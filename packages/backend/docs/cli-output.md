@@ -116,7 +116,7 @@ at the bottom. Use this for environment prerequisites that don't block dev/deplo
 A failing check's `fix()` may attach `error.summaryDetails` (an array of styled
 lines) to surface a compact version in the summary block — see
 [`setup-tests/bem-config.js`](../src/cli/commands/setup-tests/bem-config.js),
-which lists the missing `backend-manager-config.json` keys.
+which lists the missing `config/omega.json5` keys.
 
 `--continue` records the failure but keeps going instead of halting.
 

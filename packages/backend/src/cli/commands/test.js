@@ -121,7 +121,7 @@ class TestCommand extends BaseCommand {
   }
 
   /**
-   * Load project configuration from backend-manager-config.json and .env
+   * Load project configuration from config/omega.json5 and .env
    */
   loadProjectConfig(functionsDir, argv) {
     // Load .env first so env vars are available
@@ -130,18 +130,19 @@ class TestCommand extends BaseCommand {
       require('dotenv').config({ path: envPath, quiet: true });
     }
 
-    // Load backend-manager-config.json
-    const configPath = path.join(functionsDir, 'backend-manager-config.json');
-    if (!jetpack.exists(configPath)) {
-      this.logError('Error: Missing backend-manager-config.json');
+    // Load config/omega.json5 (resolved — the loader walks up to the brand
+    // layer from the functions dir in a brand monorepo)
+    const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+    if (!hasOmegaConfig(functionsDir)) {
+      this.logError('Error: Missing config/omega.json5');
       return null;
     }
 
     let config;
     try {
-      config = JSON5.parse(jetpack.read(configPath));
+      config = loadConfig(functionsDir, 'backend').config;
     } catch (error) {
-      this.logError(`Error: Could not parse backend-manager-config.json: ${error.message}`);
+      this.logError(`Error: Could not load config/omega.json5: ${error.message}`);
       return null;
     }
 
@@ -153,7 +154,7 @@ class TestCommand extends BaseCommand {
 
     // Validate required configuration
     if (!config.firebaseConfig?.projectId) {
-      this.logError('Error: Missing firebaseConfig.projectId in backend-manager-config.json');
+      this.logError('Error: Missing firebaseConfig.projectId in config/omega.json5');
       return null;
     }
 
@@ -170,12 +171,12 @@ class TestCommand extends BaseCommand {
     }
 
     if (!config.brand?.id) {
-      this.logError('Error: Missing brand.id in backend-manager-config.json');
+      this.logError('Error: Missing brand.id in config/omega.json5');
       return null;
     }
 
     if (!domain) {
-      this.logError('Error: Missing brand.contact.email in backend-manager-config.json');
+      this.logError('Error: Missing brand.contact.email in config/omega.json5');
       return null;
     }
 
@@ -228,11 +229,11 @@ class TestCommand extends BaseCommand {
     self.firebaseProjectPath = fixture;
 
     // The test HTTP client authenticates with the fixture's admin keys (the
-    // server reads the same keys from backend-manager-config.json). Inject them
-    // from the fixture config so loadProjectConfig finds them — no committed
-    // .env needed (single source = the fixture config).
+    // server reads the same keys from config/omega.json5). Inject them from
+    // the fixture config so loadProjectConfig finds them — no committed .env
+    // needed (single source = the fixture config).
     try {
-      const cfg = require(path.join(fixture, 'functions', 'backend-manager-config.json'));
+      const cfg = require('@omegajs/config').loadConfig(fixture, 'backend').config;
       process.env.BACKEND_MANAGER_KEY = process.env.BACKEND_MANAGER_KEY || cfg.backend_manager?.key;
       process.env.BACKEND_MANAGER_WEBHOOK_KEY = process.env.BACKEND_MANAGER_WEBHOOK_KEY || cfg.backend_manager?.webhookKey;
     } catch (_) { /* fixture config unreadable — let the normal key check report it */ }

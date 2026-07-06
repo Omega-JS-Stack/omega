@@ -53,6 +53,9 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 ```
 
 - "shared" = the file minus its `targets` key. In a standalone repo only the app layers exist.
+- **`projectDir` may be a backend's `functions/` dir** (BEM's runtime cwd): the brand
+  walk-up treats the app root as one level up, so `loadConfig(functionsDir, 'backend')`
+  and `loadConfig(appRoot, 'backend')` resolve identically.
 - **Target sections overlay the TOP LEVEL**: `targets.desktop.platforms` resolves to
   `config.platforms`; frameworks never read through `config.targets.<type>.…`.
 - **Any shared key inside a target entry overrides it for that surface** — a desktop-only
@@ -106,12 +109,20 @@ oauth2) move to the TOP LEVEL verbatim; everything framework-specific moves unde
 | `windows` (optional) | `targets.desktop.windows` |
 | `fileAssociations`, `protocols` | `targets.desktop.<same key>` |
 
-### backend-manager (`functions/backend-manager-config.json` → `functions/config/omega.json5`) — at BEM's flip
+### backend-manager (`functions/backend-manager-config.json` → `functions/config/omega.json5`) — DONE (checkpoint 19)
 
 | Legacy | New |
 |---|---|
 | `brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2` | top level, unchanged |
+| custom keys (`backend_manager`, `mcp`, …) | top level, unchanged |
 | `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | `targets.backend.<same key>` |
+
+Notes: BEM's framework-defaults layer is `templates/config/omega.json5` resolved through
+the same loader and passed as `options.defaults`; `Manager.init()`'s
+`backendManagerConfigPath` option is gone (the loader discovers the file); boot warns on
+schema findings, `npx mgr setup` is the hard audit. The sandbox brand dogfoods the full
+hierarchy: shared sections live in `apps/sandbox-brand/config/omega.json5` (brand level),
+the backend app file carries only `targets.backend`.
 
 ### ultimate-jekyll-manager (`_config.yml` + `ultimate-jekyll-manager.json`) — via `omega migrate` (Phase 2/4)
 

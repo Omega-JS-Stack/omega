@@ -74,7 +74,7 @@
  *   BACKEND_MANAGER_KEY   — authenticates with parent as admin
  *   OPENAI_API_KEY        — structure provider (or BACKEND_MANAGER_OPENAI_API_KEY)
  *   ANTHROPIC_API_KEY     — SVG provider (or BACKEND_MANAGER_ANTHROPIC_API_KEY)
- *   PARENT_API_URL        — or set `parent` in backend-manager-config.json
+ *   PARENT_API_URL        — or set `parent` in config/omega.json5
  *
  * Fixture mode requires: nothing.
  */

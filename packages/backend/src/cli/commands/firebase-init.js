@@ -88,11 +88,11 @@ function loadEmulatorPorts(projectDir) {
 }
 
 function resolveProjectId(projectDir, functionsDir) {
-  // Try backend-manager-config.json
-  const configPath = path.join(functionsDir, 'backend-manager-config.json');
-  if (jetpack.exists(configPath)) {
+  // Try config/omega.json5 (resolved — a brand-level firebaseConfig counts)
+  const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+  if (hasOmegaConfig(projectDir)) {
     try {
-      const config = JSON5.parse(jetpack.read(configPath));
+      const config = loadConfig(projectDir, 'backend').config;
       if (config.firebaseConfig?.projectId) {
         return config.firebaseConfig.projectId;
       }

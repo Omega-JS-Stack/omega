@@ -15,7 +15,7 @@
  *     → Remove from Beehiiv (same emails)
  *
  * Segment keys are resolved to provider-specific IDs at runtime.
- * Requires marketing.prune.enabled = true in backend-manager-config.json.
+ * Requires marketing.prune.enabled = true in config/omega.json5.
  *
  * Runs on bm_cronDaily.
  */

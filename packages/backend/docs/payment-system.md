@@ -267,7 +267,7 @@ Falls back to `{ id: 'basic' }` if no match found.
 
 ## Product Configuration
 
-Products are defined in `backend-manager-config.json` under `payment.products`:
+Products are defined in `config/omega.json5` under `payment.products` (a shared top-level section):
 
 ```javascript
 payment: {

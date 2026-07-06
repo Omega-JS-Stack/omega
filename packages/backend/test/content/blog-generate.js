@@ -27,7 +27,7 @@
  * AI mode requires:
  *   BACKEND_MANAGER_KEY   — authenticates with Ghostii + parent server
  *   OPENAI_API_KEY        — Ghostii uses OpenAI internally (or BACKEND_MANAGER_OPENAI_API_KEY)
- *   PARENT_API_URL        — or set `parent` in backend-manager-config.json (for $parent sources)
+ *   PARENT_API_URL        — or set `parent` in config/omega.json5 (for $parent sources)
  *
  * Default mode requires: nothing.
  */

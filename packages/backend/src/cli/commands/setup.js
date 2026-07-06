@@ -4,6 +4,8 @@ const jetpack = require('fs-jetpack');
 const path = require('path');
 const JSON5 = require('json5');
 const fetch = require('wonderful-fetch');
+// Namespaced: this class has its own loadConfig() method (CLI flags), which is unrelated
+const omegaConfig = require('@omegajs/config');
 
 // Regex patterns (used by getRulesFile)
 const bem_allRulesRegex = /(\/\/\/---backend-manager---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
@@ -106,10 +108,10 @@ class SetupCommand extends BaseCommand {
     // Resolve project info — safe now, scaffoldConfigs guarantees these exist.
     self.projectId = self.firebaseRC.projects.default;
     self.projectUrl = `https://console.firebase.google.com/project/${self.projectId}`;
-    self.apiUrl = `https://api.${(self.bemConfigJSON.brand?.url || '').replace(/^https?:\/\//, '')}`;
+    self.apiUrl = `https://api.${(self.omegaConfigJSON.brand?.url || '').replace(/^https?:\/\//, '')}`;
 
     // Divider-wrapped header with the project name + Firebase console link.
-    const brandName = self.bemConfigJSON.brand?.name || self.projectId;
+    const brandName = self.omegaConfigJSON.brand?.name || self.projectId;
     ui.header(brandName, { subtitle: self.projectUrl });
     ui.blank();
     ui.field('Project', self.projectId, { pad: 9 });
@@ -248,7 +250,13 @@ class SetupCommand extends BaseCommand {
     self.firebaseRC = loadJSON(`${self.firebaseProjectPath}/.firebaserc`);
     self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/functions/remoteconfig.template.json`);
     self.projectPackage = loadJSON(`${self.firebaseProjectPath}/package.json`);
-    self.bemConfigJSON = loadJSON(`${self.firebaseProjectPath}/functions/backend-manager-config.json`);
+    // Resolved through @omegajs/config WITHOUT the framework-defaults layer —
+    // the omega-config setup test compares these keys against the template, so
+    // defaults here would make every key look present. Throws on secrets/parse
+    // errors (setup IS the audit — hard failures are correct here).
+    self.omegaConfigJSON = omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
+      ? omegaConfig.loadConfig(self.firebaseProjectPath, 'backend').config
+      : {};
     self.gitignore = jetpack.read(`${self.firebaseProjectPath}/.gitignore`) || '';
   }
 
@@ -289,12 +297,12 @@ class SetupCommand extends BaseCommand {
       touched++;
     }
 
-    // backend-manager-config.json
-    const bemConfigPath = `${self.firebaseProjectPath}/functions/backend-manager-config.json`;
-    if (!hasContent(self.bemConfigJSON)) {
-      const templatePath = path.join(templatesDir, 'backend-manager-config.json');
-      jetpack.copy(templatePath, bemConfigPath);
-      ui.status('add', `Created ${chalk.cyan('functions/backend-manager-config.json')}`, { level: 2 });
+    // config/omega.json5
+    const omegaConfigPath = `${self.firebaseProjectPath}/functions/config/omega.json5`;
+    if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)) {
+      const templatePath = path.join(templatesDir, 'config', 'omega.json5');
+      jetpack.copy(templatePath, omegaConfigPath);
+      ui.status('add', `Created ${chalk.cyan('functions/config/omega.json5')}`, { level: 2 });
       touched++;
     }
 

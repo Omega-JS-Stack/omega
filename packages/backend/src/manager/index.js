@@ -1,8 +1,8 @@
 // Libraries
 const path = require('path');
-const { mergeWith, isArray, get: _get, set: _set } = require('lodash');
+const { get: _get, set: _set } = require('lodash');
 const jetpack = require('fs-jetpack');
-const JSON5 = require('json5');
+const { hasOmegaConfig, loadConfig, formatErrors } = require('@omegajs/config');
 const EventEmitter = require('events');
 // const EventEmitter = require('events').EventEmitter;
 const util = require('util');
@@ -17,7 +17,7 @@ const _legacy = './functions/_legacy';
 const events = path.resolve(__dirname, './events');
 const cron = path.resolve(events, './cron');
 
-const BEM_CONFIG_TEMPLATE_PATH = path.resolve(__dirname, '../../templates/backend-manager-config.json');
+const BEM_TEMPLATES_DIR = path.resolve(__dirname, '../../templates');
 const BEM_PACKAGE = require('../../package.json');
 
 function Manager() {
@@ -78,8 +78,7 @@ Manager.prototype.init = function (exporter, options) {
   options.reportErrorsInDev = typeof options.reportErrorsInDev === 'undefined' ? false : options.reportErrorsInDev;
   options.firebaseConfig = options.firebaseConfig;
   options.useFirebaseLogger = typeof options.useFirebaseLogger === 'undefined' ? true : options.useFirebaseLogger;
-  options.serviceAccountPath = typeof options.serviceAccountPath === 'undefined' ? 'service-account.json' : options.serviceAccountPath;
-  options.backendManagerConfigPath = typeof options.backendManagerConfigPath === 'undefined' ? 'backend-manager-config.json' : options.backendManagerConfigPath;
+  options.serviceAccountPath = typeof options.serviceAccountPath === 'undefined' ? 'service-account.json' : options.serviceAccountPath;;
   options.fetchStats = typeof options.fetchStats === 'undefined'
     // ? options.projectType === 'firebase'
     ? false
@@ -125,7 +124,6 @@ Manager.prototype.init = function (exporter, options) {
   self.project = options.firebaseConfig || JSON.parse(process.env.FIREBASE_CONFIG || '{}');
   self.project.resourceZone = options.resourceZone;
   self.project.serviceAccountPath = path.resolve(self.cwd, options.serviceAccountPath);
-  self.project.backendManagerConfigPath = path.resolve(self.cwd, options.backendManagerConfigPath);
 
   // Load package.json
   self.package = resolveProjectPackage(options.projectPackageDirectory || self.cwd);
@@ -137,15 +135,27 @@ Manager.prototype.init = function (exporter, options) {
     self.assistant.error(new Error(`Failed to set up environment variables from .env file: ${e.message}`));
   }
 
-  // Load config
-  // Use mergeWith to replace arrays instead of merging by index
-  // (lodash merge merges arrays positionally, causing template defaults to bleed into project values)
-  self.config = mergeWith(
-    {},
-    requireJSON5(BEM_CONFIG_TEMPLATE_PATH, true),
-    requireJSON5(self.project.backendManagerConfigPath, true),
-    (_objValue, srcValue) => isArray(srcValue) ? srcValue : undefined,
-  );
+  // Load config — the consumer's config/omega.json5 resolved through
+  // @omegajs/config (brand-monorepo aware: cwd is the functions dir, the
+  // loader walks up to the brand layer when one exists). The framework
+  // defaults layer is templates/config/omega.json5 resolved through the SAME
+  // loader, so both sides live in one shape. Missing consumer config
+  // (non-consumer cwd, some tests) → defaults only, same as before the flip.
+  const configDefaults = loadConfig(BEM_TEMPLATES_DIR, 'backend').config;
+  delete configDefaults.targets;
+
+  if (hasOmegaConfig(self.cwd)) {
+    const { config, errors } = loadConfig(self.cwd, 'backend', { defaults: configDefaults });
+    self.config = config;
+
+    // Boot warns on schema findings, audit (mgr setup) throws — the two-mode
+    // contract from @omegajs/config. Secrets in the file already threw above.
+    if (errors.length) {
+      console.warn(`[backend-manager] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+    }
+  } else {
+    self.config = configDefaults;
+  }
 
   // Expose config on the constructor for static access by internal libraries.
   // Since Node.js caches require(), any `require('./index.js')` returns this same
@@ -157,11 +167,6 @@ Manager.prototype.init = function (exporter, options) {
 
   // Set CHARGEBEE_SITE from config (site is public, not a secret — lives in config, not .env)
   process.env.CHARGEBEE_SITE = process.env.CHARGEBEE_SITE || self.config?.payment?.processors?.chargebee?.site || '';
-
-  // Resolve legacy paths
-  // TODO: Remove this in future versions (after all consumers migrate to brand.id)
-  self.config.app = self.config.app || {};
-  self.config.brand.id = self.config.brand.id || self.config.app.id || null;
 
   // Get brand ID
   const brandId = self.config?.brand?.id;
@@ -376,7 +381,6 @@ Manager.prototype.init = function (exporter, options) {
   if (options.log) {
     // self.assistant.log('process.env', process.env)
     self.assistant.log('Resolved serviceAccountPath', self.project.serviceAccountPath);
-    self.assistant.log('Resolved backendManagerConfigPath', self.project.backendManagerConfigPath);
   }
 
   if (!brandId) {
@@ -1310,25 +1314,6 @@ function resolveProjectPackage(dir) {
   try {
     return require(path.resolve(dir, 'package.json'));
   } catch (e) {}
-}
-
-function requireJSON5(file, throwError) {
-  // Set throwError
-  throwError = typeof throwError === 'undefined' ? true : throwError;
-
-  // Load JSON5
-  try {
-    return JSON5.parse(jetpack.read(file))
-  } catch (e) {
-    // If we're not throwing an error, just return
-    if (!throwError) {
-      return {};
-    }
-
-    // Otherwise, throw the error
-    console.error(`Failed to load JSON at ${file}:`, e);
-    throw e;
-  }
 }
 
 /**

@@ -6,7 +6,7 @@
 //
 // Two entry points:
 //   - writePublicFiles (setup test, overwrite: true) — authoritative regen
-//     with the brand URL from the consumer's backend-manager-config.json
+//     with the brand URL from the consumer's config/omega.json5
 //   - ensurePublicFiles (emulator boot / deploy, fill-if-missing) — a fresh
 //     clone has no public/ at all (it's gitignored), and firebase-tools
 //     refuses to boot or deploy hosting without the folder; this fills it
@@ -15,7 +15,7 @@
 const jetpack = require('fs-jetpack');
 const path = require('path');
 const powertools = require('node-powertools');
-const JSON5 = require('json5');
+const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
 
 const TEMPLATE_DIR = path.resolve(__dirname, '../../../templates/public');
 const FILES = ['index.html', '404.html'];
@@ -36,10 +36,9 @@ function writePublicFiles(projectPath, options) {
 }
 
 function ensurePublicFiles(projectPath) {
-  // backend-manager-config.json is JSON5 (comments allowed) — strict JSON.parse fails
   let url = '';
   try {
-    url = JSON5.parse(jetpack.read(path.join(projectPath, 'functions', 'backend-manager-config.json')))?.brand?.url || '';
+    url = hasOmegaConfig(projectPath) ? (loadConfig(projectPath, 'backend').config.brand?.url || '') : '';
   } catch (e) {
     // Unreadable config — boilerplate links home to '' until setup writes the real one
   }

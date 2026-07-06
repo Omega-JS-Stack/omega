@@ -2,7 +2,7 @@
  * Sandbox brand website entry — boots web-manager against the emulated sandbox
  * backend and exposes the hooks the cross-stack e2e driver (../../e2e/run.js) calls.
  *
- * Configuration mirrors apps/backend/functions/backend-manager-config.json
+ * Configuration mirrors the brand config (config/omega.json5 at the brand root)
  * (demo-sandbox-brand, fake-by-design values). environment=development +
  * env.FIREBASE_EMULATOR_CONNECT makes web-manager connect to the local emulator
  * suite instead of live Firebase — the same switch UJM's serve task injects.

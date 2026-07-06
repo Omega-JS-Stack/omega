@@ -20,7 +20,7 @@
  *
  * The script picks up:
  *   - SENDGRID_API_KEY, BEEHIIV_API_KEY from <cwd>/.env (functions/.env)
- *   - marketing.campaigns.listId, marketing.newsletter.publicationId from <cwd>/backend-manager-config.json
+ *   - marketing.campaigns.listId, marketing.newsletter.publicationId from <cwd>/config/omega.json5 (targets.backend.marketing)
  *   - service-account from <cwd>/service-account.json
  *
  * Exit codes: 0 ok, 1 usage error, 2 provider error.
@@ -31,7 +31,7 @@ const fs = require('fs');
 
 const cwd = process.cwd();
 const envPath = path.join(cwd, '.env');
-const configPath = path.join(cwd, 'backend-manager-config.json');
+const configPath = path.join(cwd, 'config', 'omega.json5');
 const serviceAccountPath = path.join(cwd, 'service-account.json');
 
 // --- sanity checks ---

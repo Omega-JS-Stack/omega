@@ -76,7 +76,16 @@ function readConfigFile(absolutePath) {
 // brand root actually carries a config (a plain `apps` folder outside a
 // brand monorepo has none, so the walk-up is a no-op there).
 function findBrandConfigPath(projectDir) {
-  const appsDir = path.dirname(path.resolve(projectDir));
+  let appDir = path.resolve(projectDir);
+
+  // A backend's runtime cwd is its functions/ dir (Cloud Functions and the
+  // emulator both boot there) — the app root is one level up. Mirrors the
+  // functions/config/omega.json5 entry in CONFIG_LOCATIONS.
+  if (path.basename(appDir) === 'functions') {
+    appDir = path.dirname(appDir);
+  }
+
+  const appsDir = path.dirname(appDir);
   if (path.basename(appsDir) !== 'apps') return null;
 
   const brandPath = path.join(path.dirname(appsDir), 'config', FILE_NAME);

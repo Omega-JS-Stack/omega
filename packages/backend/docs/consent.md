@@ -169,7 +169,7 @@ SendGrid → POST https://api.itwcreativeworks.com/backend-manager/marketing/web
 Beehiiv  → POST https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=beehiiv&key=X
 ```
 
-The **parent BEM** (the one whose `backend-manager-config.json` has `parent: 'self'`) exposes the forwarder route. Every other BEM has the route but it returns 404 (gated on `Manager.config.parent === 'self'`).
+The **parent BEM** (the one whose `config/omega.json5` has `parent: 'self'` under `targets.backend`) exposes the forwarder route. Every other BEM has the route but it returns 404 (gated on `Manager.config.parent === 'self'`).
 
 The parent forwarder:
 
@@ -251,7 +251,7 @@ Events: subscription.unsubscribed, subscription.deleted, subscription.paused
 
 ### Parent vs child config
 
-Parent's `backend-manager-config.json`:
+Parent's `config/omega.json5` (`targets.backend` section):
 ```js
 {
   parent: 'self',

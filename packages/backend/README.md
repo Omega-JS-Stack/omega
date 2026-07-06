@@ -34,7 +34,7 @@ npm install backend-manager
 - Node.js 22
 - Firebase project with Firestore and Authentication enabled
 - `service-account.json` - Firebase service account credentials
-- `backend-manager-config.json` - BEM configuration file
+- `config/omega.json5` - OMEGA configuration file (in your functions directory)
 
 ## Quick Start
 
@@ -111,7 +111,6 @@ const Manager = (new (require('backend-manager'))).init(exports, options);
 | `resourceZone` | `'us-central1'` | Firebase/GCP region |
 | `sentry` | `true` | Enable Sentry error tracking |
 | `serviceAccountPath` | `'service-account.json'` | Path to Firebase service account |
-| `backendManagerConfigPath` | `'backend-manager-config.json'` | Path to BEM config file |
 | `initializeLocalStorage` | `false` | Initialize local lowdb storage on startup |
 | `checkNodeVersion` | `true` | Validate Node.js version on startup |
 | `express.bodyParser.json` | `{ limit: '100kb' }` | Express JSON body parser options |
@@ -119,7 +118,7 @@ const Manager = (new (require('backend-manager'))).init(exports, options);
 
 ## Configuration File
 
-Create `backend-manager-config.json` in your functions directory:
+Create `config/omega.json5` in your functions directory (`npx mgr setup` scaffolds it from the template). Shared sections (`brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
 
 ```json5
 {
@@ -139,13 +138,10 @@ Create `backend-manager-config.json` in your functions directory:
   sentry: {
     dsn: 'https://xxx@xxx.ingest.sentry.io/xxx',
   },
-  googleAnalytics: {
-    id: 'G-XXXXXXXXXX',
-    secret: 'your-ga4-secret',
-  },
-  backend_manager: {
-    key: 'your-admin-key',
-    namespace: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+  analytics: {
+    providers: {
+      google: { id: 'G-XXXXXXXXXX' },
+    },
   },
   firebaseConfig: {
     apiKey: 'xxx',
@@ -156,8 +152,18 @@ Create `backend-manager-config.json` in your functions directory:
     appId: '1:123:web:456',
     measurementId: 'G-XXXXXXXXXX',
   },
+  targets: {
+    backend: {
+      parent: '',
+      github: { user: 'username' },
+      marketing: { /* campaigns, newsletter, prune */ },
+      reviews: { enabled: true, sites: ['trustpilot.com'] },
+    },
+  },
 }
 ```
+
+In a brand monorepo (`{brand}/apps/backend`), shared sections can live in the brand root's `config/omega.json5` instead — the loader merges `brand shared → brand targets.backend → app shared → app targets.backend`, and any shared key inside `targets.backend` acts as a backend-only override.
 
 ## Creating Custom Functions
 
@@ -441,7 +447,7 @@ Built-in marketing system with multi-provider support (SendGrid + Beehiiv + FCM 
 - **Contact pruning** — monthly 2-stage re-engagement + deletion of inactive contacts
 - **Template variables** — `{brand.name}`, `{holiday.name}`, `{season.name}`, `{date.*}` resolved at send time
 
-Configure via `marketing` section in `backend-manager-config.json`. See CLAUDE.md for full documentation.
+Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See CLAUDE.md for full documentation.
 
 ## Marketing Consent
 

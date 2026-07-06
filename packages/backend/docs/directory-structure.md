@@ -89,7 +89,7 @@ src/
   test/
     test-accounts.js                  # Test account definitions (static + journey)
 templates/
-  backend-manager-config.json         # Config template
+  config/omega.json5                  # Config template
 ```
 
 ## Consumer Project Structure
@@ -97,7 +97,7 @@ templates/
 ```
 functions/
   index.js                            # Manager.init() + custom functions
-  backend-manager-config.json         # App configuration
+  config/omega.json5                  # App configuration
   service-account.json                # Firebase credentials
   routes/
     {endpoint}/

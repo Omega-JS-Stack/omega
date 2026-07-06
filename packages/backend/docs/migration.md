@@ -34,7 +34,7 @@ Convert old config formats (runtime config / nested JSON) into individual top-le
 4. **Check existing `.env` for conflicts**: skip existing keys and warn.
 5. **Write/update `functions/.env`**: each mapped key as a top-level variable.
 6. **Delete source files**: remove `functions/.runtimeconfig.json` if it existed.
-7. **Update `functions/backend-manager-config.json`**: remove the deprecated `mailchimp` key entirely; update `brand` to the nested structure `{ name, url, contact: { email }, images: { brandmark, wordmark, combomark } }`; set `github.user` to `"itw-creative-works"`.
+7. **Convert `functions/backend-manager-config.json` to `functions/config/omega.json5`** (shared sections top-level, backend settings under `targets.backend` — see CHANGELOG for the mapping), then: remove the deprecated `mailchimp` key entirely; update `brand` to the nested structure `{ name, url, contact: { email }, images: { brandmark, wordmark, combomark } }`; set `github.user` to `"itw-creative-works"`.
 8. Update `functions/.nvmrc` to `v22/*` and `functions/package.json` `engines.node` to `"22"`.
 9. Clean up `functions/.gitignore` duplicates.
 

@@ -1,7 +1,8 @@
+// Sandbox brand — BRAND-level omega.json5 (the shared layer every app under
+// apps/ inherits). Emulator-only demo project: every value here is fake/demo
+// by design. App files override any key per-surface; key presence under
+// `targets` = this brand supports that target.
 {
-  // Sandbox brand — the Omega monorepo's permanent dogfood consumer.
-  // Emulator-only demo project: every value here is fake/demo by design.
-  parent: '',
   brand: {
     id: 'sandbox-brand',
     name: 'Sandbox Brand',
@@ -23,10 +24,6 @@
       brandmark: 'https://sandbox-brand.example.com/brandmark.png',
       combomark: 'https://sandbox-brand.example.com/combomark.png',
     },
-  },
-  github: {
-    user: 'ITW-Creative-Works',
-    repo_website: 'https://github.com/ITW-Creative-Works/omega',
   },
   sentry: {
     dsn: 'https://d965557418748jd749d837asf00552f@o777489.ingest.sentry.io/8789941',
@@ -132,44 +129,6 @@
       },
     ],
   },
-  marketing: {
-    campaigns: {
-      enabled: false,
-      platform: 'sendgrid',
-      listId: '',
-    },
-    newsletter: {
-      enabled: false,
-      platform: 'beehiiv',
-      publicationId: '',
-      content: [
-        {
-          sources: ['$brand'],
-          sourceCount: 6,
-          categories: [],
-          links: [],
-          instructions: '',
-          tone: 'professional',
-          keywords: [],
-          template: 'clean',
-          article: {
-            enabled: false,
-            author: null,
-          },
-          theme: {
-            primaryColor: '#5B5BFF',
-            secondaryColor: '#1E1E2A',
-            accentColor: '#F6F7FB',
-            font: 'Inter, system-ui, sans-serif',
-          },
-          sponsorships: [],
-        },
-      ],
-    },
-    prune: {
-      enabled: false,
-    },
-  },
   firebaseConfig: {
     apiKey: 'sandbox-api-key',
     authDomain: 'demo-sandbox-brand.firebaseapp.com',
@@ -179,30 +138,11 @@
     appId: '1:111111111111:web:1111111111111111111111',
     measurementId: 'G-1111111111',
   },
-  blog: {
-    enabled: false,
-    platform: 'ghostii',
-    content: [
-      {
-        sources: ['$brand'],
-        categories: [],
-        links: [],
-        instructions: '',
-        tone: 'professional',
-        keywords: [],
-        quantity: 0,
-        chance: 1.0,
-        author: null,
-        postPath: 'ghostii',
-        overrides: {},
-      },
-    ],
-  },
-  reviews: {
-    enabled: false,
-    sites: [],
-  },
-  dataRequest: {
-    queries: [],
+
+  // Enabled targets for this brand (key presence = enabled). Type-wide
+  // settings live in each app's own config/omega.json5.
+  targets: {
+    web: {},
+    backend: {},
   },
 }

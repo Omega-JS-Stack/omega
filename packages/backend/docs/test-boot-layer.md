@@ -39,7 +39,7 @@ module.exports = {
 
 - `firebase.json` + `.firebaserc` — a **`demo-` project** (`demo-backend-manager`) so the emulator NEVER touches real Firebase; emulator ports from `DEFAULT_EMULATOR_PORTS`; hosting rewrite to `bm_api`.
 - `functions/index.js` — the one-line `Manager.init()` bootstrap (mirrors a real consumer).
-- `functions/package.json` + `backend-manager-config.json` — fake brand/config (no real secrets).
+- `functions/package.json` + `functions/config/omega.json5` — fake brand/config (no real secrets).
 - `firestore.rules` / `storage.rules` / `database.rules.json` / `firestore.indexes.json` — minimal locked rules (`bm_api` uses the Admin SDK, which bypasses rules).
 
 **Runtime-only, gitignored** (never committed): before boot, the test command symlinks the local `backend-manager` (+ `firebase-admin`/`firebase-functions` from BEM's own `node_modules`) into the fixture's `functions/node_modules`, injects the fixture admin keys into the env, and generates a **throwaway RSA `service-account.json`** (emulator-only — a `demo-` project never authenticates against Google). All of this lives in `setupSelfTest()` / `linkFixtureDeps()` / `ensureFixtureServiceAccount()` in [src/cli/commands/test.js](../src/cli/commands/test.js).

@@ -3,15 +3,18 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const _ = require('lodash');
-const helpers = require('./helpers');
 const path = require('path');
+const { loadConfig } = require('@omegajs/config');
 
-// Load template
-const bemConfigTemplate = helpers.loadJSON(path.resolve(__dirname, '../../../../templates/backend-manager-config.json'));
+// The framework template resolved through the SAME loader the Manager uses —
+// both sides of the comparison live in the resolved (flat) namespace. The
+// targets map is stripped: its keys are already overlaid at the top level.
+const TEMPLATES_DIR = path.resolve(__dirname, '../../../../templates');
+const { targets, ...configTemplate } = loadConfig(TEMPLATES_DIR, 'backend').config;
 
-class BemConfigTest extends BaseTest {
+class OmegaConfigTest extends BaseTest {
   getName() {
-    return 'using proper backend-manager-config.json';
+    return 'using proper config/omega.json5';
   }
 
   async run() {
@@ -19,13 +22,13 @@ class BemConfigTest extends BaseTest {
     let pass = true;
 
     // Loop through all the keys in the template
-    powertools.getKeys(bemConfigTemplate).forEach((key) => {
+    powertools.getKeys(configTemplate).forEach((key) => {
       // Skip if an ancestor is explicitly set to a non-object value (e.g. stripe: false)
       if (this._isAncestorDisabled(key)) {
         return;
       }
 
-      const userValue = _.get(this.self.bemConfigJSON, key, undefined);
+      const userValue = _.get(this.self.omegaConfigJSON, key, undefined);
 
       // If the user value is undefined, then we need to set pass to false
       if (typeof userValue === 'undefined') {
@@ -41,25 +44,25 @@ class BemConfigTest extends BaseTest {
     const ui = require('../../utils/ui');
 
     // Copy template if config doesn't exist or is empty
-    if (!this.context.hasContent(this.self.bemConfigJSON)) {
-      const templatePath = path.resolve(__dirname, '../../../../templates/backend-manager-config.json');
-      jetpack.copy(templatePath, `${this.self.firebaseProjectPath}/functions/backend-manager-config.json`, { overwrite: true });
+    if (!this.context.hasContent(this.self.omegaConfigJSON)) {
+      const templatePath = path.join(TEMPLATES_DIR, 'config', 'omega.json5');
+      jetpack.copy(templatePath, `${this.self.firebaseProjectPath}/functions/config/omega.json5`, { overwrite: true });
     }
 
     // Collect the keys that are still missing (these are what the user must fill in).
     const missing = [];
-    powertools.getKeys(bemConfigTemplate).forEach((key) => {
+    powertools.getKeys(configTemplate).forEach((key) => {
       // Skip if an ancestor is explicitly set to a non-object value (e.g. stripe: false)
       if (this._isAncestorDisabled(key)) {
         return;
       }
-      const userValue = _.get(this.self.bemConfigJSON, key, undefined);
+      const userValue = _.get(this.self.omegaConfigJSON, key, undefined);
       if (typeof userValue === 'undefined') {
         missing.push(key);
       }
     });
 
-    ui.note(`Open ${chalk.bold('backend-manager-config.json')} and set the missing keys below:`, 3);
+    ui.note(`Open ${chalk.bold('functions/config/omega.json5')} and set the missing keys below (backend keys live under ${chalk.bold('targets.backend')}):`, 3);
     for (const key of missing) {
       console.log(`${ui.indent(4)}${chalk.red('•')} ${key}`);
     }
@@ -67,14 +70,14 @@ class BemConfigTest extends BaseTest {
     // Surface a compact version in the summary block (the full list printed above).
     const preview = missing.slice(0, 8);
     const summaryDetails = [
-      chalk.dim(`Set ${chalk.bold(missing.length)} missing key(s) in backend-manager-config.json:`),
+      chalk.dim(`Set ${chalk.bold(missing.length)} missing key(s) in config/omega.json5:`),
       ...preview.map((key) => `${chalk.red('•')} ${key}`),
     ];
     if (missing.length > preview.length) {
       summaryDetails.push(chalk.dim(`…and ${missing.length - preview.length} more (see list above)`));
     }
 
-    const error = new Error('Missing required backend-manager-config.json keys');
+    const error = new Error('Missing required config/omega.json5 keys');
     error.summaryDetails = summaryDetails;
     throw error;
   }
@@ -84,7 +87,7 @@ class BemConfigTest extends BaseTest {
    */
   _isAncestorDisabled(key) {
     const parts = key.split('.');
-    let current = this.self.bemConfigJSON;
+    let current = this.self.omegaConfigJSON;
 
     for (let i = 0; i < parts.length - 1; i++) {
       current = current?.[parts[i]];
@@ -98,4 +101,4 @@ class BemConfigTest extends BaseTest {
   }
 }
 
-module.exports = BemConfigTest;
+module.exports = OmegaConfigTest;

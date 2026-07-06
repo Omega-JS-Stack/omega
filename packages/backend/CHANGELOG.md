@@ -14,6 +14,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+# [Unreleased]
+
+### BREAKING
+- **Config is now `functions/config/omega.json5` — `backend-manager-config.json` is no longer read anywhere.** BEM loads config through `@omegajs/config` (vendored; no new install for consumers). One-time migration per consumer:
+  1. Create `functions/config/omega.json5` from `functions/backend-manager-config.json` (JSON5 — comments allowed).
+  2. Shared sections stay at the top level, unchanged spelling: `brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2` (plus custom keys like `backend_manager`, `mcp`).
+  3. Move the backend-specific sections under `targets: { backend: { ... } }`: `parent`, `github`, `marketing`, `blog`, `reviews`, `dataRequest`.
+  4. Delete `functions/backend-manager-config.json`.
+  5. Secrets must NOT be in the file — the loader hard-fails on secret-shaped keys (`*secret`, `*privateKey`, `*apiSecret`); they live in `functions/.env`.
+  - In a brand monorepo (`{brand}/apps/backend`), shared sections may live in the brand root's `config/omega.json5` — resolution is `framework defaults → brand shared → brand targets.backend → app shared → app targets.backend`, and any shared key inside `targets.backend` is a backend-only override.
+- **`Manager.init()` option `backendManagerConfigPath` removed** — the config path is discovered by the loader (`config/omega.json5` under the cwd, `functions/config/omega.json5` from a project root); there is nothing to point at anymore.
+- **Boot now warns on schema findings** — `Manager.init()` validates the resolved config against the shared OMEGA schema (`@omegajs/config`) and `console.warn`s findings; `npx mgr setup` (the audit) fails hard on unloadable configs and missing template keys, same as before.
+
+### Changed
+- `npx mgr setup` scaffolds `functions/config/omega.json5` (from `templates/config/omega.json5`) instead of `backend-manager-config.json`; the config setup test compares the consumer's RESOLVED config against the template resolved through the same loader, so brand-monorepo consumers with brand-level shared sections pass correctly.
+- `project-id-consistency` reads the projectId from the resolved config (a brand-level `firebaseConfig` counts) and fixes mismatches by writing an app-level override to `functions/config/omega.json5`.
+
 # [5.11.7] - 2026-07-03
 
 ### Fixed

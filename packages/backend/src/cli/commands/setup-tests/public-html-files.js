@@ -9,7 +9,7 @@ class PublicHtmlFilesTest extends BaseTest {
   async run() {
     const self = this.self;
 
-    writePublicFiles(self.firebaseProjectPath, { url: self.bemConfigJSON.brand.url, overwrite: true });
+    writePublicFiles(self.firebaseProjectPath, { url: self.omegaConfigJSON.brand.url, overwrite: true });
 
     return true;
   }

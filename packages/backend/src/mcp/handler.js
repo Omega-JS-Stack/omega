@@ -478,7 +478,7 @@ function isAdminKey(key) {
 }
 
 function resolveConsumerAuthUrl(Manager) {
-  // Check backend-manager-config.json for explicit mcp.authUrl
+  // Check config/omega.json5 for explicit mcp.authUrl
   const mcpConfig = Manager.config?.mcp || {};
 
   if (mcpConfig.authUrl) {

@@ -32,14 +32,14 @@ function resolveBrand(Manager) {
   const raw = Manager.config?.brand;
 
   if (!raw) {
-    throw errorWithCode('Missing brand configuration in backend-manager-config.json', 400);
+    throw errorWithCode('Missing brand configuration in config/omega.json5', 400);
   }
 
   const brand = _.cloneDeep(raw);
   brand.images = sanitizeImagesForEmail(brand.images || {});
 
   if (!brand.contact?.email) {
-    throw errorWithCode('Missing brand.contact.email in backend-manager-config.json', 400);
+    throw errorWithCode('Missing brand.contact.email in config/omega.json5', 400);
   }
 
   const brandDomain = brand.contact.email.split('@')[1];

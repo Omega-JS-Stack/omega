@@ -1,0 +1,80 @@
+// Sandbox backend — APP-level omega.json5. Shared sections (brand,
+// firebaseConfig, payment, ...) come from the BRAND file two levels up
+// (apps/sandbox-brand/config/omega.json5) via the loader's brand walk-up —
+// this file carries only the backend target's own settings. Dogfoods the
+// full five-layer resolution chain in a real consumer.
+{
+  targets: {
+    backend: {
+      parent: '',
+      github: {
+        user: 'ITW-Creative-Works',
+        repo_website: 'https://github.com/ITW-Creative-Works/omega',
+      },
+      marketing: {
+        campaigns: {
+          enabled: false,
+          platform: 'sendgrid',
+          listId: '',
+        },
+        newsletter: {
+          enabled: false,
+          platform: 'beehiiv',
+          publicationId: '',
+          content: [
+            {
+              sources: ['$brand'],
+              sourceCount: 6,
+              categories: [],
+              links: [],
+              instructions: '',
+              tone: 'professional',
+              keywords: [],
+              template: 'clean',
+              article: {
+                enabled: false,
+                author: null,
+              },
+              theme: {
+                primaryColor: '#5B5BFF',
+                secondaryColor: '#1E1E2A',
+                accentColor: '#F6F7FB',
+                font: 'Inter, system-ui, sans-serif',
+              },
+              sponsorships: [],
+            },
+          ],
+        },
+        prune: {
+          enabled: false,
+        },
+      },
+      blog: {
+        enabled: false,
+        platform: 'ghostii',
+        content: [
+          {
+            sources: ['$brand'],
+            categories: [],
+            links: [],
+            instructions: '',
+            tone: 'professional',
+            keywords: [],
+            quantity: 0,
+            chance: 1.0,
+            author: null,
+            postPath: 'ghostii',
+            overrides: {},
+          },
+        ],
+      },
+      reviews: {
+        enabled: false,
+        sites: [],
+      },
+      dataRequest: {
+        queries: [],
+      },
+    },
+  },
+}

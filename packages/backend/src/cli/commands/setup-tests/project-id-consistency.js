@@ -3,11 +3,13 @@ const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const chalk = require('chalk').default;
 const helpers = require('./helpers');
+const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
 
 /**
  * Ensures projectId is consistent across all configuration files:
  * - .firebaserc (projects.default)
- * - functions/backend-manager-config.json (firebaseConfig.projectId)
+ * - functions/config/omega.json5 (firebaseConfig.projectId — resolved, so a
+ *   brand-level firebaseConfig in a brand monorepo counts)
  * - functions/service-account.json (project_id)
  *
  * Mismatches cause tests to fail when running emulator in separate terminals
@@ -35,18 +37,18 @@ class ProjectIdConsistencyTest extends BaseTest {
     const expectedProjectId = sources.firebaserc.projectId;
     const mismatches = [];
 
-    // Check backend-manager-config.json
+    // Check config/omega.json5
     if (sources.bemConfig.exists) {
       if (!sources.bemConfig.projectId) {
         mismatches.push({
-          file: 'backend-manager-config.json',
+          file: 'config/omega.json5',
           field: 'firebaseConfig.projectId',
           expected: expectedProjectId,
           actual: '(missing)',
         });
       } else if (sources.bemConfig.projectId !== expectedProjectId) {
         mismatches.push({
-          file: 'backend-manager-config.json',
+          file: 'config/omega.json5',
           field: 'firebaseConfig.projectId',
           expected: expectedProjectId,
           actual: sources.bemConfig.projectId,
@@ -97,10 +99,17 @@ class ProjectIdConsistencyTest extends BaseTest {
     const firebasercContent = jetpack.read(firebasercPath);
     const firebasercData = firebasercContent ? JSON5.parse(firebasercContent) : null;
 
-    // backend-manager-config.json
-    const bemConfigPath = `${projectPath}/functions/backend-manager-config.json`;
-    const bemConfigContent = jetpack.read(bemConfigPath);
-    const bemConfigData = bemConfigContent ? JSON5.parse(bemConfigContent) : null;
+    // config/omega.json5 — resolved through the loader so the projectId is
+    // found wherever the hierarchy puts it (app file or brand file)
+    let omegaProjectId = null;
+    const omegaExists = hasOmegaConfig(projectPath);
+    if (omegaExists) {
+      try {
+        omegaProjectId = loadConfig(projectPath, 'backend').config.firebaseConfig?.projectId || null;
+      } catch (e) {
+        // Unloadable config — the omega-config test reports it; treat as missing here
+      }
+    }
 
     // service-account.json
     const serviceAccountPath = `${projectPath}/functions/service-account.json`;
@@ -113,8 +122,8 @@ class ProjectIdConsistencyTest extends BaseTest {
         projectId: firebasercData?.projects?.default || null,
       },
       bemConfig: {
-        exists: !!bemConfigContent,
-        projectId: bemConfigData?.firebaseConfig?.projectId || null,
+        exists: omegaExists,
+        projectId: omegaProjectId,
       },
       serviceAccount: {
         exists: !!serviceAccountContent,
@@ -134,17 +143,18 @@ class ProjectIdConsistencyTest extends BaseTest {
 
     const expectedProjectId = sources.firebaserc.projectId;
 
-    // Fix backend-manager-config.json
+    // Fix config/omega.json5 — write the APP file (raw): an app-level
+    // firebaseConfig.projectId is the top override layer, so it wins even
+    // when the wrong value came from a brand-level file
     if (sources.bemConfig.exists && sources.bemConfig.projectId !== expectedProjectId) {
-      const bemConfigPath = `${this.self.firebaseProjectPath}/functions/backend-manager-config.json`;
-      const bemConfigContent = jetpack.read(bemConfigPath);
-      const bemConfigData = JSON5.parse(bemConfigContent);
+      const omegaConfigPath = `${this.self.firebaseProjectPath}/functions/config/omega.json5`;
+      const omegaConfigData = JSON5.parse(jetpack.read(omegaConfigPath) || '{}');
 
-      bemConfigData.firebaseConfig = bemConfigData.firebaseConfig || {};
-      bemConfigData.firebaseConfig.projectId = expectedProjectId;
+      omegaConfigData.firebaseConfig = omegaConfigData.firebaseConfig || {};
+      omegaConfigData.firebaseConfig.projectId = expectedProjectId;
 
-      helpers.saveJSON5(bemConfigPath, bemConfigData);
-      console.log(chalk.green(`Fixed: backend-manager-config.json → firebaseConfig.projectId = ${expectedProjectId}`));
+      helpers.saveJSON5(omegaConfigPath, omegaConfigData);
+      console.log(chalk.green(`Fixed: config/omega.json5 → firebaseConfig.projectId = ${expectedProjectId}`));
     }
 
     // Cannot auto-fix service-account.json - must download correct one from Firebase Console

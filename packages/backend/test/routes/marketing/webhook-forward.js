@@ -2,7 +2,7 @@
  * Test: POST /marketing/webhook/forward (parent forwarder)
  *
  * This route is gated to only work when Manager.config.parent === 'self'.
- * Most test runs happen on a CHILD brand (e.g. Somiibo's backend-manager-config.json
+ * Most test runs happen on a CHILD brand (e.g. Somiibo's config/omega.json5
  * has `parent: 'https://api.itwcreativeworks.com'`), so the route should return 404.
  *
  * The actual fan-out behavior (reading brands collection, derive API URLs,

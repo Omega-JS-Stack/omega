@@ -8,7 +8,7 @@
 
 Backend Manager (BEM) is a comprehensive framework for building modern Firebase Cloud Functions backends. Sister project to Electron Manager (EM), Browser Extension Manager (BXM), and Ultimate Jekyll Manager (UJM). Provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`bm_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, marketing campaign automation, an MCP server, and a CLI for emulator/deploy/logs/auth/Firestore operations.
 
-**This repository** is the BEM library itself. **Consumer projects** are Firebase projects that `require('backend-manager')` in their `functions/index.js`, with `backend-manager-config.json` + `service-account.json` alongside, plus optional `routes/`, `schemas/`, and `hooks/` directories for custom endpoints.
+**This repository** is the BEM library itself. **Consumer projects** are Firebase projects that `require('backend-manager')` in their `functions/index.js`, with `config/omega.json5` + `service-account.json` alongside, plus optional `routes/`, `schemas/`, and `hooks/` directories for custom endpoints. Config is loaded via `@omegajs/config` (shared sections top-level, backend settings under `targets.backend`; brand-monorepo hierarchy supported).
 
 ## Recommended skills
 
@@ -20,7 +20,7 @@ Backend Manager (BEM) is a comprehensive framework for building modern Firebase 
 ### For Consuming Projects
 
 1. `npm install backend-manager --save-dev` (inside `functions/`)
-2. `npx mgr setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `backend-manager-config.json`, `engines.node`, CLAUDE.md, CHANGELOG.md, docs/, test/), validates config, provisions Firestore indexes
+2. `npx mgr setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `config/omega.json5`, `engines.node`, CLAUDE.md, CHANGELOG.md, docs/, test/), validates config, provisions Firestore indexes
 3. `npx mgr emulator` — start Firebase emulators (auth/firestore/functions/database/storage)
 4. `npx mgr serve` — local serve with Stripe webhook forwarding (if `STRIPE_SECRET_KEY` is set)
 5. `npx mgr test` — runs framework + project test suites against an emulator. Positional target(s) select which test FILES run, by source + path (multiple space-separated targets compose):

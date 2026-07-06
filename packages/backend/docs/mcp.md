@@ -80,7 +80,7 @@ Consumer tools can set all the same annotations — they're passed through autom
 8. Client exchanges code: `POST /backend-manager/mcp/token` → BEM verifies ID token, returns `api.privateKey` as `access_token`
 9. Client uses the API key for all future MCP requests as `Authorization: Bearer {key}`
 
-The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `backend-manager-config.json`.
+The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `config/omega.json5`.
 
 ### Admin (Stdio)
 

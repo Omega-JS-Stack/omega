@@ -181,10 +181,10 @@ Module.prototype.defaultize = function () {
 
     email.dynamicTemplateData.user = Manager.User(options.user).properties;
 
-    // Get brand configuration from Manager.config.brand (backend-manager-config.json)
+    // Get brand configuration from Manager.config.brand (config/omega.json5)
     const brand = Manager.config?.brand;
     if (!brand) {
-      return reject(new Error('Missing brand configuration in backend-manager-config.json'));
+      return reject(new Error('Missing brand configuration in config/omega.json5'));
     }
 
     // Build brand object for email template data
@@ -197,7 +197,7 @@ Module.prototype.defaultize = function () {
     };
 
     if (!brandData.email) {
-      return reject(new Error('Missing brand.contact.email in backend-manager-config.json'));
+      return reject(new Error('Missing brand.contact.email in config/omega.json5'));
     }
 
     email.dynamicTemplateData.brand = brandData;

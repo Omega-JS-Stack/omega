@@ -17,7 +17,7 @@ const FirebaseFunctionsTest = require('./firebase-functions');
 const BackendManagerTest = require('./backend-manager');
 const NpmProjectScriptsTest = require('./npm-project-scripts');
 const RootPackageJsonTest = require('./root-package-json');
-const BemConfigTest = require('./bem-config');
+const OmegaConfigTest = require('./omega-config');
 const ProjectIdConsistencyTest = require('./project-id-consistency');
 const ServiceAccountTest = require('./service-account');
 const GitignoreTest = require('./gitignore');
@@ -64,7 +64,7 @@ function getTests(context) {
     new BackendManagerTest(context),
     new NpmProjectScriptsTest(context),
     new RootPackageJsonTest(context),
-    new BemConfigTest(context),
+    new OmegaConfigTest(context),
     new ServiceAccountTest(context),
     new ProjectIdConsistencyTest(context),
     new GitignoreTest(context),

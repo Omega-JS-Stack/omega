@@ -178,6 +178,33 @@ test('no target: whole files merge (targets map included) — the disperse shape
   assert.deepStrictEqual(config.targets.web, {});
 });
 
+test('backend runtime cwd (the functions/ dir) still walks up to the brand config', (t) => {
+  // BEM's Manager boots with cwd = {brand}/apps/backend/functions — the app
+  // root is one up, and the brand layer must still resolve from there.
+  const root = makeFixture('functions-cwd', {
+    'config/omega.json5': `{
+      brand: { id: 'acme', name: 'Acme' },
+      firebaseConfig: { projectId: 'acme-prod' },
+      targets: { backend: {} },
+    }`,
+    'apps/backend/functions/config/omega.json5': `{
+      targets: { backend: { github: { user: 'acme-org' } } },
+    }`,
+  });
+  cleanup(t, root);
+
+  const functionsDir = path.join(root, 'apps', 'backend', 'functions');
+  const fromFunctions = loadConfig(functionsDir, 'backend');
+  assert.strictEqual(fromFunctions.files.brand, path.join(root, 'config', 'omega.json5'));
+  assert.strictEqual(fromFunctions.config.firebaseConfig.projectId, 'acme-prod');
+  assert.strictEqual(fromFunctions.config.github.user, 'acme-org');
+  assert.strictEqual(fromFunctions.enabled, true);
+
+  // Same resolution from the app root — both entry points agree
+  const fromAppRoot = loadConfig(path.join(root, 'apps', 'backend'), 'backend');
+  assert.deepStrictEqual(fromAppRoot.config, fromFunctions.config);
+});
+
 test('an apps/ dir without a brand-level config is standalone — no walk-up', (t) => {
   const root = makeFixture('no-brand-config', {
     'apps/backend/config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, targets: { backend: {} } }`,

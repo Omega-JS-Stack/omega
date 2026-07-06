@@ -117,6 +117,7 @@
   },
   "devDependencies": {
     "@omegajs/account": "*",
+    "@omegajs/config": "*",
     "@omegajs/devkit": "*",
     "prepare-package": "^2.1.0"
   },

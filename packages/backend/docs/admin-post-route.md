@@ -40,7 +40,7 @@ const IMAGE_MAX_DIMENSION = 2048;
 const IMAGE_JPEG_QUALITY = 80;
 ```
 
-If these need to become configurable later, promote to `backend-manager-config.json` rather than env vars (deploy-environment-specific overrides aren't a real use case — the values are algorithm constants).
+If these need to become configurable later, promote to `config/omega.json5` rather than env vars (deploy-environment-specific overrides aren't a real use case — the values are algorithm constants).
 
 ## Key Details
 

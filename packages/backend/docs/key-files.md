@@ -16,7 +16,7 @@
 | Auth: shared utilities | `src/manager/events/auth/utils.js` |
 | Cron runner | `src/manager/events/cron/runner.js` |
 | Main API handler | `src/manager/functions/core/actions/api.js` |
-| Config template | `templates/backend-manager-config.json` |
+| Config template | `templates/config/omega.json5` |
 | CLI entry | `src/cli/index.js` |
 | Stripe webhook forwarding | `src/cli/commands/stripe.js` |
 | Firebase init helper (CLI) | `src/cli/commands/firebase-init.js` |
