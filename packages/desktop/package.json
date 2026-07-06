@@ -39,6 +39,7 @@
     "bin/",
     "dist/",
     "docs/",
+    "scripts/",
     "CLAUDE.md"
   ],
   "preparePackage": {

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Package suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # BEM's suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install
+        run: npm ci
+
+      - name: client suite
+        run: npm test --workspace=packages/client
+
+      - name: extension suite
+        run: npm test --workspace=packages/extension
+
+      - name: desktop suite (xvfb for Electron)
+        run: xvfb-run --auto-servernum npm test --workspace=packages/desktop
+
+      - name: backend suite
+        run: npm test --workspace=packages/backend
+
+  pack-smoke:
+    name: Pack → scratch-install smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Catches phantom-dependency/hoisting bugs: each package must install and load
+      # from its packed tarball in a bare consumer, exactly like a real npm install.
+      - name: Pack and scratch-install each package
+        run: |
+          set -euo pipefail
+          for pkg in backend client extension desktop; do
+            echo "=== $pkg ==="
+            tarball=$(npm pack --workspace=packages/$pkg --pack-destination /tmp | tail -1)
+            scratch=$(mktemp -d)
+            (cd "$scratch" && npm init -y >/dev/null && npm install --no-audit --no-fund "/tmp/$tarball")
+            name=$(node -p "require('./packages/$pkg/package.json').name")
+            (cd "$scratch" && node -e "require.resolve('$name'); console.log('$name: resolves OK')")
+          done
