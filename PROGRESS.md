@@ -5,8 +5,8 @@
 * **Goal:** Phase 1 — foundation packages. First slice of @omegajs/devkit (logger, safe-install, attach-log-file + vendor-on-prepare mechanism) landed and proven on extension; next: adopt in backend/desktop, then the test-runner/Chromium-runner slice, sandbox brand + `omega e2e` harness.
 * **Current Phase:** Phase 1 — Foundation packages (Phase 0 complete except the publish gate, which Ian owns)
 * **Priority:** High
-* **Last Updated:** 2026-07-05 8:15 PM
-* **Notes:** Devkit vendoring mechanism: frameworks require @omegajs/devkit modules by name (workspace-linked devDependency); preparePackage `after` hook copies devkit src → dist/vendor/devkit and rewrites requires to relative paths, so published tarballs are self-contained (devkit stays private). Hard gate = CI pack-smoke's new "no raw @omegajs requires in shipped dist" check (after hooks are non-blocking in prepare-package). Discovered: packages/*/dist was never tracked (each package's own .gitignore ignores it — root .gitignore comment corrected); prepare regenerates dist on install/pack. Pending Ian: electron-manager@1.12.1 publish (he's handling in another session), @omegajs org claim, GitHub remote creation.
+* **Last Updated:** 2026-07-05 10:55 PM
+* **Notes:** Devkit vendoring proven on extension (checkpoint 5, commit 585d7cc) AND desktop (checkpoint 6). Backend adoption waits for BEM harmonization (no dist layer yet). Next slice: devkit test runner + Chromium runner (Task 1.1d), then sandbox brand + omega e2e (1.2). INCIDENT (resolved): checkpoint-5 commit initially ran in omega-manager by accident (stray shell cwd) — undone via mixed reset, Ian's working tree fully restored, nothing pushed; all git commands now use explicit `git -C`. Pending Ian: electron-manager@1.12.1 publish (his session), @omegajs org claim, GitHub remote creation.
 
 ## 📌 Active Task List
 * [ ] Phase 0: Bootstrap the monorepo
@@ -22,7 +22,7 @@
 * [ ] Phase 1: Foundation packages
   * [x] Task 1.1a: @omegajs/devkit first files — logger (identical ×4, EM's cleaned copy canonical), safe-install (byte-identical ×4), attach-log-file (functionally identical ×4; header normalized to `# omega log`). Private workspace package, 17 unit tests green (node:test until the shared runner slice lands).
   * [x] Task 1.1b: Vendor-on-prepare mechanism (packages/devkit/tools/vendor.js) — copies devkit src → dist/vendor/devkit + rewrites requires to relative paths + guards that hosts declare vendored modules' runtime deps. Proven on extension: 3 shims adopted, suite 85 passing (unchanged), pack→scratch-install resolves + runs the vendored logger, shipped dist has zero raw @omegajs requires. CI: devkit suite added; pack-smoke gained the self-containment grep (the hard gate, since prepare-package after-hooks are non-blocking).
-  * [ ] Task 1.1c: Adopt devkit shims in packages/backend + packages/desktop (mechanical repeat of 1.1b; desktop keeps its Electron-specific logger-lite)
+  * [x] Task 1.1c: Adopt devkit shims in packages/desktop — logger + safe-install + attach-log-file shimmed (Electron-specific logger-lite stays EM-owned); suite 751 passing / 5 designed skips (unchanged); pack-smoke resolves + self-contained + vendored logger runs in a bare consumer + scripts/sync-nvmrc.js still ships. **Backend deferred to its harmonization step (Task 1.3-adjacent)** — BEM has no dist layer yet, so there's nothing for the vendor hook to rewrite (its bin requires src/ directly).
   * [ ] Task 1.1d: devkit test-runner slice — shared runner core + Chromium runner extracted from UJM's 3-layer model; frameworks adopt
   * [ ] Task 1.2: Sandbox brand monorepo (fresh, via scaffolding path) + `omega e2e` cross-stack harness in CI
   * [ ] Task 1.3: @omegajs/account extraction (golden-master gate)

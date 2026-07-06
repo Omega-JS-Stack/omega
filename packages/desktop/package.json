@@ -47,7 +47,9 @@
     "output": "./dist",
     "type": "copy",
     "replace": {},
-    "hooks": {}
+    "hooks": {
+      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+    }
   },
   "scripts": {
     "start": "npm run prepare:watch",
@@ -102,6 +104,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
+    "@omegajs/devkit": "*",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "electron-manager": "^1.8.2",
