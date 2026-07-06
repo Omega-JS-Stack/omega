@@ -325,6 +325,10 @@ class TestRunner {
       this.rulesContext = await rulesClient.createRulesContext({
         projectId: this.options.firebaseConfig?.projectId,
         rulesPath: this.options.rulesPath,
+        // Consumers may run the firestore emulator on a non-default port
+        // (firebase.json emulators.firestore.port) — without this the rules
+        // client falls back to 8080 and every rules test times out.
+        port: this.options.emulatorPorts?.firestore,
         accounts: this.accounts,
       });
       console.log(chalk.green('✓'));

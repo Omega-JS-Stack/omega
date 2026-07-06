@@ -22,10 +22,13 @@ module.exports = {
     },
 
     // Test 2: Non-existent post returns 404
+    // The route searches live GitHub (route 500s "not configured" without a token),
+    // so this only runs when GH_TOKEN is set — matches the mailbox-key skip pattern.
     {
       name: 'nonexistent-post-returns-404',
       auth: 'none',
       timeout: 30000,
+      skip: !process.env.GH_TOKEN ? 'GH_TOKEN not set (content/post searches live GitHub)' : false,
 
       async run({ http, assert }) {
         const response = await http.get('backend-manager/content/post', {
@@ -41,6 +44,7 @@ module.exports = {
       name: 'authenticated-nonexistent-returns-404',
       auth: 'basic',
       timeout: 30000,
+      skip: !process.env.GH_TOKEN ? 'GH_TOKEN not set (content/post searches live GitHub)' : false,
 
       async run({ http, assert }) {
         const response = await http.get('backend-manager/content/post', {

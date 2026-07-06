@@ -1,0 +1,11 @@
+{
+  "name": "sandbox-brand",
+  "private": true,
+  "description": "Permanent dogfood consumer for the Omega monorepo — a fresh brand monorepo, nothing copied from existing brands",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm test --workspace=apps/backend"
+  }
+}
