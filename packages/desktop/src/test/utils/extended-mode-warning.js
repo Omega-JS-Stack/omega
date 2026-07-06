@@ -1,13 +1,13 @@
 // TEST_EXTENDED_MODE warning — SSOT for consistent messaging.
 //
-// Mirrors BEM/BXM/UJM: `TEST_EXTENDED_MODE` is the shared, unprefixed env var that opts a
-// test run into hitting REAL external services instead of skipping/stubbing them. Off by
-// default so `npx mgr test` stays fast and offline-safe. Used by the test command (printed to
+// The headline + shape live in @omegajs/devkit (mirrored across BEM/BXM/UJM); these
+// detail lines describe EM's blast radius. Used by the test command (printed to
 // console + teed to logs/test.log).
-const EXTENDED_MODE_WARNING = [
-  '⚠️⚠️⚠️  WARNING: TEST_EXTENDED_MODE IS TRUE  ⚠️⚠️⚠️',
+const { makeExtendedModeWarning } = require('@omegajs/devkit/test/extended-mode-warning');
+
+const EXTENDED_MODE_WARNING = makeExtendedModeWarning([
   'Tests that hit real external services (Firebase, analytics, update feeds) are ENABLED!',
   'This will make real network calls against live backends.',
-];
+]);
 
 module.exports = { EXTENDED_MODE_WARNING };
