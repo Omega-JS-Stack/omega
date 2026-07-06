@@ -16,19 +16,22 @@ function freshAudit() {
   return require(auditPath);
 }
 
-function stageConsumer(overrides = {}) {
+function stageConsumer(overrides = {}, desktopOverrides = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-audit-'));
   jetpack.dir(path.join(tmp, 'config'));
   jetpack.dir(path.join(tmp, 'src'));
   jetpack.write(path.join(tmp, 'src', 'main.js'),    '// stub');
   jetpack.write(path.join(tmp, 'src', 'preload.js'), '// stub');
 
+  // omega.json5 shape: desktop-scoped settings go under targets.desktop via
+  // desktopOverrides; top-level overrides pass through the agnostic merge as-is
+  // (strict JSON is valid JSON5, so stringify is fine).
   const baseConfig = {
     brand: { id: 'testapp', name: 'TestApp', images: { icon: '' } },
     app:   { appId: 'com.test.app', productName: 'TestApp' },
   };
-  const merged = { ...baseConfig, ...overrides };
-  jetpack.write(path.join(tmp, 'config', 'electron-manager.json'), JSON.stringify(merged));
+  const merged = { ...baseConfig, ...overrides, targets: { desktop: desktopOverrides } };
+  jetpack.write(path.join(tmp, 'config', 'omega.json5'), JSON.stringify(merged));
 
   return tmp;
 }
@@ -164,11 +167,10 @@ module.exports = {
     {
       name: 'fails on invalid startup.mode',
       run: async (ctx) => {
-        const tmp = stageConsumer({
-          brand: { id: 'testapp' },
-          app:   { appId: 'com.test.app', productName: 'TestApp' },
-          startup: { mode: 'invisible' },
-        });
+        const tmp = stageConsumer(
+          { brand: { id: 'testapp' }, app: { appId: 'com.test.app', productName: 'TestApp' } },
+          { startup: { mode: 'invisible' } },
+        );
         try {
           const err = await runAudit(tmp);
           ctx.expect(err).toBeDefined();
@@ -181,15 +183,14 @@ module.exports = {
     {
       name: 'fails on invalid Windows signing strategy',
       run: async (ctx) => {
-        const tmp = stageConsumer({
-          brand:   { id: 'testapp', name: 'TestApp' },
-          app:     { appId: 'com.test.app', productName: 'TestApp' },
-          targets: { win: { signing: { strategy: 'banana' } } },
-        });
+        const tmp = stageConsumer(
+          { brand: { id: 'testapp', name: 'TestApp' }, app: { appId: 'com.test.app', productName: 'TestApp' } },
+          { platforms: { win: { signing: { strategy: 'banana' } } } },
+        );
         try {
           const err = await runAudit(tmp);
           ctx.expect(err).toBeDefined();
-          ctx.expect(err.message).toMatch(/targets\.win\.signing\.strategy "banana" is not allowed/);
+          ctx.expect(err.message).toMatch(/platforms\.win\.signing\.strategy "banana" is not allowed/);
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }
@@ -216,11 +217,10 @@ module.exports = {
       run: async (ctx) => {
         // Multiple required fields missing + an invalid mode → must collect all into one
         // numbered list (not stop at first failure).
-        const tmp = stageConsumer({
-          brand:   {},
-          app:     {},
-          startup: { mode: 'invisible' },
-        });
+        const tmp = stageConsumer(
+          { brand: {}, app: {} },
+          { startup: { mode: 'invisible' } },
+        );
         try {
           const err = await runAudit(tmp);
           ctx.expect(err).toBeDefined();

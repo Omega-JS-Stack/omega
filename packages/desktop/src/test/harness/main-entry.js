@@ -100,12 +100,13 @@ async function runSuites() {
   const Manager = require('../../main.js');
   const manager = new Manager();
 
-  // Test mode: load default config from EM defaults (since the harness CWD won't have one),
-  // and skip window creation so we don't pop a UI during tests.
+  // Test mode: load default config from EM defaults (since the harness CWD won't have
+  // one), resolved for the desktop target via @omegajs/config, and skip window creation
+  // so we don't pop a UI during tests.
   const fs = require('fs');
   const JSON5 = require('json5');
-  const defaultConfigPath = path.join(__dirname, '..', '..', 'defaults', 'config', 'electron-manager.json');
-  const defaultConfig = JSON5.parse(fs.readFileSync(defaultConfigPath, 'utf8'));
+  const { loadConfig } = require('@omegajs/config');
+  const defaultConfig = loadConfig(path.join(__dirname, '..', '..', 'defaults'), 'desktop').config;
 
   await manager.initialize(defaultConfig, { skipWindowCreation: true });
 
@@ -131,7 +132,8 @@ async function runSuites() {
     denyOpenExternal(session.defaultSession);
     app.on('session-created', denyOpenExternal);
 
-    const consumerConfigPath = path.join(process.cwd(), 'config', 'electron-manager.json');
+    // Raw JSON5 read is fine here — `brand` is a shared section, top-level in the raw file.
+    const consumerConfigPath = path.join(process.cwd(), 'config', 'omega.json5');
     if (fs.existsSync(consumerConfigPath)) {
       const brandId = (JSON5.parse(fs.readFileSync(consumerConfigPath, 'utf8')).brand || {}).id;
       if (brandId && !protocol.isProtocolHandled(brandId)) {

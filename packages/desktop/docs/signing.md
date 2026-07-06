@@ -5,7 +5,7 @@ Cross-platform code signing reference. Covers macOS (sign + notarize), Windows (
 ## tl;dr
 
 - **macOS production**: Developer ID Application cert + notarization API key. Files in `config/certs/`. Env vars point at them.
-- **Windows production**: EV USB token (self-hosted runner now) or cloud signing (future, pluggable via `targets.win.signing.strategy`).
+- **Windows production**: EV USB token (self-hosted runner now) or cloud signing (future, pluggable via `platforms.win.signing.strategy`).
 - **Linux**: No signing for AppImage/deb. Snap/Flatpak have their own pipelines.
 
 ## Where files live
@@ -110,7 +110,7 @@ Buy an EV code-signing cert from Sectigo, DigiCert, SSL.com, etc. Get a physical
 
 ### Cloud signing (future migration)
 
-Once the framework's cloud strategy is finalized, set the provider in `config/electron-manager.json`:
+Once the framework's cloud strategy is finalized, set the provider in `config/omega.json5`:
 ```
 # config: { targets: { win: { signing: { strategy: 'cloud', cloud: { provider: 'azure' } } } } }
 # provider: 'azure' | 'sslcom' | 'digicert'
@@ -202,7 +202,7 @@ The workflow base64-decodes secrets into temp files inside `config/certs/` at jo
 ### "Hardened runtime requires entitlements"
 - EM generates `dist/config/entitlements.mac.plist` from defaults + your overrides at build time.
 - Defaults cover Electron's needs (allow-jit, network client/server, library validation off, etc.).
-- To override or add: set the `entitlements.mac` block in `config/electron-manager.json`. Setting a key to `null` removes a default.
+- To override or add: set the `entitlements.mac` block in `config/omega.json5`. Setting a key to `null` removes a default.
   ```json5
   entitlements: {
     mac: {
@@ -215,7 +215,7 @@ The workflow base64-decodes secrets into temp files inside `config/certs/` at jo
 
 ### Windows: "SignTool Error: No certificates were found"
 - Token unplugged or middleware not running.
-- For cloud: verify `targets.win.signing.cloud.provider` in `config/electron-manager.json` matches the provider whose creds are in `.env`.
+- For cloud: verify `platforms.win.signing.cloud.provider` in `config/omega.json5` matches the provider whose creds are in `.env`.
 
 ## What lives in `build/`
 

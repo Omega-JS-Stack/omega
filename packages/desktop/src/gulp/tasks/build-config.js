@@ -1,15 +1,15 @@
 // Generate dist/electron-builder.yml entirely from EM defaults + the consumer's
-// config/electron-manager.json. The consumer NEVER ships an electron-builder.yml.
+// config/omega.json5. The consumer NEVER ships an electron-builder.yml.
 //
 // Why:
-//   - Single source of truth: consumer config (electron-manager.json) drives everything.
+//   - Single source of truth: consumer config (omega.json5) drives everything.
 //   - Stops consumers from drifting into electron-builder-config-fork-of-our-defaults hell.
 //   - Lets EM evolve packaging defaults centrally (e.g. switch from NSIS to MSIX someday)
 //     without per-consumer migrations.
 //
 // Consumer overrides:
-//   `electronBuilder` block in electron-manager.json gets shallow-merged onto our defaults
-//   for genuine special cases. Most apps will never set this.
+//   `electronBuilder` block (under targets.desktop in omega.json5) gets shallow-merged
+//   onto our defaults for genuine special cases. Most apps will never set this.
 
 const path    = require('path');
 const jetpack = require('fs-jetpack');
@@ -31,9 +31,9 @@ module.exports = function buildConfig(done) {
     const startupMode = config.startup?.mode || 'normal';
 
     // 1. Generate entitlements.mac.plist into dist/config/. Consumer overrides live at
-    // `targets.mac.entitlements` (an object map of plist key → value, with `null` to
+    // `platforms.mac.entitlements` (an object map of plist key → value, with `null` to
     // remove an EM default). Top-level `entitlements.mac` is no longer read.
-    const entitlementsPath = writeMacEntitlements(distRoot, config.targets?.mac?.entitlements);
+    const entitlementsPath = writeMacEntitlements(distRoot, config.platforms?.mac?.entitlements);
     logger.log(`wrote ${entitlementsPath}`);
 
     // 2. Resolve + copy icons (3-tier waterfall) into dist/config/icons/.
@@ -91,7 +91,7 @@ module.exports = function buildConfig(done) {
     // Apply consumer overrides last so they win.
     if (config.electronBuilder && typeof config.electronBuilder === 'object') {
       builderConfig = deepMerge(builderConfig, config.electronBuilder);
-      logger.log('Applied electronBuilder overrides from electron-manager.json');
+      logger.log('Applied electronBuilder overrides from omega.json5');
     }
 
     // Serialize to YAML and write.
@@ -127,8 +127,8 @@ function expandYear(str) {
   return str.replace(/\{YEAR\}/g, String(new Date().getFullYear()));
 }
 
-// EM's canonical electron-builder config. Driven by the consumer's electron-manager.json
-// where it makes sense (appId, productName, copyright, category, languages, target archs,
+// EM's canonical electron-builder config. Driven by the consumer's omega.json5
+// where it makes sense (appId, productName, copyright, category, languages, platform archs,
 // installer flags); everything else (target list, file globs, signing) is EM's opinionated
 // default.
 //
@@ -152,10 +152,10 @@ function baseConfig(config, extras = {}) {
   const languages  = Array.isArray(config.app.languages) ? config.app.languages : ['en'];
   const darkModeSupport = config.app.darkModeSupport !== false;  // default true
 
-  // Per-target config blocks. Each is fully optional — every key has a default.
-  const macTargetCfg   = config.targets?.mac   || {};
-  const winTargetCfg   = config.targets?.win   || {};
-  const linuxTargetCfg = config.targets?.linux || {};
+  // Per-platform config blocks. Each is fully optional — every key has a default.
+  const macTargetCfg   = config.platforms?.mac   || {};
+  const winTargetCfg   = config.platforms?.win   || {};
+  const linuxTargetCfg = config.platforms?.linux || {};
 
   const macArch   = Array.isArray(macTargetCfg.arch)   && macTargetCfg.arch.length   ? macTargetCfg.arch   : ['universal'];
   const winArch   = Array.isArray(winTargetCfg.arch)   && winTargetCfg.arch.length   ? winTargetCfg.arch   : ['x64', 'ia32'];
@@ -169,7 +169,7 @@ function baseConfig(config, extras = {}) {
   const nsisRunAfterFinish     = winTargetCfg.runAfterFinish !== false;
   const nsisPerMachine         = winTargetCfg.perMachine === true;
 
-  // Snap publishing — opt-in via explicit `targets.linux.snap.enabled: true` in
+  // Snap publishing — opt-in via explicit `platforms.linux.snap.enabled: true` in
   // config. The framework scaffold ships with that field set to true by default
   // (so new consumers get snap publishing out of the box once their credentials
   // are wired up), but if the field is missing entirely we default to OFF — that

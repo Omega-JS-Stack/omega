@@ -10,10 +10,10 @@
  *
  * Replaces the per-framework config zoo (UJM's _config.yml + JSON split,
  * EM's config/electron-manager.json, BEM's backend-manager-config.json,
- * BXM's config): frameworks dual-read — omega.json5 if present, else their
- * legacy file — through Phases 1–3, then the legacy paths die at cutover.
- * omega-manager's disperse enumerates SHARED_SECTIONS instead of hardcoding
- * per-target mapping blocks.
+ * BXM's config) with NO dual-read: each framework flips to omega.json5
+ * outright and legacy brands migrate their file once (docs/config.md has
+ * the mapping tables). omega-manager's disperse enumerates SHARED_SECTIONS
+ * instead of hardcoding per-target mapping blocks.
  *
  * Private workspace package — vendored/bundled into the published frameworks
  * at prepare time, never published on its own.

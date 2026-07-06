@@ -154,7 +154,7 @@ jobs:
         run: npm run release:local
 
       # Linux — install snapcraft when (a) the consumer hasn't explicitly disabled snap
-      # in their config (`targets.linux.snap.enabled !== false`; default is true) AND
+      # in their config (`platforms.linux.snap.enabled !== false`; default is true) AND
       # (b) SNAPCRAFT_STORE_CREDENTIALS is set as a repo secret. Without the secret we
       # skip snapcraft install entirely — build-config.js auto-skips the snap target on
       # the same condition, so the build still produces .deb + .AppImage cleanly with
@@ -165,11 +165,13 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           # (a) Config check — explicit `enabled: false` opts out; missing/true opts in.
-          if node -e 'const c = require("./node_modules/json5").parse(require("fs").readFileSync("config/electron-manager.json", "utf8")); process.exit(c?.targets?.linux?.snap?.enabled === false ? 1 : 0);'; then
+          # `electron-manager/config` is the vendored @omegajs/config loader — resolves
+          # config/omega.json5 for the desktop target (brand-monorepo aware).
+          if node -e 'const c = require("electron-manager/config").loadConfig(process.cwd(), "desktop").config; process.exit(c.platforms?.linux?.snap?.enabled === false ? 1 : 0);'; then
             CONFIG_OK=1
           else
             CONFIG_OK=0
-            echo "targets.linux.snap.enabled === false — skipping snapcraft install."
+            echo "platforms.linux.snap.enabled === false — skipping snapcraft install."
           fi
           # (b) Credentials check — empty secret means no publish creds available.
           if [ -n "$SNAPCRAFT_STORE_CREDENTIALS" ]; then
@@ -209,9 +211,9 @@ jobs:
             release/*.yml
             release/*.blockmap
 
-  # Resolve the signing strategy from config/electron-manager.json. We do this in a tiny job
-  # (just runs node + reads the JSON5) so downstream jobs can gate on the result. Single
-  # source of truth = the consumer's config file; workflow doesn't duplicate the value.
+  # Resolve the signing strategy from config/omega.json5. We do this in a tiny job
+  # (just runs node + the vendored config loader) so downstream jobs can gate on the result.
+  # Single source of truth = the consumer's config file; workflow doesn't duplicate the value.
   windows-strategy:
     name: Resolve Windows signing strategy
     needs: [setup, build]
@@ -229,14 +231,14 @@ jobs:
       - run: sfw npm ci
       - id: resolve
         run: |
-          STRATEGY=$(node -e "const fs=require('fs'),JSON5=require('json5');const c=JSON5.parse(fs.readFileSync('config/electron-manager.json','utf8'));console.log(c?.targets?.win?.signing?.strategy || 'self-hosted');")
+          STRATEGY=$(node -e "const c=require('electron-manager/config').loadConfig(process.cwd(),'desktop').config;console.log(c.platforms?.win?.signing?.strategy || 'self-hosted');")
           echo "strategy=$STRATEGY" >> "$GITHUB_OUTPUT"
           echo "Resolved Windows signing strategy: $STRATEGY"
 
   windows-sign:
     name: Sign Windows
     needs: [setup, build, windows-strategy]
-    # Strategy comes from config.targets.win.signing.strategy (read by windows-strategy job).
+    # Strategy comes from config platforms.win.signing.strategy (read by windows-strategy job).
     #   self-hosted (default) — runs on a self-hosted runner with EV USB token attached
     #   cloud                 — runs on hosted windows-latest, calls cloud signing provider
     #   local                 — skip this job; sign locally via `npx mgr sign-windows`

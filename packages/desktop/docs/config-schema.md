@@ -1,6 +1,6 @@
 # Config schema
 
-EM validates `config/electron-manager.json` against a canonical schema declared in [`src/config/schema.js`](../src/config/schema.js). The schema is the single source of truth for which fields exist, which are required, and what shape their values take.
+EM validates `config/omega.json5` against the canonical OMEGA schema in **`@omegajs/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('electron-manager/config')`). The shared schema covers the cross-framework sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
 
 Validation runs in two places:
 
@@ -56,14 +56,14 @@ A non-empty credential value enables a feature — there is no separate `enabled
 | GA4 analytics | `analytics.providers.google.id = 'G-XXXXX'` | `analytics.providers.google.id = ''` |
 | Firebase Auth (renderer) | `firebaseConfig.projectId = '...'` (etc.) | empty `firebaseConfig` |
 
-**Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `downloads.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`, `targets.linux.snap.enabled`. These toggle BEHAVIOR, not credentials — you can have `releases.repo` set but still want releases off in a fork, for example.
+**Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `downloads.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`, `platforms.linux.snap.enabled`. These toggle BEHAVIOR, not credentials — you can have `releases.repo` set but still want releases off in a fork, for example.
 
 ## Adding a new field
 
 When you add a new config knob anywhere in EM:
 
-1. Add an entry to [`src/config/schema.js`](../src/config/schema.js) right next to the section it belongs to.
-2. If it has a default, set it in [`src/defaults/config/electron-manager.json`](../src/defaults/config/electron-manager.json).
+1. Add an entry to `TARGET_SCHEMAS.desktop` in `@omegajs/config` (`packages/config/src/schema.js` in the Omega monorepo) — or to `SHARED_SCHEMA` if the field is genuinely cross-framework.
+2. If it has a default, set it in [`src/defaults/config/omega.json5`](../src/defaults/config/omega.json5) (under `targets.desktop` for desktop-scoped fields).
 3. That's it. No separate validation logic to add elsewhere — the schema entry is the validation.
 
 ## What's NOT in the schema
@@ -81,7 +81,7 @@ These are kept in `audit.js` so the schema stays a pure description of the confi
 Required field missing:
 
 ```
-electron-manager: config validation failed — fix the following in config/electron-manager.json:
+electron-manager: config validation failed — fix the following in config/omega.json5:
   1. config.brand.id is required — URL-scheme-safe slug. Used as deep-link scheme + default appId. Must be lowercase, start with a letter, alnum/+/-/.
 ```
 
@@ -116,6 +116,5 @@ The schema only enforces shape for the few well-defined publishable keys — the
 
 ## Source
 
-- Schema definitions: [`src/config/schema.js`](../src/config/schema.js)
-- Validator engine: [`src/utils/validate-config.js`](../src/utils/validate-config.js)
-- Tests: [`src/test/suites/build/validate-config.test.js`](../src/test/suites/build/validate-config.test.js)
+- Schema definitions + validator engine: `@omegajs/config` (`packages/config/src/{schema,validate}.js` in the Omega monorepo; vendored copy at `dist/vendor/config/`)
+- EM integration tests: [`src/test/suites/build/validate-config.test.js`](../src/test/suites/build/validate-config.test.js)

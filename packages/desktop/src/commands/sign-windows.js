@@ -1,6 +1,6 @@
 // Strategy-aware Windows code signer.
 //
-// Reads strategy from config.targets.win.signing.strategy:
+// Reads strategy from config platforms.win.signing.strategy:
 //   self-hosted — sign with signtool against an EV USB token (typically on a self-hosted runner)
 //   cloud       — shell out to a cloud signing provider's CLI (Azure / SSL.com / DigiCert)
 //   local       — no-op (developer signs manually on their own Windows box)
@@ -108,9 +108,9 @@ async function runSignCommand(options) {
   }
 
   if (strategy === 'cloud') {
-    const provider = config.targets?.win?.signing?.cloud?.provider;
+    const provider = config.platforms?.win?.signing?.cloud?.provider;
     if (!provider) {
-      throw new Error('strategy=cloud but no provider set (config.targets.win.signing.cloud.provider).');
+      throw new Error('strategy=cloud but no provider set (config platforms.win.signing.cloud.provider).');
     }
     await signWithCloudProvider(provider, targets, inDir, outDir);
     return;

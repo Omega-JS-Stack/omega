@@ -127,17 +127,22 @@ Manager.getMode = function () {
 };
 Manager.prototype.getMode = Manager.getMode;
 
-// Config — reads config/electron-manager.json (JSON5) and applies derived defaults.
-// Derivations:
+// Config — the consumer's config/omega.json5 resolved for the desktop target via
+// @omegajs/config: shared sections (brand, firebaseConfig, analytics, payment, sentry,
+// theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
+// releases/... land at the top level here), and in a brand monorepo the brand root's
+// config merges underneath the app's. Then EM's derived defaults:
 //   app.appId       ← `com.itwcreativeworks.${brand.id}` if not set
 //   app.productName ← brand.name if not set
 // These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo' }` is
 // enough; appId/productName flow through automatically.
 Manager.getConfig = function () {
-  const file = path.join(process.cwd(), 'config', 'electron-manager.json');
-  const raw = jetpack.read(file);
+  const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
 
-  const config = raw ? JSON5.parse(raw) : {};
+  // No config at all (fresh dir, non-consumer cwd) → seeded empty shape below; the
+  // schema validation in audit/boot reports what's actually missing.
+  const cwd = process.cwd();
+  const config = hasOmegaConfig(cwd) ? loadConfig(cwd, 'desktop').config : {};
 
   // Apply derived defaults. Always seed `brand` + `app` so callers can deref
   // `config.brand.X` / `config.app.X` without optional-chaining at every callsite.
@@ -182,11 +187,11 @@ Manager.getLiveReloadPort = function () {
 };
 Manager.prototype.getLiveReloadPort = Manager.getLiveReloadPort;
 
-// Windows signing strategy. Config-only — `targets.win.signing.strategy` in
-// electron-manager.json. Default 'self-hosted'.
+// Windows signing strategy. Config-only — `platforms.win.signing.strategy`
+// (targets.desktop.platforms.win in the raw omega.json5). Default 'self-hosted'.
 Manager.getWindowsSignStrategy = function () {
   const config = Manager.getConfig();
-  return config?.targets?.win?.signing?.strategy || 'self-hosted';
+  return config?.platforms?.win?.signing?.strategy || 'self-hosted';
 };
 Manager.prototype.getWindowsSignStrategy = Manager.getWindowsSignStrategy;
 

@@ -26,7 +26,7 @@ Electron Manager (EM) is a comprehensive framework for building modern Electron 
 ### For Consuming Projects
 
 1. `npm install electron-manager --save-dev`
-2. `npx mgr setup` — scaffolds the project (writes `config/electron-manager.json`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`).
+2. `npx mgr setup` — scaffolds the project (writes `config/omega.json5`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`).
 3. `npm start` — dev (gulp → webpack → electron .)
 4. `npm run build` — local production build (compiles bundles only, no installer)
 5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally.
@@ -112,17 +112,17 @@ Convention-only. Drop PNGs at `config/icons/<platform>/<slot>.png` (platform-spe
 
 ### Build system
 
-prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets, all bundled) + electron-builder. `gulp/build-config` generates `dist/electron-builder.yml` + `dist/config/entitlements.mac.plist` from EM defaults + consumer config. Strategy-pluggable Windows signing (`targets.win.signing.strategy`: `self-hosted` | `cloud` | `local`). See [docs/build-system.md](docs/build-system.md), [docs/installer-options.md](docs/installer-options.md), [docs/signing.md](docs/signing.md).
+prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets, all bundled) + electron-builder. `gulp/build-config` generates `dist/electron-builder.yml` + `dist/config/entitlements.mac.plist` from EM defaults + consumer config. Strategy-pluggable Windows signing (`platforms.win.signing.strategy`: `self-hosted` | `cloud` | `local`). See [docs/build-system.md](docs/build-system.md), [docs/installer-options.md](docs/installer-options.md), [docs/signing.md](docs/signing.md).
 
 ### Config flow
 
-`config/electron-manager.json` (JSON5, in consumer) → `Manager.getConfig()` (applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `EM_BUILD_JSON`. Runtime reads `EM_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to disk read.
+`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omegajs/config` — `targets.desktop` overlays the top level, brand-monorepo walk-up included — then applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `EM_BUILD_JSON`. Runtime reads `EM_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
 
 Required fields: `brand.id` + `brand.name`. Everything else has defaults. See [docs/installer-options.md](docs/installer-options.md) for the full defaults table.
 
 ### Schema validation
 
-Every field in `config/electron-manager.json` is declared in `src/config/schema.js` — single source of truth. Validator engine is `src/utils/validate-config.js` (pure, ~100 lines). Runs at boot (hard-fails `manager.initialize()` if invalid) AND in `gulp/audit` (plus build-pipeline extras). See [docs/config-schema.md](docs/config-schema.md).
+Every field in `config/omega.json5` is declared in `@omegajs/config` — the shared OMEGA schema plus the desktop refinements (`TARGET_SCHEMAS.desktop`), vendored into `dist/vendor/config/` and exposed to consumers as `require('electron-manager/config')`. Runs at boot (hard-fails `manager.initialize()` if invalid) AND in `gulp/audit` (plus build-pipeline extras). See [docs/config-schema.md](docs/config-schema.md).
 
 ### Cross-context helpers
 

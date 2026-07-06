@@ -8,7 +8,7 @@
 //   --publish             Flip the update-server release from draft → published so
 //                         electron-updater can read its feed. Used by the finalize CI job.
 //
-// Reads config/electron-manager.json to discover update-server (releases.repo) and
+// Reads config/omega.json5 to discover update-server (releases.repo) and
 // download-server (downloads.repo / downloads.tag). Owner falls back to the consumer's
 // own GitHub owner if not set in config.
 //

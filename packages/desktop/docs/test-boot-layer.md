@@ -105,7 +105,7 @@ The gate decides *whether* the framework boot suite runs; the env var decides *w
 
 `src/test/fixtures/consumer-app/` — a minimal, committed EM consumer (source only):
 
-- `config/electron-manager.json` — fake brand (`em-fixture`), `releases.enabled: false` (no repo discovery during the build), empty `firebaseConfig` (no Firebase hang).
+- `config/omega.json5` — fake brand (`em-fixture`), `releases.enabled: false` (no repo discovery during the build), empty `firebaseConfig` (no Firebase hang).
 - `src/main.js` / `src/preload.js` — the one-line bootstraps a real consumer ships; `main.js` creates the `main` window (`show: false`).
 - `src/views/main/index.html` + `src/assets/js/components/main/index.js` + `src/assets/scss/main.scss` — a real view/renderer/theme so webpack + sass run exactly as for a consumer.
 

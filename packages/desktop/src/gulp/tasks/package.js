@@ -1,5 +1,5 @@
 // Package the app via electron-builder, using the materialized config at
-// `dist/electron-builder.yml` (produced by gulp/build-config from electron-manager.json).
+// `dist/electron-builder.yml` (produced by gulp/build-config from omega.json5).
 // Consumers never ship an electron-builder.yml — the dist version is the only source of truth.
 //
 // This task does NOT publish — it just produces local artifacts under `release/`.
@@ -19,7 +19,7 @@ module.exports = function packageApp(done) {
   const config = path.join(projectRoot, 'dist', 'electron-builder.yml');
 
   if (!jetpack.exists(config)) {
-    return done(new Error(`Missing ${config}. Run gulp/build-config first (it generates this file from electron-manager.json).`));
+    return done(new Error(`Missing ${config}. Run gulp/build-config first (it generates this file from omega.json5).`));
   }
 
   // Resolve electron-builder from the consumer's node_modules first, then EM's bundled one.

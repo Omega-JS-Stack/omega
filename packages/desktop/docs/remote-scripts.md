@@ -116,7 +116,7 @@ manager.remoteScripts.clearExecuted();
 
 ## Config
 
-Optional `remoteScripts` block in `config/electron-manager.json`:
+Optional `remoteScripts` block in `config/omega.json5`:
 
 ```json5
 {

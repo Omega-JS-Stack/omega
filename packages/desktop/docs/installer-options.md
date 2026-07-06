@@ -12,7 +12,7 @@ EM picks specific installer types because they're the only ones that play well w
 | **Windows** | `nsis` | The only target that integrates with `electron-updater` for delta updates. Squirrel.Windows works too but installs to a weird per-user location with no Add/Remove Programs entry. MSI uses Windows Installer's own update mechanism (no electron-updater). |
 | **Linux** | `deb` + `AppImage` (+ optional `snap`) | `deb` for Ubuntu/Debian/Mint users, `AppImage` for distro-agnostic distribution. `snap` opt-in for Snap Store distribution. |
 
-If you genuinely need a different target (Squirrel for "no installer UI" UX, MSI for enterprise, MAS for App Store), use the raw `electronBuilder` override block in `electron-manager.json` — that's an escape hatch into electron-builder's full config surface. We just don't expose those choices in the consumer-facing API to keep the default path safe.
+If you genuinely need a different target (Squirrel for "no installer UI" UX, MSI for enterprise, MAS for App Store), use the raw `electronBuilder` override block in `omega.json5` — that's an escape hatch into electron-builder's full config surface. We just don't expose those choices in the consumer-facing API to keep the default path safe.
 
 ## Cross-platform fields (`app.*`)
 
@@ -38,16 +38,16 @@ These apply identically on every OS — set them once.
 
 If you need a per-platform value not in the table, use the raw `electronBuilder.mac.category` / `electronBuilder.linux.category` override.
 
-## Windows (`targets.win.*`)
+## Windows (`platforms.win.*`)
 
 | Field | Default | What it does |
 |---|---|---|
-| `targets.win.arch` | `['x64', 'ia32']` | Architectures. Single multi-arch NSIS installer ships both. |
-| `targets.win.oneClick` | `true` | Slack-style: no installer wizard, just installs immediately to `%LocalAppData%\Programs\<App>`. Set to `false` for a standard "Next, Next, Finish" wizard. |
-| `targets.win.desktopShortcut` | `true` | Create desktop shortcut. |
-| `targets.win.startMenuShortcut` | `true` | Create Start menu entry. |
-| `targets.win.runAfterFinish` | `true` | Auto-launch the app when the install completes. |
-| `targets.win.perMachine` | `false` | Install for current user. Set `true` to install for all users (requires UAC elevation; **incompatible with `oneClick: true`**). |
+| `platforms.win.arch` | `['x64', 'ia32']` | Architectures. Single multi-arch NSIS installer ships both. |
+| `platforms.win.oneClick` | `true` | Slack-style: no installer wizard, just installs immediately to `%LocalAppData%\Programs\<App>`. Set to `false` for a standard "Next, Next, Finish" wizard. |
+| `platforms.win.desktopShortcut` | `true` | Create desktop shortcut. |
+| `platforms.win.startMenuShortcut` | `true` | Create Start menu entry. |
+| `platforms.win.runAfterFinish` | `true` | Auto-launch the app when the install completes. |
+| `platforms.win.perMachine` | `false` | Install for current user. Set `true` to install for all users (requires UAC elevation; **incompatible with `oneClick: true`**). |
 
 ### Why `oneClick: true` by default
 
@@ -61,14 +61,14 @@ If your app needs enterprise deployment, set `oneClick: false` to opt into the w
 
 ### `ia32` (32-bit Windows)
 
-EM ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-bit Windows usage is <3%, but the cost of including it is just ~2x installer size + ~2x signing time — no separate code path. Worth keeping for the long-tail user on an old Win 10 machine. To drop, set `targets.win.arch: ['x64']`.
+EM ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-bit Windows usage is <3%, but the cost of including it is just ~2x installer size + ~2x signing time — no separate code path. Worth keeping for the long-tail user on an old Win 10 machine. To drop, set `platforms.win.arch: ['x64']`.
 
-## macOS (`targets.mac.*`)
+## macOS (`platforms.mac.*`)
 
 | Field | Default | What it does |
 |---|---|---|
-| `targets.mac.arch` | `['universal']` | Architectures. `universal` produces one .dmg/.zip that runs on both Intel and Apple Silicon (electron-builder lipo's the two arch binaries together). Override to `['arm64']` or `['x64']` for single-arch builds. |
-| `targets.mac.mas.*` | (stubbed) | Mac App Store distribution config. **Not yet implemented** — see "MAS distribution" below. |
+| `platforms.mac.arch` | `['universal']` | Architectures. `universal` produces one .dmg/.zip that runs on both Intel and Apple Silicon (electron-builder lipo's the two arch binaries together). Override to `['arm64']` or `['x64']` for single-arch builds. |
+| `platforms.mac.mas.*` | (stubbed) | Mac App Store distribution config. **Not yet implemented** — see "MAS distribution" below. |
 
 ### Universal binary trade-off
 
@@ -76,22 +76,22 @@ EM ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-
 
 ### MAS distribution (stubbed)
 
-Mac App Store config keys exist in EM (`targets.mac.mas.{enabled, provisioningProfile, entitlements, entitlementsInherit}`) but **are not yet wired up** — setting `enabled: true` triggers an audit warning and is otherwise ignored. The standard DMG+zip targets still build normally.
+Mac App Store config keys exist in EM (`platforms.mac.mas.{enabled, provisioningProfile, entitlements, entitlementsInherit}`) but **are not yet wired up** — setting `enabled: true` triggers an audit warning and is otherwise ignored. The standard DMG+zip targets still build normally.
 
 When MAS support lands, the work covered will be: separate `mas` target alongside DMG/zip, separate sandbox entitlements (4 plist files instead of 1), provisioning profile copy from `config/embedded.provisionprofile`, application-groups derivation, App Store Connect submission flow (manual via Transporter, not GH Releases).
 
 Reference plists from a working MAS-published Electron app (Slapform) are archived at `<em>/src/defaults/_mas/` for the eventual implementation.
 
-## Linux (`targets.linux.*`)
+## Linux (`platforms.linux.*`)
 
 | Field | Default | What it does |
 |---|---|---|
-| `targets.linux.arch` | `['x64']` | Architectures. ia32 is essentially extinct on modern Linux. |
-| `targets.linux.snap.enabled` | `true` (in scaffold) | Snap Store publishing. EM scaffold ships this `true`; programmatic callers without the field default to OFF. Auto-skipped if `SNAPCRAFT_STORE_CREDENTIALS` env is unset. |
-| `targets.linux.snap.confinement` | `'strict'` | `strict` (sandboxed) or `classic` (unrestricted, requires Snap Store approval). |
-| `targets.linux.snap.grade` | `'stable'` | `stable` or `devel`. |
-| `targets.linux.snap.autoStart` | `true` | Register the snap to auto-start on login. |
-| `targets.linux.snap.channels` | `['stable']` | Snap Store channels to publish to. |
+| `platforms.linux.arch` | `['x64']` | Architectures. ia32 is essentially extinct on modern Linux. |
+| `platforms.linux.snap.enabled` | `true` (in scaffold) | Snap Store publishing. EM scaffold ships this `true`; programmatic callers without the field default to OFF. Auto-skipped if `SNAPCRAFT_STORE_CREDENTIALS` env is unset. |
+| `platforms.linux.snap.confinement` | `'strict'` | `strict` (sandboxed) or `classic` (unrestricted, requires Snap Store approval). |
+| `platforms.linux.snap.grade` | `'stable'` | `stable` or `devel`. |
+| `platforms.linux.snap.autoStart` | `true` | Register the snap to auto-start on login. |
+| `platforms.linux.snap.channels` | `['stable']` | Snap Store channels to publish to. |
 
 ### Snap Store publishing
 
@@ -112,7 +112,7 @@ To turn snap publishing on for a project that already has the field set to `true
 3. Run `npx mgr push-secrets` to flow the secret to GitHub Actions.
 4. Next `npm run release` builds + uploads the snap automatically. No config flip needed.
 
-Reference: the workflow's Linux step conditionally installs `snapcraft` (`sudo snap install snapcraft --classic`) only when both (a) `targets.linux.snap.enabled !== false` AND (b) `SNAPCRAFT_STORE_CREDENTIALS` secret is present. Mirrors the build-config-side gate.
+Reference: the workflow's Linux step conditionally installs `snapcraft` (`sudo snap install snapcraft --classic`) only when both (a) `platforms.linux.snap.enabled !== false` AND (b) `SNAPCRAFT_STORE_CREDENTIALS` secret is present. Mirrors the build-config-side gate.
 
 ## File associations + custom protocols (uncommon)
 
@@ -135,7 +135,7 @@ Available for the rare app that needs them — both pass through to electron-bui
 
 ## Raw `electronBuilder` overrides (escape hatch)
 
-For anything EM doesn't expose, set the value directly on `config.electronBuilder.*` in `electron-manager.json`. EM merges your overrides on top of its generated config:
+For anything EM doesn't expose, set the value directly on `config.electronBuilder.*` in `omega.json5`. EM merges your overrides on top of its generated config:
 
 **Gotcha: the merge REPLACES arrays wholesale** (objects deep-merge, arrays don't). A `target:` override must restate the FULL target list — `target: [{ target: 'mas' }]` alone would silently DROP dmg+zip and break auto-update.
 

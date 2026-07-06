@@ -16,7 +16,7 @@ function getFunctionsUrl(environment) {
   const projectId = this?.config?.firebaseConfig?.projectId;
 
   if (!projectId) {
-    throw new Error('firebaseConfig.projectId not set in config/electron-manager.json');
+    throw new Error('firebaseConfig.projectId not set in config/omega.json5');
   }
 
   // Local for development OR testing; production otherwise.
@@ -38,7 +38,7 @@ function getApiUrl(environment) {
   // Prod: api.<authDomain>. Mirrors web-manager.getApiUrl behavior.
   const authDomain = this?.config?.firebaseConfig?.authDomain;
   if (!authDomain) {
-    throw new Error('firebaseConfig.authDomain not set in config/electron-manager.json');
+    throw new Error('firebaseConfig.authDomain not set in config/omega.json5');
   }
 
   return `https://api.${authDomain}`;
@@ -58,7 +58,7 @@ function getWebsiteUrl(environment) {
 
   const url = this?.config?.brand?.url;
   if (!url) {
-    throw new Error('brand.url not set in config/electron-manager.json');
+    throw new Error('brand.url not set in config/omega.json5');
   }
   return url;
 }
@@ -78,7 +78,7 @@ function getAuthUrl(environment, returnUrl) {
   const site = this.getWebsiteUrl(environment);
   const brandId = this?.config?.brand?.id;
   if (!brandId) {
-    throw new Error('brand.id not set in config/electron-manager.json');
+    throw new Error('brand.id not set in config/omega.json5');
   }
 
   const tokenUrl = new URL('/token', site);

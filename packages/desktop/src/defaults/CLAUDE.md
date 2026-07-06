@@ -47,8 +47,8 @@ npx mgr install live # restore the published electron-manager from npm
 
 ## Where things live
 
-- `config/electron-manager.json` — JSON5 config: brand, autoUpdate, tray, menu, deep links, signing strategy, startup mode.
-- Packaging config — fully generated. EM produces `dist/electron-builder.yml` from `config/electron-manager.json` (brand/app/signing) + EM's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `electron-manager.json` if you genuinely need to.
+- `config/omega.json5` — the single OMEGA config (JSON5): shared sections (brand, analytics, payment, firebaseConfig, sentry, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, downloads, remoteConfig, restartManager) under `targets.desktop`.
+- Packaging config — fully generated. EM produces `dist/electron-builder.yml` from `config/omega.json5` (brand/app/signing) + EM's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `omega.json5` if you genuinely need to.
 - `hooks/notarize/post.js` — optional post-notarize extension hook (EM owns the actual `afterSign` notarize step).
 - `src/main.js` — main-process entry. One-line bootstrap of `electron-manager/main`.
 - `src/preload.js` — preload entry. Exposes `window.em` via contextBridge.

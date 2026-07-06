@@ -6,17 +6,17 @@ const path    = require('path');
 const fs      = require('fs');
 const os      = require('os');
 
-// Helper: stage a consumer dir with config/electron-manager.json containing the given
-// targets.win.signing.strategy. Returns the abs path to the temp dir; caller is responsible
-// for chdir'ing into it and cleaning up.
+// Helper: stage a consumer dir with config/omega.json5 containing the given
+// platforms.win.signing.strategy (under targets.desktop in the raw file). Returns the
+// abs path to the temp dir; caller is responsible for chdir'ing into it and cleaning up.
 function stageStrategyConfig({ strategy, cloudProvider }) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-sign-'));
   fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
   const signing = { strategy };
   if (cloudProvider) signing.cloud = { provider: cloudProvider };
   fs.writeFileSync(
-    path.join(tmp, 'config', 'electron-manager.json'),
-    JSON.stringify({ targets: { win: { signing } } }),
+    path.join(tmp, 'config', 'omega.json5'),
+    JSON.stringify({ targets: { desktop: { platforms: { win: { signing } } } } }),
   );
   return tmp;
 }

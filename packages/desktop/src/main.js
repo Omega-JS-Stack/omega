@@ -1,5 +1,5 @@
 // Main-process Manager singleton.
-// Consumer entry: `new (require('electron-manager/main'))().initialize(require('../config/electron-manager.json'))`.
+// Consumer entry: `new (require('electron-manager/main'))().initialize()` — config auto-loads (config/omega.json5).
 // Boot sequence below — each step delegates to a `lib/*.js` module. Stubs today, real impls land in pass 2.
 
 const LoggerLite = require('./lib/logger-lite.js');
@@ -120,24 +120,23 @@ Manager.prototype.relaunch = function (options) {
 Manager.prototype.initialize = async function (consumerConfig, options) {
   const self = this;
 
-  // Accept either a parsed config object, a string path to a JSON5 file, or nothing.
-  // Default config resolution order (when called with no arg):
+  // Accept either an already-RESOLVED config object, a string path to a consumer
+  // project dir, or nothing. Default resolution order (when called with no arg):
   //   1. EM_BUILD_JSON.config — injected at build time by webpack DefinePlugin. This is
-  //      authoritative in packaged apps because config/electron-manager.json is inside the
-  //      asar — not loadable as JSON5 from disk. EM_BUILD_JSON is a snapshot of that exact
-  //      file taken at build time.
-  //   2. <appRoot>/config/electron-manager.json — fallback for dev mode where EM is loaded
-  //      directly (no webpack bundling). appRoot resolves to the consumer's project dir.
+  //      authoritative in packaged apps because config/omega.json5 is inside the asar —
+  //      not loadable from disk. It's the RESOLVED config (Manager.getConfig() output —
+  //      shared sections + targets.desktop overlaid) snapshotted at build time.
+  //   2. <appRoot>/config/omega.json5 — resolved via @omegajs/config for dev mode where
+  //      EM is loaded directly (no webpack bundling). appRoot = the consumer project dir.
   if (typeof consumerConfig === 'string') {
-    consumerConfig = loadConfigFromFile(consumerConfig);
+    consumerConfig = loadResolvedConfig(consumerConfig);
   } else if (!consumerConfig) {
     // Try EM_BUILD_JSON (set by DefinePlugin in packaged builds) first.
     if (typeof EM_BUILD_JSON !== 'undefined' && EM_BUILD_JSON?.config) {
       consumerConfig = EM_BUILD_JSON.config;
     } else {
-      const path = require('path');
       const appRoot = require('./utils/app-root.js')();
-      consumerConfig = loadConfigFromFile(path.join(appRoot, 'config', 'electron-manager.json'));
+      consumerConfig = loadResolvedConfig(appRoot);
     }
   }
 
@@ -194,15 +193,14 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   } } catch (e) { self.logger.warn(`signing: check failed (${e.message})`); }
 
   // Schema validation. Hard-fail boot if required fields are missing — same rules as
-  // gulp/audit (single source of truth in src/config/schema.js). We do this before any
-  // lib initializes so a misconfigured app fails loud + early instead of partway through
-  // boot with a confusing stack trace.
+  // gulp/audit (single source of truth in @omegajs/config: shared schema + the desktop
+  // target refinements). We do this before any lib initializes so a misconfigured app
+  // fails loud + early instead of partway through boot with a confusing stack trace.
   {
-    const { validateConfig, formatErrors } = require('./utils/validate-config.js');
-    const schema = require('./config/schema.js');
-    const { errors } = validateConfig(self.config, schema);
+    const { validateConfig, formatErrors } = require('@omegajs/config');
+    const { errors } = validateConfig(self.config, { target: 'desktop' });
     if (errors.length > 0) {
-      throw new Error(`electron-manager: config validation failed — fix the following in config/electron-manager.json:\n${formatErrors(errors)}`);
+      throw new Error(`electron-manager: config validation failed — fix the following in config/omega.json5:\n${formatErrors(errors)}`);
     }
   }
 
@@ -501,18 +499,17 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   return self;
 };
 
-function loadConfigFromFile(filepath) {
-  const fs = require('fs');
-  // json5 is bundled via webpack — handle both interop shapes (`.parse` vs `.default.parse`)
-  // depending on how webpack's __esModule wrapping resolves at the call site.
-  const json5Mod = require('json5');
-  const JSON5 = json5Mod.parse ? json5Mod : (json5Mod.default || json5Mod);
+function loadResolvedConfig(projectDir) {
+  // @omegajs/config is vendored into dist (and bundled by webpack from there) — it
+  // finds config/omega.json5 under the project dir and resolves the desktop target
+  // (shared sections + targets.desktop overlaid, brand-monorepo walk-up included).
+  const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
 
-  if (!fs.existsSync(filepath)) {
+  if (!hasOmegaConfig(projectDir)) {
     return {};
   }
 
-  return JSON5.parse(fs.readFileSync(filepath, 'utf8'));
+  return loadConfig(projectDir, 'desktop').config;
 }
 
 // Cross-context helpers (isDevelopment/isProduction/isTesting + getFunctionsUrl/getApiUrl

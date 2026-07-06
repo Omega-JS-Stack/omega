@@ -11,13 +11,6 @@
       icon: '',
     },
   },
-  startup: {
-    mode: 'normal',
-  },
-  // Skip release/repo discovery during the fixture's production build (no GitHub repo behind it).
-  releases: {
-    enabled: false,
-  },
   sentry: {
     dsn: '',
   },
@@ -28,4 +21,15 @@
   },
   // Empty → web-manager-bridge skips Firebase init (no hang on a fake projectId).
   firebaseConfig: {},
+  targets: {
+    desktop: {
+      startup: {
+        mode: 'normal',
+      },
+      // Skip release/repo discovery during the fixture's production build (no GitHub repo behind it).
+      releases: {
+        enabled: false,
+      },
+    },
+  },
 }

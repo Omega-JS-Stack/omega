@@ -43,7 +43,7 @@ manager.windows.create('settings', { width: 600,  height: 480 });
 
 ## Config (optional)
 
-If you want to override defaults persistently (without typing them at every `create()` call), add a `windows:` block to `config/electron-manager.json`:
+If you want to override defaults persistently (without typing them at every `create()` call), add a `windows:` block to `config/omega.json5`:
 
 ```jsonc
 "windows": {

@@ -1,4 +1,4 @@
-// Audit — fail-fast schema + filesystem checks for the consumer's config/electron-manager.json.
+// Audit — fail-fast schema + filesystem checks for the consumer's config/omega.json5.
 //
 // Runs as part of `gulp build` between sass/webpack/html and build-config. Catches the
 // "I forgot to set X" / "icon path is wrong" / "main entry was renamed" footguns at build time
@@ -18,8 +18,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const Manager = new (require('../../build.js'));
-const { validateConfig, formatErrors } = require('../../utils/validate-config.js');
-const schema = require('../../config/schema.js');
+const { validateConfig } = require('@omegajs/config');
 
 const logger = Manager.logger('audit');
 
@@ -35,8 +34,9 @@ module.exports = function audit(done) {
     if (!jetpack.exists(abs)) errors.push(`${label} not found at ${rel}`);
   }
 
-  // 1. Schema-driven config validation. Single source of truth in src/config/schema.js.
-  const { errors: schemaErrors } = validateConfig(config, schema);
+  // 1. Schema-driven config validation. Single source of truth in @omegajs/config
+  // (shared schema + the desktop target refinements).
+  const { errors: schemaErrors } = validateConfig(config, { target: 'desktop' });
   errors.push(...schemaErrors);
 
   // 2. File existence for paths the build references (not in schema because these are
@@ -58,15 +58,15 @@ module.exports = function audit(done) {
 
   // MAS distribution — currently STUBBED. Surface a warning if a consumer tries to
   // turn it on so they know it's not yet wired up.
-  if (config.targets?.mac?.mas?.enabled === true) {
-    warnings.push('targets.mac.mas.enabled is true but Mac App Store distribution is not yet implemented in EM (the config keys are reserved for a future release). The standard mac DMG/zip targets will still build normally — the MAS variant is silently skipped.');
+  if (config.platforms?.mac?.mas?.enabled === true) {
+    warnings.push('platforms.mac.mas.enabled is true but Mac App Store distribution is not yet implemented in EM (the config keys are reserved for a future release). The standard mac DMG/zip targets will still build normally — the MAS variant is silently skipped.');
   }
 
   // Snap publishing — warn if enabled but the SNAPCRAFT_STORE_CREDENTIALS secret
   // hasn't been set up. The build will still succeed locally, but `electron-builder publish`
   // will fail at upload time without that credential. Catch it early.
-  if (config.targets?.linux?.snap?.enabled === true && Manager.isPublishMode() && !process.env.SNAPCRAFT_STORE_CREDENTIALS) {
-    warnings.push('targets.linux.snap.enabled is true but SNAPCRAFT_STORE_CREDENTIALS is not set in env — snap publish will fail. Run `snapcraft export-login -` locally to mint, paste into .env, then `mgr push-secrets`.');
+  if (config.platforms?.linux?.snap?.enabled === true && Manager.isPublishMode() && !process.env.SNAPCRAFT_STORE_CREDENTIALS) {
+    warnings.push('platforms.linux.snap.enabled is true but SNAPCRAFT_STORE_CREDENTIALS is not set in env — snap publish will fail. Run `snapcraft export-login -` locally to mint, paste into .env, then `mgr push-secrets`.');
   }
 
   // Report.

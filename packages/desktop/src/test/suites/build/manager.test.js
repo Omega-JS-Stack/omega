@@ -147,7 +147,7 @@ module.exports = {
       name: 'getWindowsSignStrategy defaults to self-hosted when no config',
       run: (ctx) => {
         // No EM_WIN_SIGN_STRATEGY env-var support anymore — config is the only source.
-        // Run from a cwd with no electron-manager.json to confirm the default.
+        // Run from a cwd with no omega.json5 to confirm the default.
         const fs = require('fs'); const os = require('os'); const path = require('path');
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-strategy-'));
         const orig = process.cwd();
@@ -161,13 +161,13 @@ module.exports = {
       },
     },
     {
-      name: 'getWindowsSignStrategy reads config.targets.win.signing.strategy',
+      name: 'getWindowsSignStrategy reads config platforms.win.signing.strategy',
       run: (ctx) => {
         const fs = require('fs'); const os = require('os'); const path = require('path');
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-strategy-'));
         fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-        fs.writeFileSync(path.join(tmp, 'config', 'electron-manager.json'),
-          `{ targets: { win: { signing: { strategy: 'cloud' } } } }`);
+        fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'),
+          `{ targets: { desktop: { platforms: { win: { signing: { strategy: 'cloud' } } } } } }`);
         const orig = process.cwd();
         try {
           process.chdir(tmp);

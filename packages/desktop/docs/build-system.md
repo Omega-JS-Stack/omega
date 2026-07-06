@@ -95,7 +95,7 @@ DefinePlugin replaces the bare identifier `EM_BUILD_JSON` with the parsed config
 
 ## electron-builder
 
-EM **generates** `dist/electron-builder.yml` from `config/electron-manager.json` + EM defaults — the consumer never ships an `electron-builder.yml`. `gulp/build-config` does the materialization, applying:
+EM **generates** `dist/electron-builder.yml` from `config/omega.json5` + EM defaults — the consumer never ships an `electron-builder.yml`. `gulp/build-config` does the materialization, applying:
 
 - App metadata: `appId`, `productName`, `copyright` (with `{YEAR}` token expansion to the current year)
 - App-level cross-platform fields: `category` mapping, `languages`, `darkModeSupport`
@@ -123,7 +123,7 @@ Environment variables (set by `npm run build` / `npm run release`):
 
 ## Windows code signing
 
-Strategy-pluggable via `targets.win.signing.strategy` in `config/electron-manager.json`:
+Strategy-pluggable via `platforms.win.signing.strategy` in `config/omega.json5`:
 
 | Strategy | Where signing runs | When to use |
 |---|---|---|
@@ -131,7 +131,7 @@ Strategy-pluggable via `targets.win.signing.strategy` in `config/electron-manage
 | `cloud` | `windows-latest` runner shells out to a cloud signing CLI (Azure Trusted Signing / SSL.com / DigiCert KeyLocker) | Future migration target |
 | `local` | Developer's Windows machine after CI uploads unsigned artifact | Fallback when no runner is available |
 
-The `gulp/build-config` task and `electron-builder.yml`'s `win.sign` hook both honor `targets.win.signing.strategy` so the same code path drives all three. Provider modules live in `src/lib/sign-providers/{ev,azure,sslcom,digicert}.js` (Pass 3).
+The `gulp/build-config` task and `electron-builder.yml`'s `win.sign` hook both honor `platforms.win.signing.strategy` so the same code path drives all three. Provider modules live in `src/lib/sign-providers/{ev,azure,sslcom,digicert}.js` (Pass 3).
 
 ## GitHub Actions
 

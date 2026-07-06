@@ -6,7 +6,7 @@ const path = require('path');
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'build-config — generate electron-builder.yml from electron-manager.json',
+  description: 'build-config — generate electron-builder.yml from omega.json5',
   tests: [
     {
       name: 'task module exports a function plus baseConfig + deepMerge',
@@ -183,10 +183,10 @@ module.exports = {
       },
     },
     {
-      name: 'baseConfig: targets.win.oneClick: false produces wizard installer',
+      name: 'baseConfig: platforms.win.oneClick: false produces wizard installer',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
-        const out = baseConfig({ targets: { win: { oneClick: false } } });
+        const out = baseConfig({ platforms: { win: { oneClick: false } } });
         ctx.expect(out.nsis.oneClick).toBe(false);
         ctx.expect(out.nsis.allowToChangeInstallationDirectory).toBe(true);
       },
@@ -194,7 +194,7 @@ module.exports = {
     {
       name: 'baseConfig: snap missing from config — no snap target (default OFF)',
       run: (ctx) => {
-        // Behavior contract: callers who never set targets.linux.snap.enabled should
+        // Behavior contract: callers who never set platforms.linux.snap.enabled should
         // never get a snap target emitted. The scaffold ships `enabled: true` so new
         // projects opt in by virtue of the scaffold; this case is for older projects
         // or programmatic callers that don't supply the field.
@@ -218,7 +218,7 @@ module.exports = {
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
         delete process.env.SNAPCRAFT_STORE_CREDENTIALS;
         try {
-          const out = baseConfig({ targets: { linux: { snap: { enabled: true } } } });
+          const out = baseConfig({ platforms: { linux: { snap: { enabled: true } } } });
           ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeUndefined();
           ctx.expect(out.snap).toBeUndefined();
         } finally {
@@ -233,7 +233,7 @@ module.exports = {
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
         process.env.SNAPCRAFT_STORE_CREDENTIALS = 'fake-creds-blob';
         try {
-          const out = baseConfig({ targets: { linux: { snap: { enabled: false } } } });
+          const out = baseConfig({ platforms: { linux: { snap: { enabled: false } } } });
           ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeUndefined();
           ctx.expect(out.snap).toBeUndefined();
         } finally {
@@ -249,7 +249,7 @@ module.exports = {
         const saved = process.env.SNAPCRAFT_STORE_CREDENTIALS;
         process.env.SNAPCRAFT_STORE_CREDENTIALS = 'fake-creds-blob';
         try {
-          const out = baseConfig({ targets: { linux: { snap: { enabled: true } } } });
+          const out = baseConfig({ platforms: { linux: { snap: { enabled: true } } } });
           ctx.expect(out.linux.target.find((t) => t.target === 'snap')).toBeDefined();
           ctx.expect(out.snap).toBeDefined();
           ctx.expect(out.snap.confinement).toBe('strict');
@@ -262,11 +262,11 @@ module.exports = {
       },
     },
     {
-      name: 'baseConfig: targets.<plat>.arch overrides apply per-target',
+      name: 'baseConfig: platforms.<plat>.arch overrides apply per-platform',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const out = baseConfig({
-          targets: {
+          platforms: {
             mac:   { arch: ['arm64'] },
             win:   { arch: ['x64'] },
             linux: { arch: ['arm64'] },

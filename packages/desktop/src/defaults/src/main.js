@@ -1,4 +1,4 @@
-// Main-process entry. Config is auto-loaded from config/electron-manager.json (JSON5).
+// Main-process entry. Config is auto-loaded from config/omega.json5 (resolved for the desktop target).
 const Manager = require('electron-manager/main');
 
 const manager = new Manager();

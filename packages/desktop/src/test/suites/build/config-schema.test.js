@@ -1,21 +1,24 @@
-// Validates the framework default config (src/defaults/config/electron-manager.json) parses
-// as JSON5 and has all the keys the framework code reads.
+// Validates the framework default config (src/defaults/config/omega.json5) parses as
+// JSON5 and — RESOLVED for the desktop target via @omegajs/config — has all the keys
+// the framework code reads.
 //
-// This is a SUITE (sequential, shared state) — the parsed config is loaded once by the first
-// test and reused via state by the rest.
+// This is a SUITE (sequential, shared state) — the raw file is loaded once by the first
+// test, the resolved config once, and both are reused via state by the rest.
 
 const path = require('path');
 const fs = require('fs');
 const JSON5 = require('json5');
+const { loadConfig } = require('@omegajs/config');
 
 const Manager = require('../../../build.js');
 const root = Manager.getRootPath('main');
-const defaultConfigPath = path.join(root, 'dist', 'defaults', 'config', 'electron-manager.json');
+const defaultsDir = path.join(root, 'dist', 'defaults');
+const defaultConfigPath = path.join(defaultsDir, 'config', 'omega.json5');
 
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'Default config schema',
+  description: 'Default config schema (omega.json5)',
   tests: [
     {
       name: 'default config file exists',
@@ -27,8 +30,8 @@ module.exports = {
     {
       name: 'parses as JSON5',
       run: (ctx) => {
-        ctx.state.cfg = JSON5.parse(ctx.state.raw);
-        ctx.expect(ctx.state.cfg).toBeTruthy();
+        ctx.state.rawCfg = JSON5.parse(ctx.state.raw);
+        ctx.expect(ctx.state.rawCfg).toBeTruthy();
       },
     },
     {
@@ -40,7 +43,28 @@ module.exports = {
       },
     },
     {
-      name: 'has brand block with id + name',
+      name: 'resolves for the desktop target with ZERO validation errors',
+      run: (ctx) => {
+        const { config, errors, enabled } = loadConfig(defaultsDir, 'desktop');
+        ctx.expect(errors).toEqual([]);
+        ctx.expect(enabled).toBe(true);
+        ctx.state.cfg = config;
+      },
+    },
+    {
+      name: 'raw file: shared sections at the top level, desktop settings under targets.desktop',
+      run: (ctx) => {
+        const raw = ctx.state.rawCfg;
+        ctx.expect(raw.brand).toBeTruthy();
+        ctx.expect(raw.targets.desktop).toBeTruthy();
+        // Desktop-scoped blocks must NOT sit at the raw top level.
+        ctx.expect(raw.app).toBeUndefined();
+        ctx.expect(raw.platforms).toBeUndefined();
+        ctx.expect(raw.startup).toBeUndefined();
+      },
+    },
+    {
+      name: 'resolved: has brand block with id + name',
       run: (ctx) => {
         ctx.expect(ctx.state.cfg.brand).toBeTruthy();
         ctx.expect(ctx.state.cfg.brand.id).toBeTruthy();
@@ -48,7 +72,7 @@ module.exports = {
       },
     },
     {
-      name: 'has app block (appId + productName may be null — derived from brand)',
+      name: 'resolved: has app block (appId + productName may be null — derived from brand)',
       run: (ctx) => {
         // appId and productName are derived from brand.id / brand.name at config-load
         // time (Manager.getConfig). The raw scaffold leaves them null on purpose so the
@@ -60,7 +84,7 @@ module.exports = {
       },
     },
     {
-      name: 'has autoUpdate block',
+      name: 'resolved: has autoUpdate block',
       run: (ctx) => {
         ctx.expect(ctx.state.cfg.autoUpdate).toBeTruthy();
         ctx.expect(typeof ctx.state.cfg.autoUpdate.enabled).toBe('boolean');
@@ -88,12 +112,12 @@ module.exports = {
       },
     },
     {
-      name: 'has targets.win.signing block (Windows-specific signing config)',
+      name: 'resolved: has platforms.win.signing block (Windows-specific signing config)',
       run: (ctx) => {
-        ctx.expect(ctx.state.cfg.targets).toBeTruthy();
-        ctx.expect(ctx.state.cfg.targets.win).toBeTruthy();
-        ctx.expect(ctx.state.cfg.targets.win.signing).toBeTruthy();
-        ctx.expect(['self-hosted', 'cloud', 'local']).toContain(ctx.state.cfg.targets.win.signing.strategy);
+        ctx.expect(ctx.state.cfg.platforms).toBeTruthy();
+        ctx.expect(ctx.state.cfg.platforms.win).toBeTruthy();
+        ctx.expect(ctx.state.cfg.platforms.win.signing).toBeTruthy();
+        ctx.expect(['self-hosted', 'cloud', 'local']).toContain(ctx.state.cfg.platforms.win.signing.strategy);
       },
     },
     {

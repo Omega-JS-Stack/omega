@@ -14,7 +14,7 @@ EM separates **three** GitHub repos for a typical app:
 
 Why three? Auto-update feeds and marketing downloads MUST be publicly accessible (no auth headers in `electron-updater` or in `<a href>`). Your app source can stay private. The two public repos contain only binaries — no source code.
 
-`npx mgr setup` auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/electron-manager.json`:
+`npx mgr setup` auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/omega.json5`:
 
 ```jsonc
 releases: {
@@ -127,7 +127,7 @@ CI handles the cross-platform matrix. The default workflow (`.github/workflows/b
 ```
 build (matrix: macos-latest, windows-latest, ubuntu-latest)
   └─ npm ci → npx mgr setup → platform-specific signing
-windows-sign (only if targets.win.signing.strategy != "local")
+windows-sign (only if platforms.win.signing.strategy != "local")
   └─ runs on a self-hosted runner with EV USB token (or hosted windows-latest for cloud strategy)
   └─ signs + uploads release artifacts
 ```
@@ -135,7 +135,7 @@ windows-sign (only if targets.win.signing.strategy != "local")
 The macOS step decodes `secrets.CSC_LINK` and `secrets.APPLE_API_KEY` (uploaded by `npx mgr push-secrets` as base64-encoded file contents) back to disk before running `npm run release`.
 
 To trigger a release:
-1. Bump version in `package.json` and `config/electron-manager.json` (`app.version`).
+1. Bump version in `package.json` and `config/omega.json5` (`app.version`).
 2. `git push` — workflow runs.
 3. Watch the workflow at `https://github.com/<owner>/<repo>/actions`.
 
@@ -149,7 +149,7 @@ The workflow's `softprops/action-gh-release@v2` step uploads to the matching tag
 
 ## Windows signing strategies
 
-Set `targets.win.signing.strategy` in `config/electron-manager.json`:
+Set `platforms.win.signing.strategy` in `config/omega.json5`:
 
 | Strategy | What runs | When to use |
 |---|---|---|
@@ -174,7 +174,7 @@ For details see [`docs/signing.md`](signing.md#windows-setup).
 - Check the App Store Connect notarization history at https://appstoreconnect.apple.com/apps for status / errors.
 
 ### "Hardened runtime requires entitlements"
-- EM generates `dist/config/entitlements.mac.plist` at build time from defaults + your `entitlements.mac` overrides in `config/electron-manager.json`.
+- EM generates `dist/config/entitlements.mac.plist` at build time from defaults + your `entitlements.mac` overrides in `config/omega.json5`.
 - For extra capabilities (camera, mic, etc.), add keys to `entitlements.mac`. See `docs/signing.md` for the override syntax.
 
 ### CI: GitHub Releases upload fails

@@ -15,14 +15,14 @@ Living checklist of what's done, what's in progress, and what's deferred. Update
 
 - **Every feature pass writes its tests AND its docs in the same pass.** Real impl + test suite + `docs/<topic>.md` (or update if it exists) + both `npm test` (EM) and `npx mgr test` (somiibo) green before the pass is done. No "tests later," no "docs later." Update PROGRESS.md last. CLAUDE.md / README.md only need touching when a convention or top-level surface changes — feature-level details belong in `docs/<topic>.md`.
 - **CLI alias** — canonical command is `npx mgr`. `em` and `electron-manager` are also bound.
-- **Config format** — `config/electron-manager.json` is **JSON5** (unquoted keys, single-quoted strings, trailing commas, comments). Loaded via `JSON5.parse`. Filename stays `.json` for editor familiarity.
-- **One-line bootstrap** — `new (require('electron-manager/main'))().initialize()` auto-loads config from `config/electron-manager.json`. Pass an object to override, pass a string path to load a different file.
+- **Config format** — `config/omega.json5` (the single OMEGA config, JSON5), resolved via the vendored `@omegajs/config`: shared sections top-level, desktop settings under `targets.desktop` (overlaid onto the top level at load). The legacy `config/electron-manager.json` is no longer read — migration table in the monorepo's `docs/config.md`.
+- **One-line bootstrap** — `new (require('electron-manager/main'))().initialize()` auto-loads + resolves config from `config/omega.json5`. Pass a resolved object to override, pass a string project-dir path to resolve a different project.
 - **Lib module shape** — every `src/lib/<name>.js` exports a singleton object with at minimum `initialize(manager)`. Stub modules accept the call as a no-op + log; real impls fill in.
 - **Per-process imports** — `electron-manager/main`, `/renderer`, `/preload`, `/build`, `/lib/<name>`.
 - **Module format** — CommonJS via webpack (`require()` everywhere). ESM-readiness preserved (one `module.exports` per file).
 - **Manager surface** — main-process `Manager` instance exposes `.config`, `.logger`, plus references to every lib (`.storage`, `.tray`, `.windows`, `.deepLink`, etc.) so consumer code can reach features by name.
 
-## Schema (`config/electron-manager.json`)
+## Schema (historical — `config/electron-manager.json`, superseded by `config/omega.json5`)
 
 > **NOTE**: schema below is the v1.0.0 shape. v1.0.7 simplified it considerably — see CLAUDE.md "Config flow" for the current canonical reference. Diff vs below: `tray`/`menu`/`contextMenu` blocks removed (paths conventional, disable via runtime API), `deepLinks` block removed (scheme=brand.id, routes registered at runtime), `em:` block removed (was dead config), `app.icons` block added, `entitlements.mac` block added, `startup.openAtLogin` is now `{enabled, mode}` object.
 

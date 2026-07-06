@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
+    "./config": "./dist/vendor/config/index.js",
     "./main": "./dist/main.js",
     "./renderer": "./dist/renderer.js",
     "./preload": "./dist/preload.js",
@@ -104,6 +105,7 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
+    "@omegajs/config": "*",
     "@omegajs/devkit": "*",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",

@@ -25,7 +25,7 @@ not-available   — feed says no update
 error           — checkForUpdates() or download failed; status.error.message has details
 ```
 
-## Config (`config/electron-manager.json`)
+## Config (`config/omega.json5`)
 
 ```jsonc
 autoUpdate: {

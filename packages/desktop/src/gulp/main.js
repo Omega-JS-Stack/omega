@@ -76,7 +76,7 @@ exports['hook:release:post'] = makeHookTask('release/post');
 // Build pipeline: hook:build:pre → defaults → distribute → (sass | webpack | html in parallel)
 // → audit → build-config → hook:build:post.
 // build-config generates dist/electron-builder.yml entirely from EM defaults +
-// config/electron-manager.json (no consumer-shipped electron-builder.yml). Mode-dependent
+// config/omega.json5 (no consumer-shipped electron-builder.yml). Mode-dependent
 // injections (e.g. LSUIElement for tray-only) happen here. Must run BEFORE package/release.
 exports.build = series(
   exports['hook:build:pre'],

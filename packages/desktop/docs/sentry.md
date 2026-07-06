@@ -2,7 +2,7 @@
 
 Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with EM-specific config gating, dev-mode protection, and automatic user attribution from web-manager auth state.
 
-## Config (`config/electron-manager.json`)
+## Config (`config/omega.json5`)
 
 ```jsonc
 sentry: {

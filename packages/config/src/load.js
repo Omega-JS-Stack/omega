@@ -54,8 +54,9 @@ function resolveConfigPath(projectDir) {
 }
 
 /**
- * Cheap dual-read probe: does this project have an omega.json5 at all?
- * Frameworks call this first and fall back to their legacy config when false.
+ * Cheap probe: does this project have an omega.json5 at all? Frameworks use it
+ * to fail soft in non-consumer dirs (seeded-empty config); tooling uses it as
+ * the "is this project migrated yet?" signal.
  * @param {string} projectDir
  * @returns {boolean}
  */
@@ -122,7 +123,7 @@ function loadConfig(projectDir, target, options) {
 
   const appPath = resolveConfigPath(projectDir);
   if (!appPath) {
-    throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')}) — probe with hasOmegaConfig() first for dual-read fallback`);
+    throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')}) — probe with hasOmegaConfig() first; legacy configs must be migrated (see docs/config.md)`);
   }
 
   const brandPath = findBrandConfigPath(projectDir);

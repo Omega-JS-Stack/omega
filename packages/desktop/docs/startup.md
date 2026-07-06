@@ -80,7 +80,7 @@ Sequence: applyEarly → before-quit hook → ipc → storage → sentry → pro
 `LSUIElement` is an `Info.plist` key that tells macOS *before launch* "this app is a background agent — don't put it in the dock or app switcher." Setting it at runtime (`app.dock.hide()`) is too late — by the time JS runs, the dock-bounce animation has already started.
 
 EM handles this at build time:
-1. `gulp/build-config` reads `config/electron-manager.json`.
+1. `gulp/build-config` reads `config/omega.json5`.
 2. If `startup.mode === 'hidden'` **or** `startup.openAtLogin.mode === 'hidden'`, it injects `mac.extendInfo.LSUIElement: true` into the materialized `dist/electron-builder.yml`. (The openAtLogin case matters for `mode: 'normal'` apps that launch hidden at login — without the plist key, the login launch flashes the dock before `applyEarly()`'s `dock.hide()` can run.)
 3. `electron-builder` packages the app with that key in the final `Info.plist`.
 

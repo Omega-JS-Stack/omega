@@ -52,7 +52,7 @@ module.exports = {
       name: 'firebase loaded (firebaseConfig present in test config)',
       run: (ctx) => {
         if (!ctx.manager.webManager._firebaseAuth) {
-          ctx.skip('firebaseConfig not set in default config — set one in src/defaults/config/electron-manager.json to run');
+          ctx.skip('firebaseConfig not set in default config — set one in src/defaults/config/omega.json5 to run');
         }
         ctx.expect(ctx.manager.webManager._firebaseAuth).toBeTruthy();
       },

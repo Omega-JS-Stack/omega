@@ -63,7 +63,7 @@ The full classy variable list lives at `<em>/dist/assets/themes/classy/_config.s
 
 ## Switching themes
 
-Set `config.theme.id` in `config/electron-manager.json`:
+Set `config.theme.id` in `config/omega.json5`:
 
 ```jsonc
 theme: {

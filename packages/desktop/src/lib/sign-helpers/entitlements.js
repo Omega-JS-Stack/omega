@@ -1,6 +1,6 @@
 // Generate dist/config/entitlements.mac.plist from EM defaults + consumer overrides.
 //
-// Consumer config schema (in electron-manager.json):
+// Consumer config schema (in omega.json5):
 //   entitlements: {
 //     mac: {
 //       'com.apple.security.cs.allow-jit': false,           // override default `true`
