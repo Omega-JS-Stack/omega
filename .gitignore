@@ -12,7 +12,9 @@ logs/
 # OS
 .DS_Store
 
-# Build/runtime scratch (NOTE: packages/*/dist is intentionally TRACKED, matching framework convention)
+# Build/runtime scratch
+# (packages/*/dist is NOT tracked — each package's own .gitignore ignores it, matching
+# framework-repo convention; prepare-package regenerates dist on install/pack/publish)
 .temp/
 .cache/
 .omega/

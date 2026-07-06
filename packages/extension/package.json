@@ -44,7 +44,9 @@
     "output": "./dist",
     "replace": {},
     "type": "copy",
-    "hooks": {}
+    "hooks": {
+      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+    }
   },
   "projectScripts": {
     "start": "npx mgr clean && npx mgr setup && npm run gulp --",
@@ -111,6 +113,7 @@
     "gulp": "^5.0.1"
   },
   "devDependencies": {
+    "@omegajs/devkit": "*",
     "prepare-package": "^2.1.0",
     "puppeteer": "^24.43.1"
   }
