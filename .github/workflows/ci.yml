@@ -29,6 +29,9 @@ jobs:
       - name: devkit suite
         run: npm test --workspace=packages/devkit
 
+      - name: account suite (incl. golden master vs live BEM user.js)
+        run: npm test --workspace=packages/account
+
       - name: client suite
         run: npm test --workspace=packages/client
 
