@@ -46,16 +46,9 @@ class Firestore {
         onSnapshot,
       };
 
-      // Reuse the Firestore instance already initialized in index.js
+      // Reuse the Firestore instance already initialized in index.js — emulator
+      // connection (when enabled) already happened there, at creation time.
       this._db = getFirestore(this.manager._firebaseApp);
-
-      // Connect to Firestore emulator in development
-      if (this.manager.isDevelopment() && this.manager.config.env?.FIREBASE_EMULATOR_CONNECT) {
-        console.log('[Firestore] Connecting to emulator at localhost:8080');
-        const { connectFirestoreEmulator } = await import('firebase/firestore');
-        connectFirestoreEmulator(this._db, 'localhost', 8080);
-        console.log('[Firestore] Emulator connected');
-      }
 
       this._initialized = true;
 

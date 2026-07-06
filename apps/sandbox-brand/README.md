@@ -28,19 +28,32 @@ is continuously dogfooded.
 | App | Framework | Notes |
 |-----|-----------|-------|
 | `apps/backend` | `packages/backend` (backend-manager) | Real BEM consumer: full framework corpus (routes/events/rules/…) runs against the emulator, not just the self-test boot smoke |
+| `apps/website` | `packages/client` (web-manager) | Minimal static site whose esbuild bundle embeds web-manager, pointed at the emulator suite (`FIREBASE_EMULATOR_CONNECT`). Gets replaced by an `@omegajs/web` consumer in Phase 2 — the brand-monorepo slot and the e2e contract stay the same |
 
-`apps/website` arrives with the e2e harness work (the client/auth surface for
-cross-stack signin flows), and gets replaced by an `@omegajs/web` consumer in
-Phase 2.
+## Cross-stack e2e (`npm test` at the brand root)
+
+`e2e/run.js` boots the REAL stack — the backend's Firebase emulator suite +
+the built website served statically — and drives a real Chromium (puppeteer)
+through the frontend↔backend contract: signup → BEM `auth onCreate` creates
+the Firestore user doc → signout → signin via web-manager → session
+persistence across reload → subscription resolution. Nothing is mocked; this
+is the brand-monorepo `npm test` contract from the redesign plan (the
+`omega e2e` CLI grows from this harness).
+
+Failure logs land in `e2e/.logs/` (emulator output + page console).
 
 ## Running
 
 ```bash
-# Backend: install (functions/ owns the deps), then test against the emulator
-cd apps/backend/functions && npm install
-npx mgr test            # boots the emulator (demo project) + runs the full corpus
+# Cross-stack e2e (builds the site, boots the emulator, drives the browser)
+npm test
 
-# `npm test` at the brand root proxies to the canonical consumer scripts
-# (which include `mgr setup` — that runs live checks; use `mgr test` directly
-# for offline/CI runs)
+# Backend: install (functions/ owns the deps), then run the full BEM corpus
+cd apps/backend/functions && npm install
+npx mgr test            # boots the emulator (demo project) + runs the corpus
+npm run test:backend    # same thing, proxied from the brand root
+
+# apps/website needs NO install inside the monorepo — its deps (esbuild,
+# web-manager, firebase, puppeteer) resolve from the workspace root via
+# Node's directory climb. The declared deps make it installable standalone.
 ```

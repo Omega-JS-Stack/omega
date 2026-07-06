@@ -41,6 +41,43 @@ jobs:
       - name: backend suite
         run: npm test --workspace=packages/backend
 
+  sandbox:
+    name: Sandbox brand (BEM corpus + cross-stack e2e)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # The sandbox backend runs the full Firebase emulator suite
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install
+        run: npm ci
+
+      # functions/ is a standalone install (not a workspace) — it owns its own lockfile,
+      # with backend-manager linked via file: to packages/backend
+      - name: Sandbox backend deps
+        working-directory: apps/sandbox-brand/apps/backend/functions
+        run: npm ci
+
+      # Full BEM corpus (routes/events/rules/email/mcp) against the fresh consumer
+      - name: Sandbox backend corpus
+        working-directory: apps/sandbox-brand
+        run: npm run test:backend
+
+      # Real stack, real browser: emulator + built website (web-manager bundle) +
+      # puppeteer signup → BEM onCreate → signin → session persistence → subscription
+      - name: Cross-stack e2e
+        working-directory: apps/sandbox-brand
+        run: npm test
+
   pack-smoke:
     name: Pack → scratch-install smoke
     runs-on: ubuntu-latest

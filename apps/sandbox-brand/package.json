@@ -6,6 +6,10 @@
     "apps/*"
   ],
   "scripts": {
-    "test": "npm test --workspace=apps/backend"
+    "test": "node e2e/run.js",
+    "test:backend": "npm run test:offline --workspace=apps/backend"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.43.1"
   }
 }

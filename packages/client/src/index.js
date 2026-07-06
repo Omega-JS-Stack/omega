@@ -432,6 +432,20 @@ class Manager {
     this._firebaseAuth = getAuth(app);
     this._firebaseFirestore = initializeFirestore(app, {});
 
+    // Connect to the local emulator suite in development. Both connects live HERE,
+    // immediately after the instances are created: the auth module reads accounts via
+    // `manager.firebaseFirestore` directly, so connecting lazily (or in only one module)
+    // leaves early reads pointed at LIVE Firebase. Auth warnings banner disabled: it
+    // injects a DOM overlay that interferes with page content in automated flows.
+    if (this.isDevelopment() && this.config.env?.FIREBASE_EMULATOR_CONNECT) {
+      console.log('[Firebase] Connecting to emulators (auth :9099, firestore :8080)');
+      const { connectAuthEmulator } = await import('firebase/auth');
+      const { connectFirestoreEmulator } = await import('firebase/firestore');
+      connectAuthEmulator(this._firebaseAuth, 'http://localhost:9099', { disableWarnings: true });
+      connectFirestoreEmulator(this._firebaseFirestore, 'localhost', 8080);
+      console.log('[Firebase] Emulators connected');
+    }
+
     // Only initialize messaging if service workers are supported
     if ('serviceWorker' in navigator) {
       this._firebaseMessaging = getMessaging(app);

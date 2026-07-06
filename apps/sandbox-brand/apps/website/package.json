@@ -1,0 +1,16 @@
+{
+  "name": "sandbox-brand-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sandbox brand website — minimal web-manager consumer driven by the cross-stack e2e harness",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "web-manager": "file:../../../../packages/client"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "fs-jetpack": "^5.1.0"
+  }
+}
