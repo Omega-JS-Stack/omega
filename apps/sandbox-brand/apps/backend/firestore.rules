@@ -5,7 +5,7 @@ service cloud.firestore {
     // ...
 
     ///---backend-manager---///
-    ///---version=0.0.0---///
+    ///---version=5.11.7---///
     // Lock by default
     match /{document=**} {
       allow read, write: if isAdmin();

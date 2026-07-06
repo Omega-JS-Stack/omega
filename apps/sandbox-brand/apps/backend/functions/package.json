@@ -11,5 +11,13 @@
     "backend-manager": "file:../../../../../packages/backend",
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^7.2.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "npx mgr setup && npx mgr serve",
+    "deploy": "npx mgr setup && npx mgr deploy",
+    "emulator": "npx mgr setup && npx mgr emulator",
+    "test": "npx mgr setup && npx mgr test",
+    "setup": "npx mgr setup"
   }
 }

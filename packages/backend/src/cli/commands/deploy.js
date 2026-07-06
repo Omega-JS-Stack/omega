@@ -2,6 +2,7 @@ const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
+const { ensurePublicFiles } = require('../utils/public-files');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
@@ -21,6 +22,11 @@ class DeployCommand extends BaseCommand {
     const logPath = this.getLogsPath('deploy.log');
     attachLogFile(logPath);
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
+
+    // public/ is generated, never tracked — `firebase deploy` (no --only) includes
+    // hosting and fails without the folder. The blessed flow runs setup first
+    // (authoritative overwrite); this covers a bare `npx mgr deploy`.
+    ensurePublicFiles(self.firebaseProjectPath);
 
     try {
       await powertools.execute('firebase deploy', {

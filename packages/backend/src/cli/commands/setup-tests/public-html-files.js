@@ -1,7 +1,5 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
-const path = require('path');
-const powertools = require('node-powertools');
+const { writePublicFiles } = require('../../utils/public-files');
 
 class PublicHtmlFilesTest extends BaseTest {
   getName() {
@@ -10,17 +8,8 @@ class PublicHtmlFilesTest extends BaseTest {
 
   async run() {
     const self = this.self;
-    const options = {url: self.bemConfigJSON.brand.url};
 
-    const templateIndex = jetpack.read(path.resolve(`${__dirname}/../../../../templates/public/index.html`));
-    jetpack.write(`${self.firebaseProjectPath}/public/index.html`,
-      powertools.template(templateIndex, options)
-    );
-
-    const template404 = jetpack.read(path.resolve(`${__dirname}/../../../../templates/public/404.html`));
-    jetpack.write(`${self.firebaseProjectPath}/public/404.html`,
-      powertools.template(template404, options)
-    );
+    writePublicFiles(self.firebaseProjectPath, { url: self.bemConfigJSON.brand.url, overwrite: true });
 
     return true;
   }

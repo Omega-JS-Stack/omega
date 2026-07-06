@@ -9,6 +9,7 @@ const WatchCommand = require('./watch');
 const { DEFAULT_EMULATOR_PORTS } = require('./setup-tests/emulator-config');
 const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warning');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
+const { ensurePublicFiles } = require('../utils/public-files');
 
 // Used by both `npx mgr emulator` and `npx mgr test` auto-start path.
 // Note: `emulators:start` enables the UI by default (controlled by firebase.json's
@@ -103,6 +104,11 @@ class EmulatorCommand extends BaseCommand {
    */
   async startEmulators() {
     const projectDir = this.main.firebaseProjectPath;
+
+    // public/ is generated, never tracked (fresh clones don't have it) — fill in
+    // the hosting boilerplate if missing; firebase-tools refuses to boot hosting
+    // without the folder. Setup remains the authoritative overwrite.
+    ensurePublicFiles(projectDir);
 
     // Load emulator ports from firebase.json
     const emulatorPorts = this.loadEmulatorPorts(projectDir);
