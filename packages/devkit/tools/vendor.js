@@ -8,7 +8,9 @@
 // From the framework's cwd it:
 //   1. Scans dist/ for references to @omegajs packages — CommonJS (require,
 //      require.resolve) AND ESM (import ... from, export ... from, dynamic
-//      import(), side-effect import) — web-manager's dist is ESM
+//      import(), side-effect import) — web-manager's dist is ESM. Real host
+//      files only: symlinks are never followed and node_modules never entered
+//      (BEM's dist carries a self-test fixture with a circular self-link)
 //   2. Copies ONLY the referenced modules (plus their transitive relative
 //      requires/imports) into <dist>/vendor/<package>/ — selective, so a host
 //      that uses just safe-install doesn't ship the test runner or inherit its
@@ -31,6 +33,7 @@
 //     the monorepo (workspace + file: installs resolve the packages up the tree); a
 //     full prepare (npm install / pack / publish) always re-runs the rewrite.
 
+const fs = require('fs');
 const path = require('path');
 const { isBuiltin } = require('node:module');
 const jetpack = require('fs-jetpack');
@@ -79,6 +82,37 @@ function subpathToFile(subpath) {
 function specifierToPackageName(specifier) {
   const parts = specifier.split('/');
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+// Collect the .js files under dir that are host code: never follows symlinks
+// (BEM's self-test fixture ships a circular self-link inside a dist
+// node_modules — jetpack.find follows it until ENAMETOOLONG) and never
+// descends into node_modules or the vendor output (neither is host code to
+// scan or rewrite).
+function findHostJsFiles(dir, vendorRoot) {
+  const files = [];
+  const queue = [dir];
+
+  while (queue.length > 0) {
+    const current = queue.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const abs = path.join(current, entry.name);
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && abs !== vendorRoot) {
+          queue.push(abs);
+        }
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith('.js')) {
+        files.push(abs);
+      }
+    }
+  }
+
+  return files;
 }
 
 // Locate a vendorable package's module root (the directory of its src/index.js
@@ -150,8 +184,7 @@ function vendorPackages(options) {
   // modules of which packages are used.
   const seedsByPackage = new Map();
   const filesToRewrite = [];
-  jetpack.find(distPath, { matching: ['**/*.js', '!vendor/**'] }).forEach((file) => {
-    const abs = path.resolve(file);
+  findHostJsFiles(distPath, vendorRoot).forEach((abs) => {
     const contents = jetpack.read(abs);
     if (!contents || !contents.includes('@omegajs/')) {
       return;

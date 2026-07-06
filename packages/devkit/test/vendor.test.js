@@ -171,6 +171,29 @@ test('rewrites ESM import forms and vendors multiple packages (devkit + account)
   assert.equal(typeof mod.logger.log, 'function');
 });
 
+test('host scan skips node_modules and never follows symlinks (BEM fixture tree)', (t) => {
+  const root = makeFixture('vendor-symlink', {
+    packageJSON: { name: 'fixture-symlink', version: '1.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/lib/uses.js': `module.exports = require('@omegajs/devkit/logger');`,
+      // A consumer-fixture dependency inside dist — its @omegajs reference is
+      // NOT host code and must be neither vendored-for nor rewritten
+      'dist/test/fixtures/project/node_modules/dep/index.js': `module.exports = require('@omegajs/devkit/safe-install');`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  // BEM's self-test fixture ships a circular self-symlink (backend-manager -> package root)
+  fs.symlinkSync(root, path.join(root, 'dist', 'test', 'fixtures', 'project', 'node_modules', 'circular'));
+
+  const result = vendorDevkit({ cwd: root }); // used to die with ENAMETOOLONG
+
+  assert.deepEqual(result.vendored, { devkit: ['logger.js'] }); // fixture dep's safe-install ref NOT honored
+  assert.equal(result.rewritten, 1);
+  const untouched = fs.readFileSync(path.join(root, 'dist', 'test', 'fixtures', 'project', 'node_modules', 'dep', 'index.js'), 'utf8');
+  assert.ok(untouched.includes(`require('@omegajs/devkit/safe-install')`), 'node_modules content must not be rewritten');
+});
+
 test('throws when dist does not exist yet', (t) => {
   const root = makeFixture('vendor-no-dist', {
     packageJSON: { name: 'fixture-no-dist', version: '1.0.0', dependencies: HOST_DEPS },
