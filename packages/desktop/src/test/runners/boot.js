@@ -51,10 +51,11 @@ async function runBootTests({ tests, projectRoot, emDistRoot }) {
 
 // Build + spawn + inspect — the actual boot run against effectiveRoot.
 async function bootProject({ tests, effectiveRoot, emDistRoot }) {
-  // Locate electron.
+  // Locate electron. Resolve like Node would from the project root (walks up node_modules
+  // chains), so hoisted installs (npm workspaces) are found — not just <root>/node_modules.
   let electronBin;
   try {
-    electronBin = require(path.join(effectiveRoot, 'node_modules', 'electron'));
+    electronBin = require(require.resolve('electron', { paths: [effectiveRoot] }));
   } catch (e) {
     const msg = `    ○ boot tests skipped (electron not installed in ${effectiveRoot})`;
     console.log(chalk.yellow(msg));
@@ -234,9 +235,17 @@ function runGulpBuild(projectRoot) {
 function ensureFixtureDeps(effectiveRoot, emRoot) {
   const nodeModules = path.join(effectiveRoot, 'node_modules');
   const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+  // Resolve electron's actual install dir from emRoot (walks up node_modules chains, so
+  // hoisted workspace installs work) instead of assuming emRoot/node_modules/electron.
+  let electronDir = path.join(emRoot, 'node_modules', 'electron');
+  try {
+    electronDir = path.dirname(require.resolve('electron/package.json', { paths: [emRoot] }));
+  } catch (e) {
+    // fall through with the legacy path; the existsSync guard below handles absence
+  }
   const links = [
     ['electron-manager', emRoot],
-    ['electron',         path.join(emRoot, 'node_modules', 'electron')],
+    ['electron',         electronDir],
   ];
   const created = [];
 

@@ -10,7 +10,9 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
   return new Promise((resolve, reject) => {
     let electronBin;
     try {
-      electronBin = require(path.join(projectRoot, 'node_modules', 'electron'));
+      // Resolve like Node would from the project root (walks up node_modules chains),
+      // so hoisted installs (npm workspaces) are found — not just projectRoot/node_modules.
+      electronBin = require(require.resolve('electron', { paths: [projectRoot] }));
     } catch (e) {
       const msg = `    ○ main + renderer tests skipped (electron not installed in ${projectRoot})`;
       console.log(chalk.yellow(msg));
