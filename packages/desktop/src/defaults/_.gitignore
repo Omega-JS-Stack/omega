@@ -1,0 +1,23 @@
+# ========== Default Values ==========
+
+.DS_Store
+node_modules/
+/dist/
+/release/
+/.cache/
+/.claude/
+.env
+*.log
+/logs/
+
+# Apple signing artifacts — never commit these
+config/certs/
+*.p12
+*.cer
+*.mobileprovision
+*.p8
+*.pem
+
+# ========== Custom Values ==========
+
+# Add your own ignores below. This section is preserved across `npx mgr setup` runs.

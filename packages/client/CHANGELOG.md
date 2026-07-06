@@ -1,0 +1,257 @@
+# CHANGELOG
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## Changelog Categories
+
+- `BREAKING` for breaking changes.
+- `Added` for new features.
+- `Changed` for changes in existing functionality.
+- `Deprecated` for soon-to-be removed features.
+- `Removed` for now removed features.
+- `Fixed` for any bug fixes.
+- `Security` in case of vulnerabilities.
+
+---
+## [4.3.4] - 2026-07-03
+
+### Added
+- **`isValidRedirectUrl` accepts loopback redirect URLs while the site runs in development** — `127.0.0.1` / `[::1]` / `localhost` on ANY port (RFC 8252 §7.3). This is the return channel for native-app sign-in in dev: Electron Manager's `openAuthFlow()` can't OS-register its custom scheme in dev builds, so the `/token` page redirects the minted token to the app's ephemeral loopback listener instead. Production sites are unaffected (the branch is gated on `isDevelopment()`); the existing same-host / `brand.id:` scheme / `validRedirectHosts` rules are unchanged.
+
+### Changed
+- **Dev API URL is now `https://localhost:5002`** (was `http://`) — backend-manager's `mgr serve` has exposed the local API through an HTTPS-only mkcert proxy on 5002 since BEM 5.7.0, and plain http:// cannot connect to it (the frontend's dev API calls failed outright). Requires consumers to run a BEM ≥ 5.7.0 `mgr serve` for local dev.
+
+---
+## [4.3.3] - 2026-07-02
+
+### Added
+- **OMEGA mirror mandate** — `CLAUDE.md` (Doc-update parity) now states WM follows the library subset of the canonical OMEGA CLAUDE.md skeleton; structural changes require checking the sister repos (canonical skeletons: `omega:main` skill's mirror-spec resource).
+- **`docs/cdp-debugging.md`** — WM joins the mirrored browser-debugging doc (UJM/BEM/BXM/EM/WM): per-session isolated Chrome via the `chrome-devtools` MCP, WM flavor = verify WM behavior by driving a consuming site (UJM dev server at `https://localhost:4000` — never the LAN IP), exercising auth/bindings/Firestore from the real browser. Indexed in CLAUDE.md.
+
+## [4.3.2] - 2026-06-11
+
+### Added
+- **`docs/bindings.md`**: full `data-wm-bind` deep reference migrated from the `omega:ujm` skill into the repo (the module that implements the feature) — actions table, comma-separated multi-binding syntax + parser caveat, condition operators, auth/usage/custom state paths, JS API, skeleton-loader lifecycle (`wm-binding-skeleton` → `wm-bound`), multi-phase binding, composite-text pattern, and root-key update filtering. Linked from CLAUDE.md and `docs/modules.md`. Part of the skills-as-routers refactor: framework facts live in repo docs (version-matched via `node_modules`).
+
+### Changed
+- **Dependency bumps**: `@sentry/browser` `^10.54.0` → `^10.57.0`, `firebase` `^12.13.0` → `^12.14.0`.
+
+---
+## [4.2.0] - 2026-05-21
+### Added
+- **Consent defaults in `DEFAULT_ACCOUNT`.** Phase A companion to `backend-manager` v5.2.0's marketing-consent system. `src/modules/auth.js` now defaults `account.consent.{legal,marketing}` to the canonical shape (`status: 'revoked'`, `grantedAt`/`revokedAt` with null leaves) so `resolveAccount()` always populates the field for legacy users whose Firestore doc predates the consent system. Without this, the account-page email-preferences toggle would read `undefined` for pre-migration users and mis-state.
+- **`docs/<topic>.md` deep references.** New `docs/architecture.md`, `docs/build-system.md`, `docs/code-patterns.md`, `docs/common-tasks.md`, `docs/dependencies.md`, `docs/modules.md`, `docs/testing.md`. Mirrors the architectural-overview-plus-deep-references pattern used in `backend-manager` and `electron-manager`.
+
+### Changed
+- **`CLAUDE.md` refactored to the architectural-overview pattern.** Trimmed from 301 lines to ~80; per-subsystem detail moved to the new `docs/*.md` files. Keeps Claude's loaded-context cost down on every conversation.
+
+### Fixed
+- **Toast notification width.** `src/modules/utilities.js`: notifications now have `width: calc(100% - 2rem); max-width: 500px` so longer text doesn't render as a narrow cramped strip at the top of the page.
+
+---
+## [4.1.42] - 2026-05-11
+### Changed
+- **Firebase config: presence-driven + flat shape canonical.** Firebase now initializes when a `firebaseConfig` blob is present in config (matching BEM/BXM/EM/OMEGA shape) — no separate `firebase.app.enabled` flag needed. Removes the `enabled` redundancy where consumers had to set both a credentials blob AND flip a flag.
+- New internal helper `_resolveFirebaseConfig()` reads flat `config.firebaseConfig` first (canonical), falls back to nested `config.firebase.app.config` (UJM legacy yaml). Used by `_initializeFirebase`, `getFunctionsUrl`, `getApiUrl`, `service-worker.js`, and `auth.js#listen` (Firebase-not-configured short-circuit).
+- `_initializeFirebase` now reuses an existing `[DEFAULT]` Firebase app if present (via `getApps()` / `getApp()`) instead of throwing `app/duplicate-app` on re-init (live reload, test re-runs).
+- No backwards-compat shim needed for UJM: both shapes resolve. UJM can migrate to the flat `firebaseConfig` shape on its own schedule; until then, its `firebase.app.config` keeps working.
+
+---
+## [4.1.41] - 2026-05-10
+### Changed
+- Bumped dependencies: `@sentry/browser` ^10.47.0 → ^10.52.0, `firebase` ^12.11.0 → ^12.13.0, `prepare-package` ^2.0.7 → ^2.1.0.
+- Added empty `hooks: {}` to `preparePackage` config to align with prepare-package 2.1.0 schema.
+
+---
+## [4.1.40] - 2026-05-10
+### Changed
+- **BREAKING (internal)**: `_resolveUsage()` now reads `config.payment.products` instead of `config.payment.plans`. Aligns with OMEGA's canonical shape (the SSOT) — same key name in BEM, UJM, EM. No backwards-compat shim; consumers must use `payment.products`. Default in `_processConfiguration()` updated from `plans: []` to `products: []`. Renamed local vars `plan`/`plans`/`planConfig` → `productId`/`products`/`product`. CLAUDE.md updated.
+
+---
+## [4.1.39] - 2026-04-10
+### Changed
+- Converted `Utilities` methods to arrow class fields so `this` is permanently bound to the instance, allowing methods to be destructured, aliased, or passed as callbacks without losing context.
+
+---
+## [4.1.38] - 2026-04-08
+### Added
+- Added `sanitizeURL()` utility method that validates URLs against dangerous URI schemes (javascript:, data:, etc.), allowing only http: and https: protocols.
+
+## [4.1.37] - 2026-04-05
+### Added
+- Added `_resolveUsage()` to auth module that merges account usage data with plan limits from config, exposed as a top-level `usage` binding context.
+- Added `payment.processors` and `payment.plans` defaults to configuration.
+
+## [4.1.36] - 2026-04-02
+### Fixed
+- Fixed mocha binary path preventing `npm test` from running.
+- Fixed lodash ESM named import incompatibility with Node.js (`storage.js`).
+- Fixed test suite calling nonexistent API methods (`init` → `initialize`, `storage('local')` → `storage()`).
+- Fixed mocha hanging after tests due to `setInterval` in version checker (added `--exit` flag).
+
+### Changed
+- Enhanced `escapeHTML` to recursively handle objects, arrays, and pass through non-string types.
+- Rewrote `showNotification` to use safe DOM construction (`textContent`) instead of `innerHTML`.
+- Split monolithic `test.js` into 8 modular test files under `test/tests/`.
+- Expanded test coverage from ~10 broken tests to 70 passing tests.
+
+### Security
+- Blocked `javascript:` protocol in `@attr` bindings for URL attributes (`href`, `src`, `action`, `formaction`).
+
+---
+## [4.1.35] - 2026-04-02
+### Changed
+- Bumped `chatsy` from `^2.0.13` to `^2.0.14`.
+
+---
+## [4.1.34] - 2026-04-01
+### Changed
+- Bumped `@sentry/browser` from `^10.46.0` to `^10.47.0`.
+- Bumped `lodash` from `^4.17.23` to `^4.18.1`.
+- Improved CLAUDE.md singleton pattern documentation with clearer usage examples and explicit anti-patterns.
+
+---
+## [4.1.31] - 2026-03-24
+### Changed
+- Switched from `getFirestore` to `initializeFirestore` in `index.js` to support custom Firestore configuration options.
+- Removed redundant `getFirestore` from firestore module's stored methods since the instance is already initialized in `index.js`.
+
+---
+## [4.1.30] - 2026-03-20
+### Changed
+- Bumped `@sentry/browser` from `^10.43.0` to `^10.45.0`.
+- Bumped `chatsy` from `^2.0.9` to `^2.0.11`.
+- Bumped `firebase` from `^12.10.0` to `^12.11.0`.
+
+---
+## [4.1.29] - 2026-03-19
+### Changed
+- Restructured notification subscription documents to use nested `metadata.created` and `metadata.updated` timestamps instead of top-level fields.
+- Update operations now use dot-notation (`metadata.updated`) to preserve `metadata.created` when updating existing subscriptions.
+
+---
+## [4.1.28] - 2026-03-15
+### Changed
+- Bumped `chatsy` from `^2.0.5` to `^2.0.8`.
+- Upgraded `prepare-package` from `^1.2.6` to `^2.0.7` (major version with esbuild bundler).
+- Added `preparePackage.type = "copy"` config option.
+
+---
+## [4.1.27] - 2026-03-14
+### Changed
+- Renamed default brand config values from `id:'app'`/`name:'Application'` to `id:'brand'`/`name:'Brand'`.
+- Renamed service worker config key from `app` to `brand` to align with brand terminology.
+
+---
+## [4.1.25] - 2026-03-13
+### Added
+- Automatically attach resolved subscription state (`state.resolved`) to auth state during processing, making `plan`, `active`, `trialing`, and `cancelling` available to bindings and consumers without manual calls.
+
+---
+## [4.1.24] - 2026-03-13
+### Added
+- Added `resolveSubscription()` method to Auth module that derives calculated subscription fields (plan, active, trialing, cancelling) from raw backend data.
+
+---
+## [4.1.22] - 2026-03-11
+### Changed
+- Renamed `config.tracking` to `config.analytics` with simplified property names: `google-analytics` → `google`, `google-analytics-secret` → `googleSecret`, `meta-pixel` → `meta`, `tiktok-pixel` → `tiktok`.
+
+---
+## [4.1.19] - 2026-03-11
+### Added
+- Added new chatsy import.
+
+---
+## [4.1.15] - 2026-02-26
+### Fixed
+- Fixed bindings skeleton removal happening prematurely when partial context updates didn't match any of the element's bindings.
+
+### Changed
+- `_executeAction` now returns a boolean indicating whether the action was processed, allowing `update()` to defer skeleton removal until at least one binding runs.
+
+---
+## [4.1.10] - 2026-02-17
+### Changed
+- Refactored auth to use promise-based settler pattern (`_authReady`) for reliable auth state detection, eliminating race conditions with late-registered listeners.
+- Split `listen()` into two clear paths: `once` (waits for settler, fires once) and persistent (subscribes to all changes, catches up if already settled).
+- Renamed `onAuthStateChanged` to `_subscribe` (internal-only).
+- Removed unused `_readyCallbacks`.
+
+---
+## [4.1.1] - 2025-12-17
+### Added
+- Added `getBrowser()` utility to detect browser type (chrome, firefox, safari, edge, opera, brave).
+- Added `data-browser` HTML attribute set during initialization.
+- Added `browser` and `vendor` fields to `getContext().client`.
+- Added `geolocation` object to `getContext()` with placeholder fields (ip, country, region, city, latitude, longitude).
+
+### Changed
+- Moved `vendor` from `browser` object to `client` object in `getContext()`.
+- Replaced `browser` object with `geolocation` object in `getContext()` return structure.
+
+---
+## [4.1.0] - 2025-12-16
+### Added
+- Added `analytics.js` module for Google Analytics 4 Measurement Protocol support (browser extensions and Electron).
+- Added `usage.js` module to track install date, session count, session duration, and version history.
+- Added `tracking` config section for analytics credentials (`google-analytics`, `google-analytics-secret`, `meta-pixel`, `tiktok-pixel`).
+- Added `runtime` config option for explicit runtime override.
+- Added `buildTimeISO` auto-calculated from `buildTime`.
+- Added `usage` data to bindings context for UI display.
+
+### Changed
+- Refactored `utilities.js` from standalone functions to class pattern for consistency with other modules.
+- Simplified `getApiUrl()` to always prepend `api.` subdomain instead of replacing first subdomain.
+
+## [4.0.33] - 2025-12-12
+### BREAKING
+- `@text` binding action no longer auto-detects input/textarea elements. Use `@value` for inputs instead.
+
+### Added
+- Added `@value` binding action for explicitly setting input/textarea values.
+
+## [4.0.31] - 2025-12-03
+### Added
+- Added HTML data attributes (`data-platform`, `data-runtime`, `data-device`) on initialization for CSS targeting.
+- Added `getPlatform()`, `getRuntime()`, `isMobile()`, and `getDeviceType()` as standalone exported utility functions.
+
+### Changed
+- Refactored `getContext()` to use the new standalone functions and include `deviceType` and `runtime` in client info.
+
+## [4.0.29] - 2025-12-02
+### Fixed
+- Fixed notification subscription storing to incorrect Firestore path (`users/{uid}/notifications/{token}` → `notifications/{token}`).
+
+### Changed
+- Refactored `_saveSubscription` to use internal Firestore wrapper instead of direct Firebase imports.
+
+## [4.0.28] - 2025-12-01
+### Added
+- Added `exports` field to package.json for explicit module resolution support.
+
+### Changed
+- Updated `@sentry/browser` from pinned `10.11.0` to `^10.27.0`.
+- Updated `firebase` from `^12.3.0` to `^12.6.0`.
+- Updated `prepare-package` dev dependency from `^1.2.2` to `^1.2.5`.
+
+## [4.0.0] - 2025-09-11
+### ⚠️ BREAKING
+- Updated to ITW 3.0 standard.
+
+### Added
+- Updated `@sentry/browser` to `10.11.0` to avoid breaking changes in `10.12.0` that affect Ultimate-Jekyll.
+  > When installing from NPM:
+  > lighthouse → @sentry/node@9.46.0 → @sentry/core@9.46.0
+  > web-manager → @sentry/browser@10.15.0 → expects
+  > @sentry/core@10.15.0
+
+## [3.2.74] - 2025-07-17
+### Added
+- Now looks for `build.json` in the `/@output/build/` directory to ensure it works with Vite's output structure.
+
+## [1.0.0] - 2024-06-19
+### Added
+- Initial release of the project 🚀

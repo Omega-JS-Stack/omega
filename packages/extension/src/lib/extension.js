@@ -1,0 +1,119 @@
+// APIs
+const apis = [
+  'action',
+  'alarms',
+  'bookmarks',
+  'browsingData',
+  'browserAction',
+  'certificateProvider',
+  'commands',
+  'contentSettings',
+  'contextMenus',
+  'cookies',
+  'debugger',
+  'declarativeContent',
+  'declarativeNetRequest',
+  'devtools',
+  'dns',
+  'documentScan',
+  'downloads',
+  'enterprise',
+  'events',
+  'extension',
+  'extensionTypes',
+  'fileBrowserHandler',
+  'fileSystemProvider',
+  'fontSettings',
+  'gcm',
+  'history',
+  'i18n',
+  'identity',
+  'idle',
+  'input',
+  'instanceID',
+  'management',
+  'notifications',
+  'offscreen',
+  'omnibox',
+  'pageAction',
+  'permissions',
+  'platformKeys',
+  'power',
+  'printerProvider',
+  'privacy',
+  'proxy',
+  'runtime',
+  'scripting',
+  'search',
+  'sessions',
+  'sidePanel',
+  'storage',
+  'tabGroups',
+  'tabs',
+  'topSites',
+  'tts',
+  'ttsEngine',
+  'userScripts',
+  'vpnProvider',
+  'wallpaper',
+  'webNavigation',
+  'webRequest',
+  'windows'
+]
+
+// Class
+function Extension () {
+  const self = this;
+
+  // Loop through the APIs and assign them to the object
+  apis.forEach(function (api) {
+    // Initialize the API to null
+    self[api] = null;
+
+    // Try chrome
+    try {
+      if (chrome[api]) {
+        self[api] = chrome[api];
+      }
+    } catch (e) {}
+
+    // Try window
+    try {
+      if (window[api]) {
+        self[api] = window[api];
+      }
+    } catch (e) {}
+
+    // Try browser
+    try {
+      if (browser[api]) {
+        self[api] = browser[api];
+      }
+    } catch (e) {}
+
+    // Try browser.extension
+    try {
+      self.api = browser.extension[api]
+    } catch (e) {}
+  })
+
+  // Try to get the runtime
+  try {
+    if (browser && browser.runtime) {
+      self.runtime = browser.runtime
+    }
+  } catch (e) {}
+
+  // Try to get the browserAction
+  try {
+    if (browser && browser.browserAction) {
+      self.browserAction = browser.browserAction
+    }
+  } catch (e) {}
+
+  // Return the object
+  return self;
+}
+
+// Export
+module.exports = new Extension();

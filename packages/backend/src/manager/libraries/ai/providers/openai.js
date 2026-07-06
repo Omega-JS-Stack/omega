@@ -1,0 +1,1353 @@
+const fetch = require('wonderful-fetch');
+const jetpack = require('fs-jetpack');
+const powertools = require('node-powertools');
+const _ = require('lodash');
+const JSON5 = require('json5');
+const path = require('path');
+const mimeTypes = require('mime-types');
+
+// Constants
+const DEFAULT_MODEL = 'gpt-5.4-mini';
+const MODERATION_MODEL = 'omni-moderation-latest';
+const IMAGE_DEFAULT_MODEL = 'gpt-image-2';
+
+// OpenAI model pricing table (per 1M tokens)
+// https://platform.openai.com/docs/pricing
+const MODEL_TABLE = {
+  // Mar 9, 2026
+  // GPT-5 family
+  'gpt-5.4': {
+    input: 2.50,
+    output: 15.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.2': {
+    input: 1.75,
+    output: 14.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.1': {
+    input: 1.25,
+    output: 10.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5': {
+    input: 1.25,
+    output: 10.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5-mini': {
+    input: 0.25,
+    output: 2.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5-nano': {
+    input: 0.05,
+    output: 0.40,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  // Mar 20, 2026
+  // GPT-5.4 mini/nano family
+  'gpt-5.4-mini': {
+    input: 0.75,
+    output: 4.50,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.4-nano': {
+    input: 0.20,
+    output: 1.25,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  // GPT-4.5
+  'gpt-4.5-preview': {
+    input: 75.00,
+    output: 150.00,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  // GPT-4.1 family
+  'gpt-4.1': {
+    input: 2.00,
+    output: 8.00,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  'gpt-4.1-mini': {
+    input: 0.40,
+    output: 1.60,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  'gpt-4.1-nano': {
+    input: 0.10,
+    output: 0.40,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  // GPT-4o family
+  'gpt-4o': {
+    input: 2.50,
+    output: 10.00,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  'gpt-4o-mini': {
+    input: 0.15,
+    output: 0.60,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  // Reasoning models
+  'o4-mini': {
+    input: 1.10,
+    output: 4.40,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o3-pro': {
+    input: 20.00,
+    output: 80.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o3': {
+    input: 2.00,
+    output: 8.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o3-mini': {
+    input: 1.10,
+    output: 4.40,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o1-pro': {
+    input: 150.00,
+    output: 600.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o1': {
+    input: 15.00,
+    output: 60.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o1-preview': {
+    input: 15.00,
+    output: 60.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'o1-mini': {
+    input: 1.10,
+    output: 4.40,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+  'gpt-4-turbo': {
+    input: 10.00,
+    output: 30.00,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  'gpt-4': {
+    input: 30.00,
+    output: 60.00,
+    provider: 'openai',
+    features: {
+      json: true,
+    },
+  },
+  'gpt-4-vision': {
+    input: 30.00,
+    output: 60.00,
+    provider: 'openai',
+    features: {
+      json: false,
+    },
+  },
+  'gpt-3.5-turbo': {
+    input: 0.50,
+    output: 1.50,
+    provider: 'openai',
+    features: {
+      json: false,
+    },
+  },
+  // Codex family — code/markup-specialized GPT-5 variants. Best for structured
+  // output tasks (SVG, JSON, code), agentic loops. All support reasoning tokens
+  // (low/medium/high/xhigh) and structured outputs.
+  //
+  // Pricing source: https://developers.openai.com/api/docs/models/<id>
+  // Verified: 2026-05-14
+  'gpt-5.3-codex': {
+    input: 1.75,
+    output: 14.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.2-codex': {
+    input: 1.75,
+    output: 14.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.1-codex-max': {
+    input: 1.25,
+    output: 10.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.1-codex': {
+    input: 1.25,
+    output: 10.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5.1-codex-mini': {
+    input: 0.25,
+    output: 2.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'gpt-5-codex': {
+    input: 1.25,
+    output: 10.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      temperature: false,
+      reasoning: true,
+    },
+  },
+  'codex-mini-latest': {
+    input: 1.50,
+    output: 6.00,
+    provider: 'openai',
+    features: {
+      json: true,
+      reasoning: true,
+    },
+  },
+}
+
+function OpenAI(assistant, key) {
+  const self = this;
+
+  self.assistant = assistant;
+  self.Manager = assistant?.Manager;
+  self.user = assistant?.user;
+  self.key = key
+    || self.Manager?.config?.openai?.key
+    || self.Manager?.config?.openai?.global
+    || self.Manager?.config?.openai?.main
+    || process.env.OPENAI_API_KEY
+    || process.env.BACKEND_MANAGER_OPENAI_API_KEY
+
+  self.tokens = {
+    total: {
+      count: 0,
+      price: 0,
+    },
+    input: {
+      count: 0,
+      price: 0,
+    },
+    output: {
+      count: 0,
+      price: 0,
+    },
+  }
+
+  return self;
+}
+
+OpenAI.prototype.request = function (options) {
+  const self = this;
+  const Manager = self.Manager;
+  const assistant = self.assistant;
+
+  return new Promise(async function(resolve, reject) {
+    // Deep merge options
+    options = _.merge({}, options);
+
+    // Set defaults
+    options.model = typeof options.model === 'undefined' ? DEFAULT_MODEL : options.model;
+    options.response = typeof options.response === 'undefined' ? undefined : options.response;
+    options.timeout = typeof options.timeout === 'undefined' ? 120000 : options.timeout;
+    options.moderate = typeof options.moderate === 'undefined' ? true : options.moderate;
+    options.log = typeof options.log === 'undefined' ? false : options.log;
+    options.user = options.user || assistant.getUser();
+
+    // Format retries
+    options.retries = typeof options.retries === 'undefined' ? 0 : options.retries;
+    options.retryTriggers = typeof options.retryTriggers === 'undefined' ? ['network', 'parse'] : options.retryTriggers;
+
+    // Format other options
+    options.temperature = typeof options.temperature === 'undefined' ? 0.7 : options.temperature;
+    options.maxTokens = typeof options.maxTokens === 'undefined' ? 1024 : options.maxTokens;
+
+    // Custom options
+    options.dedupeConsecutiveRoles = typeof options.dedupeConsecutiveRoles === 'undefined' ? true : options.dedupeConsecutiveRoles;
+
+    // Format schema — accept inline object or { path: '...' } to load from a JSON file
+    options.schema = resolveSchema(options.schema, _log);
+
+    // Reasons
+    options.reasoning = options.reasoning || undefined;
+
+    // Tools — nested, opt-in. `tools.list` is an array of tool definitions (built-in
+    // hosted tools like `{ type: 'web_search' }`, OR custom function tools like
+    // `{ type: 'function', name, parameters }`); `tools.choice` maps to `tool_choice`
+    // (`auto` | `required` | `none` | a specific tool). When omitted/empty, no tools
+    // are sent and behavior is identical to a plain request.
+    options.tools = options.tools || undefined;
+
+    // Format prompt
+    //
+    // Accepts two forms:
+    //
+    //   1) Object form (legacy / single-role):
+    //        prompt: { path|content, settings }
+    //      Auto-wrapped to a single 'system'-role segment per the OpenAI Model
+    //      Spec — unlabeled prompts represent the platform's authoritative
+    //      instruction.
+    //
+    //   2) Array form (multi-role):
+    //        prompt: [
+    //          { role: 'system',    path|content, settings },
+    //          { role: 'developer', path|content, settings },
+    //          ...
+    //        ]
+    //      Each segment becomes its own message with the declared role. Order
+    //      is preserved. Valid roles: 'system', 'developer', 'user',
+    //      'assistant'. Segments default to 'system' if role is omitted.
+    options.prompt = normalizePrompt(options.prompt);
+
+    // Format message
+    options.message = options.message || {};
+    options.message.path = options.message.path || '';
+    options.message.content = options.message.content || options.message.content || '';
+    options.message.settings = options.message.settings || {};
+    options.message.attachments = options.message.attachments || [];
+
+    // Format history
+    options.history = options.history || {};
+    options.history.messages = options.history.messages || [];
+    options.history.limit = typeof options.history.limit === 'undefined' ? 5 : options.history.limit;
+
+    let attempt = { count: 0 };
+
+    function _log() {
+      if (!options.log)  {
+        return;
+      }
+
+      assistant.log('callOpenAI():', ...arguments);
+    }
+
+
+    // Log
+    _log('Starting', options);
+
+
+    // Direct-messages mode: when a unified messages[] array is passed (incl.
+    // assistant toolCalls turns + role:'tool' results), it IS the full
+    // conversation — prompt/message/history are ignored and the array maps
+    // straight to the Responses API input (see formatMessages). The last user
+    // turn's text still feeds moderation.
+    const useMessages = Array.isArray(options.messages) && options.messages.length > 0;
+
+    // Load prompt segments (one entry per role) and the user message
+    const promptSegments = useMessages ? [] : options.prompt.map((segment) => ({
+      role: segment.role,
+      content: loadContent(segment, _log),
+    }));
+    const message = useMessages ? lastUserText(options.messages) : loadContent(options.message, _log);
+    const user = options.user?.auth?.uid || assistant.request.geolocation.ip || 'unknown';
+
+    // Log
+    for (const segment of promptSegments) {
+      _log(`Prompt[${segment.role}]`, segment.content);
+    }
+    _log('Message', message);
+    _log('User', user);
+
+    // Check for errors
+    for (const segment of promptSegments) {
+      if (segment.content instanceof Error) {
+        return reject(assistant.errorify(`Error loading prompt[${segment.role}]: ${segment.content}`, {code: 400}));
+      }
+    }
+
+    if (message instanceof Error) {
+      return reject(assistant.errorify(`Error loading message: ${message}`, {code: 400}));
+    }
+
+    // Moderate if needed (skipped in direct-messages mode when the last turn
+    // carries no user text — e.g. a tool-result continuation turn)
+    let moderation = null;
+    if (options.moderate && !(useMessages && !message)) {
+      moderation = await makeRequest('moderations', options, self, promptSegments, message, user, _log)
+      .then(async (r) => {
+        // {
+        //   id: 'modr-8205',
+        //   model: 'omni-moderation-latest',
+        //   results: [
+        //     {
+        //       flagged: false,
+        //       categories: [Object],
+        //       category_scores: [Object],
+        //       category_applied_input_types: [Object]
+        //     }
+        //   ]
+        // }
+
+        // Log
+        _log('Moderated', r);
+
+        // Return results
+        return r.results[0];
+      })
+      .catch((e) => e);
+
+      // Check for moderation flag
+      if (moderation?.flagged) {
+        return reject(assistant.errorify(`This request is inappropriate`, {code: 451}));
+      }
+    }
+
+
+    // Make attempt
+    attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log);
+  });
+}
+
+/**
+ * Generate an image via OpenAI's image API (gpt-image-2 by default).
+ *
+ * Returns the raw bytes — caller decides what to do with them (upload to a CDN,
+ * embed as a data URL, write to disk, etc.). gpt-image-* always returns base64,
+ * so there's no URL-fetch round trip.
+ *
+ * @param {object} options
+ * @param {string}  options.prompt           - The image description (required)
+ * @param {string} [options.model]           - Image model (default gpt-image-2)
+ * @param {string} [options.size]            - 1024x1024 | 1536x1024 | 1024x1536 | auto (default 1024x1024)
+ * @param {string} [options.quality]         - low | medium | high | auto (default medium)
+ * @param {string} [options.background]      - transparent | opaque | auto
+ * @param {number} [options.n]               - How many images (default 1)
+ * @param {number} [options.timeout]         - ms (default 300000 — image gen is slow)
+ * @param {boolean}[options.log]
+ * @returns {Promise<{buffer: Buffer, b64: string, mime: string, revisedPrompt: string|null, model: string, size: string, quality: string, raw: object}>}
+ *          (or an array of those when n > 1)
+ */
+OpenAI.prototype.image = function (options) {
+  const self = this;
+  const assistant = self.assistant;
+
+  return new Promise(async function (resolve, reject) {
+    options = _.merge({}, options);
+
+    if (!options.prompt) {
+      return reject(assistant.errorify(`image(): {prompt} is required`, { code: 400 }));
+    }
+
+    options.model = options.model || IMAGE_DEFAULT_MODEL;
+    options.size = options.size || '1024x1024';
+    options.quality = options.quality || 'medium';
+    options.n = options.n || 1;
+    options.timeout = typeof options.timeout === 'undefined' ? 300000 : options.timeout;
+    options.log = typeof options.log === 'undefined' ? false : options.log;
+
+    const body = {
+      model: options.model,
+      prompt: options.prompt,
+      size: options.size,
+      quality: options.quality,
+      n: options.n,
+    };
+
+    // background is opt-in (transparent/opaque/auto)
+    if (options.background) {
+      body.background = options.background;
+    }
+
+    if (options.log) {
+      assistant.log(`OpenAI.image(): model=${options.model} size=${options.size} quality=${options.quality} n=${options.n}`);
+    }
+
+    let data;
+    try {
+      data = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'post',
+        response: 'json',
+        timeout: options.timeout,
+        tries: options.tries || 1,
+        headers: {
+          'Authorization': `Bearer ${self.key}`,
+          'Content-Type': 'application/json',
+        },
+        body: body,
+      });
+    } catch (e) {
+      return reject(assistant.errorify(`OpenAI.image() request failed: ${e.message}`, { code: e.code || 500 }));
+    }
+
+    if (!data?.data?.length) {
+      return reject(assistant.errorify(`OpenAI.image() returned no image data: ${JSON.stringify(data).slice(0, 300)}`, { code: 500 }));
+    }
+
+    const mapItem = (item) => {
+      const b64 = item.b64_json;
+      return {
+        buffer: b64 ? Buffer.from(b64, 'base64') : null,
+        b64: b64 || null,
+        mime: 'image/png',
+        revisedPrompt: item.revised_prompt || null,
+        model: options.model,
+        size: options.size,
+        quality: options.quality,
+        raw: data,
+      };
+    };
+
+    // Single image (the common case) returns one object; n > 1 returns an array.
+    return resolve(options.n === 1 ? mapItem(data.data[0]) : data.data.map(mapItem));
+  });
+};
+
+function tryParse(content) {
+  try {
+    return JSON5.parse(content);
+  } catch (e) {
+    return content;
+  }
+}
+
+// Roles permitted in the `options.prompt` array. Order is canonical per the
+// OpenAI Model Spec authority hierarchy (system > developer > user > assistant).
+const VALID_PROMPT_ROLES = new Set(['system', 'developer', 'user', 'assistant']);
+
+// Normalize the `options.prompt` input into a canonical array of segments:
+//   [{ role, path, content, settings }, ...]
+//
+// Accepts:
+//   - undefined/null/empty → []
+//   - object: { path|content, settings } → wrapped as a single 'system' segment
+//   - array: [{ role, path|content, settings }, ...] → role defaults to 'system'
+//     if omitted; invalid roles throw.
+function normalizePrompt(input) {
+  const segments = Array.isArray(input)
+    ? input
+    : (input && (input.path || input.content || input.settings)) ? [input] : [];
+
+  return segments.map((segment) => {
+    const role = segment.role || 'system';
+
+    if (!VALID_PROMPT_ROLES.has(role)) {
+      throw new Error(`Invalid prompt role: ${role}. Valid roles: ${[...VALID_PROMPT_ROLES].join(', ')}`);
+    }
+
+    return {
+      role: role,
+      path: segment.path || '',
+      content: segment.content || '',
+      settings: segment.settings || {},
+    };
+  });
+}
+
+function resolveSchema(schema, _log) {
+  if (!schema) {
+    return undefined;
+  }
+
+  // Already an inline schema object (has "type" or "properties")
+  if (!schema.path) {
+    return schema;
+  }
+
+  const filePath = schema.path;
+  const exists = jetpack.exists(filePath);
+
+  _log('Reading schema from path:', filePath);
+
+  if (!exists) {
+    throw new Error(`Schema path ${filePath} not found`);
+  }
+
+  if (exists === 'dir') {
+    throw new Error(`Schema path ${filePath} is a directory`);
+  }
+
+  const raw = jetpack.read(filePath);
+  return JSON5.parse(raw);
+}
+
+function loadContent(input, _log) {
+  // console.log('*** input!!!', input.content.slice(0, 50), input.path);
+  // console.log('*** input.content', input.content.slice(0, 50));
+  // console.log('*** input.path', input.path);
+
+  let content = '';
+
+  // Load content
+  if (input.path) {
+    // Convert to array if not already
+    const pathArray = Array.isArray(input.path) ? input.path : [input.path];
+
+    // Load and concatenate all files
+    for (const path of pathArray) {
+      const exists = jetpack.exists(path);
+
+      _log('Reading prompt from path:', path);
+
+      if (!exists) {
+        return new Error(`Path ${path} not found`);
+      } else if (exists === 'dir') {
+        return new Error(`Path ${path} is a directory`);
+      }
+
+      try {
+        const fileContent = jetpack.read(path);
+        content += (content ? '\n' : '') + fileContent;
+      } catch (e) {
+        return new Error(`Error reading file ${path}: ${e}`);
+      }
+    }
+  } else {
+    content = input.content;
+  }
+
+  return powertools.template(content, input.settings).trim();
+}
+
+function loadAttachment(type, content, _log) {
+  if (!content) {
+    return null;
+  }
+
+  _log('Loading attachment:', type, content.substring(0, 100));
+
+  // Handle remote URLs (https://, http://)
+  if (content.startsWith('http://') || content.startsWith('https://')) {
+    _log('Remote URL detected:', content);
+    return {
+      contentType: 'url',
+      data: content
+    };
+  }
+
+  // Handle base64 data URLs (data:image/png;base64,...)
+  if (content.startsWith('data:')) {
+    _log('Base64 data URL detected');
+    return {
+      contentType: 'base64',
+      data: content
+    };
+  }
+
+  // Handle local file paths - need to read and convert to base64
+  try {
+    const exists = jetpack.exists(content);
+    if (!exists) {
+      throw new Error(`File not found: ${content}`);
+    }
+    if (exists === 'dir') {
+      throw new Error(`Path is a directory: ${content}`);
+    }
+
+    _log('Local file detected, reading:', content);
+
+    // Read file as buffer
+    const fileBuffer = jetpack.read(content, 'buffer');
+    if (!fileBuffer) {
+      throw new Error(`Failed to read file: ${content}`);
+    }
+
+    // Get MIME type from file extension
+    const mimeType = mimeTypes.lookup(content) || 'application/octet-stream';
+    _log('Detected MIME type:', mimeType);
+
+    // Convert to base64 data URL
+    const base64Data = fileBuffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
+
+    _log('Converted to base64 data URL, length:', dataUrl.length);
+    return {
+      contentType: 'base64',
+      data: dataUrl
+    };
+
+  } catch (error) {
+    _log('Error loading attachment:', error.message);
+    throw new Error(`Failed to load attachment: ${error.message}`);
+  }
+}
+
+function formatMessageContent(content, attachments, _log, mode = 'responses', role = 'user') {
+  const formattedContent = [];
+
+  // Format text content
+  if (content) {
+    let contentType = 'text';
+
+    if (mode === 'moderations') {
+      contentType = 'text';
+    } else if (role === 'assistant') {
+      contentType = 'output_text';
+    } else {
+      contentType = 'input_text';
+    }
+
+    formattedContent.push({
+      type: contentType,
+      text: content,
+    });
+  }
+
+  // Format attachments
+  if (attachments) {
+    attachments.forEach((attachment) => {
+      try {
+        // Use content field (supports URLs, base64, local paths) or fallback to url field
+        const attachmentContent = attachment.content || attachment.url;
+
+        if (!attachmentContent) {
+          _log('Skipping attachment with no content or url:', attachment);
+          return;
+        }
+
+        const loadedAttachment = loadAttachment(attachment.type, attachmentContent, _log);
+
+        // Handle image attachments
+        if (attachment.type === 'image' && loadedAttachment) {
+          if (mode === 'moderations') {
+            formattedContent.push({
+              type: 'image_url',
+              image_url: {
+                url: loadedAttachment.data
+              }
+            });
+          } else {
+            formattedContent.push({
+              type: 'input_image',
+              image_url: loadedAttachment.data,
+              detail: attachment.detail || 'low',
+            });
+          }
+        }
+        // Handle file attachments (only for responses, not moderation)
+        else if (attachment.type === 'file' && loadedAttachment && mode !== 'moderations') {
+          const fileContent = {
+            type: 'input_file',
+          };
+
+          // Use correct field name based on content type
+          if (loadedAttachment.contentType === 'url') {
+            fileContent.file_url = loadedAttachment.data;
+          } else if (loadedAttachment.contentType === 'base64') {
+            fileContent.file_data = loadedAttachment.data;
+            // Only include filename for base64 data, not for URLs
+            fileContent.filename = attachment.filename || path.basename(attachmentContent);
+          }
+
+          formattedContent.push(fileContent);
+        }
+      } catch (error) {
+        _log('Error processing attachment:', error.message);
+        // Continue processing other attachments
+      }
+    });
+  }
+
+  return formattedContent;
+}
+
+
+function formatHistory(options, promptSegments, message, _log) {
+  // Get history with respect to the message limit
+  const history = options.history.messages.slice(-options.history.limit);
+
+  // Add prompt segments to the beginning of history, in the order provided
+  // (each segment becomes its own message with the declared role)
+  for (let i = promptSegments.length - 1; i >= 0; i--) {
+    const segment = promptSegments[i];
+    history.unshift({
+      role: segment.role,
+      content: segment.content,
+      attachments: [],
+    });
+  }
+
+  // Get last history item
+  const lastHistory = history[history.length - 1];
+
+  // Remove last message from history
+  if (
+    options.dedupeConsecutiveRoles
+    && lastHistory?.role === 'user'
+  ) {
+    history.pop();
+  }
+
+  // Add message to history
+  history.push({
+    role: 'user',
+    content: message,
+    attachments: options.message.attachments,
+  });
+
+  // Format history into new objects (avoid mutating originals which may be persisted by the caller)
+  const formatted = history.map((m) => {
+    const role = m.role || 'developer';
+    const content = typeof m.content === 'string' ? m.content.trim() : String(m.content || '');
+
+    const result = {
+      role: role,
+      content: formatMessageContent(content, m.attachments, _log, 'responses', role),
+    };
+
+    // Log
+    _log('Message', result.role, result.content);
+
+    return result;
+  });
+
+  return formatted;
+}
+
+/**
+ * Map a unified messages[] array straight to the Responses API input array.
+ *
+ * Unified turn shapes:
+ *   - { role: 'system'|'developer'|'user'|'assistant', content: string }
+ *   - { role: 'assistant', content?, toolCalls: [{ id, name, arguments }] }
+ *     → message item (if content) + function_call items
+ *   - { role: 'tool', toolCallId, content } → function_call_output item
+ */
+function formatMessages(messages, _log) {
+  const input = [];
+
+  for (const m of messages) {
+    // Tool result turn → function_call_output item
+    if (m.role === 'tool') {
+      input.push({
+        type: 'function_call_output',
+        call_id: m.toolCallId,
+        output: typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''),
+      });
+      continue;
+    }
+
+    // Assistant turn with tool calls → message item (if text) + function_call items
+    if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length) {
+      const text = typeof m.content === 'string' ? m.content.trim() : '';
+
+      if (text) {
+        input.push({
+          role: 'assistant',
+          content: formatMessageContent(text, [], _log, 'responses', 'assistant'),
+        });
+      }
+
+      for (const call of m.toolCalls) {
+        input.push({
+          type: 'function_call',
+          call_id: call.id,
+          name: call.name,
+          arguments: typeof call.arguments === 'string' ? call.arguments : JSON.stringify(call.arguments || {}),
+        });
+      }
+
+      continue;
+    }
+
+    // Plain text turn
+    const role = m.role || 'user';
+    const content = typeof m.content === 'string' ? m.content.trim() : String(m.content || '');
+
+    input.push({
+      role: role,
+      content: formatMessageContent(content, m.attachments, _log, 'responses', role),
+    });
+  }
+
+  return input;
+}
+
+// Last user turn's text — feeds moderation in direct-messages mode
+function lastUserText(messages) {
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user' && typeof m.content === 'string');
+  return lastUser?.content || '';
+}
+
+// Normalized function tools ({ name, description, parameters }) get the
+// Responses API envelope; anything carrying another `type` passes verbatim
+// (hosted tools like { type: 'web_search' })
+function normalizeToolEntry(tool) {
+  if (tool && tool.name && (!tool.type || tool.type === 'function')) {
+    return {
+      type: 'function',
+      name: tool.name,
+      description: tool.description || '',
+      parameters: tool.parameters || { type: 'object', properties: {} },
+    };
+  }
+
+  return tool;
+}
+
+// 'auto' | 'required' | 'none' pass through; { name } → a specific function tool
+function normalizeToolChoice(choice) {
+  if (typeof choice === 'object' && choice?.name) {
+    return { type: 'function', name: choice.name };
+  }
+
+  return choice;
+}
+
+function parseArguments(args) {
+  if (args && typeof args === 'object') {
+    return args;
+  }
+
+  if (typeof args === 'string' && args.trim()) {
+    try {
+      return JSON5.parse(args);
+    } catch (e) {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log) {
+  const retries = options.retries;
+  const triggers = options.retryTriggers;
+
+  // Increment attempt
+  attempt.count++;
+
+  // Log
+  _log(`Request ${attempt.count}/${retries}`);
+
+  // Request
+  makeRequest('responses', options, self, promptSegments, message, user, _log)
+  .then((r) => {
+    // Example
+    // {
+    //   id: 'resp_68734dd2e6148199956fb6ef63a72b13095b79119b6129af',
+    //   object: 'response',
+    //   created_at: 1752387027,
+    //   status: 'completed',
+    //   background: false,
+    //   error: null,
+    //   incomplete_details: null,
+    //   instructions: null,
+    //   max_output_tokens: 1024,
+    //   max_tool_calls: null,
+    //   model: 'gpt-4o-2024-08-06',
+    //   output: [
+    //     {
+    //       id: 'msg_6872127d078081989822de29fea13a1b07e3a2c4abdba0ba',
+    //       type: 'message',
+    //       status: 'completed',
+    //       content: [
+    //         {
+    //           type: 'output_text,
+    //           annotations: [],
+    //           logprobs: [],
+    //           text: 'Hi!'
+    //         }
+    //       ],
+    //       role: 'assistant'
+    //     }
+    //   ],
+    //   parallel_tool_calls: true,
+    //   previous_response_id: null,
+    //   reasoning: { effort: null, summary: null },
+    //   service_tier: 'default',
+    //   store: true,
+    //   temperature: 0.7,
+    //   text: { format: { type: 'text' } },
+    //   tool_choice: 'auto',
+    //   tools: [],
+    //   top_logprobs: 0,
+    //   top_p: 1,
+    //   truncation: 'disabled',
+    //   usage: {
+    //     input_tokens: 32,
+    //     input_tokens_details: { cached_tokens: 0 },
+    //     output_tokens: 3,
+    //     output_tokens_details: { reasoning_tokens: 0 },
+    //     total_tokens: 35
+    //   },
+    //   user: '127.0.0.1',
+    //   metadata: {}
+    // }
+
+    // Get output
+    const output = r.output;
+
+    // Ensure content is set
+    const content = output.find((o) => o.type === 'message')?.content || [];
+
+    // Trim and combine all output text
+    const outputText = content
+      .filter((c) => c.type === 'output_text')
+      .map((c) => c.text.trim())
+      .join('\n')
+      .trim();
+
+    // Normalized tool calls (Responses API function_call items) + stop reason
+    const toolCalls = output
+      .filter((o) => o.type === 'function_call')
+      .map((o) => ({ id: o.call_id, name: o.name, arguments: parseArguments(o.arguments) }));
+    const stopReason = toolCalls.length
+      ? 'tool_use'
+      : (r.status === 'incomplete' && r.incomplete_details?.reason === 'max_output_tokens' ? 'max_tokens' : 'end');
+
+    // Get model configuration
+    const modelConfig = getModelConfig(options.model);
+
+    // Set token counts
+    self.tokens.input.count += (r.usage.input_tokens || 0)
+      - (r.usage.input_tokens_details.cached_tokens || 0);
+    self.tokens.output.count += r.usage.output_tokens || 0;
+    self.tokens.total.count = self.tokens.input.count + self.tokens.output.count;
+
+    // Set token prices
+    self.tokens.input.price = (self.tokens.input.count * modelConfig.input) / 1000000;
+    self.tokens.output.price = (self.tokens.output.count * modelConfig.output) / 1000000;
+    self.tokens.total.price = self.tokens.input.price + self.tokens.output.price;
+
+    // Log
+    _log('Response', outputText.length, typeof outputText, outputText);
+    _log('Tokens', self.tokens);
+
+    // Try to parse JSON response if needed — never on a tool-call turn, where
+    // empty text is the normal intermediate state (the caller continues the loop)
+    try {
+      const parsed = options.response === 'json' && !toolCalls.length ? JSON5.parse(outputText) : outputText;
+
+      // Return
+      return resolve({
+        output: content,
+        content: parsed,
+        tokens: self.tokens,
+        moderation: moderation,
+        raw: r,
+        toolCalls: toolCalls,
+        stopReason: stopReason,
+      })
+    } catch (e) {
+      assistant.error('Error parsing response', r, e);
+
+      // Retry
+      if (attempt.count < retries && triggers.includes('parse')) {
+        return attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log);
+      }
+
+      // Return
+      return reject(e);
+    }
+  })
+  .catch((e) => {
+    const parsed = tryParse(e.message)?.error || {};
+    const type = parsed?.type || '';
+    const message = parsed?.message || e.message;
+
+    // Log
+    assistant.error(`Error requesting (type=${type}, message=${message})`, e);
+
+    // Check for invalid request error
+    if (type === 'invalid_request_error') {
+      return reject(assistant.errorify(message, {code: 400}));
+    }
+
+    // Retry
+    if (attempt.count < retries && triggers.includes('network')) {
+      return attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log);
+    }
+
+    // Return
+    return reject(e);
+  });
+}
+
+function makeRequest(mode, options, self, promptSegments, message, user, _log) {
+  return new Promise(async function(resolve, reject) {
+    const request = {
+      url: '',
+      method: 'post',
+      response: 'json',
+      // response: 'raw',
+      // log: true,
+      attachResponseHeaders: true,
+      tries: 1,
+      timeout: options.timeout,
+      headers: {
+        'Authorization': `Bearer ${self.key}`,
+      },
+      body: {},
+    }
+
+    // Format depending on mode
+    if (mode === 'moderations') {
+      // Format moderation input using shared helper
+      const input = formatMessageContent(message, options.message.attachments, _log, 'moderations');
+
+      // Set request
+      request.url = 'https://api.openai.com/v1/moderations';
+      request.body = {
+        model: MODERATION_MODEL,
+        input: input,
+        user: user,
+      }
+    } else if (mode === 'responses') {
+      // Format input for the Responses API — direct-messages mode maps the
+      // unified messages[] straight through; legacy mode builds from
+      // prompt segments + history + message
+      const history = Array.isArray(options.messages) && options.messages.length
+        ? formatMessages(options.messages, _log)
+        : formatHistory(options, promptSegments, message, _log);
+
+      // Set request
+      request.url = 'https://api.openai.com/v1/responses';
+      request.body = {
+        model: options.model,
+        input: history,
+        user: user,
+        max_output_tokens: options.maxTokens,
+        text: resolveFormatting(options),
+      }
+
+      // Only include temperature if the model supports it
+      const temperature = resolveTemperature(options);
+      if (temperature !== undefined) {
+        request.body.temperature = temperature;
+      }
+
+      // Only include reasoning if the model supports it
+      const reasoning = resolveReasoning(options);
+      if (reasoning) {
+        request.body.reasoning = reasoning;
+      }
+
+      // Only include tools if `tools.list` is a non-empty array. Normalized
+      // function tools ({ name, description, parameters }) get the Responses
+      // `type: 'function'` envelope; hosted tools (web_search, code_interpreter)
+      // pass verbatim. When present, the response output may contain tool-call
+      // items alongside the message — function_call items are extracted into
+      // the normalized `toolCalls` return field.
+      if (Array.isArray(options.tools?.list) && options.tools.list.length) {
+        request.body.tools = options.tools.list.map(normalizeToolEntry);
+
+        if (options.tools.choice) {
+          request.body.tool_choice = normalizeToolChoice(options.tools.choice);
+        }
+      }
+    }
+
+    // Request
+    await fetch(request.url, request)
+    .then(async (r) => {
+      // Log raw response
+      _log('Response RAW', JSON.stringify(r, null, 2));
+
+      // Return
+      return resolve(r);
+    })
+    .catch((e) => {
+      return reject(e);
+    })
+  });
+}
+
+// Helper function to get model configuration with fallback to default model
+function getModelConfig(model) {
+  const config = MODEL_TABLE[model];
+
+  // Return config if found
+  if (config) {
+    return config;
+  }
+
+  // Fallback to default model if not found
+  console.warn(`Model configuration not found for: ${model}, falling back to ${DEFAULT_MODEL}`);
+  return MODEL_TABLE[DEFAULT_MODEL];
+}
+
+function resolveFormatting(options) {
+  const modelConfig = getModelConfig(options.model);
+
+  // Format for JSON
+  if (options.response === 'json' && modelConfig.features?.json) {
+
+    // If schema is set, return JSON schema format
+    if (options.schema) {
+      return {
+        format: {
+          type: 'json_schema',
+          name: 'response_schema',
+          schema: options.schema || {},
+        },
+      };
+    } else {
+      return {
+        format: {
+          type: 'json_object',
+        },
+      };
+    };
+  }
+
+  // Other, return undefined
+  return undefined;
+}
+
+function resolveTemperature(options) {
+  // Check if the model supports temperature
+  const modelConfig = getModelConfig(options.model);
+  if (modelConfig.features?.temperature === false) {
+    return undefined;
+  }
+
+  return options.temperature;
+}
+
+function resolveReasoning(options) {
+  // If reasoning is not requested, return undefined
+  if (!options.reasoning) {
+    return undefined;
+  }
+
+  // Check if the model supports reasoning
+  const modelConfig = getModelConfig(options.model);
+  if (!modelConfig.features?.reasoning) {
+    console.warn(`Reasoning not supported for model: ${options.model}, ignoring reasoning option`);
+    return undefined;
+  }
+
+  return {
+    effort: options.reasoning.effort || 'medium',
+    // summary: options.reasoning.summary || 'concise',
+  };
+}
+
+module.exports = OpenAI;
+
+// Exposed for unit tests. Not part of the public API — do not rely on these
+// from consumer code.
+module.exports._internals = {
+  normalizePrompt,
+  formatHistory,
+  formatMessages,
+  normalizeToolEntry,
+  normalizeToolChoice,
+  resolveSchema,
+  VALID_PROMPT_ROLES,
+};

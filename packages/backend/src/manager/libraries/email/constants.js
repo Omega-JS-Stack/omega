@@ -1,0 +1,436 @@
+/**
+ * Shared constants for email libraries (transactional + marketing)
+ *
+ * SSOT for templates, ASM groups, and semantic senders.
+ * Used by: transactional/index.js, marketing/index.js, providers/*
+ */
+
+// Template shortcut map — callers use readable paths instead of SendGrid IDs
+// Paths mirror the email website structure: {category}/{subcategory}/{name}
+// Group shortcut map — SendGrid ASM group IDs
+// Rename these in SendGrid dashboard to match the comments
+const GROUPS = {
+  'orders': 16223,         // BEM - Order Updates
+  'hello': 35092,          // BEM - Onboarding
+  'account': 25927,        // BEM - Account
+  'marketing': 25928,      // BEM - Marketing & Promotions
+  'security': 35093,       // BEM - Security
+  'newsletter': 28096,     // BEM - Newsletter
+  'internal': 35094,       // BEM - Internal Alerts
+};
+
+// Semantic sender categories — pass `sender: 'orders'` to auto-resolve from address, display name, and ASM group
+const SENDERS = {
+  // Payment receipts, failed/recovered, cancellation, plan changes, refunds, trial ending
+  orders: {
+    localPart: 'orders',
+    displayName: '{brand} Orders',
+    group: GROUPS['orders'],
+  },
+  // Warm onboarding: welcome, 7-day checkup, feedback request
+  hello: {
+    localPart: 'hello',
+    displayName: '{brand}',
+    group: GROUPS['hello'],
+  },
+  // Transactional account actions: deletion, data requests
+  account: {
+    localPart: 'account',
+    displayName: '{brand} Account',
+    group: GROUPS['account'],
+  },
+  // Promotions, discounts, win-back, abandoned cart, app download link
+  marketing: {
+    localPart: 'offers',
+    displayName: '{brand}',
+    group: GROUPS['marketing'],
+  },
+  // Forgot password, 2FA, password reset
+  security: {
+    localPart: 'security',
+    displayName: '{brand} Security',
+    group: GROUPS['security'],
+  },
+  // Monthly newsletters, feature announcements, industry news
+  newsletter: {
+    localPart: 'newsletter',
+    displayName: '{brand}',
+    group: GROUPS['newsletter'],
+  },
+  // Dispute alerts, system notifications sent to brand contact
+  internal: {
+    localPart: 'alerts',
+    displayName: '{brand} Alerts',
+    group: GROUPS['internal'],
+  },
+};
+
+
+// SendGrid limit for scheduled emails (72 hours, but use 71 for buffer)
+const SEND_AT_LIMIT = 71;
+
+// --- Campaign scheduling helpers (SSOT — used by seed-campaigns + both cron jobs) ---
+const moment = require('moment');
+
+/**
+ * Get the next occurrence of a specific weekday.
+ * @param {number} dayOfWeek - 0=Sunday, 1=Monday, ..., 6=Saturday
+ * @param {number} hour - Hour (UTC, 0-23)
+ * @param {number} [minute=0] - Minute (0-59)
+ * @returns {number} Unix timestamp
+ */
+function nextWeekday(dayOfWeek, hour, minute = 0) {
+  const next = moment.utc().startOf('day').hour(hour).minute(minute);
+
+  while (next.day() !== dayOfWeek || next.isBefore(moment.utc())) {
+    next.add(1, 'day');
+  }
+
+  return next.unix();
+}
+
+/**
+ * Get the next occurrence of the Nth weekday in a month (e.g., 2nd Wednesday).
+ * @param {number} nth - Which occurrence (1=first, 2=second, 3=third, 4=fourth)
+ * @param {number} dayOfWeek - 0=Sunday, 1=Monday, ..., 6=Saturday
+ * @param {number} hour - Hour (UTC, 0-23)
+ * @param {number} [minute=0] - Minute (0-59)
+ * @returns {number} Unix timestamp
+ */
+function nextNthWeekday(nth, dayOfWeek, hour, minute = 0) {
+  function findNthWeekdayInMonth(m) {
+    const first = m.clone().startOf('month');
+    let day = first.clone();
+
+    // Advance to the first matching weekday
+    while (day.day() !== dayOfWeek) {
+      day.add(1, 'day');
+    }
+
+    // Advance to the Nth occurrence
+    day.add(nth - 1, 'weeks');
+
+    return day.hour(hour).minute(minute).second(0).millisecond(0);
+  }
+
+  const thisMonth = findNthWeekdayInMonth(moment.utc());
+
+  if (thisMonth.isAfter(moment.utc())) {
+    return thisMonth.unix();
+  }
+
+  return findNthWeekdayInMonth(moment.utc().add(1, 'month')).unix();
+}
+
+/**
+ * Get the next occurrence of a specific day of month.
+ * @param {number} dayOfMonth - Day (1-31)
+ * @param {number} hour - Hour (UTC, 0-23)
+ * @param {number} [minute=0] - Minute (0-59)
+ * @returns {number} Unix timestamp
+ */
+function nextMonthDay(dayOfMonth, hour, minute = 0) {
+  const next = moment.utc().startOf('month').date(dayOfMonth).hour(hour).minute(minute);
+
+  if (next.isBefore(moment.utc())) {
+    next.add(1, 'month');
+  }
+
+  return next.unix();
+}
+
+/**
+ * Calculate the next occurrence unix timestamp from the current sendAt.
+ *
+ * Supports:
+ *   - daily, weekly, monthly, quarterly, yearly — simple interval addition
+ *   - monthly-weekday — Nth weekday of the month (e.g., 2nd Wednesday)
+ *     Requires recurrence: { pattern: 'monthly-weekday', nth, day, hour, minute? }
+ *
+ * @param {number} currentSendAt - Current fire time (unix)
+ * @param {object} recurrence - { pattern, hour, day, nth?, minute? }
+ * @returns {number} Next fire time (unix)
+ */
+function getNextOccurrence(currentSendAt, recurrence) {
+  const current = moment.unix(currentSendAt).utc();
+  const { pattern } = recurrence;
+
+  switch (pattern) {
+    case 'daily':
+      return current.add(1, 'day').unix();
+
+    case 'weekly':
+      return current.add(1, 'week').unix();
+
+    case 'monthly':
+      return current.add(1, 'month').unix();
+
+    case 'monthly-weekday': {
+      const target = current.clone().add(1, 'month').startOf('month');
+
+      while (target.day() !== recurrence.day) {
+        target.add(1, 'day');
+      }
+
+      target.add((recurrence.nth || 1) - 1, 'weeks');
+
+      return target
+        .hour(recurrence.hour)
+        .minute(recurrence.minute || 0)
+        .second(0)
+        .millisecond(0)
+        .unix();
+    }
+
+    case 'quarterly':
+      return current.add(3, 'months').unix();
+
+    case 'yearly':
+      return current.add(1, 'year').unix();
+
+    default:
+      return current.add(1, 'month').unix();
+  }
+}
+
+/**
+ * Like getNextOccurrence, but guarantees the returned time is in the FUTURE.
+ *
+ * A recurring campaign that stalled for several periods (cron outage, sources
+ * dried up, repeated failures) advances past ALL missed occurrences instead of
+ * firing a catch-up burst — one send per cron tick until sendAt catches up.
+ *
+ * @param {number} currentSendAt - Current fire time (unix)
+ * @param {object} recurrence - { pattern, hour, day, nth?, minute? }
+ * @param {number} [now] - Unix time to advance past (defaults to Date.now())
+ * @returns {number} Next fire time strictly after `now`
+ */
+function getNextFutureOccurrence(currentSendAt, recurrence, now) {
+  now = now || Math.round(Date.now() / 1000);
+
+  let next = getNextOccurrence(currentSendAt, recurrence);
+
+  while (next <= now) {
+    const after = getNextOccurrence(next, recurrence);
+
+    // Safety: a recurrence must strictly advance, otherwise bail out
+    if (after <= next) {
+      break;
+    }
+
+    next = after;
+  }
+
+  return next;
+}
+
+/**
+ * Convert SVG image URLs to PNG equivalents — email clients don't render SVGs.
+ * CDN naming convention: `-x.svg` -> `-1024.png`
+ */
+function sanitizeImagesForEmail(images) {
+  const result = {};
+
+  for (const [key, value] of Object.entries(images)) {
+    if (typeof value === 'string' && value.endsWith('.svg')) {
+      result[key] = value.replace(/-x\.svg$/, '-1024.png');
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * URL-encode a value as base64
+ */
+function encode(s) {
+  return encodeURIComponent(Buffer.from(String(s)).toString('base64'));
+}
+
+/**
+ * Create an Error with a code property for distinguishing build (400) vs send (500) failures.
+ */
+function errorWithCode(message, code) {
+  const err = new Error(message);
+  err.code = code;
+  return err;
+}
+
+// Master field dictionary — SSOT for all marketing custom fields.
+//
+// SendGrid: `display` is the custom field name (created by OMEGA, resolved by ID at runtime).
+// Beehiiv: `display` is the custom field name (matched by display name).
+//
+// Source types:
+//   'user'     — read from user doc via _.get(userDoc, path)
+//   'resolved' — read from User.resolveSubscription() output via path
+//   'config'   — read from Manager.config via _.get(config, path)
+//
+// To add a new tracked marketing field:
+//   1. Add an entry here (key, display, source, path, type)
+//   2. Run OMEGA: npm start -- --service=sendgrid,beehiiv --brand=X
+//   3. BEM resolves field IDs at runtime — no provider code changes needed
+//   4. If 'resolved' source, ensure resolveFieldValues() computes it
+//
+// Flags:
+//   skip — Array of provider names to skip field creation for (e.g., ['sendgrid'])
+//          SendGrid has first_name/last_name as built-in contact fields
+//          Beehiiv needs them created as custom fields (preset templates)
+const FIELDS = {
+  // Brand
+  brand_id:                              { display: 'Brand ID', source: 'config', path: 'brand.id', type: 'text' },
+
+  // User identity
+  user_auth_uid:                         { display: 'User UID', source: 'user', path: 'auth.uid', type: 'text' },
+  user_personal_name_first:              { display: 'First Name', source: 'user', path: 'personal.name.first', type: 'text', skip: ['sendgrid'] },
+  user_personal_name_last:               { display: 'Last Name', source: 'user', path: 'personal.name.last', type: 'text', skip: ['sendgrid'] },
+  user_personal_company:                 { display: 'Company', source: 'user', path: 'personal.company.name', type: 'text' },
+  user_personal_country:                 { display: 'Country', source: 'user', path: 'personal.location.country', type: 'text', skip: ['beehiiv'] },
+  user_metadata_signup_date:             { display: 'Signup Date', source: 'user', path: 'metadata.created.timestamp', type: 'date' },
+  user_metadata_last_activity:           { display: 'Last Activity', source: 'user', path: 'metadata.updated.timestamp', type: 'date' },
+
+  // Subscription
+  user_subscription_plan:                { display: 'Plan', source: 'resolved', path: 'plan', type: 'text' },
+  user_subscription_status:              { display: 'Status', source: 'resolved', path: 'status', type: 'text' },
+  user_subscription_trialing:            { display: 'Trialing', source: 'resolved', path: 'trialing', type: 'text' },
+  user_subscription_trial_claimed:       { display: 'Trial Claimed', source: 'user', path: 'subscription.trial.claimed', type: 'text' },
+  user_subscription_cancelling:          { display: 'Cancelling', source: 'resolved', path: 'cancelling', type: 'text' },
+  user_subscription_ever_paid:           { display: 'Ever Paid', source: 'resolved', path: 'everPaid', type: 'text' },
+  user_subscription_payment_processor:   { display: 'Payment Processor', source: 'user', path: 'subscription.payment.processor', type: 'text' },
+  user_subscription_payment_frequency:   { display: 'Payment Frequency', source: 'user', path: 'subscription.payment.frequency', type: 'text' },
+  user_subscription_payment_price:       { display: 'Payment Price', source: 'user', path: 'subscription.payment.price', type: 'number' },
+  user_subscription_payment_last_date:   { display: 'Last Payment Date', source: 'user', path: 'subscription.payment.updatedBy.date.timestamp', type: 'date' },
+
+  // Attribution
+  user_attribution_utm_source:           { display: 'UTM Source', source: 'user', path: 'attribution.utm.tags.utm_source', type: 'text', skip: ['beehiiv'] },
+};
+
+// Master segment dictionary — SSOT for all marketing segments.
+//
+// Segments are created in each provider by OMEGA (like custom fields).
+// BEM references them by key. Provider-specific IDs are resolved at runtime.
+//
+// Condition types:
+//   'field'      — custom field condition (uses FIELDS above)
+//   'engagement' — provider built-in engagement tracking (opens, clicks)
+//
+// To add a new segment:
+//   1. Add an entry here
+//   2. Add matching entry in OMEGA's src/lib/bem-segments.js
+//   3. Run OMEGA: npm start -- --service=sendgrid,beehiiv --brand=X
+//
+// Providers:
+//   skip — Array of provider names to skip segment creation for
+//          (e.g., engagement segments may not be supported on all providers)
+const SEGMENTS = {
+  // Subscription
+  subscription_free:          { display: 'Free Users', conditions: [{ field: 'user_subscription_plan', op: '==', value: 'basic' }] },
+  subscription_paid:          { display: 'Paid Users', conditions: [{ field: 'user_subscription_plan', op: '!=', value: 'basic' }, { field: 'user_subscription_status', op: '==', value: 'active' }] },
+  subscription_trialing:      { display: 'Trialing', conditions: [{ field: 'user_subscription_trialing', op: '==', value: 'true' }] },
+  subscription_cancelling:    { display: 'Cancelling', conditions: [{ field: 'user_subscription_cancelling', op: '==', value: 'true' }] },
+  subscription_suspended:     { display: 'Suspended', conditions: [{ field: 'user_subscription_status', op: '==', value: 'suspended' }] },
+  subscription_cancelled:     { display: 'Cancelled', conditions: [{ field: 'user_subscription_status', op: '==', value: 'cancelled' }] },
+  subscription_churned_paid:  { display: 'Churned Paid (Paid → Cancelled)', conditions: [{ field: 'user_subscription_ever_paid', op: '==', value: 'true' }, { field: 'user_subscription_status', op: '==', value: 'cancelled' }] },
+  subscription_churned_trial: { display: 'Churned Trial (Trial → Never Paid)', conditions: [{ field: 'user_subscription_trial_claimed', op: '==', value: 'true' }, { field: 'user_subscription_ever_paid', op: '!=', value: 'true' }] },
+  subscription_ever_paid:     { display: 'Ever Paid', conditions: [{ field: 'user_subscription_ever_paid', op: '==', value: 'true' }] },
+  subscription_never_paid:    { display: 'Never Paid', conditions: [{ field: 'user_subscription_ever_paid', op: '!=', value: 'true' }] },
+
+  // Lifecycle (time since signup)
+  lifecycle_7d:               { display: 'Signed Up Last 7 Days', conditions: [{ field: 'user_metadata_signup_date', op: 'within', value: '7d' }] },
+  lifecycle_30d:              { display: 'Signed Up Last 30 Days', conditions: [{ field: 'user_metadata_signup_date', op: 'within', value: '30d' }] },
+  lifecycle_90d:              { display: 'Signed Up Last 90 Days', conditions: [{ field: 'user_metadata_signup_date', op: 'within', value: '90d' }] },
+  lifecycle_6m:               { display: 'Signed Up Last 6 Months', conditions: [{ field: 'user_metadata_signup_date', op: 'within', value: '180d' }] },
+  lifecycle_1y:               { display: 'Signed Up Last 1 Year', conditions: [{ field: 'user_metadata_signup_date', op: 'within', value: '365d' }] },
+
+  // Engagement (provider built-in open/click tracking)
+  engagement_active_30d:      { display: 'Engaged Last 30 Days', conditions: [{ type: 'engagement', op: 'opened_or_clicked', value: '30d' }] },
+  engagement_active_90d:      { display: 'Engaged Last 90 Days', conditions: [{ type: 'engagement', op: 'opened_or_clicked', value: '90d' }] },
+  engagement_inactive_90d:    { display: 'Inactive 90+ Days', conditions: [{ type: 'engagement', op: 'not_opened', value: '90d' }] },
+  engagement_inactive_5m:     { display: 'Inactive 5+ Months', conditions: [{ type: 'engagement', op: 'not_opened_or_clicked', value: '150d' }, { type: 'engagement', op: 'received_gte', value: '5' }, { field: 'user_metadata_signup_date', op: 'not_within', value: '150d' }] },
+  engagement_inactive_6m:     { display: 'Inactive 6+ Months', conditions: [{ type: 'engagement', op: 'not_opened_or_clicked', value: '180d' }, { type: 'engagement', op: 'received_gte', value: '5' }, { field: 'user_metadata_signup_date', op: 'not_within', value: '180d' }] },
+
+  // Test
+  test_admin:                 { display: 'Test Admin', conditions: [{ type: 'contact', op: 'email_is', value: 'hello@itwcreativeworks.com' }] },
+};
+
+/**
+ * Resolve all field values from a user doc + config.
+ * Returns a map of semantic field names → resolved values (type-coerced).
+ * Providers use this internally to build their native field format.
+ *
+ * @param {object} userDoc - User document from Firestore
+ * @param {object} config - Manager.config
+ * @returns {object} Map of semantic name → value (e.g., { plan: 'basic', status: 'active', ... })
+ */
+const _ = require('lodash');
+const User = require('../../helpers/user.js');
+
+function resolveFieldValues(userDoc, config) {
+  const resolved = User.resolveSubscription(userDoc);
+  const subscription = userDoc.subscription || {};
+
+  // Computed values from resolveSubscription() + raw status
+  const resolvedValues = {
+    plan: resolved.plan,
+    status: subscription.status || 'active',
+    everPaid: String(resolved.everPaid),
+    trialing: String(resolved.trialing),
+    cancelling: String(resolved.cancelling),
+  };
+
+  const result = {};
+
+  for (const [name, fieldConfig] of Object.entries(FIELDS)) {
+    let value;
+
+    if (fieldConfig.source === 'config') {
+      value = _.get(config, fieldConfig.path);
+    } else if (fieldConfig.source === 'resolved') {
+      value = resolvedValues[fieldConfig.path];
+    } else {
+      value = _.get(userDoc, fieldConfig.path);
+    }
+
+    if (value == null) {
+      continue;
+    }
+
+    // Coerce booleans to strings for text fields
+    if (fieldConfig.type === 'text' && typeof value === 'boolean') {
+      value = String(value);
+    }
+
+    // Coerce to number for number fields
+    if (fieldConfig.type === 'number' && typeof value !== 'number') {
+      value = Number(value) || 0;
+    }
+
+    // Skip epoch default dates (1970-01-01)
+    if (fieldConfig.type === 'date' && (!value || value === '1970-01-01T00:00:00.000Z')) {
+      continue;
+    }
+
+    result[name] = value;
+  }
+
+  return result;
+}
+
+module.exports = {
+  GROUPS,
+  SENDERS,
+  FIELDS,
+  SEGMENTS,
+  SEND_AT_LIMIT,
+  sanitizeImagesForEmail,
+  encode,
+  errorWithCode,
+  resolveFieldValues,
+  nextWeekday,
+  nextNthWeekday,
+  nextMonthDay,
+  getNextOccurrence,
+  getNextFutureOccurrence,
+};

@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+
+# Build/runtime scratch (NOTE: packages/*/dist is intentionally TRACKED, matching framework convention)
+.temp/
+.cache/
+.omega/

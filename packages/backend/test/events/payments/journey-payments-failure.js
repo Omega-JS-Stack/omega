@@ -1,0 +1,146 @@
+/**
+ * Test: Payment Journey - Invoice Payment Failure
+ * Simulates: basic → paid subscription → invoice.payment_failed → suspended
+ *
+ * Unlike journey-payments-suspend (which uses customer.subscription.updated with past_due),
+ * this test uses the invoice.payment_failed event with billing_reason: subscription_cycle.
+ * This verifies the new parseWebhook routing that determines category from invoice data.
+ *
+ * Product-agnostic: resolves the first paid product from config.payment.products
+ */
+module.exports = {
+  description: 'Payment journey: paid → invoice.payment_failed → suspended',
+  type: 'suite',
+  timeout: 30000,
+
+  tests: [
+    {
+      name: 'setup-paid-subscription',
+      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+        const uid = accounts['journey-payments-failure'].uid;
+
+        // Resolve first paid subscription product. If the brand has none configured,
+        // skip the entire journey — this is a config-gap, not a code failure.
+        const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.type === 'subscription' && p.prices);
+        if (!paidProduct) {
+          skip('No paid subscription product configured in this brand');
+        }
+
+        state.uid = uid;
+        state.paidProductId = paidProduct.id;
+        state.product = payments.products[paidProduct.id];
+
+        state.paidProductName = paidProduct.name;
+
+        // Create subscription via test intent
+        const response = await http.as('journey-payments-failure').post('backend-manager/payments/intent', {
+          processor: 'test',
+          productId: paidProduct.id,
+          frequency: state.product.frequency,
+        });
+        assert.isSuccess(response, 'Intent should succeed');
+        state.orderId = response.data.orderId;
+
+        // Wait for subscription to activate
+        await waitFor(async () => {
+          const userDoc = await firestore.get(`users/${uid}`);
+          return userDoc?.subscription?.product?.id === paidProduct.id;
+        }, 15000, 500);
+
+        const userDoc = await firestore.get(`users/${uid}`);
+        assert.equal(userDoc.subscription?.product?.id, paidProduct.id, `Should start as ${paidProduct.id}`);
+        assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
+        assert.equal(userDoc.subscription?.payment?.orderId, state.orderId, 'Order ID should match intent');
+
+        state.subscriptionId = userDoc.subscription.payment.resourceId;
+      },
+    },
+
+    {
+      name: 'send-invoice-payment-failed',
+      async run({ http, assert, state, config }) {
+        state.eventId = `_test-evt-journey-failure-${Date.now()}`;
+
+        // Send invoice.payment_failed with subscription billing reason
+        // This tests the new parseWebhook routing: billing_reason=subscription_cycle → subscription category
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.backendManagerWebhookKey}`, {
+          id: state.eventId,
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              id: `in_test_failure_${Date.now()}`,
+              object: 'invoice',
+              billing_reason: 'subscription_cycle',
+              amount_due: 999,
+              amount_paid: 0,
+              status: 'open',
+              parent: {
+                subscription_details: {
+                  subscription: state.subscriptionId,
+                  metadata: { uid: state.uid, orderId: state.orderId },
+                },
+                type: 'subscription_details',
+              },
+            },
+          },
+        });
+
+        assert.isSuccess(response, 'Webhook should be accepted');
+      },
+    },
+
+    {
+      name: 'verify-webhook-categorized-as-subscription',
+      async run({ firestore, assert, state, waitFor }) {
+        // Wait for webhook doc to be saved
+        await waitFor(async () => {
+          const doc = await firestore.get(`payments-webhooks/${state.eventId}`);
+          return doc?.status === 'completed' || doc?.status === 'failed';
+        }, 15000, 500);
+
+        const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId}`);
+        assert.ok(webhookDoc, 'Webhook doc should exist');
+        assert.equal(webhookDoc.event?.category, 'subscription', 'Category should be subscription');
+        assert.equal(webhookDoc.event?.resourceType, 'subscription', 'Resource type should be subscription');
+        assert.equal(webhookDoc.event?.resourceId, state.subscriptionId, 'Resource ID should be subscription ID');
+        assert.equal(webhookDoc.transition, 'payment-failed', 'Transition should be payment-failed');
+      },
+    },
+
+    {
+      name: 'subscription-suspended',
+      async run({ firestore, assert, state }) {
+        const userDoc = await firestore.get(`users/${state.uid}`);
+
+        assert.equal(userDoc.subscription.status, 'suspended', 'Status should be suspended after payment failure');
+        assert.equal(userDoc.subscription.product.id, state.paidProductId, `Product should still be ${state.paidProductId}`);
+      },
+    },
+
+    {
+      name: 'order-doc-verified',
+      async run({ firestore, assert, state }) {
+        const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
+
+        assert.ok(orderDoc, 'Order doc should exist');
+        assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
+        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
+        assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
+        assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null');
+        assert.equal(orderDoc.requests.refund, null, 'requests.refund should be null');
+      },
+    },
+
+    {
+      name: 'intent-doc-completed',
+      async run({ firestore, assert, state }) {
+        const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
+
+        assert.ok(intentDoc, 'Intent doc should exist');
+        assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
+        assert.equal(intentDoc.status, 'completed', 'Intent status should be completed after initial webhook processing');
+        assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');
+      },
+    },
+  ],
+};

@@ -1,0 +1,62 @@
+{
+  "name": "web-manager",
+  "version": "4.3.4",
+  "description": "Easily access important variables such as the query string, current domain, and current page in a single object.",
+  "main": "dist/index.js",
+  "files": [
+    "dist/",
+    "src/",
+    "docs/",
+    "CLAUDE.md"
+  ],
+  "module": "src/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./modules/*": "./dist/modules/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "start": "npm run prepare:watch",
+    "test": "npm run prepare && mocha --require ./test/setup.js --require ./test/helpers.js 'test/tests/**/*.test.js' --timeout=10000 --exit",
+    "prepare_": "node -e 'require(`prepare-package`)()'",
+    "prepare": "node -e \"require('prepare-package')()\"",
+    "prepare:watch": "node -e \"require('prepare-package/watch')()\""
+  },
+  "engines": {
+    "node": ">=12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itw-creative-works/web-manager.git"
+  },
+  "keywords": [
+    "library"
+  ],
+  "author": "ITW Creative Works",
+  "license": "CC-BY-4.0",
+  "bugs": {
+    "url": "https://github.com/itw-creative-works/web-manager/issues"
+  },
+  "homepage": "https://itwcreativeworks.com",
+  "preparePackage": {
+    "input": "./src",
+    "output": "./dist",
+    "replace": {},
+    "type": "copy",
+    "hooks": {}
+  },
+  "notes": {
+    "@sentry/browser": "Resolved by using OVERRIDES in web-manager (lighthouse is the issue"
+  },
+  "dependencies": {
+    "@sentry/browser": "^10.57.0",
+    "chatsy": "^2.0.14",
+    "firebase": "^12.14.0",
+    "itwcw-package-analytics": "^1.0.8",
+    "lodash": "^4.18.1"
+  },
+  "devDependencies": {
+    "mocha": "^11.7.6",
+    "prepare-package": "^2.1.0"
+  }
+}

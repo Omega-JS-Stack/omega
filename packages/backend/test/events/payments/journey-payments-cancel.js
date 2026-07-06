@@ -1,0 +1,182 @@
+/**
+ * Test: Payment Journey - Cancel
+ * Simulates: paid active → pending cancel → cancelled
+ *
+ * Uses test intent for initial subscription, then manual webhooks for cancel flow
+ * Product-agnostic: resolves the first paid product from config.payment.products
+ */
+module.exports = {
+  description: 'Payment journey: paid → pending cancel → cancelled',
+  type: 'suite',
+  timeout: 30000,
+
+  tests: [
+    {
+      name: 'setup-paid-subscription',
+      async run({ accounts, firestore, assert, state, config, http, waitFor, skip, payments }) {
+        const uid = accounts['journey-payments-cancel'].uid;
+
+        // Resolve first paid product from config. If the brand has none configured,
+        // skip the entire journey — this is a config-gap, not a code failure.
+        const paidProduct = config.payment.products.find(p => p.id !== 'basic' && p.prices);
+        if (!paidProduct) {
+          skip('No paid product configured in this brand');
+        }
+
+        state.uid = uid;
+        state.paidProductId = paidProduct.id;
+        state.product = payments.products[paidProduct.id];
+
+        state.paidProductName = paidProduct.name;
+
+        // Create subscription via test intent
+        const response = await http.as('journey-payments-cancel').post('backend-manager/payments/intent', {
+          processor: 'test',
+          productId: paidProduct.id,
+          frequency: state.product.frequency,
+        });
+        assert.isSuccess(response, 'Intent should succeed');
+        state.orderId = response.data.orderId;
+
+        // Wait for subscription to activate
+        await waitFor(async () => {
+          const userDoc = await firestore.get(`users/${uid}`);
+          return userDoc?.subscription?.product?.id === paidProduct.id;
+        }, 15000, 500);
+
+        const userDoc = await firestore.get(`users/${uid}`);
+        assert.equal(userDoc.subscription?.product?.id, paidProduct.id, `Should start as ${paidProduct.id}`);
+        assert.equal(userDoc.subscription?.status, 'active', 'Should be active');
+        assert.equal(userDoc.subscription?.payment?.orderId, state.orderId, 'Order ID should match intent');
+
+        state.subscriptionId = userDoc.subscription.payment.resourceId;
+      },
+    },
+
+    {
+      name: 'send-pending-cancel-webhook',
+      async run({ http, assert, state, config, payments }) {
+        const futureDate = new Date();
+        futureDate.setFullYear(futureDate.getFullYear() + 1);
+
+        state.eventId1 = `_test-evt-journey-cancel-pending-${Date.now()}`;
+
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.backendManagerWebhookKey}`, {
+          id: state.eventId1,
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              id: state.subscriptionId,
+              object: 'subscription',
+              status: 'active',
+              metadata: { uid: state.uid, orderId: state.orderId },
+              cancel_at_period_end: true,
+              cancel_at: Math.floor(futureDate.getTime() / 1000),
+              canceled_at: null,
+              current_period_end: Math.floor(futureDate.getTime() / 1000),
+              current_period_start: Math.floor(Date.now() / 1000),
+              start_date: Math.floor(Date.now() / 1000) - 86400 * 30,
+              trial_start: null,
+              trial_end: null,
+              plan: { product: payments.stripeProductIds[state.paidProductId], interval: state.product.interval },
+            },
+          },
+        });
+
+        assert.isSuccess(response, 'Webhook should be accepted');
+      },
+    },
+
+    {
+      name: 'pending-cancel-processed',
+      async run({ firestore, assert, state, waitFor }) {
+        await waitFor(async () => {
+          const doc = await firestore.get(`payments-webhooks/${state.eventId1}`);
+          return doc?.status === 'completed';
+        }, 15000, 500);
+
+        const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId1}`);
+        assert.equal(webhookDoc.transition, 'cancellation-requested', 'Transition should be cancellation-requested');
+
+        const userDoc = await firestore.get(`users/${state.uid}`);
+
+        assert.equal(userDoc.subscription.status, 'active', 'Status should still be active');
+        assert.equal(userDoc.subscription.cancellation.pending, true, 'Cancellation should be pending');
+      },
+    },
+
+    {
+      name: 'send-cancelled-webhook',
+      async run({ http, assert, state, config, payments }) {
+        state.eventId2 = `_test-evt-journey-cancel-final-${Date.now()}`;
+
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.backendManagerWebhookKey}`, {
+          id: state.eventId2,
+          type: 'customer.subscription.deleted',
+          data: {
+            object: {
+              id: state.subscriptionId,
+              object: 'subscription',
+              status: 'canceled',
+              metadata: { uid: state.uid, orderId: state.orderId },
+              cancel_at_period_end: false,
+              canceled_at: Math.floor(Date.now() / 1000),
+              current_period_end: Math.floor(Date.now() / 1000),
+              current_period_start: Math.floor(Date.now() / 1000) - 86400 * 30,
+              start_date: Math.floor(Date.now() / 1000) - 86400 * 60,
+              trial_start: null,
+              trial_end: null,
+              plan: { product: payments.stripeProductIds[state.paidProductId], interval: state.product.interval },
+            },
+          },
+        });
+
+        assert.isSuccess(response, 'Webhook should be accepted');
+      },
+    },
+
+    {
+      name: 'subscription-cancelled',
+      async run({ firestore, assert, state, waitFor }) {
+        await waitFor(async () => {
+          const doc = await firestore.get(`payments-webhooks/${state.eventId2}`);
+          return doc?.status === 'completed';
+        }, 15000, 500);
+
+        const webhookDoc = await firestore.get(`payments-webhooks/${state.eventId2}`);
+        assert.equal(webhookDoc.transition, 'subscription-cancelled', 'Transition should be subscription-cancelled');
+
+        const userDoc = await firestore.get(`users/${state.uid}`);
+
+        assert.equal(userDoc.subscription.status, 'cancelled', 'Status should be cancelled');
+        assert.equal(userDoc.subscription.cancellation.pending, false, 'Cancellation should not be pending');
+      },
+    },
+
+    {
+      name: 'order-doc-verified',
+      async run({ firestore, assert, state }) {
+        const orderDoc = await firestore.get(`payments-orders/${state.orderId}`);
+
+        assert.ok(orderDoc, 'Order doc should exist');
+        assert.equal(orderDoc.type, 'subscription', 'Type should be subscription');
+        assert.equal(orderDoc.owner, state.uid, 'Owner should match');
+        assert.ok(orderDoc.requests !== undefined, 'requests field should exist');
+        assert.equal(orderDoc.requests.cancellation, null, 'requests.cancellation should be null (cancel was via webhook, not endpoint)');
+        assert.equal(orderDoc.requests.refund, null, 'requests.refund should be null');
+      },
+    },
+
+    {
+      name: 'intent-doc-completed',
+      async run({ firestore, assert, state }) {
+        const intentDoc = await firestore.get(`payments-intents/${state.orderId}`);
+
+        assert.ok(intentDoc, 'Intent doc should exist');
+        assert.equal(intentDoc.id, state.orderId, 'ID should match orderId');
+        assert.equal(intentDoc.status, 'completed', 'Intent status should be completed after webhook processing');
+        assert.ok(intentDoc.metadata?.completed?.timestampUNIX > 0, 'Completed timestamp should be set');
+      },
+    },
+  ],
+};

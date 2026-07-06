@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+// Value-less flags must be declared boolean — otherwise yargs treats the next
+// positional as the flag's VALUE (`mgr test --extended some/target` became
+// extended='some/target' with NO target, silently running EVERYTHING in
+// normal mode). Mirrors the same fix in BEM's CLI.
+const argv = require('yargs')(process.argv.slice(2)).boolean(['extended']).parseSync();
+const cli = new (require('../dist/cli.js'))(argv);
+(async function() {
+  'use strict';
+  await cli.process(argv);
+}());

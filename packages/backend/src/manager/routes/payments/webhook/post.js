@@ -1,0 +1,117 @@
+const path = require('path');
+const powertools = require('node-powertools');
+
+/**
+ * POST /payments/webhook?processor=stripe&key=XXX
+ * Receives payment processor webhooks, validates them, and saves to Firestore
+ * The Firestore onWrite trigger handles async processing
+ *
+ * This handler is processor-agnostic. Each processor module defines:
+ *   - parseWebhook(req) — extracts { eventId, eventType, category, resourceType, resourceId, raw, uid }
+ *   - isSupported(eventType) — returns true for events we should process
+ */
+module.exports = async ({ assistant, Manager, libraries }) => {
+  const { admin } = libraries;
+  const data = assistant.request.data;
+  const query = assistant.request.query;
+
+  // Get processor and key from query params
+  const processor = query.processor;
+  const key = query.key;
+
+  // Validate processor
+  if (!processor) {
+    return assistant.respond('Missing processor parameter', { code: 400 });
+  }
+
+  // Validate key
+  if (!key || key !== process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
+    return assistant.respond('Invalid key', { code: 401 });
+  }
+
+  // Validate brand — quit if a brand is specified and doesn't match ours
+  const brand = query.brand;
+  const ourBrand = Manager.config.brand?.id;
+  if (brand && ourBrand && brand !== ourBrand) {
+    assistant.log(`Ignoring webhook: explicit brand mismatch (received=${brand}, expected=${ourBrand})`);
+    return assistant.respond({ received: true, ignored: true });
+  }
+
+  // Load the processor module
+  let processorModule;
+  try {
+    processorModule = require(path.resolve(__dirname, `processors/${processor}.js`));
+  } catch (e) {
+    return assistant.respond(`Unknown processor: ${processor}`, { code: 400 });
+  }
+
+  // Parse the webhook using the processor
+  let parsed;
+  try {
+    parsed = processorModule.parseWebhook(assistant.ref.req);
+  } catch (e) {
+    return assistant.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
+  }
+
+  const { eventId, eventType, category, resourceType, resourceId, raw, uid } = parsed;
+
+  assistant.log(`Parsed webhook: eventId=${eventId}, eventType=${eventType}, category=${category || 'null'}, resourceType=${resourceType || 'null'}, uid=${uid || 'null'}, api_version=${raw?.api_version || 'unknown'}`);
+
+  // Let the processor decide if this event type is relevant
+  if (processorModule.isSupported && !processorModule.isSupported(eventType)) {
+    assistant.log(`Ignoring unsupported event type: ${eventType}`);
+    return assistant.respond({ received: true, ignored: true });
+  }
+
+  // Skip events with no category (e.g., checkout.session.completed for subscription mode)
+  if (!category) {
+    assistant.log(`Ignoring event with no category: ${eventType}`);
+    return assistant.respond({ received: true, ignored: true });
+  }
+
+  // Check for duplicate (skip if already processing/completed)
+  const existingDoc = await admin.firestore().doc(`payments-webhooks/${eventId}`).get();
+  if (existingDoc.exists) {
+    const existingStatus = existingDoc.data()?.status;
+    if (existingStatus !== 'failed') {
+      assistant.log(`Duplicate webhook ${eventId}, existing status=${existingStatus}, skipping`);
+      return assistant.respond({ received: true, duplicate: true });
+    }
+    assistant.log(`Retrying previously failed webhook ${eventId}`);
+  }
+
+  // Build timestamps
+  const now = powertools.timestamp(new Date(), { output: 'string' });
+  const nowUNIX = powertools.timestamp(now, { output: 'unix' });
+
+  // Save to Firestore with status=pending (trigger handles the rest)
+  await admin.firestore().doc(`payments-webhooks/${eventId}`).set({
+    id: eventId,
+    processor: processor,
+    status: 'pending',
+    raw: raw,
+    owner: uid,
+    event: {
+      type: eventType,
+      category: category,
+      resourceType: resourceType,
+      resourceId: resourceId,
+    },
+    error: null,
+    metadata: {
+      created: {
+        timestamp: now,
+        timestampUNIX: nowUNIX,
+      },
+      completed: {
+        timestamp: null,
+        timestampUNIX: null,
+      },
+    },
+  });
+
+  assistant.log(`Saved payments-webhooks/${eventId}: eventType=${eventType}, category=${category}, processor=${processor}, uid=${uid}`);
+
+  // Return 200 immediately
+  return assistant.respond({ received: true });
+};
