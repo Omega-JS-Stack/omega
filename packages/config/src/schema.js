@@ -1,0 +1,313 @@
+/**
+ * Canonical schema for config/omega.json5 — pure data, no logic.
+ *
+ * Entry format is electron-manager's proven src/config/schema.js shape:
+ *
+ *   {
+ *     path:        'brand.id',            // dot-path into the RESOLVED config
+ *     type:        'string' | 'boolean' | 'number' | 'array' | 'object',
+ *     required:    true | false | (config) => bool,
+ *     match:       RegExp,                // only checked when value present + string
+ *     enum:        [...],                 // only checked when value present
+ *     description: 'What the field drives.',
+ *   }
+ *
+ * Rules run against the RESOLVED config for a target — target-section keys
+ * are overlaid at the top level by loadConfig() (targets.desktop.platforms
+ * validates as `platforms`), which is also how any shared key inside a
+ * target entry overrides the shared value.
+ *
+ * SHARED_SCHEMA always applies; TARGET_SCHEMAS[target] adds that target's
+ * refinements. Sections grow as each framework adopts dual-read — seed
+ * entries come from EM's schema (desktop) and the sandbox brand's real BEM
+ * config (backend), never from guesses.
+ */
+
+// Canonical target names — the only keys allowed under `targets`.
+// Key presence in a config's `targets` object = "this brand enables this
+// target" (absorbs the legacy brand-config targets ARRAY).
+const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
+
+// The machine-owned top-level sections identical in every omega.json5 —
+// omega-manager's disperse enumerates THIS list instead of hardcoding
+// per-target mapping blocks. (`targets` itself is the scoping key, not a
+// shared section; `theme` is project-owned but shared-shaped.)
+const SHARED_SECTIONS = ['brand', 'firebaseConfig', 'analytics', 'payment', 'sentry', 'oauth2', 'theme'];
+
+const SHARED_SCHEMA = [
+  // ── brand ────────────────────────────────────────────────────────────────
+  {
+    path:        'brand.id',
+    type:        'string',
+    required:    true,
+    match:       /^[a-z][a-z0-9+\-.]*$/,
+    description: 'URL-scheme-safe slug. Drives deep-link schemes, default appIds, repo names. Lowercase, starts with a letter, alnum/+/-/.',
+  },
+  {
+    path:        'brand.name',
+    type:        'string',
+    required:    true,
+    description: 'Human-readable brand name. Default productName/site title everywhere.',
+  },
+  {
+    path:        'brand.url',
+    type:        'string',
+    required:    false,
+    match:       /^https?:\/\//,
+    description: 'Marketing site URL. Derives remote-config URLs, "Open Website" menu items, hosting boilerplate links.',
+  },
+  {
+    path:        'brand.description',
+    type:        'string',
+    required:    false,
+    description: 'One-sentence brand description. Meta descriptions, store listings.',
+  },
+  {
+    path:        'brand.tagline',
+    type:        'string',
+    required:    false,
+    description: 'Short marketing tagline.',
+  },
+  {
+    path:        'brand.contact.email',
+    type:        'string',
+    required:    false,
+    match:       /@/,
+    description: 'Support email surfaced in About / Help / legal pages.',
+  },
+  {
+    path:        'brand.address',
+    type:        'object',
+    required:    false,
+    description: 'Postal address (line1, line2, city, region, postalCode, country). Legal pages + email footers.',
+  },
+  {
+    path:        'brand.images',
+    type:        'object',
+    required:    false,
+    description: 'Brand image URLs/paths (wordmark, brandmark, combomark, icon).',
+  },
+
+  // ── firebaseConfig ───────────────────────────────────────────────────────
+  {
+    path:        'firebaseConfig',
+    type:        'object',
+    required:    false,
+    description: 'Firebase web-app config, verbatim from the console. Public by design — the web API key is not a secret.',
+  },
+  {
+    path:        'firebaseConfig.projectId',
+    type:        'string',
+    required:    false,
+    description: 'Drives auth, emulator project selection, analytics uuidv5 namespace, remote-config URL fallbacks.',
+  },
+
+  // ── analytics ────────────────────────────────────────────────────────────
+  {
+    path:        'analytics.providers.google.id',
+    type:        'string',
+    required:    false,
+    match:       /^G-[A-Z0-9]+$/,
+    description: 'GA4 Measurement ID. Presence-driven: set G-XXXXXXXXXX to enable. Secret lives in process.env.GOOGLE_ANALYTICS_SECRET.',
+  },
+  {
+    path:        'analytics.providers.meta.id',
+    type:        'string',
+    required:    false,
+    description: 'Meta (Facebook) Pixel ID. Presence-driven.',
+  },
+  {
+    path:        'analytics.providers.tiktok.id',
+    type:        'string',
+    required:    false,
+    description: 'TikTok Pixel ID. Presence-driven.',
+  },
+
+  // ── payment ──────────────────────────────────────────────────────────────
+  {
+    path:        'payment.processors.stripe.publishableKey',
+    type:        'string',
+    required:    false,
+    match:       /^pk_(test|live)_/,
+    description: 'Stripe publishable key. Lives in config (not secret); the secret key stays in env.',
+  },
+  {
+    path:        'payment.processors.paypal.clientId',
+    type:        'string',
+    required:    false,
+    description: 'PayPal client ID. Lives in config; secret stays in env.',
+  },
+  {
+    path:        'payment.processors.chargebee.site',
+    type:        'string',
+    required:    false,
+    description: 'Chargebee site slug.',
+  },
+  {
+    path:        'payment.products',
+    type:        'array',
+    required:    false,
+    description: 'Product catalog (BEM-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target.',
+  },
+
+  // ── sentry ───────────────────────────────────────────────────────────────
+  {
+    path:        'sentry.dsn',
+    type:        'string',
+    required:    false,
+    match:       /^https?:\/\//,
+    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.sentry.dsn overrides.',
+  },
+
+  // ── oauth2 ───────────────────────────────────────────────────────────────
+  {
+    path:        'oauth2',
+    type:        'object',
+    required:    false,
+    description: 'Public OAuth client IDs only — never client secrets.',
+  },
+
+  // ── theme ────────────────────────────────────────────────────────────────
+  {
+    path:        'theme.id',
+    type:        'string',
+    required:    false,
+    description: "Theme id (seeded 'classy' at onboarding). Project-owned — omega-manager never overwrites it.",
+  },
+  {
+    path:        'theme.appearance',
+    type:        'string',
+    required:    false,
+    enum:        ['system', 'light', 'dark'],
+    description: "Default appearance. 'system' follows the OS; a user's runtime choice persists in storage and wins.",
+  },
+
+  // ── targets ──────────────────────────────────────────────────────────────
+  {
+    path:        'targets',
+    type:        'object',
+    required:    false,
+    description: 'Key presence = target enabled; values = target-scoped config (any shared key inside overrides it). Unknown keys are errors.',
+  },
+];
+
+// Per-target refinements — validated against the RESOLVED config (the target
+// section's keys land at the top level).
+const TARGET_SCHEMAS = {
+  // Filled in Phase 2 with @omegajs/web's design: distribute, purgecss
+  // safelist, imagemin, workflows.
+  web: [],
+
+  // Seeded from the sandbox brand's real BEM config (backend-manager-config.json).
+  backend: [
+    {
+      path:        'parent',
+      type:        'string',
+      required:    false,
+      description: 'Parent backend/brand identifier — empty when the brand stands alone.',
+    },
+    {
+      path:        'github',
+      type:        'object',
+      required:    false,
+      description: 'GitHub identity for the brand (user, website repo URL).',
+    },
+    {
+      path:        'reviews',
+      type:        'object',
+      required:    false,
+      description: 'Review-collection settings (enabled, sites).',
+    },
+    {
+      path:        'marketing',
+      type:        'object',
+      required:    false,
+      description: 'Marketing automation: campaigns, newsletter (Beehiiv), prune.',
+    },
+    {
+      path:        'blog',
+      type:        'object',
+      required:    false,
+      description: 'AI blog-content settings (Ghostii pipeline).',
+    },
+    {
+      path:        'dataRequest',
+      type:        'object',
+      required:    false,
+      description: 'GDPR/CCPA data-request query definitions.',
+    },
+  ],
+
+  // Seeded from EM's proven src/config/schema.js. EM's per-OS `targets` key
+  // is renamed `platforms` here (avoids targets.desktop.targets).
+  desktop: [
+    {
+      path:        'app.category',
+      type:        'string',
+      required:    false,
+      enum:        ['productivity', 'developer-tools', 'utilities', 'media', 'social', 'network'],
+      description: 'Generic high-level category. Maps to per-platform UTI + freedesktop strings.',
+    },
+    {
+      path:        'platforms.win.signing.strategy',
+      type:        'string',
+      required:    false,
+      enum:        ['self-hosted', 'cloud', 'local'],
+      description: 'Windows code-signing path. self-hosted = EV USB token on a runner; cloud = provider CLI; local = developer signs manually.',
+    },
+    {
+      path:        'startup.mode',
+      type:        'string',
+      required:    false,
+      enum:        ['normal', 'hidden'],
+      description: 'normal = main window appears at launch; hidden = bakes LSUIElement=true on macOS (no dock, no Cmd+Tab).',
+    },
+    {
+      path:        'cdp.readySignal',
+      type:        'string',
+      required:    false,
+      description: 'Boot-complete signal for `mgr cdp relaunch` — a URL substring matched against CDP page targets.',
+    },
+    {
+      path:        'releases.repo',
+      type:        'string',
+      required:    false,
+      description: 'GitHub repo where built artifacts + the auto-update feed live.',
+    },
+    {
+      path:        'restartManager.enabled',
+      type:        'boolean',
+      required:    false,
+      description: 'External guardian app that relaunches this app on crash. Default true; false disables entirely.',
+    },
+    {
+      path:        'restartManager.feed.owner',
+      type:        'string',
+      required:    false,
+      match:       /^[A-Za-z0-9-]+$/,
+      description: 'GitHub owner of the RM release feed. Override for forks/mirrors.',
+    },
+    {
+      path:        'restartManager.feed.repo',
+      type:        'string',
+      required:    false,
+      match:       /^[\w.-]+$/,
+      description: 'GitHub repo of the RM release feed.',
+    },
+    {
+      path:        'restartManager.feed.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Full base-URL override for the RM feed + artifacts (air-gapped mirrors). Wins over feed.owner/repo.',
+    },
+  ],
+
+  // Near-empty at launch by design.
+  extension: [],
+
+  // RESERVED — MAM is parked for a separate overhaul; schema slot only.
+  mobile: [],
+};
+
+module.exports = { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS };

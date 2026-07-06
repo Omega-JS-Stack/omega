@@ -1,0 +1,26 @@
+{
+  "name": "@omegajs/config",
+  "version": "1.0.0",
+  "description": "The single omega.json5 config format for every OMEGA project type — loader, schema, validator, and the SHARED_SECTIONS enumeration omega-manager disperses from (private workspace package, vendored/bundled into frameworks at prepare time)",
+  "private": true,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./schema": "./src/schema.js",
+    "./merge": "./src/merge.js",
+    "./secrets": "./src/secrets.js",
+    "./validate": "./src/validate.js",
+    "./load": "./src/load.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "json5": "^2.2.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "ITW Creative Works",
+  "license": "MIT"
+}
