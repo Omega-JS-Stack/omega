@@ -20,8 +20,10 @@ const fs   = require('fs');
 const chalk = require('chalk').default;
 
 // Inline the source of assert.js so we can build it into the injected harness
-// payload. The runner reads it from disk once at module-load time.
-const ASSERT_SRC = fs.readFileSync(path.join(__dirname, '..', 'assert.js'), 'utf8');
+// payload. The runner reads it from disk once at module-load time. Resolved through
+// devkit (NOT ../assert.js, which is now a CommonJS re-export shim — its source would
+// leave a bare `module.exports = require(...)` in the browser context).
+const ASSERT_SRC = fs.readFileSync(require.resolve('@omegajs/devkit/test/assert'), 'utf8');
 
 async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, projectRoot, bxmDistRoot }) {
   let puppeteer;

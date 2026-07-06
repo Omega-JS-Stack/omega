@@ -46,10 +46,12 @@ test('copies devkit into dist/vendor, rewrites requires, and the result loads + 
 
   const result = vendorDevkit({ cwd: root });
 
-  // Vendored modules exist
+  // Vendored modules exist — index.js pulls the other three via its relative requires
   for (const file of ['index.js', 'logger.js', 'safe-install.js', 'attach-log-file.js']) {
     assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', file)), `missing vendored ${file}`);
   }
+  // Selective: unused modules (e.g. the test runner) are NOT vendored
+  assert.ok(!fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'test')), 'test/ should not be vendored');
 
   // Requires rewritten to relative paths, both quote styles, no @omegajs refs left
   const rewritten = fs.readFileSync(path.join(root, 'dist', 'lib', 'thing.js'), 'utf8');
@@ -97,7 +99,34 @@ test('throws on a require of a devkit module that does not exist', (t) => {
   });
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  assert.throws(() => vendorDevkit({ cwd: root }), /no such module/);
+  assert.throws(() => vendorDevkit({ cwd: root }), /has no module/);
+});
+
+test('rewrites require.resolve() forms too (used to inline devkit module source)', (t) => {
+  const root = makeFixture('vendor-resolve', {
+    packageJSON: { name: 'fixture-resolve', version: '1.0.0', dependencies: HOST_DEPS },
+    files: { 'dist/deep/reader.js': `module.exports = require.resolve('@omegajs/devkit/logger');` },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  vendorDevkit({ cwd: root });
+  const rewritten = fs.readFileSync(path.join(root, 'dist', 'deep', 'reader.js'), 'utf8');
+  assert.match(rewritten, /require\.resolve\('\.\.\/vendor\/devkit\/logger\.js'\)/);
+  // And the resolved path actually points at a real vendored file
+  const resolved = require(path.join(root, 'dist', 'deep', 'reader.js'));
+  assert.ok(fs.existsSync(resolved));
+});
+
+test('vendors selectively: a safe-install-only host ships one module and needs only its deps', (t) => {
+  const root = makeFixture('vendor-selective', {
+    packageJSON: { name: 'fixture-selective', version: '1.0.0', dependencies: { 'node-powertools': '*' } }, // no chalk!
+    files: { 'dist/a.js': `module.exports = require('@omegajs/devkit/safe-install');` },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root }); // must NOT throw about chalk/glob/fs-jetpack
+  assert.deepEqual(result.vendored, ['safe-install.js']);
+  assert.ok(!fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'logger.js')));
 });
 
 test('throws when dist does not exist yet', (t) => {

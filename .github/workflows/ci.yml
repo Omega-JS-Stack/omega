@@ -70,7 +70,7 @@ jobs:
             (cd "$scratch" && npm init -y >/dev/null && npm install --no-audit --no-fund "/tmp/$tarball")
             name=$(node -p "require('./packages/$pkg/package.json').name")
             (cd "$scratch" && node -e "require.resolve('$name'); console.log('$name: resolves OK')")
-            if grep -rE "require\((['\"])@omegajs" "$scratch/node_modules/$name/dist"; then
+            if grep -rE "require(\.resolve)?\((['\"])@omegajs" "$scratch/node_modules/$name/dist"; then
               echo "FAIL: $name ships raw @omegajs requires — devkit vendoring did not run/rewrite"
               exit 1
             fi
