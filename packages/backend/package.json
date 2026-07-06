@@ -2,7 +2,7 @@
   "name": "backend-manager",
   "version": "5.11.7",
   "description": "Quick tools for developing Firebase functions",
-  "main": "src/manager/index.js",
+  "main": "dist/manager/index.js",
   "files": [
     "bin/",
     "dist/",
@@ -19,11 +19,11 @@
     "mgr": "./bin/backend-manager"
   },
   "scripts": {
-    "start": "node src/manager/index.js",
+    "start": "npm run prepare:watch",
     "test": "node bin/backend-manager test",
     "prepare": "node -e \"require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "prepublishOnly": "node -e \"require('fs').rmSync('src/test/fixtures/firebase-project/functions/node_modules', { recursive: true, force: true })\""
+    "prepublishOnly": "node -e \"['src', 'dist'].forEach((d) => require('fs').rmSync(d + '/test/fixtures/firebase-project/functions/node_modules', { recursive: true, force: true }))\""
   },
   "engines": {
     "node": "22"
@@ -57,8 +57,8 @@
   },
   "homepage": "https://itwcreativeworks.com",
   "preparePackage": {
-    "input": "./src_",
-    "output": "./dist_",
+    "input": "./src",
+    "output": "./dist",
     "replace": {},
     "type": "copy",
     "hooks": {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-let Main = new (require('../src/cli/index.js'))(process.argv);
+let Main = new (require('../dist/cli/index.js'))(process.argv);
 (async function() {
   'use strict';
   try {

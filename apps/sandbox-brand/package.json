@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "test": "node e2e/run.js",
-    "test:backend": "npm run test:offline --workspace=apps/backend"
+    "test:backend": "cd apps/backend && npm run test:offline"
   },
   "devDependencies": {
     "puppeteer": "^24.43.1"
