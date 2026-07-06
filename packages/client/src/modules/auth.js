@@ -1,81 +1,9 @@
-const DEFAULT_ACCOUNT = {
-  auth: { uid: null, email: null, temporary: false },
-  subscription: {
-    product: { id: 'basic', name: 'Basic' },
-    status: 'active',
-    expires: { timestamp: null, timestampUNIX: null },
-    trial: { claimed: false, expires: { timestamp: null, timestampUNIX: null } },
-    cancellation: { pending: false, date: { timestamp: null, timestampUNIX: null } },
-    payment: {
-      processor: null,
-      orderId: null,
-      resourceId: null,
-      frequency: null,
-      price: 0,
-      startDate: { timestamp: null, timestampUNIX: null },
-      updatedBy: {
-        event: { name: null, id: null },
-        date: { timestamp: null, timestampUNIX: null },
-      },
-    },
-  },
-  roles: { admin: false, betaTester: false, developer: false },
-  affiliate: { code: null, referrals: [] },
-  activity: {
-  },
-  metadata: {
-    created: { timestamp: null, timestampUNIX: null },
-    updated: { timestamp: null, timestampUNIX: null },
-  },
-  api: { clientId: null, privateKey: null },
-  usage: {},
-  personal: { name: { first: null, last: null } },
-  oauth2: {},
-  attribution: {
-    affiliate: { code: null, timestamp: null, url: null, page: null },
-    utm: { tags: {}, timestamp: null, url: null, page: null },
-  },
-  consent: {
-    legal: {
-      status: 'revoked',
-      grantedAt: { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null },
-    },
-    marketing: {
-      status: 'revoked',
-      grantedAt: { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null },
-      revokedAt: { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null },
-    },
-  },
-};
-
-function resolveAccount(rawData, firebaseUser) {
-  const user = firebaseUser || {};
-  const data = rawData || {};
-
-  // Deep merge: rawData values take precedence over defaults
-  function deepMerge(target, source) {
-    const result = { ...target };
-    for (const key in source) {
-      if (!source.hasOwnProperty(key)) continue;
-      if (result[key] === null || result[key] === undefined) {
-        result[key] = source[key];
-      } else if (typeof result[key] === 'object' && !Array.isArray(result[key])
-        && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-        result[key] = deepMerge(result[key], source[key]);
-      }
-    }
-    return result;
-  }
-
-  const account = deepMerge(data, DEFAULT_ACCOUNT);
-
-  // Set auth from firebase user if not already set
-  account.auth = account.auth || {};
-  account.auth.uid = account.auth.uid || user.uid || null;
-  account.auth.email = account.auth.email || user.email || null;
-
-  return account;
-}
+// The account schema + subscription derivation live in @omegajs/account — the
+// single source of truth shared with backend-manager, so a doc resolved here is
+// byte-identical to one resolved by the backend. No generators are injected:
+// $uuid/$randomId/$apiKey fields resolve to null (real values always come from
+// the backend-written doc).
+import { resolveAccount, resolveSubscription } from '@omegajs/account';
 
 class Auth {
   constructor(manager) {
@@ -148,7 +76,7 @@ class Auth {
     if (!this.manager._resolveFirebaseConfig()) {
       callback({
         user: null,
-        account: resolveAccount({}, {}),
+        account: resolveAccount({}),
       });
 
       return () => {};
@@ -168,7 +96,7 @@ class Auth {
       }
 
       // Ensure account is always a resolved object
-      state.account = state.account || resolveAccount({}, { uid: user?.uid });
+      state.account = state.account || resolveAccount({}, { user: { uid: user?.uid } });
 
       // Derive resolved subscription state for bindings and consumers
       state.resolved = this.resolveSubscription(state.account);
@@ -237,34 +165,11 @@ class Auth {
   }
 
   // Resolves calculated subscription fields that require derivation logic
-  // Raw data (product.id, status, trial, cancellation) is on account.subscription directly
-  // Returns: { plan, active, trialing, cancelling }
-  // - plan: the plan ID the user effectively has access to RIGHT NOW ('basic' if cancelled/suspended)
-  // - active: user has active access (active, trialing, or cancelling)
-  // - trialing: user is in an active trial (backend status is 'active' but trial hasn't expired)
-  // - cancelling: cancellation is pending (backend status is 'active' but cancellation.pending is true)
+  // (shared @omegajs/account implementation — same math as the backend).
+  // Returns: { plan, active, trialing, cancelling, everPaid }
+  // Falls back to the stored auth state when no account is passed.
   resolveSubscription(account) {
-    const subscription = (account || this.manager.storage().get('auth', {})?.account)?.subscription || {};
-    const productId = subscription.product?.id || 'basic';
-
-    // Derive trial and cancelling states from raw backend data
-    let trialing = false;
-    let cancelling = false;
-
-    if (productId !== 'basic' && subscription.status === 'active') {
-      trialing = !!(subscription.trial?.claimed
-        && subscription.trial?.expires?.timestampUNIX > Math.floor(Date.now() / 1000));
-      cancelling = !trialing && !!subscription.cancellation?.pending;
-    }
-
-    const active = (productId !== 'basic' && subscription.status === 'active');
-
-    return {
-      plan: active ? productId : 'basic',
-      active,
-      trialing,
-      cancelling,
-    };
+    return resolveSubscription(account || this.manager.storage().get('auth', {})?.account);
   }
 
   // Resolve usage bindings from account data + product limits from config.
@@ -368,12 +273,12 @@ class Auth {
       if (snapshot.exists()) {
         // Resolve the account data to ensure proper structure and defaults
         const rawData = snapshot.data();
-        const resolvedAccount = resolveAccount(rawData, firebaseUser);
+        const resolvedAccount = resolveAccount(rawData, { user: firebaseUser });
         return resolvedAccount;
       }
 
       // If no account exists, return resolved empty object for consistent structure
-      return resolveAccount({}, firebaseUser);
+      return resolveAccount({}, { user: firebaseUser });
     } catch (error) {
       console.error('Get account data error:', error);
       return null;

@@ -43,7 +43,9 @@
     "output": "./dist",
     "replace": {},
     "type": "copy",
-    "hooks": {}
+    "hooks": {
+      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+    }
   },
   "notes": {
     "@sentry/browser": "Resolved by using OVERRIDES in web-manager (lighthouse is the issue"
@@ -56,6 +58,8 @@
     "lodash": "^4.18.1"
   },
   "devDependencies": {
+    "@omegajs/account": "*",
+    "@omegajs/devkit": "*",
     "mocha": "^11.7.6",
     "prepare-package": "^2.1.0"
   }

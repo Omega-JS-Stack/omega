@@ -38,6 +38,7 @@ describe('Auth Module', () => {
       assert.strictEqual(result.active, false);
       assert.strictEqual(result.trialing, false);
       assert.strictEqual(result.cancelling, false);
+      assert.strictEqual(result.everPaid, false);
     });
 
     it('should return basic for basic product', () => {
@@ -91,6 +92,19 @@ describe('Auth Module', () => {
       });
       assert.strictEqual(result.plan, 'basic');
       assert.strictEqual(result.active, false);
+    });
+
+    it('should report everPaid when a payment startDate exists', () => {
+      const result = getManager().auth().resolveSubscription({
+        subscription: {
+          product: { id: 'premium' },
+          status: 'active',
+          payment: { startDate: { timestampUNIX: 1735689600 } },
+        },
+      });
+      assert.strictEqual(result.plan, 'premium');
+      assert.strictEqual(result.active, true);
+      assert.strictEqual(result.everPaid, true);
     });
   });
 });

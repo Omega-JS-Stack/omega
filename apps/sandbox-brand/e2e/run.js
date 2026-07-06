@@ -231,20 +231,21 @@ async function main() {
     });
 
     await step('BEM auth onCreate creates the Firestore user doc', async () => {
-      // DEFAULT_ACCOUNT has metadata.created.timestamp: null — it only becomes
-      // non-null when the account read hits the REAL doc BEM's trigger wrote.
+      // The frontend resolver (@omegajs/account with no generators) leaves
+      // api.clientId null — it's only non-null when the account read hits the
+      // REAL doc BEM's trigger wrote (the backend generates the $uuid).
       const deadline = Date.now() + DOC_CREATE_TIMEOUT;
       let last = null;
       while (Date.now() < deadline) {
         last = await page.evaluate(() => window.__omega.authState().then((state) => ({
           uid: state.account.auth.uid,
-          created: state.account.metadata.created.timestamp,
+          clientId: state.account.api.clientId,
         })));
-        if (last.created) {
+        if (last.clientId) {
           if (last.uid !== uid) {
             throw new Error(`user doc uid mismatch: ${last.uid} !== ${uid}`);
           }
-          return `created: ${last.created}`;
+          return `api.clientId: ${last.clientId}`;
         }
         await sleep(1500);
       }
@@ -274,12 +275,12 @@ async function main() {
       await page.waitForFunction('window.__omega && (window.__omega.isReady || window.__omega.initError)', { timeout: 30000 });
       const state = await page.evaluate(() => window.__omega.authState().then((s) => ({
         uid: s.user && s.user.uid,
-        created: s.account.metadata.created.timestamp,
+        clientId: s.account.api.clientId,
       })));
       if (state.uid !== uid) {
         throw new Error(`restored session uid mismatch: ${JSON.stringify(state)}`);
       }
-      if (!state.created) {
+      if (!state.clientId) {
         throw new Error('account doc not readable after reload');
       }
     });
@@ -289,8 +290,11 @@ async function main() {
         email: s.account.auth.email,
         plan: s.resolved.plan,
         active: s.resolved.active,
+        everPaid: s.resolved.everPaid,
       })));
-      if (resolved.email !== EMAIL || resolved.plan !== 'basic' || resolved.active !== false) {
+      // everPaid must be exactly false (not undefined) — proves the shared
+      // @omegajs/account resolveSubscription is the one running in the bundle
+      if (resolved.email !== EMAIL || resolved.plan !== 'basic' || resolved.active !== false || resolved.everPaid !== false) {
         throw new Error(`unexpected resolved state: ${JSON.stringify(resolved)}`);
       }
       return `plan: ${resolved.plan}, active: ${resolved.active}`;

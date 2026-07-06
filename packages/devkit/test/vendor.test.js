@@ -1,4 +1,5 @@
-// Unit tests for tools/vendor.js — vendoring devkit into a host framework's dist.
+// Unit tests for tools/vendor.js — vendoring @omegajs packages (devkit, account, ...)
+// into a host framework's dist, for both CommonJS requires and ESM imports.
 //
 // Fixtures are built under packages/devkit/.temp/ (gitignored) rather than os.tmpdir()
 // ON PURPOSE: the runtime-load assertion requires that vendored modules can resolve
@@ -9,6 +10,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const vendorDevkit = require('../tools/vendor');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
@@ -125,8 +127,48 @@ test('vendors selectively: a safe-install-only host ships one module and needs o
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   const result = vendorDevkit({ cwd: root }); // must NOT throw about chalk/glob/fs-jetpack
-  assert.deepEqual(result.vendored, ['safe-install.js']);
+  assert.deepEqual(result.vendored, { devkit: ['safe-install.js'] });
   assert.ok(!fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'logger.js')));
+});
+
+test('rewrites ESM import forms and vendors multiple packages (devkit + account)', async (t) => {
+  const root = makeFixture('vendor-esm', {
+    packageJSON: { name: 'fixture-esm', version: '1.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/module.js': [
+        `import { resolveAccount, resolveSubscription } from '@omegajs/account';`,
+        `import Logger from '@omegajs/devkit/logger';`,
+        `export { default as engineExports } from '@omegajs/account/engine';`,
+        `import '@omegajs/account/subscription';`,
+        `const schema = await import('@omegajs/account/schema');`,
+        `export const account = resolveAccount({});`,
+        `export const resolved = resolveSubscription(account);`,
+        `export const hasAuthBranch = !!schema.default.auth;`,
+        `export const logger = new Logger('esm-fixture');`,
+      ].join('\n'),
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root });
+
+  // Every ESM reference form rewritten, nothing @omegajs left behind
+  const rewritten = fs.readFileSync(path.join(root, 'dist', 'module.js'), 'utf8');
+  assert.match(rewritten, /from '\.\/vendor\/account\/index\.js'/);
+  assert.match(rewritten, /from '\.\/vendor\/devkit\/logger\.js'/);
+  assert.match(rewritten, /from '\.\/vendor\/account\/engine\.js'/);
+  assert.match(rewritten, /import '\.\/vendor\/account\/subscription\.js'/);
+  assert.match(rewritten, /import\('\.\/vendor\/account\/schema\.js'\)/);
+  assert.ok(!rewritten.includes('@omegajs'));
+  assert.deepEqual(Object.keys(result.vendored).sort(), ['account', 'devkit']);
+
+  // The rewritten ESM file actually loads — named imports from the vendored
+  // CommonJS account modules must work through Node's CJS/ESM interop
+  const mod = await import(pathToFileURL(path.join(root, 'dist', 'module.js')));
+  assert.equal(mod.account.subscription.product.id, 'basic');
+  assert.equal(mod.resolved.everPaid, false);
+  assert.equal(mod.hasAuthBranch, true);
+  assert.equal(typeof mod.logger.log, 'function');
 });
 
 test('throws when dist does not exist yet', (t) => {

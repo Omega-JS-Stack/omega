@@ -1,27 +1,35 @@
-// Vendors @omegajs/devkit into a framework's dist/ so published tarballs are
-// self-contained (devkit is a private workspace package — it never ships to npm).
+// Vendors private @omegajs workspace packages (devkit, account, ...) into a
+// framework's dist/ so published tarballs are self-contained (the shared packages
+// never ship to npm).
 //
 // Wired as the framework's prepare-package `after` hook:
 //   "preparePackage": { "hooks": { "after": "node -e \"require('@omegajs/devkit/vendor')()\"" } }
 //
 // From the framework's cwd it:
-//   1. Scans dist/ for requires of @omegajs/devkit modules
-//   2. Copies ONLY those modules (plus their transitive relative requires) into
-//      <dist>/vendor/devkit/ — selective, so a host that uses just safe-install
-//      doesn't ship the test runner or inherit its dependency requirements
-//   3. Rewrites every require('@omegajs/devkit[/<subpath>]') under dist/ to a
-//      relative path into that vendor dir
+//   1. Scans dist/ for references to @omegajs packages — CommonJS (require,
+//      require.resolve) AND ESM (import ... from, export ... from, dynamic
+//      import(), side-effect import) — web-manager's dist is ESM
+//   2. Copies ONLY the referenced modules (plus their transitive relative
+//      requires/imports) into <dist>/vendor/<package>/ — selective, so a host
+//      that uses just safe-install doesn't ship the test runner or inherit its
+//      dependency requirements
+//   3. Rewrites every @omegajs specifier under dist/ to a relative path into
+//      the matching vendor dir
 //   4. Fails if the host doesn't declare a runtime dependency the vendored modules
 //      require — vendored code resolves e.g. chalk from the HOST's node_modules
+//
+// Package convention: every vendorable package's entry is <root>/src/index.js and
+// subpath exports live beside it ('@omegajs/x/foo' → src/foo.js) — the entry's
+// directory is the module root, resolved via require.resolve of the bare name.
 //
 // Notes:
 //   - prepare-package `after` hooks are non-blocking (a failure warns but doesn't
 //     stop prepare). The hard gate is CI's pack→scratch-install smoke plus its
 //     "no @omegajs refs in shipped dist" check.
 //   - Watch mode's single-file copies skip hooks, so a freshly-saved file can hold
-//     a raw @omegajs require in dist. That's fine wherever dist is consumed from
-//     the monorepo (workspace + file: installs resolve devkit up the tree); a full
-//     prepare (npm install / pack / publish) always re-runs the rewrite.
+//     a raw @omegajs specifier in dist. That's fine wherever dist is consumed from
+//     the monorepo (workspace + file: installs resolve the packages up the tree); a
+//     full prepare (npm install / pack / publish) always re-runs the rewrite.
 
 const path = require('path');
 const { isBuiltin } = require('node:module');
@@ -30,35 +38,63 @@ const Logger = require('../src/logger');
 
 const logger = new Logger('devkit-vendor');
 
-const DEVKIT_SRC = path.join(__dirname, '..', 'src');
+// Specifier body shared by every reference pattern: package name + optional subpath.
+const SPECIFIER = '@omegajs\\/([a-z0-9-]+)(?:\\/([A-Za-z0-9._/-]+))?';
 
-// Matches require('@omegajs/devkit'), require('@omegajs/devkit/<subpath>'), and the
-// require.resolve(...) forms (used e.g. by runners that inline devkit module SOURCE
-// into a browser context). Groups: 1 = '.resolve' | undefined, 2 = quote, 3 = subpath.
-const REQUIRE_PATTERN = /require(\.resolve)?\((['"])@omegajs\/devkit(?:\/([A-Za-z0-9._/-]+))?\2\)/g;
+// The ways dist code can reference an @omegajs package. Each pattern captures:
+// 1 = prefix (kept verbatim on rewrite), 2 = quote, 3 = package name, 4 = subpath.
+// The match ends at the closing quote, so trailing syntax (`)`, `;`) is untouched.
+const REFERENCE_PATTERNS = [
+  new RegExp(`(require(?:\\.resolve)?\\(\\s*)(['"])${SPECIFIER}\\2`, 'g'), // require / require.resolve
+  new RegExp(`(from\\s+)(['"])${SPECIFIER}\\2`, 'g'),                      // import|export ... from
+  new RegExp(`(import\\s*\\(\\s*)(['"])${SPECIFIER}\\2`, 'g'),             // dynamic import()
+  new RegExp(`(import\\s+)(['"])${SPECIFIER}\\2`, 'g'),                    // side-effect import
+];
 
-// Matches relative requires — used to walk devkit-internal dependencies.
-const RELATIVE_REQUIRE_PATTERN = /require\((['"])(\.{1,2}\/[^'"]+)\1\)/g;
+// Matches relative requires/imports — used to walk package-internal dependencies.
+// Group 2 = the relative path in every pattern.
+const RELATIVE_PATTERNS = [
+  /require\(\s*(['"])(\.{1,2}\/[^'"]+)\1/g,
+  /from\s+(['"])(\.{1,2}\/[^'"]+)\1/g,
+  /import\s*\(\s*(['"])(\.{1,2}\/[^'"]+)\1/g,
+  /import\s+(['"])(\.{1,2}\/[^'"]+)\1/g,
+];
 
-// Matches bare-specifier requires (anything not starting with . or /) — used by the
-// host-dependency guard on the vendored files.
-const BARE_REQUIRE_PATTERN = /require\((['"])([^'"./][^'"]*)\1\)/g;
+// Matches bare-specifier requires/imports (anything not starting with . or /) —
+// used by the host-dependency guard on the vendored files. Group 2 = specifier.
+const BARE_PATTERNS = [
+  /require\(\s*(['"])([^'"./][^'"]*)\1/g,
+  /from\s+(['"])([^'"./][^'"]*)\1/g,
+  /import\s*\(\s*(['"])([^'"./][^'"]*)\1/g,
+  /import\s+(['"])([^'"./][^'"]*)\1/g,
+];
 
-// Map a devkit subpath ('' | 'logger' | 'test/assert' | 'logger.js') to its src-relative file.
+// Map a package subpath ('' | 'logger' | 'test/assert' | 'logger.js') to its module-root-relative file.
 function subpathToFile(subpath) {
   const name = subpath || 'index';
   return name.endsWith('.js') ? name : `${name}.js`;
 }
 
-// Reduce a require specifier to its package name ('chalk', '@scope/pkg').
+// Reduce a require/import specifier to its package name ('chalk', '@scope/pkg').
 function specifierToPackageName(specifier) {
   const parts = specifier.split('/');
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 }
 
-// From a seed set of src-relative files, follow relative requires inside devkit src
-// until closure. Returns the full set of src-relative files to vendor.
-function resolveNeededFiles(seeds) {
+// Locate a vendorable package's module root (the directory of its src/index.js
+// entry) — resolved from the host first, falling back to devkit's own tree so
+// devkit always self-resolves.
+function resolvePackageRoot(name, cwd) {
+  try {
+    return path.dirname(require.resolve(`@omegajs/${name}`, { paths: [cwd, __dirname] }));
+  } catch (error) {
+    throw new Error(`[devkit vendor] Cannot resolve '@omegajs/${name}' from ${cwd} — is it a devDependency of the host?`);
+  }
+}
+
+// From a seed set of module-root-relative files, follow relative requires/imports
+// inside the package until closure. Returns the full set of files to vendor.
+function resolveNeededFiles(name, packageRoot, seeds) {
   const needed = new Set();
   const queue = [...seeds];
 
@@ -66,17 +102,19 @@ function resolveNeededFiles(seeds) {
     const relative = queue.pop();
     if (needed.has(relative)) continue;
 
-    const abs = path.join(DEVKIT_SRC, relative);
+    const abs = path.join(packageRoot, relative);
     if (!jetpack.exists(abs)) {
-      throw new Error(`[devkit vendor] devkit has no module '${relative}' (requested by the host or a devkit-internal require)`);
+      throw new Error(`[devkit vendor] '@omegajs/${name}' has no module '${relative}' (requested by the host or a package-internal require)`);
     }
     needed.add(relative);
 
     const contents = jetpack.read(abs) || '';
-    for (const match of contents.matchAll(RELATIVE_REQUIRE_PATTERN)) {
-      let dep = path.join(path.dirname(relative), match[2]).split(path.sep).join('/');
-      if (!dep.endsWith('.js')) dep = `${dep}.js`;
-      queue.push(dep);
+    for (const pattern of RELATIVE_PATTERNS) {
+      for (const match of contents.matchAll(pattern)) {
+        let dep = path.join(path.dirname(relative), match[2]).split(path.sep).join('/');
+        if (!dep.endsWith('.js')) dep = `${dep}.js`;
+        queue.push(dep);
+      }
     }
   }
 
@@ -84,14 +122,14 @@ function resolveNeededFiles(seeds) {
 }
 
 /**
- * Vendor the devkit modules a host framework actually uses into its dist and
- * rewrite the requires.
+ * Vendor the @omegajs modules a host framework actually uses into its dist and
+ * rewrite the references.
  *
  * @param {object} [options]
  * @param {string} [options.cwd] - Host framework root (defaults to process.cwd())
- * @returns {{ rewritten: number, vendored: string[], vendorDir: string }}
+ * @returns {{ rewritten: number, vendored: Object<string, string[]>, vendorRoot: string }}
  */
-function vendorDevkit(options) {
+function vendorPackages(options) {
   options = options || {};
   const cwd = path.resolve(options.cwd || process.cwd());
 
@@ -106,87 +144,103 @@ function vendorDevkit(options) {
     throw new Error(`[devkit vendor] Output dir does not exist: ${distPath} — run prepare first`);
   }
 
-  const vendorDir = path.join(distPath, 'vendor', 'devkit');
+  const vendorRoot = path.join(distPath, 'vendor');
 
-  // 1. Scan dist for devkit requires: which files need rewriting, which modules are used.
-  const seeds = new Set();
+  // 1. Scan dist for @omegajs references: which files need rewriting, which
+  // modules of which packages are used.
+  const seedsByPackage = new Map();
   const filesToRewrite = [];
   jetpack.find(distPath, { matching: ['**/*.js', '!vendor/**'] }).forEach((file) => {
     const abs = path.resolve(file);
     const contents = jetpack.read(abs);
-    if (!contents || !contents.includes('@omegajs/devkit')) {
+    if (!contents || !contents.includes('@omegajs/')) {
       return;
     }
     let uses = false;
-    for (const match of contents.matchAll(REQUIRE_PATTERN)) {
-      seeds.add(subpathToFile(match[3]));
-      uses = true;
+    for (const pattern of REFERENCE_PATTERNS) {
+      for (const match of contents.matchAll(pattern)) {
+        const name = match[3];
+        if (!seedsByPackage.has(name)) seedsByPackage.set(name, new Set());
+        seedsByPackage.get(name).add(subpathToFile(match[4]));
+        uses = true;
+      }
     }
     if (uses) filesToRewrite.push(abs);
   });
 
-  // Nothing uses devkit — clear any stale vendor dir and exit.
-  if (seeds.size === 0) {
-    jetpack.remove(vendorDir);
-    logger.log(`No devkit requires found in ${hostPackage.name} dist — nothing to vendor`);
-    return { rewritten: 0, vendored: [], vendorDir };
+  // Nothing references @omegajs — clear any stale vendor dir and exit.
+  // (Everything under dist/vendor is generated by this tool, so a full reset is safe.)
+  jetpack.remove(vendorRoot);
+  if (seedsByPackage.size === 0) {
+    logger.log(`No @omegajs references found in ${hostPackage.name} dist — nothing to vendor`);
+    return { rewritten: 0, vendored: {}, vendorRoot };
   }
 
-  // 2. Selective copy: seeds + transitive relative requires, nothing else.
-  const needed = resolveNeededFiles(seeds);
-  jetpack.remove(vendorDir);
-  for (const relative of needed) {
-    jetpack.copy(path.join(DEVKIT_SRC, relative), path.join(vendorDir, relative));
+  // 2. Selective copy per package: seeds + transitive relative deps, nothing else.
+  const vendored = {};
+  for (const [name, seeds] of seedsByPackage) {
+    const packageRoot = resolvePackageRoot(name, cwd);
+    const needed = resolveNeededFiles(name, packageRoot, seeds);
+    for (const relative of needed) {
+      jetpack.copy(path.join(packageRoot, relative), path.join(vendorRoot, name, relative));
+    }
+    vendored[name] = [...needed].sort();
   }
 
-  // 3. Rewrite the devkit requires to relative paths into the vendor dir.
+  // 3. Rewrite the @omegajs references to relative paths into the vendor dirs.
   let rewritten = 0;
   filesToRewrite.forEach((abs) => {
     const contents = jetpack.read(abs);
-    const updated = contents.replace(REQUIRE_PATTERN, (match, resolveSuffix, quote, subpath) => {
-      const target = path.join(vendorDir, subpathToFile(subpath));
-      let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
-      if (!relative.startsWith('.')) {
-        relative = `./${relative}`;
-      }
-      return `require${resolveSuffix || ''}(${quote}${relative}${quote})`;
-    });
+    let updated = contents;
+    for (const pattern of REFERENCE_PATTERNS) {
+      updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
+        const target = path.join(vendorRoot, name, subpathToFile(subpath));
+        let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
+        if (!relative.startsWith('.')) {
+          relative = `./${relative}`;
+        }
+        return `${prefix}${quote}${relative}${quote}`;
+      });
+    }
     if (updated !== contents) {
       jetpack.write(abs, updated);
       rewritten += 1;
     }
   });
 
-  // 4. Guard: every bare require in the vendored modules must resolve from the host
-  // at consumer runtime — i.e. live in its dependencies/peerDependencies/optionalDependencies.
+  // 4. Guard: every bare specifier in the vendored modules must resolve from the
+  // host at consumer runtime — i.e. live in its dependencies/peerDependencies/
+  // optionalDependencies.
   const hostRuntimeDeps = {
     ...(hostPackage.dependencies || {}),
     ...(hostPackage.peerDependencies || {}),
     ...(hostPackage.optionalDependencies || {}),
   };
   const missing = new Set();
-  jetpack.find(vendorDir, { matching: '**/*.js' }).forEach((file) => {
+  jetpack.find(vendorRoot, { matching: '**/*.js' }).forEach((file) => {
     const contents = jetpack.read(path.resolve(file)) || '';
-    for (const match of contents.matchAll(BARE_REQUIRE_PATTERN)) {
-      const name = specifierToPackageName(match[2]);
-      // Internal @omegajs packages are never host deps — leftover requires of them
-      // in shipped dist are caught by CI's no-@omegajs-refs pack-smoke check.
-      if (name.startsWith('@omegajs/')) {
-        continue;
-      }
-      if (!isBuiltin(name) && !hostRuntimeDeps[name]) {
-        missing.add(name);
+    for (const pattern of BARE_PATTERNS) {
+      for (const match of contents.matchAll(pattern)) {
+        const name = specifierToPackageName(match[2]);
+        // Cross-references between @omegajs packages are never host deps —
+        // leftovers in shipped dist are caught by CI's no-@omegajs-refs check.
+        if (name.startsWith('@omegajs/')) {
+          continue;
+        }
+        if (!isBuiltin(name) && !hostRuntimeDeps[name]) {
+          missing.add(name);
+        }
       }
     }
   });
   if (missing.size > 0) {
-    throw new Error(`[devkit vendor] ${hostPackage.name} must declare runtime dependencies used by vendored devkit modules: ${[...missing].join(', ')}`);
+    throw new Error(`[devkit vendor] ${hostPackage.name} must declare runtime dependencies used by vendored modules: ${[...missing].join(', ')}`);
   }
 
-  const vendored = [...needed].sort();
-  logger.log(`Vendored ${vendored.length} devkit module(s) into ${path.relative(cwd, vendorDir)}, rewrote ${rewritten} file(s) in ${hostPackage.name}`);
+  const summary = Object.entries(vendored).map(([name, files]) => `${name} (${files.length})`).join(', ');
+  logger.log(`Vendored ${summary} into ${path.relative(cwd, vendorRoot)}, rewrote ${rewritten} file(s) in ${hostPackage.name}`);
 
-  return { rewritten, vendored, vendorDir };
+  return { rewritten, vendored, vendorRoot };
 }
 
-module.exports = vendorDevkit;
+module.exports = vendorPackages;
