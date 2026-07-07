@@ -1,0 +1,116 @@
+<!-- Skip to main content link for accessibility -->
+<a href="#main-content" class="visually-hidden-focusable">Skip to main content</a>
+
+<!-- Alerts -->
+<!-- Master - Outdated Alert Box -->
+<div
+  class="main-alert main-alert-top main-alert-fixed main-alert-outdated bg-danger animation-fade-in"
+  role="alert" aria-live="polite" aria-label="Outdated browser"
+  hidden>
+  <span class="main-alert-close">&times;</span>
+  <div>
+    {% uj_icon "warning", "fa-bounce me-2" %}
+    You are using an outdated browser that our site <strong>DOES NOT</strong> support. Please <a href="https://www.google.com/chrome" rel="nofollow" target="_blank">click here</a> to update your browser.
+  </div>
+</div>
+<div
+  class="main-alert main-alert-top main-alert-fixed main-alert-suspended bg-danger animation-fade-in"
+  role="alert" aria-live="polite" aria-label="Payment method issue"
+  hidden>
+  <span class="main-alert-close">&times;</span>
+  <div>
+    {% uj_icon "warning", "fa-bounce me-2" %}
+    There is a <strong>problem with your payment method</strong>. To continue using <strong>{{ site.brand.name }}</strong>, please <a href="{{ site.url }}/account#billing" target="_blank">update your payment method</a>.
+  </div>
+</div>
+<!-- <div
+  class="main-alert main-alert-top main-alert-fixed main-alert-sale bg-primary animation-fade-in"
+  role="alert" aria-live="polite" aria-label="Flash sale"
+  hidden>
+  <span class="main-alert-close">&times;</span>
+  <div>
+    <i class="fa-solid fa-stopwatch fa-beat me-2"></i>
+    <strong>FLASH SALE!</strong>
+    Save <strong>15%</strong> at checkout—today only! <a href="{{ site.url }}/pricing" target="_blank">Claim discount</a>.
+  </div>
+</div> -->
+
+<!-- Prerendered Icons -->
+{%- assign icons = resolved.prerender_icons | default: empty -%}
+{%- iftruthy icons -%}
+  <!-- Pre-rendered Icon Templates -->
+  <div id="prerendered-icons" class="d-none" aria-hidden="true">
+    {%- for icon in icons -%}
+      {%- assign icon_name = icon.name | default: icon -%}
+      <div data-icon="{{ icon_name }}">
+        {% uj_icon icon_name, "" %}
+      </div>
+    {%- endfor -%}
+  </div>
+{%- endiftruthy -%}
+
+<!-- Script - Iframe detection -->
+<script type="text/javascript">
+  if (window.parent !== window) {
+    document.documentElement.setAttribute('data-iframed', 'true');
+  }
+</script>
+
+<!-- Script - Set preferred appearance -->
+<!-- This runs immediately to prevent flash of wrong theme -->
+<!-- Priority: 1) User saved preference, 2) Site preset, 3) System preference (if preset is 'system') -->
+<script type="text/javascript">
+  (function() {
+    'use strict';
+    var $html = document.documentElement;
+
+    // Get the preset value from Jekyll (set at build time)
+    var preset = $html.getAttribute('data-bs-theme');
+
+    // Try to read user's saved preference from _manager storage
+    // (same format as webManager.storage() uses)
+    var saved = null;
+    try {
+      var managerData = localStorage.getItem('_manager');
+      var parsedData = managerData ? JSON.parse(managerData) : null;
+      saved = parsedData && parsedData.appearance && parsedData.appearance.preference;
+    } catch (e) {}
+
+    // Use saved preference if available, otherwise fall back to preset
+    var preference = saved || preset;
+    var theme = preference;
+
+    // If preference is 'system', resolve to actual light/dark based on OS setting
+    if (preference === 'system') {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    // Only update if different from preset (avoid unnecessary DOM write)
+    if (theme && theme !== preset) {
+      $html.setAttribute('data-bs-theme', theme);
+    }
+  })();
+</script>
+
+<!-- Script to prevent clicks on disabled elements during page load -->
+<script type="text/javascript">
+  (function() {
+    'use strict';
+    document.addEventListener('click', function(e) {
+      var target = e.target;
+      if (
+        target.closest('*[disabled], *.disabled, :disabled, [aria-disabled="true"]')
+        || (
+          document.documentElement.hasAttribute('data-page-loading')
+          && target.closest('button, input[type="submit"], input[type="button"], input[type="reset"], .btn-action')
+        )
+      ) {
+        console.log('Click prevented (disabled):', target);
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        return false;
+      }
+    }, { capture: true });
+  }());
+</script>

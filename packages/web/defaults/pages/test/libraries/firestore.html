@@ -1,0 +1,202 @@
+---
+permalink: /test/libraries/firestore
+sitemap:
+  include: false
+---
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Firestore version test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: monospace; padding: 16px; font-size: 13px; background: #111; color: #eee; }
+    h1 { font-size: 18px; margin-bottom: 8px; }
+    h2 { font-size: 14px; margin-bottom: 4px; color: #aaa; }
+    .test { margin-bottom: 12px; border: 1px solid #333; padding: 8px; border-radius: 4px; }
+    .test.success { border-color: #0a0; }
+    .test.fail { border-color: #a00; }
+    pre { white-space: pre-wrap; font-size: 11px; line-height: 1.3; max-height: 150px; overflow-y: auto; }
+    #ua { font-size: 11px; color: #666; margin-bottom: 12px; word-break: break-all; }
+    #status { font-size: 14px; margin-bottom: 12px; color: #ff0; }
+    .summary { margin-bottom: 16px; padding: 12px; border: 2px solid #555; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Firestore version + transport test</h1>
+  <div id="ua"></div>
+  <div id="status">Loading...</div>
+  <div id="sw-status" style="color: #f80; margin-bottom: 12px;"></div>
+  <div class="summary" id="summary" style="display:none"></div>
+
+  <div class="test" id="rest"><h2>Baseline: REST API (v12.11.0 auth only)</h2><pre id="rest-log"></pre></div>
+  <div class="test" id="v11"><h2>Firebase 11.0.0 - getFirestore</h2><pre id="v11-log"></pre></div>
+  <div class="test" id="v11lp"><h2>Firebase 11.0.0 - initializeFirestore + forceLongPolling</h2><pre id="v11lp-log"></pre></div>
+  <div class="test" id="v12_0"><h2>Firebase 12.0.0 - getFirestore</h2><pre id="v12_0-log"></pre></div>
+  <div class="test" id="v12_0lp"><h2>Firebase 12.0.0 - initializeFirestore + forceLongPolling</h2><pre id="v12_0lp-log"></pre></div>
+  <div class="test" id="v12_11"><h2>Firebase 12.11.0 (current) - getFirestore</h2><pre id="v12_11-log"></pre></div>
+  <div class="test" id="v12_11lp"><h2>Firebase 12.11.0 (current) - initializeFirestore + forceLongPolling</h2><pre id="v12_11lp-log"></pre></div>
+  <div class="test" id="v10"><h2>Firebase 10.14.0 - getFirestore</h2><pre id="v10-log"></pre></div>
+  <div class="test" id="v10lp"><h2>Firebase 10.14.0 - initializeFirestore + forceLongPolling</h2><pre id="v10lp-log"></pre></div>
+
+  <script type="module">
+    // Use 12.11.0 for auth only (default app)
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
+
+    (async function() {
+      const config = {{ resolved.web_manager.firebase.app.config | jsonify }};
+
+      document.getElementById('ua').textContent = navigator.userAgent;
+
+      // Unregister all service workers first
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        console.log(`[Setup] Found ${regs.length} service worker(s)`);
+        for (const reg of regs) {
+          const result = await reg.unregister();
+          console.log(`[Setup] Unregistered service worker: ${reg.scope} (success: ${result})`);
+        }
+        const swMsg = regs.length > 0
+          ? `Unregistered ${regs.length} service worker(s)`
+          : 'No service workers found';
+        document.getElementById('sw-status').textContent = swMsg;
+        document.getElementById('status').textContent = swMsg + '. Running tests...';
+      } else {
+        console.log('[Setup] Service workers not supported');
+        document.getElementById('sw-status').textContent = 'Service workers not supported';
+      }
+
+      function makeLogger(id) {
+        const $log = document.getElementById(id + '-log');
+        const $box = document.getElementById(id);
+        return {
+          log: (msg) => {
+            console.log(`[${id}]`, msg);
+            $log.textContent += msg + '\n';
+            $log.scrollTop = $log.scrollHeight;
+          },
+          pass: () => { $box.classList.add('success'); return 'PASS'; },
+          fail: () => { $box.classList.add('fail'); return 'FAIL'; },
+        };
+      }
+
+      const results = {};
+
+      // REST baseline
+      async function testRest(uid, token) {
+        const t = makeLogger('rest');
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/users/${uid}`;
+          t.log('Fetching via REST...');
+          const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+          t.log(`Status: ${res.status}`);
+          if (res.ok) {
+            const data = await res.json();
+            t.log('SUCCESS');
+            results['REST'] = t.pass();
+          } else {
+            const text = await res.text();
+            t.log('ERROR: ' + text.substring(0, 150));
+            results['REST'] = t.fail();
+          }
+        } catch (e) { t.log('ERROR: ' + e.message); results['REST'] = t.fail(); }
+      }
+
+      // Generic version test using dynamic import
+      async function testVersion(id, version, uid, useLP) {
+        const t = makeLogger(id);
+        try {
+          const label = useLP ? 'initializeFirestore+forceLongPolling' : 'getFirestore';
+          t.log(`Loading Firebase ${version}...`);
+
+          const appMod = await import(`https://www.gstatic.com/firebasejs/${version}/firebase-app.js`);
+          const fsMod = await import(`https://www.gstatic.com/firebasejs/${version}/firebase-firestore.js`);
+
+          const appName = id;
+          let app;
+          try {
+            app = appMod.initializeApp(config, appName);
+          } catch (e) {
+            app = appMod.getApp(appName);
+          }
+
+          let db;
+          if (useLP) {
+            t.log(`initializeFirestore + experimentalForceLongPolling...`);
+            db = fsMod.initializeFirestore(app, { experimentalForceLongPolling: true });
+          } else {
+            t.log(`getFirestore...`);
+            db = fsMod.getFirestore(app);
+          }
+
+          t.log(`Fetching users/${uid} (10s timeout)...`);
+
+          // Race against a timeout
+          const fetchPromise = fsMod.getDoc(fsMod.doc(db, 'users', uid));
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('TIMEOUT after 10s')), 10000)
+          );
+
+          const snap = await Promise.race([fetchPromise, timeoutPromise]);
+
+          if (snap.exists()) {
+            t.log('SUCCESS: ' + JSON.stringify(snap.data()).substring(0, 100));
+            results[id] = t.pass();
+          } else {
+            t.log('Doc not found');
+            results[id] = t.fail();
+          }
+        } catch (e) {
+          const code = e.code || '';
+          if (code === 'permission-denied') {
+            t.log('TRANSPORT OK (permission-denied = network works, just no auth)');
+            results[id] = t.pass();
+          } else {
+            t.log(`ERROR: ${code} ${e.message}`);
+            results[id] = t.fail();
+          }
+        }
+      }
+
+      // Main
+      const defaultApp = initializeApp(config);
+      const auth = getAuth(defaultApp);
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          document.getElementById('status').textContent = 'Not signed in. Sign in at /dashboard first.';
+          return;
+        }
+
+        const uid = user.uid;
+        const token = await user.getIdToken();
+        document.getElementById('status').textContent = `Signed in: ${uid}. Running tests...`;
+
+        // Run REST first
+        await testRest(uid, token);
+
+        // Run version tests (sequential to avoid interference)
+        await testVersion('v10', '10.14.0', uid, false);
+        await testVersion('v10lp', '10.14.0', uid, true);
+        await testVersion('v11', '11.0.0', uid, false);
+        await testVersion('v11lp', '11.0.0', uid, true);
+        await testVersion('v12_0', '12.0.0', uid, false);
+        await testVersion('v12_0lp', '12.0.0', uid, true);
+        await testVersion('v12_11', '12.11.0', uid, false);
+        await testVersion('v12_11lp', '12.11.0', uid, true);
+
+        // Show summary
+        document.getElementById('status').textContent = 'All tests complete.';
+        const $summary = document.getElementById('summary');
+        $summary.style.display = 'block';
+        $summary.innerHTML = '<h2 style="margin-bottom:8px">Results summary</h2>' +
+          Object.entries(results).map(([k, v]) =>
+            `<div style="color:${v === 'PASS' ? '#0f0' : '#f00'}">${v}: ${k}</div>`
+          ).join('');
+      });
+    })();
+  </script>
+</body>
+</html>

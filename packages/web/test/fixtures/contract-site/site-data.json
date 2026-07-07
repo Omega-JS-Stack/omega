@@ -1,0 +1,6 @@
+{
+  "url": "https://contract.test",
+  "brand": { "id": "contract", "name": "Contract" },
+  "meta": { "title": "Contract - Theme Contract Fixture", "description": "Contract fixture" },
+  "theme": { "id": "classy" }
+}

@@ -14,6 +14,7 @@ A0–A2). Private workspace package — never published.
 | [src/generate-corpus.js](src/generate-corpus.js) | Deterministic corpus generator (seeded PRNG, byte-reproducible) |
 | [src/prng.js](src/prng.js) | mulberry32 + sampling helpers |
 | [src/bench.js](src/bench.js) | Repeated-run timing harness (hyperfine-style, zero deps — hyperfine is not installed on this machine) |
+| [fixtures/consumer-layouts/](fixtures/consumer-layouts) | Consumer-LOCAL layout replicas (somiibo's platform-bot/solution/package) — the generator copies them into the corpus `_layouts/` (the engine resolves consumer layouts as the top layout layer) |
 
 ## Usage
 

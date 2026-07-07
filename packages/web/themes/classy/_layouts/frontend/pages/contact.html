@@ -1,0 +1,337 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "Get in"
+  headline_accent: "touch"
+  subheadline: "Have questions about {{ site.brand.name }}? Our support team is here to help you"
+
+# Contact Methods Section
+contact_methods:
+  - title: "Email support"
+    description: "Get help within 24 hours"
+    icon: "envelope"
+    value: "Email us"
+    link: "#form"
+  - title: "Live chat"
+    description: "Chat with our team now 24/7"
+    icon: "comments"
+    value: "Chat now"
+    link: "#chat"
+
+# Contact Form Section
+contact_form:
+  superheadline:
+    icon: "envelope"
+    text: "Email"
+  headline: "Send us a"
+  headline_accent: "message"
+  subheadline: "Fill out the form below and we'll get back to you within 24 hours."
+
+# Stats Section
+stats:
+  items:
+    - number: "<15m"
+      label: "Response time"
+      icon: "clock"
+      color: "primary"
+    - number: "24/7"
+      label: "Live chat support"
+      icon: "users"
+      color: "success"
+    - number: "4.9"
+      label: "Support rating"
+      icon: "star"
+      color: "warning"
+    - number: "50+"
+      label: "Languages"
+      icon: "globe"
+      color: "info"
+
+# Testimonials Section
+testimonials:
+  superheadline:
+    icon: "megaphone"
+    text: "Testimonials"
+  headline: "What our customers"
+  headline_accent: "say"
+  subheadline: "Hear from people who've experienced our support firsthand"
+  items:
+  - quote: "The support team responded within minutes and solved my issue perfectly!"
+    author: "Jessica Martinez"
+    role: "Marketing Manager"
+    company: "TechCorp"
+    initial: "J"
+  - quote: "Outstanding customer service. They went above and beyond to help me."
+    author: "David Thompson"
+    role: "Product Designer"
+    company: "StartupCo"
+    initial: "D"
+  - quote: "Quick, professional, and friendly. Exactly what you want in support."
+    author: "Lisa Chen"
+    role: "Developer"
+    company: "InnovateLab"
+    initial: "L"
+
+# FAQs Section
+faqs:
+  superheadline:
+    icon: "messages-question"
+    text: "FAQs"
+  headline: "Frequently asked"
+  headline_accent: "questions"
+  subheadline: "Everything you need to know about our support experience."
+  items:
+  - question: "How quickly do you respond to support requests?"
+    answer: "We aim to respond to all support requests within 24 hours during business days. For urgent issues, our live chat is available 24/7."
+  - question: "Do you offer phone support?"
+    answer: "Yes! Phone support is available for premium customers. Contact us to schedule a call with our support team."
+  - question: "Can you help with technical integration?"
+    answer: "Absolutely! Our technical support team can help with API integration, troubleshooting, and custom implementations."
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="fs-5 text-muted">
+            {{ resolved.hero.subheadline }}
+          </p>
+        {% endiftruthy %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Contact Methods Section -->
+<section class="pt-0">
+  <div class="container">
+    <div class="row g-4 justify-content-center">
+      {% assign method_count = resolved.contact_methods | size %}
+
+      <!-- Determine column classes based on number of contact methods -->
+      {% if method_count == 1 %}
+        {% assign col_classes = "col-12 col-md-8 col-lg-6 col-xl-5" %}
+      {% elsif method_count == 2 %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-5" %}
+      {% elsif method_count == 3 %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
+      {% elsif method_count == 4 %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-3" %}
+      {% elsif method_count == 5 %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
+      {% else %}
+        <!-- Fallback for 6+ methods -->
+        {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3" %}
+      {% endif %}
+
+      {% for method in resolved.contact_methods %}
+        <div class="{{ col_classes }}">
+          <div class="card h-100 border-0 shadow-sm text-center" data-lazy="@class animation-slide-up">
+            <div class="card-body p-4">
+              <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                {% uj_icon method.icon, "text-light fs-2" %}
+              </div>
+              <h4 class="mb-1">{{ method.title }}</h4>
+              <p class="text-muted mb-3">{{ method.description }}</p>
+              <a href="{{ method.link }}" class="btn btn-outline-primary">{{ method.value }}</a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Contact Form Section -->
+<section id="form">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-lg" data-lazy="@class animation-slide-up">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              {% iftruthy resolved.contact_form.superheadline.text %}
+                <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+                  {% iftruthy resolved.contact_form.superheadline.icon %}
+                    {% uj_icon resolved.contact_form.superheadline.icon, "me-1" %}
+                  {% endiftruthy %}
+                  {{ resolved.contact_form.superheadline.text }}
+                </span>
+              {% endiftruthy %}
+              <h2 class="h3 mb-2">
+                {{ resolved.contact_form.headline }}
+                {% iftruthy resolved.contact_form.headline_accent %}
+                  <span class="text-accent">{{ resolved.contact_form.headline_accent }}</span>
+                {% endiftruthy %}
+              </h2>
+              {% iftruthy resolved.contact_form.subheadline %}
+                <p class="text-muted">{{ resolved.contact_form.subheadline }}</p>
+              {% endiftruthy %}
+            </div>
+
+            <form id="contact-form" autocomplete="on" data-form-state="initializing" onsubmit="return false">
+              <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                  <label for="first_name" class="form-label fw-semibold">First name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-lg" id="first_name" name="first_name"
+                    placeholder="Enter your first name"
+                    autocomplete="given-name"
+                    minlength="2"
+                    maxlength="50"
+                    required>
+                  <div class="invalid-feedback"></div>
+                </div>
+                <div class="col-md-6">
+                  <label for="last_name" class="form-label fw-semibold">Last name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-lg" id="last_name" name="last_name"
+                    placeholder="Enter your last name"
+                    autocomplete="family-name"
+                    minlength="2"
+                    maxlength="50"
+                    required>
+                  <div class="invalid-feedback"></div>
+                </div>
+              </div>
+
+              <!-- Honeypot field (bot detection) -->
+              <div class="form-group mb-3" style="display: none;" aria-hidden="true">
+                <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
+              </div>
+
+              <!-- Hidden auth field (auto-populated via bindings) -->
+              <input type="hidden" aria-hidden="true" name="uid" data-wm-bind="@value auth.user.uid">
+
+              <div class="mb-4">
+                <label for="email" class="form-label fw-semibold">Email address <span class="text-danger">*</span></label>
+                <input type="email" class="form-control form-control-lg" id="email" name="email"
+                  placeholder="Enter your email address"
+                  autocomplete="email"
+                  data-wm-bind="@value auth.user.email"
+                  required>
+                <div class="invalid-feedback"></div>
+              </div>
+
+              <div class="mb-4">
+                <label for="company" class="form-label fw-semibold">Company</label>
+                <input type="text" class="form-control form-control-lg" id="company" name="company"
+                  placeholder="Enter your company name (optional)"
+                  autocomplete="organization"
+                  maxlength="100">
+              </div>
+
+              <div class="mb-4">
+                <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+                <select class="form-select form-select-lg" id="subject" name="subject" required>
+                  <option value="">Choose a topic...</option>
+                  <option value="general">General inquiry</option>
+                  <option value="support">Technical support</option>
+                  <option value="billing">Billing question</option>
+                  <option value="partnership">Partnership</option>
+                  <option value="other">Other</option>
+                </select>
+                <div class="invalid-feedback"></div>
+              </div>
+
+              <div class="mb-4">
+                <label for="message" class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
+                <textarea class="form-control form-control-lg" id="message" name="message" rows="3"
+                  placeholder="Tell us how we can help you..."
+                  minlength="10"
+                  maxlength="5000"
+                  required></textarea>
+                <div class="invalid-feedback"></div>
+              </div>
+
+              <div class="d-grid gap-2 d-md-flex justify-content-md-between align-items-center">
+                <button type="submit" class="btn btn-primary btn-lg px-5">
+                  {% uj_icon "paper-plane", "me-2" %}
+                  Send message
+                </button>
+                <a href="{{ site.url }}" class="btn btn-link">
+                  {% uj_icon "arrow-left", "me-1" %}
+                  Back to home
+                </a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats Section -->
+<section>
+  <div class="container">
+    <div class="row text-center g-4">
+      {% for stat in resolved.stats.items %}
+        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
+          <div class="mb-3">
+            {% uj_icon stat.icon, "text-{{ stat.color }} display-4" %}
+          </div>
+          <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
+          <p class="text-muted mb-0">{{ stat.label }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+          {% iftruthy resolved.faqs.superheadline.text %}
+            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+              {% iftruthy resolved.faqs.superheadline.icon %}
+                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
+              {% endiftruthy %}
+              {{ resolved.faqs.superheadline.text }}
+            </span>
+          {% endiftruthy %}
+          <h2 class="display-5 fw-bold mb-2">
+            {{ resolved.faqs.headline }}
+            {% iftruthy resolved.faqs.headline_accent %}
+              <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
+            {% endiftruthy %}
+          </h2>
+          {% iftruthy resolved.faqs.subheadline %}
+            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        {% if resolved.faqs.items %}
+          <div class="accordion" id="contactFaqAccordion">
+            {% for faq in resolved.faqs.items %}
+              <div class="accordion-item border-0 mb-3" data-lazy="@class animation-slide-up">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#contactFaq{{ forloop.index }}" aria-expanded="false" aria-controls="contactFaq{{ forloop.index }}">
+                    <span class="fw-semibold">{{ faq.question }}</span>
+                  </button>
+                </h2>
+                <div id="contactFaq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#contactFaqAccordion">
+                  <div class="accordion-body text-muted shadow-sm">
+                    {{ faq.answer }}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

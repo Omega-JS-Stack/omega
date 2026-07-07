@@ -1,0 +1,49 @@
+// Newsflash Theme — Typography
+// Optical-sized serif headlines over a clean grotesk body — the editorial
+// voice of the theme. Fonts are loaded via the theme's `head` block in
+// base.html (Google Fonts), NOT @import-ed here, to avoid render-blocking
+// duplicate loads.
+
+// NOTE: families, weights, and line-heights ship as Bootstrap vars in
+// _config.scss ($headings-*, $display-*, $lead-font-weight, $line-height-base)
+// — NOT as element rules here. Page bundles re-emit Bootstrap AFTER the main
+// bundle, so element-rule overrides of Bootstrap-owned props would silently
+// lose on any page that ships page CSS (the stock 300 display/lead weights
+// would come back). Only non-Bootstrap props live below.
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-optical-sizing: auto;
+  letter-spacing: $nf-heading-letter-spacing;
+  text-wrap: balance;
+}
+
+// Display headlines: tighter tracking — the front-page splash voice
+// (weight 550 + leading 1.04 come from $display-* in _config.scss).
+.display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
+  font-family: $nf-font-display;
+  font-optical-sizing: auto;
+  letter-spacing: -0.022em;
+}
+
+// Deks (the standfirst under a headline) — .lead reads as ink-soft prose.
+.lead {
+  color: var(--bs-secondary-color);
+  line-height: 1.6;
+}
+
+// Plain in-content links: vermilion with a visible underline. Buttons set
+// their own text color via --bs-btn-color — guard them so labels never turn
+// vermilion on hover.
+a {
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1.5px;
+}
+
+a.btn:hover {
+  color: var(--bs-btn-color);
+}

@@ -1,0 +1,148 @@
+// Neobrutalism Theme — Buttons
+// Every button is a hard-bordered block sitting on an offset shadow that
+// "presses" into the page on interaction. This restyles Bootstrap's own
+// .btn / .btn-* classes so all existing markup (nav CTAs, hero buttons,
+// forms) inherits the look with zero HTML changes.
+
+.btn {
+  font-family: $nb-font-display;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(md);
+  text-transform: none;
+  padding: 0.6rem 1.25rem;
+}
+
+// Press EXACTLY like the stat cards. These use the DOUBLED `.btn.btn` selector
+// (specificity 0,2,0) on purpose: every theme page bundle re-emits Bootstrap's own
+// `.btn { transition: color … }` and `.btn:hover` (because page SCSS @forwards
+// Bootstrap), and those load AFTER the main bundle. The doubled class beats them so
+// the press is pure transform+shadow with the stat-card timing — no color flash, no
+// focus-ring fighting the offset shadow.
+.btn.btn {
+  // Same transition the stat cards use → identical feel.
+  @include nb-press();
+
+  // Focus shows an OUTLINE ring (outside the box, never conflicts with the offset
+  // shadow). No focus box-shadow — that was the "flash of border".
+  &:focus { outline: 0; }
+  &:focus-visible {
+    outline: 3px solid var(--nb-border-color);
+    outline-offset: 3px;
+  }
+}
+
+.btn {
+
+  // Bootstrap adds a subtle border-color per-variant; force ink so the
+  // signature black/white frame is consistent across every color.
+  // (btn-adaptive / -inverse are the mode-flipping solids used by the nav CTA,
+  // auth buttons, etc. — they MUST be in this list or they'd keep Bootstrap's
+  // default "darken on hover" and feel different from every other button.)
+  &.btn-primary,
+  &.btn-secondary,
+  &.btn-success,
+  &.btn-info,
+  &.btn-warning,
+  &.btn-danger,
+  &.btn-light,
+  &.btn-dark,
+  &.btn-adaptive,
+  &.btn-adaptive-inverse {
+    border-color: var(--nb-border-color);
+    --bs-btn-hover-border-color: var(--nb-border-color);
+    --bs-btn-active-border-color: var(--nb-border-color);
+  }
+
+  // 3. SOLID buttons: freeze hover/active fill to the resting color so the press is
+  //    pure transform+shadow (no color shift) — exactly the stat-card feel. Outline
+  //    buttons are intentionally EXCLUDED so they keep their fill-on-hover.
+  //    Freezing to `var(--bs-btn-bg)` works in BOTH modes automatically because the
+  //    adaptive classes already set --bs-btn-bg per light/dark.
+  &.btn-primary,   &.btn-secondary, &.btn-success,
+  &.btn-info,      &.btn-warning,   &.btn-danger,
+  &.btn-light,     &.btn-dark,
+  &.btn-adaptive,  &.btn-adaptive-inverse {
+    --bs-btn-hover-bg: var(--bs-btn-bg);
+    --bs-btn-hover-color: var(--bs-btn-color);
+    --bs-btn-active-bg: var(--bs-btn-bg);
+    --bs-btn-active-color: var(--bs-btn-color);
+  }
+}
+
+// btn-adaptive / -inverse RESTING fill. The global _buttons-adaptive.scss sets these
+// via `.btn-adaptive` (0,1,0), but Bootstrap's own `.btn { --bs-btn-bg: transparent }`
+// re-emission can tie/beat it on order, leaving the button transparent. Restate the
+// resting fill here at `.btn.btn-adaptive` (0,2,0) so it always wins — same trick the
+// press uses. Mode-flip handled by pairing with [data-bs-theme="dark"].
+.btn.btn-adaptive {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--bs-dark);
+  --bs-btn-border-color: var(--nb-border-color);
+}
+[data-bs-theme="dark"] .btn.btn-adaptive {
+  --bs-btn-color: #000;
+  --bs-btn-bg: var(--bs-light);
+}
+.btn.btn-adaptive-inverse {
+  --bs-btn-color: #000;
+  --bs-btn-bg: var(--bs-light);
+  --bs-btn-border-color: var(--nb-border-color);
+}
+[data-bs-theme="dark"] .btn.btn-adaptive-inverse {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--bs-dark);
+}
+
+// Size variants keep the chunky proportions
+.btn-lg {
+  padding: 0.85rem 1.75rem;
+  font-size: 1.1rem;
+  @include nb-border($nb-border-width-lg);
+}
+
+.btn-sm {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+// Outline buttons: transparent fill, ink frame, fill-on-hover (no fade)
+[class*="btn-outline-"] {
+  background: transparent;
+  border-color: var(--nb-border-color);
+  color: var(--bs-body-color);
+
+  &:hover {
+    color: #111111;
+  }
+}
+.btn-outline-primary:hover { background: $primary; }
+.btn-outline-secondary:hover { background: $secondary; }
+.btn-outline-success:hover { background: $success; }
+.btn-outline-danger:hover { background: $danger; }
+.btn-outline-warning:hover { background: $warning; }
+.btn-outline-info:hover { background: $info; }
+
+// Link-style button stays flat (no border/shadow) but bold + underlined
+.btn-link {
+  border: 0;
+  box-shadow: none;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+
+  &:hover,
+  &:active {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+// NOTE: There are intentionally NO theme-specific accent button classes
+// (e.g. .btn-nb-yellow). Themes must restyle the STANDARD Bootstrap button
+// classes so the same markup works across themes (swap theme.id, done). Need a
+// yellow CTA? Use `.btn-warning` ($warning is the acid-yellow accent). Need other
+// accents? Use `.btn-primary` / `.btn-success` / etc. The base `.btn` rule above
+// already gives every variant the neobrutalist border + offset shadow + press.

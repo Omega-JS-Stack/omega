@@ -1,0 +1,36 @@
+{
+  dropdown: [
+    {
+      label: 'Account',
+      href: '/account#profile',
+      icon: 'user-gear'
+    },
+    {
+      label: 'Dashboard',
+      href: '/dashboard',
+      icon: 'gauge-high'
+    },
+    {
+      divider: true,
+      attributes: [
+        ['data-wm-bind', '@show auth.account.roles.admin']
+      ]
+    },
+    {
+      label: 'Admin panel',
+      href: '/admin/dashboard',
+      icon: 'shield-halved',
+      attributes: [
+        ['data-wm-bind', '@show auth.account.roles.admin']
+      ]
+    },
+    {
+      divider: true,
+    },
+    {
+      label: 'Sign out',
+      icon: 'arrow-right-from-bracket',
+      class: 'auth-signout-btn text-danger'
+    }
+  ]
+}

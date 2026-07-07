@@ -1,0 +1,47 @@
+---
+### ALL PAGES ###
+layout: blueprint/index
+permalink: /test/components/hero-demo-input
+
+### PAGE CONFIG ###
+asset_path: index
+sitemap:
+  include: false
+meta:
+  title: "Hero Demo: Input Type"
+  description: "Test page demonstrating the input hero demo type"
+  index: false
+
+# Hero Section
+hero:
+  tagline: "Input demo"
+  headline: "Create your logo in"
+  headline_accent: "seconds"
+  description: "Enter your business name and watch the magic happen"
+  demo:
+    enabled: true
+    type: "input"
+    placement: "bottom"
+    options:
+      class: "mw-md"
+      placeholder: "Enter your business name..."
+      name: "business_name"
+      input_type: "text"
+      required: true
+      redirect: "/dashboard"
+      subtext: "No credit card required - 5 free logos"
+      button:
+        text: "Generate logo"
+        icon: "sparkles"
+        class: "btn-adaptive-inverse"
+  primary_button:
+    text: "Get started free"
+    icon: "rocket"
+    href: "/dashboard"
+    class: "btn-light"
+  secondary_button:
+    text: "Explore solutions"
+    icon: "book-open"
+    href: "/pricing"
+    class: "btn-outline-light"
+---

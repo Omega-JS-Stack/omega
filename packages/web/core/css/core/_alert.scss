@@ -1,0 +1,80 @@
+// Core Alert Styles
+// System-wide alert notifications and banners for important messages
+
+// ============================================
+// Base Alert Styles
+// ============================================
+
+.main-alert {
+  padding: 20px;
+  color: white;
+  left: 0;
+  // z-index: 1060 because some headers (like studymonkey) are set high
+  // Previous: z-index: 100 (below modals at 101)
+  z-index: 1060;
+  width: 100%;
+
+  a {
+    color: white;
+    text-decoration: underline;
+
+    &:hover {
+      color: black;
+    }
+  }
+}
+
+// ============================================
+// Alert Positioning
+// ============================================
+
+.main-alert-top {
+  top: 0;
+}
+
+.main-alert-bottom {
+  bottom: 0;
+}
+
+.main-alert-fixed {
+  position: fixed;
+}
+
+.main-alert-block {
+  // Block-level alert (inherits default display)
+}
+
+// ============================================
+// Alert Close Button
+// ============================================
+
+.main-alert-close {
+  margin-left: 15px;
+  color: white;
+  font-weight: bold;
+  float: right;
+  font-size: 22px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+
+  &:hover {
+    color: black;
+  }
+}
+
+// ============================================
+// Alert Types / Variants
+// ============================================
+
+.main-alert-outdated {
+  background-color: #f44336;
+}
+
+.main-alert-suspended {
+  background-color: #f44336;
+}
+
+.main-alert-sale {
+  background-color: #0d6efd;
+}

@@ -1,0 +1,57 @@
+---
+### ALL PAGES ###
+layout: frontend/core/minimal
+permalink: /test/libraries/layers
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  title: "Asset layers"
+  description: "Live status of the Global → Theme → Consumer page-asset cascade (CSS + JS)."
+  breadcrumb: "Asset layers"
+  index: false
+---
+
+<!--
+  ASSET-LAYER TEST PANEL
+  Shows the three-layer page-asset cascade (CSS and JS), loaded in this order:
+    1. Global   — the framework's own page-specific file
+    2. Theme    — the active theme's page-specific file
+    3. Consumer — the consuming project's page-specific file
+  Each dot starts RED. A layer turns ITS OWN dot green when it loads (CSS via a
+  selector, JS by setting the dot's color). A RED dot = that layer has no file
+  for this page (the normal state for layers nobody customized).
+
+  The Consumer layer only loads if the consuming project has its own files at
+  src/assets/{css,js}/pages/test/libraries/layers/index.*. To prove it live
+  without committing anything, run with the UJ_TEST_LAYERS flag (see docs/themes.md
+  → "Asset-layer test panel"), which generates those files at build start and
+  auto-removes them on the next run.
+-->
+<section class="py-5">
+  <div class="container" style="max-width: 720px;">
+    <h1 class="mb-2">Asset layers</h1>
+    <p class="text-muted mb-4">
+      Each <strong>page-specific</strong> asset loads in three layers, in order:
+      <strong>Global → Theme → Consumer</strong> — all three are the same
+      <code>pages/&lt;path&gt;</code> file, just from different sources. Each layer turns its
+      own dot <strong>green</strong> when it loads; a <strong>red</strong> dot means that
+      layer has no file for this page (the normal state for layers nobody customized).
+    </p>
+
+    <h2 class="h5 mb-3">Page-specific CSS</h2>
+    <ul class="layer-list list-unstyled mb-4">
+      <li class="layer-row"><span class="layer-dot" data-layer="css-global"></span> Global <span class="text-muted">(framework default)</span></li>
+      <li class="layer-row"><span class="layer-dot" data-layer="css-theme"></span> Theme <span class="text-muted">(active theme)</span></li>
+      <li class="layer-row"><span class="layer-dot" data-layer="css-consumer"></span> Consumer <span class="text-muted">(your project)</span></li>
+    </ul>
+
+    <h2 class="h5 mb-3">Page-specific JS</h2>
+    <ul class="layer-list list-unstyled mb-0">
+      <li class="layer-row"><span class="layer-dot" data-layer="js-global"></span> Global <span class="text-muted">(framework default)</span></li>
+      <li class="layer-row"><span class="layer-dot" data-layer="js-theme"></span> Theme <span class="text-muted">(active theme)</span></li>
+      <li class="layer-row"><span class="layer-dot" data-layer="js-consumer"></span> Consumer <span class="text-muted">(your project)</span></li>
+    </ul>
+  </div>
+</section>

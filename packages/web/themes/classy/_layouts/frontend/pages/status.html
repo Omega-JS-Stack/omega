@@ -1,0 +1,388 @@
+---
+### ALL PAGES ###
+layout: frontend/core/cover
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "{{ site.brand.name }}"
+  headline_accent: "status"
+  subheadline: "Current status and uptime for all {{ site.brand.name }} services"
+
+# Status Section
+status:
+  days: 90  # Number of days to show in uptime bars
+  overall:
+    operational: "All systems operational"
+    degraded: "Partial system outage"
+    major: "Major system outage"
+    maintenance: "Under maintenance"
+  services:
+    - id: "website"
+      name: "Website"
+      description: "Main website and landing pages"
+      url: null  # Optional: Link to the service
+    - id: "api"
+      name: "API"
+      description: "REST API endpoints"
+      url: null
+    - id: "dashboard"
+      name: "Dashboard"
+      description: "User dashboard and account management"
+      url: null
+    - id: "cdn"
+      name: "CDN"
+      description: "Content delivery network"
+      url: null
+
+# Updates Section
+updates:
+  superheadline:
+    icon: "bell"
+    text: "Notifications"
+  headline: "Get"
+  headline_accent: "updates"
+  subheadline: "Subscribe to receive status updates via email"
+  button:
+    text: "Subscribe"
+    icon: "envelope"
+
+# Maintenance Section
+maintenance:
+  headline: "Scheduled maintenance"
+  empty_message: "No scheduled maintenance"
+
+# Incidents Section
+incidents:
+  headline: "Recent incidents"
+  empty_message: "No incidents reported"
+  show_history_link: "Show incident history"
+  history_url: null  # Optional: Link to full incident history
+
+# Build Info Section
+build_info:
+  headline: "Build information"
+---
+
+<!-- Hero Section with Status Banner -->
+<section class="status-hero py-5">
+  <div class="container">
+    <div class="row justify-content-center text-center mb-4">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }}
+          <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="fs-5 text-muted mb-0">
+            {{ resolved.hero.subheadline }}
+          </p>
+        {% endiftruthy %}
+      </div>
+    </div>
+
+    <!-- Overall Status Banner -->
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div id="status-banner" class="card border-0 shadow-lg status-banner bg-success" data-lazy="@class animation-slide-up">
+          <div class="card-body p-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+              <div class="d-flex align-items-center gap-3">
+                <div class="avatar avatar-md bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center status-indicator">
+                  {% uj_icon "circle-check", "status-icon text-success fs-4" %}
+                </div>
+                <h2 id="status-text" class="h3 mb-0">{{ resolved.status.overall.operational }}</h2>
+              </div>
+              <div class="d-flex align-items-center gap-2 text-muted small">
+                <span class="status-pulse bg-success rounded-circle animation-pulse"></span>
+                <span>Refreshed <span id="status-refresh-timer">0</span>s ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Services Status Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div id="services-list">
+          {% for service in resolved.status.services %}
+            <div class="service-item py-3 border-bottom {% if forloop.last %}border-bottom-0{% endif %}" data-service-id="{{ service.id }}" data-lazy="@class animation-slide-up">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="service-status-dot" data-service-status="{{ service.id }}">
+                    {% uj_icon "circle-check", "text-success" %}
+                  </span>
+                  {% iftruthy service.url %}
+                    <a href="{{ service.url }}" class="fw-semibold text-body text-decoration-none">{{ service.name }}</a>
+                  {% endiftruthy %}
+                  {% iffalsy service.url %}
+                    <span class="fw-semibold">{{ service.name }}</span>
+                  {% endiffalsy %}
+                  {% iftruthy service.description %}
+                    <span class="text-muted small d-none d-md-inline">— {{ service.description }}</span>
+                  {% endiftruthy %}
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="service-uptime fw-semibold" data-service-uptime="{{ service.id }}">100%</span>
+                </div>
+              </div>
+              <div class="uptime-bars d-flex gap-1 cursor-pointer" data-service-bars="{{ service.id }}" title="Uptime history for the last {{ resolved.status.days }} days">
+                {% for i in (1..90) %}
+                  <div class="uptime-bar rounded-1 bg-success" data-day="{{ i }}"></div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Uptime Legend -->
+        <div class="mt-4 d-flex align-items-center justify-content-between flex-wrap gap-2 text-muted small" data-lazy="@class animation-slide-up">
+          <div class="d-flex align-items-center flex-wrap gap-2 gap-md-4">
+            <div class="d-flex align-items-center gap-1">
+              <div class="uptime-bar-legend rounded-1 bg-success"></div>
+              <span>Operational</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <div class="uptime-bar-legend rounded-1 bg-warning"></div>
+              <span>Degraded</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <div class="uptime-bar-legend rounded-1 bg-danger"></div>
+              <span>Outage</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <div class="uptime-bar-legend rounded-1 bg-info"></div>
+              <span>Maintenance</span>
+            </div>
+          </div>
+          <div>
+            <span class="d-none d-lg-inline">{{ resolved.status.days }} days ago</span>
+            <span class="d-none d-md-inline d-lg-none">60 days ago</span>
+            <span class="d-md-none">30 days ago</span>
+            <span class="mx-2">—</span>
+            <span>Today</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Recent Incidents Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <h2 class="h4 mb-4" data-lazy="@class animation-slide-up">{{ resolved.incidents.headline }}</h2>
+
+        <div id="incidents-list" data-lazy="@class animation-slide-up">
+          <!-- Incident items will be populated by JavaScript -->
+          <!-- If no incidents, show empty state -->
+          <div id="incidents-empty" class="card border-0 bg-body-tertiary">
+            <div class="card-body p-4 text-center text-muted">
+              {% uj_icon "circle-check", "fs-1 mb-3 text-success opacity-75" %}
+              <p class="mb-0">{{ resolved.incidents.empty_message }}</p>
+            </div>
+          </div>
+        </div>
+
+        {% iftruthy resolved.incidents.history_url %}
+          <div class="mt-4" data-lazy="@class animation-slide-up">
+            <a href="{{ resolved.incidents.history_url }}" class="text-decoration-none">
+              {{ resolved.incidents.show_history_link }}
+              {% uj_icon "arrow-right", "ms-1" %}
+            </a>
+          </div>
+        {% endiftruthy %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Scheduled Maintenance Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <h2 class="h4 mb-4" data-lazy="@class animation-slide-up">{{ resolved.maintenance.headline }}</h2>
+
+        <div id="maintenance-list" data-lazy="@class animation-slide-up">
+          <!-- Maintenance items will be populated by JavaScript -->
+          <!-- If no maintenance scheduled, show empty state -->
+          <div id="maintenance-empty" class="card border-0 bg-body-tertiary">
+            <div class="card-body p-4 text-center text-muted">
+              {% uj_icon "calendar-check", "fs-1 mb-3 opacity-50" %}
+              <p class="mb-0">{{ resolved.maintenance.empty_message }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Subscribe to Updates Section -->
+<section class="py-5 pb-0">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="card border-0 bg-body-tertiary" data-lazy="@class animation-slide-up">
+          <div class="card-body p-4">
+            <div class="row align-items-center">
+              <div class="col-lg-7 mb-3 mb-lg-0">
+                {% iftruthy resolved.updates.superheadline.text %}
+                  <span class="badge bg-primary bg-opacity-10 text-primary p-2 mb-2 fw-semibold small">
+                    {% iftruthy resolved.updates.superheadline.icon %}
+                      {% uj_icon resolved.updates.superheadline.icon, "me-1" %}
+                    {% endiftruthy %}
+                    {{ resolved.updates.superheadline.text }}
+                  </span>
+                {% endiftruthy %}
+                <h3 class="h4 mb-1">
+                  {{ resolved.updates.headline }}
+                  {% iftruthy resolved.updates.headline_accent %}
+                    <span class="text-accent">{{ resolved.updates.headline_accent }}</span>
+                  {% endiftruthy %}
+                </h3>
+                {% iftruthy resolved.updates.subheadline %}
+                  <p class="text-muted mb-0">{{ resolved.updates.subheadline }}</p>
+                {% endiftruthy %}
+              </div>
+              <div class="col-lg-5">
+                <form id="status-subscribe-form" class="d-flex flex-column flex-sm-row gap-2" novalidate data-form-state="initializing" onsubmit="return false">
+                  <input
+                    type="email"
+                    class="form-control flex-grow-1"
+                    id="status-email"
+                    name="email"
+                    placeholder="your@email.com"
+                    autocomplete="email"
+                    required
+                  >
+                  <button type="submit" class="btn btn-primary text-nowrap flex-shrink-0">
+                    {% uj_icon resolved.updates.button.icon, "me-2" %}
+                    <span class="button-text">{{ resolved.updates.button.text }}</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Build Info Section -->
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <h2 class="h4 mb-4" data-lazy="@class animation-slide-up">{{ resolved.build_info.headline }}</h2>
+
+        <div id="build-info" class="card border-0 bg-body-tertiary" data-lazy="@class animation-slide-up">
+          <div class="card-body p-4">
+            <!-- Loading state -->
+            <div id="build-info-loading" class="text-center text-muted py-3">
+              <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              Loading build information...
+            </div>
+
+            <!-- Content (hidden until loaded) -->
+            <div id="build-info-content" class="d-none">
+              <div class="row g-4">
+                <!-- Build Time -->
+                <div class="col-md-6">
+                  <div class="d-flex align-items-start gap-3">
+                    <div class="avatar avatar-sm bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
+                      {% uj_icon "clock", "text-primary" %}
+                    </div>
+                    <div>
+                      <div class="text-muted small mb-1">Last build</div>
+                      <div class="fw-semibold"><span id="build-time">—</span> <span id="build-time-ago" class="text-muted small ms-1"></span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Environment -->
+                <div class="col-md-6">
+                  <div class="d-flex align-items-start gap-3">
+                    <div class="avatar avatar-sm bg-info bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
+                      {% uj_icon "server", "text-info" %}
+                    </div>
+                    <div>
+                      <div class="text-muted small mb-1">Environment</div>
+                      <div id="build-environment" class="fw-semibold">—</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Packages -->
+                <div class="col-12">
+                  <div class="d-flex align-items-start gap-3">
+                    <div class="avatar avatar-sm bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
+                      {% uj_icon "box", "text-success" %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted small mb-2">Package versions</div>
+                      <div id="build-packages" class="d-flex flex-wrap gap-2">
+                        <!-- Package badges will be inserted here -->
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Repository -->
+                <div class="col-12">
+                  <div class="d-flex align-items-start gap-3">
+                    <div class="avatar avatar-sm bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
+                      {% uj_icon "code-branch", "text-secondary" %}
+                    </div>
+                    <div>
+                      <div class="text-muted small mb-1">Repository</div>
+                      <div id="build-repo" class="fw-semibold">—</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Error state -->
+            <div id="build-info-error" class="d-none text-center text-muted py-3">
+              {% uj_icon "circle-exclamation", "fs-3 mb-2 text-warning opacity-75" %}
+              <p class="mb-0">Unable to load build information</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer Links -->
+<section class="py-5 pt-1">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="d-flex justify-content-center align-items-center gap-3 text-muted small flex-wrap" data-lazy="@class animation-slide-up">
+          <a href="/updates" class="text-decoration-none">
+            {% uj_icon "rocket", "me-1" %}
+            View updates
+          </a>
+          <span>•</span>
+          <span>Powered by <a href="{{ site.url }}" class="text-decoration-none fw-semibold">{{ site.brand.name }}</a></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

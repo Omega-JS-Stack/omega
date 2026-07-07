@@ -1,0 +1,33 @@
+// Admin Firebase Explorer
+
+// JSON viewer
+.json-viewer {
+  max-height: 500px;
+  overflow-y: auto;
+  font-size: 0.85em;
+  background: var(--bs-tertiary-bg);
+  border-radius: 0;
+
+  code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+// JSON editor
+.json-editor {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.85em;
+  min-height: 300px;
+}
+
+// Collection nav
+.collection-nav .nav-link {
+  font-size: 0.875rem;
+  border-radius: var(--bs-border-radius);
+
+  &.active {
+    font-weight: 600;
+    background: var(--bs-tertiary-bg);
+  }
+}

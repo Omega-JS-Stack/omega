@@ -1,0 +1,23 @@
+---
+### ALL PAGES ###
+layout: frontend/pages/pricing
+
+### REGULAR PAGES ###
+meta:
+  title: "Pricing - {{ site.brand.name }}"
+  description: "{{ site.brand.name }} Premium plans grant you access to more features and support. Get started for free today!"
+  breadcrumb: "Pricing"
+
+### SCHEMA ###
+schema:
+  software_application:
+    enabled: true
+    features:
+      - "Free to use"
+      - "Multiple pricing plans"
+      - "24/7 availability"
+  faq_page:
+    enabled: true
+---
+
+{{ content | uj_content_format }}

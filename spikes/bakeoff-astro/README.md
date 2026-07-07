@@ -4,8 +4,11 @@
 ([../bakeoff-shared/DECISION.md](../bakeoff-shared/DECISION.md)); this spike
 proved the layered-theme model is engine-portable and holds the Astro-specific
 findings if the decision is ever revisited. Since B1 it imports the
-SSG-agnostic pieces (asset pipeline, frontmatter Liquid, consumer scan) and
-the mini-site/ports-site test fixtures from `@omegajs/web`.
+SSG-agnostic pieces (frontmatter Liquid, consumer scan, layered resolution)
+and the mini-site/ports-site test fixtures from `@omegajs/web`; since B2 the
+asset pipeline is a FROZEN B1 snapshot vendored at
+[src/assets-pipeline.js](src/assets-pipeline.js) (@omegajs/web moved to
+layer-root conventions; this reference stays as measured).
 
 The A1 slice built on Astro against the shared corpus
 ([spikes/bakeoff-shared](../bakeoff-shared)). Numbers + checklist live in

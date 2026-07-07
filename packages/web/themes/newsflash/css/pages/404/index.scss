@@ -1,0 +1,27 @@
+// Newsflash Theme — 404 page-specific CSS
+// The "correction notice" treatment for
+// (_layouts/themes/newsflash/frontend/pages/404.html).
+// Compiles standalone, so it pulls in the theme tokens + mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// Oversized stroked serif numerals
+.error-code {
+  font-family: $nf-font-display;
+  font-style: italic;
+  font-weight: 900;
+  font-size: clamp(5rem, 16vw, 8rem);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px var(--nf-ink);
+}
+
+// The rotated "Correction" chip pinned to the notice
+.error-stamp {
+  position: absolute;
+  top: -0.85rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  z-index: 1;
+  white-space: nowrap;
+}

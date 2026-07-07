@@ -1,0 +1,90 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "Follow the"
+  headline_accent: "threads"
+  subheadline: "Topics that run through our coverage — pick one and pull."
+---
+
+{% comment %}
+  NEWSFLASH BLOG TAGS
+  Same data contract as classy's tags index (tags + counts built from
+  site.posts), presented as a topics wall of pill buttons with volt counts.
+{% endcomment %}
+
+<!-- ============================================ -->
+<!-- HERO -->
+<!-- ============================================ -->
+<section class="pb-4">
+  <div class="container text-center" data-lazy="@class animation-slide-up">
+    <span class="kicker mb-3">{% uj_icon "tags", "me-1" %}Topics</span>
+    <h1 class="display-4 my-3">
+      {{ resolved.hero.headline }}
+      <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="lead mb-0">{{ resolved.hero.subheadline }}</p>
+    {% endiftruthy %}
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- TOPICS WALL -->
+<!-- ============================================ -->
+<section class="pt-0">
+  <div class="container">
+    {% comment %} Build unique tags list with post counts {% endcomment %}
+    {% assign tags = '' | split: ',' %}
+    {% assign tag_counts = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% for tag in post.post.tags %}
+        {% assign tag_fixed = tag | uj_title_case %}
+        {% unless tags contains tag_fixed %}
+          {% assign tags = tags | push: tag_fixed %}
+          {% comment %} Count posts for this tag {% endcomment %}
+          {% assign count = 0 %}
+          {% for p in site.posts %}
+            {% for t in p.post.tags %}
+              {% assign t_fixed = t | uj_title_case %}
+              {% if t_fixed == tag_fixed %}
+                {% assign count = count | plus: 1 %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {% assign tag_counts = tag_counts | push: count %}
+        {% endunless %}
+      {% endfor %}
+    {% endfor %}
+
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="d-flex flex-wrap gap-2 justify-content-center" data-lazy="@class animation-slide-up">
+          {% for tag in tags %}
+            <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-outline-dark d-inline-flex align-items-center gap-2">
+              {{ tag }}
+              <span class="badge bg-body-tertiary">{{ tag_counts[forloop.index0] }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {% if tags.size == 0 %}
+      <div class="text-center py-5" data-lazy="@class animation-slide-up">
+        <span class="kicker mb-2">No topics yet</span>
+        <h2 class="h3 mb-2">The threads start with the first story</h2>
+        <p class="text-body-secondary mb-4">Check back soon for tagged coverage.</p>
+        <a href="{{ site.url }}/blog" class="btn btn-primary">
+          {% uj_icon "arrow-left", "me-2" %}Back to the news
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{{ content | uj_content_format }}

@@ -1,0 +1,247 @@
+---
+### ALL PAGES ###
+layout: backend/core/minimal
+
+### THEME CONFIG ###
+theme:
+  header:
+    title:
+      content: "Dashboard"
+      icon: "gauge-high"
+    breadcrumbs:
+      items:
+        - label: Home
+          href: /
+          icon: house
+        - label: Dashboard
+    actions:
+      items:
+        - label: New project
+          icon: plus
+          color: primary
+        - label: Reports
+          icon: chart-line
+          color: adaptive
+          dropdown:
+            - label: Sales report
+              icon: dollar-sign
+              href: /reports/sales
+            - label: Analytics report
+              icon: chart-bar
+              href: /reports/analytics
+            - divider: true
+            - label: Export all
+              icon: download
+              href: /reports/export
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  index: false
+
+### PAGE CONFIG ###
+stats_cards:
+  - id: "total_revenue"
+    title: "Total revenue"
+    value: "$24,300"
+    change: "+12.5%"
+    change_type: "success"
+    icon: "dollar-sign"
+
+  - id: "new_users"
+    title: "New users"
+    value: "1,423"
+    change: "+5.8%"
+    change_type: "success"
+    icon: "users"
+
+  - id: "active_projects"
+    title: "Active projects"
+    value: "14"
+    change: "2 pending"
+    change_type: "warning"
+    icon: "folder-open"
+
+  - id: "performance"
+    title: "Performance"
+    value: "89%"
+    change: "Good"
+    change_type: "info"
+    icon: "chart-line"
+
+recent_activity:
+  - id: "new_document"
+    title: "New document created"
+    description: "Project proposal for Q2 2024"
+    time: "2 hours ago"
+    icon: "file-alt"
+    icon_color: "primary"
+
+  - id: "task_completed"
+    title: "Task completed"
+    description: "Website redesign approved"
+    time: "5 hours ago"
+    icon: "check-circle"
+    icon_color: "success"
+
+  - id: "new_member"
+    title: "New team member"
+    description: "Sarah Johnson joined the team"
+    time: "1 day ago"
+    icon: "user-plus"
+    icon_color: "warning"
+
+  - id: "code_deployed"
+    title: "Code deployed"
+    description: "Version 2.4.1 released to production"
+    time: "2 days ago"
+    icon: "code-branch"
+    icon_color: "info"
+
+quick_actions:
+  - id: "create_project"
+    label: "Create new project"
+    icon: "plus"
+    style: "primary"
+    href: "#"
+
+  - id: "upload_files"
+    label: "Upload files"
+    icon: "upload"
+    style: "outline-adaptive"
+    href: "#"
+
+  - id: "invite_members"
+    label: "Invite team members"
+    icon: "users"
+    style: "outline-adaptive"
+    href: "#"
+
+  - id: "view_analytics"
+    label: "View analytics"
+    icon: "chart-bar"
+    style: "outline-adaptive"
+    href: "/analytics"
+
+  - id: "settings"
+    label: "Settings"
+    icon: "cog"
+    style: "outline-adaptive"
+    href: "/settings"
+
+progress_items:
+  - id: "project_alpha"
+    name: "Project alpha"
+    progress: 75
+    color: "primary"
+
+  - id: "website_redesign"
+    name: "Website redesign"
+    progress: 50
+    color: "info"
+
+  - id: "mobile_app"
+    name: "Mobile app"
+    progress: 90
+    color: "success"
+---
+
+<!-- Dashboard Content -->
+<div class="row g-3 mb-4">
+  <!-- Stats Cards -->
+  {% for card in resolved.stats_cards %}
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="text-uppercase text-muted mb-0">{{ card.title }}</h6>
+            <span class="text-muted">
+              {% uj_icon card.icon, "fa-lg" %}
+            </span>
+          </div>
+          <div class="h2 mb-1">{{ card.value }}</div>
+          <div>
+            <span class="badge bg-{{ card.change_type }}-subtle text-{{ card.change_type }}">{{ card.change }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Recent Activity & Quick Actions -->
+<div class="row g-3">
+  <!-- Recent Activity -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="mb-3">Recent activity</h5>
+        <div class="list-group list-group-flush">
+          {% for activity in resolved.recent_activity %}
+            <div class="list-group-item bg-body-tertiary px-0">
+              <div class="row align-items-center">
+                <div class="col-auto">
+                  <div class="avatar avatar-sm bg-{{ activity.icon_color }}-subtle text-{{ activity.icon_color }} rounded-circle d-flex align-items-center justify-content-center">
+                    {% uj_icon activity.icon, "fa-sm" %}
+                  </div>
+                </div>
+                <div class="col ms-n2">
+                  <h6 class="mb-1">{{ activity.title }}</h6>
+                  <p class="card-text small text-muted">{{ activity.description }}</p>
+                </div>
+                <div class="col-auto">
+                  <small class="text-muted">{{ activity.time }}</small>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="mb-3">Quick actions</h5>
+        <div class="d-grid gap-2">
+          {% for action in resolved.quick_actions %}
+            {% if action.href %}
+              <a href="{{ action.href }}" class="btn btn-{{ action.style }}">
+                {% uj_icon action.icon, "fa-sm me-2" %}
+                {{ action.label }}
+              </a>
+            {% else %}
+              <button class="btn btn-{{ action.style }}">
+                {% uj_icon action.icon, "fa-sm me-2" %}
+                {{ action.label }}
+              </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Overview -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="mb-3">Progress overview</h5>
+        {% for item in resolved.progress_items %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-muted">{{ item.name }}</span>
+              <span class="text-muted">{{ item.progress }}%</span>
+            </div>
+            <div class="progress" style="height: 6px;">
+              <div class="progress-bar bg-{{ item.color }}" role="progressbar" style="width: {{ item.progress }}%"></div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ content | uj_content_format }}

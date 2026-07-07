@@ -1,0 +1,535 @@
+<!-- Main - Exit Popup -->
+<div id="modal-exit-popup" class="modal _fade animation-slide-up" tabindex="-1" hidden>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg overflow-hidden rounded-3">
+      <div class="position-relative">
+        <!-- Gradient background overlay -->
+        <div class="position-absolute top-0 start-0 w-100 h-100" style=""></div>
+
+        <!-- Close button -->
+        <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
+
+        <!-- Content -->
+        <div class="position-relative p-5 text-center" style="z-index: 1;">
+          <!-- Icon -->
+          <div class="mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10" style="width: 80px; height: 80px;">
+              <span class="text-primary animation-hand-wave">{% uj_icon "hand-wave", "fa-3xl" %}</span>
+            </div>
+          </div>
+
+          <!-- Title -->
+          <h3 class="modal-exit-title fw-bold mb-3">
+            Wait, don't go yet!
+          </h3>
+
+          <!-- Body -->
+          <p class="modal-exit-message text-muted mb-4 fs-5">
+            You're about to miss out on something amazing.
+          </p>
+
+          <div class="modal-exit-offer bg-body-tertiary rounded-3 p-4 mb-4" hidden>
+            <h5 class="modal-exit-offer-title fw-semibold mb-3 text-primary">
+              {% uj_icon "gift", "me-2" %}
+              <span class="modal-exit-offer-title-text">Special Offer Just for You!</span>
+            </h5>
+            <p class="modal-exit-offer-description mb-0">
+              Stay and discover exclusive features and benefits that could transform your experience.
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="d-flex flex-column align-items-center">
+            <a href="{{ site.url }}" class="modal-exit-button btn btn-primary btn-lg px-5 shadow-sm mb-1" data-bs-dismiss="modal">
+              {% uj_icon "arrow-right", "me-2" %}
+              <span class="modal-exit-button-text">Show me more</span>
+            </a>
+            <a href="#" class="modal-exit-dismiss btn btn-link text-decoration-none small" data-bs-dismiss="modal">
+              Maybe later
+            </a>
+          </div>
+
+          <hr class="my-4">
+
+          <!-- Social proof -->
+          <div class="d-flex align-items-center justify-content-center">
+            <div class="d-flex me-2">
+              <span class="avatar avatar-sm rounded-circle border border-2 border-body overflow-hidden me-n2">
+                <img src="{{ site.uj.placeholder.src }}" data-lazy="@src https://i.pravatar.cc/40?img=1" alt="">
+              </span>
+              <span class="avatar avatar-sm rounded-circle border border-2 border-body overflow-hidden me-n2">
+                <img src="{{ site.uj.placeholder.src }}" data-lazy="@src https://i.pravatar.cc/40?img=2" alt="">
+              </span>
+              <span class="avatar avatar-sm rounded-circle border border-2 border-body overflow-hidden me-n2">
+                <img src="{{ site.uj.placeholder.src }}" data-lazy="@src https://i.pravatar.cc/40?img=3" alt="">
+              </span>
+              <span class="avatar avatar-sm rounded-circle border border-2 border-body overflow-hidden">
+                <img src="{{ site.uj.placeholder.src }}" data-lazy="@src https://i.pravatar.cc/40?img=4" alt="">
+              </span>
+            </div>
+            <span class="text-muted">
+              •
+            </span>
+            <small class="ms-2 text-muted"><strong class="text-body">Join 10k+</strong> happy subscribers!</small>
+          </div>
+
+          <!-- Trust indicators -->
+          {% comment %}
+          <div class="mt-3 pt-3 border-top">
+            <small class="text-muted">
+              <span class="text-success me-1">{% uj_icon "shield-alt" %}</span>
+              No spam, ever. Unsubscribe anytime.
+            </small>
+          </div>
+          {% endcomment %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Configuration -->
+<script type="text/javascript">
+  var Configuration = {
+    runtime: "web",
+    environment: "{{ jekyll.environment }}",
+    buildTime: {{ site.uj.cache_breaker | default: 0 }},
+    brand: {{ resolved.brand | jsonify }},
+    advertising: {{ resolved.advertising | jsonify }},
+    analytics: {{ resolved.analytics | jsonify }},
+    {% for item in resolved.web_manager %}
+      {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
+    {% endfor %}
+    env: {{ resolved.web_manager.env | jsonify }},
+    recaptcha: {{ resolved.recaptcha | jsonify }},
+    oauth2: {{ resolved.oauth2 | jsonify }},
+  };
+</script>
+
+<!-- JS Bundle: content-hashed by the asset pipeline, mapped via the manifest -->
+<script type="text/javascript" src="{{ assetManifest.js.main }}" async></script>
+
+<!-- Page module (present only when a js/pages entry exists for this page) -->
+{% iftruthy pageAssets.js %}
+  <script type="text/javascript" src="{{ pageAssets.js }}" defer></script>
+{% endiftruthy %}
+
+<!-- Script to quickly handle nav user state -->
+<script type="text/javascript">
+  try {
+    (function() {
+      'use strict';
+      // Read and parse localStorage data
+      var managerData = localStorage.getItem('_manager');
+      var parsedData = managerData ? JSON.parse(managerData) : null;
+      var isLoggedIn = !!(parsedData && parsedData.auth && parsedData.auth.user && parsedData.auth.user.uid);
+
+      // Quit if NOT logged in
+      if (!isLoggedIn) {
+        return;
+      }
+
+      // Process binds
+      var $bindElements = document.querySelectorAll('[data-wm-bind]');
+
+      $bindElements.forEach(function($el) {
+        var bindValue = $el.getAttribute('data-wm-bind');
+
+        if (bindValue === '@show auth.user') {
+          // Show element when user is logged in
+          $el.removeAttribute('hidden');
+        } else if (bindValue === '@show !auth.user') {
+          // Hide element when user is logged in (show when not logged in)
+          $el.setAttribute('hidden', '');
+        }
+      });
+    }());
+  } catch (error) {
+    console.error('Error occurred while selecting elements:', error);
+  }
+</script>
+
+<!-- Script - Google Analytics Tracking Script -->
+{% iftruthy resolved.analytics.google %}
+  <script type="text/javascript" src="https://www.googletagmanager.com/gtag/js?id={{ site.analytics.google }}" async></script>
+  <script type="text/javascript">
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', '{{ site.analytics.google }}');
+  </script>
+{% endiftruthy %}
+{% iffalsy resolved.analytics.google %}
+  <script type="text/javascript">
+    function gtag() {};
+  </script>
+{% endiffalsy %}
+
+<!-- Script - Meta Pixel Tracking Script -->
+{% iftruthy resolved.analytics.meta %}
+  <script type="text/javascript">
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+
+    fbq('init', '{{ site.analytics.meta }}');
+    fbq('track', 'PageView');
+  </script>
+  <noscript>
+    <img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id={{ site.analytics.meta }}&ev=PageView&noscript=1"
+    />
+  </noscript>
+{% endiftruthy %}
+{% iffalsy resolved.analytics.meta %}
+  <script type="text/javascript">
+    function fbq() {};
+  </script>
+{% endiffalsy %}
+
+<!-- Script - TikTok Pixel Tracking Script -->
+{% iftruthy resolved.analytics.tiktok %}
+  <script type="text/javascript">
+    !function (w, d, t) {
+      //part1
+      w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+
+      //part2
+      ttq.load('{{ site.analytics.tiktok }}');
+      ttq.page();
+    }(window, document, 'ttq');
+  </script>
+{% endiftruthy %}
+{% iffalsy resolved.analytics.tiktok %}
+  <script type="text/javascript">
+    window.ttq = {
+      load: function () {},
+      page: function () {},
+      track: function () {},
+      identify: function () {},
+    }
+  </script>
+{% endiffalsy %}
+
+<!-- Script - Google Adsense -->
+{% comment %}
+{% iftruthy resolved.advertising.google-adsense.client %}
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-{{ site.advertising.google-adsense.client }}" crossorigin="anonymous"></script>
+{% endiftruthy %}
+{% endcomment %}
+
+<!-- Schema - Breadcrumbs -->
+<!-- Only include the https://schema.org if size > -1 because it throws an error on Google Search Console if the itemListElement is empty -->
+{% assign breadcrumbs = page.url | split: "/" %}
+{% assign breadcrumbs = page.url | split: "/" %}
+{% assign breadcrumbs-size = breadcrumbs | size | minus: 1 %}
+{% assign breadcrumb-url = site.url %}
+<script id="uj-schema-breadcrumbs" type="application/ld+json">
+  {
+    {% if breadcrumbs-size > -1 %}
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "name": "{{ site.brand.name }}",
+    {% endif %}
+    "itemListElement": [
+      {%- for breadcrumb in breadcrumbs -%}
+        {%- unless breadcrumb == "" -%}
+          {%- capture breadcrumb-url -%}{{ breadcrumb-url }}/{{ breadcrumb }}{%- endcapture -%}
+          {
+            "@type": "ListItem",
+            "position": {{ forloop.index | minus: 1 }},
+            "item": {
+              "@id": "{{ breadcrumb-url }}",
+              "name": "{{ breadcrumb }}"
+            }
+          }{% unless forloop.last %},{% endunless %}
+        {%- endunless -%}
+      {%- endfor -%}
+    ]
+  }
+</script>
+
+<!-- Schema - Brand -->
+<script id="uj-schema-brand" type="application/ld+json">
+  {
+    "@context": "http://schema.org",
+    "@type": "{{ site.brand.type }}",
+    "@id": "{{ site.url }}#{{ site.brand.type }}",
+    "url": "{{ site.url }}",
+    "name": "{{ site.brand.name }}",
+    "description": "{{ site.brand.description }}",
+    "logo": "{%- if site.brand.images.brandmark contains '://' %}{%- else %}{{ site.url }}/assets/images/og{%- endif -%}{{ site.brand.images.brandmark }}",
+    "sameAs": [
+      {%- for social in site.socials -%}
+        {% assign platform = social[0] %}
+        {% assign username = social[1] %}
+
+        {%- iftruthy username -%}
+          "{% uj_social platform %}",
+        {%- endiftruthy -%}
+      {%- endfor -%}
+
+      "{{ site.url }}"
+    ],
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "{{ site.brand.address.locality }}",
+      "addressCountry": "{{ site.brand.address.country }}"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "Customer Support",
+      "email": "{{ site.brand.contact.email }}",
+      "url": "{{ site.url }}/contact"
+    },
+    "telephone": "{{ site.brand.contact.phone }}",
+    "areaServed": {
+      "@type": "Place",
+      "name": "Worldwide"
+    }
+    {% comment %}
+      "founder": {
+        "@type": "Person",
+        "name": "{{ site.brand.founder }}"
+      },
+      "slogan": "{{ site.brand.slogan }}",
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Our Services",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "{{ site.brand.service }}"
+            }
+          }
+        ]
+      },
+    {% endcomment %}
+  }
+</script>
+
+<!-- Schema - Website -->
+<script id="uj-schema-website" type="application/ld+json">
+  {
+    "@context": "http://schema.org",
+    "@type": "WebSite",
+    "@id": "{{ site.url }}#WebSite",
+    "url": "{{ site.url }}",
+    "name": "{{ site.brand.name }}",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "{{ site.url }}/search/cse?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    },
+    "publisher": {
+      "@id": "{{ site.url }}#{{ site.brand.type }}"
+    }
+  }
+</script>
+
+<!-- Schema - BlogPosting -->
+{%- iftruthy resolved.post.id -%}
+  <script id="uj-schema-blog" type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "BlogPosting",
+      "@id": "{{ site.url }}{{ page.url }}#BlogPosting",
+      "url": "{{ site.url }}{{ page.url }}",
+      "name": "{{ resolved.post.title | uj_liquify }}",
+      "description": "{{ resolved.post.description | uj_liquify }} ",
+      "headline": "{{ resolved.post.title | uj_liquify }}",
+      "datePublished": "{{ page.date | date_to_xmlschema }}",
+      "dateModified": "{{ site.time | date_to_xmlschema }}",
+      "author": {
+        "@type": "Person",
+        "name": "{%- uj_member resolved.post.author, "name" -%}",
+        "url": "{%- uj_member resolved.post.author, "url" -%}#Person"
+      },
+      "publisher": {
+        "@id": "{{ site.url }}#{{ resolved.brand.type }}"
+      },
+      "isPartOf": {
+        "@id": "{{ site.url }}/blog"
+      },
+      "mainEntityOfPage": {
+        "@id": "{{ site.url }}{{ page.url }}"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "{{ site.url }}{%- uj_post resolved.post.id, "image" -%}"
+      },
+      "inLanguage": "{{ site.translation.default |  default: 'en' }}"
+    }
+  </script>
+{% endiftruthy %}
+
+<!-- Schema - Person -->
+{%- iftruthy resolved.member.id -%}
+  <script id="uj-schema-person" type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "Person",
+      "@id": "{%- uj_member resolved.post.author, "url" -%}#Person",
+      "url": "{%- uj_member resolved.post.author, "url" -%}",
+      "name": "{%- uj_member resolved.post.author, "name" -%}",
+      "image": {
+        "@type": "ImageObject",
+        "url": "{{ site.url }}{%- uj_member resolved.member.id, "image" -%}"
+      },
+      "jobTitle": "Blog Author",
+      "worksFor": {
+        "@id": "{{ site.url }}#{{ site.brand.type }}"
+      }
+      {% comment %}
+      "sameAs": [
+        resolved.team.socials
+        {%- for social in site.socials -%}
+          {% assign platform = social[0] %}
+          {% assign username = social[1] %}
+
+          {%- iftruthy username -%}
+            "{% uj_social platform %}",
+          {%- endiftruthy -%}
+        {%- endfor -%}
+      ]
+      {% endcomment %}
+    }
+  </script>
+{% endiftruthy %}
+
+<!-- Schema - Product -->
+{%- if page-is-product == true -%}
+  <script id="uj-schema-product" type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "Product",
+      "@id": "{{ site.url }}{{ page.url }}#Product",
+      "url": "{{ site.url }}{{ page.url }}",
+      "name": "{{ resolved.product.title | uj_liquify }}",
+      "description": "{{ resolved.product.description | uj_liquify }}",
+      "image": [
+        "{{ site.url }}/assets/images/products/product-{{ resolved.product.id }}/{{ page.url | split: '/' | last }}.jpg"
+      ],
+      "brand": {
+        "@id": "{{ site.url }}#{{ site.brand.type }}"
+      },
+      "offers": {
+        "@type": "Offer",
+        "url": "{{ site.url }}{{ page.url }}",
+        "priceCurrency": "{{ site.currency }}",
+        "price": "{{ resolved.product.price }}",
+        "itemCondition": "http://schema.org/NewCondition",
+        "availability": "http://schema.org/InStock"
+      }
+    }
+  </script>
+{% endif %}
+
+<!-- Schema - SoftwareApplication -->
+{%- iftruthy resolved.schema.software_application.enabled -%}
+  {% assign sa = resolved.schema.software_application %}
+  {% assign sa-hash-seed = sa.hash_seed | default: site.url %}
+  {% assign sa-rating-rand = sa-hash-seed | uj_hash: 2 %}
+  {% if sa-rating-rand == 0 %}
+    {% assign sa-rating-value = "4.8" %}
+  {% else %}
+    {% assign sa-rating-value = "4.9" %}
+  {% endif %}
+  {% assign sa-review-count = sa-hash-seed | uj_hash: 800000 | plus: 200000 %}
+  <script id="uj-schema-software-application" type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "{{ site.url }}{{ page.url }}#SoftwareApplication",
+      "url": "{{ site.url }}{{ page.url }}",
+      "name": "{{ sa.name | default: site.brand.name }}",
+      "description": "{{ sa.description | default: resolved.meta.description | uj_liquify }}",
+      "applicationCategory": "{{ sa.application_category | default: 'WebApplication' }}",
+      "operatingSystem": "{{ sa.operating_system | default: 'Web-based' }}",
+      "offers": {
+        "@type": "Offer",
+        "price": "{{ sa.price | default: '0' }}",
+        "priceCurrency": "{{ sa.price_currency | default: 'USD' }}",
+        "availability": "https://schema.org/InStock"
+      },
+      "provider": {
+        "@id": "{{ site.url }}#{{ site.brand.type }}"
+      },
+      "publisher": {
+        "@id": "{{ site.url }}#{{ site.brand.type }}"
+      },
+      "image": "{%- if site.brand.images.brandmark contains '://' %}{%- else %}{{ site.url }}/assets/images/og{%- endif -%}{{ site.brand.images.brandmark }}",
+      {% iftruthy sa.features %}
+      "featureList": {{ sa.features | jsonify }},
+      {% endiftruthy %}
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "{{ sa-rating-value }}",
+        "bestRating": "5",
+        "worstRating": "1",
+        "ratingCount": "{{ sa-review-count }}"
+      }
+    }
+  </script>
+{% endiftruthy %}
+
+<!-- Schema - ContactPage -->
+{%- if page.url == "/contact" -%}
+  <script id="uj-schema-contact" type="application/ld+json">
+    {
+      "@context": "http://schema.org",
+      "@type": "ContactPage",
+      "@id": "{{ site.url }}{{ page.url }}#ContactPage",
+      "url": "{{ site.url }}{{ page.url }}",
+      "name": "{{ resolved.meta.title | uj_liquify }}",
+      "description": "{{ resolved.meta.description | uj_liquify }}",
+      "mainEntity": {
+        "@type": "Organization",
+        "@id": "{{ site.url }}#{{ site.brand.type }}"
+      }
+    }
+  </script>
+{% endif %}
+
+<!-- Schema - FAQPage -->
+{%- iftruthy resolved.schema.faq_page.enabled -%}
+  {% assign faq_items = resolved.schema.faq_page.items %}
+  {% assign faq_size = faq_items | size %}
+  {% if faq_size == 0 %}
+    {% assign faq_items = resolved.faqs.items %}
+    {% assign faq_size = faq_items | size %}
+  {% endif %}
+  {% if faq_size == 0 %}
+    {% assign faq_items = resolved.alternative.faqs.items %}
+    {% assign faq_size = faq_items | size %}
+  {% endif %}
+  {% if faq_size > 0 %}
+    <script id="uj-schema-faq-page" type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "@id": "{{ site.url }}{{ page.url }}#FAQPage",
+        "mainEntity": [
+          {%- for item in faq_items -%}
+            {
+              "@type": "Question",
+              "name": "{{ item.question | uj_liquify | uj_json_escape }}",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "{{ item.answer | uj_liquify | uj_json_escape }}"
+              }
+            }{% unless forloop.last %},{% endunless %}
+          {%- endfor -%}
+        ]
+      }
+    </script>
+  {% endif %}
+{% endiftruthy %}

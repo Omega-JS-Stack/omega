@@ -1,0 +1,302 @@
+---
+### ALL PAGES ###
+layout: admin/core/minimal
+
+### THEME CONFIG ###
+theme:
+  header:
+    title:
+      content: "Users"
+      icon: "users"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Users"
+
+### REGULAR PAGES ###
+meta:
+  title: "Users - Admin"
+  description: "Manage system users"
+  breadcrumb: "All users"
+
+prerender_icons:
+  - name: "user"
+  - name: "eye"
+  - name: "pen"
+  - name: "fire"
+  - name: "trash"
+  - name: "ellipsis-vertical"
+  - name: "copy"
+  - name: "right-to-bracket"
+  - name: "circle-check"
+  - name: "arrow-up-right-from-square"
+  - name: "circle-xmark"
+---
+
+<!-- Page Header Actions -->
+<div class="row mb-4">
+  <div class="col">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <p class="text-muted mb-0">Search users by email or UID</p>
+      </div>
+      <div>
+        <button class="btn btn-outline-adaptive" id="btn-refresh-users">
+          {% uj_icon "rotate", "fa-md me-2" %}
+          Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+  <!-- Total Users -->
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-primary bg-opacity-10 mx-auto mb-2">
+          {% uj_icon "users", "fa-xl text-primary" %}
+        </div>
+        <h6 class="text-muted mb-1">Total users</h6>
+        <h3 class="mb-0" id="stat-total-users">
+          <span class="spinner-border spinner-border-sm fs-6"></span>
+        </h3>
+        <small class="text-muted" id="stat-new-users"></small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Subscriptions -->
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-success bg-opacity-10 mx-auto mb-2">
+          {% uj_icon "credit-card", "fa-xl text-success" %}
+        </div>
+        <h6 class="text-muted mb-1">Active subscriptions</h6>
+        <h3 class="mb-0" id="stat-active-subs">
+          <span class="spinner-border spinner-border-sm fs-6"></span>
+        </h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active users (30d) -->
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-info bg-opacity-10 mx-auto mb-2">
+          {% uj_icon "user-plus", "fa-xl text-info" %}
+        </div>
+        <h6 class="text-muted mb-1">Active users (30d)</h6>
+        <h3 class="mb-0" id="stat-active-users">
+          <span class="spinner-border spinner-border-sm fs-6"></span>
+        </h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search Form -->
+<form id="user-search-form" data-form-state="initializing" onsubmit="return false">
+  <div class="row mb-3">
+    <div class="col">
+      <div class="input-group">
+        <span class="input-group-text">
+          {% uj_icon "magnifying-glass", "fa-sm" %}
+        </span>
+        <input type="text" class="form-control" name="search.query" placeholder="Search by email or UID..." aria-label="Search users" required minlength="1" autofocus>
+        <button type="submit" class="btn btn-adaptive">
+          <span class="button-text">Search</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Users Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <!-- Search Prompt (default state) -->
+    <div id="users-prompt" class="text-center text-muted py-5">
+      {% uj_icon "magnifying-glass", "fa-2xl mb-3 d-block" %}
+      Enter an email or UID above to search
+    </div>
+
+    <!-- Loading -->
+    <div id="users-loading" class="text-center text-muted py-5 d-none">
+      <span class="spinner-border spinner-border-sm"></span>
+    </div>
+
+    <!-- Empty State -->
+    <div id="users-empty" class="text-center text-muted py-5 d-none">
+      No users found
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 d-none" id="users-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Plan</th>
+            <th>Expires</th>
+            <th>Updated</th>
+            <th style="width: 40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="card-footer d-none" id="users-footer">
+    <div class="small text-muted" id="users-count"></div>
+  </div>
+</div>
+
+<!-- User Detail Modal -->
+<div class="modal fade" id="user-detail-modal" tabindex="-1" aria-labelledby="user-detail-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" id="user-detail-modal-label">User details</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <pre class="mb-0 p-3" style="max-height: 500px; overflow-y: auto; font-size: 0.85em; background: var(--bs-tertiary-bg);"><code id="user-detail-json"></code></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-adaptive" id="btn-copy-uid">
+          {% uj_icon "copy", "fa-sm me-1" %}
+          Copy UID
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-adaptive" id="btn-view-in-firebase">
+          {% uj_icon "fire", "fa-sm me-1" %}
+          View in Explorer
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-adaptive" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sign in as user modal -->
+<div class="modal fade" id="signin-as-modal" tabindex="-1" aria-labelledby="signin-as-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" id="signin-as-modal-label">Sign in as user</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="modal-body text-center py-5" id="signin-as-loading">
+        <div class="spinner-border text-primary mb-3" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <h5 class="mb-2">Generating sign-in link</h5>
+        <p class="text-muted mb-0">
+          Creating a one-time token for <strong id="signin-as-loading-email" class="text-body"></strong>...
+        </p>
+      </div>
+
+      <!-- Ready State -->
+      <div class="modal-body text-center d-none" id="signin-as-ready">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-success bg-opacity-10 mx-auto mb-3">
+          {% uj_icon "circle-check", "fa-2xl text-success" %}
+        </div>
+        <h5 class="mb-2">Sign-in link ready</h5>
+        <p class="text-muted mb-3">
+          A one-time sign-in link for <strong id="signin-as-email" class="text-body"></strong> has been generated. Open it in an incognito window to avoid signing out of your admin session.
+        </p>
+        <div class="input-group mb-2">
+          <input type="text" class="form-control form-control-sm font-monospace" id="signin-as-url" readonly>
+          <button type="button" class="btn btn-sm btn-outline-adaptive" id="btn-signin-as-copy">
+            {% uj_icon "copy", "fa-sm" %}
+          </button>
+        </div>
+        <small class="text-muted d-block">The link contains a short-lived custom token</small>
+      </div>
+
+      <!-- Error State -->
+      <div class="modal-body text-center py-5 d-none" id="signin-as-error">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-danger bg-opacity-10 mx-auto mb-3">
+          {% uj_icon "circle-xmark", "fa-2xl text-danger" %}
+        </div>
+        <h5 class="mb-2">Failed to generate link</h5>
+        <p class="text-muted mb-0" id="signin-as-error-message"></p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-adaptive" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm btn-adaptive d-none" id="btn-signin-as-navigate">
+          {% uj_icon "arrow-up-right-from-square", "fa-sm me-1" %}
+          Open in new tab
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User Edit Modal -->
+<div class="modal fade" id="user-edit-modal" tabindex="-1" aria-labelledby="user-edit-modal-label" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" id="user-edit-modal-label">Edit user</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="user-edit-form" data-form-state="initializing" onsubmit="return false">
+          <!-- UID (read-only) -->
+          <div class="mb-3">
+            <label class="form-label small text-muted">UID</label>
+            <input type="text" class="form-control form-control-sm font-monospace" id="edit-uid" readonly disabled>
+          </div>
+
+          <!-- Email (read-only) -->
+          <div class="mb-3">
+            <label class="form-label small text-muted">Email</label>
+            <input type="text" class="form-control form-control-sm" id="edit-email" readonly disabled>
+          </div>
+
+          <hr>
+
+          <!-- Roles -->
+          <h6 class="mb-3">Roles</h6>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="edit-role-admin" name="roles.admin">
+            <label class="form-check-label" for="edit-role-admin">Administrator</label>
+          </div>
+
+          <hr>
+
+          <!-- Subscription -->
+          <h6 class="mb-3">Subscription</h6>
+          <div class="mb-3">
+            <label for="edit-plan" class="form-label small">Plan</label>
+            <input type="text" class="form-control form-control-sm" id="edit-plan" name="subscription.product.id" placeholder="e.g. basic, premium, max">
+          </div>
+          <div class="mb-3">
+            <label for="edit-expires" class="form-label small">Expires (date)</label>
+            <input type="date" class="form-control form-control-sm" id="edit-expires" name="subscription.expires.date">
+          </div>
+
+          <!-- Submit -->
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" class="btn btn-sm btn-outline-adaptive" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-sm btn-adaptive">
+              {% uj_icon "check", "fa-sm me-1" %}
+              <span class="button-text">Save changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

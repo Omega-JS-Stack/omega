@@ -1,0 +1,139 @@
+// Neobrutalism Theme Configuration
+// ALL customizable variables are defined here with !default.
+// Consuming projects override any of these BEFORE the theme is imported.
+//
+// Design language: raw, high-contrast color blocks; pure-black hard borders;
+// hard offset shadows (no blur); zero border-radius; chunky grotesk type.
+// This is NOT a recolored Classy — the shadow/border/press system is the identity.
+
+// ============================================
+// Bootstrap Color Overrides
+// ============================================
+// Loud, saturated, high-contrast. These map onto Bootstrap's semantic colors.
+$primary:    #2563EB !default;   // electric blue
+$secondary:  #EC4899 !default;   // hot pink
+$success:    #16A34A !default;   // grass green
+$info:       #06B6D4 !default;   // cyan
+$warning:    #FACC15 !default;   // acid yellow
+$danger:     #EF4444 !default;   // red
+$light:      #FFFEF2 !default;   // paper white (warm off-white)
+$dark:       #111111 !default;   // near-black
+
+// ============================================
+// Ink & Paper (the structural neutrals)
+// ============================================
+// "Ink" = the universal border/shadow color. "Paper" = the page surface.
+$nb-ink:            #111111 !default;   // borders + hard shadows (light mode)
+$nb-paper:          #FFFEF2 !default;   // body background (light mode)
+$nb-surface:        #FFFFFF !default;   // cards / elevated surfaces (light mode)
+$nb-surface-alt:    #F4F1E4 !default;   // alt sections / wells (light mode)
+
+// Dark mode counterparts
+$nb-ink-dark:       #F5F5F5 !default;   // borders + shadows become near-white
+$nb-paper-dark:     #16161A !default;   // body background (dark mode)
+$nb-surface-dark:   #1F1F25 !default;   // cards (dark mode)
+$nb-surface-alt-dark: #25252D !default; // alt sections (dark mode)
+
+// ============================================
+// Accent Palette (for color-block sections, tags, highlights)
+// ============================================
+// Used directly as section backgrounds and decorative blocks.
+$nb-accent-blue:    #2563EB !default;
+$nb-accent-pink:    #EC4899 !default;
+$nb-accent-yellow:  #FACC15 !default;
+$nb-accent-green:   #16A34A !default;
+$nb-accent-purple:  #8B5CF6 !default;
+$nb-accent-orange:  #FB923C !default;
+
+// ============================================
+// Borders — the defining structural element
+// ============================================
+$nb-border-width:     3px !default;          // standard border thickness
+$nb-border-width-lg:  4px !default;          // emphasis (hero buttons, feature cards)
+$nb-border-width-sm:  2px !default;          // small controls (inputs, tags)
+$nb-border-color:     $nb-ink !default;      // remapped to ink-dark in dark mode via _root
+$nb-border:           $nb-border-width solid $nb-border-color !default;
+
+// Zero radius everywhere — this is the neobrutalist signature.
+$border-radius:     0 !default;
+$border-radius-sm:  0 !default;
+$border-radius-lg:  0 !default;
+$border-radius-xl:  0 !default;
+$border-radius-2xl: 0 !default;
+$border-radius-pill: 0 !default;
+
+// ============================================
+// Hard Offset Shadows — the second defining element
+// ============================================
+// No blur, no spread — a solid block offset down-right in ink color.
+$nb-shadow-offset:     5px !default;   // default offset distance
+$nb-shadow-offset-sm:  3px !default;
+$nb-shadow-offset-lg:  8px !default;
+$nb-shadow-color:      $nb-ink !default;  // remapped in dark mode via _root
+
+$nb-shadow-sm: $nb-shadow-offset-sm $nb-shadow-offset-sm 0 $nb-shadow-color !default;
+$nb-shadow:    $nb-shadow-offset    $nb-shadow-offset    0 $nb-shadow-color !default;
+$nb-shadow-lg: $nb-shadow-offset-lg $nb-shadow-offset-lg 0 $nb-shadow-color !default;
+
+// ============================================
+// Typography
+// ============================================
+// Chunky geometric grotesk for display; clean grotesk for body.
+$font-family-sans-serif: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !default;
+$nb-font-display: 'Archivo', 'Space Grotesk', sans-serif !default;
+$nb-font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace !default;
+
+$headings-font-weight: 800 !default;
+$nb-heading-letter-spacing: -0.02em !default;
+$font-weight-bold: 700 !default;
+
+// ============================================
+// Motion — snappy, mechanical, no easing softness
+// ============================================
+// Neobrutalism favors instant/linear motion over smooth cubic-beziers.
+$nb-transition-fast: all 0.08s ease-out !default;
+$nb-transition:      all 0.12s ease-out !default;
+
+// ============================================
+// Component Sizing
+// ============================================
+// Avatar sizes map (matches Classy so shared layouts/includes render correctly)
+$avatar-sizes: (
+  null: 3rem,
+  2xs: 0.5rem,
+  xs: 1.5rem,
+  sm: 2rem,
+  md: 2.5rem,
+  lg: 3.5rem,
+  xl: 5rem,
+  2xl: 7.5rem,
+  3xl: 10rem,
+  4xl: 12.5rem,
+  5xl: 15rem
+) !default;
+
+// ============================================
+// Forward Bootstrap with our configuration
+// ============================================
+@forward '../bootstrap/scss/bootstrap.scss' with (
+  $primary: $primary,
+  $secondary: $secondary,
+  $success: $success,
+  $info: $info,
+  $warning: $warning,
+  $danger: $danger,
+  $light: $light,
+  $dark: $dark,
+  $font-family-sans-serif: $font-family-sans-serif,
+  $headings-font-weight: $headings-font-weight,
+  $font-weight-bold: $font-weight-bold,
+  $border-radius: $border-radius,
+  $border-radius-sm: $border-radius-sm,
+  $border-radius-lg: $border-radius-lg,
+  // Neobrutalism uses solid borders everywhere, so Bootstrap's default
+  // border width is bumped and box-shadow softness is disabled.
+  $border-width: $nb-border-width,
+  $enable-rounded: false,
+  $enable-shadows: false,
+  $enable-negative-margins: true
+);

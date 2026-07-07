@@ -1,0 +1,46 @@
+// Neobrutalism Theme — Mixins
+// The shared building blocks of the neobrutalist look. Components @include these
+// so the border/shadow/press system lives in ONE place (SSOT) rather than being
+// copy-pasted across buttons, cards, inputs, etc.
+
+// Hard border in the current ink color.
+@mixin nb-border($width: var(--nb-border-width)) {
+  border: $width solid var(--nb-border-color);
+}
+
+// Hard offset shadow (no blur). $size: sm | md | lg.
+@mixin nb-shadow($size: md) {
+  @if $size == sm {
+    box-shadow: var(--nb-shadow-sm);
+  } @else if $size == lg {
+    box-shadow: var(--nb-shadow-lg);
+  } @else {
+    box-shadow: var(--nb-shadow);
+  }
+}
+
+// The signature interaction: the element sits on a hard offset shadow, then
+// "presses" toward the page on hover/active. THE INVARIANT: the element's
+// translate distance + the shrunk shadow offset must always equal the RESTING
+// shadow offset, so the bottom-right edge stays perfectly pinned (the face and
+// shadow line up exactly when the press completes — no drift).
+//
+// $rest = the element's resting shadow offset. Pass the SAME size you gave
+// nb-shadow() (default 5px = md; pass $nb-shadow-offset-lg for lg-shadow elements).
+@mixin nb-press($rest: $nb-shadow-offset) {
+  transition: $nb-transition;
+
+  // Hover: press ~40% of the way in. shadow = rest - translate (stays pinned).
+  &:hover {
+    $hover-move: round($rest * 0.4);
+    $hover-shadow: $rest - $hover-move;
+    transform: translate($hover-move, $hover-move);
+    box-shadow: #{$hover-shadow} #{$hover-shadow} 0 var(--nb-shadow-color);
+  }
+
+  // Active: press fully in. translate == rest, shadow collapses to 0 → flush.
+  &:active {
+    transform: translate($rest, $rest);
+    box-shadow: 0 0 0 var(--nb-shadow-color);
+  }
+}

@@ -1,0 +1,37 @@
+// Newsflash Theme — SCSS entry point
+// Forwards config (so consuming projects can override vars), loads Bootstrap
+// via config, then layers the editorial system on top. Import order matters:
+// config → mixins → root vars → base → layout → components → bootstrap overrides.
+
+// Forward theme configuration (allows consuming project to override)
+@forward 'config';
+@use 'config' as *;
+
+// Mixins must be available to every partial below.
+// @import (not @use) so the mixins land in the global scope the @imports share.
+@import 'css/base/mixins';
+
+// CSS custom properties (light/dark bridge)
+@import 'css/base/root';
+
+// Base styles
+@import 'css/base/typography';
+@import 'css/base/utilities';
+
+// Layout styles
+@import 'css/layout/general';
+@import 'css/layout/navigation';
+
+// Component styles
+@import 'css/components/buttons';
+@import 'css/components/cards';
+@import 'css/components/forms';
+@import 'css/components/badges';
+@import 'css/components/ticker';
+@import 'css/components/editorial';
+@import 'css/components/panels';
+@import 'css/components/infinite-scroll';
+
+// Universal Bootstrap overrides (shared across all UJ themes).
+// Must come AFTER Bootstrap is loaded via config to use @extend.
+@import '../bootstrap/overrides';

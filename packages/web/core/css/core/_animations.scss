@@ -1,0 +1,294 @@
+// Core Animation Styles
+// Reusable animation utilities for the entire application
+
+// ============================================
+// Fade Animations
+// ============================================
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animation-fade-in {
+  animation: fade-in 1s ease;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.animation-fade-out {
+  animation: fade-out 1s ease;
+}
+
+// ============================================
+// Slide Animations
+// ============================================
+
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animation-slide-up {
+  animation: slide-up 1s ease;
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animation-slide-down {
+  animation: slide-down 0.5s ease-out;
+}
+
+// ============================================
+// Scale Animations
+// ============================================
+
+@keyframes popup {
+  0% {
+    transform: scale(.93);
+    opacity: .8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animation-popup {
+  animation: popup .5s ease-in-out;
+}
+
+@keyframes popup-medium {
+  0% {
+    transform: scale(.93);
+    opacity: 0;
+  }
+  75% {
+    transform: scale(.93);
+    opacity: 0;
+  }
+  80% {
+    transform: scale(.93);
+    opacity: .8;
+  }
+  90% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animation-popup-medium {
+  animation: popup-medium 1.5s ease-in-out;
+}
+
+@keyframes flex {
+  0% {
+    transform: scaleX(1)
+  }
+  50% {
+    transform: scale3d(1.05, 1.05, 1.05)
+  }
+  to {
+    transform: scaleX(1)
+  }
+}
+
+.animation-flex {
+  animation: flex 1.5s ease-in-out infinite;
+}
+
+// ============================================
+// Movement Animations
+// ============================================
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animation-bounce {
+  animation: bounce 3s ease-in-out infinite;
+}
+
+@keyframes pulse-right {
+  0%, 100% {
+    transform: translateX(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(10px);
+    opacity: 1;
+  }
+}
+
+.animation-pulse-right {
+  animation: pulse-right 1.5s ease-in-out infinite;
+}
+
+// ============================================
+// Rotation Animations
+// ============================================
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animation-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes wiggle {
+  0%,
+  20%,
+  80%,
+  to {
+    transform: rotate(0deg);
+  }
+  30%,
+  60% {
+    transform: rotate(-2deg);
+  }
+  40%,
+  70% {
+    transform: rotate(2deg);
+  }
+  45% {
+    transform: rotate(-4deg);
+  }
+  55% {
+    transform: rotate(4deg);
+  }
+}
+
+.animation-wiggle {
+  animation: wiggle 1.5s ease-in-out infinite;
+}
+
+// ============================================
+// Effect Animations
+// ============================================
+
+@keyframes pulse {
+  50% {
+    opacity: .5;
+  }
+}
+
+.animation-pulse {
+  animation: pulse 2s cubic-bezier(.4, 0, .6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+.animation-shimmer {
+  animation: shimmer 3s ease-out infinite alternate;
+}
+
+@keyframes gradient-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+// ============================================
+// Hover Animation Utilities
+// ============================================
+
+$hover-transition: all 0.3s cubic-bezier(.2,.3,0,1);
+
+.hover-up {
+  transition: $hover-transition;
+
+  &:hover {
+    transform: translateY(-8px);
+  }
+}
+
+.hover-flex {
+  transition: $hover-transition;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+}
+
+// One for opacity
+.hover-opacity {
+  transition: $hover-transition;
+
+  &:hover {
+    opacity: 0.5;
+  }
+}
+
+// .hover-shadow {
+//   transition: $hover-transition;
+
+//   &:hover {
+//     box-shadow: $classy-shadow-lg;
+//   }
+// }
+
+// .hover-glow {
+//   transition: $hover-transition;
+
+//   &:hover {
+//     box-shadow: $classy-shadow-glow;
+//   }
+// }

@@ -1,0 +1,25 @@
+// Neobrutalism Theme — Base
+// Body surface + neobrutalist treatment of Bootstrap's accent-block utilities.
+// No theme-prefixed classes: the look comes from restyling STANDARD classes
+// (.text-bg-*, .border, .shadow, .card) so markup stays swappable across themes.
+
+// Body surface
+body {
+  background-color: var(--nb-paper);
+  color: var(--bs-body-color);
+}
+
+// ============================================
+// Accent blocks: .text-bg-* (Bootstrap) get the hard neobrutalist edge when
+// used as full-bleed section/decorative blocks. Bootstrap already sets the
+// background + a readable contrast color; we just square the corners.
+// (Borders/shadows are added per-component where needed, e.g. .showcase-num.)
+// ============================================
+.text-bg-primary,
+.text-bg-secondary,
+.text-bg-success,
+.text-bg-info,
+.text-bg-warning,
+.text-bg-danger {
+  border-radius: 0;
+}

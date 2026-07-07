@@ -1,0 +1,14 @@
+---
+### ALL PAGES ###
+layout: blueprint/blog/categories/category
+
+### GENERATED PAGES ###
+# One page per blog category (replaces jekyll-uj-powertools' dynamic-pages
+# generator): pagination over the aggregated taxonomy, one category per page.
+pagination:
+  data: collections.postCategories
+  size: 1
+  alias: category
+permalink: "/blog/categories/{{ category.slug }}/"
+eleventyExcludeFromCollections: true
+---

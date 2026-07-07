@@ -1,0 +1,524 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section — the front-page lead. News voice: the brand IS the publication.
+hero:
+  tagline: "{{ site.brand.name }} — independent journalism"
+  headline: "News with a"
+  headline_accent: "pulse"
+  description: "Sharp reporting and zero noise — the stories that matter, delivered before your coffee gets cold."
+  primary_button:
+    text: "Read the latest"
+    icon: "bolt"
+    href: "/blog"
+  secondary_button:
+    text: "Get the newsletter"
+    icon: "envelope"
+    href: "#signup"
+
+# The Latest — the front-page feed (posts-driven; newsflash-specific section)
+latest:
+  superheadline:
+    icon: "bolt"
+    text: "The latest"
+  view_all:
+    text: "View the firehose"
+    href: "/blog"
+
+# More to Chew On — extra stories before the big read (posts-driven)
+more_stories:
+  superheadline:
+    icon: "newspaper"
+    text: "More to chew on"
+
+# The Rundown — the newsroom's three-step playbook (newsflash-specific section)
+rundown:
+  superheadline:
+    icon: "list"
+    text: "The rundown"
+  headline: "Journalism worth your"
+  headline_accent: "morning"
+  subheadline: "What you get from the {{ site.brand.name }} newsroom every single day"
+  items:
+    - title: "Original reporting"
+      description: "Stories researched and written by people who pick up the phone — not rewrites of someone else's scoop."
+    - title: "The daily briefing"
+      description: "The five stories that actually matter, distilled into a five-minute read and delivered before sunrise."
+    - title: "Deep dives"
+      description: "Long-form features that follow the money, the people, and the consequences long after the headlines move on."
+
+# Newsletter Rail (sidebar signup)
+newsletter:
+  headline: "{{ site.brand.name }}, daily."
+  subheadline: "One ridiculously good email every morning. The stories that matter, minus the noise."
+  button:
+    text: "Join"
+  form:
+    placeholder: "you@example.com"
+  disclaimer: "Free forever. Unsubscribe anytime."
+
+# The Desks — coverage areas (newsflash-specific section)
+desks:
+  superheadline:
+    icon: "newspaper"
+    text: "The desks"
+  headline: "Coverage with"
+  headline_accent: "teeth"
+  subheadline: "Three desks, one standard: report it right, write it sharp."
+  cta_button:
+    text: "Browse all stories"
+    icon: "arrow-right"
+    href: "/blog"
+  items:
+    - title: "Tech"
+      description: "The machines, the makers, and the money rewiring how we live and work."
+      icon: "microchip"
+      href: "/blog/categories/tech"
+    - title: "Culture"
+      description: "What we watch, wear, and argue about — and why it matters more than you think."
+      icon: "masks-theater"
+      href: "/blog/categories/culture"
+    - title: "Money"
+      description: "Markets, paychecks, and the economics hiding inside everyday decisions."
+      icon: "chart-line"
+      href: "/blog/categories/money"
+
+# Stats Section — the masthead numbers
+stats:
+  - number: "2M+"
+    label: "Monthly readers"
+    sublabel: "Across 120+ countries"
+  - number: "12k+"
+    label: "Stories published"
+    sublabel: "And counting"
+  - number: "5 min"
+    label: "Daily briefing"
+    sublabel: "Fully caught up"
+  - number: "0"
+    label: "Clickbait headlines"
+    sublabel: "We checked"
+
+# CTA Section — the big-read band
+cta:
+  superheadline:
+    icon: "bolt"
+    text: "The big read"
+  headline: "Don't just scroll the news."
+  headline_accent: "Understand it."
+  description: "Join the readers who start their day with {{ site.brand.name }} — reporting with teeth, context with heart, and zero filler."
+  primary_button:
+    text: "Start reading"
+    icon: "bolt"
+    href: "/blog"
+  secondary_button:
+    text: "Get the newsletter"
+    icon: "envelope"
+    href: "#signup"
+---
+
+{% comment %}
+  NEWSFLASH HOMEPAGE
+  A newspaper front page: a featured-story hero (publication pitch left, the
+  latest post as the framed cover story right), top-story tiles, "the latest"
+  as an editorial post feed (square art + kicker + headline + dek) with a
+  sticky rail sidebar (most-read + newsletter signup), "the rundown" as the
+  newsroom's numbered three-step playbook, coverage-desk cards (linked to
+  their category pages), a masthead numbers strip, "more to chew on" story
+  tiles, and a dark big-read CTA band. (Reader quotes live on the about page.)
+  Every section is rendered by this layout — no classy includes. The
+  frontmatter defaults are NEWS-genre copy — a theme's defaults are part of
+  its identity (see docs/themes.md "Frontmatter defaults are part of the
+  theme's identity"). Universal sections (hero, stats, cta, newsletter) keep
+  the shared key names; `latest`, `rundown`, `desks`, and `more_stories` are
+  newsflash-specific. Posts-driven sections disappear gracefully when
+  site.posts is empty.
+{% endcomment %}
+
+<!-- ============================================ -->
+<!-- HERO — front page lead: pitch left, cover story right -->
+<!-- ============================================ -->
+<section class="section-hero pb-4">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <!-- Left: kicker + serif headline + dek + actions -->
+      <div class="col-lg-6" data-lazy="@class animation-slide-up">
+        {% iftruthy resolved.hero.tagline %}
+          <span class="kicker">{{ resolved.hero.tagline }}</span>
+        {% endiftruthy %}
+        <h1 class="hero-title my-3">
+          {{ resolved.hero.headline }}
+          {% iftruthy resolved.hero.headline_accent %}
+            <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+          {% endiftruthy %}
+        </h1>
+        {% iftruthy resolved.hero.description %}
+          <p class="lead mb-4" style="max-width: 34em;">{{ resolved.hero.description }}</p>
+        {% endiftruthy %}
+        <div class="d-flex flex-wrap gap-3">
+          {% iftruthy resolved.hero.primary_button %}
+            <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-primary btn-lg">
+              {% uj_icon resolved.hero.primary_button.icon, "me-2" %}{{ resolved.hero.primary_button.text }}
+            </a>
+          {% endiftruthy %}
+          {% iftruthy resolved.hero.secondary_button %}
+            <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-dark btn-lg">
+              {% uj_icon resolved.hero.secondary_button.icon, "me-2" %}{{ resolved.hero.secondary_button.text }}
+            </a>
+          {% endiftruthy %}
+        </div>
+      </div>
+
+      <!-- Right: the cover story (latest post) — or a cover-art block pre-content -->
+      <div class="col-lg-6" data-lazy="@class animation-slide-up">
+        {% if site.posts.size > 0 %}
+          {% assign featured = site.posts.first %}
+          <a href="{{ site.url }}{{ featured.url }}" class="hero-art d-block position-relative text-decoration-none text-body">
+            <span class="badge bg-body-tertiary hero-art-chip">Featured</span>
+            <div class="art-frame shadow">
+              {%- uj_post featured.post.id, "image-tag", class="w-100" -%}
+            </div>
+            <div class="mt-3">
+              {% if featured.post.categories[0] %}
+                <span class="kicker mb-1">{{ featured.post.categories[0] | uj_title_case }}</span>
+              {% endif %}
+              <h2 class="h4 mb-1">{{ featured.post.title }}</h2>
+              <p class="small text-body-secondary mb-0">
+                <b class="text-body">{%- uj_member featured.post.author, "name" -%}</b>
+                · {{ featured.date | date: "%b %d, %Y" }}
+                · {% uj_readtime featured.content %} min read
+              </p>
+            </div>
+          </a>
+        {% else %}
+          <div class="hero-art position-relative">
+            <span class="badge bg-body-tertiary hero-art-chip">Featured</span>
+            <div class="art-frame shadow">
+              <div class="cover-art ratio ratio-4x3"></div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- TOP STORIES — three editorial tiles -->
+<!-- ============================================ -->
+{% if site.posts.size > 1 %}
+  <section class="pt-4">
+    <div class="container">
+      <div class="section-head" data-lazy="@class animation-slide-up">
+        <h2>Top stories</h2>
+        <span class="rule"></span>
+        <a href="{{ site.url }}/blog">View all {% uj_icon "arrow-right", "ms-1" %}</a>
+      </div>
+      <div class="row g-4">
+        {% for post in site.posts offset: 1 limit: 3 %}
+          <div class="col-md-4" data-lazy="@class animation-slide-up">
+            <a href="{{ site.url }}{{ post.url }}" class="story-card">
+              <div class="art-frame mb-3">
+                {%- uj_post post.post.id, "image-tag", class="w-100" -%}
+              </div>
+              {% if post.post.categories[0] %}
+                <span class="kicker mb-1">{{ post.post.categories[0] | uj_title_case }}</span>
+              {% endif %}
+              <h3 class="h5 my-2">{{ post.post.title }}</h3>
+              <p class="small text-body-secondary mb-0">
+                <b class="text-body">{%- uj_member post.post.author, "name" -%}</b>
+                · {{ post.date | date: "%b %d, %Y" }}
+                · {% uj_readtime post.content %} min read
+              </p>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- THE LATEST — editorial post feed + sticky rail sidebar -->
+<!-- (mirrors the front-page feed: square art, kicker, headline, dek, byline) -->
+<!-- ============================================ -->
+{% comment %}
+  Post slots are strictly deduplicated down the page: hero = post 1,
+  top stories = 2-4, this feed = 5-9, most-read rail = 10-14, "more to chew
+  on" = 15-17. Sections disappear gracefully when the site doesn't have
+  enough posts to fill their slice (only the ticker repeats the latest —
+  it's chrome, not content).
+{% endcomment %}
+{% if site.posts.size > 4 %}
+<section class="section-feed">
+  <div class="container">
+    <div class="section-head" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.latest.superheadline.text %}
+        <h2>{{ resolved.latest.superheadline.text }}</h2>
+      {% endiftruthy %}
+      <span class="rule"></span>
+      {% iftruthy resolved.latest.view_all %}
+        <a href="{{ resolved.latest.view_all.href }}">{{ resolved.latest.view_all.text }} {% uj_icon "arrow-right", "ms-1" %}</a>
+      {% endiftruthy %}
+    </div>
+
+    <div class="row g-5">
+      <!-- The feed: posts 5-9 (hero + top stories show 1-4) -->
+      <div class="col-lg-7">
+        <div>
+          {% for post in site.posts offset: 4 limit: 5 %}
+            <a href="{{ site.url }}{{ post.url }}" class="feed-item" data-lazy="@class animation-slide-up">
+              <div class="art-frame">
+                {%- uj_post post.post.id, "image-tag", class="w-100" -%}
+              </div>
+              <div>
+                {% if post.post.categories[0] %}
+                  <span class="kicker mb-1">{{ post.post.categories[0] | uj_title_case }}</span>
+                {% endif %}
+                <h3 class="h4 my-2">{{ post.post.title }}</h3>
+                {% iftruthy post.post.description %}
+                  <p class="text-body-secondary mb-2">{{ post.post.description }}</p>
+                {% endiftruthy %}
+                <p class="small text-body-secondary mb-0">
+                  <b class="text-body">{%- uj_member post.post.author, "name" -%}</b>
+                  · {{ post.date | date: "%b %d, %Y" }}
+                  · {% uj_readtime post.content %} min read
+                </p>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- The rail -->
+      <aside class="col-lg-5 col-xl-4 ms-auto">
+        <div class="rail-stack d-flex flex-column gap-4">
+          {% comment %} Most read: posts 10-14 — the next slice after the feed (no duplicates) {% endcomment %}
+          {% if site.posts.size > 9 %}
+            <div class="card p-4" data-lazy="@class animation-slide-up">
+              <div class="rail-title">Most read</div>
+              <ol class="mostread list-unstyled mb-0">
+                {% for post in site.posts offset: 9 limit: 5 %}
+                  <li>
+                    <a href="{{ site.url }}{{ post.url }}">{{ post.post.title }}</a>
+                  </li>
+                {% endfor %}
+              </ol>
+            </div>
+          {% endif %}
+
+          {% iftruthy resolved.newsletter %}
+            <div class="card bg-primary text-white p-4" data-lazy="@class animation-slide-up" id="signup">
+              <h3 class="h3 fst-italic mb-2">{{ resolved.newsletter.headline }}</h3>
+              <p class="small mb-3">{{ resolved.newsletter.subheadline }}</p>
+              <form class="d-flex gap-2 needs-validation" action="{{ site.url }}/email-subscription">
+                <label for="newsletter-email" class="visually-hidden">Email address</label>
+                <input type="email" name="email" id="newsletter-email" class="form-control" placeholder="{{ resolved.newsletter.form.placeholder }}" autocomplete="email" required>
+                <button type="submit" class="btn btn-dark">{{ resolved.newsletter.button.text }}</button>
+              </form>
+              {% iftruthy resolved.newsletter.disclaimer %}
+                <small class="d-block mt-2 opacity-75">{{ resolved.newsletter.disclaimer }}</small>
+              {% endiftruthy %}
+            </div>
+          {% endiftruthy %}
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- THE RUNDOWN — the newsroom's numbered three-step playbook -->
+<!-- ============================================ -->
+<section class="section-rundown pt-0">
+  <div class="container">
+    <div class="section-head" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.rundown.superheadline.text %}
+        <h2>{{ resolved.rundown.superheadline.text }}</h2>
+      {% endiftruthy %}
+      <span class="rule"></span>
+    </div>
+
+    <header class="mb-4" data-lazy="@class animation-slide-up">
+      <h2 class="h1 mb-2">
+        {{ resolved.rundown.headline }}
+        {% iftruthy resolved.rundown.headline_accent %}
+          <span class="text-accent">{{ resolved.rundown.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.rundown.subheadline %}
+        <p class="lead mb-0">{{ resolved.rundown.subheadline }}</p>
+      {% endiftruthy %}
+    </header>
+
+    <div class="row">
+      <div class="col-lg-9">
+        {% for item in resolved.rundown.items %}
+          <article class="feed-item" data-lazy="@class animation-slide-up">
+            <div class="feed-num" aria-hidden="true">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</div>
+            <div>
+              <h3 class="h4 mb-2">{{ item.title }}</h3>
+              <p class="text-body-secondary mb-0">{{ item.description }}</p>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- THE DESKS — coverage cards in a paper well -->
+<!-- ============================================ -->
+<section class="bg-body-tertiary">
+  <div class="container">
+    <div class="section-head" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.desks.superheadline.text %}
+        <h2>{{ resolved.desks.superheadline.text }}</h2>
+      {% endiftruthy %}
+      <span class="rule"></span>
+    </div>
+
+    <header class="mb-5" data-lazy="@class animation-slide-up">
+      <h2 class="h1 mb-2">
+        {{ resolved.desks.headline }}
+        {% iftruthy resolved.desks.headline_accent %}
+          <span class="text-accent">{{ resolved.desks.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.desks.subheadline %}
+        <p class="lead mb-0">{{ resolved.desks.subheadline }}</p>
+      {% endiftruthy %}
+    </header>
+
+    <div class="row g-4">
+      {% for desk in resolved.desks.items %}
+        {% comment %} Each desk card links to its category page (href overrides the slugified title) {% endcomment %}
+        {% capture desk_href %}{% if desk.href %}{{ desk.href }}{% else %}/blog/categories/{{ desk.title | slugify }}{% endif %}{% endcapture %}
+        <div class="col-md-4" data-lazy="@class animation-slide-up">
+          <a href="{{ desk_href }}" class="card story-card h-100 p-4 text-decoration-none">
+            <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
+              {% uj_icon desk.icon %}
+            </span>
+            <h3 class="h4 mb-2">{{ desk.title }}</h3>
+            <p class="text-body-secondary mb-0">{{ desk.description }}</p>
+            <span class="small fw-bold text-primary mt-3">Read the desk {% uj_icon "arrow-right", "ms-1" %}</span>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% iftruthy resolved.desks.cta_button %}
+      <div class="text-center mt-5" data-lazy="@class animation-slide-up">
+        <a href="{{ resolved.desks.cta_button.href }}" class="btn btn-primary btn-lg">
+          {% uj_icon resolved.desks.cta_button.icon, "me-2" %}{{ resolved.desks.cta_button.text }}
+        </a>
+      </div>
+    {% endiftruthy %}
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- STATS — masthead numbers, stroked numerals -->
+<!-- ============================================ -->
+{% iftruthy resolved.stats %}
+  <section>
+    <div class="container">
+      <div class="section-head" data-lazy="@class animation-slide-up">
+        <h2>By the numbers</h2>
+        <span class="rule"></span>
+      </div>
+      <div class="row g-4 text-center">
+        {% for stat in resolved.stats %}
+          <div class="col-6 col-lg-3" data-lazy="@class animation-slide-up">
+            <div class="stat-num">{{ stat.number }}</div>
+            <div class="fw-bold">{{ stat.label }}</div>
+            {% iftruthy stat.sublabel %}
+              <div class="small text-body-secondary">{{ stat.sublabel }}</div>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endiftruthy %}
+
+<!-- ============================================ -->
+<!-- MORE TO CHEW ON — extra story tiles before the big read -->
+<!-- ============================================ -->
+{% comment %} More to chew on: posts 15-17 — the slice after the most-read rail (no duplicates) {% endcomment %}
+{% if site.posts.size > 14 %}
+  <section class="pt-0">
+    <div class="container">
+      <div class="section-head" data-lazy="@class animation-slide-up">
+        {% iftruthy resolved.more_stories.superheadline.text %}
+          <h2>{{ resolved.more_stories.superheadline.text }}</h2>
+        {% endiftruthy %}
+        <span class="rule"></span>
+      </div>
+      <div class="row g-4">
+        {% for post in site.posts offset: 14 limit: 3 %}
+          <div class="col-md-4" data-lazy="@class animation-slide-up">
+            <a href="{{ site.url }}{{ post.url }}" class="story-card">
+              <div class="art-frame mb-3">
+                {%- uj_post post.post.id, "image-tag", class="w-100" -%}
+              </div>
+              {% if post.post.categories[0] %}
+                <span class="kicker mb-1">{{ post.post.categories[0] | uj_title_case }}</span>
+              {% endif %}
+              <h3 class="h5 my-2">{{ post.post.title }}</h3>
+              <p class="small text-body-secondary mb-0">
+                <b class="text-body">{%- uj_member post.post.author, "name" -%}</b>
+                · {{ post.date | date: "%b %d, %Y" }}
+                · {% uj_readtime post.content %} min read
+              </p>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- ============================================ -->
+<!-- CTA — the dark big-read band -->
+<!-- ============================================ -->
+<section class="cta">
+  <div class="container">
+    <div class="cta-panel" data-lazy="@class animation-slide-up">
+      <div class="cta-rings" aria-hidden="true"></div>
+      <div class="position-relative">
+        {% iftruthy resolved.cta.superheadline.text %}
+          <span class="kicker mb-3">
+            {% uj_icon resolved.cta.superheadline.icon, "me-1" %}{{ resolved.cta.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+        <h2 class="cta-title">
+          {{ resolved.cta.headline }}
+          {% iftruthy resolved.cta.headline_accent %}
+            <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
+          {% endiftruthy %}
+        </h2>
+        {% iftruthy resolved.cta.description %}
+          <p class="cta-desc">{{ resolved.cta.description }}</p>
+        {% endiftruthy %}
+        <div class="d-flex flex-wrap gap-3">
+          {% iftruthy resolved.cta.primary_button %}
+            <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-warning btn-lg">
+              {% uj_icon resolved.cta.primary_button.icon, "me-2" %}{{ resolved.cta.primary_button.text }}
+            </a>
+          {% endiftruthy %}
+          {% iftruthy resolved.cta.secondary_button %}
+            <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-light btn-lg">
+              {% uj_icon resolved.cta.secondary_button.icon, "me-2" %}{{ resolved.cta.secondary_button.text }}
+            </a>
+          {% endiftruthy %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

@@ -1,0 +1,43 @@
+---
+### ALL PAGES ###
+layout: blueprint/index
+permalink: /test/components/hero-demo-video
+
+### PAGE CONFIG ###
+asset_path: index
+sitemap:
+  include: false
+meta:
+  title: "Hero Demo: Video Type"
+  description: "Test page demonstrating the video hero demo type"
+  index: false
+
+# Hero Section
+hero:
+  tagline: "Video demo"
+  headline: "See {{ site.brand.name}} in"
+  headline_accent: "action"
+  description: "Watch how easy it is to create stunning logos with our AI-powered platform"
+  demo:
+    enabled: true
+    type: "video"
+    placement: "bottom"
+    options:
+      class: "mw-lg"
+      src: "https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-1.webm"
+      autoplay: true
+      loop: true
+      muted: true
+      controls: false
+      subtext: "No sound - autoplay enabled"
+  primary_button:
+    text: "Get started free"
+    icon: "rocket"
+    href: "/dashboard"
+    class: "btn-light"
+  secondary_button:
+    text: "Explore solutions"
+    icon: "book-open"
+    href: "/pricing"
+    class: "btn-outline-light"
+---

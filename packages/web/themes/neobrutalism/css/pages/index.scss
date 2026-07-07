@@ -1,0 +1,227 @@
+// Neobrutalism Theme — Homepage page-specific CSS
+// Styles the neobrutalist homepage override
+// (_layouts/themes/neobrutalism/frontend/pages/index.html).
+//
+// Class names are UNIVERSAL (section-hero, showcase-row, stat-block, cta-panel,
+// .card, Bootstrap .text-bg-* …) — no theme prefix — so the same markup is
+// swappable across themes. This file gives those classes the neobrutalist look.
+// Compiles standalone, so it pulls in the theme tokens + mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// Shared section heading block
+.section-head { max-width: 60ch; }
+.section-title {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 0;
+}
+
+// ============================================
+// Hero — asymmetric split (.text-bg-warning gives the yellow block + ink text)
+// ============================================
+.section-hero {
+  padding-top: clamp(3rem, 8vw, 7rem);
+  padding-bottom: clamp(3rem, 8vw, 7rem);
+  border-bottom: $nb-border-width-lg solid var(--nb-border-color);
+
+  .text-uppercase {
+    display: inline-block;
+    font-family: $nb-font-mono;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    background: #111111;
+    color: var(--nb-accent-yellow);
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+.hero-title {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(2.75rem, 8vw, 6rem);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  margin: 0;
+
+  .text-accent {
+    background: #111111;
+    color: var(--nb-accent-yellow);
+    padding: 0 0.1em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
+
+// Hero CTAs use Bootstrap `.d-grid.gap-3` (full-width stacked buttons) in the
+// markup. The only theme-specific bit is the slight rightward offset on large
+// screens that gives the split hero its asymmetry.
+.hero-actions {
+  @media (min-width: 992px) { margin-left: 1.5rem; }
+}
+
+// ============================================
+// Trusted-by — framed marquee strip
+// ============================================
+.logo-strip { padding: clamp(2.5rem, 6vw, 4rem) 0; }
+.logo-strip-box {
+  position: relative;
+  padding: 2rem 0 1.75rem;
+  background: var(--nb-surface);
+  @include nb-border();
+  @include nb-shadow(md);
+  overflow: hidden;
+}
+.logo-strip-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: $nb-font-mono;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #111111;
+  color: var(--nb-accent-yellow);
+  padding: 0.3rem 0.7rem;
+  z-index: 5;
+}
+
+// ============================================
+// Showcase — alternating offset rows
+// ============================================
+.showcase { padding: clamp(3rem, 8vw, 6rem) 0; }
+.showcase-list { display: flex; flex-direction: column; gap: 2rem; }
+.showcase-row {
+  display: grid;
+  // Number column fixed; text column sized to content so it sits next to the
+  // number instead of stretching across the row (which left an awkward gap).
+  grid-template-columns: minmax(120px, 180px) minmax(auto, 60ch);
+  gap: 2.5rem;
+  align-items: center;
+  justify-content: start;
+
+  @media (max-width: 767.98px) { grid-template-columns: 1fr; gap: 1rem; }
+
+  // Flipped rows: number moves to the right, the whole pair sits to the right edge.
+  &--flip {
+    @media (min-width: 768px) {
+      grid-template-columns: minmax(auto, 60ch) minmax(120px, 180px);
+      justify-content: end;
+      .showcase-num { order: 2; }
+      .showcase-body { order: 1; }
+    }
+  }
+}
+.showcase-num {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(3rem, 9vw, 6rem);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  @include nb-border($nb-border-width-lg);
+  @include nb-shadow(lg);
+  // Color comes from the Bootstrap .text-bg-* utility on the element.
+}
+.showcase-body { max-width: 60ch; }
+.showcase-title {
+  font-family: $nb-font-display;
+  font-weight: 800;
+  font-size: clamp(1.5rem, 3.5vw, 2.25rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.75rem;
+}
+.showcase-desc { font-size: 1.1rem; margin: 0; color: var(--bs-body-color); }
+
+// ============================================
+// Steps (features) — numbered .card blocks
+// ============================================
+.steps {
+  padding: clamp(3rem, 8vw, 6rem) 0;
+  border-top: $nb-border-width-lg solid var(--nb-border-color);
+  border-bottom: $nb-border-width-lg solid var(--nb-border-color);
+}
+.step-card { // sits on .card (gets the neobrutalist frame from the card component)
+  .card-body { padding: 1.75rem; }
+}
+.step-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.step-card-num { font-family: $nb-font-display; font-weight: 900; font-size: 2.5rem; line-height: 1; }
+.step-card-icon {
+  font-size: 1.75rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nb-accent-yellow);
+  color: #111111;
+  @include nb-border($nb-border-width-sm);
+}
+.step-card-title { font-family: $nb-font-display; font-weight: 800; font-size: 1.5rem; margin-bottom: 0.5rem; }
+.step-card-desc { margin: 0; color: var(--bs-body-color); }
+
+// ============================================
+// Stats — oversized color-block cells (.text-bg-* gives the fill)
+// ============================================
+.stats { padding: clamp(3rem, 8vw, 6rem) 0; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+
+  @media (max-width: 991.98px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 479.98px) { grid-template-columns: 1fr; }
+}
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  @include nb-border($nb-border-width-lg);
+  @include nb-shadow(lg);
+  @include nb-press($nb-shadow-offset-lg); // press matched to the lg resting shadow
+}
+.stat-block-num { font-family: $nb-font-display; font-weight: 900; font-size: clamp(2.5rem, 6vw, 3.5rem); line-height: 1; }
+.stat-block-label { font-weight: 800; font-size: 1.1rem; margin-top: 0.5rem; }
+.stat-block-sub { font-family: $nb-font-mono; font-size: 0.8rem; margin-top: 0.25rem; }
+
+// ============================================
+// CTA — full-bleed ink panel
+// ============================================
+.cta { padding: clamp(3rem, 8vw, 6rem) 0; }
+.cta-panel {
+  background: #111111;
+  color: #FFFEF2;
+  padding: clamp(2.5rem, 6vw, 4.5rem);
+  text-align: center;
+  // Frame + offset shadow in the accent (not ink) so both read against the dark panel.
+  border: $nb-border-width-lg solid var(--nb-accent-yellow);
+  box-shadow: #{$nb-shadow-offset-lg} #{$nb-shadow-offset-lg} 0 var(--nb-accent-yellow);
+}
+.cta-title {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.25rem;
+
+  .text-accent {
+    background: var(--nb-accent-yellow);
+    color: #111111;
+    padding: 0 0.1em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
+.cta-desc { font-size: 1.25rem; max-width: 50ch; margin: 0 auto 2rem; opacity: 0.85; }

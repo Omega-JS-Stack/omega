@@ -120,6 +120,11 @@ function createFrontmatterResolver(options) {
     const transform = (node) => {
       if (typeof node === 'string') return maybeRender(node, extraScope);
       if (node === null || typeof node !== 'object' || seen.has(node)) return node;
+      // Eleventy collection items (pagination aliases carry them, e.g. a
+      // taxonomy group's `posts`) stay opaque — checked WITHOUT touching the
+      // getter: templateContent THROWS before render, and constructing those
+      // errors per item per page was a measured corpus hotspot (~19% CPU).
+      if ('templateContent' in node) return node;
       seen.add(node);
 
       let entries;

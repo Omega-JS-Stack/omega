@@ -1,0 +1,94 @@
+// Neobrutalism Theme — Infinite Scroll
+// Structural marquee used by the shared layouts (trusted-by logo strip,
+// testimonial scroll). Mostly layout/animation (theme-agnostic); cosmetic bits
+// are tuned to the neobrutalist look (square cards, hard hover shadow).
+// NOTE: this is structural behavior the inherited Classy layouts depend on —
+// see docs/themes.md "Structural vs visual components".
+
+.infinite-scroll-wrapper {
+  position: relative;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  overflow: hidden;
+
+  &.infinite-scroll-fade-edges {
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    &::before { left: 0;  background: linear-gradient(to right, var(--bs-body-bg), transparent); }
+    &::after  { right: 0; background: linear-gradient(to left,  var(--bs-body-bg), transparent); }
+  }
+}
+
+.infinite-scroll-track {
+  display: flex;
+  width: fit-content;
+  animation: infinite-scroll var(--infinite-scroll-duration, 30s) linear infinite;
+
+  &:hover { animation-play-state: paused; }
+
+  &.gap-sm { gap: 1rem; }
+  &.gap-md { gap: 1.5rem; }
+  &.gap-lg { gap: 2rem; }
+}
+
+.infinite-scroll-item { flex-shrink: 0; }
+
+@keyframes infinite-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(var(--infinite-scroll-distance, -50%)); }
+}
+
+// Logo items
+.infinite-scroll-item--logo {
+  padding: 0 3rem;
+  display: flex;
+  align-items: center;
+  height: 60px;
+
+  img, svg {
+    height: 40px;
+    width: auto;
+    max-width: 150px;
+    transition: $nb-transition;
+  }
+}
+
+// Card items (testimonials) — square, ink frame + hard offset shadow
+.infinite-scroll-item--card {
+  width: 320px;
+  padding: 0.5rem 0.5rem 0.5rem 0; // give the offset shadow room so it isn't clipped
+
+  .card {
+    height: 100%;
+    border-radius: 0;
+    @include nb-border();
+    @include nb-shadow(md);
+
+    &:hover {
+      @include nb-shadow(lg);
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .infinite-scroll-wrapper.infinite-scroll-fade-edges {
+    &::before,
+    &::after { width: 50px; }
+  }
+
+  .infinite-scroll-item--logo {
+    padding: 0 2rem;
+    height: 50px;
+    img, svg { height: 30px; }
+  }
+
+  .infinite-scroll-item--card { width: 280px; }
+}

@@ -1,0 +1,31 @@
+/**
+ * Feedback Page Styles
+ */
+
+// Rating buttons
+.feedback-rating-btn {
+  cursor: pointer;
+  padding: 1.25rem 0.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  &.active {
+    border-color: var(--bs-primary) !important;
+    border-width: 2px !important;
+    box-shadow: 0 4px 16px rgba(var(--bs-primary-rgb), 0.25);
+    transform: translateY(-4px);
+  }
+}
+
+.feedback-rating-img {
+  transition: transform 0.2s ease;
+
+  .feedback-rating-btn:hover &,
+  .feedback-rating-btn.active & {
+    transform: scale(1.15);
+  }
+}

@@ -1,0 +1,92 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### THEME CONFIG ###
+theme:
+  nav:
+    enabled: false
+  footer:
+    enabled: false
+
+### REGULAR PAGES ###
+meta:
+  title: "Animation Studio"
+  index: false
+sitemap:
+  include: false
+
+### WEB MANAGER CONFIG ###
+web_manager:
+  auth:
+    config:
+      policy: "authenticated"
+  cookieConsent:
+    enabled: false
+  chatsy:
+    enabled: false
+  exitPopup:
+    enabled: false
+---
+
+<div id="studio" hidden>
+  <!-- Clip selector sidebar -->
+  <nav id="studio-nav">
+    <div class="studio-brand">{{ site.brand.name }} Studio</div>
+    <div class="studio-clips" id="studio-clips">
+      <!-- Populated by JS from registered clips -->
+    </div>
+    <form id="studio-controls-form" class="studio-controls" data-form-state="initializing" onsubmit="return false">
+      <fieldset id="studio-fieldset">
+        <!-- Aspect ratio toggle -->
+        <label class="studio-label">
+          Aspect Ratio
+          <div class="d-flex gap-1">
+            <button type="button" class="studio-aspect-btn active" data-aspect="16:9">16:9</button>
+            <button type="button" class="studio-aspect-btn" data-aspect="9:16">9:16</button>
+          </div>
+        </label>
+        <label class="studio-label">
+          Resolution
+          <select name="resolution" id="studio-resolution">
+            <option value="960x540">540p (960×540)</option>
+            <option value="1280x720">720p (1280×720)</option>
+            <option value="1920x1080" selected>1080p (1920×1080)</option>
+            <option value="3840x2160">4K (3840×2160)</option>
+          </select>
+        </label>
+        <label class="studio-label">
+          Pause (ms)
+          <input type="range" name="pause" id="studio-pause" min="500" max="4000" value="1500" step="100">
+          <span id="studio-pause-val">1500</span>
+        </label>
+        <label class="studio-label">
+          Speed
+          <select name="speed" id="studio-speed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label class="studio-label">
+          Appearance
+          <div class="d-flex gap-1">
+            <button type="button" class="studio-toggle-btn" data-appearance-set="light">Light</button>
+            <button type="button" class="studio-toggle-btn" data-appearance-set="dark">Dark</button>
+            <button type="button" class="studio-toggle-btn" data-appearance-set="system">System</button>
+          </div>
+        </label>
+        <button type="button" id="studio-toggle" class="studio-play-btn">⏸ Pause</button>
+        <button type="button" id="studio-record" class="studio-record-btn">⏺ Record</button>
+      </fieldset>
+    </form>
+  </nav>
+
+  <!-- Animation stage -->
+  <main id="studio-stage">
+    <div id="studio-canvas" data-aspect="16:9">
+      <!-- Animation content injected by JS -->
+    </div>
+  </main>
+</div>

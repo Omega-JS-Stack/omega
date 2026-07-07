@@ -1,0 +1,353 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+#### THEME CONFIG ####
+theme:
+  main:
+    class: "pt-0"
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  tagline: "Compare & choose"
+  headline: "{{ site.brand.name }} vs the"
+  headline_accent: "competition"
+  description: "Not sure if {{ site.brand.name }} is right for you? Compare us head-to-head with the most popular alternatives and see why thousands are making the switch."
+  primary_button:
+    text: "Get started free"
+    icon: "rocket"
+    href: "/pricing"
+    class: "btn-light"
+  secondary_button:
+    text: "See pricing"
+    icon: "tags"
+    href: "/pricing"
+    class: "btn-outline-light"
+
+# Alternatives Section
+alternatives:
+  superheadline:
+    icon: "scale-balanced"
+    text: "Comparisons"
+  headline: "Explore"
+  headline_accent: "alternatives"
+  subheadline: "In-depth comparisons to help you make the right choice"
+  empty_message: "No alternatives available yet"
+  view_comparison: "View full comparison"
+
+# Value Props Section
+value_props:
+  superheadline:
+    icon: "trophy"
+    text: "Why us"
+  headline: "Why people choose"
+  headline_accent: "{{ site.brand.name }}"
+  subheadline: "Here's what sets us apart from the rest"
+  items:
+    - title: "Lightning fast"
+      description: "Built on modern infrastructure for blazing performance. No more waiting around."
+      icon: "bolt"
+    - title: "AI-powered"
+      description: "Smart automation built into every workflow to save you hours every week."
+      icon: "sparkles"
+    - title: "24/7 support"
+      description: "Real humans ready to help whenever you need it. Average response time under 5 minutes."
+      icon: "headset"
+
+# Stats Section
+stats:
+  - number: "50,000+"
+    label: "Active users"
+    sublabel: "From 120+ countries"
+    icon: "users"
+    color: "primary"
+  - number: "4.9"
+    label: "Average rating"
+    icon: "star"
+    color: "warning"
+    show_stars: true
+  - number: "99.99%"
+    label: "Uptime"
+    sublabel: "Enterprise-grade"
+    icon: "shield-check"
+    color: "success"
+  - number: "24/7"
+    label: "Support"
+    sublabel: "Real humans"
+    icon: "headset"
+    color: "info"
+
+# CTA Section
+cta:
+  superheadline:
+    icon: "rocket"
+    text: "Get started"
+  headline: "Ready to make the"
+  headline_accent: "switch?"
+  description: "Join thousands of happy users who chose {{ site.brand.name }}. Start your free trial today — no credit card required."
+  primary_button:
+    text: "Start free trial"
+    icon: "rocket"
+    href: "/pricing"
+  secondary_button:
+    text: "Talk to sales"
+    icon: "comments"
+    href: "/contact"
+---
+
+<!-- Hero Section -->
+<section class="bg-gradient-rainbow gradient-animated gradient-grain text-light overflow-hidden position-relative min-vh-60 d-flex align-items-center rounded-bottom-4 shadow-lg">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-10 text-center py-5">
+        <div data-lazy="@class animation-slide-up">
+          {% iftruthy resolved.hero.tagline %}
+            <p class="text-uppercase fw-semibold mb-3 opacity-80">{{ resolved.hero.tagline }}</p>
+          {% endiftruthy %}
+
+          <h1 class="display-3 fw-900 mb-4">
+            {{ resolved.hero.headline }} <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+          </h1>
+
+          {% iftruthy resolved.hero.description %}
+            <p class="fs-4 mb-4 opacity-80">{{ resolved.hero.description }}</p>
+          {% endiftruthy %}
+
+          {% assign primary_btn_class = resolved.hero.primary_button.class | default: "btn-light" %}
+          {% assign secondary_btn_class = resolved.hero.secondary_button.class | default: "btn-outline-light" %}
+          <div class="d-flex flex-row flex-wrap gap-3 justify-content-center">
+            {% iftruthy resolved.hero.primary_button.text %}
+              <a href="{{ resolved.hero.primary_button.href }}" class="btn {{ primary_btn_class }} btn-lg py-3 px-5">
+                {% iftruthy resolved.hero.primary_button.icon %}
+                  {% uj_icon resolved.hero.primary_button.icon, "me-2" %}
+                {% endiftruthy %}
+                {{ resolved.hero.primary_button.text }}
+              </a>
+            {% endiftruthy %}
+            {% iftruthy resolved.hero.secondary_button.text %}
+              <a href="{{ resolved.hero.secondary_button.href }}" class="btn {{ secondary_btn_class }} btn-lg py-3 px-5">
+                {% iftruthy resolved.hero.secondary_button.icon %}
+                  {% uj_icon resolved.hero.secondary_button.icon, "me-2" %}
+                {% endiftruthy %}
+                {{ resolved.hero.secondary_button.text }}
+              </a>
+            {% endiftruthy %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Alternatives List Section -->
+<section>
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.alternatives.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.alternatives.superheadline.icon %}
+            {% uj_icon resolved.alternatives.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.alternatives.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.alternatives.headline }}
+        {% iftruthy resolved.alternatives.headline_accent %}
+          <span class="text-accent">{{ resolved.alternatives.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.alternatives.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.alternatives.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+
+    {% if site.alternatives %}
+      {% assign alternatives = site.alternatives | sort: 'alternative.competitor.name' %}
+    {% else %}
+      {% assign alternatives = nil %}
+    {% endif %}
+
+    {% if alternatives and alternatives.size > 0 %}
+      <div class="row g-4 justify-content-center">
+        {% for item in alternatives %}
+          {% if item.draft and jekyll.environment == 'production' %}
+            {% continue %}
+          {% endif %}
+          <div class="col-md-6 col-lg-4" data-lazy="@class animation-slide-up">
+            <div class="card border-0 bg-body-tertiary h-100 hover-flex rounded-4 overflow-hidden">
+              <div class="card-body p-0 d-flex flex-column">
+                <!-- Gradient header strip -->
+                <div class="bg-gradient-rainbow gradient-animated p-4 text-light">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px">
+                      {% uj_icon "scale-balanced", "text-white fs-5" %}
+                    </div>
+                    <h3 class="h5 fw-bold mb-0">
+                      {{ site.brand.name }} vs {{ item.alternative.competitor.name }}
+                    </h3>
+                  </div>
+                </div>
+
+                <div class="p-4 d-flex flex-column flex-grow-1">
+                  {% iftruthy item.alternative.competitor.description %}
+                    <p class="text-muted mb-4 flex-grow-1">{{ item.alternative.competitor.description }}</p>
+                  {% endiftruthy %}
+
+                  <a href="{{ item.url }}" class="btn btn-primary w-100 stretched-link">
+                    {{ resolved.alternatives.view_comparison }}
+                    {% uj_icon "arrow-right", "ms-2" %}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card border-0 bg-body-tertiary rounded-4" data-lazy="@class animation-slide-up">
+        <div class="card-body p-5 text-center text-muted">
+          {% uj_icon "box-open", "display-4 mb-3 opacity-50" %}
+          <p class="fs-5 mb-0">{{ resolved.alternatives.empty_message }}</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Value Props Section -->
+{% assign value_props_size = resolved.value_props.items | size %}
+{% if value_props_size > 0 %}
+  <section class="bg-body-secondary rounded-4">
+    <div class="container">
+      <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+        {% iftruthy resolved.value_props.superheadline.text %}
+          <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+            {% iftruthy resolved.value_props.superheadline.icon %}
+              {% uj_icon resolved.value_props.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ resolved.value_props.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+        <h2 class="h2 mb-2">
+          {{ resolved.value_props.headline }}
+          {% iftruthy resolved.value_props.headline_accent %}
+            <span class="text-accent">{{ resolved.value_props.headline_accent }}</span>
+          {% endiftruthy %}
+        </h2>
+        {% iftruthy resolved.value_props.subheadline %}
+          <p class="fs-5 text-muted">{{ resolved.value_props.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+
+      <div class="row g-4">
+        {% for prop in resolved.value_props.items %}
+          <div class="col-lg-4 col-md-6" data-lazy="@class animation-slide-up">
+            <div class="card bg-body border-0 h-100 rounded-4 shadow-sm">
+              <div class="card-body p-4 text-center">
+                <div class="mb-4">
+                  {% uj_icon prop.icon, "display-4 text-primary" %}
+                </div>
+                <h3 class="h4 fw-bold mb-3">{{ prop.title }}</h3>
+                <p class="text-muted mb-0">{{ prop.description }}</p>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- Stats Section -->
+{% assign stats_size = resolved.stats | size %}
+{% if stats_size > 0 %}
+  <section>
+    <div class="container">
+      <div class="row text-center g-4">
+        {% for stat in resolved.stats %}
+          <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
+            <div class="mb-3">
+              {% uj_icon stat.icon, "text-{{ stat.color }} display-4" %}
+            </div>
+            <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
+            {% iftruthy stat.show_stars %}
+              <div class="mb-0">
+                {% for i in (1..5) %}
+                  {% uj_icon "star", "text-{{ stat.color }}" %}
+                {% endfor %}
+              </div>
+            {% endiftruthy %}
+            <p class="text-muted mb-0">{{ stat.label }}</p>
+            {% iftruthy stat.sublabel %}
+              <p class="small text-muted">{{ stat.sublabel }}</p>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- CTA Section -->
+{% iftruthy resolved.cta.headline %}
+  <section>
+    <div class="container">
+      <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+        <!-- Decorative icon - top right -->
+        <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
+          {% uj_icon "rocket", "text-white" %}
+        </div>
+
+        <!-- Decorative icon - bottom left -->
+        <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
+          {% uj_icon "sparkles", "text-white" %}
+        </div>
+
+        <div class="position-relative">
+          {% iftruthy resolved.cta.superheadline.text %}
+            <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
+              {% iftruthy resolved.cta.superheadline.icon %}
+                {% uj_icon resolved.cta.superheadline.icon, "me-1" %}
+              {% endiftruthy %}
+              {{ resolved.cta.superheadline.text }}
+            </span>
+          {% endiftruthy %}
+
+          <h2 class="h3 fw-bold mb-3">
+            {{ resolved.cta.headline }}
+            {% iftruthy resolved.cta.headline_accent %}
+              <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
+            {% endiftruthy %}
+          </h2>
+
+          {% iftruthy resolved.cta.description %}
+            <p class="lead mb-4">{{ resolved.cta.description }}</p>
+          {% endiftruthy %}
+
+          <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+            {% iftruthy resolved.cta.primary_button.text %}
+              <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-light btn-lg px-4">
+                {% iftruthy resolved.cta.primary_button.icon %}
+                  {% uj_icon resolved.cta.primary_button.icon, "me-2" %}
+                {% endiftruthy %}
+                {{ resolved.cta.primary_button.text }}
+              </a>
+            {% endiftruthy %}
+            {% iftruthy resolved.cta.secondary_button.text %}
+              <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-light btn-lg px-4">
+                {% iftruthy resolved.cta.secondary_button.icon %}
+                  {% uj_icon resolved.cta.secondary_button.icon, "me-2" %}
+                {% endiftruthy %}
+                {{ resolved.cta.secondary_button.text }}
+              </a>
+            {% endiftruthy %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endiftruthy %}
+
+{{ content | uj_content_format }}

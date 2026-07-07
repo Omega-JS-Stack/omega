@@ -1,0 +1,9 @@
+// Admin Users Index
+#users-tbody td {
+  vertical-align: middle;
+}
+
+// Prevent action dropdown from being clipped by table-responsive overflow
+.table-responsive:has(#users-table) {
+  overflow: visible;
+}

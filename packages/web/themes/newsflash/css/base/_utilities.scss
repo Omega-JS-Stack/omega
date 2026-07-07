@@ -1,0 +1,58 @@
+// Newsflash Theme — Base
+// Body surface, the film-grain overlay, selection color, and editorial
+// treatments of utility classes the shared (Classy-derived) layouts emit.
+// No theme-prefixed classes in markup: the look comes from restyling
+// STANDARD classes so markup stays swappable across themes.
+
+// Body surface
+body {
+  background-color: var(--nf-paper);
+  color: var(--bs-body-color);
+}
+
+// ============================================
+// Film grain — the analog print texture over everything
+// ============================================
+// Fixed SVG-noise overlay; pointer-events none so it never intercepts input.
+// Multiply on paper, screen on dark paper (multiply would just vanish).
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  opacity: var(--nf-grain-opacity);
+  mix-blend-mode: multiply;
+}
+
+[data-bs-theme="dark"] body::after {
+  mix-blend-mode: screen;
+}
+
+// Volt selection — the highlighter
+::selection {
+  background: var(--nf-volt);
+  color: var(--nf-volt-ink);
+}
+
+// ============================================
+// Accent text (headline_accent spans) — italic serif vermilion
+// ============================================
+.text-accent {
+  font-family: $nf-font-display;
+  font-style: italic;
+  color: var(--bs-primary);
+}
+
+// ============================================
+// Highlighter swipe — volt half-height marker behind inline text
+// ============================================
+mark,
+.highlight {
+  background: linear-gradient(transparent 55%, var(--nf-volt) 55%);
+  color: inherit;
+  padding: 0 0.12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}

@@ -1,0 +1,135 @@
+---
+### ALL PAGES ###
+layout: frontend/core/cover
+
+### PAGE CONFIG ###
+benefits:
+  - title: "Free forever"
+    description: "Start with our free plan and upgrade when you're ready"
+    icon: "gift"
+  - title: "No setup fees"
+    description: "Get started instantly with no hidden costs or setup fees"
+    icon: "credit-card"
+  - title: "24/7 Support"
+    description: "Our support team is always here to help you succeed"
+    icon: "headset"
+
+social_signup:
+  - id: "google.com"
+    name: "Google"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/google.svg"
+---
+
+<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
+  <div class="card border-0 shadow-lg">
+    <div class="card-body p-3 p-md-5">
+      <!-- Logo -->
+      <div class="text-center mb-3">
+        <div class="avatar avatar-xl">
+          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <div class="text-center mb-4">
+        <h1 class="h3 mb-2">Create your account</h1>
+        <p class="text-muted">Get started with {{ site.brand.name }} in seconds</p>
+      </div>
+
+      <!-- Spinner -->
+      {% capture initializing_spinner %}<span class="spinner-border spinner-border-sm me-2 form-initializing-spinner"></span>{% endcapture %}
+
+      <!-- Sign up Form -->
+      <form id="auth-form" autocomplete="on" novalidate data-form-state="initializing" onsubmit="return false">
+        <!-- Hidden default submit button for Enter key -->
+        <button type="submit" class="d-none" data-provider="email" aria-hidden="true" tabindex="-1"></button>
+
+        <!-- Social Signup (Optional) -->
+        <div class="mb-4">
+          {% for provider in resolved.social_signup %}
+            <button type="submit" class="btn btn-adaptive _btn-lg w-100 mb-3 d-flex align-items-center justify-content-center" data-provider="{{ provider.id }}">
+              {{ initializing_spinner }}
+              <span class="avatar avatar-xs me-2">
+                <img src="{{ provider.logo | uj_cachebreak }}" class="object-fit-contain" alt="{{ provider.name }} Logo"/>
+              </span>
+              <span class="button-text">Sign up with {{ provider.name }}</span>
+            </button>
+          {% endfor %}
+        </div>
+
+        <!-- Divider -->
+        <div class="position-relative mb-4">
+          <hr class="text-muted">
+          <span class="position-absolute top-50 start-50 translate-middle px-3 text-muted small bg-body-secondary">OR</span>
+        </div>
+        <!-- <div class="row g-3 mb-3 text-start">
+          <div class="col-md-6">
+            <label for="firstName" class="form-label fw-semibold">First name</label>
+            <input type="text" class="form-control form-control-md" id="firstName" name="firstName" placeholder="John" autocomplete="given-name" required>
+          </div>
+          <div class="col-md-6">
+            <label for="lastName" class="form-label fw-semibold">Last name</label>
+            <input type="text" class="form-control form-control-md" id="lastName" name="lastName" placeholder="Doe" autocomplete="family-name" required>
+          </div>
+        </div> -->
+
+        <div class="mb-3 text-start">
+          <label for="email" class="form-label fw-semibold">
+            Email <span class="text-danger">*</span>
+          </label>
+          <input type="email" class="form-control form-control-md" id="email" name="email" placeholder="Enter your email" autocomplete="email" autofocus>
+        </div>
+
+        <div class="mb-3 text-start">
+          <label for="password" class="form-label fw-semibold">
+            Password <span class="text-danger">*</span>
+          </label>
+          <div class="input-group">
+            <input type="password" class="form-control form-control-md" id="password" name="password" placeholder="Create a strong password" autocomplete="new-password">
+            <button class="btn border uj-password-toggle px-3" type="button" aria-label="Toggle password visibility">
+              <span class="uj-password-show">{% uj_icon "eye", "fa-fw" %}</span>
+              <span class="uj-password-hide d-none">{% uj_icon "eye-slash", "fa-fw" %}</span>
+            </button>
+          </div>
+          <!-- <div class="form-text">Must be at least 8 characters with letters and numbers</div> -->
+        </div>
+
+        {% comment %} TODO: in regions that allow pre-checked consent (e.g. US), default both to checked. {% endcomment %}
+        <div id="consent-group" class="mb-3 text-start p-2 rounded" style="border: 1px solid transparent;">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="consent-legal" name="consentLegal">
+            <label class="form-check-label small" for="consent-legal">
+              I agree to {{ site.brand.name }}'s
+              <a href="/terms" class="text-decoration-none" target="_blank">Terms of Service</a>
+              and
+              <a href="/privacy" class="text-decoration-none" target="_blank">Privacy Policy</a>.
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="consent-marketing" name="consentMarketing">
+            <label class="form-check-label small" for="consent-marketing">
+              I agree to receive product updates, newsletters, and other marketing communications from {{ site.brand.name }}. You can unsubscribe anytime.
+            </label>
+          </div>
+          <div id="consent-error" class="small mt-2 d-none" style="color: var(--bs-form-invalid-color, var(--bs-danger, #dc3545));"></div>
+        </div>
+
+        <button type="submit" class="btn btn-success _btn-lg w-100 mb-3" data-provider="email">
+          {{ initializing_spinner }}
+          {% uj_icon "user-plus", "me-2" %}
+          <span class="button-text">Create account</span>
+        </button>
+      </form>
+
+      <!-- Sign in Link -->
+      <div class="text-center">
+        <p class="text-muted mb-0">
+          Already have an account?
+          <a href="/signin" class="text-decoration-none fw-semibold">Sign in</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

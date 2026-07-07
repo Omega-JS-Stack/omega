@@ -1,0 +1,84 @@
+{% comment %}
+  Testimonial Scroll Component
+  A scrolling masonry-style testimonial display inspired by modern SaaS landing pages.
+  Uses the generic infinite-scroll component for animation.
+
+  Usage:
+    {% include frontend/components/testimonial-scroll.html
+       testimonials=resolved.testimonials %}
+
+  Required data structure:
+    testimonials:
+      superheadline:
+        icon: "megaphone"
+        text: "Testimonials"
+      headline: "What people are saying"
+      headline_accent: "about us"
+      subheadline: "Hear from real customers"
+      items:
+        - quote: "..."
+          author: "Name"
+          role: "Title"
+          company: "Company"
+          initial: "N"
+          handle: "@username" (optional)
+{% endcomment %}
+
+<!-- Testimonials Section -->
+<section class="testimonial-scroll-section overflow-hidden">
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy include.testimonials.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy include.testimonials.superheadline.icon %}
+            {% uj_icon include.testimonials.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ include.testimonials.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ include.testimonials.headline }}
+        {% iftruthy include.testimonials.headline_accent %}
+          <span class="text-accent">{{ include.testimonials.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy include.testimonials.subheadline %}
+        <p class="fs-5 text-muted">{{ include.testimonials.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+  </div>
+
+  {% if include.testimonials.items %}
+    <div class="infinite-scroll-wrapper infinite-scroll-fade-edges" data-lazy="@class animation-fade-in">
+      <div class="infinite-scroll-track gap-md" data-scroll-speed="30">
+        {% for testimonial in include.testimonials.items %}
+          <div class="infinite-scroll-item infinite-scroll-item--card">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body p-4">
+                <!-- Header with avatar and info -->
+                <div class="d-flex align-items-center mb-3">
+                  <div class="avatar avatar-md rounded-circle bg-primary text-light d-flex align-items-center justify-content-center flex-shrink-0">
+                    <span class="fw-bold">{{ testimonial.initial }}</span>
+                  </div>
+                  <div class="ms-3">
+                    <div class="fw-semibold text-body">{{ testimonial.author }}</div>
+                    <div class="small text-muted">
+                      {% iftruthy testimonial.handle %}
+                        {{ testimonial.handle }}
+                      {% endiftruthy %}
+                      {% iffalsy testimonial.handle %}
+                        {{ testimonial.role }}{% iftruthy testimonial.company %} at {{ testimonial.company }}{% endiftruthy %}
+                      {% endiffalsy %}
+                    </div>
+                  </div>
+                </div>
+                <!-- Quote -->
+                <p class="mb-0 text-body">{{ testimonial.quote }}</p>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</section>

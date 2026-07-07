@@ -75,7 +75,8 @@ function dateToRfc822(input) {
  * @returns {string}
  */
 function jsonify(input) {
-  return JSON.stringify(input);
+  // Jekyll parity: nil.to_json == "null" (an absent value must still emit valid JS)
+  return JSON.stringify(input === undefined ? null : input);
 }
 
 /**

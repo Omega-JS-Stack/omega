@@ -1,0 +1,59 @@
+{% comment %}
+  Shared plan-pricing resolution — the SSOT for the pricing math every theme's
+  pricing layout uses. Jekyll includes share the caller's variable scope, so
+  the assigns below land in the calling template.
+
+  In:  include.plan — a resolved.pricing.plans item
+
+  Out: _config_product        — matching site.web_manager.payment.products entry (or nil)
+       _plan_monthly          — monthly price (frontmatter pricing → config prices → 0)
+       _plan_annually         — annual price (frontmatter pricing → config prices → 0)
+       _ppu_value             — per-unit feature value (nil unless price_per_unit enabled and plan is paid)
+       monthly_price_per_unit — $/unit at monthly billing (nil unless _ppu_value > 0)
+       annual_price_per_unit  — $/unit at annual billing, monthly-equivalent (nil unless _ppu_value > 0)
+
+  Every output is (re)assigned on every call so loop iterations never see a
+  previous plan's values.
+{% endcomment %}
+
+{% assign _config_product = nil %}
+{% for p in site.web_manager.payment.products %}
+  {% if p.id == include.plan.id %}{% assign _config_product = p %}{% break %}{% endif %}
+{% endfor %}
+
+{% comment %} Prices: frontmatter pricing takes precedence, then config, then 0 {% endcomment %}
+{% if include.plan.pricing.monthly or include.plan.pricing.monthly == 0 %}
+  {% assign _plan_monthly = include.plan.pricing.monthly %}
+{% elsif _config_product.prices.monthly or _config_product.prices.monthly == 0 %}
+  {% assign _plan_monthly = _config_product.prices.monthly %}
+{% else %}
+  {% assign _plan_monthly = 0 %}
+{% endif %}
+
+{% if include.plan.pricing.annually or include.plan.pricing.annually == 0 %}
+  {% assign _plan_annually = include.plan.pricing.annually %}
+{% elsif _config_product.prices.annually or _config_product.prices.annually == 0 %}
+  {% assign _plan_annually = _config_product.prices.annually %}
+{% else %}
+  {% assign _plan_annually = 0 %}
+{% endif %}
+
+{% comment %} Per-unit value: frontmatter feature value, falling back to config product limits. Per-unit prices only compute when the value is a usable positive number (guards the divided_by) {% endcomment %}
+{% assign _ppu_value = nil %}
+{% assign monthly_price_per_unit = nil %}
+{% assign annual_price_per_unit = nil %}
+{% if resolved.pricing.price_per_unit.enabled and _plan_monthly > 0 %}
+  {% for feature in include.plan.features %}
+    {% if feature.id == resolved.pricing.price_per_unit.feature_id %}
+      {% assign _ppu_value = feature.value %}
+      {% if _config_product and _ppu_value == nil %}
+        {% for _lim in _config_product.limits %}{% if _lim[0] == feature.id %}{% assign _ppu_value = _lim[1] %}{% break %}{% endif %}{% endfor %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  {% if _ppu_value and _ppu_value > 0 %}
+    {% assign monthly_price_per_unit = _plan_monthly | times: 1.0 | divided_by: _ppu_value | round: 2 %}
+    {% assign annual_monthly_price = _plan_annually | divided_by: 12.0 %}
+    {% assign annual_price_per_unit = annual_monthly_price | divided_by: _ppu_value | round: 2 %}
+  {% endif %}
+{% endif %}

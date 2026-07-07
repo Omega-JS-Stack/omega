@@ -17,7 +17,7 @@ const byDateThenSlug = (a, b) => (b.date - a.date) || a.page.fileSlug.localeComp
  * @param {Map<string, object[]>} collectionsHolder - template-kit's collection view
  */
 function registerCollections(eleventyConfig, collectionsHolder) {
-  const toDoc = (item) => ({ id: item.inputPath, url: item.url, data: item.data });
+  const toDoc = (item) => ({ id: item.inputPath, url: item.url, date: item.date, data: item.data });
 
   eleventyConfig.addCollection('posts', (api) => {
     const posts = api.getFilteredByTag('posts').sort(byDateThenSlug);
@@ -34,6 +34,12 @@ function registerCollections(eleventyConfig, collectionsHolder) {
   eleventyConfig.addCollection('team', (api) => {
     const docs = api.getFilteredByTag('team').sort((a, b) => a.url.localeCompare(b.url));
     collectionsHolder.set('team', docs.map(toDoc));
+    return docs;
+  });
+
+  eleventyConfig.addCollection('updates', (api) => {
+    const docs = api.getFilteredByTag('updates').sort((a, b) => b.url.localeCompare(a.url));
+    collectionsHolder.set('updates', docs.map(toDoc));
     return docs;
   });
 

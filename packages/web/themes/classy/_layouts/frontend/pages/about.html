@@ -1,0 +1,338 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "About"
+  headline_accent: "us"
+  description: "Learn about the people, mission, and values driving {{ site.brand.name }} forward"
+
+# Mission & Vision
+mission:
+  title: "Our mission"
+  description: "To empower individuals and businesses with innovative technology solutions that simplify complex challenges and unlock new possibilities for growth and success."
+  icon: "bullseye"
+
+vision:
+  title: "Our vision"
+  description: "To become the world's most trusted platform for business transformation, where innovation meets simplicity and everyone can achieve their full potential."
+  icon: "lightbulb"
+
+# Story Timeline Section
+story:
+  superheadline:
+    icon: "clock-rotate-left"
+    text: "History"
+  headline: "Follow our"
+  headline_accent: "journey"
+  subheadline: "From humble beginnings to industry leaders"
+  items:
+  - year: "2017"
+    title: "The beginning"
+    description: "{{ site.brand.name }} was founded with a vision to revolutionize the industry"
+  - year: "2018"
+    title: "Rapid growth"
+    description: "Expanded our team and launched our flagship platform to thousands of users"
+  - year: "2020"
+    title: "Global expansion"
+    description: "Reached customers in over 100 countries and opened international offices"
+  - year: "2023"
+    title: "Innovation award"
+    description: "Recognized as industry leader and received multiple awards for innovation"
+  - year: "{{ site.uj.date.year }}"
+    title: "The future"
+    description: "Continuing to push boundaries and build the future of business technology"
+
+# Company Stats
+stats:
+  superheadline:
+    icon: "chart-line"
+    text: "Numbers"
+  headline: "Measuring our"
+  headline_accent: "impact"
+  subheadline: "The milestones that define our growth"
+  items:
+  - number: "2017"
+    label: "Founded"
+    icon: "calendar"
+  - number: "50+"
+    label: "Team members"
+    icon: "users"
+  - number: "1M+"
+    label: "Happy customers"
+    icon: "smile"
+  - number: "120+"
+    label: "Countries"
+    icon: "globe"
+
+# Company Values Section
+values:
+  superheadline:
+    icon: "compass"
+    text: "Principles"
+  headline: "Our core"
+  headline_accent: "values"
+  subheadline: "The principles that guide everything we do"
+  items:
+  - title: "Innovation first"
+    description: "We push boundaries and challenge the status quo to create breakthrough solutions that transform how businesses operate"
+    icon: "rocket"
+  - title: "Customer obsessed"
+    description: "Everything we do is focused on delivering exceptional value to our customers. Their success is our success"
+    icon: "heart"
+  - title: "Team excellence"
+    description: "We hire the best talent and create an environment where everyone can thrive, learn, and make an impact"
+    icon: "users"
+  - title: "Transparent culture"
+    description: "We believe in open communication, honest feedback, and shared decision-making at every level"
+    icon: "magnifying-glass"
+
+# Team CTA Section
+team_cta:
+  superheadline:
+    icon: "handshake"
+    text: "People"
+  headline: "Meet our amazing"
+  headline_accent: "team"
+  subheadline: "Get to know the passionate individuals behind {{ site.brand.name }} who work every day to make your experience exceptional"
+  button:
+    text: "Meet the team"
+    icon: "arrow-right"
+    href: "/team"
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+
+        <p class="fs-5 text-muted mb-0">
+          {{ resolved.hero.description }}
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Story Section -->
+<section class="pt-0">
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.story.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.story.superheadline.icon %}
+            {% uj_icon resolved.story.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.story.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.story.headline }} <span class="text-accent">{{ resolved.story.headline_accent }}</span>
+      </h2>
+      {% iftruthy resolved.story.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.story.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="position-relative">
+          {% for item in resolved.story.items %}
+            <div class="row mb-5" data-lazy="@class animation-slide-up">
+              {% assign is_odd = forloop.index | modulo: 2 %}
+              {% if is_odd == 1 %}
+                <div class="col-md-5 text-md-end mb-3 mb-md-0">
+                  <div class="rounded-3 p-4 shadow-sm h-100">
+                    <div class="bg-primary text-light avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                      <span class="fw-bold fs-4">{{ item.year }}</span>
+                    </div>
+                    <h4 class="mb-2">{{ item.title }}</h4>
+                    <p class="text-muted mb-0">{{ item.description }}</p>
+                  </div>
+                </div>
+                <div class="col-md-2 d-none d-md-flex justify-content-center">
+                  <div class="border-start border-primary border-3 h-100"></div>
+                </div>
+                <div class="col-md-5"></div>
+              {% else %}
+                <div class="col-md-5"></div>
+                <div class="col-md-2 d-none d-md-flex justify-content-center">
+                  <div class="border-start border-primary border-3 h-100"></div>
+                </div>
+                <div class="col-md-5 mb-3 mb-md-0">
+                  <div class="rounded-3 p-4 shadow-sm h-100">
+                    <div class="bg-primary text-light avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                      <span class="fw-bold fs-4">{{ item.year }}</span>
+                    </div>
+                    <h4 class="mb-2">{{ item.title }}</h4>
+                    <p class="text-muted mb-0">{{ item.description }}</p>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Mission & Vision Section -->
+<section>
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-lg-6" data-lazy="@class animation-slide-up">
+        <div class="card h-100 border-0 shadow-sm bg-primary bg-gradient text-light rounded-4">
+          <div class="card-body p-5 text-center">
+            <div class="bg-white text-primary avatar avatar-2xl rounded-circle d-inline-flex align-items-center justify-content-center mb-4">
+              {% uj_icon resolved.mission.icon, "fs-1" %}
+            </div>
+            <h3 class="h3 mb-4">{{ resolved.mission.title }}</h3>
+            <p class="fs-5 mb-0 opacity-90">{{ resolved.mission.description }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6" data-lazy="@class animation-slide-up">
+        <div class="card h-100 border-0 shadow-sm bg-warning bg-gradient text-light rounded-4">
+          <div class="card-body p-5 text-center">
+            <div class="bg-white text-warning avatar avatar-2xl rounded-circle d-inline-flex align-items-center justify-content-center mb-4">
+              {% uj_icon resolved.vision.icon, "fs-1" %}
+            </div>
+            <h3 class="h3 mb-4">{{ resolved.vision.title }}</h3>
+            <p class="fs-5 mb-0 opacity-90">{{ resolved.vision.description }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats Section -->
+<section>
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.stats.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.stats.superheadline.icon %}
+            {% uj_icon resolved.stats.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.stats.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.stats.headline }}
+        {% iftruthy resolved.stats.headline_accent %}
+          <span class="text-accent">{{ resolved.stats.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.stats.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.stats.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+
+    <div class="row text-center g-4">
+      {% for stat in resolved.stats.items %}
+        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
+          <div class="mb-3">
+            {% uj_icon stat.icon, "text-primary display-4" %}
+          </div>
+          <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
+          <p class="text-muted mb-0">{{ stat.label }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Values Section -->
+<section>
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.values.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.values.superheadline.icon %}
+            {% uj_icon resolved.values.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.values.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.values.headline }} <span class="text-accent">{{ resolved.values.headline_accent }}</span>
+      </h2>
+      {% iftruthy resolved.values.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.values.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+
+    <div class="row g-4">
+      {% for value in resolved.values.items %}
+        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
+          <div class="card h-100 border-0 shadow-sm text-center rounded-3">
+            <div class="card-body p-4">
+              <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                {% uj_icon value.icon, "text-light fs-2" %}
+              </div>
+              <h4 class="mb-3">{{ value.title }}</h4>
+              <p class="text-muted mb-0">{{ value.description }}</p>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Team CTA Section -->
+<section>
+  <div class="container">
+    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+      <!-- Decorative icon - top right -->
+      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
+        {% uj_icon "users", "text-white" %}
+      </div>
+
+      <!-- Decorative icon - bottom left -->
+      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
+        {% uj_icon "heart", "text-white" %}
+      </div>
+
+      <div class="position-relative">
+        {% iftruthy resolved.team_cta.superheadline.text %}
+          <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
+            {% iftruthy resolved.team_cta.superheadline.icon %}
+              {% uj_icon resolved.team_cta.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ resolved.team_cta.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+
+        <h2 class="h3 fw-bold mb-3">
+          {{ resolved.team_cta.headline }}
+          {% iftruthy resolved.team_cta.headline_accent %}
+            {{ resolved.team_cta.headline_accent }}
+          {% endiftruthy %}
+        </h2>
+
+        {% iftruthy resolved.team_cta.subheadline %}
+          <p class="lead mb-4">{{ resolved.team_cta.subheadline }}</p>
+        {% endiftruthy %}
+
+        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+          <a href="{{ resolved.team_cta.button.href }}" class="btn btn-light btn-lg px-4">
+            {% uj_icon resolved.team_cta.button.icon, "me-2" %}
+            {{ resolved.team_cta.button.text }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

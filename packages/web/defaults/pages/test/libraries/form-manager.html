@@ -1,0 +1,378 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+permalink: /test/libraries/form-manager
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  title: "FormManager Test Page"
+  description: "Testing different configurations of the FormManager library."
+  breadcrumb: "FormManager Test"
+  index: false
+---
+
+<section>
+  <div class="container">
+    <h1 class="mb-4">FormManager test page</h1>
+    <p class="text-muted mb-5">Testing different configurations of the FormManager library.</p>
+
+    <div class="row g-4">
+
+    <!-- Test 1: Full Test (success/fail, nested, change events) -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Test 1: Full Test</h5>
+          <small class="text-muted">Success/failure toggle, nested dot notation, change events (check console)</small>
+        </div>
+        <div class="card-body">
+          <form id="test-form-main" data-form-state="initializing" onsubmit="return false">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="main-name" class="form-label">user.name</label>
+                  <input type="text" class="form-control" id="main-name" name="user.name" value="Ian" autofocus>
+                </div>
+                <div class="mb-3">
+                  <label for="main-email" class="form-label">user.email</label>
+                  <input type="email" class="form-control" id="main-email" name="user.email" value="ian@example.com">
+                </div>
+                <div class="mb-3">
+                  <label for="main-city" class="form-label">user.address.city</label>
+                  <input type="text" class="form-control" id="main-city" name="user.address.city" value="NYC">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="main-outcome" class="form-label">Simulate outcome</label>
+                  <select class="form-select" id="main-outcome" name="settings.outcome">
+                    <option value="success">Success</option>
+                    <option value="error">Error (throw Error)</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label d-block">preferences.notifications (radio group)</label>
+                  <div class="form-check form-check-inline">
+                    <input type="radio" class="form-check-input" id="notif-all" name="preferences.notifications" value="all" checked>
+                    <label class="form-check-label" for="notif-all">All</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input type="radio" class="form-check-input" id="notif-important" name="preferences.notifications" value="important">
+                    <label class="form-check-label" for="notif-important">Important</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input type="radio" class="form-check-input" id="notif-none" name="preferences.notifications" value="none">
+                    <label class="form-check-label" for="notif-none">None</label>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label d-block">preferences.features (checkbox group)</label>
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="feat-darkmode" name="preferences.features" value="darkmode">
+                    <label class="form-check-label" for="feat-darkmode">Dark Mode</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="feat-analytics" name="preferences.features" value="analytics">
+                    <label class="form-check-label" for="feat-analytics">Analytics</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="feat-beta" name="preferences.features" value="beta">
+                    <label class="form-check-label" for="feat-beta">Beta features</label>
+                  </div>
+                </div>
+                <div class="mb-3 form-check">
+                  <input type="checkbox" class="form-check-input" id="main-subscribe" name="settings.subscribe">
+                  <label class="form-check-label" for="main-subscribe">settings.subscribe (single checkbox)</label>
+                </div>
+                <!-- Honeypot field for bot detection (fill to trigger rejection) -->
+                <div class="mb-3">
+                  <label for="main-honey" class="form-label">honey <span class="badge bg-warning text-dark">Honeypot</span></label>
+                  <input type="text" class="form-control" id="main-honey" name="honey" data-honey placeholder="Fill to trigger bot rejection" autocomplete="off" tabindex="-1">
+                  <small class="text-muted">Hidden in production; fill here to test rejection</small>
+                </div>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="submit" data-action="save" class="btn btn-primary">Save</button>
+              <button type="submit" data-action="draft" class="btn btn-outline-secondary">Save as Draft</button>
+              <button type="button" id="main-set-data" class="btn btn-outline-info">Set data</button>
+            </div>
+          </form>
+          <div class="mt-3 d-flex gap-3">
+            <small class="text-muted" id="main-status">Status: ready</small>
+            <small class="text-muted" id="main-action">Action: -</small>
+          </div>
+          <div class="mt-3">
+            <pre id="main-output" class="bg-body-secondary p-2 rounded small" style="max-height: 200px; overflow: auto;">Submit to see collected data...</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 2: Validation -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="mb-0">Test 2: Validation</h5>
+            <small class="text-muted">HTML5 + custom validation event</small>
+          </div>
+          <button type="button" id="validation-set-correct" class="btn btn-sm btn-outline-success">Set correct</button>
+        </div>
+        <div class="card-body">
+          <form id="test-form-validation" data-form-state="initializing" onsubmit="return false">
+            <div class="mb-3">
+              <label for="validation-name" class="form-label">Name (required)</label>
+              <input type="text" class="form-control" id="validation-name" name="name" required>
+            </div>
+            <div class="mb-3">
+              <label for="validation-email" class="form-label">Email (required, valid format)</label>
+              <input type="email" class="form-control" id="validation-email" name="email" required>
+            </div>
+            <div class="mb-3">
+              <label for="validation-age" class="form-label">Age (required, must be 18+)</label>
+              <input type="number" class="form-control" id="validation-age" name="age" required min="1">
+            </div>
+            <div class="mb-3 form-check">
+              <input type="checkbox" class="form-check-input" id="validation-terms" name="terms" required>
+              <label class="form-check-label" for="validation-terms">I agree to the terms (required)</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </form>
+          <div class="mt-2">
+            <small class="text-muted" id="validation-status">Status: ready</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 3: Contact Form (one-time submit, reset on success) -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Test 3: Contact Form</h5>
+          <small class="text-muted">allowResubmit: false, resetOnSuccess: true</small>
+        </div>
+        <div class="card-body">
+          <form id="test-form-contact" data-form-state="initializing" onsubmit="return false">
+            <div class="mb-3">
+              <label for="contact-message" class="form-label">Message</label>
+              <textarea class="form-control" id="contact-message" name="message" rows="2">Hello!</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Send message</button>
+          </form>
+          <div class="mt-2">
+            <small class="text-muted" id="contact-status">Status: ready</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 4: Manual Ready -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Test 4: Manual Ready</h5>
+          <small class="text-muted">autoReady: false, ready after 2 seconds</small>
+        </div>
+        <div class="card-body">
+          <form id="test-form-manual" data-form-state="initializing" onsubmit="return false">
+            <div class="mb-3">
+              <label for="manual-data" class="form-label">Data</label>
+              <input type="text" class="form-control" id="manual-data" name="data">
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </form>
+          <div class="mt-2">
+            <small class="text-muted" id="manual-status">Status: initializing</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 5: Input Groups -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Test 5: Input Groups</h5>
+          <small class="text-muted">setInputGroup() filters getData() - fields without data-input-group are global</small>
+        </div>
+        <div class="card-body">
+          <form id="test-form-groups" data-form-state="initializing" onsubmit="return false">
+            <div class="row">
+              <!-- Global settings (no data-input-group = always included) -->
+              <div class="col-md-4">
+                <h6 class="text-muted mb-3">Global settings <span class="badge bg-secondary">Always included</span></h6>
+                <div class="mb-3">
+                  <label for="groups-name" class="form-label">settings.name</label>
+                  <input type="text" class="form-control" id="groups-name" name="settings.name" value="My project">
+                </div>
+                <div class="mb-3">
+                  <label for="groups-theme" class="form-label">settings.theme</label>
+                  <select class="form-select" id="groups-theme" name="settings.theme">
+                    <option value="light">Light</option>
+                    <option value="dark" selected>Dark</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Group A fields -->
+              <div class="col-md-4">
+                <h6 class="text-primary mb-3">Group A <span class="badge bg-primary">data-input-group="a"</span></h6>
+                <div class="mb-3">
+                  <label for="groups-a-url" class="form-label">options.url</label>
+                  <input type="url" class="form-control" id="groups-a-url" name="options.url" data-input-group="a" value="https://example.com">
+                </div>
+                <div class="mb-3">
+                  <label for="groups-a-title" class="form-label">options.title</label>
+                  <input type="text" class="form-control" id="groups-a-title" name="options.title" data-input-group="a" value="My link">
+                </div>
+              </div>
+
+              <!-- Group B fields -->
+              <div class="col-md-4">
+                <h6 class="text-success mb-3">Group B <span class="badge bg-success">data-input-group="b"</span></h6>
+                <div class="mb-3">
+                  <label for="groups-b-ssid" class="form-label">options.ssid</label>
+                  <input type="text" class="form-control" id="groups-b-ssid" name="options.ssid" data-input-group="b" value="MyWiFi">
+                </div>
+                <div class="mb-3">
+                  <label for="groups-b-password" class="form-label">options.password</label>
+                  <input type="text" class="form-control" id="groups-b-password" name="options.password" data-input-group="b" value="secret123">
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <span class="text-muted me-2">Select group:</span>
+              <button type="button" class="btn btn-outline-secondary btn-sm groups-filter-btn active" data-group="">All (no filter)</button>
+              <button type="button" class="btn btn-outline-primary btn-sm groups-filter-btn" data-group="a">Group A</button>
+              <button type="button" class="btn btn-outline-success btn-sm groups-filter-btn" data-group="b">Group B</button>
+              <button type="button" class="btn btn-outline-info btn-sm groups-filter-btn" data-group='["a", "b"]'>Both (a, b)</button>
+              <button type="submit" class="btn btn-primary btn-sm ms-auto">Get data</button>
+            </div>
+          </form>
+          <div class="mt-3 d-flex gap-3">
+            <small class="text-muted" id="groups-status">Status: ready</small>
+            <small class="text-muted" id="groups-filter">Filter: none (all fields)</small>
+          </div>
+          <div class="mt-3">
+            <pre id="groups-output" class="bg-body-secondary p-2 rounded small" style="max-height: 200px; overflow: auto;">Click "Get data" to see filtered results...</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 6: File Drop -->
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Test 6: File Drop</h5>
+          <small class="text-muted">data-file-drop (local) and data-file-drop="page"</small>
+        </div>
+        <div class="card-body">
+          <form id="test-form-file-drop" data-form-state="initializing" onsubmit="return false">
+            <h6 class="text-muted mb-2">Local mode <span class="badge bg-secondary">default</span></h6>
+            <div class="p-4 text-center mb-3" data-file-drop>
+              <p class="mb-2">Drag & drop or click to browse</p>
+              <input type="file" class="form-control mx-auto" style="max-width: 300px;" name="localFile">
+              <p data-file-drop-name class="small mt-2 mb-0 text-muted">No file selected</p>
+            </div>
+            <h6 class="text-muted mb-2">Local mode + accept <span class="badge bg-warning text-dark">accept=".pdf"</span></h6>
+            <div class="p-4 text-center mb-3" data-file-drop>
+              <p class="mb-2">Drag & drop or click to browse (PDF only)</p>
+              <input type="file" class="form-control mx-auto" style="max-width: 300px;" name="pdfFile" accept=".pdf">
+              <p data-file-drop-name class="small mt-2 mb-0 text-muted">No file selected</p>
+            </div>
+            <h6 class="text-muted mb-2">Page mode <span class="badge bg-info">data-file-drop="page"</span></h6>
+            <div class="p-4 text-center mb-3" data-file-drop="page">
+              <p class="mb-2">Drop anywhere on the page</p>
+              <input type="file" class="form-control mx-auto" style="max-width: 300px;" name="pageFile">
+              <p data-file-drop-name class="small mt-2 mb-0 text-muted">No file selected</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </form>
+          <div class="mt-2">
+            <small class="text-muted" id="file-drop-status">Status: ready</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 7: Disabled-State Snapshot -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Test 7: Disabled-State Snapshot</h5>
+          <small class="text-muted">Elements disabled in HTML stay disabled through every FM state transition. Submit buttons are loading guards — FM takes them over.</small>
+        </div>
+        <div class="card-body">
+          <form id="test-form-snapshot" data-form-state="initializing" onsubmit="return false">
+            <div class="row">
+              <div class="col-md-6">
+                <h6 class="text-muted mb-3">FM-managed <span class="badge bg-success">enabled on ready</span></h6>
+                <div class="mb-3">
+                  <label for="snapshot-name" class="form-label">Name</label>
+                  <input type="text" class="form-control" id="snapshot-name" name="name" value="Ian">
+                </div>
+                <div class="mb-3">
+                  <label for="snapshot-email" class="form-label">Email</label>
+                  <input type="email" class="form-control" id="snapshot-email" name="email" value="ian@example.com">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label d-block">Plan</label>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" id="snapshot-plan-free" name="plan" value="free" checked>
+                    <label class="form-check-label" for="snapshot-plan-free">Free</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" id="snapshot-plan-pro" name="plan" value="pro">
+                    <label class="form-check-label" for="snapshot-plan-pro">Pro</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="radio" class="form-check-input" id="snapshot-plan-enterprise" name="plan" value="enterprise" disabled>
+                    <label class="form-check-label" for="snapshot-plan-enterprise">Enterprise <span class="badge bg-secondary">Coming soon</span></label>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <h6 class="text-muted mb-3">Permanently disabled <span class="badge bg-danger">stays disabled</span></h6>
+                <div class="mb-3">
+                  <label for="snapshot-region" class="form-label">Region <span class="badge bg-secondary">Coming soon</span></label>
+                  <select class="form-select" id="snapshot-region" name="region" disabled>
+                    <option>US (coming soon)</option>
+                    <option>EU (coming soon)</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label for="snapshot-notes" class="form-label">Internal notes <span class="badge bg-secondary">Admin only</span></label>
+                  <textarea class="form-control" id="snapshot-notes" name="notes" rows="2" disabled>Restricted field</textarea>
+                </div>
+                <div class="alert alert-info small mb-0">
+                  Enterprise radio, Region select, and Notes textarea have <code>disabled</code> in the HTML. FM snapshots them at init and never re-enables them. The other fields start without <code>disabled</code> — the form-level <code>data-form-state</code> + CSS blocks interaction until FM is ready.
+                </div>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
+                <span class="button-text">Submit (watch disabled states)</span>
+              </button>
+              <button type="button" id="snapshot-cycle" class="btn btn-outline-warning">Rapid cycle (5x)</button>
+            </div>
+          </form>
+          <div class="mt-3 d-flex gap-3">
+            <small class="text-muted" id="snapshot-status">Status: initializing</small>
+            <small class="text-muted" id="snapshot-cycle-count">Cycles: 0</small>
+          </div>
+          <div class="mt-2">
+            <pre id="snapshot-output" class="bg-body-secondary p-2 rounded small" style="max-height: 160px; overflow: auto;">Submit to see disabled states toggle. Enterprise radio + Region select should NEVER re-enable.</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+  </div>
+</section>

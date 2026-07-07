@@ -1,0 +1,186 @@
+<footer class="pt-5 pb-4 border-top bg-body-secondary mt-auto" role="contentinfo" aria-label="Site footer">
+  <div class="container">
+    <!-- Logo Row -->
+    <div class="row mb-4">
+      <!-- Brand/Logo Section -->
+      <div class="col-12 col-lg-3 mb-4 mb-lg-0">
+        {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+        {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+        {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
+        {% capture logo_description %}{{ data.logo.description | default: site.brand.description | uj_liquify }}{% endcapture %}
+        {% assign logo_description = logo_description | strip %}
+        {% comment %} A data value that LIQUIFIES to empty (e.g. '{{ site.meta.description }}' with no meta.description set) still needs the brand fallback — `default:` only sees the raw string {% endcomment %}
+        {% if logo_description == '' or logo_description == 'null' %}{% assign logo_description = site.brand.description %}{% endif %}
+        {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
+
+        <div class="h5 mb-3">
+          <a class="d-flex align-items-center text-decoration-none text-body" href="{{ logo_href }}">
+            {% if logo_src and logo_src != '' and logo_src != 'null' %}
+              <div class="avatar avatar-md me-2 {{ logo_class }}">
+                <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo"/>
+              </div>
+            {% endif %}
+            {% if logo_text and logo_text != '' and logo_text != 'null' %}
+              <span>{{ logo_text }}</span>
+            {% endif %}
+          </a>
+        </div>
+        {% if logo_description and logo_description != '' and logo_description != 'null' %}
+          <p class="mb-0">{{ logo_description }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Links Column (only on lg screens) -->
+      <div class="col-12 col-lg-9">
+        <div class="row">
+          <!-- Dynamic Links Sections -->
+          {% if data.links and data.links.size > 0 %}
+            {% assign links_count = data.links.size %}
+            {% assign col_class = 'col-6 col-md' %}
+            {% if links_count == 2 %}
+              {% assign col_class = 'col-6 col-md-6' %}
+            {% elsif links_count == 3 %}
+              {% assign col_class = 'col-6 col-md-4' %}
+            {% elsif links_count == 4 %}
+              {% assign col_class = 'col-6 col-md-3' %}
+            {% elsif links_count == 6 %}
+              {% assign col_class = 'col-6 col-md-2' %}
+            {% endif %}
+
+            {% for link_group in data.links %}
+              {% capture group_label %}{{ link_group.label | default: 'Links' }}{% endcapture %}
+              <div class="{{ col_class }}">
+            <div class="h6 mb-4 fw-semibold">{{ group_label }}</div>
+            <ul class="list-unstyled">
+              {% for link in link_group.links %}
+                {% capture link_classes %}link-muted text-decoration-none{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
+                {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                {% capture link_icon %}{% if link.icon %}{{ site.icons[link.icon] }}{% endif %}{% endcapture %}
+                {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+                <li class="mb-1">
+                  <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
+                    {{ link_icon }}
+                    {{ link.label }}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Section -->
+    <div class="row mt-4 pt-3 border-top align-items-center">
+      <div class="col-md-6 d-flex align-items-center">
+        <!-- Language Dropdown -->
+        <div class="d-flex align-items-center me-3">
+            <div class="dropup uj-language-dropdown">
+              <button class="btn btn-sm btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                {% uj_icon "language", "fa-sm me-1" %}
+                <span class="_text-body">
+                  Language
+                </span>
+              </button>
+              <ul class="dropdown-menu">
+                {% assign default_language = site.translation.default | default: "en" %}
+                {% assign page_excluded_from_translation = false %}
+                {% for exclude in site.translation.exclude %}
+                  {% assign exclude_folder = "/" | append: exclude | append: "/" %}
+                  {% assign exclude_page = "/" | append: exclude %}
+                  {% if page.url == exclude_page or page.url contains exclude_folder %}
+                    {% assign page_excluded_from_translation = true %}
+                  {% endif %}
+                {% endfor %}
+                {% if site.translation.enabled and site.translation.languages.size > 0 and page_excluded_from_translation != true %}
+                  {% assign all_languages = site.translation.languages | push: default_language %}
+                {% else %}
+                  {% assign all_languages = "" | split: "" | push: default_language %}
+                {% endif %}
+                {% for language in all_languages %}
+                  <li>
+                    {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
+                    <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
+                      {% uj_icon language, "fa-sm me-2" %}
+                      {{ lang_name | capitalize }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+
+        <!-- Appearance Dropdown (logic handled framework-side via data-appearance-* attributes — see docs/appearance.md) -->
+        <div class="d-flex align-items-center me-3">
+          <div class="dropup uj-appearance-dropdown">
+            <button class="btn btn-sm btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Appearance">
+              <span data-appearance-icon="light" hidden>{% uj_icon "sun", "fa-sm" %}</span>
+              <span data-appearance-icon="dark" hidden>{% uj_icon "moon-stars", "fa-sm" %}</span>
+              <span data-appearance-icon="system" hidden>{% uj_icon "circle-half-stroke", "fa-sm" %}</span>
+            </button>
+            <ul class="dropdown-menu">
+              <li><button class="dropdown-item" type="button" data-appearance-set="light">{% uj_icon "sun", "fa-sm me-2" %}Light</button></li>
+              <li><button class="dropdown-item" type="button" data-appearance-set="dark">{% uj_icon "moon-stars", "fa-sm me-2" %}Dark</button></li>
+              <li><button class="dropdown-item" type="button" data-appearance-set="system">{% uj_icon "circle-half-stroke", "fa-sm me-2" %}System</button></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Social Links -->
+        {% if data.socials.enabled %}
+          <div class="d-flex align-items-center">
+            {% if data.socials.list and data.socials.list.size > 0 %}
+              {% assign social_list = data.socials.list %}
+            {% else %}
+              {% assign social_list = 'twitter,facebook,instagram,linkedin,github' | split: ',' %}
+            {% endif %}
+
+            {% for social in social_list %}
+              {% iftruthy social %}
+                {% if forloop.last %}
+                  {% assign spacing_class = '' %}
+                {% else %}
+                  {% assign spacing_class = 'me-2' %}
+                {% endif %}
+                <a href="{% uj_social social %}" class="link-muted text-decoration-none {{ spacing_class }}" aria-label="{{ social | capitalize }}">
+                  {% uj_icon social, "fa-xl" %}
+                </a>
+              {% endiftruthy %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Legal Links -->
+      {% if data.legal.enabled %}
+        <div class="col-md-6 text-md-end">
+          <a href="/terms" class="link-muted text-decoration-none">Terms</a>
+          <span class="text-body-secondary mx-2"> / </span>
+          <a href="/privacy" class="link-muted text-decoration-none">Privacy</a>
+          <span class="text-body-secondary mx-2"> / </span>
+          <a href="/cookies" class="link-muted text-decoration-none">Cookies</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Copyright Row -->
+    {% if data.copyright.enabled %}
+      <div class="row mt-3">
+        <div class="col-12 text-center">
+          {% if data.copyright.text %}
+            {% capture copyright_text %}{{ data.copyright.text }}{% endcapture %}
+          {% else %}
+            {% capture copyright_text %}
+              {{ site.characters.copyright }} {{ site.uj.date.year }} <strong>{{ site.brand.name }}</strong> by <a href="https://itwcreativeworks.com">ITW Creative Works</a>. All rights reserved.
+              <br>
+              By using this site and our services, you agree to our <a href="/terms">Terms</a> & <a href="/privacy">Privacy Policy</a>.
+            {% endcapture %}
+          {% endif %}
+          <span class="text-body-secondary">{{ copyright_text | uj_liquify }}</span>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</footer>

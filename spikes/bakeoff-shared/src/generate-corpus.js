@@ -501,6 +501,14 @@ function generateCorpus(options) {
   const pages = generatePages(rng, outDir);
   const alternatives = generateAlternatives(rng, outDir);
 
+  // Consumer-LOCAL layouts (somiibo ships platform-bot/solution/package in
+  // its own _layouts) — copied from the checked-in replicas; the engine
+  // resolves consumer _layouts as the top layout layer.
+  const layoutsFixtureDir = path.join(__dirname, '..', 'fixtures', 'consumer-layouts');
+  for (const file of jetpack.list(layoutsFixtureDir) || []) {
+    jetpack.copy(path.join(layoutsFixtureDir, file), path.join(outDir, '_layouts', file), { overwrite: true });
+  }
+
   // Synthetic site.* data — the resolution source for {{ site.* }} refs
   jetpack.write(path.join(outDir, 'site-data.json'), {
     url: 'https://bakeoff.example.com',

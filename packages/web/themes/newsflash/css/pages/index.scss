@@ -1,0 +1,159 @@
+// Newsflash Theme — Homepage page-specific CSS
+// Styles the editorial front-page override
+// (_layouts/themes/newsflash/frontend/pages/index.html).
+//
+// Class names are UNIVERSAL (section-hero, hero-title, feed-num, rail-title,
+// mostread, stat-num, cta-panel, Bootstrap .card/.badge …) — no theme prefix —
+// so the same markup is swappable across themes. This file gives those classes
+// the newsflash look. Compiles standalone, so it pulls in the theme tokens +
+// mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// ============================================
+// Hero — the front-page lead
+// ============================================
+.section-hero {
+  padding-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.hero-title {
+  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  font-weight: 550;
+  letter-spacing: -0.022em;
+  line-height: 1.04;
+}
+
+.hero-art {
+  .art-frame {
+    aspect-ratio: 4 / 3;
+    @include nf-shadow-pop();
+  }
+
+  .hero-art-chip {
+    position: absolute;
+    top: 18px;
+    left: -14px;
+    transform: rotate(-4deg);
+    z-index: 2;
+  }
+}
+
+// Decorative cover art (pre-content fallback when the site has no posts yet):
+// vermilion-to-orange wash with a blue corner glow — pure CSS, no asset.
+.cover-art {
+  background:
+    radial-gradient(110% 90% at 88% 8%, #FFB36B 0%, rgba(255, 179, 107, 0) 52%),
+    radial-gradient(120% 110% at 8% 95%, var(--nf-blue) 0%, rgba(39, 66, 245, 0) 56%),
+    linear-gradient(155deg, var(--nf-vermilion) 10%, #FF7A3D 90%);
+}
+
+// ============================================
+// The rundown — stroked step numerals on dashed rows
+// ============================================
+// (The latest feed uses .feed-item's BASE layout from _editorial.scss —
+// square art thumb + text. Only the rundown swaps the thumb for a numeral.)
+.feed-num {
+  font-family: $nf-font-display;
+  font-style: italic;
+  font-weight: 800;
+  font-size: 3.2rem;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--nf-ink);
+}
+
+// On rundown rows the numeral replaces the thumbnail — shrink its column
+.feed-item .feed-num {
+  width: 5rem;
+}
+.section-rundown .feed-item {
+  grid-template-columns: 5rem 1fr;
+}
+
+// ============================================
+// The rail (sticky sidebar)
+// ============================================
+.rail-stack {
+  position: sticky;
+  top: 5.75rem; // clears the sticky masthead
+}
+
+.rail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+
+  &::after {
+    content: "";
+    flex: 1;
+    height: var(--nf-border-width);
+    background: var(--nf-border-color);
+  }
+}
+
+// Most-read list — stroked counter numerals that ink in on hover
+.mostread {
+  counter-reset: mostread;
+
+  li {
+    counter-increment: mostread;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--nf-line);
+
+    &:first-child { padding-top: 0; }
+    &:last-child { border-bottom: 0; padding-bottom: 0; }
+
+    &::before {
+      content: counter(mostread);
+      font-family: $nf-font-display;
+      font-style: italic;
+      font-weight: 900;
+      font-size: 2rem;
+      line-height: 1;
+      color: transparent;
+      -webkit-text-stroke: 1.3px var(--nf-ink);
+      flex: none;
+      width: 1.2em;
+      transition: $nf-transition;
+    }
+
+    &:hover::before {
+      color: var(--bs-primary);
+      -webkit-text-stroke-color: var(--bs-primary);
+    }
+  }
+
+  a {
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1.35;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--bs-primary);
+    }
+  }
+}
+
+// Newsletter rail — the vermilion slab gets the hard offset shadow
+.rail-stack .card.bg-primary {
+  box-shadow: var(--nf-shadow-hard-hover) !important;
+}
+
+// (Feature icon chips, stats numerals + the CTA band live in the main bundle — _panels.scss —
+// because pricing/about reuse them. Reader quote-cards live in pages/about/index.scss —
+// the testimonials section moved to the about page.)
+
+@media (max-width: 991.98px) {
+  .rail-stack { position: static; }
+}

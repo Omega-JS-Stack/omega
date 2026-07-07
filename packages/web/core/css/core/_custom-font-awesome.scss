@@ -1,0 +1,45 @@
+// Core Font Awesome Customizations
+// Extended icon sizing and display utilities
+
+// ============================================
+// Size Scale Configuration
+// ============================================
+
+$fa-sizes: (
+  '2xs': 0.625rem,
+  'xs': 0.75rem,
+  'sm': 0.875rem,
+  'base': 1rem,
+  'md': 1rem,
+  'lg': 1.125rem,
+  'xl': 1.25rem,
+  '2xl': 1.5rem,
+  '3xl': 1.8125rem,
+  '4xl': 2.1875rem,
+  '5xl': 2.625rem,
+  '6xl': 4rem
+);
+
+// ============================================
+// Base Icon Styles
+// ============================================
+
+.fa {
+  svg, img {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+  }
+}
+
+// ============================================
+// Size Classes
+// ============================================
+
+@each $name, $size in $fa-sizes {
+  .fa-#{$name} {
+    font-size: $size;
+    line-height: 1;
+    vertical-align: baseline;
+  }
+}

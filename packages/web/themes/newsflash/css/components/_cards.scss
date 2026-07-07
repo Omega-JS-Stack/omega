@@ -1,0 +1,47 @@
+// Newsflash Theme — Cards
+// Framed paper objects: hairline ink border, editorial radius, serif titles.
+// Cards that ARE links lift gently and grow their framed image on hover.
+
+.card {
+  background: var(--bs-card-bg);
+  @include nf-border();
+  border-radius: var(--bs-border-radius-lg);
+  transition: $nf-transition;
+
+  .card-title {
+    font-family: $nf-font-display;
+    font-optical-sizing: auto;
+    letter-spacing: -0.012em;
+    line-height: 1.22;
+  }
+
+  // Serif headline links read as ink until hovered — then the vermilion
+  // rule grows in underneath (see nf-underline-grow).
+  .card-title a {
+    color: inherit;
+    text-decoration: none;
+    @include nf-underline-grow();
+  }
+}
+
+a.card {
+  color: inherit;
+  text-decoration: none;
+}
+
+// Framed images inside hovered cards/links zoom slowly (cinematic pan feel)
+.card:hover .art-frame img,
+a:hover > .art-frame img {
+  transform: scale(1.04);
+}
+
+// Card footers used as byline rows stay flush with the editorial look
+.card-footer {
+  background: transparent;
+  border-top: 1px solid var(--nf-line);
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--nf-line);
+}

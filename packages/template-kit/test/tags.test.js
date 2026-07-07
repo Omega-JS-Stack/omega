@@ -297,7 +297,9 @@ test('uj_post finds docs by id / custom post.id across collections', () => {
     }
   );
 
-  assert.strictEqual(TAGS.uj_post.render(ctx, '"1732444329"'), 'My Post'); // custom post.id, default property
+  // UJM posts carry the real title in post.title (Jekyll only had data.title
+  // because it derives one from the filename) — post.title wins when present.
+  assert.strictEqual(TAGS.uj_post.render(ctx, '"1732444329"'), 'Custom Title'); // custom post.id, default property
   assert.strictEqual(TAGS.uj_post.render(ctx, '"my-slug", "url"'), 'https://somiibo.com/blog/my-slug');
   assert.strictEqual(TAGS.uj_post.render(ctx, '"my-slug", "date"'), '2024-01-15');
   assert.strictEqual(TAGS.uj_post.render(ctx, '"my-slug", "author"'), 'rare-ivy'); // post.post.author wins

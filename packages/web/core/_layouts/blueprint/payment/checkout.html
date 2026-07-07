@@ -1,0 +1,17 @@
+---
+### ALL PAGES ###
+layout: frontend/pages/payment/checkout
+
+### THEME CONFIG ###
+theme:
+  css:
+    bundle: "classy"
+
+### REGULAR PAGES ###
+meta:
+  title: "Checkout - {{ site.brand.name }}"
+  description: "Complete your purchase on {{ site.brand.name }}."
+  breadcrumb: "Checkout"
+---
+
+{{ content | uj_content_format }}

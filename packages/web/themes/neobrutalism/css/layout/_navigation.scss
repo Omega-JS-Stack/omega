@@ -1,0 +1,153 @@
+// Neobrutalism Theme — Navigation
+// The inherited nav markup (.navbar-wrapper > .navbar.navbar-floating) is a
+// floating glass pill in Classy. Here we make it a solid, ink-framed bar that
+// sits flush at the top — a hard horizontal block, true to the style.
+
+.navbar-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  pointer-events: none;
+
+  .navbar {
+    pointer-events: auto;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding-left: clamp(1rem, 4vw, 3rem);
+    padding-right: clamp(1rem, 4vw, 3rem);
+  }
+}
+
+.navbar.navbar-floating {
+  border-radius: 0;
+  padding: 0.75rem clamp(1rem, 4vw, 3rem);
+  background: var(--nb-surface) !important;
+  border: 0;
+  border-bottom: $nb-border-width-lg solid var(--nb-border-color);
+  transition: $nb-transition;
+
+  // Slight shadow only once scrolled (set by _theme.js)
+  &.scrolled {
+    @include nb-shadow(sm);
+  }
+
+  .container,
+  .container-fluid {
+    padding: 0;
+  }
+}
+
+// Brand: chunky display type, no fade
+.navbar-brand {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: 1.4rem;
+  letter-spacing: -0.03em;
+
+  .brand-logo { height: 32px; width: auto; margin-right: 0.5rem; }
+}
+
+// Nav links: square hover blocks. Hover/active fill is the PRIMARY blue (white
+// text) — not the yellow accent — so the top-bar interactions match the brand's
+// blue buttons instead of the yellow CTA accent.
+.navbar-nav .nav-link {
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.85rem;
+  margin: 0 0.15rem;
+  border-radius: 0;
+  color: var(--bs-body-color);
+  border: $nb-border-width-sm solid transparent;
+  transition: $nb-transition;
+
+  // Interactive accent (blue), not the yellow signature accent. Single token so
+  // every hover/active state across the theme stays consistent.
+  &:hover {
+    background: var(--nb-accent-interactive);
+    color: var(--nb-accent-interactive-ink);
+    border-color: var(--nb-border-color);
+  }
+
+  // Active = solid blue block with white text (matches hover, always readable).
+  // Use &.active.active + !important to beat Bootstrap's .text-body utility that
+  // the nav include adds to links (which otherwise forces color back to body).
+  &.active,
+  &.active.text-body {
+    background: var(--nb-accent-interactive) !important;
+    color: var(--nb-accent-interactive-ink) !important;
+    border-color: var(--nb-border-color);
+  }
+}
+
+// Mobile toggle: a hard square button
+.navbar-toggler {
+  border-radius: 0;
+  padding: 0.3rem 0.55rem;
+  background: var(--nb-surface);
+  @include nb-border($nb-border-width-sm);
+  transition: $nb-transition;
+
+  &:hover { background: var(--nb-accent-interactive); }
+  &:focus { box-shadow: var(--nb-shadow-sm); }
+
+  .navbar-toggler-icon {
+    width: 1.25em;
+    height: 1.25em;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2817,17,17,1%29' stroke-linecap='square' stroke-miterlimit='10' stroke-width='3' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  }
+
+  [data-bs-theme="dark"] & .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28245,245,245,1%29' stroke-linecap='square' stroke-miterlimit='10' stroke-width='3' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  }
+}
+
+// Mobile collapsed menu becomes a bordered drawer panel
+@media (max-width: 991.98px) {
+  .navbar-collapse {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--nb-surface);
+    @include nb-border();
+    @include nb-shadow(md);
+  }
+}
+
+// ============================================
+// Dropdown menus — hard bordered panels
+// ============================================
+.dropdown-menu {
+  background: var(--nb-surface);
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(md);
+  padding: 0.4rem;
+  margin-top: 0.6rem;
+
+  .dropdown-item {
+    border-radius: 0;
+    font-weight: 600;
+    padding: 0.55rem 0.85rem;
+    color: var(--bs-body-color);
+
+    &:hover,
+    &:focus {
+      background: var(--nb-accent-interactive);
+      color: var(--nb-accent-interactive-ink);
+    }
+
+    &.active,
+    &:active {
+      background: var(--bs-body-color);
+      color: var(--nb-paper);
+    }
+  }
+
+  .dropdown-divider {
+    border-top: $nb-border-width-sm solid var(--nb-border-color);
+    opacity: 1;
+    margin: 0.4rem 0;
+  }
+}

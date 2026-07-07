@@ -1,0 +1,77 @@
+// Neobrutalism Theme — Typography
+// Chunky, confident, tightly-tracked headings; clean grotesk body.
+// Fonts are loaded via the theme's `head` block in base.html (Google Fonts),
+// NOT @import-ed here, to avoid render-blocking duplicate loads.
+
+body {
+  font-family: $font-family-sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: $nb-font-display;
+  font-weight: $headings-font-weight;
+  letter-spacing: $nb-heading-letter-spacing;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+// Display headings get extra weight + tighter tracking
+.display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 0.98;
+}
+
+// Monospace accents (kickers, labels, code-ish tags)
+.font-mono,
+code, kbd, samp, pre {
+  font-family: $nb-font-mono;
+}
+
+// Eyebrow / kicker label — universal "section kicker" above headlines.
+.kicker {
+  display: inline-block;
+  font-family: $nb-font-mono;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.65rem;
+  background: var(--nb-accent-yellow);
+  color: #111111;
+  @include nb-border($nb-border-width-sm);
+
+  // On a dark/ink panel (e.g. the CTA), keep the accent block readable.
+  &--invert { background: var(--nb-accent-yellow); color: #111111; }
+}
+
+// Highlighted inline text — marker-style background swipe.
+.highlight {
+  background: var(--nb-accent-yellow);
+  color: #111111;
+  padding: 0 0.15em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+// Links: bold, underlined, no fade — they look clickable and stay readable in both
+// modes. Hover shifts to the interactive accent (blue), matching every other hover
+// in the theme. Buttons/nav/dropdown/footer links opt out of this generic rule via
+// their own higher-specificity hover, so this only catches plain in-content links.
+a {
+  font-weight: 600;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 2px;
+
+  &:hover { color: var(--nb-accent-interactive); }
+}
+
+// Buttons are <a> too, but set their text via --bs-btn-color. A direct `color` on
+// `a:hover` would beat that var and turn button labels blue — exclude them so the
+// button keeps its own (frozen) text color. Nav/dropdown/footer links already win
+// on specificity with their explicit white hover, so they need no guard here.
+a.btn:hover { color: var(--bs-btn-color); }

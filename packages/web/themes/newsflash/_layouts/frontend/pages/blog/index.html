@@ -1,0 +1,373 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "The {{ site.brand.name }}"
+  headline_accent: "wire"
+  subheadline: "Discover insights, tutorials, and news from our team"
+
+# Newsletter CTA Section
+newsletter_cta:
+  superheadline:
+    icon: "envelope"
+    text: "Newsletter"
+  headline: "Never miss a"
+  headline_accent: "story"
+  subheadline: "Get the latest insights delivered straight to your inbox. No spam, unsubscribe anytime."
+  button:
+    text: "Subscribe"
+  form:
+    placeholder: "Enter your email"
+    success_message: "Thank you for subscribing! Check your email to confirm."
+    error_message: "Something went wrong. Please try again."
+---
+
+{% comment %}
+  NEWSFLASH BLOG INDEX
+  The newspaper front page: serif masthead title + pill search, a framed lead
+  story splash, an editorial tile grid for the rest of the page's posts, pill
+  pagination, category/tag chips, and the vermilion newsletter slab. Preserves
+  classy's contracts: paginator, /search/cse form, #newsletter-form + alert
+  classes (wired by the main-layer page JS), and the adsense include.
+{% endcomment %}
+
+<!-- Page head: serif title + dek + search -->
+<section class="pb-4">
+  <div class="container">
+    <div class="row align-items-end g-4" data-lazy="@class animation-slide-up">
+      <div class="col-lg-8">
+        <span class="kicker mb-2">The latest</span>
+        <h1 class="display-4 mb-2">
+          {{ resolved.hero.headline }}
+          {% iftruthy resolved.hero.headline_accent %}
+            <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+          {% endiftruthy %}
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="lead mb-0">{{ resolved.hero.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+      <div class="col-lg-4">
+        <form action="{{ site.url }}/search/cse" target="_blank">
+          <div class="input-group">
+            <input
+              type="search"
+              class="form-control"
+              name="q"
+              placeholder="Search posts..."
+              aria-label="Search posts"
+            >
+            <button class="btn btn-outline-dark" type="submit">
+              {% uj_icon "search" %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Lead story + feed -->
+<section class="pt-0">
+  <div class="container">
+    {% if paginator.posts.size > 0 %}
+      <!-- Lead story splash -->
+      {% assign lead = paginator.posts.first %}
+      <div class="section-head" data-lazy="@class animation-slide-up">
+        <h2>Lead story</h2>
+        <span class="rule"></span>
+      </div>
+      <a href="{{ site.url }}{{ lead.url }}" class="story-card story-card--lead mb-5" data-lazy="@class animation-slide-up">
+        <div class="row g-4 g-lg-5 align-items-center">
+          <div class="col-lg-7">
+            <div class="art-frame shadow">
+              {%- uj_post lead.post.id, "image-tag", class="w-100" -%}
+            </div>
+          </div>
+          <div class="col-lg-5">
+            {% if lead.post.categories[0] %}
+              <span class="kicker mb-2">{{ lead.post.categories[0] | uj_title_case }}</span>
+            {% endif %}
+            <h3 class="h1 my-2">{{ lead.post.title }}</h3>
+            <p class="text-body-secondary mb-3">
+              <b class="text-body">{%- uj_member lead.post.author, "name" -%}</b>
+              · {{ lead.date | date: "%b %d, %Y" }}
+              · {% uj_readtime lead.content %} min read
+            </p>
+            <span class="btn btn-outline-dark btn-sm">Read the story {% uj_icon "arrow-right", "ms-1" %}</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- The rest of this page's posts -->
+      {% if paginator.posts.size > 1 %}
+        <div class="section-head" data-lazy="@class animation-slide-up">
+          <h2>More stories</h2>
+          <span class="rule"></span>
+        </div>
+        <div class="row g-4 mb-4">
+          {% for post in paginator.posts offset: 1 %}
+            <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
+              <a href="{{ site.url }}{{ post.url }}" class="story-card">
+                <div class="art-frame mb-3">
+                  {%- uj_post post.post.id, "image-tag", class="w-100" -%}
+                </div>
+                {% if post.post.categories[0] %}
+                  <span class="kicker mb-1">{{ post.post.categories[0] | uj_title_case }}</span>
+                {% endif %}
+                <h3 class="h5 my-2">{{ post.post.title }}</h3>
+                <p class="small text-body-secondary mb-0">
+                  <b class="text-body">{%- uj_member post.post.author, "name" -%}</b>
+                  · {{ post.date | date: "%b %d, %Y" }}
+                  · {% uj_readtime post.content %} min read
+                </p>
+              </a>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% else %}
+      <!-- No posts yet -->
+      <div class="text-center py-5" data-lazy="@class animation-slide-up">
+        <span class="kicker mb-2">No dispatches yet</span>
+        <h2 class="h3 mb-2">The presses are warming up</h2>
+        <p class="text-body-secondary mb-0">Check back soon for our first stories.</p>
+      </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    <div class="row mb-5">
+      <div class="col-12">
+        {% if paginator.total_pages > 1 %}
+          <nav aria-label="Blog pagination" class="d-flex justify-content-center" data-lazy="@class animation-slide-up">
+            <ul class="pagination mb-0">
+              <!-- Previous Page -->
+              {% if paginator.previous_page %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ paginator.previous_page_path }}" aria-label="Previous page">
+                    {% uj_icon "chevron-left" %}
+                    <span class="d-none d-sm-inline ms-1">Previous</span>
+                  </a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">
+                    {% uj_icon "chevron-left" %}
+                    <span class="d-none d-sm-inline ms-1">Previous</span>
+                  </span>
+                </li>
+              {% endif %}
+
+              <!-- Page Numbers -->
+              {% assign start_page = paginator.page | minus: 2 | at_least: 1 %}
+              {% assign end_page = paginator.page | plus: 2 | at_most: paginator.total_pages %}
+
+              {% if start_page > 1 %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ site.url }}/blog">1</a>
+                </li>
+                {% if start_page > 2 %}
+                  <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                  </li>
+                {% endif %}
+              {% endif %}
+
+              {% for page in (start_page..end_page) %}
+                <li class="page-item {% if page == paginator.page %}active{% endif %}">
+                  {% if page == 1 %}
+                    <a class="page-link" href="{{ site.url }}/blog">{{ page }}</a>
+                  {% else %}
+                    <a class="page-link" href="{{ site.url }}/blog/page/{{ page }}">{{ page }}</a>
+                  {% endif %}
+                </li>
+              {% endfor %}
+
+              {% if end_page < paginator.total_pages %}
+                {% assign second_to_last = paginator.total_pages | minus: 1 %}
+                {% if end_page < second_to_last %}
+                  <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                  </li>
+                {% endif %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ site.url }}/blog/page/{{ paginator.total_pages }}">
+                    {{ paginator.total_pages }}
+                  </a>
+                </li>
+              {% endif %}
+
+              <!-- Next Page -->
+              {% if paginator.next_page %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ paginator.next_page_path }}" aria-label="Next page">
+                    <span class="d-none d-sm-inline me-1">Next</span>
+                    {% uj_icon "chevron-right" %}
+                  </a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">
+                    <span class="d-none d-sm-inline me-1">Next</span>
+                    {% uj_icon "chevron-right" %}
+                  </span>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- In-Feed Ad -->
+    <div class="row justify-content-center mb-5">
+      <div class="col-12 col-lg-8" data-lazy="@class animation-slide-up">
+        {% include modules/adunits/adsense.html type="in-feed" %}
+      </div>
+    </div>
+
+    <!-- Categories & Tags -->
+    {% comment %} Build unique categories list (max 10) {% endcomment %}
+    {% assign categories = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% if categories.size >= 10 %}
+        {% break %}
+      {% endif %}
+      {% for category in post.post.categories %}
+        {% assign category_fixed = category | uj_title_case %}
+        {% unless categories contains category_fixed %}
+          {% assign categories = categories | push: category_fixed %}
+        {% endunless %}
+      {% endfor %}
+    {% endfor %}
+
+    {% comment %} Build unique tags list (max 10) {% endcomment %}
+    {% assign tags = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% if tags.size >= 10 %}
+        {% break %}
+      {% endif %}
+      {% for tag in post.post.tags %}
+        {% assign tag_fixed = tag | uj_title_case %}
+        {% unless tags contains tag_fixed %}
+          {% assign tags = tags | push: tag_fixed %}
+        {% endunless %}
+      {% endfor %}
+    {% endfor %}
+
+    {% if categories.size > 0 or tags.size > 0 %}
+      <div class="row justify-content-center">
+        <div class="col-lg-10" data-lazy="@class animation-slide-up">
+          <!-- Categories -->
+          {% if categories.size > 0 %}
+            <div class="mb-5 text-center">
+              <h3 class="h5 mb-3">
+                {% uj_icon "folder", "me-2" %}
+                Categories
+              </h3>
+              <div>
+                {% for category in categories %}
+                  <a href="{{ site.url }}/blog/categories/{{ category | slugify }}" class="badge bg-primary-soft text-primary text-decoration-none me-1 mb-2">
+                    {{ category }}
+                  </a>
+                {% endfor %}
+                <a href="{{ site.url }}/blog/categories" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
+                  View all {% uj_icon "arrow-right", "ms-1" %}
+                </a>
+              </div>
+            </div>
+          {% endif %}
+
+          <!-- Tags -->
+          {% if tags.size > 0 %}
+            <div class="text-center">
+              <h3 class="h5 mb-3">
+                {% uj_icon "tags", "me-2" %}
+                Tags
+              </h3>
+              <div>
+                {% for tag in tags %}
+                  <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="badge bg-body-tertiary text-decoration-none me-1 mb-2">
+                    {{ tag }}
+                  </a>
+                {% endfor %}
+                <a href="{{ site.url }}/blog/tags" class="badge bg-body-tertiary text-decoration-none ms-1 mb-2">
+                  View all {% uj_icon "arrow-right", "ms-1" %}
+                </a>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Newsletter CTA — the vermilion slab -->
+<section>
+  <div class="container">
+    <div class="card bg-primary text-white p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+      <div class="position-relative">
+        {% iftruthy resolved.newsletter_cta.superheadline.text %}
+          <span class="badge bg-body-tertiary p-2 mb-3">
+            {% iftruthy resolved.newsletter_cta.superheadline.icon %}
+              {% uj_icon resolved.newsletter_cta.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ resolved.newsletter_cta.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+
+        <h2 class="h2 fst-italic mb-3">
+          {{ resolved.newsletter_cta.headline }}
+          {% iftruthy resolved.newsletter_cta.headline_accent %}
+            {{ resolved.newsletter_cta.headline_accent }}
+          {% endiftruthy %}
+        </h2>
+
+        {% iftruthy resolved.newsletter_cta.subheadline %}
+          <p class="lead text-white mb-4">{{ resolved.newsletter_cta.subheadline }}</p>
+        {% endiftruthy %}
+
+        <!-- Newsletter Form -->
+        <form id="newsletter-form" class="newsletter-form" novalidate data-form-state="initializing" onsubmit="return false">
+          <div class="row g-3 justify-content-center">
+            <div class="col-md-7">
+              <input
+                type="email"
+                class="form-control form-control-lg"
+                placeholder="{{ resolved.newsletter_cta.form.placeholder }}"
+                name="email"
+                required
+                pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                autocomplete="email"
+              >
+              <div class="invalid-feedback text-start">
+                Please enter a valid email address.
+              </div>
+            </div>
+            <div class="col-md-auto">
+              <button type="submit" class="btn btn-dark btn-lg px-4">
+                <span class="button-text">{{ resolved.newsletter_cta.button.text }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Success/Error Messages -->
+          <div class="newsletter-success-alert alert alert-success mt-3 d-none" role="alert">
+            {% uj_icon "check-circle", "me-2" %}
+            {{ resolved.newsletter_cta.form.success_message }}
+          </div>
+          <div class="newsletter-error-alert alert alert-danger mt-3 d-none" role="alert">
+            {% uj_icon "exclamation-circle", "me-2" %}
+            <span class="error-message">{{ resolved.newsletter_cta.form.error_message }}</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

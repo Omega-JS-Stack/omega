@@ -1,0 +1,997 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "Download {{ site.brand.name }}"
+  headline_accent: "today"
+  description: "Get {{ site.brand.name }} for your platform and start building amazing things"
+
+# Downloads Section
+downloads:
+  superheadline:
+    icon: "download"
+    text: "Download"
+  headline: "Available on every"
+  headline_accent: "platform"
+  subheadline: "Choose your platform below to get started"
+  supported_platforms:
+    - "Windows"
+    - "macOS"
+    - "Linux"
+    - "Android"
+    - "iOS"
+  loading:
+    headline: "Detecting platform"
+    description: "Determining your operating system..."
+    button_text: "Please wait"
+  coming_soon_mobile:
+    headline: "Coming soon to mobile"
+    description: "Enter your email below and we'll send you the desktop version download link."
+  not_available:
+    headline: "Not available yet"
+    description: "{{ site.brand.name }} is not currently available for {{ platform.name }}. Please choose another platform."
+  platforms:
+    - id: "windows"
+      name: "Windows"
+      icon: "windows"
+      description: "Windows 10+"
+      types:
+        - type: "universal"
+          name: "Windows installer"
+          icon: "download"
+    - id: "mac"
+      name: "macOS"
+      icon: "apple"
+      description: "macOS 10.15+ (Apple Silicon & Intel)"
+      types:
+        - type: "universal"
+          name: "macOS installer"
+          icon: "download"
+    - id: "linux"
+      name: "Linux"
+      icon: "linux"
+      description: "Ubuntu 18.04+"
+      types:
+        - type: "debian"
+          name: "Debian package"
+          icon: "download"
+        - type: "snap"
+          name: "Snap package"
+          icon: "download"
+    - id: "android"
+      name: "Android"
+      icon: "android"
+      description: "Android 8.0+"
+      types:
+        - type: "universal"
+          name: "APK download"
+          icon: "download"
+    - id: "ios"
+      name: "iOS"
+      icon: "apple"
+      description: "iOS 13+"
+      types:
+        - type: "universal"
+          name: "Download from App Store"
+          icon: "apple"
+
+# Features Section
+features:
+  superheadline:
+    icon: "star"
+    text: "Benefits"
+  headline: "Why you should"
+  headline_accent: "download"
+  subheadline: "Everything you need to succeed, built right in"
+  items:
+    - title: "Lightning fast"
+      description: "Install in seconds and start using immediately"
+      icon: "bolt"
+    - title: "Cross-platform"
+      description: "Seamlessly sync across all your devices"
+      icon: "sync"
+    - title: "Auto-update"
+      description: "Always get the latest features automatically"
+      icon: "cloud-arrow-down"
+    - title: "Secure"
+      description: "Enterprise-grade security built-in"
+      icon: "shield-check"
+
+# System Requirements Section
+system_requirements:
+  superheadline:
+    icon: "server"
+    text: "Requirements"
+  headline: "System"
+  headline_accent: "requirements"
+  subheadline: "Make sure your device meets these minimum requirements"
+  desktop:
+    label: "Desktop"
+    icon: "desktop"
+    items:
+      - text: "2GB RAM minimum"
+        icon: "check"
+      - text: "500MB free disk space"
+        icon: "check"
+  mobile:
+    label: "Mobile"
+    icon: "mobile"
+    items:
+      - text: "100MB free storage"
+        icon: "check"
+      - text: "Internet connection required"
+        icon: "check"
+
+# FAQ Section
+faqs:
+  superheadline:
+    icon: "messages-question"
+    text: "FAQs"
+  headline: "Frequently asked"
+  headline_accent: "questions"
+  subheadline: "Everything you need to know about downloading and installing {{ site.brand.name }}."
+  items:
+    - question: "Is {{ site.brand.name }} free to download?"
+      answer: "Yes! {{ site.brand.name }} is completely free to download and use. We offer premium features for power users, but the core functionality is always free."
+    - question: "How do I update {{ site.brand.name }}?"
+      answer: "{{ site.brand.name }} automatically checks for updates and will notify you when a new version is available. You can also manually check for updates in the app settings."
+    - question: "Can I use {{ site.brand.name }} on multiple devices?"
+      answer: "Absolutely! Your {{ site.brand.name }} account works across all platforms. Download the app on all your devices and your data will sync automatically."
+    - question: "Is my data secure?"
+      answer: "Yes. We use enterprise-grade encryption to protect your data both in transit and at rest. Your privacy and security are our top priorities."
+
+# CTA Section
+cta:
+  superheadline:
+    icon: "comments"
+    text: "Support"
+  headline: "Need help getting"
+  headline_accent: "started?"
+  subheadline: "Our support team is here 24/7 to help you with installation and setup"
+  primary_button:
+    text: "Contact support"
+    icon: "headset"
+    href: "/contact"
+  secondary_button:
+    text: "View docs"
+    icon: "book"
+    href: "#docs"
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }}
+          <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+        <p class="fs-5 text-muted mb-0">
+          {{ resolved.hero.description }}
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Downloads Section -->
+<section class="pt-0">
+  <div class="container">
+
+    <!-- Platform Selector -->
+    <div class="row justify-content-center mb-5">
+      <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-center gap-3" data-lazy="@class animation-slide-up">
+          <ul class="nav nav-pills gap-3 border-0 justify-content-center w-100" id="platform-selector" role="tablist">
+          <!-- Loading tab (shown by default until platform is detected) -->
+          <li class="nav-item d-none" role="presentation" data-platform="loading">
+            <button
+              class="btn btn-outline-adaptive btn-lg active d-flex align-items-center justify-content-center"
+              id="loading-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#loading-pane"
+              type="button"
+              role="tab"
+              aria-controls="loading-pane"
+              aria-selected="true"
+            >
+              <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              Detecting...
+            </button>
+          </li>
+
+          {% for platform in resolved.downloads.platforms %}
+            {% assign has_download = false %}
+            {% for type in platform.types %}
+              {% assign config_url = site.download[platform.id][type.type] %}
+              {% iftruthy config_url %}
+                {% assign has_download = true %}
+                {% break %}
+              {% endiftruthy %}
+            {% endfor %}
+
+            <li class="nav-item flex-fill flex-sm-grow-0" role="presentation">
+              <button
+                class="btn btn-outline-adaptive btn-lg platform-btn d-flex align-items-center justify-content-center w-100"
+                id="{{ platform.id }}-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#{{ platform.id }}-pane"
+                data-platform="{{ platform.id }}"
+                data-has-download="{% if has_download %}true{% else %}false{% endif %}"
+                type="button"
+                role="tab"
+                aria-controls="{{ platform.id }}-pane"
+                aria-selected="false"
+              >
+                {% uj_icon platform.icon, "fa-3xl me-2" %}
+                {{ platform.name }}
+              </button>
+            </li>
+          {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download Buttons -->
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="tab-content">
+          <!-- Loading Platform Card -->
+          <div
+            class="tab-pane fade show active"
+            id="loading-pane"
+            role="tabpanel"
+            aria-labelledby="loading-tab"
+            tabindex="0"
+          >
+            <div class="card border-0 shadow-lg">
+              <div class="card-body p-5 text-center">
+                <div class="mb-4">
+                  <div class="avatar avatar-2xl rounded-circle bg-primary d-inline-flex align-items-center justify-content-center">
+                    <div class="spinner-border text-light" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+                </div>
+                <h2 class="h2 mb-1">{{ resolved.downloads.loading.headline }}</h2>
+                <p class="text-muted fs-5 mb-4">{{ resolved.downloads.loading.description }}</p>
+
+                <div class="d-flex flex-column gap-3">
+                  <button type="button" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center">
+                    {% uj_icon "download", "fa-3xl me-2" %}
+                    {{ resolved.downloads.loading.button_text }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% for platform in resolved.downloads.platforms %}
+        {% assign has_download = false %}
+        {% for type in platform.types %}
+          {% assign config_url = site.download[platform.id][type.type] %}
+          {% iftruthy config_url %}
+            {% assign has_download = true %}
+            {% break %}
+          {% endiftruthy %}
+        {% endfor %}
+
+          <div
+            class="tab-pane fade"
+            id="{{ platform.id }}-pane"
+            role="tabpanel"
+            aria-labelledby="{{ platform.id }}-tab"
+            tabindex="0"
+            data-platform="{{ platform.id }}"
+            data-has-download="{% if has_download %}true{% else %}false{% endif %}"
+          >
+            <div class="card border-0 shadow-lg">
+            <div class="card-body p-5 text-center">
+              <div class="mb-4">
+                <div class="avatar avatar-2xl rounded-circle bg-primary d-inline-flex align-items-center justify-content-center">
+                  {% uj_icon platform.icon, "display-4 text-light" %}
+                </div>
+              </div>
+              <h2 class="h2 mb-1">{{ platform.name }}</h2>
+              <p class="text-muted fs-5 mb-4">{{ platform.description }}</p>
+
+              {% unless has_download %}
+                {% if platform.id == "android" or platform.id == "ios" %}
+                  <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+                    {% uj_icon "mobile", "fs-4 me-3" %}
+                    <div class="text-start">
+                      <h6 class="mb-0">{{ resolved.downloads.coming_soon_mobile.headline }}</h6>
+                      <small>{{ resolved.downloads.coming_soon_mobile.description }}</small>
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                    {% uj_icon "triangle-exclamation", "fs-4 me-3" %}
+                    <div class="text-start">
+                      <h6 class="mb-0">{{ resolved.downloads.not_available.headline }}</h6>
+                      <small>{{ site.brand.name }} is not currently available for {{ platform.name }}. Please choose another platform.</small>
+                    </div>
+                  </div>
+                {% endif %}
+              {% endunless %}
+
+              {% if has_download %}
+                <div class="d-flex flex-column gap-3">
+                  {% for type in platform.types %}
+                    {% assign config_url = site.download[platform.id][type.type] %}
+                    {% iftruthy config_url %}
+                      <a
+                        href="{{ config_url }}"
+                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                        data-download="true"
+                      >
+                        {% uj_icon type.icon, "fa-3xl me-2" %}
+                        {{ type.name }}
+                      </a>
+                    {% endiftruthy %}
+                    {% iffalsy config_url %}
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                        data-download="true"
+                      >
+                        {% uj_icon type.icon, "fa-3xl me-2" %}
+                        {{ type.name }}
+                      </button>
+                    {% endiffalsy %}
+                  {% endfor %}
+                </div>
+              {% else %}
+                {% if platform.id == "android" or platform.id == "ios" %}
+                  <div class="mb-4 text-start">
+                    <form id="mobile-email-form-{{ platform.id }}" class="mobile-email-form" data-platform="{{ platform.id }}" data-form-state="initializing" onsubmit="return false">
+                      <label for="email-{{ platform.id }}" class="form-label">Email address</label>
+                      <div class="row g-3">
+                        <div class="col-12 col-md-8">
+                          <input
+                            type="email"
+                            class="form-control form-control-md"
+                            id="email-{{ platform.id }}"
+                            name="email"
+                            placeholder="jonsnow@gmail.com"
+                            autocomplete="email"
+                            required
+                          >
+                        </div>
+                        <div class="col-12 col-md-4">
+                          <button type="submit" class="btn btn-primary btn-md w-100">
+                            {% uj_icon "paper-plane", "me-2" %}
+                            Send link
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                {% endif %}
+
+                <div class="d-flex flex-column gap-3">
+                  {% for type in platform.types %}
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                      disabled
+                    >
+                      {% uj_icon type.icon, "fa-3xl me-2" %}
+                      {{ type.name }}
+                    </button>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section>
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.features.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.features.superheadline.icon %}
+            {% uj_icon resolved.features.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.features.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.features.headline }}
+        {% iftruthy resolved.features.headline_accent %}
+          <span class="text-accent">{{ resolved.features.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.features.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.features.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+
+    <div class="row g-4 justify-content-center">
+      {% for feature in resolved.features.items %}
+        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
+          <div class="card h-100 border-0 shadow-sm text-center">
+            <div class="card-body p-4">
+              <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                {% uj_icon feature.icon, "text-light fs-2" %}
+              </div>
+              <h4 class="mb-3">{{ feature.title }}</h4>
+              <p class="text-muted mb-0">{{ feature.description }}</p>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- System Requirements -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              {% iftruthy resolved.system_requirements.superheadline.text %}
+                <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+                  {% iftruthy resolved.system_requirements.superheadline.icon %}
+                    {% uj_icon resolved.system_requirements.superheadline.icon, "me-1" %}
+                  {% endiftruthy %}
+                  {{ resolved.system_requirements.superheadline.text }}
+                </span>
+              {% endiftruthy %}
+              <h2 class="h2 mb-2">
+                {{ resolved.system_requirements.headline }}
+                {% iftruthy resolved.system_requirements.headline_accent %}
+                  <span class="text-accent">{{ resolved.system_requirements.headline_accent }}</span>
+                {% endiftruthy %}
+              </h2>
+              {% iftruthy resolved.system_requirements.subheadline %}
+                <p class="fs-5 text-muted">{{ resolved.system_requirements.subheadline }}</p>
+              {% endiftruthy %}
+            </div>
+
+            <div class="row g-4">
+              <div class="col-md-6">
+                <h5 class="d-flex align-items-center mb-3">
+                  {% uj_icon resolved.system_requirements.desktop.icon, "fa-2xl me-2" %}
+                  {{ resolved.system_requirements.desktop.label }}
+                </h5>
+                <ul class="list-unstyled text-muted">
+                  {% for platform in resolved.downloads.platforms %}
+                    {% if platform.id == 'windows' or platform.id == 'mac' or platform.id == 'linux' %}
+                      <li class="mb-2">{% uj_icon "check", "text-success me-2" %} {{ platform.description }}</li>
+                    {% endif %}
+                  {% endfor %}
+                  {% for req in resolved.system_requirements.desktop.items %}
+                    <li class="mb-2">{% uj_icon req.icon, "text-success me-2" %} {{ req.text }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+
+              <div class="col-md-6">
+                <h5 class="d-flex align-items-center mb-3">
+                  {% uj_icon resolved.system_requirements.mobile.icon, "fa-2xl me-2" %}
+                  {{ resolved.system_requirements.mobile.label }}
+                </h5>
+                <ul class="list-unstyled text-muted">
+                  {% for platform in resolved.downloads.platforms %}
+                    {% if platform.id == 'ios' or platform.id == 'android' %}
+                      <li class="mb-2">{% uj_icon "check", "text-success me-2" %} {{ platform.description }}</li>
+                    {% endif %}
+                  {% endfor %}
+                  {% for req in resolved.system_requirements.mobile.items %}
+                    <li class="mb-2">{% uj_icon req.icon, "text-success me-2" %} {{ req.text }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+          {% iftruthy resolved.faqs.superheadline.text %}
+            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+              {% iftruthy resolved.faqs.superheadline.icon %}
+                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
+              {% endiftruthy %}
+              {{ resolved.faqs.superheadline.text }}
+            </span>
+          {% endiftruthy %}
+          <h2 class="h2 mb-2">
+            {{ resolved.faqs.headline }}
+            {% iftruthy resolved.faqs.headline_accent %}
+              <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
+            {% endiftruthy %}
+          </h2>
+          {% iftruthy resolved.faqs.subheadline %}
+            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        <div class="accordion" id="downloadFaqAccordion" data-lazy="@class animation-slide-up">
+          {% for faq in resolved.faqs.items %}
+            <div class="accordion-item border-0 mb-3">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                  <span class="fw-semibold">{{ faq.question }}</span>
+                </button>
+              </h2>
+              <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#downloadFaqAccordion">
+                <div class="accordion-body text-muted shadow-sm">
+                  {{ faq.answer }}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section>
+  <div class="container">
+    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+      <!-- Decorative icon - top right -->
+      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
+        {% uj_icon "messages-question", "text-white" %}
+      </div>
+
+      <!-- Decorative icon - bottom left -->
+      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
+        {% uj_icon "shield-check", "text-white" %}
+      </div>
+
+      <div class="position-relative">
+        {% iftruthy resolved.cta.superheadline.text %}
+          <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
+            {% iftruthy resolved.cta.superheadline.icon %}
+              {% uj_icon resolved.cta.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ resolved.cta.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+
+        <h2 class="h3 fw-bold mb-3">
+          {{ resolved.cta.headline }}
+          {% iftruthy resolved.cta.headline_accent %}
+            <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
+          {% endiftruthy %}
+        </h2>
+
+        {% iftruthy resolved.cta.subheadline %}
+          <p class="lead mb-4">{{ resolved.cta.subheadline }}</p>
+        {% endiftruthy %}
+
+        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+          <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-light btn-lg px-4">
+            {% uj_icon resolved.cta.primary_button.icon, "me-2" %}
+            {{ resolved.cta.primary_button.text }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Onboarding Modal -->
+<div class="modal fade" id="onboardingModal" tabindex="-1" aria-labelledby="onboardingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="onboardingModalLabel">
+          {% uj_icon "rocket", "text-primary me-2" %}
+          Getting Started
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
+          {% uj_icon "check-circle", "fs-4 me-3" %}
+          <div>
+            <h6 class="mb-0">Download started!</h6>
+            <small class="text-muted">Your download should begin automatically.</small>
+          </div>
+        </div>
+
+        <!-- Windows Instructions -->
+        <div class="platform-instructions" data-platform="windows" hidden>
+          <div class="steps-slideshow">
+            <div class="steps-slideshow-slides">
+            <div class="step-slide" data-step="1">
+              <div class="step-number-badge">1</div>
+                <h5 class="step-title">Open your Downloads folder</h5>
+              <!-- <p class="text-muted mb-3">Find the <strong>Downloads</strong> folder on your computer</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2 position-relative">
+                  <div class="folder-icon animation-flex position-relative d-flex align-items-center justify-content-center">
+                    {% uj_icon "download", "display-4" %}
+                  </div>
+                  <span class="fw-bold">Downloads</span>
+                  <div class="click-indicator folder-click-target position-absolute top-50 start-50">
+                    <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
+                    <div class="pointer-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#E0E0E0" d="M27.8,39.7c-0.1,0-0.2,0-0.4-0.1c-0.2-0.1-0.4-0.3-0.6-0.5l-3.7-8.6l-4.5,4.2C18.5,34.9,18.3,35,18,35c-0.1,0-0.3,0-0.4-0.1C17.3,34.8,17,34.4,17,34l0-22c0-0.4,0.2-0.8,0.6-0.9C17.7,11,17.9,11,18,11c0.2,0,0.5,0.1,0.7,0.3l16,15c0.3,0.3,0.4,0.7,0.3,1.1c-0.1,0.4-0.5,0.6-0.9,0.7l-6.3,0.6l3.9,8.5c0.1,0.2,0.1,0.5,0,0.8c-0.1,0.2-0.3,0.5-0.5,0.6l-2.9,1.3C28.1,39.7,27.9,39.7,27.8,39.7z"/><path fill="#212121" d="M18,12l16,15l-7.7,0.7l4.5,9.8l-2.9,1.3l-4.3-9.9L18,34L18,12 M18,10c-0.3,0-0.5,0.1-0.8,0.2c-0.7,0.3-1.2,1-1.2,1.8l0,22c0,0.8,0.5,1.5,1.2,1.8C17.5,36,17.8,36,18,36c0.5,0,1-0.2,1.4-0.5l3.4-3.2l3.1,7.3c0.2,0.5,0.6,0.9,1.1,1.1c0.2,0.1,0.5,0.1,0.7,0.1c0.3,0,0.5-0.1,0.8-0.2l2.9-1.3c0.5-0.2,0.9-0.6,1.1-1.1c0.2-0.5,0.2-1.1,0-1.5l-3.3-7.2l4.9-0.4c0.8-0.1,1.5-0.6,1.7-1.3c0.3-0.7,0.1-1.6-0.5-2.1l-16-15C19,10.2,18.5,10,18,10L18,10z"/></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="2">
+              <div class="step-number-badge">2</div>
+                <h5 class="step-title">Double-click {{ site.brand.name }}-Setup.exe</h5>
+              <!-- <p class="text-muted mb-3">Click <strong>"Yes"</strong> if Windows asks for permission</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2 position-relative">
+                  <div class="file-to-click bg-white border border-primary border-3 rounded-3 d-flex align-items-center justify-content-center">
+                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                  </div>
+                  <span class="fw-bold">{{ site.brand.name }}-Setup.exe</span>
+                  <div class="click-indicator position-absolute top-50 start-50">
+                    <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
+                    <div class="pointer-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#E0E0E0" d="M27.8,39.7c-0.1,0-0.2,0-0.4-0.1c-0.2-0.1-0.4-0.3-0.6-0.5l-3.7-8.6l-4.5,4.2C18.5,34.9,18.3,35,18,35c-0.1,0-0.3,0-0.4-0.1C17.3,34.8,17,34.4,17,34l0-22c0-0.4,0.2-0.8,0.6-0.9C17.7,11,17.9,11,18,11c0.2,0,0.5,0.1,0.7,0.3l16,15c0.3,0.3,0.4,0.7,0.3,1.1c-0.1,0.4-0.5,0.6-0.9,0.7l-6.3,0.6l3.9,8.5c0.1,0.2,0.1,0.5,0,0.8c-0.1,0.2-0.3,0.5-0.5,0.6l-2.9,1.3C28.1,39.7,27.9,39.7,27.8,39.7z"/><path fill="#212121" d="M18,12l16,15l-7.7,0.7l4.5,9.8l-2.9,1.3l-4.3-9.9L18,34L18,12 M18,10c-0.3,0-0.5,0.1-0.8,0.2c-0.7,0.3-1.2,1-1.2,1.8l0,22c0,0.8,0.5,1.5,1.2,1.8C17.5,36,17.8,36,18,36c0.5,0,1-0.2,1.4-0.5l3.4-3.2l3.1,7.3c0.2,0.5,0.6,0.9,1.1,1.1c0.2,0.1,0.5,0.1,0.7,0.1c0.3,0,0.5-0.1,0.8-0.2l2.9-1.3c0.5-0.2,0.9-0.6,1.1-1.1c0.2-0.5,0.2-1.1,0-1.5l-3.3-7.2l4.9-0.4c0.8-0.1,1.5-0.6,1.7-1.3c0.3-0.7,0.1-1.6-0.5-2.1l-16-15C19,10.2,18.5,10,18,10L18,10z"/></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="3">
+              <div class="step-number-badge">3</div>
+                <h5 class="step-title">Follow the installation setup</h5>
+              <!-- <p class="text-muted mb-3">Click <strong>"Next"</strong> through the steps and accept the terms</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="wizard-window card border-2 rounded-3 shadow overflow-hidden">
+                  <div class="wizard-header bg-primary text-light d-flex align-items-center px-2 small fw-bold">
+                    {{ site.brand.name }} Setup
+                  </div>
+                  <div class="wizard-content bg-adaptive-inverse d-flex flex-column justify-content-center p-3">
+                    <div class="small text-adaptive mb-2 text-center">Installing...</div>
+                    <div class="progress-bar-container bg-secondary rounded-pill overflow-hidden w-100">
+                      <div class="progress-fill"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="4">
+              <div class="step-number-badge">4</div>
+                <h5 class="step-title">Launch the app</h5>
+              <!-- <p class="text-muted mb-3">Find {{ site.brand.name }} in your <strong>Start Menu</strong> or <strong>Desktop</strong> shortcut</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2">
+                  <div class="app-icon animation-flex bg-white border border-primary border-3 rounded-3 d-flex align-items-center justify-content-center">
+                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                  </div>
+                  <span class="fw-bold">{{ site.brand.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            </div>
+            <div class="steps-slideshow-nav">
+              <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
+                {% uj_icon "chevron-left", "me-1" %} Back
+              </button>
+              <div class="steps-dots"></div>
+              <button type="button" class="btn btn-primary btn-sm step-next">
+                <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- macOS Instructions -->
+        <div class="platform-instructions" data-platform="mac" hidden>
+          <div class="steps-slideshow">
+            <div class="steps-slideshow-slides">
+            <div class="step-slide" data-step="1">
+              <div class="step-number-badge">1</div>
+                <h5 class="step-title">Open your Downloads folder</h5>
+              <!-- <p class="text-muted mb-3">Find the <strong>Downloads</strong> folder on your Mac</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2 position-relative">
+                  <div class="folder-icon animation-flex position-relative d-flex align-items-center justify-content-center">
+                    {% uj_icon "download", "display-4" %}
+                  </div>
+                  <span class="fw-bold">Downloads</span>
+                  <div class="click-indicator folder-click-target position-absolute top-50 start-50">
+                    <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
+                    <div class="pointer-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#E0E0E0" d="M27.8,39.7c-0.1,0-0.2,0-0.4-0.1c-0.2-0.1-0.4-0.3-0.6-0.5l-3.7-8.6l-4.5,4.2C18.5,34.9,18.3,35,18,35c-0.1,0-0.3,0-0.4-0.1C17.3,34.8,17,34.4,17,34l0-22c0-0.4,0.2-0.8,0.6-0.9C17.7,11,17.9,11,18,11c0.2,0,0.5,0.1,0.7,0.3l16,15c0.3,0.3,0.4,0.7,0.3,1.1c-0.1,0.4-0.5,0.6-0.9,0.7l-6.3,0.6l3.9,8.5c0.1,0.2,0.1,0.5,0,0.8c-0.1,0.2-0.3,0.5-0.5,0.6l-2.9,1.3C28.1,39.7,27.9,39.7,27.8,39.7z"/><path fill="#212121" d="M18,12l16,15l-7.7,0.7l4.5,9.8l-2.9,1.3l-4.3-9.9L18,34L18,12 M18,10c-0.3,0-0.5,0.1-0.8,0.2c-0.7,0.3-1.2,1-1.2,1.8l0,22c0,0.8,0.5,1.5,1.2,1.8C17.5,36,17.8,36,18,36c0.5,0,1-0.2,1.4-0.5l3.4-3.2l3.1,7.3c0.2,0.5,0.6,0.9,1.1,1.1c0.2,0.1,0.5,0.1,0.7,0.1c0.3,0,0.5-0.1,0.8-0.2l2.9-1.3c0.5-0.2,0.9-0.6,1.1-1.1c0.2-0.5,0.2-1.1,0-1.5l-3.3-7.2l4.9-0.4c0.8-0.1,1.5-0.6,1.7-1.3c0.3-0.7,0.1-1.6-0.5-2.1l-16-15C19,10.2,18.5,10,18,10L18,10z"/></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="2">
+              <div class="step-number-badge">2</div>
+                <h5 class="step-title">Double-click {{ site.brand.name }}.dmg</h5>
+              <!-- <p class="text-muted mb-3">This will mount the disk image</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2 position-relative">
+                  <div class="file-to-click bg-white border border-primary border-3 rounded-3 d-flex align-items-center justify-content-center">
+                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                  </div>
+                  <span class="fw-bold">{{ site.brand.name }}.dmg</span>
+                  <div class="click-indicator position-absolute top-50 start-50">
+                    <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
+                    <div class="pointer-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#E0E0E0" d="M27.8,39.7c-0.1,0-0.2,0-0.4-0.1c-0.2-0.1-0.4-0.3-0.6-0.5l-3.7-8.6l-4.5,4.2C18.5,34.9,18.3,35,18,35c-0.1,0-0.3,0-0.4-0.1C17.3,34.8,17,34.4,17,34l0-22c0-0.4,0.2-0.8,0.6-0.9C17.7,11,17.9,11,18,11c0.2,0,0.5,0.1,0.7,0.3l16,15c0.3,0.3,0.4,0.7,0.3,1.1c-0.1,0.4-0.5,0.6-0.9,0.7l-6.3,0.6l3.9,8.5c0.1,0.2,0.1,0.5,0,0.8c-0.1,0.2-0.3,0.5-0.5,0.6l-2.9,1.3C28.1,39.7,27.9,39.7,27.8,39.7z"/><path fill="#212121" d="M18,12l16,15l-7.7,0.7l4.5,9.8l-2.9,1.3l-4.3-9.9L18,34L18,12 M18,10c-0.3,0-0.5,0.1-0.8,0.2c-0.7,0.3-1.2,1-1.2,1.8l0,22c0,0.8,0.5,1.5,1.2,1.8C17.5,36,17.8,36,18,36c0.5,0,1-0.2,1.4-0.5l3.4-3.2l3.1,7.3c0.2,0.5,0.6,0.9,1.1,1.1c0.2,0.1,0.5,0.1,0.7,0.1c0.3,0,0.5-0.1,0.8-0.2l2.9-1.3c0.5-0.2,0.9-0.6,1.1-1.1c0.2-0.5,0.2-1.1,0-1.5l-3.3-7.2l4.9-0.4c0.8-0.1,1.5-0.6,1.7-1.3c0.3-0.7,0.1-1.6-0.5-2.1l-16-15C19,10.2,18.5,10,18,10L18,10z"/></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="3">
+              <div class="step-number-badge">3</div>
+                <h5 class="step-title">Drag {{ site.brand.name }} to Applications folder</h5>
+              <!-- <p class="text-muted mb-3">This installs the app for all users</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex gap-5 align-items-center position-relative">
+                  <div class="d-flex flex-column align-items-center gap-2 position-relative">
+                    <div class="file-to-click bg-white border border-primary border-3 rounded-3 d-flex align-items-center justify-content-center">
+                      <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                    </div>
+                    <span class="fw-bold">{{ site.brand.name }}</span>
+                    <div class="drag-indicator position-absolute top-50 start-50">
+                      <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
+                      <div class="pointer-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#E0E0E0" d="M27.8,39.7c-0.1,0-0.2,0-0.4-0.1c-0.2-0.1-0.4-0.3-0.6-0.5l-3.7-8.6l-4.5,4.2C18.5,34.9,18.3,35,18,35c-0.1,0-0.3,0-0.4-0.1C17.3,34.8,17,34.4,17,34l0-22c0-0.4,0.2-0.8,0.6-0.9C17.7,11,17.9,11,18,11c0.2,0,0.5,0.1,0.7,0.3l16,15c0.3,0.3,0.4,0.7,0.3,1.1c-0.1,0.4-0.5,0.6-0.9,0.7l-6.3,0.6l3.9,8.5c0.1,0.2,0.1,0.5,0,0.8c-0.1,0.2-0.3,0.5-0.5,0.6l-2.9,1.3C28.1,39.7,27.9,39.7,27.8,39.7z"/><path fill="#212121" d="M18,12l16,15l-7.7,0.7l4.5,9.8l-2.9,1.3l-4.3-9.9L18,34L18,12 M18,10c-0.3,0-0.5,0.1-0.8,0.2c-0.7,0.3-1.2,1-1.2,1.8l0,22c0,0.8,0.5,1.5,1.2,1.8C17.5,36,17.8,36,18,36c0.5,0,1-0.2,1.4-0.5l3.4-3.2l3.1,7.3c0.2,0.5,0.6,0.9,1.1,1.1c0.2,0.1,0.5,0.1,0.7,0.1c0.3,0,0.5-0.1,0.8-0.2l2.9-1.3c0.5-0.2,0.9-0.6,1.1-1.1c0.2-0.5,0.2-1.1,0-1.5l-3.3-7.2l4.9-0.4c0.8-0.1,1.5-0.6,1.7-1.3c0.3-0.7,0.1-1.6-0.5-2.1l-16-15C19,10.2,18.5,10,18,10L18,10z"/></svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="text-primary animation-pulse-right">
+                    {% uj_icon "arrow-right", "fs-1" %}
+                  </div>
+                  <div class="d-flex flex-column align-items-center gap-2">
+                    <div class="folder-icon position-relative d-flex align-items-center justify-content-center">
+                      <i class="fa display-4">
+                        <?xml version="1.0" encoding="utf-8"?>
+                          <svg width="800px" height="800px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="#1D81F3" d="M3,17 C2.44771525,17 2,16.5522847 2,16 C2,15.4477153 2.44771525,15 3,15 L13.5,15 C14.5,15 15.5,17 15,17 L3,17 Z M17,17 C16.4477153,17 16,16.5522847 16,16 C16,15.4477153 16.4477153,15 17,15 L21,15 C21.5522847,15 22,15.4477153 22,16 C22,16.5522847 21.5522847,17 21,17 L17,17 Z M12.6333775,3.50103556 C12.908948,3.02241319 13.5203421,2.85780709 13.9989644,3.13337754 C14.4775868,3.408948 14.6421929,4.02034208 14.3666225,4.49896444 L7.45953351,16.4954873 C7.18396306,16.9741097 6.57256898,17.1387158 6.09394661,16.8631454 C5.61532424,16.5875749 5.45071815,15.9761808 5.7262886,15.4975585 L12.6333775,3.50103556 Z M4,18.5 C4.5,17.5 7.5,16.5 6.5,18.2208385 C6.32221095,18.5267848 5.77775177,19.4528267 4.86662246,20.9989644 C4.591052,21.4775868 3.97965792,21.6421929 3.50103556,21.3666225 C3.02241319,21.091052 2.85780709,20.4796579 3.13337754,20.0010356 L4,18.5 Z M9.13337754,4.49896444 C8.85780709,4.02034208 9.02241319,3.408948 9.50103556,3.13337754 C9.97965792,2.85780709 10.591052,3.02241319 10.8666225,3.50103556 L12.6104584,6.52980328 C12.8860289,7.00842564 12.7214228,7.61981972 12.2428004,7.89539018 C11.764178,8.17096063 11.152784,8.00635453 10.8772135,7.52773217 L9.13337754,4.49896444 Z M13,11.5 C12.1018662,10 13,7 13.7163439,8.49589818 L20.3666225,20.0010356 C20.6421929,20.4796579 20.4775868,21.091052 19.9989644,21.3666225 C19.5203421,21.6421929 18.908948,21.4775868 18.6333775,20.9989644 L13,11.5 Z"/>
+                          </svg>
+                      </i>
+                    </div>
+                    <span class="fw-bold">Applications</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="4">
+              <div class="step-number-badge">4</div>
+                <h5 class="step-title">Launch the app</h5>
+              <!-- <p class="text-muted mb-3">Find {{ site.brand.name }} in your <strong>Applications</strong> folder or use <strong>Spotlight</strong></p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2">
+                  <div class="app-icon animation-flex bg-white border border-primary border-3 rounded-3 d-flex align-items-center justify-content-center">
+                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                  </div>
+                  <span class="fw-bold">{{ site.brand.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            </div>
+            <div class="steps-slideshow-nav">
+              <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
+                {% uj_icon "chevron-left", "me-1" %} Back
+              </button>
+              <div class="steps-dots"></div>
+              <button type="button" class="btn btn-primary btn-sm step-next">
+                <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linux Instructions -->
+        <div class="platform-instructions" data-platform="linux" hidden>
+          <div class="steps-slideshow">
+            <div class="steps-slideshow-slides">
+            <div class="step-slide" data-step="1">
+              <div class="step-number-badge">1</div>
+                <h5 class="step-title">Open terminal</h5>
+              <!-- <p class="text-muted mb-3">Press <strong>Ctrl+Alt+T</strong></p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2 position-relative">
+                  <div class="app-icon animation-flex bg-dark text-light rounded-3 d-flex align-items-center justify-content-center">
+                    {% uj_icon "terminal", "display-4" %}
+                  </div>
+                  <span class="fw-bold">Terminal</span>
+                  <div class="click-indicator folder-click-target position-absolute top-50 start-50">
+                    <div class="click-pulse position-absolute border border-3 border-primary rounded-circle"></div>
+                    <div class="pointer-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px"><path fill="#E0E0E0" d="M27.8,39.7c-0.1,0-0.2,0-0.4-0.1c-0.2-0.1-0.4-0.3-0.6-0.5l-3.7-8.6l-4.5,4.2C18.5,34.9,18.3,35,18,35c-0.1,0-0.3,0-0.4-0.1C17.3,34.8,17,34.4,17,34l0-22c0-0.4,0.2-0.8,0.6-0.9C17.7,11,17.9,11,18,11c0.2,0,0.5,0.1,0.7,0.3l16,15c0.3,0.3,0.4,0.7,0.3,1.1c-0.1,0.4-0.5,0.6-0.9,0.7l-6.3,0.6l3.9,8.5c0.1,0.2,0.1,0.5,0,0.8c-0.1,0.2-0.3,0.5-0.5,0.6l-2.9,1.3C28.1,39.7,27.9,39.7,27.8,39.7z"/><path fill="#212121" d="M18,12l16,15l-7.7,0.7l4.5,9.8l-2.9,1.3l-4.3-9.9L18,34L18,12 M18,10c-0.3,0-0.5,0.1-0.8,0.2c-0.7,0.3-1.2,1-1.2,1.8l0,22c0,0.8,0.5,1.5,1.2,1.8C17.5,36,17.8,36,18,36c0.5,0,1-0.2,1.4-0.5l3.4-3.2l3.1,7.3c0.2,0.5,0.6,0.9,1.1,1.1c0.2,0.1,0.5,0.1,0.7,0.1c0.3,0,0.5-0.1,0.8-0.2l2.9-1.3c0.5-0.2,0.9-0.6,1.1-1.1c0.2-0.5,0.2-1.1,0-1.5l-3.3-7.2l4.9-0.4c0.8-0.1,1.5-0.6,1.7-1.3c0.3-0.7,0.1-1.6-0.5-2.1l-16-15C19,10.2,18.5,10,18,10L18,10z"/></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="2">
+              <div class="step-number-badge">2</div>
+                <h5 class="step-title" id="linux-step-2-label">Navigate to Downloads</h5>
+              <!-- <p class="text-muted mb-3">Run the command below</p> -->
+              <div class="bg-body-tertiary rounded-4 p-4 overflow-hidden position-relative">
+                <div class="input-group">
+                  <input type="text" class="form-control font-monospace bg-dark text-light border-0" name="linux-command-1" value="cd ~/Downloads" readonly aria-labelledby="linux-step-2-label">
+                  <button type="button" class="btn btn-outline-adaptive copy-command-btn">
+                    {% uj_icon "copy", "me-2" %}
+                    <span class="button-text d-none d-sm-inline">Copy</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="3">
+              <div class="step-number-badge">3</div>
+                <h5 class="step-title" id="linux-step-3-label">Install the package</h5>
+              <!-- <p class="text-muted mb-3">Run the appropriate command for your distribution</p> -->
+              <div class="bg-body-tertiary rounded-4 p-4 overflow-hidden position-relative">
+                <div class="mb-3">
+                  <small class="text-muted d-block mb-2 fw-bold" id="linux-debian-label">For Debian/Ubuntu:</small>
+                  <div class="input-group">
+                    <input type="text" class="form-control font-monospace bg-dark text-light border-0" name="linux-command-2" value="sudo dpkg -i {{ site.brand.name | downcase }}_amd64.deb" readonly aria-labelledby="linux-debian-label">
+                    <button type="button" class="btn btn-outline-adaptive copy-command-btn">
+                      {% uj_icon "copy", "me-2" %}
+                      <span class="button-text d-none d-sm-inline">Copy</span>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <small class="text-muted d-block mb-2 fw-bold" id="linux-fedora-label">For Fedora/RHEL:</small>
+                  <div class="input-group">
+                    <input type="text" class="form-control font-monospace bg-dark text-light border-0" name="linux-command-3" value="sudo rpm -i {{ site.brand.name | downcase }}_amd64.rpm" readonly aria-labelledby="linux-fedora-label">
+                    <button type="button" class="btn btn-outline-adaptive copy-command-btn">
+                      {% uj_icon "copy", "me-2" %}
+                      <span class="button-text d-none d-sm-inline">Copy</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-slide" data-step="4">
+              <div class="step-number-badge">4</div>
+                <h5 class="step-title">Launch the app</h5>
+              <!-- <p class="text-muted mb-3">Find {{ site.brand.name }} in your <strong>Applications</strong> menu</p> -->
+              <div class="instruction-step-container bg-body-tertiary rounded-4 p-4 d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                <div class="d-flex flex-column align-items-center gap-2">
+                  <div class="app-icon animation-flex bg-white border border-primary border-3 rounded-3 d-flex align-items-center justify-content-center">
+                    <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ site.brand.images.brandmark }}" class="brandmark" alt="{{ site.brand.name }} Logo"/>
+                  </div>
+                  <span class="fw-bold">{{ site.brand.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            </div>
+            <div class="steps-slideshow-nav">
+              <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
+                {% uj_icon "chevron-left", "me-1" %} Back
+              </button>
+              <div class="steps-dots"></div>
+              <button type="button" class="btn btn-primary btn-sm step-next">
+                <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Android Instructions -->
+        <div class="platform-instructions" data-platform="android" hidden>
+          <div class="steps-slideshow">
+            <div class="steps-slideshow-slides">
+            <div class="step-slide" data-step="1">
+              <div class="step-number-badge">1</div>
+                <h5 class="step-title">Open the Play Store app</h5>
+              <!-- <p class="text-muted mb-3">Or follow the download link that opened</p> -->
+            </div>
+
+            <div class="step-slide" data-step="2">
+              <div class="step-number-badge">2</div>
+                <h5 class="step-title">Tap "Install"</h5>
+              <!-- <p class="text-muted mb-3">Grant any required permissions</p> -->
+            </div>
+
+            <div class="step-slide" data-step="3">
+              <div class="step-number-badge">3</div>
+                <h5 class="step-title">Tap "Open"</h5>
+              <!-- <p class="text-muted mb-3">Or find the app icon on your home screen</p> -->
+            </div>
+
+            </div>
+            <div class="steps-slideshow-nav">
+              <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
+                {% uj_icon "chevron-left", "me-1" %} Back
+              </button>
+              <div class="steps-dots"></div>
+              <button type="button" class="btn btn-primary btn-sm step-next">
+                <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- iOS Instructions -->
+        <div class="platform-instructions" data-platform="ios" hidden>
+          <div class="steps-slideshow">
+            <div class="steps-slideshow-slides">
+            <div class="step-slide" data-step="1">
+              <div class="step-number-badge">1</div>
+                <h5 class="step-title">Open the App Store</h5>
+              <!-- <p class="text-muted mb-3">Or follow the link that opened</p> -->
+            </div>
+
+            <div class="step-slide" data-step="2">
+              <div class="step-number-badge">2</div>
+                <h5 class="step-title">Tap "Get" or the download button</h5>
+              <!-- <p class="text-muted mb-3">You may need to verify with Face ID or Touch ID</p> -->
+            </div>
+
+            <div class="step-slide" data-step="3">
+              <div class="step-number-badge">3</div>
+                <h5 class="step-title">Tap "Open"</h5>
+              <!-- <p class="text-muted mb-3">Or find the app icon on your home screen</p> -->
+            </div>
+
+            </div>
+            <div class="steps-slideshow-nav">
+              <button type="button" class="btn btn-outline-adaptive btn-sm step-prev" disabled>
+                {% uj_icon "chevron-left", "me-1" %} Back
+              </button>
+              <div class="steps-dots"></div>
+              <button type="button" class="btn btn-primary btn-sm step-next">
+                <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-info mt-4" role="alert">
+          {% uj_icon "lightbulb", "me-2" %}
+          <strong>Need help?</strong> Please <a href="/contact" class="alert-link">contact support</a>.
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ content | uj_content_format }}

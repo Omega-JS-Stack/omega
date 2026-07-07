@@ -1,0 +1,19 @@
+// <Theme Name> — CSS Custom Properties
+// Bridges SCSS config into runtime CSS variables. Components should read these
+// var(--*) tokens (never the raw SCSS values) so dark mode is one override block.
+
+:root,
+[data-bs-theme="light"] {
+  --bs-body-bg: #{$theme-bg-light};
+  --bs-body-bg-rgb: #{red($theme-bg-light)}, #{green($theme-bg-light)}, #{blue($theme-bg-light)};
+  --bs-secondary-bg: #{$theme-surface-light};
+  // Add your own tokens, e.g.:
+  // --theme-card-bg: #{$theme-surface-light};
+}
+
+[data-bs-theme="dark"] {
+  --bs-body-bg: #{$theme-bg-dark};
+  --bs-body-bg-rgb: #{red($theme-bg-dark)}, #{green($theme-bg-dark)}, #{blue($theme-bg-dark)};
+  --bs-secondary-bg: #{$theme-surface-dark};
+  // --theme-card-bg: #{$theme-surface-dark};
+}

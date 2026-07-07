@@ -1,0 +1,454 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+permalink: /test/libraries/lazy-loading
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  title: "Lazy loading test page"
+  description: "Test page for demonstrating lazy loading functionality"
+  breadcrumb: "Lazy loading test"
+  index: false
+---
+
+<section>
+<div class="container">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <h1 class="h2 mb-4">Lazy loading test page</h1>
+      <p class="lead mb-5">This page demonstrates lazy loading of images, iframes, and other media. Scroll down to see content load as it comes into view.</p>
+
+      <!-- Instructions -->
+      <div class="alert alert-info mb-5">
+        <h5 class="alert-heading">How to Test:</h5>
+        <ol class="mb-0">
+          <li>Open browser DevTools → Network tab</li>
+          <li>Filter by Images/Media</li>
+          <li>Scroll down slowly to see images load dynamically</li>
+          <li>Images should only load when they're about to enter the viewport</li>
+        </ol>
+      </div>
+
+      <!-- First visible image (should load immediately) -->
+      <section>
+        <h2 class="h3 mb-3">1. Above the fold image (lazy loading starts immediately)</h2>
+        <p>This image is visible on page load, so it should start loading immediately:</p>
+        <img data-lazy="@src https://placehold.co/800x400?text=Immediate+Load"
+             class="card-img-top lazy"
+             alt="Immediately loaded image">
+      </section>
+
+      <!-- Spacer to push content below fold -->
+      <div class="d-flex align-items-center justify-content-center text-muted vh-100">
+        <div class="text-center">
+          {% uj_icon "arrow-down", "fa-3xl mb-3" %}
+          <p class="h4">Scroll down to trigger lazy loading...</p>
+        </div>
+      </div>
+
+      <!-- Lazy loaded images with data-src -->
+      <section>
+        <h2 class="h3 mb-3">2. Standard lazy loading (data-src)</h2>
+        <p>These images use <code>data-src</code> attribute and will load when scrolled into view:</p>
+
+        <div class="row g-4 mb-4">
+          <div class="col-md-6">
+            <div class="card">
+              <img data-lazy="@src https://placehold.co/400x300?text=Lazy+Image+1"
+                   class="card-img-top"
+                   alt="Lazy loaded image 1">
+              <div class="card-body">
+                <p class="card-text">Image #1 - Loads when visible</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <img data-lazy="@src https://placehold.co/400x300?text=Lazy+Image+2"
+                   class="card-img-top"
+                   alt="Lazy loaded image 2">
+              <div class="card-body">
+                <p class="card-text">Image #2 - Loads when visible</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Responsive images with srcset -->
+      <section>
+        <h2 class="h3 mb-3">3. Responsive Images with srcset</h2>
+        <p>These images use <code>data-srcset</code> for responsive loading:</p>
+
+        <img data-lazy="@src https://placehold.co/800x400?text=Responsive+800w"
+             class="img-fluid rounded shadow mb-4"
+             alt="Responsive lazy loaded image">
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Picture element with multiple sources -->
+      <section>
+        <h2 class="h3 mb-3">4. Picture Element with Art Direction</h2>
+        <p>Picture element with different sources for different screen sizes:</p>
+
+        <picture>
+          <source data-lazy="@srcset https://placehold.co/1200x400?text=Desktop+View"
+                  media="(min-width: 768px)">
+          <source data-lazy="@srcset https://placehold.co/600x600?text=Tablet+View"
+                  media="(min-width: 576px)">
+          <img data-lazy="@src https://placehold.co/400x400?text=Mobile+View"
+               class="img-fluid rounded shadow"
+               alt="Art directed image">
+        </picture>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Background images -->
+      <section>
+        <h2 class="h3 mb-3">5. Background Images</h2>
+        <p>These divs use <code>data-lazy-bg</code> for background images:</p>
+
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div data-lazy="@bg https://placehold.co/400x400?text=BG+1"
+                 class="rounded shadow"
+                 style="height: 250px; background-size: cover; background-position: center;">
+              <div class="d-flex align-items-end h-100 p-3">
+                <span class="badge bg-dark">Background Image 1</span>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div data-lazy="@bg https://placehold.co/400x400?text=BG+2"
+                 class="rounded shadow"
+                 style="height: 250px; background-size: cover; background-position: center;">
+              <div class="d-flex align-items-end h-100 p-3">
+                <span class="badge bg-dark">Background Image 2</span>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div data-lazy="@bg https://placehold.co/400x400?text=BG+3"
+                 class="rounded shadow"
+                 style="height: 250px; background-size: cover; background-position: center;">
+              <div class="d-flex align-items-end h-100 p-3">
+                <span class="badge bg-dark">Background Image 3</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Lazy Classes -->
+      <section>
+        <h2 class="h3 mb-3">6. Lazy loaded classes</h2>
+        <p>These elements get classes added when they come into view:</p>
+
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div data-lazy="@class animation-slide-up"
+                 class="p-4 rounded border">
+              <h5>Fade in left</h5>
+              <p>This box will fade in from the left when visible</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div data-lazy="@class animation-popup-long"
+                 class="p-4 rounded border">
+              <h5>Fade in up</h5>
+              <p>This box will fade in from below when visible</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div data-lazy="@class animation-slide-up"
+                 class="p-4 rounded border">
+              <h5>Fade in right</h5>
+              <p>This box will fade in from the right when visible</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div data-lazy="@class bg-primary text-white"
+               class="p-4 rounded">
+            <h5>Dynamic styling</h5>
+            <p>This box will get Bootstrap primary background and white text when visible</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Iframes -->
+      <section>
+        <h2 class="h3 mb-3">7. Lazy loaded iframes</h2>
+        <p>YouTube videos and other iframes that load on scroll:</p>
+
+        <div class="ratio ratio-16x9 mb-4">
+          <iframe data-lazy="@src https://www.youtube.com/embed/dQw4w9WgXcQ"
+                  title="YouTube video player"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen></iframe>
+        </div>
+
+        <div class="ratio ratio-16x9 mb-4">
+          <iframe data-lazy="@src https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3024.0917678282367!2d-74.00601228459395!3d40.71643097933047!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c25a316bb7ae1b%3A0x5e0cab9c0e0b6f0e!2sOne%20World%20Trade%20Center!5e0!3m2!1sen!2sus!4v1234567890"
+                  style="border:0;"
+                  allowfullscreen=""
+                  referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Gallery of many images -->
+      <section>
+        <h2 class="h3 mb-3">8. Image Gallery</h2>
+        <p>A grid of many images to test performance with multiple lazy-loaded elements:</p>
+
+        <div class="row g-3">
+          {% for i in (9..20) %}
+          <div class="col-6 col-md-4 col-lg-3">
+            <div class="card">
+              <img data-lazy="@src https://placehold.co/300x300?text=Image+{{ i }}"
+                   class="card-img-top"
+                   alt="Gallery image {{ i }}">
+              <div class="card-body p-2">
+                <small class="text-muted">Image #{{ i }}</small>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Video -->
+      <section>
+        <h2 class="h3 mb-3">9. Lazy loaded video</h2>
+        <p>HTML5 video that loads when scrolled into view:</p>
+
+        <video data-lazy="@src https://www.w3schools.com/html/mov_bbb.mp4"
+               controls
+               class="w-100 rounded shadow">
+          Your browser does not support the video tag.
+        </video>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Slow Loading Test with Picsum -->
+      <section>
+        <h2 class="h3 mb-3">10. Slow loading test (loading animation demo)</h2>
+        <p>These images from picsum.photos load slowly, so you can see the loading animation:</p>
+
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="card">
+              <img data-lazy="@src https://picsum.photos/600/400?random=100"
+                   class="card-img-top"
+                   alt="Slow loading image 1">
+              <div class="card-body">
+                <p class="card-text">Watch the shimmer loading animation</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <img data-lazy="@src https://picsum.photos/600/400?random=101"
+                   class="card-img-top"
+                   alt="Slow loading image 2">
+              <div class="card-body">
+                <p class="card-text">This should show loading state longer</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-2">
+          <div class="col-md-4">
+            <img data-lazy="@src https://picsum.photos/400/300?random=102"
+                 class="img-fluid rounded shadow"
+                 alt="Slow loading image 3">
+          </div>
+          <div class="col-md-4">
+            <img data-lazy="@src https://picsum.photos/400/300?random=103"
+                 class="img-fluid rounded shadow"
+                 alt="Slow loading image 4">
+          </div>
+          <div class="col-md-4">
+            <img data-lazy="@src https://picsum.photos/400/300?random=104"
+                 class="img-fluid rounded shadow"
+                 alt="Slow loading image 5">
+          </div>
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- HTML Loading Test -->
+      <section>
+        <h2 class="h3 mb-3">11. Lazy Loaded HTML Content</h2>
+        <p>This container will load HTML content when scrolled into view:</p>
+
+        <div data-lazy="@html <div class='alert alert-success'><h4 class='alert-heading'>🎉 HTML Loaded!</h4><p class='mb-0'>This HTML content was injected when you scrolled to this section.</p></div>"
+             class="border rounded p-3 mb-4"
+             style="min-height: 100px;">
+        </div>
+
+        <div data-lazy="@html <div class='card'><div class='card-body'><h5 class='card-title'>Dynamic card</h5><p class='card-text'>This entire card was lazy loaded as HTML content.</p><a href='#' class='btn btn-primary btn-sm'>Example button</a></div></div>"
+             class="mb-4">
+        </div>
+      </section>
+
+      <!-- Another spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Error handling test -->
+      <section>
+        <h2 class="h3 mb-3">12. Error handling test</h2>
+        <p>These images have invalid URLs to test error handling:</p>
+
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="card">
+              <img data-lazy="@src https://itwcreativeworks.com/image.jpg"
+                   class="card-img-top"
+                   alt="This should show error state">
+              <div class="card-body">
+                <p class="card-text text-danger">This image should fail to load</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <img data-lazy="@src https://placehold.co/400x300?text=Success+Load"
+                   class="card-img-top"
+                   alt="This should load successfully">
+              <div class="card-body">
+                <p class="card-text text-success">This image should load successfully</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Final spacer -->
+      <div class="vh-50"></div>
+
+      <!-- Very last image -->
+      <section>
+        <h2 class="h3 mb-3">13. Final Image at Bottom</h2>
+        <p>This image is at the very bottom of the page:</p>
+
+        <img data-lazy="@src https://placehold.co/800x400?text=Final+Image"
+             class="img-fluid rounded shadow"
+             alt="Final lazy loaded image">
+      </section>
+
+      <!-- Status indicator -->
+      <div class="alert alert-success text-center">
+        <h5 class="mb-0">🎉 You've reached the end!</h5>
+        <p class="mb-0">All lazy-loaded content should now be visible.</p>
+      </div>
+
+      <!-- Dynamic content test -->
+      <section>
+        <h2 class="h3 mb-3">14. Dynamic content test</h2>
+        <p>Click the button below to dynamically add new lazy-loaded images to test MutationObserver:</p>
+
+        <button id="add-dynamic-images" class="btn btn-primary mb-4">Add dynamic images</button>
+
+        <div id="dynamic-content-container" class="row g-3">
+          <!-- Dynamic images will be added here -->
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- Script for dynamic content test -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  let dynamicImageCount = 0;
+
+  document.getElementById('add-dynamic-images')?.addEventListener('click', function() {
+    const container = document.getElementById('dynamic-content-container');
+
+    // Add 3 new images
+    for (let i = 0; i < 3; i++) {
+      dynamicImageCount++;
+
+      const col = document.createElement('div');
+      col.className = 'col-md-4';
+
+      // Use picsum for one of the images to test slower loading
+      const imageUrl = i === 1
+        ? `https://picsum.photos/400/300?random=${Date.now() + dynamicImageCount}`
+        : `https://placehold.co/400x300?text=Dynamic+${dynamicImageCount}`;
+
+      col.innerHTML = `
+        <div class="card">
+          <img data-lazy="@src ${imageUrl}"
+               class="card-img-top"
+               alt="Dynamically added image ${dynamicImageCount}">
+          <div class="card-body">
+            <p class="card-text">Dynamic Image #${dynamicImageCount}</p>
+            <small class="text-muted">Added at ${new Date().toLocaleTimeString()}</small>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(col);
+    }
+
+    // Show alert
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-info mt-3';
+    alert.innerHTML = `<strong>Added 3 new images!</strong> They should automatically be picked up by the lazy loader.`;
+    container.parentElement.insertBefore(alert, container.nextSibling);
+
+    // Remove alert after 3 seconds
+    setTimeout(() => alert.remove(), 3000);
+  });
+});
+</script>
+
+<!-- Add some CSS for loading states -->
+<!-- Error state CSS only (loading and loaded states are in core CSS) -->
+<style>
+  .lazy-error {
+    background: #ffe0e0;
+    border: 2px dashed #ff0000;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lazy-error::after {
+    content: "⚠️ Failed to load";
+    color: #ff0000;
+    font-weight: bold;
+  }
+</style>

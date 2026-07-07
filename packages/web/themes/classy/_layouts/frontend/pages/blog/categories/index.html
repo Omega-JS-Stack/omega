@@ -1,0 +1,94 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "Blog"
+  headline_accent: "categories"
+  subheadline: "Browse posts by category"
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="fs-5 text-muted">
+            {{ resolved.hero.subheadline }}
+          </p>
+        {% endiftruthy %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories Grid -->
+<section class="pt-4">
+  <div class="container">
+    {% comment %} Build unique categories list with post counts {% endcomment %}
+    {% assign categories = '' | split: ',' %}
+    {% assign category_counts = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% for category in post.post.categories %}
+        {% assign category_fixed = category | uj_title_case %}
+        {% unless categories contains category_fixed %}
+          {% assign categories = categories | push: category_fixed %}
+          {% comment %} Count posts for this category {% endcomment %}
+          {% assign count = 0 %}
+          {% for p in site.posts %}
+            {% for c in p.post.categories %}
+              {% assign c_fixed = c | uj_title_case %}
+              {% if c_fixed == category_fixed %}
+                {% assign count = count | plus: 1 %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+          {% assign category_counts = category_counts | push: count %}
+        {% endunless %}
+      {% endfor %}
+    {% endfor %}
+
+    <div class="row g-4 mb-5">
+      {% for category in categories %}
+        <div class="col-xl-3 col-lg-4 col-md-6" data-lazy="@class animation-slide-up">
+          <a href="{{ site.url }}/blog/categories/{{ category | slugify }}" class="card h-100 shadow-sm border-0 text-decoration-none text-body hover-lift">
+            <div class="card-body text-center py-5">
+              <div class="mb-3">
+                {% uj_icon "folder", "fa-5xl text-primary" %}
+              </div>
+              <h2 class="h5 card-title mb-2">{{ category }}</h2>
+              <p class="text-muted mb-0">
+                {{ category_counts[forloop.index0] }} {{ category_counts[forloop.index0] | uj_pluralize: 'post', 'posts' }}
+              </p>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if categories.size == 0 %}
+      <div class="row justify-content-center">
+        <div class="col-lg-6 text-center" data-lazy="@class animation-slide-up">
+          <div class="py-5">
+            {% uj_icon "folder-open", "fa-4xl text-muted mb-3" %}
+            <h2 class="h4 text-muted">No categories yet</h2>
+            <p class="text-muted">Check back soon for categorized content.</p>
+            <a href="{{ site.url }}/blog" class="btn btn-primary">
+              {% uj_icon "arrow-left", "me-2" %}
+              Back to blog
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{{ content | uj_content_format }}

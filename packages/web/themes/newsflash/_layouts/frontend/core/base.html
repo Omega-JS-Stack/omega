@@ -1,0 +1,61 @@
+---
+### ALL PAGES ###
+layout: core/root
+
+### THEME CONFIG ###
+theme:
+  # html:
+  #   class: ""
+  head:
+    content: |
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap" media="print" onload="this.media='all'">
+  body:
+    class: "d-flex flex-column min-vh-100"
+  # main:
+  #   class: "flex-fill"
+---
+
+<!-- News ticker — the latest headlines marquee above the masthead.
+     Pure CSS animation; the track is duplicated once (aria-hidden) so the
+     -50% keyframe loops seamlessly. Absent when the site has no posts. -->
+{% if site.posts.size > 0 %}
+  <div class="ticker">
+    <div class="ticker-track">
+      {% for post in site.posts limit: 5 %}
+        <span class="ticker-item">
+          {% if forloop.first %}
+            <span class="live-dot"></span><b>LATEST</b>
+          {% else %}
+            {% uj_icon "bolt" %}
+          {% endif %}
+          <a href="{{ site.url }}{{ post.url }}">{{ post.post.title }}</a>
+        </span>
+      {% endfor %}
+      {% for post in site.posts limit: 5 %}
+        <span class="ticker-item" aria-hidden="true">
+          {% if forloop.first %}
+            <span class="live-dot"></span><b>LATEST</b>
+          {% else %}
+            {% uj_icon "bolt" %}
+          {% endif %}
+          <a href="{{ site.url }}{{ post.url }}" tabindex="-1">{{ post.post.title }}</a>
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+<!-- Nav (controlled by page/layout front matter) -->
+{% unless resolved.theme.nav.enabled == false %}
+  {%- include frontend/sections/nav.html -%}
+{% endunless %}
+
+<!-- Main Content -->
+<main id="main-content" class="flex-fill {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
+  {{ content | uj_content_format }}
+</main>
+
+<!-- Footer (controlled by page/layout front matter) -->
+{% unless resolved.theme.footer.enabled == false %}
+  {%- include frontend/sections/footer.html -%}
+{% endunless %}

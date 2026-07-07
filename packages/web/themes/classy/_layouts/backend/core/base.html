@@ -1,0 +1,55 @@
+---
+### ALL PAGES ###
+layout: core/root
+
+### THEME CONFIG ###
+theme:
+  # html:
+  #   class: ""
+  head:
+    content: |
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" media="print" onload="this.media='all'">
+  body:
+    class: "d-flex flex-column min-vh-100"
+  # main:
+  #   class: ""
+
+### WEB MANAGER CONFIG ###
+web_manager:
+  auth:
+    config:
+      policy: "authenticated"
+  cookieConsent:
+    enabled: false
+  exitPopup:
+    enabled: false
+---
+
+<!-- Backend Layout: Sidebar + (Top Bar + Content) -->
+<div class="d-flex vh-100">
+  <!-- Sidebar Navigation (full height, controlled by page/layout front matter) -->
+  {% unless resolved.theme.sidebar.enabled == false %}
+    {% if page.url contains "/admin" %}
+      {%- include admin/sections/sidebar.html -%}
+    {% else %}
+      {%- include backend/sections/sidebar.html -%}
+    {% endif %}
+  {% endunless %}
+
+  <!-- Right Side: Top Bar + Main Content -->
+  <div class="d-flex flex-column flex-fill overflow-hidden">
+    <!-- Top Bar (controlled by page/layout front matter) -->
+    {% unless resolved.theme.topbar.enabled == false %}
+      {% if page.url contains "/admin" %}
+        {%- include admin/sections/topbar.html -%}
+      {% else %}
+        {%- include backend/sections/topbar.html -%}
+      {% endif %}
+    {% endunless %}
+
+    <!-- Main Content -->
+    <main id="main-content" class="d-flex flex-column flex-fill overflow-auto p-3 p-lg-4 {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
+      {{ content | uj_content_format }}
+    </main>
+  </div>
+</div>

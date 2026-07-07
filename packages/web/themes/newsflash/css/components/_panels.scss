@@ -1,0 +1,91 @@
+// Newsflash Theme — Shared Panels & Numerals
+// Cross-page editorial set pieces: the dark "big read" CTA band (home,
+// pricing, about) and the stroked serif numerals (stats strips, step
+// numbers). Universal semantic class names — no theme prefixes.
+
+// ============================================
+// CTA panel — the dark big-read band
+// ============================================
+.cta-panel {
+  background: var(--nf-panel-bg);
+  color: var(--nf-panel-color);
+  border-radius: calc(#{$nf-radius} + 8px);
+  padding: clamp(2.5rem, 6vw, 4rem);
+  position: relative;
+  overflow: hidden;
+
+  .kicker {
+    color: var(--nf-volt);
+  }
+
+  .text-accent {
+    color: var(--nf-volt);
+  }
+}
+
+.cta-title {
+  font-style: italic;
+  font-weight: 550;
+  font-size: clamp(2rem, 3.6vw, 3.2rem);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  margin: 0.75rem 0;
+}
+
+.cta-desc {
+  color: var(--nf-panel-color);
+  opacity: 0.72;
+  max-width: 36em;
+  margin-bottom: 1.75rem;
+}
+
+// Spinning vermilion ring field — the band's decorative flourish
+.cta-rings {
+  position: absolute;
+  right: -120px;
+  top: 50%;
+  width: 520px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, var(--nf-vermilion) 0 2px, transparent 2px 34px);
+  opacity: 0.7;
+  transform: translateY(-50%);
+  animation: cta-rings-spin 60s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes cta-rings-spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+@media (max-width: 991.98px) {
+  .cta-rings { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-rings { animation: none; }
+}
+
+// ============================================
+// Feature icon chip — round accent badge for desk cards (features, values,
+// contact methods)
+// ============================================
+.feature-icon {
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  border: var(--nf-border);
+}
+
+// ============================================
+// Stroked numerals — stats strips, oversized counters
+// ============================================
+.stat-num {
+  font-family: $nf-font-display;
+  font-style: italic;
+  font-weight: 800;
+  font-size: clamp(2.6rem, 5vw, 3.6rem);
+  line-height: 1.1;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--nf-ink);
+}

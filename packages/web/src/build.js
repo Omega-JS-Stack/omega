@@ -49,15 +49,16 @@ async function buildSite(options) {
 
   fs.rmSync(options.outDir, { recursive: true, force: true });
 
-  // ---- assets first: the manifest feeds the head include
+  // ---- assets first: the manifest feeds the head/foot includes
   const manifest = await phase('assets', () =>
     buildAssets({
-      jsLayers: [
-        ...(options.siteAssetsDir ? [path.join(options.siteAssetsDir, 'js')] : []),
-        ...themeLayerDirs.map((dir) => path.join(dir, 'js')),
-        path.join(coreDir, 'js'),
+      layers: [
+        ...(options.siteAssetsDir ? [options.siteAssetsDir] : []),
+        ...themeLayerDirs,
+        coreDir,
       ],
-      cssLayers: [...themeLayerDirs.map((dir) => path.join(dir, 'css')), path.join(coreDir, 'css')],
+      themesDir,
+      coreDir,
       outDir: options.outDir,
       clientEntry: options.clientEntry,
     })
@@ -84,6 +85,7 @@ async function buildSite(options) {
           layoutMode: options.layoutMode,
           farmDir: options.farmDir,
           assetManifest: manifest,
+          environment: options.environment,
         }),
     });
     await elev.write();

@@ -1,0 +1,25 @@
+// Forward the theme (allows consuming project to configure it).
+// `omega:theme` resolves _theme.scss through the layer chain
+// (active theme → classy) — never relatively.
+@forward 'omega:theme';
+@use 'omega:theme' as *;
+
+// Vendor styles
+// @use 'vendor/cookieconsent' as *;
+
+// Import libraries
+// Important to do these BEFORE defaults so the animations, etc can be overridden
+// @use 'core/_chatsy' as *;
+@use 'core/_cookieconsent' as *;
+@use 'core/_lazy-loading' as *;
+@use 'core/_bindings' as *;
+@use 'core/_social-sharing' as *;
+@use 'core/_custom-font-awesome' as *;
+
+// Import default Ultimate Jekyll Manager styles
+@use 'core/_initialize' as *;
+@use 'core/_utilities' as *;
+@use 'core/_animations' as *;
+@use 'core/_alert' as *;
+@use 'core/_exit-popup' as *;
+@use 'core/_verts' as *;

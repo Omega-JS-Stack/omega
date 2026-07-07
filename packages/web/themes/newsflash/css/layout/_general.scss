@@ -1,0 +1,264 @@
+// Newsflash Theme — General Layout
+// Section rhythm, footer, shadow utilities, and overrides for the
+// gradient/accent classes the shared (Classy-derived) layouts emit. The goal:
+// inherited pages (auth, account, team, feedback…) render as flat editorial
+// paper-and-ink — no layout override needed.
+
+// ============================================
+// Section rhythm
+// ============================================
+// Shared layouts rely on the theme to provide vertical section padding.
+// The masthead is sticky (in-flow), so no first-section navbar offset is
+// needed — content starts right under the bar.
+section {
+  padding-top: clamp(3rem, 6vw, 5rem);
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+
+// ============================================
+// Gradient neutralization — inherited markup goes flat editorial
+// ============================================
+.bg-gradient-rainbow,
+.gradient-animated,
+.gradient-grain {
+  background-image: none !important;
+  animation: none !important;
+}
+
+// Hero sections ship as .bg-gradient-rainbow with light text; flatten to a
+// paper-2 well closed by an ink rule, and pull the text back to ink.
+section.bg-gradient-rainbow {
+  background-color: var(--nf-paper-2) !important;
+  color: var(--bs-body-color) !important;
+  border-radius: 0 !important;
+  border-bottom: var(--nf-border);
+  box-shadow: none !important;
+
+  .text-light,
+  &.text-light,
+  h1, h2, h3, .lead,
+  p {
+    color: var(--bs-body-color) !important;
+  }
+
+  // The hero tagline becomes a vermilion kicker line
+  .text-uppercase {
+    color: var(--bs-primary) !important;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    opacity: 1 !important;
+  }
+}
+
+// Gradient-clipped text → solid italic serif vermilion
+.text-gradient-rainbow {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--bs-primary) !important;
+  font-family: $nf-font-display;
+  font-style: italic;
+}
+
+// Decorative gradient borders → hairline ink
+.border-gradient-rainbow {
+  border-image: none !important;
+  border-color: var(--nf-line) !important;
+}
+
+// Glassy panels → framed paper
+.bg-glassy,
+.card.bg-glassy {
+  background: var(--bs-card-bg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  @include nf-border();
+}
+
+// Gradient promo/CTA cards (newsletter bands on inherited blog pages) →
+// solid vermilion signup slab with ink frame + hard offset shadow.
+.card.bg-gradient,
+.card.bg-primary {
+  background-image: none !important;
+  background-color: var(--bs-primary) !important;
+  color: #fff !important;
+  @include nf-border();
+  box-shadow: var(--nf-shadow-hard-hover) !important;
+}
+
+// ============================================
+// Shadow utilities → editorial pop (soft depth; frames carry the ink)
+// ============================================
+.shadow-sm { box-shadow: 0 8px 20px -14px rgba(23, 19, 16, 0.35) !important; }
+.shadow    { box-shadow: var(--nf-shadow-pop) !important; }
+.shadow-lg { box-shadow: var(--nf-shadow-pop) !important; }
+
+// Cards that ship with .border-0 (e.g. the auth card) lose the frame; give it
+// back on elevated cards so the ink outline + pop shadow read as one object.
+.card.border-0.shadow-sm,
+.card.border-0.shadow,
+.card.border-0.shadow-lg {
+  @include nf-border();
+}
+
+// ============================================
+// Rules — hr reads as a soft editorial divider
+// ============================================
+hr {
+  border-top: 1px solid var(--nf-line);
+  opacity: 1;
+}
+
+// ============================================
+// Footer — the ink slab that closes every page
+// ============================================
+// The shared footer include ships a .bg-body-secondary utility (!important,
+// specificity 0,1,0) — the ink slab needs !important AND the class-qualified
+// selector to beat it (a bare `footer` ties on !important and loses on
+// specificity).
+footer,
+footer.bg-body-secondary {
+  background: var(--nf-panel-bg) !important;
+}
+
+footer {
+  color: var(--nf-panel-color);
+
+  h1, h2, h3, h4, h5, h6,
+  .h1, .h2, .h3, .h4, .h5, .h6 {
+    color: var(--nf-panel-color);
+  }
+
+  a {
+    color: var(--nf-panel-color);
+    opacity: 0.78;
+    text-decoration: none;
+    transition: $nf-transition;
+
+    &:hover {
+      opacity: 1;
+      color: var(--nf-volt);
+    }
+  }
+
+  // The inherited (classy) footer brand row ships an avatar + .h5 wordmark;
+  // render it as the masthead echo instead — wordmark-only, oversized serif —
+  // and keep the description to a column measure.
+  .h5 {
+    font-family: $nf-font-display;
+    font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+
+    .avatar { display: none; }
+  }
+
+  p { max-width: 24em; }
+
+  // Inherited links carry .link-muted / .text-body utilities (!important
+  // color) — repaint with panel color so they read on the ink slab.
+  .text-body { color: var(--nf-panel-color) !important; }
+
+  .link-muted {
+    color: var(--nf-panel-color) !important;
+
+    &:hover,
+    &:focus {
+      color: var(--nf-volt) !important;
+      text-decoration: none;
+      opacity: 1;
+    }
+  }
+
+  // Muted footer text keeps panel contrast (utilities would go ink-soft)
+  .text-muted,
+  .text-body-secondary {
+    color: var(--nf-panel-color) !important;
+    opacity: 0.6;
+  }
+
+  // Volt uppercase column heads (the editorial footer's section labels).
+  // !important on weight: the inherited column heads carry .fw-semibold.
+  h6, .h6 {
+    font-family: $font-family-sans-serif;
+    font-size: 0.72rem;
+    font-weight: 800 !important;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--nf-volt);
+  }
+
+  // Rules + dividers read as faint panel-color lines on the ink slab
+  hr,
+  .border-top {
+    border-top-color: color-mix(in srgb, var(--nf-panel-color) 18%, transparent) !important;
+  }
+
+  // Outline buttons (language/appearance pickers) carry the panel color — the
+  // global ghost-button rule paints body ink, which vanishes on the slab.
+  // Doubled attribute + footer scope (0,2,1) beats the global doubled rule.
+  [class*="btn-outline-"][class*="btn-outline-"] {
+    color: var(--nf-panel-color);
+    border-color: color-mix(in srgb, var(--nf-panel-color) 55%, transparent);
+    opacity: 1;
+    --bs-btn-hover-bg: var(--nf-panel-color);
+    --bs-btn-hover-color: var(--nf-panel-bg);
+
+    &:hover {
+      color: var(--nf-panel-bg);
+      background: var(--nf-panel-color);
+      border-color: var(--nf-panel-color);
+    }
+  }
+}
+
+// ============================================
+// Alerts, accordions, modals — framed paper panels
+// ============================================
+.alert {
+  @include nf-border();
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.accordion-item {
+  @include nf-border();
+  background: var(--bs-card-bg);
+
+  // Bootstrap strips the top border on stacked items; ours are framed
+  // objects, so force the full frame back on every item.
+  &:not(:first-of-type) {
+    border-top: var(--nf-border) !important;
+  }
+}
+
+.accordion-button {
+  font-family: $nf-font-display;
+  font-weight: 600;
+  background: var(--bs-card-bg);
+  color: var(--bs-body-color);
+
+  &:not(.collapsed) {
+    background: var(--nf-volt);
+    color: var(--nf-volt-ink);
+    box-shadow: none;
+  }
+
+  &:focus {
+    box-shadow: none;
+    border-color: var(--nf-border-color);
+  }
+}
+
+.modal-content,
+.toast,
+.offcanvas {
+  background: var(--bs-card-bg);
+  @include nf-border();
+  @include nf-shadow-pop();
+}
+
+// Back-to-top / floating action buttons stay on-brand
+.btn-back-to-top {
+  border-radius: 50rem;
+  @include nf-border();
+  @include nf-shadow-hard();
+}

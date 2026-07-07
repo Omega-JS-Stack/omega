@@ -1,9 +1,0 @@
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="omega-theme" content="dusk">
-<title>{% iftruthy meta.title %}{{ meta.title }}{% endiftruthy %}{% iffalsy meta.title %}{{ site.meta.title }}{% endiffalsy %}</title>
-<meta name="description" content="{{ meta.description | default: site.meta.description }}">
-<link rel="canonical" href="{% uj_external page.url %}">
-<link rel="icon" href="{{ '/favicon.ico' | uj_cachebreak }}">
-<link rel="stylesheet" href="{{ assetManifest.css.theme }}">
-{% if pageModule %}<script defer src="{{ assetManifest.js[pageModule] }}"></script>{% endif %}

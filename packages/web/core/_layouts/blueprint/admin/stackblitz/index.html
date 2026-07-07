@@ -1,0 +1,33 @@
+---
+### ALL PAGES ###
+layout: admin/core/minimal
+
+### THEME CONFIG ###
+theme:
+  header:
+    title:
+      content: "Stackblitz"
+      icon: "bolt"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Stackblitz"
+
+### REGULAR PAGES ###
+meta:
+  title: "Stackblitz - Admin"
+  description: "Stackblitz cloud IDE"
+  breadcrumb: "Stackblitz"
+---
+
+<div class="row flex-grow-1">
+  <div class="col d-flex">
+    <iframe
+      src="https://stackblitz.com/edit/itw-creative-works-nodejs?embed=1&view=editor&hidedevtools=0&terminalHeight=30&showSidebar=1"
+      class="border-0 rounded w-100 flex-grow-1"
+      allowfullscreen
+      loading="lazy">
+    </iframe>
+  </div>
+</div>

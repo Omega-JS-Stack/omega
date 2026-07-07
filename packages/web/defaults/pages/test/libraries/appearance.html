@@ -1,0 +1,273 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+permalink: /test/libraries/appearance
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  title: "Appearance test page"
+  description: "Testing the appearance switching system (dark, light, system modes)."
+  breadcrumb: "Appearance test"
+  index: false
+
+---
+
+<section>
+<div class="container">
+  <h1 class="mb-4">Appearance test page</h1>
+  <p class="text-muted mb-5">Testing the appearance switching system with detailed debugging information.</p>
+
+  <div class="row g-4">
+
+    <!-- Theme Switcher -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Theme Switcher</h5>
+          <small class="text-muted">Click to change appearance mode</small>
+        </div>
+        <div class="card-body">
+          <!-- Dropdown Switcher -->
+          <div class="mb-4">
+            <label class="form-label">Dropdown Switcher</label>
+            <div class="dropdown">
+              <button class="btn btn-outline-adaptive dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <span data-appearance-icon="light" hidden>{% uj_icon "sun", "fa-md me-2" %}</span>
+                <span data-appearance-icon="dark" hidden>{% uj_icon "moon-stars", "fa-md me-2" %}</span>
+                <span data-appearance-icon="system" hidden>{% uj_icon "circle-half-stroke", "fa-md me-2" %}</span>
+                <span data-appearance-current></span>
+              </button>
+              <ul class="dropdown-menu w-100">
+                <li><a class="dropdown-item" href="#" data-appearance-set="light">{% uj_icon "sun", "fa-md me-2" %} Light</a></li>
+                <li><a class="dropdown-item" href="#" data-appearance-set="dark">{% uj_icon "moon-stars", "fa-md me-2" %} Dark</a></li>
+                <li><a class="dropdown-item" href="#" data-appearance-set="system">{% uj_icon "circle-half-stroke", "fa-md me-2" %} System</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Button Group Switcher -->
+          <div class="mb-4">
+            <label class="form-label">Button Group Switcher</label>
+            <div class="btn-group w-100" role="group">
+              <button type="button" class="btn btn-outline-adaptive" data-appearance-set="light">
+                {% uj_icon "sun", "fa-md me-1" %} Light
+              </button>
+              <button type="button" class="btn btn-outline-adaptive" data-appearance-set="dark">
+                {% uj_icon "moon-stars", "fa-md me-1" %} Dark
+              </button>
+              <button type="button" class="btn btn-outline-adaptive" data-appearance-set="system">
+                {% uj_icon "circle-half-stroke", "fa-md me-1" %} System
+              </button>
+            </div>
+          </div>
+
+          <!-- Programmatic Controls -->
+          <div class="mb-4">
+            <label class="form-label">Programmatic Controls</label>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-primary btn-sm" id="btn-toggle">
+                {% uj_icon "repeat", "fa-md me-1" %} Toggle (dark/light)
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-cycle">
+                {% uj_icon "arrows-spin", "fa-md me-1" %} Cycle (all 3)
+              </button>
+              <button type="button" class="btn btn-warning btn-sm" id="btn-clear">
+                {% uj_icon "trash", "fa-md me-1" %} Clear Preference
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Set -->
+          <div>
+            <label class="form-label">Quick Set via API</label>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-warning btn-sm" id="btn-set-light">set('light')</button>
+              <button type="button" class="btn btn-outline-info btn-sm" id="btn-set-dark">set('dark')</button>
+              <button type="button" class="btn btn-outline-success btn-sm" id="btn-set-system">set('system')</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debug Panel -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Debug Panel</h5>
+            <small class="text-muted">Live values (updates automatically)</small>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refresh">
+            {% uj_icon "arrows-rotate", "fa-md" %}
+          </button>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tbody>
+              <tr>
+                <th scope="row" class="text-muted" style="width: 50%;">Saved Preference</th>
+                <td><code id="debug-saved">-</code></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Resolved Theme</th>
+                <td><code id="debug-resolved">-</code></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">data-bs-theme attr</th>
+                <td><code id="debug-attr">-</code></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">localStorage raw</th>
+                <td><code id="debug-localstorage">-</code></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">System Preference</th>
+                <td><code id="debug-system">-</code></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Site Preset (Jekyll)</th>
+                <td><code id="debug-preset">{{ resolved.theme.appearance }}</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Event Log</h5>
+            <small class="text-muted">Theme change events</small>
+          </div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-clear-log">
+            {% uj_icon "trash", "fa-md" %}
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <pre id="event-log" class="mb-0 p-3 small" style="max-height: 200px; overflow: auto; background: var(--bs-tertiary-bg);">Waiting for events...</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visual Test -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Visual theme test</h5>
+          <small class="text-muted">These elements should adapt to the current theme</small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <!-- Background colors -->
+            <div class="col-md-4">
+              <h6>Backgrounds</h6>
+              <div class="p-2 mb-2 bg-body border rounded">bg-body</div>
+              <div class="p-2 mb-2 bg-body-secondary border rounded">bg-body-secondary</div>
+              <div class="p-2 mb-2 bg-body-tertiary border rounded">bg-body-tertiary</div>
+            </div>
+
+            <!-- Text colors -->
+            <div class="col-md-4">
+              <h6>Text</h6>
+              <p class="text-body mb-2">text-body (primary text)</p>
+              <p class="text-body-secondary mb-2">text-body-secondary</p>
+              <p class="text-body-tertiary mb-2">text-body-tertiary</p>
+              <p class="text-muted mb-2">text-muted</p>
+            </div>
+
+            <!-- Buttons -->
+            <div class="col-md-4">
+              <h6>Adaptive buttons</h6>
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-adaptive">btn-adaptive</button>
+                <button class="btn btn-outline-adaptive">btn-outline-adaptive</button>
+              </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="col-md-6">
+              <h6>Alerts</h6>
+              <div class="alert alert-primary py-2 mb-2">Primary alert</div>
+              <div class="alert alert-secondary py-2 mb-2">Secondary alert</div>
+              <div class="alert alert-success py-2 mb-0">Success alert</div>
+            </div>
+
+            <!-- Form -->
+            <div class="col-md-6">
+              <h6>Form elements</h6>
+              <input type="text" class="form-control mb-2" placeholder="Text input">
+              <select class="form-select mb-2">
+                <option>Select option</option>
+              </select>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="test-check" checked>
+                <label class="form-check-label" for="test-check">Checkbox</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Reference -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">API Reference</h5>
+          <small class="text-muted">webManager.uj().appearance methods</small>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Method</th>
+                  <th>Returns</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>.get()</code></td>
+                  <td><code>'dark' | 'light' | 'system' | null</code></td>
+                  <td>Get saved preference (null if not set)</td>
+                </tr>
+                <tr>
+                  <td><code>.getResolved()</code></td>
+                  <td><code>'dark' | 'light'</code></td>
+                  <td>Get actual displayed theme</td>
+                </tr>
+                <tr>
+                  <td><code>.set(value)</code></td>
+                  <td><code>void</code></td>
+                  <td>Save and apply preference ('dark', 'light', or 'system')</td>
+                </tr>
+                <tr>
+                  <td><code>.toggle()</code></td>
+                  <td><code>void</code></td>
+                  <td>Toggle between dark and light</td>
+                </tr>
+                <tr>
+                  <td><code>.cycle()</code></td>
+                  <td><code>void</code></td>
+                  <td>Cycle: dark -> light -> system -> dark</td>
+                </tr>
+                <tr>
+                  <td><code>.clear()</code></td>
+                  <td><code>void</code></td>
+                  <td>Clear saved preference (revert to site default)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</section>

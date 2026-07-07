@@ -26,7 +26,24 @@ const { PATHS } = require('./paths.js');
 const RESOLVED_OMIT = new Set([
   'collections', 'content', 'page', 'eleventy', 'pkg', 'eleventyComputed',
   'resolved', 'permalink', 'layout', 'tags', 'pagination', 'site', 'assetManifest',
+  'paginator', 'pageAssets', 'jekyll',
 ]);
+
+// Site keys that do NOT seed `resolved` (bulk/runtime values templates read
+// via site.* directly — mirrors inject-properties.rb's config exclusions,
+// which also dropped `collections`; seeding the site collection arrays
+// would make every page's resolved walk all 1,030 post docs).
+const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'updates', 'alternatives']);
+
+// Plain-object deep merge (b wins) — fresh containers, never mutates either side.
+function deepMerge(a, b) {
+  if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+    const out = { ...a };
+    for (const key of Object.keys(b)) out[key] = deepMerge(a[key], b[key]);
+    return out;
+  }
+  return b === undefined ? a : b;
+}
 
 /**
  * Configure an Eleventy instance as an OMEGA web engine.
@@ -72,11 +89,55 @@ function configureOmega(eleventyConfig, options) {
     jekyllInclude: true,
     root: includeRoots,
     timezoneOffset: 0,
+    // Parsed-template cache for includes: without it LiquidJS re-reads and
+    // re-parses every {% include %} on every render — the real core chrome
+    // (head/body/foot ≈ 885 lines) made that the corpus bottleneck
+    // (40.6s → measured again with cache below). Keyed by resolved file
+    // path, so theme switches (different winning path) stay correct.
+    cache: true,
   });
+
+  // ---- Jekyll site-data emulation.
+  // site.data._includes.<path> mirrors UJM's json-in-_includes data system
+  // (admin sidebar/topbar read site.data._includes.admin.sections.sidebar):
+  // every .json under a layered include root lands at its path, higher
+  // layers win.
+  const dataIncludes = {};
+  for (const root of [...includeRoots].reverse()) {
+    for (const entry of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      const rel = path.relative(root, path.join(entry.parentPath, entry.name));
+      const segments = rel.replace(/\.json$/, '').split(path.sep);
+      let node = dataIncludes;
+      for (const segment of segments.slice(0, -1)) node = node[segment] = node[segment] || {};
+      try {
+        node[segments[segments.length - 1]] = JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
+      } catch { /* malformed data file — leave the slot empty */ }
+    }
+  }
+  site.data = { ...(site.data || {}), _includes: dataIncludes };
+
 
   // ---- template-kit on Eleventy's own Liquid instance
   const md = markdownIt({ html: true });
   const collectionsHolder = new Map();
+
+  // site.posts / site.team / site.updates / site.alternatives are Jekyll's
+  // site collections, flattened to Jekyll doc shape (post.url, post.date,
+  // post.post.title). Real arrays SYNCED when the holder fills — mutated in
+  // place, never reassigned: the site object is captured into Eleventy's
+  // data cascade at data-init (before collections compute), so replacing the
+  // array (or lazy getters) after that is invisible to templates.
+  const SITE_COLLECTIONS = ['posts', 'team', 'updates', 'alternatives'];
+  for (const name of SITE_COLLECTIONS) site[name] = [];
+  const holderSet = collectionsHolder.set.bind(collectionsHolder);
+  collectionsHolder.set = (name, docs) => {
+    if (SITE_COLLECTIONS.includes(name)) {
+      site[name].length = 0;
+      site[name].push(...docs.map((doc) => ({ url: doc.url, date: doc.date, ...doc.data })));
+    }
+    return holderSet(name, docs);
+  };
 
   eleventyConfig.amendLibrary('liquid', (engine) => {
     registerLiquid(engine, {
@@ -95,10 +156,24 @@ function configureOmega(eleventyConfig, options) {
   });
 
   // ---- Layered layouts (zero copying): virtual templates or symlink farm.
+  // Layer order: consumer-local _layouts (sweet-saucy ships src/_layouts/
+  // recipe.html) → active theme → classy → core (blueprint/root/modules —
+  // the theme-agnostic framework layouts live in the core layer).
   // The farm must live OUTSIDE the input dir — inside it, Eleventy processes
   // the symlinked layouts as content templates (and `../`-relative inputs
   // defeat ignore globs).
-  const layoutMap = collectLayered(themeLayers.map((layer) => path.join(layer, '_layouts')));
+  const layoutMap = collectLayered([
+    path.join(options.consumerDir, '_layouts'),
+    ...themeLayers.map((layer) => path.join(layer, '_layouts')),
+    path.join(coreDir, '_layouts'),
+  ]);
+  // Consumer _layouts live INSIDE the input dir — without an ignore, Eleventy
+  // would process them as content templates (each writing to /index.html).
+  // Eleventy matches ignores against CWD-RELATIVE paths (`../corpus/...` for
+  // `../`-relative input dirs — the known farm gotcha), so the glob must be
+  // built the same way; the bare `**/` form covers cwd-contained inputs.
+  eleventyConfig.ignores.add('**/_layouts/**');
+  eleventyConfig.ignores.add(path.join(path.relative(process.cwd(), options.consumerDir), '_layouts', '**'));
   if (layoutMode === 'farm') {
     composeSymlinkFarm(layoutMap, options.farmDir);
     eleventyConfig.setIncludesDirectory(path.relative(options.consumerDir, options.farmDir));
@@ -108,18 +183,22 @@ function configureOmega(eleventyConfig, options) {
 
   // ---- Legacy bracket-layout hack → alias table. Layout values are resolved
   // BEFORE preprocessors run (Template #getData vs getTemplates), so this
-  // cannot be a data transform — it's a fixed alias set for the one legacy
-  // idiom (`themes/[ site.theme.id ]/frontend/core/base`); the migration
-  // codemod (B4) rewrites these away permanently.
+  // cannot be a data transform — every layer-resolved layout name gets its
+  // legacy spellings aliased (`themes/[ site.theme.id ]/frontend/pages/X`,
+  // plus hardcoded `themes/<id>/X`). Migrated content uses the plain names;
+  // the migration codemod (B4) rewrites the legacy idioms away permanently.
   const themeIds = fs.readdirSync(themesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
-  const legacyForms = [
-    'themes/[ site.theme.id ]/frontend/core/base',
-    'themes/[site.theme.id]/frontend/core/base',
-    ...themeIds.map((id) => `themes/${id}/frontend/core/base`),
-  ];
-  for (const from of legacyForms) eleventyConfig.addLayoutAlias(from, 'core/base.html');
+  for (const rel of layoutMap.keys()) {
+    const plain = rel.replace(/\.[a-z]+$/, '');
+    const spellings = [
+      `themes/[ site.theme.id ]/${plain}`,
+      `themes/[site.theme.id]/${plain}`,
+      ...themeIds.map((id) => `themes/${id}/${plain}`),
+    ];
+    for (const from of spellings) eleventyConfig.addLayoutAlias(from, rel);
+  }
 
   // ---- Frontmatter Liquid + collection tagging
   const frontmatter = createFrontmatterResolver({ site });
@@ -128,6 +207,7 @@ function configureOmega(eleventyConfig, options) {
     if (inputPath.includes('/_posts/')) data.tags = ['posts'];
     else if (inputPath.includes('/_alternatives/')) data.tags = ['alternatives'];
     else if (inputPath.includes('/_team/')) data.tags = ['team'];
+    else if (inputPath.includes('/_updates/')) data.tags = ['updates'];
 
     frontmatter.resolveData(data);
   });
@@ -136,29 +216,82 @@ function configureOmega(eleventyConfig, options) {
   eleventyConfig.addGlobalData('eleventyComputed', {
     permalink: (data) => {
       const inputPath = data.page.inputPath;
-      // Jekyll dated filenames: Eleventy's fileSlug already strips the date
-      if (inputPath.includes('/_posts/')) return `/blog/${data.page.fileSlug}/`;
-      if (inputPath.includes('/_alternatives/')) return `/alternatives/${data.page.fileSlug}/`;
+      // Collection URLs mirror UJM's Jekyll defaults (permalink: "/<coll>/
+      // :title", with Eleventy's fileSlug stripping the dated-filename part) —
+      // but an EXPLICIT permalink in the doc's frontmatter wins, like Jekyll.
+      // '' counts as absent: Eleventy's computed dependency pass probes with
+      // an empty-string proxy, and that probe value persists into the data.
+      if (data.permalink === undefined || data.permalink === '') {
+        if (inputPath.includes('/_posts/')) return `/blog/${data.page.fileSlug}/`;
+        if (inputPath.includes('/_alternatives/')) return `/alternatives/${data.page.fileSlug}/`;
+        if (inputPath.includes('/_team/')) return `/team/${data.page.fileSlug}/`;
+        if (inputPath.includes('/_updates/')) return `/updates/${data.page.fileSlug}/`;
+      }
       // Jekyll pretty URLs: `/about` means `/about/index.html`
       if (typeof data.permalink === 'string' && !path.extname(data.permalink) && !data.permalink.endsWith('/')) {
         return `${data.permalink}/`;
       }
       return data.permalink;
     },
+    // Jekyll paginator compat: layouts iterate `paginator.posts` with Jekyll
+    // post shapes (post.url, post.post.title), so items are flattened
+    // ({ url, date, ...data }) — references, not copies.
+    paginator: (data) => {
+      const p = data.pagination;
+      if (!p || !p.items) return undefined;
+      const totalPages = (p.pages || []).length;
+      return {
+        posts: p.items.map((item) => ({ url: item.url, date: item.date, ...item.data })),
+        page: p.pageNumber + 1,
+        per_page: p.items.length,
+        total_pages: totalPages,
+        previous_page: p.pageNumber > 0 ? p.pageNumber : null,
+        previous_page_path: (p.href && p.href.previous) || null,
+        next_page: p.pageNumber + 2 <= totalPages ? p.pageNumber + 2 : null,
+        next_page_path: (p.href && p.href.next) || null,
+      };
+    },
+    // Per-page asset lookups against the content-hash manifest: `<key>` for
+    // flat entries (js/pages/pricing.js), `<key>/index` for per-page dirs
+    // (js/pages/pricing/index.js). `asset_path` frontmatter overrides the
+    // URL-derived key (blueprint/blog/post sets asset_path: blog/post).
+    pageAssets: (data) => {
+      const manifest = data.assetManifest || {};
+      const trimmed = (data.page.url || '/').replace(/^\/|\/$/g, '');
+      const base = data.asset_path || (trimmed === '' ? 'index' : trimmed);
+      const pick = (map) => (map && (map[base] ?? map[`${base}/index`])) || null;
+      return {
+        js: pick(manifest.js && manifest.js.pages),
+        css: pick(manifest.css && manifest.css.pages),
+        themeCss: pick(manifest.css && manifest.css.themePages),
+      };
+    },
     resolved: (data) => {
+      // inject-properties.rb parity: resolved = site config ← layout chain ←
+      // page data. The cascade already merged layouts under page frontmatter;
+      // the site seed adds the site-level sections (brand, theme, analytics,
+      // web_manager…) every core include reads via resolved.*.
       const out = {};
+      for (const key of Object.keys(site)) {
+        if (!RESOLVED_SITE_EXCLUDE.has(key)) out[key] = site[key];
+      }
       for (const key of Object.keys(data)) {
-        if (!RESOLVED_OMIT.has(key)) out[key] = data[key];
+        if (!RESOLVED_OMIT.has(key)) out[key] = deepMerge(out[key], data[key]);
       }
 
       // Layout-frontmatter Liquid: the preprocessor only sees PAGE frontmatter,
       // so cascade data contributed by layouts (real classy contact carries
       // `{{ site.brand.name }}`, real sweet-saucy recipe carries
       // `{{ page.recipe.title }}` in meta values) still holds raw refs here.
+      // `resolved` is in context too — layout defaults template on the merged
+      // data (classy alternative: tagline "The #1 {{ resolved.alternative.
+      // competitor.name }} alternative"); `page.resolved` covers the legacy
+      // spelling in not-yet-migrated consumer frontmatter.
       // Copy-on-write: shared cascade sub-objects are never mutated, and
       // pages with no remaining refs return `out` untouched.
       return frontmatter.renderData(out, {
-        page: { ...out, url: data.page.url, slug: data.page.fileSlug, fileSlug: data.page.fileSlug },
+        resolved: out,
+        page: { ...out, resolved: out, url: data.page.url, slug: data.page.fileSlug, fileSlug: data.page.fileSlug },
       });
     },
   });
@@ -180,9 +313,18 @@ function configureOmega(eleventyConfig, options) {
     eleventyConfig.addTemplate(`omega-defaults/${rel}`, raw);
   }
 
-  // ---- Globals
+  // ---- Globals. site.uj carries UJM-runtime site values the core includes
+  // read (cache_breaker in the web-manager Configuration, date.year in the
+  // copyright meta, placeholder.src in lazy-loaded imgs).
+  site.uj = {
+    cache_breaker: 0,
+    date: { year: new Date().getFullYear() },
+    placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
+    ...(site.uj || {}),
+  };
   eleventyConfig.addGlobalData('site', site);
-  eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: {}, css: {} });
+  eleventyConfig.addGlobalData('jekyll', { environment: options.environment || 'development' });
+  eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: { pages: {} }, css: { pages: {}, themePages: {} } });
 
   return { site, layers, layoutMap, frontmatter, suppressed, collectionsHolder };
 }

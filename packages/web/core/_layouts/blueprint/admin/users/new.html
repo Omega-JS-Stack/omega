@@ -1,0 +1,85 @@
+---
+### ALL PAGES ###
+layout: admin/core/minimal
+
+### THEME CONFIG ###
+theme:
+  header:
+    title:
+      content: "Create user"
+      icon: "user-plus"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Users"
+          href: "/admin/users"
+        - label: "Create user"
+
+### REGULAR PAGES ###
+meta:
+  title: "Create User - Admin"
+  description: "Create a new user account"
+  breadcrumb: "Create user"
+---
+
+<!-- Back Link -->
+<div class="mb-3">
+  <a href="/admin/users" class="text-decoration-none">
+    {% uj_icon "arrow-left", "fa-sm me-2" %}
+    Back to users
+  </a>
+</div>
+
+<!-- Form Card -->
+<div class="row">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">Create new user</h5>
+      </div>
+      <div class="card-body">
+        <form id="create-user-form" novalidate data-form-state="initializing" onsubmit="return false">
+          <div class="mb-3">
+            <label for="email" class="form-label">Email address <span class="text-danger">*</span></label>
+            <input type="email" class="form-control" id="email" name="user.email" required autofocus>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+              <input type="password" class="form-control" id="password" name="user.password" required minlength="6">
+              <div class="form-text">Must be at least 6 characters</div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="confirmPassword" class="form-label">Confirm password <span class="text-danger">*</span></label>
+              <input type="password" class="form-control" id="confirmPassword" name="user.confirmPassword" required minlength="6">
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <a href="/admin/users" class="btn btn-outline-adaptive">Cancel</a>
+            <button type="submit" class="btn btn-adaptive">
+              {% uj_icon "check", "fa-md me-2" %}
+              <span class="button-text">Create user</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Sidebar -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="mb-3">{% uj_icon "circle-info", "fa-sm me-2" %} How it works</h6>
+        <ul class="small text-muted mb-0">
+          <li class="mb-2">A Firebase Auth account is created with the provided email and password</li>
+          <li class="mb-2">The backend automatically creates the Firestore user document</li>
+          <li>The user can sign in immediately with their credentials</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

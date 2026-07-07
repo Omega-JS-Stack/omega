@@ -1,0 +1,107 @@
+// Core Bindings Styles
+// Loading skeleton effects for data-bound elements
+
+// ============================================
+// Loading States
+// ============================================
+
+// Loading state with shimmer animation for skeleton elements
+// This applies to elements that have the wm-binding-skeleton class
+.wm-binding-skeleton {
+  --binding-color-1: rgba(0, 0, 0, 0.03);
+  --binding-color-2: rgba(0, 0, 0, 0.06);
+  --binding-color-3: rgba(0, 0, 0, 0.03);
+
+  background: linear-gradient(
+    90deg,
+    var(--binding-color-1) 25%,
+    var(--binding-color-2) 50%,
+    var(--binding-color-3) 75%
+  );
+  background-size: 200% 100%;
+  animation: binding-shimmer 1.5s infinite;
+  border-radius: 0.25rem;
+
+  // Subtle color overlay for text elements
+  color: transparent !important;
+  * {
+    // color: transparent !important;
+    // z-index: -1 !important;
+    opacity: 0 !important;
+  }
+
+  // Prevent text selection during loading
+  user-select: none;
+  pointer-events: none;
+
+  // Minimum dimensions for empty elements
+  min-width: 50px;
+  min-height: 1lh;
+  // display: inline-block;
+}
+
+// Dark theme overrides
+[data-bs-theme="dark"] .wm-binding-skeleton {
+  --binding-color-1: rgba(255, 255, 255, 0.03);
+  --binding-color-2: rgba(255, 255, 255, 0.08);
+  --binding-color-3: rgba(255, 255, 255, 0.03);
+}
+
+// ============================================
+// Bound State
+// ============================================
+
+// When bound is added while skeleton is still present, fade out the skeleton
+.wm-bound.wm-binding-skeleton {
+  animation: binding-fadeout 0.25s ease-out forwards;
+}
+
+// ============================================
+// Animations
+// ============================================
+
+// Shimmer animation
+@keyframes binding-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+// Fade out animation for skeleton
+@keyframes binding-fadeout {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+// ============================================
+// Special Cases
+// ============================================
+
+// For block-level elements, use full width
+.wm-binding-skeleton.d-block {
+  display: block;
+  width: 100%;
+}
+
+// For images, maintain aspect ratio
+img.wm-binding-skeleton {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 100px; // Default minimum height for image skeleton
+}
+
+// For input fields, keep as inline-block with normal sizing
+input.wm-binding-skeleton,
+textarea.wm-binding-skeleton,
+select.wm-binding-skeleton {
+  min-width: auto;
+  min-height: auto;
+}

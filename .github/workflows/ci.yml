@@ -38,7 +38,7 @@ jobs:
       - name: template-kit suite (incl. registerLiquid vs real liquidjs)
         run: npm test --workspace=packages/template-kit
 
-      - name: web suite (engine core + real-layout ports + asset pipeline vs real Eleventy 3)
+      - name: web suite (engine core + real-layout ports + asset pipeline + theme contract vs real Eleventy 3)
         run: npm test --workspace=packages/web
 
       - name: bakeoff-shared suite (corpus generator)

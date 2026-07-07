@@ -1,0 +1,107 @@
+---
+### ALL PAGES ###
+layout: frontend/core/cover
+
+### PAGE CONFIG ###
+prerender_icons:
+  - name: "bell-slash"
+  - name: "bell"
+---
+
+<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
+  <div class="card border-0 shadow-lg">
+    <div class="card-body p-3 p-md-5">
+      <!-- Logo -->
+      <div class="text-center mb-3">
+        <div class="avatar avatar-xl">
+          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <div class="text-center mb-4">
+        <h1 class="h3 mb-2">Email preferences</h1>
+        <p class="text-muted" id="email-preferences-description">Loading your preferences...</p>
+      </div>
+
+      <!-- Error state (hidden by default) -->
+      <div id="email-preferences-error" class="text-center" hidden>
+        <div class="alert alert-danger mb-4">
+          {% uj_icon "triangle-exclamation", "me-1" %}
+          <span id="email-preferences-error-message">Invalid or missing parameters.</span>
+        </div>
+        <a href="/" class="btn btn-outline-adaptive">
+          {% uj_icon "arrow-left", "me-1" %}
+          Back to home
+        </a>
+      </div>
+
+      <!-- Form (hidden until params are validated by JS) -->
+      <div id="email-preferences-content" hidden>
+        <!-- Email display -->
+        <div class="bg-body-tertiary rounded-3 p-3 mb-4 text-center">
+          <small class="text-muted d-block mb-1">Managing preferences for</small>
+          <strong id="email-preferences-address" class="text-break"></strong>
+        </div>
+
+        <!-- Email preferences Form -->
+        <form id="email-preferences-form" autocomplete="off" data-form-state="initializing" onsubmit="return false">
+          <!-- Action selector -->
+          <div class="mb-4">
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-adaptive flex-fill active" data-action="unsubscribe">
+                {% uj_icon "bell-slash", "me-1" %}
+                Unsubscribe
+              </button>
+              <button type="button" class="btn btn-outline-adaptive flex-fill" data-action="resubscribe">
+                {% uj_icon "bell", "me-1" %}
+                Resubscribe
+              </button>
+            </div>
+          </div>
+
+          <!-- Info message (changes based on action) -->
+          <div class="alert alert-warning small mb-4" id="email-preferences-info-unsubscribe">
+            {% uj_icon "circle-info", "me-1" %}
+            You will stop receiving emails of this type. Other important account emails may still be sent.
+          </div>
+          <div class="alert alert-success small mb-4" id="email-preferences-info-resubscribe" hidden>
+            {% uj_icon "circle-info", "me-1" %}
+            You will start receiving these emails again.
+          </div>
+
+          <div class="mb-4 text-start">
+            <label for="email_confirm" class="form-label fw-semibold">
+              Confirm your email address <span class="text-danger">*</span>
+            </label>
+            <input type="email" class="form-control form-control-md" id="email_confirm" name="email_confirm"
+              placeholder="Type your email to confirm"
+              autocomplete="email"
+              autofocus
+              required>
+            <div class="invalid-feedback"></div>
+          </div>
+
+          <!-- Honeypot field (bot detection) -->
+          <div class="form-group mb-3" style="display: none;" aria-hidden="true">
+            <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
+          </div>
+
+          <button type="submit" class="btn btn-danger w-100 mb-4" id="email-preferences-submit">
+            <span class="button-text">Unsubscribe</span>
+          </button>
+        </form>
+
+        <!-- Back to Home -->
+        <div class="mt-3 pt-3 border-top text-center">
+          <a href="/" class="btn btn-outline-adaptive btn-sm">
+            {% uj_icon "arrow-left", "me-1" %}
+            Back to home
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

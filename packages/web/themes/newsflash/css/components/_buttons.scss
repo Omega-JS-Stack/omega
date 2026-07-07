@@ -1,0 +1,139 @@
+// Newsflash Theme — Buttons
+// Pill buttons framed in ink, resting on a small hard offset shadow that
+// LIFTS on hover. This restyles Bootstrap's own .btn / .btn-* classes so all
+// existing markup (nav CTAs, hero buttons, forms) inherits the look with
+// zero HTML changes.
+
+.btn {
+  font-family: $font-family-sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 50rem;
+  @include nf-border();
+  @include nf-shadow-hard();
+  padding: 0.6rem 1.4rem;
+}
+
+// The lift interaction. Doubled `.btn.btn` selector (specificity 0,2,0) on
+// purpose: every theme page bundle re-emits Bootstrap's own `.btn` rules
+// (because page SCSS @forwards Bootstrap) and those load AFTER the main
+// bundle — the doubled class beats them so the lift is pure transform+shadow.
+// Outline and link buttons are flat — they opt out below.
+.btn.btn:not([class*="btn-outline-"]):not(.btn-link) {
+  @include nf-lift();
+
+  // Focus shows an OUTLINE ring (outside the box, never conflicts with the
+  // offset shadow).
+  &:focus { outline: 0; }
+  &:focus-visible {
+    outline: 3px solid var(--nf-volt);
+    outline-offset: 2px;
+  }
+}
+
+.btn {
+  // Bootstrap adds a subtle border-color per-variant; force ink so the
+  // hairline frame is consistent across every color.
+  // (btn-adaptive / -inverse are the mode-flipping solids used by the nav
+  // CTA, auth buttons, etc. — they MUST be in this list or they'd keep
+  // Bootstrap's default "darken on hover" and feel different.)
+  &.btn-primary,
+  &.btn-secondary,
+  &.btn-success,
+  &.btn-info,
+  &.btn-warning,
+  &.btn-danger,
+  &.btn-light,
+  &.btn-dark,
+  &.btn-adaptive,
+  &.btn-adaptive-inverse {
+    border-color: var(--nf-border-color);
+    --bs-btn-hover-border-color: var(--nf-border-color);
+    --bs-btn-active-border-color: var(--nf-border-color);
+  }
+
+  // SOLID buttons: freeze hover/active fill to the resting color so the lift
+  // is pure transform+shadow (no color shift). Outline buttons are excluded —
+  // they keep their fill-on-hover.
+  &.btn-primary,   &.btn-secondary, &.btn-success,
+  &.btn-info,      &.btn-warning,   &.btn-danger,
+  &.btn-light,     &.btn-dark,
+  &.btn-adaptive,  &.btn-adaptive-inverse {
+    --bs-btn-hover-bg: var(--bs-btn-bg);
+    --bs-btn-hover-color: var(--bs-btn-color);
+    --bs-btn-active-bg: var(--bs-btn-bg);
+    --bs-btn-active-color: var(--bs-btn-color);
+  }
+}
+
+// btn-adaptive / -inverse RESTING fill. The global _buttons-adaptive.scss sets
+// these via `.btn-adaptive` (0,1,0), but Bootstrap's own re-emitted
+// `.btn { --bs-btn-bg: transparent }` can tie/beat it on order. Restate the
+// resting fill at `.btn.btn-adaptive` (0,2,0) so it always wins.
+.btn.btn-adaptive {
+  --bs-btn-color: #{$nf-paper};
+  --bs-btn-bg: #{$nf-ink};
+  --bs-btn-border-color: var(--nf-border-color);
+}
+[data-bs-theme="dark"] .btn.btn-adaptive {
+  --bs-btn-color: #{$nf-paper-dark};
+  --bs-btn-bg: #{$nf-ink-dark};
+}
+.btn.btn-adaptive-inverse {
+  --bs-btn-color: #{$nf-paper-dark};
+  --bs-btn-bg: #{$nf-ink-dark};
+  --bs-btn-border-color: var(--nf-border-color);
+}
+[data-bs-theme="dark"] .btn.btn-adaptive-inverse {
+  --bs-btn-color: #{$nf-paper};
+  --bs-btn-bg: #{$nf-ink};
+}
+
+// Size variants keep the pill proportions
+.btn-lg {
+  padding: 0.85rem 1.75rem;
+  font-size: 1.05rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+// Outline ("ghost") buttons: flat — transparent fill, ink frame, no shadow,
+// no lift. Hover fills with ink + paper text, true to the editorial ghost.
+// DOUBLED attribute selector (0,2,0) on purpose: page bundles re-emit
+// Bootstrap's .btn / .btn-outline-* rules after the main bundle; the doubled
+// selector wins regardless of load order (the variant's compile-time ink
+// color is invisible on dark paper otherwise).
+[class*="btn-outline-"][class*="btn-outline-"] {
+  box-shadow: none;
+  background: transparent;
+  border-color: var(--nf-border-color);
+  color: var(--bs-body-color);
+  --bs-btn-hover-bg: var(--nf-ink);
+  --bs-btn-hover-color: var(--nf-paper);
+  --bs-btn-hover-border-color: var(--nf-border-color);
+  --bs-btn-active-bg: var(--nf-ink);
+  --bs-btn-active-color: var(--nf-paper);
+  --bs-btn-active-border-color: var(--nf-border-color);
+
+  &:hover {
+    color: var(--nf-paper);
+    background: var(--nf-ink);
+  }
+}
+
+// Link-style button stays flat (no frame/shadow) but bold + underlined
+.btn-link {
+  border: 0;
+  box-shadow: none;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+// NOTE: There are intentionally NO theme-specific accent button classes.
+// Themes must restyle the STANDARD Bootstrap button classes so the same
+// markup works across themes (swap theme.id, done). Need a volt CTA? Use
+// `.btn-warning` ($warning is volt). Vermilion? `.btn-primary`.

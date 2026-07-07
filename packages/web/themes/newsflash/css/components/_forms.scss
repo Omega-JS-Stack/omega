@@ -1,0 +1,75 @@
+// Newsflash Theme — Forms
+// Pill inputs framed in ink with a volt focus ring — the newsletter-signup
+// look applied to every form control.
+
+.form-control,
+.form-select {
+  background-color: var(--bs-body-bg);
+  border: var(--nf-border);
+  color: var(--bs-body-color);
+  border-radius: 50rem;
+  font-weight: 500;
+  padding: 0.6rem 1.1rem;
+  transition: $nf-transition;
+
+  &::placeholder {
+    color: var(--bs-secondary-color);
+    opacity: 0.8;
+  }
+
+  &:focus {
+    background-color: var(--bs-body-bg);
+    border-color: var(--nf-border-color);
+    color: var(--bs-body-color);
+    box-shadow: 0 0 0 3px var(--nf-volt);
+  }
+}
+
+// Multiline fields keep the editorial frame radius (a pill textarea is silly)
+textarea.form-control {
+  border-radius: var(--bs-border-radius);
+}
+
+// Checks + radios: ink frames, vermilion when checked
+.form-check-input {
+  border: var(--nf-border);
+  background-color: var(--bs-body-bg);
+
+  &:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--nf-border-color);
+  }
+
+  &:focus {
+    border-color: var(--nf-border-color);
+    box-shadow: 0 0 0 3px var(--nf-volt);
+  }
+}
+
+// Switches keep the pill but pick up the ink frame
+.form-switch .form-check-input {
+  border-radius: 50rem;
+}
+
+// Labels read as compact editorial labels
+.form-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+// Input groups: joined pill — round only the outer corners
+.input-group {
+  > .form-control:not(:last-child),
+  > .form-select:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  > .btn:last-child {
+    border-top-right-radius: 50rem;
+    border-bottom-right-radius: 50rem;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    box-shadow: none; // joined controls share one frame; no floating shadow
+  }
+}

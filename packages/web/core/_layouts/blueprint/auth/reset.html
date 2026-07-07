@@ -1,0 +1,20 @@
+---
+### ALL PAGES ###
+layout: frontend/pages/auth/reset
+
+### REGULAR PAGES ###
+meta:
+  title: "Reset Password - {{ site.brand.name }}"
+  description: "Reset your password for your {{ site.brand.name }} account."
+  breadcrumb: "Reset"
+
+### WEB MANAGER CONFIG ###
+web_manager:
+  auth:
+    config:
+      policy: "unauthenticated"
+      redirects:
+        authenticated: "/"
+---
+
+{{ content | uj_content_format }}

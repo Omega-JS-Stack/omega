@@ -1,0 +1,47 @@
+---
+---
+
+<!DOCTYPE html>
+<html
+  lang="{{ site.translation.default |  default: 'en' }}"
+  dir="ltr"
+
+  class="{{ resolved.theme.html.class }}" {{ resolved.theme.html.attributes }}
+
+  data-theme-id="{{ resolved.theme.id }}"
+  data-theme-target="{{ resolved.theme.target }}"
+
+  data-bs-theme="{{ resolved.theme.appearance }}"
+
+  data-page-path="{{ page.url }}"
+  data-asset-path="{{ resolved.asset_path }}"
+
+  data-environment="{{ jekyll.environment | default: 'development' }}"
+  data-platform=""
+  data-device=""
+  data-runtime=""
+  data-browser=""
+  data-iframed="false"
+
+  data-page-loading="true"
+  aria-busy="true"
+  >
+  <head>
+    <!-- Head -->
+    {%- include core/head.html -%}
+  </head>
+
+  <body
+    class="{{ resolved.theme.body.class }}" {{ resolved.theme.body.attributes }}
+    >
+
+    <!-- Head -->
+    {%- include core/body.html -%}
+
+    <!-- Content -->
+    {{ content | uj_content_format }}
+
+    <!-- Foot -->
+    {%- include core/foot.html -%}
+  </body>
+</html>

@@ -1,0 +1,152 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+asset_path: blog/categories/category
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  subheadline: "Browse all posts in this category"
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-3">
+          <ol class="breadcrumb justify-content-center mb-0">
+            <li class="breadcrumb-item">
+              <a href="{{ site.url }}/blog" class="text-decoration-none">Blog</a>
+            </li>
+            <li class="breadcrumb-item">
+              <a href="{{ site.url }}/blog/categories" class="text-decoration-none">Categories</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">{{ resolved.category.name }}</li>
+          </ol>
+        </nav>
+
+        <h1 class="h1 mb-3">
+          {{ resolved.category.name }}
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="fs-5 text-muted">
+            {{ resolved.hero.subheadline }}
+          </p>
+        {% endiftruthy %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Posts Grid -->
+<section class="pt-4">
+  <div class="container">
+    {% comment %} Filter posts by category (max 100) {% endcomment %}
+    {% assign category_slug = resolved.category.slug %}
+    {% assign filtered_posts = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% if filtered_posts.size >= 100 %}
+        {% break %}
+      {% endif %}
+      {% for category in post.post.categories %}
+        {% assign cat_slug = category | slugify %}
+        {% if cat_slug == category_slug %}
+          {% assign filtered_posts = filtered_posts | push: post %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    <div class="row g-4 mb-5">
+      {% for post in filtered_posts %}
+        <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
+          <article class="card h-100 shadow-sm border-0">
+            <!-- Image -->
+            <a href="{{ site.url }}{{ post.url }}" class="text-decoration-none d-block p-3 pb-0">
+              {%- uj_post post.post.id, "image-tag", class="img-fluid object-fit-cover blog-post-card-image rounded-3" -%}
+            </a>
+
+            <!-- Card Body -->
+            <div class="card-body d-flex flex-column">
+              <!-- Category Badge -->
+              {% if post.post.categories[0] %}
+                <div class="mb-2">
+                  <span class="badge bg-primary-soft text-primary">
+                    {{ post.post.categories[0] | uj_title_case }}
+                  </span>
+                </div>
+              {% endif %}
+
+              <!-- Title -->
+              <h3 class="h5 card-title mb-0">
+                <a href="{{ site.url }}{{ post.url }}" class="text-decoration-none text-body">
+                  {{ post.post.title }}
+                </a>
+              </h3>
+            </div>
+
+            <!-- Card Footer -->
+            <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+              <div class="d-flex align-items-center justify-content-between small">
+                <!-- Left side: Author and Date -->
+                <div class="d-flex align-items-center">
+                  <!-- Author Avatar -->
+                  <a href="{%- uj_member post.post.author, "url" -%}" class="text-decoration-none me-2 position-relative z-1">
+                    <div class="avatar avatar-md">
+                      {%- uj_member post.post.author, "image-tag", class="rounded-circle" -%}
+                    </div>
+                  </a>
+
+                  <!-- Author Name and Date stacked -->
+                  <div>
+                    <a href="{%- uj_member post.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold position-relative z-1 d-block">
+                      {%- uj_member post.post.author, "name" -%}
+                    </a>
+                    <time datetime="{{ post.date | date_to_xmlschema }}" class="text-muted">
+                      {{ post.date | date: "%b %d, %Y" }}
+                    </time>
+                  </div>
+                </div>
+
+                <!-- Right side: Read time -->
+                <div class="text-muted">
+                  {% uj_readtime post.content %} min read
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if filtered_posts.size == 0 %}
+      <div class="row justify-content-center">
+        <div class="col-lg-6 text-center" data-lazy="@class animation-slide-up">
+          <div class="py-5">
+            {% uj_icon "file-lines", "fa-4xl text-muted mb-3" %}
+            <h2 class="h4 text-muted">No posts in this category</h2>
+            <p class="text-muted">Check back soon for new content.</p>
+            <a href="{{ site.url }}/blog/categories" class="btn btn-primary">
+              {% uj_icon "arrow-left", "me-2" %}
+              All categories
+            </a>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Back to Categories -->
+    <div class="row justify-content-center">
+      <div class="col-12 text-center" data-lazy="@class animation-slide-up">
+        <a href="{{ site.url }}/blog/categories" class="btn btn-outline-adaptive">
+          {% uj_icon "arrow-left", "me-2" %}
+          All categories
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

@@ -1,0 +1,12 @@
+---
+### ALL PAGES ###
+layout: frontend/pages/updates/index
+
+### REGULAR PAGES ###
+meta:
+  title: "Updates - {{ site.brand.name }}"
+  description: "View release notes and version history for {{ site.brand.name }}. Stay up to date with the latest features and improvements."
+  breadcrumb: "Updates"
+---
+
+{{ content | uj_content_format }}

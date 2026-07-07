@@ -1,0 +1,54 @@
+---
+### ALL PAGES ###
+layout: frontend/core/cover
+permalink: /test/libraries/cover
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  title: "Cover page example"
+  description: "Example of a centered cover page layout"
+  breadcrumb: "Cover page"
+  index: false
+---
+
+<!-- Login Section - max-width keeps form dainty on larger screens -->
+<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
+  <div class="card shadow">
+    <div class="card-body p-4">
+      <h2 class="text-center mb-4">Welcome back</h2>
+      <form>
+        <div class="mb-3">
+          <label for="emailInput" class="form-label">Email address</label>
+          <input type="email" class="form-control" id="emailInput" placeholder="Enter email">
+        </div>
+        <div class="mb-3">
+          <label for="passwordInput" class="form-label">Password</label>
+          <input type="password" class="form-control" id="passwordInput" placeholder="Password">
+        </div>
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="rememberCheck">
+          <label class="form-check-label" for="rememberCheck">
+            Remember me
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Sign in</button>
+        <div class="text-center mt-3">
+          <small class="text-muted">
+            Don't have an account? <a href="#">Sign up</a>
+          </small>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Additional content to test scrolling behavior -->
+  <div class="mt-4 text-center">
+    <p class="text-muted">
+      <small>This layout centers content vertically and horizontally.</small><br>
+      <small>Use column classes with style="max-width: 540px;" to control form width.</small><br>
+      <small>If content exceeds viewport height, it scrolls naturally.</small>
+    </p>
+  </div>
+</section>

@@ -1,0 +1,102 @@
+// Newsflash Theme — Infinite Scroll
+// Structural marquee used by the shared layouts (trusted-by logo strip,
+// testimonial scroll). Mostly layout/animation (theme-agnostic); cosmetic
+// bits are tuned to the editorial look (framed cards, paper fade edges).
+// NOTE: this is structural behavior the inherited Classy layouts depend on —
+// see docs/themes.md "Structural vs visual components".
+
+.infinite-scroll-wrapper {
+  position: relative;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  overflow: hidden;
+
+  &.infinite-scroll-fade-edges {
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    &::before { left: 0;  background: linear-gradient(to right, var(--bs-body-bg), transparent); }
+    &::after  { right: 0; background: linear-gradient(to left,  var(--bs-body-bg), transparent); }
+  }
+}
+
+.infinite-scroll-track {
+  display: flex;
+  width: fit-content;
+  animation: infinite-scroll var(--infinite-scroll-duration, 30s) linear infinite;
+
+  &:hover { animation-play-state: paused; }
+
+  &.gap-sm { gap: 1rem; }
+  &.gap-md { gap: 1.5rem; }
+  &.gap-lg { gap: 2rem; }
+}
+
+.infinite-scroll-item { flex-shrink: 0; }
+
+@keyframes infinite-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(var(--infinite-scroll-distance, -50%)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .infinite-scroll-track { animation: none; }
+  .infinite-scroll-wrapper { overflow-x: auto; }
+}
+
+// Logo items — quiet ink-tinted marks that wake on hover
+.infinite-scroll-item--logo {
+  padding: 0 3rem;
+  display: flex;
+  align-items: center;
+  height: 60px;
+
+  img, svg {
+    height: 40px;
+    width: auto;
+    max-width: 150px;
+    opacity: 0.65;
+    transition: $nf-transition;
+  }
+
+  &:hover img,
+  &:hover svg {
+    opacity: 1;
+  }
+}
+
+// Card items (testimonials) — framed paper, pop on hover
+.infinite-scroll-item--card {
+  width: 320px;
+  padding: 0.5rem 0.5rem 1.5rem 0; // room for the pop shadow
+
+  .card {
+    height: 100%;
+
+    &:hover {
+      @include nf-shadow-pop();
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .infinite-scroll-wrapper.infinite-scroll-fade-edges {
+    &::before,
+    &::after { width: 50px; }
+  }
+
+  .infinite-scroll-item--logo {
+    padding: 0 2rem;
+    height: 50px;
+    img, svg { height: 30px; }
+  }
+
+  .infinite-scroll-item--card { width: 280px; }
+}

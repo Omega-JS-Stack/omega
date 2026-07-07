@@ -1,0 +1,347 @@
+<!-- Desktop Sidebar -->
+<aside class="sidebar d-none d-xl-flex flex-column flex-shrink-0 bg-body-tertiary">
+  <!-- Logo Section -->
+  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+  {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+  {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
+  {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
+
+  <div class="sidebar-logo d-flex align-items-center px-3 py-2 border-bottom">
+    <a href="{{ logo_href }}" class="d-flex align-items-center text-decoration-none text-body">
+      {% iftruthy logo_src %}
+        <div class="avatar avatar-md me-2 {{ logo_class }}">
+          <img src="{{ logo_src | uj_cachebreak }}" alt="{{ logo_text }} Logo"/>
+        </div>
+      {% endiftruthy %}
+      {% iftruthy logo_text %}
+        <span class="fs-5 fw-semibold">{{ logo_text }}</span>
+      {% endiftruthy %}
+    </a>
+  </div>
+
+  <!-- Navigation Section -->
+  <div class="d-flex flex-column w-100 p-3 overflow-auto flex-fill">
+    <!-- Navigation Links -->
+    <ul class="list-unstyled ps-0">
+      {% for link in data.links %}
+        {% if link.divider %}
+          <!-- Divider -->
+          <li class="border-top my-3"></li>
+        {% elsif link.header %}
+          <!-- Section Header -->
+          <li class="mb-1">
+            <div class="px-3 pt-2 mt-4 text-muted small text-uppercase fw-semibold">
+              {{ link.label }}
+            </div>
+          </li>
+        {% elsif link.dropdown %}
+          <!-- Collapsible Dropdown -->
+          {% capture link_id %}sidebar-collapse-{{ forloop.index }}{% endcapture %}
+          {% assign dropdown_has_active = false %}
+          {% for child in link.dropdown %}
+            {% unless child.divider %}
+              {% if child.dropdown %}
+                {% for grandchild in child.dropdown %}
+                  {% unless grandchild.divider %}
+                    {% capture _check_nested %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                    {% if _check_nested == "active" %}{% assign dropdown_has_active = true %}{% endif %}
+                  {% endunless %}
+                {% endfor %}
+              {% else %}
+                {% capture _check_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                {% if _check_active == "active" %}{% assign dropdown_has_active = true %}{% endif %}
+              {% endif %}
+            {% endunless %}
+          {% endfor %}
+          <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center justify-content-between rounded py-2 px-3 border-0 {% unless dropdown_has_active %}collapsed{% endunless %}" data-bs-toggle="collapse" data-bs-target="#{{ link_id }}" aria-expanded="{{ dropdown_has_active }}">
+              <span class="d-inline-flex align-items-center">
+                {% if link.icon %}
+                  {% uj_icon link.icon, "fa-xl me-3" %}
+                {% endif %}
+                {{ link.label }}
+              </span>
+            </button>
+            <div class="collapse {% if dropdown_has_active %}show{% endif %}" id="{{ link_id }}">
+              <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                {% for child in link.dropdown %}
+                  {% if child.divider %}
+                    <li><hr class="dropdown-divider my-2"></li>
+                  {% elsif child.dropdown %}
+                    <!-- Nested Dropdown -->
+                    {% capture nested_id %}{{ link_id }}-nested-{{ forloop.index }}{% endcapture %}
+                    {% assign nested_has_active = false %}
+                    {% for grandchild in child.dropdown %}
+                      {% unless grandchild.divider %}
+                        {% capture _check_nested %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                        {% if _check_nested == "active" %}{% assign nested_has_active = true %}{% endif %}
+                      {% endunless %}
+                    {% endfor %}
+                    <li>
+                      <button class="btn btn-toggle d-inline-flex align-items-center justify-content-between rounded border-0 {% unless nested_has_active %}collapsed{% endunless %}" data-bs-toggle="collapse" data-bs-target="#{{ nested_id }}" aria-expanded="{{ nested_has_active }}">
+                        <span class="d-inline-flex align-items-center">
+                          {% if child.icon %}{% uj_icon child.icon, "fa-xl me-3" %}{% endif %}
+                          {{ child.label }}
+                        </span>
+                      </button>
+                      <div class="collapse {% if nested_has_active %}show{% endif %}" id="{{ nested_id }}">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 ps-3">
+                          {% for grandchild in child.dropdown %}
+                            {% if grandchild.divider %}
+                              <li><hr class="dropdown-divider my-2"></li>
+                            {% else %}
+                              {% capture grandchild_active %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                              <li>
+                                <a href="{{ grandchild.href }}" class="link-body-emphasis d-flex text-decoration-none rounded {{ grandchild_active }}">
+                                  {% if grandchild.icon %}{% uj_icon grandchild.icon, "fa-xl me-3" %}{% endif %}
+                                  {{ grandchild.label }}
+                                </a>
+                              </li>
+                            {% endif %}
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    </li>
+                  {% else %}
+                    {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                    {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                    <li>
+                      {% iftruthy child.href %}
+                        <a href="{{ child.href }}" class="link-body-emphasis d-flex text-decoration-none rounded {{ child_active }}" {{ child_attributes }}>
+                          {% if child.icon %}
+                            {% uj_icon child.icon, "fa-xl me-3" %}
+                          {% endif %}
+                          {{ child.label }}
+                          {% if child.badge %}
+                            <span class="badge {{ child.badge.class | default: 'bg-primary' }} ms-auto">{{ child.badge.text }}</span>
+                          {% endif %}
+                        </a>
+                      {% endiftruthy %}
+                      {% iffalsy child.href %}
+                        <button type="button" class="link-body-emphasis d-flex text-decoration-none rounded border-0 bg-transparent {% if child.class %}{{ child.class }}{% endif %}">
+                          {% if child.icon %}
+                            {% uj_icon child.icon, "fa-xl me-3" %}
+                          {% endif %}
+                          {{ child.label }}
+                        </button>
+                      {% endiffalsy %}
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+          </li>
+        {% else %}
+          <!-- Regular Nav Link -->
+          {% capture link_active %}{% urlmatches link.href, "active" %}{% endcapture %}
+          {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+          <li class="mb-1">
+            {% iftruthy link.href %}
+              <a href="{{ link.href }}" class="link-body-emphasis d-flex align-items-center text-decoration-none rounded py-2 px-3 {{ link_active }}" {{ link_attributes }}>
+                {% if link.icon %}
+                  {% uj_icon link.icon, "fa-xl me-3" %}
+                {% endif %}
+                {{ link.label }}
+                {% if link.badge %}
+                  <span class="badge {{ link.badge.class | default: 'bg-primary' }} ms-auto">{{ link.badge.text }}</span>
+                {% endif %}
+              </a>
+            {% endiftruthy %}
+            {% iffalsy link.href %}
+              <button type="button" class="link-body-emphasis d-flex align-items-center text-decoration-none rounded py-2 px-3 border-0 bg-transparent w-100">
+                {% if link.icon %}
+                  {% uj_icon link.icon, "fa-xl me-3" %}
+                {% endif %}
+                {{ link.label }}
+              </button>
+            {% endiffalsy %}
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+
+    <!-- Bottom Section -->
+    {% if data.bottom %}
+      <div class="mt-auto px-0">
+        {% if data.bottom.ad.enabled %}
+          <!-- Upsell Link -->
+          <a href="/pricing" class="d-block text-center text-muted small text-decoration-none mb-2" data-wm-bind="@show !auth.resolved.active" hidden>
+            Remove with {% uj_icon "crown", "fa-sm text-success" %} <span class="text-success">Premium</span>
+          </a>
+          <!-- Sidebar Ad -->
+          {% include modules/adunits/adsense.html type="in-article" vert-size="380" %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</aside>
+
+<!-- Mobile Offcanvas Sidebar -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+  <div class="offcanvas-header border-bottom">
+    {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+    {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
+    {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
+
+    <h5 class="offcanvas-title d-flex align-items-center" id="mobileSidebarLabel">
+      {% iftruthy logo_src %}
+        <div class="avatar avatar-md me-2">
+          <img src="{{ logo_src | uj_cachebreak }}" alt="{{ logo_text }} Logo"/>
+        </div>
+      {% endiftruthy %}
+      {% iftruthy logo_text %}
+        <span>{{ logo_text }}</span>
+      {% endiftruthy %}
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body d-flex flex-column p-3">
+    <ul class="list-unstyled ps-0 flex-fill">
+      {% for link in data.links %}
+        {% if link.divider %}
+          <li class="border-top my-3"></li>
+        {% elsif link.header %}
+          <li class="mb-1">
+            <div class="px-3 pt-2 mt-4 text-muted small text-uppercase fw-semibold">
+              {{ link.label }}
+            </div>
+          </li>
+        {% elsif link.dropdown %}
+          {% capture link_id %}mobile-collapse-{{ forloop.index }}{% endcapture %}
+          {% assign dropdown_has_active = false %}
+          {% for child in link.dropdown %}
+            {% unless child.divider %}
+              {% if child.dropdown %}
+                {% for grandchild in child.dropdown %}
+                  {% unless grandchild.divider %}
+                    {% capture _check_nested %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                    {% if _check_nested == "active" %}{% assign dropdown_has_active = true %}{% endif %}
+                  {% endunless %}
+                {% endfor %}
+              {% else %}
+                {% capture _check_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                {% if _check_active == "active" %}{% assign dropdown_has_active = true %}{% endif %}
+              {% endif %}
+            {% endunless %}
+          {% endfor %}
+          <li class="mb-1">
+            <button class="btn btn-toggle d-inline-flex align-items-center justify-content-between rounded py-2 px-3 border-0 {% unless dropdown_has_active %}collapsed{% endunless %}" data-bs-toggle="collapse" data-bs-target="#{{ link_id }}" aria-expanded="{{ dropdown_has_active }}">
+              <span class="d-inline-flex align-items-center">
+                {% if link.icon %}
+                  {% uj_icon link.icon, "fa-xl me-3" %}
+                {% endif %}
+                {{ link.label }}
+              </span>
+            </button>
+            <div class="collapse {% if dropdown_has_active %}show{% endif %}" id="{{ link_id }}">
+              <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                {% for child in link.dropdown %}
+                  {% if child.divider %}
+                    <li><hr class="dropdown-divider my-2"></li>
+                  {% elsif child.dropdown %}
+                    <!-- Nested Dropdown -->
+                    {% capture nested_id %}{{ link_id }}-nested-{{ forloop.index }}{% endcapture %}
+                    {% assign nested_has_active = false %}
+                    {% for grandchild in child.dropdown %}
+                      {% unless grandchild.divider %}
+                        {% capture _check_nested %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                        {% if _check_nested == "active" %}{% assign nested_has_active = true %}{% endif %}
+                      {% endunless %}
+                    {% endfor %}
+                    <li>
+                      <button class="btn btn-toggle d-inline-flex align-items-center justify-content-between rounded border-0 {% unless nested_has_active %}collapsed{% endunless %}" data-bs-toggle="collapse" data-bs-target="#{{ nested_id }}" aria-expanded="{{ nested_has_active }}">
+                        <span class="d-inline-flex align-items-center">
+                          {% if child.icon %}{% uj_icon child.icon, "fa-xl me-3" %}{% endif %}
+                          {{ child.label }}
+                        </span>
+                      </button>
+                      <div class="collapse {% if nested_has_active %}show{% endif %}" id="{{ nested_id }}">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 ps-3">
+                          {% for grandchild in child.dropdown %}
+                            {% if grandchild.divider %}
+                              <li><hr class="dropdown-divider my-2"></li>
+                            {% else %}
+                              {% capture grandchild_active %}{% urlmatches grandchild.href, "active" %}{% endcapture %}
+                              <li>
+                                <a href="{{ grandchild.href }}" class="link-body-emphasis d-flex text-decoration-none rounded {{ grandchild_active }}">
+                                  {% if grandchild.icon %}{% uj_icon grandchild.icon, "fa-xl me-3" %}{% endif %}
+                                  {{ grandchild.label }}
+                                </a>
+                              </li>
+                            {% endif %}
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    </li>
+                  {% else %}
+                    {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+                    {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                    <li>
+                      {% iftruthy child.href %}
+                        <a href="{{ child.href }}" class="link-body-emphasis d-flex text-decoration-none rounded {{ child_active }}" {{ child_attributes }}>
+                          {% if child.icon %}
+                            {% uj_icon child.icon, "fa-xl me-3" %}
+                          {% endif %}
+                          {{ child.label }}
+                          {% if child.badge %}
+                            <span class="badge {{ child.badge.class | default: 'bg-primary' }} ms-auto">{{ child.badge.text }}</span>
+                          {% endif %}
+                        </a>
+                      {% endiftruthy %}
+                      {% iffalsy child.href %}
+                        <button type="button" class="link-body-emphasis d-flex text-decoration-none rounded border-0 bg-transparent {% if child.class %}{{ child.class }}{% endif %}">
+                          {% if child.icon %}
+                            {% uj_icon child.icon, "fa-xl me-3" %}
+                          {% endif %}
+                          {{ child.label }}
+                        </button>
+                      {% endiffalsy %}
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+          </li>
+        {% else %}
+          {% capture link_active %}{% urlmatches link.href, "active" %}{% endcapture %}
+          {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+          <li class="mb-1">
+            {% iftruthy link.href %}
+              <a href="{{ link.href }}" class="link-body-emphasis d-flex align-items-center text-decoration-none rounded py-2 px-3 {{ link_active }}" {{ link_attributes }}>
+                {% if link.icon %}
+                  {% uj_icon link.icon, "fa-xl me-3" %}
+                {% endif %}
+                {{ link.label }}
+                {% if link.badge %}
+                  <span class="badge {{ link.badge.class | default: 'bg-primary' }} ms-auto">{{ link.badge.text }}</span>
+                {% endif %}
+              </a>
+            {% endiftruthy %}
+            {% iffalsy link.href %}
+              <button type="button" class="link-body-emphasis d-flex align-items-center text-decoration-none rounded py-2 px-3 border-0 bg-transparent w-100">
+                {% if link.icon %}
+                  {% uj_icon link.icon, "fa-xl me-3" %}
+                {% endif %}
+                {{ link.label }}
+              </button>
+            {% endiffalsy %}
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+
+    <!-- Bottom Section -->
+    {% if data.bottom %}
+      <div class="mt-auto pt-3">
+        {% if data.bottom.ad.enabled %}
+          <!-- Upsell Link -->
+          <a href="/pricing" class="d-block text-center text-muted small text-decoration-none mb-2" data-wm-bind="@show !auth.resolved.active" hidden>
+            Remove with {% uj_icon "crown", "fa-sm text-success" %} <span class="text-success">Premium</span>
+          </a>
+          <!-- Mobile Sidebar Ad -->
+          {% include modules/adunits/adsense.html type="in-article" vert-size="380" %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>

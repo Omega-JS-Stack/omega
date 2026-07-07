@@ -1,0 +1,225 @@
+---
+### ALL PAGES ###
+layout: admin/core/minimal
+
+### THEME CONFIG ###
+theme:
+  header:
+    title:
+      content: "Firebase Explorer"
+      icon: "fire"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Firebase Explorer"
+
+### REGULAR PAGES ###
+meta:
+  title: "Firebase Explorer - Admin"
+  description: "Explore and manage Firebase data"
+  breadcrumb: "Firebase Explorer"
+
+prerender_icons:
+  - name: "folder"
+  - name: "folder-open"
+  - name: "file"
+  - name: "pen"
+  - name: "floppy-disk"
+  - name: "arrow-left"
+  - name: "trash"
+---
+
+<!-- Page Header -->
+<div class="row mb-4">
+  <div class="col">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <p class="text-muted mb-0">Browse and manage your Firestore database</p>
+      </div>
+      <div>
+        <button class="btn btn-outline-adaptive" id="btn-refresh-explorer">
+          {% uj_icon "rotate", "fa-md me-2" %}
+          Refresh
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Sidebar -->
+  <div class="col-md-3">
+    <!-- Collections -->
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0">{% uj_icon "database", "fa-sm me-2" %} Collections</h6>
+      </div>
+      <div class="card-body p-2">
+        <!-- Quick access -->
+        <div class="nav flex-column collection-nav" id="collection-links">
+          <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="users">
+            {% uj_icon "folder", "fa-sm me-2" %} users
+            <span class="badge bg-body-secondary text-body collection-count">
+              <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
+            </span>
+          </a>
+          <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="notifications">
+            {% uj_icon "folder", "fa-sm me-2" %} notifications
+            <span class="badge bg-body-secondary text-body collection-count">
+              <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
+            </span>
+          </a>
+          <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="payments-orders">
+            {% uj_icon "folder", "fa-sm me-2" %} payments-orders
+            <span class="badge bg-body-secondary text-body collection-count">
+              <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
+            </span>
+          </a>
+          <a href="#" class="nav-link px-2 py-1 d-flex justify-content-between align-items-center" data-collection="meta">
+            {% uj_icon "folder", "fa-sm me-2" %} meta
+            <span class="badge bg-body-secondary text-body collection-count">
+              <span class="spinner-border spinner-border-sm" style="width: 0.7rem; height: 0.7rem;"></span>
+            </span>
+          </a>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- Custom Collection Input -->
+        <form id="collection-form" data-form-state="initializing" onsubmit="return false">
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control" name="collection.path" placeholder="Collection path..." aria-label="Collection path" required>
+            <button type="submit" class="btn btn-outline-adaptive">
+              <span class="button-text">{% uj_icon "arrow-right", "fa-sm" %}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Query Builder -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h6 class="mb-0">{% uj_icon "magnifying-glass", "fa-sm me-2" %} Query</h6>
+      </div>
+      <div class="card-body">
+        <form id="query-form" data-form-state="initializing" onsubmit="return false">
+          <div class="mb-2">
+            <label for="query-field" class="form-label small mb-1">Field</label>
+            <input type="text" class="form-control form-control-sm" name="query.field" id="query-field" placeholder="e.g. auth.email" required>
+          </div>
+          <div class="mb-2">
+            <label for="query-operator" class="form-label small mb-1">Operator</label>
+            <select class="form-select form-select-sm" name="query.operator" id="query-operator" aria-label="Comparison operator">
+              <option value="==">==(equals)</option>
+              <option value="!=">!= (not equals)</option>
+              <option value=">">&#62; (greater than)</option>
+              <option value="<">&#60; (less than)</option>
+              <option value=">=">&#62;= (greater or equal)</option>
+              <option value="<=">&#60;= (less or equal)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="query-value" class="form-label small mb-1">Value</label>
+            <input type="text" class="form-control form-control-sm" name="query.value" id="query-value" placeholder="Value" aria-label="Query value" required>
+            <div class="form-text" style="font-size: 0.7rem;">Numbers and booleans auto-detected</div>
+          </div>
+          <button type="submit" class="btn btn-sm btn-adaptive w-100">
+            {% uj_icon "magnifying-glass", "fa-sm me-2" %}
+            <span class="button-text">Run query</span>
+          </button>
+        </form>
+        <button class="btn btn-sm btn-outline-adaptive w-100 mt-2 d-none" id="btn-clear-query">
+          Clear query
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="col-md-9">
+    <!-- Breadcrumb -->
+    <nav class="mb-3" id="explorer-breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item">
+          <a href="#" id="breadcrumb-root">{% uj_icon "database", "fa-xs" %}</a>
+        </li>
+      </ol>
+    </nav>
+
+    <!-- Documents List View -->
+    <div id="view-documents">
+      <div class="card">
+        <div class="card-body p-0">
+          <!-- Loading -->
+          <div id="docs-loading" class="text-center text-muted py-5 d-none">
+            <span class="spinner-border spinner-border-sm"></span>
+          </div>
+
+          <!-- Empty / No Collection -->
+          <div id="docs-empty" class="text-center text-muted py-5">
+            {% uj_icon "folder-open", "fa-2xl mb-3 d-block" %}
+            Select a collection to browse documents
+          </div>
+
+          <!-- Table -->
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 d-none" id="docs-table">
+              <thead>
+                <tr id="docs-thead-row"></tr>
+              </thead>
+              <tbody id="docs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="card-footer d-flex justify-content-between align-items-center d-none" id="docs-footer">
+          <div class="small text-muted" id="docs-count"></div>
+          <button class="btn btn-sm btn-outline-adaptive d-none" id="btn-load-more-docs">
+            Load more
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Detail View -->
+    <div id="view-document" class="d-none">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 font-monospace small" id="doc-detail-path"></h6>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-adaptive" id="btn-edit-doc">
+              {% uj_icon "pen", "fa-sm me-1" %}
+              Edit
+            </button>
+            <button class="btn btn-sm btn-outline-adaptive" id="btn-back-to-list">
+              {% uj_icon "arrow-left", "fa-sm me-1" %}
+              Back
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <!-- JSON Viewer -->
+          <pre class="json-viewer mb-0 p-3" id="doc-json-viewer"><code id="doc-json-content"></code></pre>
+
+          <!-- JSON Editor (hidden by default) -->
+          <div id="doc-editor-wrapper" class="d-none p-3">
+            <textarea class="form-control json-editor" id="doc-json-editor"></textarea>
+            <div id="doc-editor-error" class="text-danger small mt-2 d-none"></div>
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-sm btn-adaptive" id="btn-save-doc">
+                {% uj_icon "floppy-disk", "fa-sm me-1" %}
+                Save
+              </button>
+              <button class="btn btn-sm btn-outline-adaptive" id="btn-cancel-edit">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,17 @@
+// Newsflash Theme — Blog index page-specific CSS
+// Small accents for the newspaper front page
+// (_layouts/themes/newsflash/frontend/pages/blog/index.html).
+// Compiles standalone, so it pulls in the theme tokens + mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// The lead-story splash stays planted — only its framed image zooms
+.story-card--lead {
+  &:hover {
+    transform: none;
+  }
+
+  .art-frame {
+    aspect-ratio: 16 / 10;
+  }
+}

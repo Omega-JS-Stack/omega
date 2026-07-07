@@ -1,0 +1,246 @@
+---
+### ALL PAGES ###
+layout: admin/core/minimal
+
+### THEME CONFIG ###
+theme:
+  header:
+    title:
+      content: "Dashboard"
+      icon: "gauge-high"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Dashboard"
+
+### REGULAR PAGES ###
+meta:
+  title: "Dashboard - Admin"
+  description: "Admin dashboard overview and statistics"
+  breadcrumb: "Dashboard"
+
+prerender_icons:
+  - name: "users"
+  - name: "user-plus"
+  - name: "credit-card"
+  - name: "bell"
+  - name: "user"
+  - name: "circle"
+---
+
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+  <!-- Total Users -->
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-primary bg-opacity-10 mx-auto mb-2">
+          {% uj_icon "users", "fa-xl text-primary" %}
+        </div>
+        <h6 class="text-muted mb-1">Total users</h6>
+        <h3 class="mb-0" id="stat-total-users">
+          <span class="spinner-border spinner-border-sm fs-6"></span>
+        </h3>
+        <small class="text-muted" id="stat-new-users"></small>
+      </div>
+    </div>
+  </div>
+
+  <!-- MRR -->
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-info bg-opacity-10 mx-auto mb-2">
+          {% uj_icon "credit-card", "fa-xl text-info" %}
+        </div>
+        <h6 class="text-muted mb-1">MRR</h6>
+        <h3 class="mb-0" id="stat-mrr">
+          <span class="spinner-border spinner-border-sm fs-6"></span>
+        </h3>
+        <small class="text-muted" id="stat-mrr-count"></small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Push Subscribers -->
+  <div class="col-lg-4 col-md-6">
+    <div class="card h-100">
+      <div class="card-body text-center">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-warning bg-opacity-10 mx-auto mb-2">
+          {% uj_icon "bell", "fa-xl text-warning" %}
+        </div>
+        <h6 class="text-muted mb-1">Push subscribers</h6>
+        <h3 class="mb-0" id="stat-notifications">
+          <span class="spinner-border spinner-border-sm fs-6"></span>
+        </h3>
+        <small class="text-muted" id="stat-new-notifications"></small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-3 mb-4">
+  <!-- Plan Distribution -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-pie", "fa-md me-2" %} Plan distribution</h6>
+      </div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <div id="chart-plans-loading" class="text-center text-muted py-4">
+          <span class="spinner-border spinner-border-sm"></span>
+        </div>
+        <canvas id="chart-plans" class="d-none"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Billing Frequency -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-bar", "fa-md me-2" %} Billing frequency</h6>
+      </div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <div id="chart-frequency-loading" class="text-center text-muted py-4">
+          <span class="spinner-border spinner-border-sm"></span>
+        </div>
+        <canvas id="chart-frequency" class="d-none"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Tables -->
+<div class="row g-3 mb-4">
+  <!-- Recent Signups -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "user-plus", "fa-md me-2" %} Recent signups</h6>
+        <a href="/admin/users" class="btn btn-sm btn-outline-adaptive">{% uj_icon "arrow-right", "fa-sm me-1" %} View all</a>
+      </div>
+      <div class="card-body p-0">
+        <div id="recent-users-loading" class="text-center text-muted py-5">
+          <span class="spinner-border spinner-border-sm"></span>
+        </div>
+        <div id="recent-users-empty" class="text-center text-muted py-5 d-none">
+          No users found
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 d-none" id="recent-users-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Plan</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody id="recent-users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Orders -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "receipt", "fa-md me-2" %} Recent orders</h6>
+      </div>
+      <div class="card-body p-0">
+        <div id="recent-orders-loading" class="text-center text-muted py-5">
+          <span class="spinner-border spinner-border-sm"></span>
+        </div>
+        <div id="recent-orders-empty" class="text-center text-muted py-5 d-none">
+          No orders found
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 d-none" id="recent-orders-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Product</th>
+                <th>Processor</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="recent-orders-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "bolt", "fa-md me-2" %} Quick actions</h6>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+          <a href="/admin/users" class="btn btn-outline-adaptive">
+            {% uj_icon "users", "fa-md me-2" %}
+            Manage users
+          </a>
+          <a href="/admin/notifications/new" class="btn btn-outline-adaptive">
+            {% uj_icon "bell", "fa-md me-2" %}
+            Send notification
+          </a>
+          <a href="/admin/firebase" class="btn btn-outline-adaptive">
+            {% uj_icon "fire", "fa-md me-2" %}
+            Firebase explorer
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Tools -->
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "clock", "fa-md me-2" %} Cron jobs</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Manually trigger scheduled cron jobs</p>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-outline-adaptive btn-run-cron" data-cron-id="daily">
+            {% uj_icon "calendar-day", "fa-sm me-2" %}
+            <span class="btn-run-cron-text">Run daily</span>
+          </button>
+          <button class="btn btn-sm btn-outline-adaptive btn-run-cron" data-cron-id="frequent">
+            {% uj_icon "rotate", "fa-sm me-2" %}
+            <span class="btn-run-cron-text">Run frequent</span>
+          </button>
+        </div>
+        <div id="cron-result" class="mt-3 d-none"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "cloud-arrow-up", "fa-md me-2" %} Backup</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Export Firestore database to Cloud Storage</p>
+        <button class="btn btn-sm btn-outline-adaptive" id="btn-run-backup">
+          {% uj_icon "cloud-arrow-up", "fa-sm me-2" %}
+          <span id="btn-run-backup-text">Run backup</span>
+        </button>
+        <div id="backup-result" class="mt-3 d-none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+

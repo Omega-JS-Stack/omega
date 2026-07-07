@@ -1,0 +1,300 @@
+// Extension Installed Page Styles
+// Only custom styles that cannot be achieved with Bootstrap
+
+// Success icon animation
+.extension-success-icon {
+  animation: success-appear 0.6s ease-out;
+}
+
+@keyframes success-appear {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+// URL bar min width
+.extension-url-bar {
+  min-width: 100px;
+}
+
+// Extension dropdown width
+.extension-dropdown {
+  width: 280px;
+
+  @media (max-width: 576px) {
+    width: 100%;
+  }
+}
+
+// Icon/brandmark sizing
+.extension-item-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.extension-brandmark {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+// Toolbar brandmark (pinned state in step 4)
+.extension-toolbar-brandmark {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+// ============================================================================
+// Click Indicator Animation (same pattern as download page)
+// ============================================================================
+
+.click-indicator {
+  pointer-events: none;
+
+  .pointer-icon {
+    width: 48px;
+    height: 48px;
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .click-pulse {
+    width: 30px;
+    height: 30px;
+    top: -2px;
+    left: -2px;
+    opacity: 0;
+  }
+}
+
+// Step 1: Puzzle piece - mouse moves to target, clicks, snaps back
+.extension-puzzle-target {
+  .click-indicator {
+    .pointer-icon {
+      animation: puzzle-mouse-move 2.5s ease-out infinite;
+    }
+
+    .click-pulse {
+      animation: puzzle-click-pulse 2.5s ease-out infinite;
+    }
+  }
+}
+
+@keyframes puzzle-mouse-move {
+  // Start off-screen (bottom-right)
+  0% {
+    transform: translate(40px, 30px);
+  }
+  // Arrive at target (cursor tip on button)
+  30% {
+    transform: translate(-5px, -12px);
+  }
+  // Stay on target during clicks
+  70% {
+    transform: translate(-5px, -12px);
+  }
+  // Snap back instantly
+  70.1%, 100% {
+    transform: translate(40px, 30px);
+  }
+}
+
+@keyframes puzzle-click-pulse {
+  0%, 35% {
+    opacity: 0;
+    transform: translate(-5px, -12px) scale(0.5);
+  }
+  40%, 50% {
+    opacity: 0.8;
+    transform: translate(-5px, -12px) scale(1.3);
+  }
+  55%, 65% {
+    opacity: 0.8;
+    transform: translate(-5px, -12px) scale(1.3);
+  }
+  70%, 100% {
+    opacity: 0;
+    transform: translate(-5px, -12px) scale(0.5);
+  }
+}
+
+// Step 3: Pin button - mouse moves to target, clicks, snaps back
+.extension-pin-target {
+  .click-indicator {
+    .pointer-icon {
+      animation: pin-mouse-move 2.5s ease-out infinite;
+    }
+
+    .click-pulse {
+      animation: pin-click-pulse 2.5s ease-out infinite;
+    }
+  }
+}
+
+@keyframes pin-mouse-move {
+  // Start off-screen (bottom-right)
+  0% {
+    transform: translate(35px, 25px);
+  }
+  // Arrive at target (cursor tip on button)
+  30% {
+    transform: translate(-5px, -12px);
+  }
+  // Stay on target during clicks
+  70% {
+    transform: translate(-5px, -12px);
+  }
+  // Snap back instantly
+  70.1%, 100% {
+    transform: translate(35px, 25px);
+  }
+}
+
+@keyframes pin-click-pulse {
+  0%, 35% {
+    opacity: 0;
+    transform: translate(-5px, -12px) scale(0.5);
+  }
+  40%, 50% {
+    opacity: 0.8;
+    transform: translate(-5px, -12px) scale(1.3);
+  }
+  55%, 65% {
+    opacity: 0.8;
+    transform: translate(-5px, -12px) scale(1.3);
+  }
+  70%, 100% {
+    opacity: 0;
+    transform: translate(-5px, -12px) scale(0.5);
+  }
+}
+
+// ============================================================================
+// Steps Slideshow (mirrored from download page)
+// ============================================================================
+
+// Instruction step container
+.instruction-step-container {
+  min-height: 200px;
+}
+
+// Steps slideshow — uses a grid stack so all slides overlap in the same cell,
+// making the container always the height of the tallest slide (no jitter).
+.steps-slideshow {
+  position: relative;
+
+  .steps-slideshow-slides {
+    display: grid;
+
+    > .step-slide {
+      grid-area: 1 / 1;
+      text-align: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.35s ease-out;
+      display: flex;
+      flex-direction: column;
+
+      &.active {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .step-number-badge,
+      .step-title {
+        align-self: center;
+      }
+
+      // The last child (visual content area) grows to fill remaining space
+      // and centers its content vertically
+      > :last-child {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+    }
+  }
+}
+
+// Big step number badge
+.step-number-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bs-primary);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+// Step title
+.step-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+// Navigation bar
+.steps-slideshow-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+
+// Progress dots
+.steps-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  .step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bs-border-color);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+
+    &.active {
+      background: var(--bs-primary);
+      transform: scale(1.3);
+    }
+
+    &:hover:not(.active) {
+      background: var(--bs-secondary);
+    }
+  }
+}
+
+// Slide fade-in animation
+@keyframes step-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

@@ -1,0 +1,50 @@
+// Newsflash Theme — Mixins
+// The shared building blocks of the editorial look. Components @include these
+// so the frame/shadow/lift system lives in ONE place (SSOT) rather than being
+// copy-pasted across buttons, cards, inputs, etc.
+
+// Hairline frame in the current ink color.
+@mixin nf-border($width: var(--nf-border-width)) {
+  border: $width solid var(--nf-border-color);
+}
+
+// Small hard offset shadow (no blur) — the resting state of controls.
+@mixin nf-shadow-hard() {
+  box-shadow: var(--nf-shadow-hard);
+}
+
+// Soft "pop" shadow — depth for frames and panels (hero art, signup rail).
+@mixin nf-shadow-pop() {
+  box-shadow: var(--nf-shadow-pop);
+}
+
+// The signature interaction: the element rests on a small hard shadow, then
+// LIFTS up-left on hover (shadow grows beneath it) and presses flush on
+// active. Pure transform + shadow — no color shift.
+@mixin nf-lift() {
+  transition: $nf-transition;
+
+  &:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--nf-shadow-hard-hover);
+  }
+
+  &:active {
+    transform: translate(0, 0);
+    box-shadow: 1px 1px 0 var(--nf-shadow-color);
+  }
+}
+
+// Headline hover underline — an accent rule that grows from the left under
+// the text (the editorial "this is a link" affordance on serif headlines).
+@mixin nf-underline-grow($color: var(--bs-primary), $thickness: 2px) {
+  background-image: linear-gradient($color, $color);
+  background-repeat: no-repeat;
+  background-size: 0% $thickness;
+  background-position: 0 96%;
+  transition: background-size 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+
+  &:hover {
+    background-size: 100% $thickness;
+  }
+}

@@ -1,0 +1,200 @@
+// Neobrutalism Theme — General Layout
+// Section rhythm, the hero treatment, footer, badges, and overrides for the
+// gradient/accent classes the shared (Classy-derived) layouts emit. The goal:
+// the inherited homepage/pricing/auth markup renders as flat neobrutalist
+// color-blocks instead of soft gradients — no layout override needed.
+
+// ============================================
+// Section rhythm
+// ============================================
+// Shared layouts rely on the theme to provide vertical section padding.
+section {
+  padding-top: clamp(3rem, 7vw, 6rem);
+  padding-bottom: clamp(3rem, 7vw, 6rem);
+}
+
+// The navbar is fixed and overlaps the page, so the FIRST section on every page
+// must add the navbar's height to its top padding — otherwise its content sits
+// under the nav (cramped at the top, unbalanced vs. the section's bottom).
+// Targets the first section regardless of page; the !important beats a `pt-0`
+// utility that a layout may put on the first section.
+main > section:first-child,
+#main-content > section:first-child {
+  padding-top: calc(var(--nb-navbar-height) + clamp(2rem, 5vw, 4rem)) !important;
+}
+
+// ============================================
+// Hero — flat color block, not a gradient
+// ============================================
+// The hero <section> ships with .bg-gradient-rainbow .gradient-animated etc.
+// We neutralize the gradient and replace it with a solid accent block framed
+// by a thick ink rule at the bottom. Decorative grain/animation are dropped.
+.bg-gradient-rainbow,
+.gradient-animated,
+.gradient-grain {
+  background-image: none !important;
+  animation: none !important;
+}
+
+section.bg-gradient-rainbow {
+  background-color: var(--nb-accent-yellow) !important;
+  color: #111111 !important;
+  border-radius: 0 !important;
+  border-bottom: $nb-border-width-lg solid var(--nb-border-color);
+  box-shadow: none !important;
+
+  // Force readable ink text over the bright block
+  // (exclude the tagline kicker, which is ink-on-accent and styled below)
+  .text-light,
+  &.text-light,
+  h1, h2, h3, .lead,
+  p:not(.text-uppercase) {
+    color: #111111 !important;
+  }
+
+  // Tagline becomes a mono kicker chip: accent text on an ink block
+  .text-uppercase {
+    display: inline-block;
+    font-family: $nb-font-mono;
+    font-weight: 700;
+    background: #111111;
+    color: var(--nb-accent-yellow) !important;
+    padding: 0.4rem 0.8rem;
+    opacity: 1 !important;
+  }
+}
+
+// Accent text (headline_accent spans) — marker highlight instead of color swap
+.text-accent {
+  background: #111111;
+  color: var(--nb-accent-yellow);
+  padding: 0 0.12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+// ============================================
+// CTA / promo cards (.card.bg-gradient.bg-primary.text-white)
+// ============================================
+// Flatten gradient promo cards into solid accent blocks with ink frame.
+.card.bg-gradient,
+.card.bg-primary {
+  background-image: none !important;
+  background-color: var(--nb-accent-blue) !important;
+  color: #fff !important;
+  @include nb-border();
+  @include nb-shadow(lg);
+}
+
+// Glassy hero-demo card → solid surface box
+.bg-glassy,
+.card.bg-glassy {
+  background: var(--nb-surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  @include nb-border();
+}
+
+// ============================================
+// Shadow utility overrides → hard offset shadows
+// ============================================
+// Bootstrap's .shadow / .shadow-lg are soft blurs. Map them to the neobrutalist
+// hard offset so inherited markup (auth cards, modals) gets the right look.
+.shadow-sm { box-shadow: var(--nb-shadow-sm) !important; }
+.shadow    { box-shadow: var(--nb-shadow) !important; }
+.shadow-lg { box-shadow: var(--nb-shadow-lg) !important; }
+
+// Cards that ship with .border-0 (e.g. the auth card) lose Bootstrap's border;
+// give the frame back so the ink outline + hard shadow read as one box.
+// (Targeted to elevated cards so flat inline cards stay borderless.)
+.card.border-0.shadow-sm,
+.card.border-0.shadow,
+.card.border-0.shadow-lg {
+  @include nb-border();
+}
+
+// ============================================
+// Badges — sticker chips with ink frame
+// ============================================
+.badge {
+  border-radius: 0;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 0.4rem 0.6rem;
+  @include nb-border($nb-border-width-sm);
+  color: #111111;
+}
+.badge.bg-body-tertiary { background: var(--nb-accent-yellow) !important; }
+// Strip decorative gradient borders from inherited badges
+.border-gradient-rainbow { border-image: none !important; }
+
+// ============================================
+// Footer
+// ============================================
+footer {
+  background: var(--nb-surface);
+  border-top: $nb-border-width-lg solid var(--nb-border-color);
+
+  a {
+    color: var(--bs-body-color);
+    text-decoration: none;
+    font-weight: 600;
+
+    &:hover {
+      background: var(--nb-accent-interactive);
+      color: var(--nb-accent-interactive-ink);
+    }
+  }
+}
+
+// ============================================
+// Tables, alerts, accordions — square + framed
+// ============================================
+.alert {
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(sm);
+}
+
+.accordion-item {
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(sm);
+
+  // Bootstrap strips the top border on .accordion-item:not(:first-of-type) to
+  // avoid doubled borders in a connected stack. Our items are separated (mb-3),
+  // so force the full ink frame back on every item (!important beats Bootstrap's
+  // same-specificity reset that may load after this via bootstrap/overrides).
+  &:not(:first-of-type) {
+    border-top: $nb-border-width solid var(--nb-border-color) !important;
+  }
+}
+.accordion-button {
+  border-radius: 0;
+  font-weight: 700;
+
+  &:not(.collapsed) {
+    background: var(--nb-accent-yellow);
+    color: #111111;
+    box-shadow: none;
+  }
+  &:focus {
+    box-shadow: none;
+    border-color: var(--nb-border-color);
+  }
+}
+
+.modal-content,
+.toast,
+.offcanvas {
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(lg);
+}
+
+// Back-to-top / floating action buttons stay on-brand
+.btn-back-to-top {
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(sm);
+}

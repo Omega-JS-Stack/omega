@@ -1,0 +1,42 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### THEME CONFIG ###
+theme:
+  nav:
+    enabled: true
+  # main:
+  #   class: ""
+  footer:
+    enabled: true
+---
+
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 col-md-12 col-12">
+        <div class="text-center">
+          <h1 class="h1 mb-3">
+            {{ resolved.meta.breadcrumb }}
+          </h1>
+          <p class="lead px-8">
+            {{ resolved.meta.description }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12">
+        {{ content | uj_content_format }}
+      </div>
+    </div>
+  </div>
+</section>
+
+

@@ -1,0 +1,205 @@
+<!-- Meta Variables -->
+{% assign page-viewport = "width=device-width, initial-scale=1.0, user-scalable=yes, shrink-to-fit=no" %}
+{%- iftruthy resolved.meta.viewport -%}
+  {% assign page-viewport = resolved.meta.viewport | uj_liquify %}
+{% endiftruthy %}
+
+{% assign page-referrer = "strict-origin-when-cross-origin" %}
+{%- iftruthy resolved.meta.referrer -%}
+  {% assign page-referrer = resolved.meta.referrer | uj_liquify %}
+{%- endiftruthy -%}
+
+{% assign page-keywords = "" %}
+{%- iftruthy resolved.meta.keywords -%}
+  {% assign page-keywords = resolved.meta.keywords | uj_liquify %}
+{%- endiftruthy -%}
+
+{% assign favicon-path = site.url | append: "/assets/images/favicon" %}
+{%- iftruthy resolved.favicon.path -%}
+  {% assign favicon-path = resolved.favicon.path %}
+{%- endiftruthy -%}
+
+{% assign page-robots = "index" %}
+{%- if resolved.meta.index == false -%}
+  {% assign page-robots = "noindex" %}
+{%- endif -%}
+
+<!-- Assign Default Dynamic Variables -->
+<!-- (Page asset lookups are computed by the engine: pageAssets.css / pageAssets.themeCss / pageAssets.js
+     resolve this page's content-hashed bundles from the asset manifest.) -->
+{% assign page-title = resolved.meta.title | uj_liquify %}
+{% assign page-description = resolved.meta.description | uj_liquify %}
+{% assign page-image = resolved.meta.image | uj_liquify %}
+{% assign page-og-type = "website" %}
+
+<!-- Assign Post Dynamic Variables -->
+{%- iftruthy resolved.post.id -%}
+  {% assign page-title = resolved.post.title | uj_liquify %}
+  {% assign page-description = resolved.post.description | uj_liquify %}
+  {% capture page-image %}{%- uj_post resolved.post.id, "image" -%}{% endcapture %}
+  {% assign page-og-type = "article" %}
+{% endiftruthy %}
+
+<!-- Assign Member Dynamic Variables -->
+{%- iftruthy resolved.member.id -%}
+  {% assign page-title = resolved.member.name | uj_liquify %}
+  {% assign page-description = resolved.member.description | uj_liquify %}
+  {% capture page-image %}{%- uj_member resolved.member.id, "image" -%}{% endcapture %}
+  {% assign page-og-type = "profile" %}
+{% endiftruthy %}
+
+<!-- Resolve Image -->
+{% capture page-image %}{% uj_external page-image %}{% endcapture %}
+
+{% capture page-ie-script %}
+  <style media="screen">
+    .main-alert-outdated {
+      display: block !important;
+    }
+  </style>
+{% endcapture %}
+
+<!-- Prefetch and Preconnect -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin/>
+<link rel="dns-prefetch" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="dns-prefetch" href="https://fonts.gstatic.com"/>
+<!-- <link rel="preconnect" href="https://cdn.jsdelivr.net"/> -->
+<!-- <link rel="preconnect" href="https://cdnjs.cloudflare.com"/> -->
+<!-- <link rel="dns-prefetch" href="https://cdn.jsdelivr.net"/> -->
+<!-- <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/> -->
+
+<!-- Google Adsense (conditionally loaded) -->
+{% iftruthy resolved.advertising.google-adsense.client %}
+  <!-- Google AdSense -->
+  <!-- <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin/> -->
+  <!-- <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com"/> -->
+
+  <!-- Additional AdSense domains if needed -->
+  <!-- <link rel="preconnect" href="https://googleads.g.doubleclick.net" crossorigin/> -->
+  <!-- <link rel="dns-prefetch" href="https://googleads.g.doubleclick.net"/> -->
+  <!-- <link rel="preconnect" href="https://tpc.googlesyndication.com" crossorigin/> -->
+  <!-- <link rel="dns-prefetch" href="https://tpc.googlesyndication.com"/> -->
+{% endiftruthy %}
+
+<!-- Chatsy (if used) -->
+{% iftruthy resolved.web_manager.chatsy.enabled %}
+  <link rel="preconnect" href="https://chatsy.ai" crossorigin/>
+  <link rel="dns-prefetch" href="https://chatsy.ai"/>
+{% endiftruthy %}
+
+<!-- Cloudflare Insights (if used) -->
+<!-- <link rel="preconnect" href="https://static.cloudflareinsights.com"/>
+<link rel="dns-prefetch" href="https://static.cloudflareinsights.com"/> -->
+
+<!-- Meta -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="{{ page-viewport }}"/>
+<meta name="HandheldFriendly" content="True"/>
+<meta name="MobileOptimized" content="320"/>
+<meta name="generator" content="Ultimate Jekyll"/>
+<meta name="author" content="{{ site.brand.name }}"/>
+<meta name="copyright" content="{{ site.characters.copyright }} {{ site.uj.date.year }} {{ site.brand.name }}">
+
+<!-- Referrer -->
+<meta name="referrer" content="{{ page-referrer }}"/>
+
+<!-- Canonical -->
+<link rel="canonical" href="{{ site.url }}{{ page.url }}"/>
+
+<!-- Robots -->
+<meta name="robots" content="{{ page-robots }}"/>
+
+<!-- Keywords -->
+<meta name="keywords" content="{{ page-keywords }}"/>
+
+<!-- Manifest.json -->
+<link rel="manifest" href="{{ site.url }}/manifest.json"/>
+
+<!-- Title -->
+<title>{{ page-title }}</title>
+<meta name="twitter:title" content="{{ page-title }}"/>
+<meta property="og:title" content="{{ page-title }}"/>
+
+<!-- Description -->
+<meta name="description" content="{{ page-description }}"/>
+<meta name="twitter:description" content="{{ page-description }}"/>
+<meta property="og:description" content="{{ page-description }}"/>
+
+<!-- Image -->
+<meta name="twitter:image" content="{{ page-image }}"/>
+<meta property="og:image" content="{{ page-image }}"/>
+<meta property="og:image:width" content="{{ resolved.meta.og_image_width | default: '1200' }}"/>
+<meta property="og:image:height" content="{{ resolved.meta.og_image_height | default: '630' }}"/>
+
+<!-- OG: Twitter -->
+<meta name="twitter:card" content="{{ resolved.meta.twitter_card | default: 'summary_large_image' }}"/>
+<meta name="twitter:site" content="@{{ site.socials.twitter }}"/>
+<meta name="twitter:widgets:theme" content="light"/>
+
+<!-- OG: Facebook / Open Graph -->
+<meta property="og:url" content="{{ site.url }}{{ page.url }}"/>
+<meta property="og:type" content="{{ page-og-type }}"/>
+<meta property="og:locale" content="{{ page-translation-default }}"/>
+<meta property="og:site_name" content="{{ site.brand.name }}"/>
+
+<!-- Additional SEO Tags -->
+<meta property="article:author" content="{{ site.brand.name }}"/>
+<meta property="article:publisher" content="{{ site.url }}"/>
+<meta name="twitter:creator" content="@{{ site.socials.twitter }}"/>
+{%- iftruthy resolved.post.id -%}
+<meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}"/>
+<meta property="article:modified_time" content="{{ site.time | date_to_xmlschema }}"/>
+{%- endiftruthy -%}
+
+<!-- Main Feed -->
+<link href="{{ site.url }}/feeds/posts.xml" type="application/atom+xml" rel="alternate" title="{{ site.brand.name }} Feed"/>
+
+<!-- Language Tags -->
+<link rel="alternate" href="{{ site.url }}{{ page.url }}" hreflang="x-default"/>
+<link rel="alternate" href="{{ site.url }}{{ page.url }}" hreflang="{{ page-translation-default }}"/>
+
+<!-- Favicon -->
+<link rel="apple-touch-icon" sizes="180x180" href="{{ favicon-path | append: '/apple-touch-icon.png' | uj_cachebreak }}"/>
+<link rel="icon" type="image/png" sizes="32x32" href="{{ favicon-path | append: '/favicon-32x32.png' | uj_cachebreak }}"/>
+<link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | uj_cachebreak }}"/>
+<link rel="mask-icon" href="{{ favicon-path | append: '/safari-pinned-tab.svg' | uj_cachebreak }}" color="{{ resolved.favicon.safari-pinned-tab }}"/>
+<link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | uj_cachebreak }}"/>
+<meta name="msapplication-TileColor" content="{{ resolved.favicon.msapp-tile-color }}"/>
+<meta name="msapplication-config" content="{{ favicon-path | append: '/browserconfig.xml' | uj_cachebreak }}"/>
+<meta name="theme-color" content="{{ resolved.favicon.theme-color }}"/>
+
+<!-- Browser Support -->
+<!--[if lte IE 11]>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js"></script>
+  {{ page-ie-script }}
+<![endif]-->
+
+<!-- CSS Bundles: content-hashed by the asset pipeline, mapped via the manifest -->
+<!-- Note: media="print" onload="this.media='all'" does NOT improve performance -->
+<link rel="stylesheet" type="text/css" href="{{ assetManifest.css.main }}"/>
+
+<!-- Then, fetch any page specific bundle -->
+{% iftruthy pageAssets.css %}
+  <link rel="stylesheet" type="text/css" href="{{ pageAssets.css }}"/>
+{% endiftruthy %}
+
+<!-- Then, the active theme's page-specific bundle (loaded AFTER base so it can override).
+     Only present when the theme ships page CSS for this path — otherwise nothing loads
+     and the theme's component/general styles handle the page. No fallback needed. -->
+{% iftruthy pageAssets.themeCss %}
+  <link rel="stylesheet" type="text/css" href="{{ pageAssets.themeCss }}"/>
+{% endiftruthy %}
+
+<!-- Style - Scripts are Disabled -->
+<noscript>
+  {{ page-ie-script }}
+</noscript>
+
+<!-- Theme - Injected head -->
+{{ resolved.theme.head.content | uj_content_format }}
+
+<!-- Page - Injected head -->
+{{ resolved.head.content | uj_content_format }}

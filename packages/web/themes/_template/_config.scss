@@ -1,0 +1,60 @@
+// <Theme Name> Configuration
+// ALL customizable variables live here with !default so consuming projects can
+// override any of them BEFORE the theme is imported. Keep this file as the
+// single source of truth for your theme's design tokens.
+
+// ============================================
+// Bootstrap Color Overrides
+// ============================================
+$primary:   #3B82F6 !default;
+$secondary: #6B7280 !default;
+$success:   #10B981 !default;
+$info:      #06B6D4 !default;
+$warning:   #F59E0B !default;
+$danger:    #EF4444 !default;
+$light:     #F9FAFB !default;
+$dark:      #111827 !default;
+
+// ============================================
+// Surfaces (light + dark mode)
+// ============================================
+// Define your page/card backgrounds for each mode. _root.scss bridges these
+// into CSS variables so dark-mode switching needs no recompilation.
+$theme-bg-light:         #FFFFFF !default;
+$theme-surface-light:    #F3F4F6 !default;
+$theme-bg-dark:          #0B0B0F !default;
+$theme-surface-dark:     #16161C !default;
+
+// ============================================
+// Typography
+// ============================================
+$font-family-sans-serif: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !default;
+$headings-font-weight: 700 !default;
+
+// ============================================
+// Component sizing
+// ============================================
+// Match Classy's avatar map so the shared layouts/includes render correctly.
+$avatar-sizes: (
+  null: 3rem, 2xs: 0.5rem, xs: 1.5rem, sm: 2rem, md: 2.5rem,
+  lg: 3.5rem, xl: 5rem, 2xl: 7.5rem, 3xl: 10rem, 4xl: 12.5rem, 5xl: 15rem
+) !default;
+
+// ============================================
+// Forward Bootstrap with our configuration
+// ============================================
+// Pass your overridden tokens into Bootstrap so .btn/.card/.form-control etc.
+// are generated with your colors. Add/remove forwards as your theme needs.
+@forward '../bootstrap/scss/bootstrap.scss' with (
+  $primary: $primary,
+  $secondary: $secondary,
+  $success: $success,
+  $info: $info,
+  $warning: $warning,
+  $danger: $danger,
+  $light: $light,
+  $dark: $dark,
+  $font-family-sans-serif: $font-family-sans-serif,
+  $headings-font-weight: $headings-font-weight,
+  $enable-negative-margins: true
+);

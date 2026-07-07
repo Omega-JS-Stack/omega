@@ -1,0 +1,410 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "{{ site.brand.name }}"
+  headline_accent: "browser extension"
+  description: "Unlock the full potential of {{ site.brand.name }} right in your browser"
+
+# Downloads Section
+downloads:
+  loading:
+    headline: "Detecting browser"
+    description: "Determining your browser..."
+    button_text: "Please wait"
+  not_available:
+    headline: "Not available yet"
+    description: "The {{ site.brand.name }} extension is not currently available for this browser."
+  browsers:
+    - id: "chrome"
+      name: "Chrome"
+      logo: "chrome"
+      description: "Chrome 88+"
+    - id: "firefox"
+      name: "Firefox"
+      logo: "firefox"
+      description: "Firefox 78+"
+    - id: "edge"
+      name: "Edge"
+      logo: "edge"
+      description: "Edge 88+"
+    - id: "opera"
+      name: "Opera"
+      logo: "opera"
+      description: "Opera 74+"
+    - id: "safari"
+      name: "Safari"
+      logo: "safari"
+      description: "Safari 14+"
+    - id: "brave"
+      name: "Brave"
+      logo: "brave"
+      description: "Brave 1.25+"
+
+# Features Section
+features:
+  superheadline:
+    icon: "star"
+    text: "Benefits"
+  headline: "Why you should"
+  headline_accent: "install"
+  subheadline: "Everything you need, right in your browser"
+  items:
+    - title: "Quick access"
+      description: "Access {{ site.brand.name }} features with just one click"
+      icon: "bolt"
+    - title: "Seamless integration"
+      description: "Works naturally with your browsing workflow"
+      icon: "link"
+    - title: "Real-Time Updates"
+      description: "Get instant notifications and alerts"
+      icon: "bell"
+    - title: "Secure & Private"
+      description: "Your data stays safe with enterprise-grade encryption"
+      icon: "shield-check"
+
+# FAQ Section
+faqs:
+  superheadline:
+    icon: "messages-question"
+    text: "FAQs"
+  headline: "Frequently asked"
+  headline_accent: "questions"
+  subheadline: "Everything you need to know about the {{ site.brand.name }} browser extension."
+  items:
+    - question: "Is the extension free?"
+      answer: "Yes! The {{ site.brand.name }} browser extension is completely free to download and use."
+    - question: "Which browsers are supported?"
+      answer: "The extension is available for Chrome, Firefox, Edge, Opera, and Safari."
+    - question: "How do I pin the extension?"
+      answer: "After installing, click the puzzle piece icon in your browser toolbar, then click the pin icon next to {{ site.brand.name }}."
+    - question: "Is my data secure?"
+      answer: "Absolutely. We use enterprise-grade encryption to protect your data. The extension only accesses what it needs to function."
+
+# CTA Section
+cta:
+  superheadline:
+    icon: "comments"
+    text: "Support"
+  headline: "Need help with"
+  headline_accent: "installation?"
+  subheadline: "Our support team is here 24/7 to help you get set up"
+  primary_button:
+    text: "Contact support"
+    icon: "headset"
+    href: "/contact"
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }}
+          <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+        <p class="fs-5 text-muted mb-0">
+          {{ resolved.hero.description }}
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Downloads Section -->
+<section class="pt-0">
+  <div class="container">
+    <!-- Browser Selector -->
+    <div class="row justify-content-center mb-5">
+      <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-center gap-3" data-lazy="@class animation-slide-up">
+          <ul class="nav nav-pills gap-3 border-0 justify-content-center w-100" id="browser-selector" role="tablist">
+            <!-- Loading tab (shown by default until browser is detected) -->
+            <li class="nav-item d-none" role="presentation" data-browser="loading">
+              <button
+                class="btn btn-outline-adaptive btn-lg active d-flex align-items-center justify-content-center"
+                id="loading-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#loading-pane"
+                type="button"
+                role="tab"
+                aria-controls="loading-pane"
+                aria-selected="true"
+              >
+                <div class="spinner-border spinner-border-sm me-2" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                Detecting...
+              </button>
+            </li>
+
+            {% for browser in resolved.downloads.browsers %}
+              {% assign has_download = false %}
+              {% assign config_url = site.extension[browser.id] %}
+              {% iftruthy config_url %}
+                {% assign has_download = true %}
+              {% endiftruthy %}
+
+              <li class="nav-item flex-fill flex-sm-grow-0" role="presentation">
+                <button
+                  class="btn btn-outline-adaptive btn-lg browser-btn d-flex align-items-center justify-content-center w-100"
+                  id="{{ browser.id }}-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#{{ browser.id }}-pane"
+                  data-browser="{{ browser.id }}"
+                  data-has-download="{% if has_download %}true{% else %}false{% endif %}"
+                  type="button"
+                  role="tab"
+                  aria-controls="{{ browser.id }}-pane"
+                  aria-selected="false"
+                >
+                  <span class="avatar avatar-sm me-2">{% uj_logo browser.logo %}</span>
+                  {{ browser.name }}
+                </button>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download Cards -->
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="tab-content">
+          <!-- Loading Browser Card -->
+          <div
+            class="tab-pane fade show active"
+            id="loading-pane"
+            role="tabpanel"
+            aria-labelledby="loading-tab"
+            tabindex="0"
+          >
+            <div class="card border-0 shadow-lg">
+              <div class="card-body p-5 text-center">
+                <div class="mb-4">
+                  <div class="avatar avatar-2xl rounded-circle bg-primary d-inline-flex align-items-center justify-content-center">
+                    <div class="spinner-border text-light" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+                </div>
+                <h2 class="h2 mb-1">{{ resolved.downloads.loading.headline }}</h2>
+                <p class="text-muted fs-5 mb-4">{{ resolved.downloads.loading.description }}</p>
+
+                <div class="d-flex flex-column gap-3">
+                  <button type="button" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" disabled>
+                    {% uj_icon "puzzle-piece", "fa-3xl me-2" %}
+                    {{ resolved.downloads.loading.button_text }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {% for browser in resolved.downloads.browsers %}
+            {% assign has_download = false %}
+            {% assign config_url = site.extension[browser.id] %}
+            {% iftruthy config_url %}
+              {% assign has_download = true %}
+            {% endiftruthy %}
+
+            <div
+              class="tab-pane fade"
+              id="{{ browser.id }}-pane"
+              role="tabpanel"
+              aria-labelledby="{{ browser.id }}-tab"
+              tabindex="0"
+              data-browser="{{ browser.id }}"
+              data-has-download="{% if has_download %}true{% else %}false{% endif %}"
+            >
+              <div class="card border-0 shadow-lg">
+                <div class="card-body p-5 text-center">
+                  <div class="mb-4">
+                    <span class="avatar avatar-2xl">{% uj_logo browser.logo %}</span>
+                  </div>
+                  <h2 class="h2 mb-1">{{ browser.name }}</h2>
+                  <p class="text-muted fs-5 mb-4">{{ browser.description }}</p>
+
+                  {% unless has_download %}
+                    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                      {% uj_icon "triangle-exclamation", "fs-4 me-3" %}
+                      <div class="text-start">
+                        <h6 class="mb-0">{{ resolved.downloads.not_available.headline }}</h6>
+                        <small>{{ resolved.downloads.not_available.description }}</small>
+                      </div>
+                    </div>
+                  {% endunless %}
+
+                  {% if has_download %}
+                    <div class="d-flex flex-column gap-3">
+                      <a
+                        href="{{ config_url }}"
+                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {% uj_icon "puzzle-piece", "fa-3xl me-2" %}
+                        Add to {{ browser.name }}
+                      </a>
+                    </div>
+                  {% else %}
+                    <div class="d-flex flex-column gap-3">
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                        disabled
+                      >
+                        {% uj_icon "puzzle-piece", "fa-3xl me-2" %}
+                        Coming soon
+                      </button>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section>
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.features.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.features.superheadline.icon %}
+            {% uj_icon resolved.features.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.features.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.features.headline }}
+        {% iftruthy resolved.features.headline_accent %}
+          <span class="text-accent">{{ resolved.features.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.features.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.features.subheadline }}</p>
+      {% endiftruthy %}
+    </div>
+
+    <div class="row g-4 justify-content-center">
+      {% for feature in resolved.features.items %}
+        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
+          <div class="card h-100 border-0 shadow-sm text-center">
+            <div class="card-body p-4">
+              <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                {% uj_icon feature.icon, "text-light fs-2" %}
+              </div>
+              <h4 class="mb-3">{{ feature.title }}</h4>
+              <p class="text-muted mb-0">{{ feature.description }}</p>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+          {% iftruthy resolved.faqs.superheadline.text %}
+            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+              {% iftruthy resolved.faqs.superheadline.icon %}
+                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
+              {% endiftruthy %}
+              {{ resolved.faqs.superheadline.text }}
+            </span>
+          {% endiftruthy %}
+          <h2 class="h2 mb-2">
+            {{ resolved.faqs.headline }}
+            {% iftruthy resolved.faqs.headline_accent %}
+              <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
+            {% endiftruthy %}
+          </h2>
+          {% iftruthy resolved.faqs.subheadline %}
+            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        <div class="accordion" id="extensionFaqAccordion" data-lazy="@class animation-slide-up">
+          {% for faq in resolved.faqs.items %}
+            <div class="accordion-item border-0 mb-3">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                  <span class="fw-semibold">{{ faq.question }}</span>
+                </button>
+              </h2>
+              <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#extensionFaqAccordion">
+                <div class="accordion-body text-muted shadow-sm">
+                  {{ faq.answer }}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section>
+  <div class="container">
+    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+      <!-- Decorative icon - top right -->
+      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
+        {% uj_icon "puzzle-piece", "text-white" %}
+      </div>
+
+      <!-- Decorative icon - bottom left -->
+      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
+        {% uj_icon "shield-check", "text-white" %}
+      </div>
+
+      <div class="position-relative">
+        {% iftruthy resolved.cta.superheadline.text %}
+          <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
+            {% iftruthy resolved.cta.superheadline.icon %}
+              {% uj_icon resolved.cta.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ resolved.cta.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+
+        <h2 class="h3 fw-bold mb-3">
+          {{ resolved.cta.headline }}
+          {% iftruthy resolved.cta.headline_accent %}
+            <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
+          {% endiftruthy %}
+        </h2>
+
+        {% iftruthy resolved.cta.subheadline %}
+          <p class="lead mb-4">{{ resolved.cta.subheadline }}</p>
+        {% endiftruthy %}
+
+        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+          <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-light btn-lg px-4">
+            {% uj_icon resolved.cta.primary_button.icon, "me-2" %}
+            {{ resolved.cta.primary_button.text }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

@@ -1,0 +1,70 @@
+// Newsflash Theme — About page-specific CSS
+// The editorial timeline for
+// (_layouts/themes/newsflash/frontend/pages/about.html).
+// Compiles standalone, so it pulls in the theme tokens + mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// Single-rail editorial timeline: an ink rule down the left, volt year chips
+// hanging on it, entries stepping down the page.
+.timeline {
+  position: relative;
+  padding-left: 1.5rem;
+  border-left: var(--nf-border);
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding-bottom: 2.25rem;
+
+  &:last-child {
+    padding-bottom: 0;
+  }
+
+  // The rule marker — a vermilion dot pinned to the rail
+  &::before {
+    content: "";
+    position: absolute;
+    left: calc(-1.5rem - 5.75px); // centers the dot on the 1.5px rail
+    top: 0.45rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--bs-primary);
+    border: var(--nf-border);
+  }
+}
+
+.timeline-year {
+  transform: rotate(-2deg);
+}
+
+// ============================================
+// Reader quotes — letters to the editor
+// ============================================
+.quote-card {
+  &::before {
+    content: "\201C";
+    display: block;
+    font-family: $nf-font-display;
+    font-weight: 900;
+    font-size: 3rem;
+    line-height: 0.5;
+    color: var(--bs-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    font-family: $nf-font-display;
+    font-optical-sizing: auto;
+    font-style: italic;
+    font-weight: 550;
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+    line-height: 1.45;
+  }
+}

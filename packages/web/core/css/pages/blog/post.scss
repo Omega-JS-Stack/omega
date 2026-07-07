@@ -1,0 +1,55 @@
+/*
+ * Blog Post Page Styles
+ * Styles specific to individual blog post pages
+ */
+
+article .blog-post-content {
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 2.5rem;
+  }
+
+  // Markdown tables — every plain `| col | col |` table gets the same look.
+  table {
+    width: 100%;
+    margin: 1.5rem 0 2rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg, 0.5rem);
+    overflow: hidden;            // clip cell backgrounds against the rounded corners
+    font-size: 0.95rem;
+    line-height: 1.5;
+
+    th, td {
+      padding: 0.85rem 1rem;
+      vertical-align: top;
+      border-top: 1px solid var(--bs-border-color);
+    }
+
+    // First-row cells skip the top border — the rounded outer border owns that edge.
+    tr:first-child th,
+    tr:first-child td {
+      border-top: 0;
+    }
+
+    thead {
+      background-color: color-mix(in srgb, var(--bs-emphasis-color) 12%, var(--bs-body-bg));
+      th {
+        font-weight: 700;
+        text-align: left;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.8rem;
+        border-bottom: 2px solid var(--bs-border-color);
+      }
+    }
+
+    tbody tr:nth-of-type(even) { background-color: var(--bs-tertiary-bg); }
+    tbody tr:hover             { background-color: var(--bs-secondary-bg); }
+
+    @media (max-width: 575.98px) {
+      font-size: 0.85rem;
+      th, td { padding: 0.6rem 0.75rem; }
+    }
+  }
+}

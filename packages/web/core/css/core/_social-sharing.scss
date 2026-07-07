@@ -1,0 +1,19 @@
+// Core Social Sharing Styles
+// Social media share button interactions
+
+// ============================================
+// Share Button Interactions
+// ============================================
+
+// Button styles - minimal since Bootstrap handles most styling
+.social-share-btn {
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:active {
+    opacity: 0.6;
+  }
+}

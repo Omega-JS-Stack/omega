@@ -1,0 +1,267 @@
+// Neobrutalism Theme — Pricing page-specific CSS
+// Styles the neobrutalist pricing override. Class names are UNIVERSAL (no theme
+// prefix) so the markup is swappable across themes. Compiles to its own bundle
+// (pages/pricing/index.neobrutalism.bundle.css). See docs/themes.md.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// Section heading (also defined in homepage bundle; page bundles are independent)
+.section-head { max-width: 60ch; }
+.section-title {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 0;
+}
+
+// ============================================
+// Hero
+// ============================================
+.pricing-hero {
+  text-align: center;
+  padding: clamp(3rem, 7vw, 5rem) 0 clamp(2rem, 4vw, 3rem);
+}
+.pricing-title {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+
+  .text-accent {
+    background: var(--nb-accent-yellow);
+    color: #111111;
+    padding: 0 0.1em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
+
+// ============================================
+// Billing toggle — hard square segmented control
+// ============================================
+.billing-toggle {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  width: 100%;
+  max-width: 420px;
+  @include nb-border();
+  @include nb-shadow(md);
+}
+.billing-option {
+  flex: 1;
+  text-align: center;
+  padding: 0.85rem 1rem;
+  font-family: $nb-font-display;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--nb-surface);
+  color: var(--bs-body-color);
+  transition: $nb-transition;
+  margin: 0;
+
+  & + .billing-option { border-left: $nb-border-width solid var(--nb-border-color); }
+
+  .btn-check:checked + & {
+    background: #111111;
+    color: var(--nb-accent-yellow);
+  }
+}
+.billing-save {
+  display: inline-block;
+  font-family: $nb-font-mono;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--nb-accent-yellow);
+  color: #111111;
+  padding: 0.1rem 0.35rem;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+.btn-check:checked + .billing-option .billing-save { background: var(--nb-accent-yellow); }
+
+// ============================================
+// Plan grid — popular plan emphasized (equal height, same baseline)
+// ============================================
+.pricing-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  align-items: stretch; // all cards fill the row's full height → equal height
+  margin-bottom: 2rem;
+
+  @media (max-width: 1199.98px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 575.98px) { grid-template-columns: 1fr; }
+}
+.pricing-plan { // sits on .card (frame/shadow come from the card component)
+  position: relative;
+  display: flex;
+  flex-direction: column; // lets the features list grow so footers align
+  padding: 1.75rem 1.5rem;
+  // No press interaction on the card itself — it's not clickable. Only the CTA
+  // button inside reacts to the pointer.
+
+  // Features sit directly under the divider (top of the lower half), not pushed
+  // to the bottom. Cards stay equal height via the grid's align-items: stretch.
+
+  // Popular plan: accent fill + thicker frame. Same height + same press as the others.
+  &--popular {
+    background: var(--nb-accent-yellow);
+    color: #111111;
+    @include nb-border($nb-border-width-lg);
+  }
+}
+.pricing-plan-flag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translateY(-50%);
+  font-family: $nb-font-mono;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #111111;
+  color: var(--nb-accent-yellow);
+  padding: 0.3rem 0.6rem;
+}
+.pricing-plan-name {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: 1.75rem;
+  margin-bottom: 0.15rem;
+}
+.pricing-plan-tagline {
+  font-family: $nb-font-mono;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-bottom: 1rem;
+}
+.pricing-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1rem;
+  margin-bottom: 0.25rem;
+}
+.pricing-plan-currency { font-family: $nb-font-display; font-weight: 900; font-size: 1.5rem; }
+.pricing-plan-amount { font-family: $nb-font-display; font-weight: 900; font-size: 3rem; line-height: 1; }
+.pricing-plan-per { font-family: $nb-font-mono; font-size: 0.85rem; opacity: 0.7; }
+.pricing-plan-ppu { font-family: $nb-font-mono; font-size: 0.75rem; opacity: 0.7; margin-bottom: 1.25rem; min-height: 1.2em; }
+.pricing-plan-billing { font-size: 0.8rem; text-align: center; opacity: 0.75; margin-bottom: 0.4rem; }
+.pricing-plan-guarantee { font-size: 0.8rem; text-align: center; opacity: 0.8; margin-bottom: 1rem; }
+.pricing-plan-rule {
+  border: 0;
+  border-top: $nb-border-width-sm solid currentColor;
+  opacity: 0.25;
+  margin: 0 0 1.25rem;
+}
+.pricing-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.95rem; font-weight: 500; }
+
+  // Spacing when a second (additional-features) list follows the inherit label
+  & + .pricing-plan-inherit { margin-top: 1rem; }
+}
+
+// "Everything in <plan>, and more:" / "What you get:" tier-inheritance label
+.pricing-plan-inherit {
+  font-family: $nb-font-mono;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin: 0 0 0.6rem;
+
+  strong { font-weight: 700; opacity: 1; }
+}
+.pricing-plan-feature-icon {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nb-accent-green);
+  color: #111111;
+  @include nb-border($nb-border-width-sm);
+}
+
+// Enterprise strip (sits on .card)
+.enterprise-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.75rem 2rem;
+  flex-wrap: wrap;
+}
+.enterprise-panel-title { font-family: $nb-font-display; font-weight: 900; font-size: 1.75rem; margin-bottom: 0.25rem; }
+
+// ============================================
+// Stats / social proof (.text-bg-* gives the fill)
+// ============================================
+.stats { padding: clamp(3rem, 8vw, 6rem) 0; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+
+  @media (max-width: 991.98px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 479.98px) { grid-template-columns: 1fr; }
+}
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  @include nb-border($nb-border-width-lg);
+  @include nb-shadow(lg);
+  @include nb-press($nb-shadow-offset-lg); // press matched to the lg resting shadow
+}
+.stat-block-num { font-family: $nb-font-display; font-weight: 900; font-size: clamp(2.5rem, 6vw, 3.5rem); line-height: 1; }
+.stat-block-label { font-weight: 800; font-size: 1.1rem; margin-top: 0.5rem; }
+
+// ============================================
+// FAQ
+// ============================================
+.faq { padding: clamp(3rem, 8vw, 6rem) 0; }
+
+// ============================================
+// CTA — full-bleed ink panel
+// ============================================
+.cta { padding: clamp(3rem, 8vw, 6rem) 0; }
+.cta-panel {
+  background: #111111;
+  color: #FFFEF2;
+  padding: clamp(2.5rem, 6vw, 4.5rem);
+  text-align: center;
+  // Frame + offset shadow in the accent (not ink) so both read against the dark panel.
+  border: $nb-border-width-lg solid var(--nb-accent-yellow);
+  box-shadow: #{$nb-shadow-offset-lg} #{$nb-shadow-offset-lg} 0 var(--nb-accent-yellow);
+}
+.cta-title {
+  font-family: $nb-font-display;
+  font-weight: 900;
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.25rem;
+
+  .text-accent {
+    background: var(--nb-accent-yellow);
+    color: #111111;
+    padding: 0 0.1em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
+.cta-desc { font-size: 1.25rem; max-width: 50ch; margin: 0 auto 2rem; opacity: 0.85; }

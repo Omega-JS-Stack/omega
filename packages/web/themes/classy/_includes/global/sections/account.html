@@ -1,0 +1,72 @@
+<!-- Account Dropdown (shared across frontend nav, backend topbar, admin topbar) -->
+{% assign account_data = site.data._includes.global.sections.account %}
+{% assign avatar_size = include.size | default: "md" %}
+
+{% capture action_attributes %}{% if include.attributes %}{% for attr in include.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+
+<div class="dropdown animation-slide-up d-inline-flex" data-wm-bind="@show auth.user" hidden>
+  <button class="p-0 border-0 bg-transparent" type="button" data-bs-toggle="dropdown" {{ action_attributes }} aria-expanded="false">
+    <span class="d-flex align-items-center">
+      <span class="position-relative d-inline-flex">
+        <span class="avatar avatar-{{ avatar_size }} rounded-circle bg-secondary bg-opacity-10 border d-flex align-items-center justify-content-center overflow-hidden d-inline-flex">
+          <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+        </span>
+        <!-- Active status indicator -->
+        <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
+          <span class="visually-hidden">Active status</span>
+        </span>
+      </span>
+    </span>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width: 280px;">
+    <!-- User info header (clickable) -->
+    <li>
+      <a href="/account#profile" class="dropdown-item px-3 py-2 text-decoration-none">
+        <div class="d-flex align-items-center">
+          <div class="position-relative me-3">
+            <div class="avatar avatar-md rounded-circle bg-secondary bg-opacity-10 border d-flex align-items-center justify-content-center overflow-hidden">
+              <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+            </div>
+            <!-- Active status indicator -->
+            <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
+              <span class="visually-hidden">Active status</span>
+            </span>
+          </div>
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="fw-semibold text-truncate text-body" data-wm-bind="@text auth.user.displayName">User</div>
+            <div class="small text-muted text-truncate" data-wm-bind="@text auth.user.email">email@example.com</div>
+          </div>
+        </div>
+      </a>
+    </li>
+    <!-- Dropdown items -->
+    {% for child in account_data.dropdown %}
+      {% capture child_attributes %}{% if child.attributes %}{% for attr in child.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+      {% capture child_active %}{% urlmatches child.href, "active" %}{% endcapture %}
+      {% capture child_class %}dropdown-item d-flex align-items-center text-body {{ child_active }} {% if child.class %}{{ child.class }}{% endif %}{% endcapture %}
+      {% capture child_content %}
+        {% if child.icon %}
+          {% uj_icon child.icon, "fa-md me-3" %}
+        {% endif %}
+        <span>{{ child.label }}</span>
+      {% endcapture %}
+
+      {% if child.divider %}
+        <li><hr class="dropdown-divider" {{ child_attributes }}/></li>
+      {% else %}
+        <li>
+          {% iftruthy child.href %}
+            <a class="{{ child_class }}" href="{{ child.href }}" {{ child_attributes }}>
+              {{ child_content }}
+            </a>
+          {% endiftruthy %}
+          {% iffalsy child.href %}
+            <button class="{{ child_class }}" type="button" {{ child_attributes }}>
+              {{ child_content }}
+            </button>
+          {% endiffalsy %}
+        </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+</div>

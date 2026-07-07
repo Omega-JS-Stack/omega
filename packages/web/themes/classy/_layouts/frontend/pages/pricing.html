@@ -1,0 +1,907 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section
+hero:
+  headline: "The right plans,"
+  headline_accent: "for the right price"
+  subheadline: "Simple and affordable pricing. No hidden fees, no surprises."
+
+# Pricing Section
+pricing:
+  price_per_unit:
+    enabled: true
+    feature_id: "credits"  # Which feature to calculate price per unit for
+    label: "credit"  # What to call the unit (e.g., "credit", "user", "GB")
+  definitions:
+    - id: "credits"
+      definition: "Credits are used to generate content. Each generation consumes 1 credit."
+    - id: "exports"
+      definition: "Export your creations in various formats. Watermarked exports include a small logo."
+    - id: "api_access"
+      definition: "Access our REST API to integrate with your own applications and workflows."
+    - id: "priority_support"
+      definition: "Get faster response times and dedicated support from our team."
+    - id: "team_collaboration"
+      definition: "Invite team members to collaborate on projects and share resources."
+    - id: "custom_branding"
+      definition: "Remove our branding and add your own logo to exports."
+  plans:
+    - id: "basic"
+      name: "Basic"
+      tagline: "best for getting started"
+      url: "/dashboard"  # URL to get started
+      features:
+        # Common features (values resolve from _config.yml payment.products.limits)
+        - id: "credits"
+          name: "Credits"
+          icon: "sparkles"
+        - id: "exports"
+          name: "Exports"
+          icon: "download"
+        # Additional features
+        - id: "storage"
+          name: "Logo storage"
+          icon: "clock"
+
+    - id: "plus"
+      name: "Plus"
+      tagline: "best for individuals"
+      url: null
+      features:
+        # Common features
+        - id: "credits"
+          name: "Credits"
+          icon: "sparkles"
+        - id: "exports"
+          name: "Exports"
+          icon: "download"
+        # Additional features
+        - id: "api_access"
+          name: "API access"
+          icon: "code"
+        - id: "priority_support"
+          name: "Priority support"
+          icon: "headset"
+
+    - id: "pro"
+      name: "Pro"
+      tagline: "best for small businesses"
+      url: null
+      popular: true
+      features:
+        # Common features
+        - id: "credits"
+          name: "Credits"
+          icon: "sparkles"
+        - id: "exports"
+          name: "Exports"
+          icon: "download"
+        # Additional features
+
+    - id: "max"
+      name: "Max"
+      tagline: "best for growing businesses"
+      url: null
+      features:
+        # Common features
+        - id: "credits"
+          name: "Credits"
+          icon: "sparkles"
+        - id: "exports"
+          name: "Exports"
+          icon: "download"
+        # Additional features
+        - id: "team_collaboration"
+          name: "Team collaboration"
+          icon: "users"
+        - id: "custom_branding"
+          name: "Custom branding"
+          icon: "palette"
+
+# Feature Comparison Section
+feature_comparison:
+  superheadline:
+    icon: "sparkles"
+    text: "Features"
+  headline: "Compare all"
+  headline_accent: "plans"
+  subheadline: "See exactly what's included in each plan"
+
+# Social Proof Section
+social_proof:
+  items:
+    - number: "5M"
+      label: "Customers"
+      sublabel: "90 countries"
+    - number: "#1"
+      label: "Product of the month"
+      sublabel: "Product Hunt"
+    - number: "4.8"
+      label: "Capterra"
+      show_stars: true
+      star_color: "primary"
+    - number: "4.8"
+      label: "G2"
+      show_stars: true
+      star_color: "danger"
+
+# CTA Section
+cta:
+  superheadline:
+    icon: "comments"
+    text: "Support"
+  headline: "Need help finding the right plan for your"
+  headline_accent: "needs?"
+  subheadline: "Talk to our support team 24/7"
+  button:
+    text: "Talk to us"
+    icon: "headset"
+    href: "/contact"
+
+# Testimonials Section
+testimonials:
+  superheadline:
+    icon: "megaphone"
+    text: "Testimonials"
+  headline: "People {% uj_icon \"heart\", \"text-danger\" %} "
+  headline_accent: "{{ site.brand.name }}"
+  subheadline: "Hear from real people who have transformed their business with us"
+  items:
+    - quote: "This platform transformed my business. The support is incredible!"
+      author: "Sarah Johnson"
+      role: "CEO"
+      company: "TechStart Inc"
+      initial: "S"
+    - quote: "Best investment I've made. Achieved more here than with any consultant."
+      author: "Michael Chen"
+      role: "Founder"
+      company: "DataFlow"
+      initial: "M"
+    - quote: "The community support made all the difference in our growth journey."
+      author: "Emily Davis"
+      role: "Director"
+      company: "Creative Studio"
+      initial: "E"
+
+# FAQs Section
+faqs:
+  superheadline:
+    icon: "messages-question"
+    text: "FAQs"
+  headline: "Frequently asked"
+  headline_accent: "questions"
+  subheadline: "Everything you need to know about {{ site.brand.name }} billing & subscriptions."
+  items:
+    # - question: "Is {{ site.brand.name }} AI included with my existing {{ site.brand.name }} Studio plan?"
+    #   answer: "No, {{ site.brand.name }} AI and {{ site.brand.name }} Studio function as separate products with individual pricing plans. If you were an active lifetime deal holder of {{ site.brand.name }} Studio and had purchased it before August 15, 2023, you'll qualify for free {{ site.brand.name }} AI credits. These will be phased in gradually, and you'll be notified via email when they become available. As for other {{ site.brand.name }} Studio subscribers, we're actively exploring ways to offer some benefits to help you get started on {{ site.brand.name }} AI. Stay tuned for more announcements.<br><br>PS: This is available exclusively to users who have purchased their {{ site.brand.name }} accounts from {{ site.brand.name }}."
+    # - question: "What happens after I cancel my subscription?"
+    #   answer: "After canceling your subscription, you'll continue to have access to your plan features until the end of your current billing period. Once the period ends, your account will be downgraded to the free plan."
+    # - question: "What should I do if I run out of my quotas mid-month?"
+    #   answer: "If you run out of quotas mid-month, you can upgrade to a higher plan or wait until your quotas reset at the beginning of your next billing cycle."
+    # - question: "Will my exports, generation & iStock credits roll-over into the next month or billing cycle?"
+    #   answer: "No, unused credits and quotas do not roll over to the next billing cycle. Your quotas reset at the beginning of each new billing period."
+    - question: "Can I cancel at any time?"
+      answer: "Yes, you can cancel anytime, no questions asked. However, we would highly appreciate it if you could give us some feedback so we can improve."
+    - question: "Is there a free trial?"
+      answer: "Yes, there is a 14-day free trial of the paid plans. You can cancel your subscription at any time during the trial period for a full refund."
+    - question: "What is your refund policy?"
+      answer: "We offer a 14-day free trial of the premium plans. You can cancel any time during your trial for a full refund. After the trial period, you can cancel and you may receive a prorated refund for the remaining time on your subscription."
+---
+
+<!-- Promo Banner -->
+<div id="pricing-promo-banner" class="position-fixed top-0 start-0 w-100 text-light text-center bg-body animation-slide-down" style="z-index: 1050;" hidden>
+  <div class="bg-primary-soft py-2 position-relative">
+    <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 mt-2 me-2" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;document.querySelector('.navbar-wrapper').style.marginTop='';document.querySelector('main > section:first-of-type').style.paddingTop=''"></button>
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-4">
+        <span id="pricing-promo-badge" class="badge bg-gradient-rainbow px-2 py-1 fs-6 animation-wiggle">
+          15% OFF!
+        </span>
+        <span id="pricing-promo-text" class="fw-semibold">
+          Flash sale
+        </span>
+        <span class="text-white-50">
+          Ending in <span id="pricing-promo-countdown" class="fw-semibold text-white">--</span>
+        </span>
+        <span class="text-white-50">
+          Use code <span id="pricing-promo-code" class="badge bg-white bg-opacity-25 px-2 py-1 fs-6">WELCOME15</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-10">
+        <h1 class="h1 mb-3">
+          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="fs-5 text-muted mb-0">
+            {{ resolved.hero.subheadline }}
+          </p>
+        {% endiftruthy %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing Plans Section -->
+<section class="pt-0">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12">
+        <div class="text-center mb-5">
+          <div class="btn-group" role="group" aria-label="Billing toggle" data-lazy="@class animation-popup">
+            <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly">
+            <label class="btn btn-outline-adaptive rounded-start-pill" for="monthly">Monthly</label>
+
+            <input type="radio" class="btn-check" name="billing" id="annually" autocomplete="off" checked data-billing="annually">
+            <label class="btn btn-primary rounded-end-pill position-relative" for="annually">
+              Annually
+            </label>
+
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-adaptive-inverse text-adaptive">
+                🎁 up to 20% off!
+                <span class="visually-hidden">discount</span>
+            </span>
+          </div>
+        </div>
+
+        <p class="small text-muted text-center mb-4">
+          {% uj_icon "shield-check", "me-1 text-success" %}
+          Every paid plan backed by a 7-day money-back guarantee
+        </p>
+
+        {% assign plan_count = resolved.pricing.plans | size %}
+
+        <!-- Automatically detect common features across ALL plans -->
+        {% assign common_feature_ids = "" | split: "," %}
+        {% if plan_count > 0 %}
+          {% assign first_plan = resolved.pricing.plans[0] %}
+          {% for first_feature in first_plan.features %}
+            {% assign is_common = true %}
+            {% for check_plan in resolved.pricing.plans %}
+              {% assign found_in_plan = false %}
+              {% for check_feature in check_plan.features %}
+                {% if check_feature.id == first_feature.id %}
+                  {% assign found_in_plan = true %}
+                  {% break %}
+                {% endif %}
+              {% endfor %}
+              {% unless found_in_plan %}
+                {% assign is_common = false %}
+                {% break %}
+              {% endunless %}
+            {% endfor %}
+            {% if is_common %}
+              {% assign common_feature_ids = common_feature_ids | push: first_feature.id %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        <!-- Determine column classes based on number of plans -->
+        {% if plan_count == 1 %}
+          {% assign col_classes = "col-12 col-md-8 col-lg-6 col-xl-5" %}
+        {% elsif plan_count == 2 %}
+          {% assign col_classes = "col-12 col-md-6 col-lg-5 col-xl-5" %}
+        {% elsif plan_count == 3 %}
+          {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-4" %}
+        {% elsif plan_count == 4 %}
+          {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-3" %}
+        {% elsif plan_count == 5 %}
+          {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-4 col-xxl-2" %}
+        {% else %}
+          <!-- Fallback for 6+ plans -->
+          {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2" %}
+        {% endif %}
+
+        <div class="row g-4 mb-5 justify-content-center">
+          {% for plan in resolved.pricing.plans %}
+            {% comment %} Shared pricing math (assigns _plan_monthly/_plan_annually/per-unit into this scope) {% endcomment %}
+            {% include core/pricing/resolve-plan.html plan=plan %}
+
+            {% if plan.popular %}
+              {% assign border_classes = "border-gradient-rainbow border-3" %}
+            {% else %}
+              {% assign border_classes = "" %}
+            {% endif %}
+
+            <div class="{{ col_classes }}">
+              <div class="card h-100 {{ border_classes }} position-relative hover-flex" data-lazy="@class animation-slide-up">
+                {% if plan.popular %}
+                  <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill bg-gradient-rainbow px-3 py-2">
+                    Most Popular
+                  </span>
+                {% endif %}
+
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                  <div>
+                    <!-- Header -->
+                    <h3 class="card-title h2 mb-1">{{ plan.name }}</h3>
+                    <p class="text-muted small mb-3">{{ plan.tagline }}</p>
+
+                    <!-- Price -->
+                    {% if _plan_monthly == 0 %}
+                      <p class="display-6 fw-bold mb-0">Free</p>
+                    {% else %}
+                      <p class="mb-0">
+                        <span class="display-6 fw-bold">
+                          <span class="fs-3">$</span><span class="amount" data-monthly="{{ _plan_monthly }}" data-annually="{{ _plan_annually | divided_by: 12 | round }}">{{ _plan_annually | divided_by: 12 | round }}</span>
+                        </span>
+                        <small class="text-muted">/month</small>
+                      </p>
+                    {% endif %}
+
+                    <!-- Price per unit (only shown when enabled) -->
+                    {% if resolved.pricing.price_per_unit.enabled %}
+                      <p class="text-muted small mb-4">
+                        {% if monthly_price_per_unit %}
+                          <span class="price-per-unit" data-monthly="${{ monthly_price_per_unit }}" data-annually="${{ annual_price_per_unit }}">${{ annual_price_per_unit }}</span> per {{ resolved.pricing.price_per_unit.label }}
+                        {% elsif _plan_monthly == 0 %}
+                          <!-- Placeholder text for free plan to maintain consistent height -->
+                          Perfect for trying out
+                        {% endif %}
+                      </p>
+                    {% endif %}
+
+                    <!-- Button -->
+                    <div class="d-grid mb-3 {% unless resolved.pricing.price_per_unit.enabled %}mt-3{% endunless %}">
+                      {% if plan.popular %}
+                        {% assign btn_style = "btn-gradient-rainbow gradient-animated" %}
+                      {% else %}
+                        {% assign btn_style = "btn-primary" %}
+                      {% endif %}
+                      {% assign btn_style = "btn-primary" %}
+
+                      {% iftruthy plan.url %}
+                        <a href="{{ plan.url }}" class="btn {% if _plan_monthly == 0 %}btn-adaptive{% else %}{{ btn_style }}{% endif %} btn-md fw-semibold px-2 fs-5">
+                          {% if _plan_monthly == 0 %}
+                            Get started
+                          {% elsif plan.trial.days > 0 %}
+                            Get free trial
+                          {% else %}
+                            Get started
+                          {% endif %}
+                        </a>
+                      {% endiftruthy %}
+                      {% iffalsy plan.url %}
+                        <button class="btn {{ btn_style }} btn-md fw-semibold px-2 fs-5" data-plan-id="{{ plan.id }}">
+                          {% if plan.trial.days > 0 %}
+                            Get free trial
+                          {% else %}
+                            Get started
+                          {% endif %}
+                        </button>
+                      {% endiffalsy %}
+                    </div>
+
+                    <!-- Billing info -->
+                    <p class="text-center text-muted small mb-1">
+                      {% if _plan_monthly == 0 %}
+                        <span>No credit card required</span>
+                      {% else %}
+                        <span class="billing-info" data-monthly="Billed ${{ _plan_monthly | uj_commaify }} monthly" data-annually="Billed ${{ _plan_annually | uj_commaify }} annually">
+                          Billed ${{ _plan_annually | uj_commaify }} annually
+                        </span>
+                      {% endif %}
+                    </p>
+
+                    <!-- Guarantee badge (paid plans only) -->
+                    {% if _plan_monthly > 0 %}
+                      <p class="text-center text-muted small mb-3">
+                        {% uj_icon "shield-check", "me-1 text-success" %}
+                        7-day money-back guarantee
+                      </p>
+                    {% else %}
+                      <p class="text-center text-muted small mb-3">
+                        {% uj_icon "rocket", "me-1 text-success" %}
+                        Upgrade any time
+                      </p>
+                    {% endif %}
+
+                    <hr class="border-1">
+
+                    <!-- Features -->
+                    <div>
+                      <!-- Common features that vary by plan -->
+                      <ul class="list-unstyled mb-3">
+                        {% for feature in plan.features %}
+                          {% if common_feature_ids contains feature.id %}
+                            {% comment %} Resolve feature value: frontmatter > config limits {% endcomment %}
+                            {% assign _feature_value = feature.value %}
+                            {% if _config_product and _feature_value == nil %}
+                              {% assign _config_limit = nil %}{% for _lim in _config_product.limits %}{% if _lim[0] == feature.id %}{% assign _config_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                              {% if _config_limit == -1 %}
+                                {% assign _feature_value = "Unlimited" %}
+                              {% elsif _config_limit %}
+                                {% assign _feature_value = _config_limit %}
+                              {% endif %}
+                            {% endif %}
+                            {% assign feature_definition = nil %}
+                            {% for def in resolved.pricing.definitions %}
+                              {% if def.id == feature.id %}
+                                {% assign feature_definition = def.definition %}
+                                {% break %}
+                              {% endif %}
+                            {% endfor %}
+                            <li class="d-flex align-items-start mb-2">
+                              <span class="me-3">{% uj_icon feature.icon, "fa-md" %}</span>
+                              <span>
+                                {% if _feature_value == "Unlimited" %}
+                                  Unlimited
+                                {% else %}
+                                  {{ _feature_value | uj_commaify }}
+                                {% endif %}
+                                {% iftruthy feature_definition %}
+                                  <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature_definition }}">{{ feature.name }}</span>
+                                {% endiftruthy %}
+                                {% iffalsy feature_definition %}
+                                  {{ feature.name }}
+                                {% endiffalsy %}
+                              </span>
+                            </li>
+                          {% endif %}
+                        {% endfor %}
+                      </ul>
+
+                      <!-- Show Additional features for the first (Basic) plan -->
+                      {% if forloop.index == 1 %}
+                        {% assign has_unique_basic = false %}
+                        {% for feature in plan.features %}
+                          {% unless common_feature_ids contains feature.id %}
+                            {% assign has_unique_basic = true %}
+                            {% break %}
+                          {% endunless %}
+                        {% endfor %}
+
+                        {% if has_unique_basic %}
+                          <div class="text-muted small mb-2">
+                            <em>What you get:</em>
+                          </div>
+                          <ul class="list-unstyled mb-0">
+                            {% for feature in plan.features %}
+                              {% unless common_feature_ids contains feature.id %}
+                                {% comment %} Resolve feature value: frontmatter > config limits {% endcomment %}
+                                {% assign _feature_value = feature.value %}
+                                {% if _config_product and _feature_value == nil %}
+                                  {% assign _config_limit = nil %}{% for _lim in _config_product.limits %}{% if _lim[0] == feature.id %}{% assign _config_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                                  {% if _config_limit == -1 %}
+                                    {% assign _feature_value = "Unlimited" %}
+                                  {% elsif _config_limit %}
+                                    {% assign _feature_value = _config_limit %}
+                                  {% endif %}
+                                {% endif %}
+                                {% assign feature_definition = nil %}
+                                {% for def in resolved.pricing.definitions %}
+                                  {% if def.id == feature.id %}
+                                    {% assign feature_definition = def.definition %}
+                                    {% break %}
+                                  {% endif %}
+                                {% endfor %}
+                                <li class="d-flex align-items-start mb-2 {% if forloop.last %}mb-0{% endif %}">
+                                  <span class="me-3">{% uj_icon feature.icon, "fa-md" %}</span>
+                                  <span>
+                                    {% if _feature_value == "24/7" %}
+                                      {{ _feature_value }}
+                                    {% elsif _feature_value == true or _feature_value == "Included" or _feature_value == "Available" or _feature_value == "Full" %}
+                                      <!-- No prefix for these values -->
+                                    {% else %}
+                                      {{ _feature_value | uj_commaify }}
+                                    {% endif %}
+                                    {% iftruthy feature_definition %}
+                                      <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature_definition }}">{{ feature.name }}</span>
+                                    {% endiftruthy %}
+                                    {% iffalsy feature_definition %}
+                                      {{ feature.name }}
+                                    {% endiffalsy %}
+                                  </span>
+                                </li>
+                              {% endunless %}
+                            {% endfor %}
+                          </ul>
+                        {% endif %}
+                      {% endif %}
+
+                      <!-- Show "Everything in previous plan" for non-Basic plans -->
+                      {% if forloop.index > 1 %}
+                        <!-- Check if there are additional features -->
+                        {% assign has_additional = false %}
+                        {% for feature in plan.features %}
+                          {% unless common_feature_ids contains feature.id %}
+                            {% assign has_additional = true %}
+                            {% break %}
+                          {% endunless %}
+                        {% endfor %}
+
+                        {% assign _prev_index = forloop.index0 | minus: 1 %}
+                        {% assign _prev_plan = resolved.pricing.plans[_prev_index] %}
+                        <div class="text-muted small mb-2">
+                          <em>Everything in</em>
+                          <em>
+                            <strong>{{ _prev_plan.name }}</strong>
+                            {%- if has_additional -%}, and more:{%- endif -%}
+                          </em>
+                        </div>
+
+                        <!-- Additional/Additional features if they exist -->
+                        {% if has_additional %}
+                          <ul class="list-unstyled mb-0">
+                            {% for feature in plan.features %}
+                              {% unless common_feature_ids contains feature.id %}
+                                {% comment %} Resolve feature value: frontmatter > config limits {% endcomment %}
+                                {% assign _feature_value = feature.value %}
+                                {% if _config_product and _feature_value == nil %}
+                                  {% assign _config_limit = nil %}{% for _lim in _config_product.limits %}{% if _lim[0] == feature.id %}{% assign _config_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                                  {% if _config_limit == -1 %}
+                                    {% assign _feature_value = "Unlimited" %}
+                                  {% elsif _config_limit %}
+                                    {% assign _feature_value = _config_limit %}
+                                  {% endif %}
+                                {% endif %}
+                                {% assign feature_definition = nil %}
+                                {% for def in resolved.pricing.definitions %}
+                                  {% if def.id == feature.id %}
+                                    {% assign feature_definition = def.definition %}
+                                    {% break %}
+                                  {% endif %}
+                                {% endfor %}
+                                <li class="d-flex align-items-start mb-2 {% if forloop.last %}mb-0{% endif %}">
+                                  <span class="me-3">{% uj_icon feature.icon, "fa-md" %}</span>
+                                  <span>
+                                    {% if _feature_value == "24/7" %}
+                                      {{ _feature_value }}
+                                    {% elsif _feature_value == true or _feature_value == "Included" or _feature_value == "Available" or _feature_value == "Full" %}
+                                      <!-- No prefix for these values -->
+                                    {% else %}
+                                      {{ _feature_value | uj_commaify }}
+                                    {% endif %}
+                                    {% iftruthy feature_definition %}
+                                      <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature_definition }}">{{ feature.name }}</span>
+                                    {% endiftruthy %}
+                                    {% iffalsy feature_definition %}
+                                      {{ feature.name }}
+                                    {% endiffalsy %}
+                                  </span>
+                                </li>
+                              {% endunless %}
+                            {% endfor %}
+                          </ul>
+                        {% endif %}
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="row g-4 mt-3 justify-content-center">
+          <div class="col-12 col-md-8 col-lg-6">
+            <div class="card border-0" data-lazy="@class animation-slide-up">
+              <div class="card-body p-4 text-center">
+                <h3 class="h2 mb-3">Enterprise</h3>
+                <h4 class="mb-4">Custom pricing</h4>
+                <p class="mb-4">Custom solutions for large organizations. Advanced security and flexible pricing based on your needs.</p>
+                <button class="btn btn-primary btn-lg" data-plan-id="enterprise">
+                  {% uj_icon "envelope", "fa-lg me-2" %}
+                  <span class="button-text">
+                    Contact us
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Feature Comparison Grid -->
+<section>
+  <div class="container">
+    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      {% iftruthy resolved.feature_comparison.superheadline.text %}
+        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+          {% iftruthy resolved.feature_comparison.superheadline.icon %}
+            {% uj_icon resolved.feature_comparison.superheadline.icon, "me-1" %}
+          {% endiftruthy %}
+          {{ resolved.feature_comparison.superheadline.text }}
+        </span>
+      {% endiftruthy %}
+      <h2 class="h2 mb-2">
+        {{ resolved.feature_comparison.headline }}
+        {% iftruthy resolved.feature_comparison.headline_accent %}
+          <span class="text-accent">{{ resolved.feature_comparison.headline_accent }}</span>
+        {% endiftruthy %}
+      </h2>
+      {% iftruthy resolved.feature_comparison.subheadline %}
+        <p class="fs-5 text-muted">{{ resolved.feature_comparison.subheadline }}</p>
+      {% endiftruthy %}
+      <!-- Mobile scroll indicator -->
+      <div class="d-md-none">
+        <small class="text-muted">
+          <span class="me-2">Swipe to see more</span>
+          <span class="animation-pulse-right d-inline-block">
+            {% uj_icon "arrow-right", "text-primary" %}
+          </span>
+        </small>
+      </div>
+    </div>
+  </div>
+
+  {% assign all_feature_ids = "" | split: "," %}
+  {% assign all_features = "" | split: "," %}
+  {% for plan in resolved.pricing.plans %}
+    {% for feature in plan.features %}
+      {% unless all_feature_ids contains feature.id %}
+        {% assign all_feature_ids = all_feature_ids | push: feature.id %}
+        {% assign all_features = all_features | push: feature %}
+      {% endunless %}
+    {% endfor %}
+  {% endfor %}
+
+  <div class="container">
+    <div class="table-responsive" data-lazy="@class animation-slide-up">
+      <table class="table caption-top">
+        <caption>Compare features</caption>
+        <thead>
+          <tr>
+            <th scope="col">Feature</th>
+            {% for plan in resolved.pricing.plans %}
+              <th scope="col">{{ plan.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for feature_def in all_features %}
+            {% assign table_feature_definition = nil %}
+            {% for def in resolved.pricing.definitions %}
+              {% if def.id == feature_def.id %}
+                {% assign table_feature_definition = def.definition %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+            <tr>
+              <th scope="row">
+                {% iftruthy table_feature_definition %}
+                  <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ table_feature_definition }}">{{ feature_def.name }}</span>
+                {% endiftruthy %}
+                {% iffalsy table_feature_definition %}
+                  {{ feature_def.name }}
+                {% endiffalsy %}
+              </th>
+              {% for plan in resolved.pricing.plans %}
+                {% comment %} Look up config product for this plan {% endcomment %}
+                {% assign _tbl_config_product = nil %}
+                {% for p in site.web_manager.payment.products %}
+                  {% if p.id == plan.id %}
+                    {% assign _tbl_config_product = p %}
+                    {% break %}
+                  {% endif %}
+                {% endfor %}
+                <td>
+                  {% assign has_feature = false %}
+                  {% assign feature_value = nil %}
+                  {% assign inherited_feature = false %}
+                  {% assign inherited_value = nil %}
+
+                  {% for plan_feature in plan.features %}
+                    {% if plan_feature.id == feature_def.id %}
+                      {% assign has_feature = true %}
+                      {% assign feature_value = plan_feature.value %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+
+                  {% comment %} Resolve feature value from config limits if not set {% endcomment %}
+                  {% if has_feature and feature_value == nil and _tbl_config_product %}
+                    {% assign _tbl_limit = nil %}{% for _lim in _tbl_config_product.limits %}{% if _lim[0] == feature_def.id %}{% assign _tbl_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                    {% if _tbl_limit == -1 %}
+                      {% assign feature_value = "Unlimited" %}
+                    {% elsif _tbl_limit %}
+                      {% assign feature_value = _tbl_limit %}
+                    {% endif %}
+                  {% endif %}
+
+                  {% unless has_feature %}
+                    {% for check_plan in resolved.pricing.plans %}
+                      {% if check_plan.id == plan.id %}
+                        {% break %}
+                      {% endif %}
+                      {% for check_feature in check_plan.features %}
+                        {% if check_feature.id == feature_def.id %}
+                          {% assign inherited_feature = true %}
+                          {% assign inherited_value = check_feature.value %}
+                          {% break %}
+                        {% endif %}
+                      {% endfor %}
+
+                      {% comment %} Resolve inherited value from config limits if not set {% endcomment %}
+                      {% if inherited_feature and inherited_value == nil %}
+                        {% assign _inh_config_product = nil %}
+                        {% for p in site.web_manager.payment.products %}
+                          {% if p.id == check_plan.id %}
+                            {% assign _inh_config_product = p %}
+                            {% break %}
+                          {% endif %}
+                        {% endfor %}
+                        {% if _inh_config_product %}
+                          {% assign _inh_limit = nil %}{% for _lim in _inh_config_product.limits %}{% if _lim[0] == feature_def.id %}{% assign _inh_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                          {% if _inh_limit == -1 %}
+                            {% assign inherited_value = "Unlimited" %}
+                          {% elsif _inh_limit %}
+                            {% assign inherited_value = _inh_limit %}
+                          {% endif %}
+                        {% endif %}
+                      {% endif %}
+
+                      {% if inherited_feature %}
+                        {% break %}
+                      {% endif %}
+                    {% endfor %}
+                  {% endunless %}
+
+                  {% if has_feature %}
+                    {% if feature_value == true or feature_value == "Included" or feature_value == "Available" or feature_value == "Full" %}
+                      {% uj_icon "check-circle", "text-success fs-5" %}
+                    {% elsif feature_value == false %}
+                      {% uj_icon "times-circle", "text-muted fs-5 opacity-25" %}
+                    {% elsif feature_value %}
+                      {{ feature_value | uj_commaify }}
+                    {% else %}
+                      {% uj_icon "times-circle", "text-muted fs-5 opacity-25" %}
+                    {% endif %}
+                  {% elsif inherited_feature %}
+                    {% if inherited_value == true or inherited_value == "Included" or inherited_value == "Available" or inherited_value == "Full" %}
+                      {% uj_icon "check-circle", "text-success fs-5" %}
+                    {% elsif inherited_value == false %}
+                      {% uj_icon "times-circle", "text-muted fs-5 opacity-25" %}
+                    {% elsif inherited_value %}
+                      {{ inherited_value | uj_commaify }}
+                    {% else %}
+                      {% uj_icon "times-circle", "text-muted fs-5 opacity-25" %}
+                    {% endif %}
+                  {% else %}
+                    {% uj_icon "times-circle", "text-muted fs-5 opacity-25" %}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Social Proof Section -->
+<section>
+  <div class="container">
+    <div class="row text-center g-4">
+      {% for item in resolved.social_proof.items %}
+        <div class="col-6 col-md-3" data-lazy="@class animation-slide-up">
+          <h2 class="display-5 fw-bold mb-0">{{ item.number }}</h2>
+          {% iftruthy item.show_stars %}
+            <div class="mb-0">
+              {% for i in (1..5) %}
+                {% uj_icon "star", "text-{{ item.star_color }}" %}
+              {% endfor %}
+            </div>
+          {% endiftruthy %}
+          <p class="text-muted mb-0">{{ item.label }}</p>
+          {% iftruthy item.sublabel %}
+            <p class="small text-muted {% if forloop.last %}mb-0{% endif %}">{{ item.sublabel }}</p>
+          {% endiftruthy %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section>
+  <div class="container">
+    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+      <!-- Decorative icon - top right -->
+      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
+        {% uj_icon "messages-question", "text-white" %}
+      </div>
+
+      <!-- Decorative icon - bottom left -->
+      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
+        {% uj_icon "shield-check", "text-white" %}
+      </div>
+
+      <div class="position-relative">
+        {% iftruthy resolved.cta.superheadline.text %}
+          <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
+            {% iftruthy resolved.cta.superheadline.icon %}
+              {% uj_icon resolved.cta.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ resolved.cta.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+
+        <h2 class="h3 fw-bold mb-3">
+          {{ resolved.cta.headline }}
+          {% iftruthy resolved.cta.headline_accent %}
+            <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
+          {% endiftruthy %}
+        </h2>
+
+        {% iftruthy resolved.cta.subheadline %}
+          <p class="lead mb-4">{{ resolved.cta.subheadline }}</p>
+        {% endiftruthy %}
+
+        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
+          <a href="{{ resolved.cta.button.href }}" class="btn btn-light btn-lg px-4">
+            {% uj_icon resolved.cta.button.icon, "me-2" %}
+            {{ resolved.cta.button.text }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include frontend/components/testimonial-scroll.html testimonials=resolved.testimonials %}
+
+<!-- FAQ Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+          {% iftruthy resolved.faqs.superheadline.text %}
+            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
+              {% iftruthy resolved.faqs.superheadline.icon %}
+                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
+              {% endiftruthy %}
+              {{ resolved.faqs.superheadline.text }}
+            </span>
+          {% endiftruthy %}
+          <h2 class="h2 mb-2">
+            {{ resolved.faqs.headline }}
+            {% iftruthy resolved.faqs.headline_accent %}
+              <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
+            {% endiftruthy %}
+          </h2>
+          {% iftruthy resolved.faqs.subheadline %}
+            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        {% if resolved.faqs.items %}
+          <div class="accordion" id="faqAccordion" data-lazy="@class animation-slide-up">
+            {% for faq in resolved.faqs.items %}
+              <div class="accordion-item border-0 mb-3">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed py-4" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                    <span class="fw-semibold">{{ faq.question }}</span>
+                  </button>
+                </h2>
+                <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body text-muted">
+                    {{ faq.answer }}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

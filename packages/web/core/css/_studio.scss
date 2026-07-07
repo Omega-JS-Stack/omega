@@ -1,0 +1,229 @@
+// ============================================
+// Studio Layout — theme-agnostic boilerplate
+// Forces a fullscreen dark takeover regardless
+// of whatever theme chrome wraps the page.
+// ============================================
+body:has(#studio:not([hidden])) {
+  overflow: hidden !important;
+  background: #111 !important;
+}
+
+#studio {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  background: #0d0d0d;
+  color: #f5f5f5;
+  overflow: hidden;
+}
+
+// ============================================
+// Sidebar nav
+// ============================================
+#studio-nav {
+  width: 240px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 10;
+}
+
+.studio-brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--bs-primary, #0d6efd);
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.studio-clips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.studio-clip-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: #f5f5f5;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &.active {
+    color: #fff;
+    background: var(--bs-primary, #0d6efd);
+  }
+}
+
+// ============================================
+// Controls panel
+// ============================================
+.studio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+  fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    &:disabled { opacity: 0.4; pointer-events: none; }
+  }
+}
+
+.studio-label {
+  font-size: 0.72rem;
+  font-family: var(--bs-font-monospace, monospace);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  input, select {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #f5f5f5;
+    padding: 4px 8px;
+    font-size: 0.82rem;
+  }
+
+  input[type="range"] {
+    padding: 0;
+    accent-color: var(--bs-primary, #0d6efd);
+  }
+}
+
+.studio-aspect-btn,
+.studio-toggle-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--bs-font-monospace, monospace);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover { color: #f5f5f5; background: rgba(255, 255, 255, 0.1); }
+  &.active { background: var(--bs-primary, #0d6efd); color: #fff; border-color: var(--bs-primary, #0d6efd); }
+}
+
+.studio-play-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #f5f5f5;
+  padding: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { background: rgba(255, 255, 255, 0.14); }
+}
+
+.studio-record-btn {
+  background: rgba(220, 53, 69, 0.15);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  border-radius: 8px;
+  color: #f5f5f5;
+  padding: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { background: rgba(220, 53, 69, 0.3); }
+  &.recording {
+    background: rgba(220, 53, 69, 0.5);
+    border-color: #dc3545;
+    animation: studio-pulse-record 1s ease infinite;
+  }
+}
+
+@keyframes studio-pulse-record {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+// ============================================
+// Stage — where animations render
+// ============================================
+#studio-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+#studio-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  border: 2px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  transition: width 0.4s ease, height 0.4s ease;
+
+  background: var(--lm-paper, #FAF5EC);
+  color: var(--lm-ink, #191613);
+
+  // Width/height set by JS from resolution picker
+
+  &.recording {
+    border-color: transparent;
+    border-radius: 0;
+    &::after { display: none; }
+  }
+}
+
+#studio-canvas::after {
+  content: attr(data-aspect) " · " attr(data-size);
+  position: absolute;
+  top: -24px;
+  right: 0;
+  font-family: var(--bs-font-monospace, monospace);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+}
+
+// ============================================
+// Generic clip primitives — used by framework
+// builder helpers (flowClip, cardClip, chatClip)
+// ============================================
+.s-hidden { opacity: 0; }
+.s-step-bg { background: rgba(0, 0, 0, 0.04); }
+.s-bar-fill { height: 100%; width: 0; }

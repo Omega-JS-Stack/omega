@@ -1,0 +1,14 @@
+---
+### ALL PAGES ###
+layout: blueprint/blog/tags/tag
+
+### GENERATED PAGES ###
+# One page per blog tag (replaces jekyll-uj-powertools' dynamic-pages
+# generator): pagination over the aggregated taxonomy, one tag per page.
+pagination:
+  data: collections.postTags
+  size: 1
+  alias: tag
+permalink: "/blog/tags/{{ tag.slug }}/"
+eleventyExcludeFromCollections: true
+---

@@ -1,0 +1,1526 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+permalink: /test/libraries/bootstrap
+
+### REGULAR PAGES ###
+sitemap:
+  include: false
+meta:
+  title: "Bootstrap components test page"
+  description: "Test page for demonstrating Bootstrap components"
+  breadcrumb: "Bootstrap components test"
+  index: false
+---
+
+<section>
+<div class="container">
+  <h1 class="display-1 mb-5">Bootstrap components test page</h1>
+
+  <!-- Core CSS Utilities -->
+  <section class="p-4 rounded">
+    <h2 class="border-bottom border-primary pb-2 mb-4 text-primary">🎨 Core CSS Utilities</h2>
+
+    <h3 class="mb-3">Rainbow gradient effects</h3>
+    <h1 class="text-gradient-rainbow">Static rainbow text</h1>
+    <h2 class="text-gradient-rainbow gradient-animated">Animated rainbow text</h2>
+    <p class="fs-4">Button examples:</p>
+    <button class="btn btn-gradient-rainbow me-2">Static rainbow button</button>
+    <button class="btn btn-gradient-rainbow gradient-animated">Animated rainbow button</button>
+    <p class="fs-4 mt-3">Background example:</p>
+    <div class="p-3 bg-gradient-rainbow gradient-animated text-light rounded">Animated rainbow background</div>
+
+    <h3 class="mt-4 mb-3">Core animations</h3>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="card animation-slide-up">
+          <div class="card-body">
+            <h5>Slide up</h5>
+            <p class="small">.animation-slide-up</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card animation-fade-in">
+          <div class="card-body">
+            <h5>Fade in</h5>
+            <p class="small">.animation-fade-in</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card animation-popup">
+          <div class="card-body">
+            <h5>Popup</h5>
+            <p class="small">.animation-popup</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card animation-popup-medium">
+          <div class="card-body">
+            <h5>Popup short</h5>
+            <p class="small">.animation-popup-medium</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Hover animations</h3>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card animation-hover-up">
+          <div class="card-body text-center">
+            {% uj_icon "rocket", "fa-3xl mb-2" %}
+            <h5>Hover up</h5>
+            <p class="small">.animation-hover-up</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card animation-hover-flex">
+          <div class="card-body text-center">
+            {% uj_icon "expand", "fa-3xl mb-2" %}
+            <h5>Hover zoom</h5>
+            <p class="small">.animation-hover-flex</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Continuous animations</h3>
+    <div class="row g-3 align-items-center">
+      <div class="col-md-2 text-center">
+        <div class="animation-pulse p-3 bg-danger text-light rounded">
+          {% uj_icon "heart", "fa-2xl" %}
+          <p class="mb-0 mt-2">.animation-pulse</p>
+        </div>
+      </div>
+      <div class="col-md-2 text-center">
+        <div class="animation-wiggle p-3 bg-warning text-dark rounded">
+          {% uj_icon "bell", "fa-2xl" %}
+          <p class="mb-0 mt-2">.animation-wiggle</p>
+        </div>
+      </div>
+      <div class="col-md-2 text-center">
+        <div class="animation-flex p-3 bg-primary text-light rounded">
+          {% uj_icon "sync", "fa-2xl" %}
+          <p class="mb-0 mt-2">.animation-flex</p>
+        </div>
+      </div>
+      <div class="col-md-2 text-center">
+        <div class="animation-up-down p-3 bg-success text-light rounded">
+          {% uj_icon "arrow-up", "fa-2xl" %}
+          <p class="mb-0 mt-2">.animation-up-down</p>
+        </div>
+      </div>
+      <div class="col-md-2 text-center">
+        <div class="animation-shimmer p-3 bg-gradient-rainbow text-light rounded">
+          {% uj_icon "star", "fa-2xl" %}
+          <p class="mb-0 mt-2">.animation-shimmer</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Core utility classes</h3>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h5>Filter utilities</h5>
+            <div class="d-flex gap-3 align-items-center">
+              <img src="https://via.placeholder.com/50" alt="Original" class="rounded"/>
+              <img src="https://via.placeholder.com/50" alt="White" class="filter-white rounded bg-dark p-1"/>
+              <img src="https://via.placeholder.com/50" alt="Black" class="filter-black rounded bg-light p-1"/>
+            </div>
+            <p class="small mt-2 mb-0">.filter-white | .filter-black</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h5>Pointer events</h5>
+            <button class="btn btn-primary pe-none">Can't Click Me (.pe-none)</button>
+            <p class="small mt-2 mb-0">Useful for preventing click events</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Classy Theme Specific -->
+  <section class="p-4 text-light rounded">
+    <h2 class="border-bottom border-light pb-2 mb-4">✨ Classy theme components</h2>
+
+    <h3 class="mb-3">Glassy effects</h3>
+    <div class="p-5 bg-gradient-rainbow gradient-animated rounded mb-4">
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="bg-glassy p-4 rounded">
+            <h5 class="text-body">Glassy background</h5>
+            <p class="text-body">.bg-glassy - Beautiful glassmorphism effect with blur and transparency</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-3">Classy gradients</h3>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="p-4 bg-gradient-primary text-light rounded">
+          <h5>Primary gradient</h5>
+          <p class="mb-0">.bg-gradient-primary</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-4 bg-gradient-sunset text-light rounded">
+          <h5>Sunset gradient</h5>
+          <p class="mb-0">.bg-gradient-sunset</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-4 bg-gradient-aurora text-light rounded">
+          <h5>Aurora gradient</h5>
+          <p class="mb-0">.bg-gradient-aurora</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Classy text gradients</h3>
+    <h1 class="text-gradient-aurora">Aurora gradient text</h1>
+
+    <h3 class="mt-4 mb-3">Classy shadows</h3>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="bg-white text-dark p-3 rounded shadow-soft">
+          <h6>Soft shadow</h6>
+          <p class="small mb-0">.shadow-soft</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="bg-white text-dark p-3 rounded shadow-hover">
+          <h6>Hover shadow</h6>
+          <p class="small mb-0">.shadow-hover (on hover)</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="bg-white text-dark p-3 rounded shadow-primary">
+          <h6>Primary shadow</h6>
+          <p class="small mb-0">.shadow-primary</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="bg-white text-dark p-3 rounded shadow-glow">
+          <h6>Glow shadow</h6>
+          <p class="small mb-0">.shadow-glow</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Classy borders</h3>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="bg-white text-dark p-3 border-gradient-rainbow">
+          <h6>Gradient border rainbow</h6>
+          <p class="small mb-0">.border-gradient-rainbow</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="bg-white text-dark p-3 border-dashed">
+          <h6>Dashed border</h6>
+          <p class="small mb-0">.border-dashed</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="bg-white text-dark p-3 border-glow">
+          <h6>Glow border</h6>
+          <p class="small mb-0">.border-glow</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Classy buttons</h3>
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-gradient-rainbow">Gradient button</button>
+      <button class="btn btn-glow">Glow button</button>
+      <button class="btn btn-glass">Glass button</button>
+      <button class="btn btn-soft-primary">Soft primary</button>
+      <button class="btn btn-soft-success">Soft success</button>
+      <button class="btn btn-soft-danger">Soft danger</button>
+    </div>
+
+    <h3 class="mt-4 mb-3">Classy cards</h3>
+    <div class="p-5 bg-gradient-rainbow gradient-animated rounded">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="card hover-up">
+            <div class="card-body">
+              <h5 class="card-title">Hover card</h5>
+              <p class="card-text">.hover-up - Lifts on hover</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card bg-glassy">
+            <div class="card-body">
+              <h5 class="card-title">Glass card</h5>
+              <p class="card-text">.bg-glassy - Glassmorphism</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card bg-gradient">
+            <div class="card-body">
+              <h5 class="card-title text-light">Gradient card</h5>
+              <p class="card-text text-light">.bg-gradient</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Typography -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Typography</h2>
+
+    <h3 class="mb-3">Display headings</h3>
+    <h1 class="display-1">Display 1</h1>
+    <h1 class="display-2">Display 2</h1>
+    <h1 class="display-3">Display 3</h1>
+    <h1 class="h2">Display 4</h1>
+    <h1 class="display-5">Display 5</h1>
+    <h1 class="display-6">Display 6</h1>
+
+    <h3 class="mt-4 mb-3">Regular headings</h3>
+    <h1>h1. Bootstrap heading</h1>
+    <h2>h2. Bootstrap heading</h2>
+    <h3>h3. Bootstrap heading</h3>
+    <h4>h4. Bootstrap heading</h4>
+    <h5>h5. Bootstrap heading</h5>
+    <h6>h6. Bootstrap heading</h6>
+
+    <h3 class="mt-4 mb-3">Lead text</h3>
+    <p class="lead">This is a lead paragraph. It stands out from regular paragraphs.</p>
+
+    <h3 class="mt-4 mb-3">Font sizes</h3>
+    <p class="fs-1">Font size 1</p>
+    <p class="fs-2">Font size 2</p>
+    <p class="fs-3">Font size 3</p>
+    <p class="fs-4">Font size 4</p>
+    <p class="fs-5">Font size 5</p>
+    <p class="fs-6">Font size 6</p>
+
+    <h3 class="mt-4 mb-3">Font weight & style</h3>
+    <p class="fw-bold">Bold text</p>
+    <p class="fw-bolder">Bolder weight text</p>
+    <p class="fw-semibold">Semibold weight text</p>
+    <p class="fw-normal">Normal weight text</p>
+    <p class="fw-light">Light weight text</p>
+    <p class="fw-lighter">Lighter weight text</p>
+    <p class="fst-italic">Italic text</p>
+    <p class="fst-normal">Normal text</p>
+    <p class="text-decoration-underline">Underlined text</p>
+    <p class="text-decoration-line-through">Line through text</p>
+    <p class="text-decoration-none">No decoration text</p>
+
+    <h3 class="mt-4 mb-3">Text transform</h3>
+    <p class="text-lowercase">LOWERCASED TEXT</p>
+    <p class="text-uppercase">uppercased text</p>
+    <p class="text-capitalize">capitalized text</p>
+  </section>
+
+  <!-- Colors -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Colors</h2>
+
+    <h3 class="mb-3">Text colors</h3>
+    <p class="text-primary">.text-primary</p>
+    <p class="text-secondary">.text-secondary</p>
+    <p class="text-success">.text-success</p>
+    <p class="text-danger">.text-danger</p>
+    <p class="text-warning">.text-warning</p>
+    <p class="text-info">.text-info</p>
+    <p class="text-light bg-dark">.text-light</p>
+    <p class="text-dark">.text-dark</p>
+    <p class="text-body">.text-body</p>
+    <p class="text-muted">.text-muted</p>
+    <p class="text-white bg-dark">.text-white</p>
+    <p class="text-black-50">.text-black-50</p>
+    <p class="text-white-50 bg-dark">.text-white-50</p>
+
+    <h3 class="mt-4 mb-3">Background colors</h3>
+    <div class="row g-2">
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-primary text-light">.bg-primary</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-secondary text-light">.bg-secondary</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-success text-light">.bg-success</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-danger text-light">.bg-danger</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-warning text-dark">.bg-warning</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-info text-dark">.bg-info</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-light text-dark">.bg-light</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-dark text-light">.bg-dark</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-body text-dark">.bg-body</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-white text-dark">.bg-white</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-transparent text-dark">.bg-transparent</div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Background gradients</h3>
+    <div class="row g-2">
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-primary bg-gradient text-light">.bg-primary.bg-gradient</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-secondary bg-gradient text-light">.bg-secondary.bg-gradient</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-success bg-gradient text-light">.bg-success.bg-gradient</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-danger bg-gradient text-light">.bg-danger.bg-gradient</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-warning bg-gradient text-dark">.bg-warning.bg-gradient</div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 mb-2 bg-info bg-gradient text-dark">.bg-info.bg-gradient</div>
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Background opacity</h3>
+    <div class="row g-2">
+      <div class="col">
+        <div class="bg-primary p-2 text-light">100% opacity</div>
+      </div>
+      <div class="col">
+        <div class="bg-primary p-2 text-light bg-opacity-75">75% opacity</div>
+      </div>
+      <div class="col">
+        <div class="bg-primary p-2 text-dark bg-opacity-50">50% opacity</div>
+      </div>
+      <div class="col">
+        <div class="bg-primary p-2 text-dark bg-opacity-25">25% opacity</div>
+      </div>
+      <div class="col">
+        <div class="bg-primary p-2 text-dark bg-opacity-10">10% opacity</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Buttons -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Buttons</h2>
+
+    <h3 class="mb-3">Solid buttons</h3>
+    <button type="button" class="btn btn-primary">Primary</button>
+    <button type="button" class="btn btn-secondary">Secondary</button>
+    <button type="button" class="btn btn-success">Success</button>
+    <button type="button" class="btn btn-danger">Danger</button>
+    <button type="button" class="btn btn-warning">Warning</button>
+    <button type="button" class="btn btn-info">Info</button>
+    <button type="button" class="btn btn-light">Light</button>
+    <button type="button" class="btn btn-dark">Dark</button>
+    <button type="button" class="btn btn-link">Link</button>
+
+    <h3 class="mt-4 mb-3">Outline buttons</h3>
+    <button type="button" class="btn btn-outline-primary">Primary</button>
+    <button type="button" class="btn btn-outline-secondary">Secondary</button>
+    <button type="button" class="btn btn-outline-success">Success</button>
+    <button type="button" class="btn btn-outline-danger">Danger</button>
+    <button type="button" class="btn btn-outline-warning">Warning</button>
+    <button type="button" class="btn btn-outline-info">Info</button>
+    <button type="button" class="btn btn-outline-light">Light</button>
+    <button type="button" class="btn btn-outline-dark">Dark</button>
+
+    <h3 class="mt-4 mb-3">Adaptive buttons (Theme-Aware)</h3>
+    <p class="text-muted">These buttons automatically adapt to light/dark mode. Use instead of btn-light/btn-dark.</p>
+    <button type="button" class="btn btn-adaptive">Adaptive</button>
+    <button type="button" class="btn btn-outline-adaptive">Outline adaptive</button>
+    <button type="button" class="btn btn-adaptive-inverse">Adaptive inverse</button>
+    <button type="button" class="btn btn-outline-adaptive-inverse">Outline adaptive inverse</button>
+
+    <h3 class="mt-4 mb-3">Button sizes</h3>
+    <button type="button" class="btn btn-primary btn-lg">Large button</button>
+    <button type="button" class="btn btn-primary">Default button</button>
+    <button type="button" class="btn btn-primary btn-sm">Small button</button>
+
+    <h3 class="mt-4 mb-3">Block buttons</h3>
+    <div class="d-grid gap-2 col-6">
+      <button class="btn btn-primary" type="button">Block button</button>
+      <button class="btn btn-outline-primary" type="button">Block outline button</button>
+    </div>
+
+    <h3 class="mt-4 mb-3">Button states</h3>
+    <button type="button" class="btn btn-primary">Normal</button>
+    <button type="button" class="btn btn-primary active">Active</button>
+    <button type="button" class="btn btn-primary" disabled>Disabled</button>
+  </section>
+
+  <!-- Alerts -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Alerts</h2>
+
+    <div class="alert alert-primary" role="alert">
+      A simple primary alert—check it out!
+    </div>
+    <div class="alert alert-secondary" role="alert">
+      A simple secondary alert—check it out!
+    </div>
+    <div class="alert alert-success" role="alert">
+      A simple success alert—check it out!
+    </div>
+    <div class="alert alert-danger" role="alert">
+      A simple danger alert—check it out!
+    </div>
+    <div class="alert alert-warning" role="alert">
+      A simple warning alert—check it out!
+    </div>
+    <div class="alert alert-info" role="alert">
+      A simple info alert—check it out!
+    </div>
+    <div class="alert alert-light" role="alert">
+      A simple light alert—check it out!
+    </div>
+    <div class="alert alert-dark" role="alert">
+      A simple dark alert—check it out!
+    </div>
+
+    <h3 class="mt-4 mb-3">Alert with Icons and Dismiss</h3>
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+      <strong>Holy guacamole!</strong> You should check in on some of those fields below.
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  </section>
+
+  <!-- Badges -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Badges</h2>
+
+    <h3 class="mb-3">Regular badges</h3>
+    <span class="badge bg-primary">Primary</span>
+    <span class="badge bg-secondary">Secondary</span>
+    <span class="badge bg-success">Success</span>
+    <span class="badge bg-danger">Danger</span>
+    <span class="badge bg-warning text-dark">Warning</span>
+    <span class="badge bg-info text-dark">Info</span>
+    <span class="badge bg-light text-dark">Light</span>
+    <span class="badge bg-dark">Dark</span>
+
+    <h3 class="mt-4 mb-3">Pill badges</h3>
+    <span class="badge rounded-pill bg-primary">Primary</span>
+    <span class="badge rounded-pill bg-secondary">Secondary</span>
+    <span class="badge rounded-pill bg-success">Success</span>
+    <span class="badge rounded-pill bg-danger">Danger</span>
+    <span class="badge rounded-pill bg-warning text-dark">Warning</span>
+    <span class="badge rounded-pill bg-info text-dark">Info</span>
+    <span class="badge rounded-pill bg-light text-dark">Light</span>
+    <span class="badge rounded-pill bg-dark">Dark</span>
+  </section>
+
+  <!-- Cards -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Cards</h2>
+
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card">
+          <img src="https://via.placeholder.com/350x200" class="card-img-top" alt="..."/>
+          <div class="card-body">
+            <h5 class="card-title">Card title</h5>
+            <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's content.</p>
+            <a href="#" class="btn btn-primary">Go somewhere</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-light bg-primary">
+          <div class="card-header">Featured</div>
+          <div class="card-body">
+            <h5 class="card-title">Primary card</h5>
+            <p class="card-text">Some quick example text to build on the card title.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-danger">
+          <div class="card-header text-danger">Header</div>
+          <div class="card-body">
+            <h5 class="card-title text-danger">Danger card</h5>
+            <p class="card-text">Some quick example text to build on the card title.</p>
+          </div>
+          <div class="card-footer text-muted">Footer</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Forms -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Forms</h2>
+
+    <div class="row">
+      <div class="col-md-6">
+        <h3 class="mb-3">Form controls</h3>
+        <div class="mb-3">
+          <label for="exampleFormControlInput1" class="form-label">Email address</label>
+          <input type="email" class="form-control" id="exampleFormControlInput1" placeholder="name@example.com">
+        </div>
+        <div class="mb-3">
+          <label for="exampleFormControlInput2" class="form-label">Large input</label>
+          <input type="text" class="form-control form-control-lg" id="exampleFormControlInput2" placeholder="Large input">
+        </div>
+        <div class="mb-3">
+          <label for="exampleFormControlInput3" class="form-label">Small input</label>
+          <input type="text" class="form-control form-control-sm" id="exampleFormControlInput3" placeholder="Small input">
+        </div>
+        <div class="mb-3">
+          <label for="exampleFormControlTextarea1" class="form-label">Example textarea</label>
+          <textarea class="form-control" id="exampleFormControlTextarea1" rows="3"></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="formFile" class="form-label">Default file input</label>
+          <input class="form-control" type="file" id="formFile">
+        </div>
+
+        <h3 class="mt-4 mb-3">Form & button size comparison</h3>
+        <div class="card">
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-6">
+                <input class="form-control form-control-lg" type="text" placeholder=".form-control-lg" aria-label=".form-control-lg example">
+              </div>
+              <div class="col-6">
+                <button class="btn btn-primary btn-lg">btn-lg</button>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-6">
+                <input class="form-control form-control-md" type="text" placeholder=".form-control-md" aria-label=".form-control-md example">
+              </div>
+              <div class="col-6">
+                <button class="btn btn-primary btn-md">btn-md</button>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-6">
+                <input class="form-control" type="text" placeholder="Default input" aria-label="default input example">
+              </div>
+              <div class="col-6">
+                <button class="btn btn-primary">btn (default)</button>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-6">
+                <input class="form-control form-control-sm" type="text" placeholder=".form-control-sm" aria-label=".form-control-sm example">
+              </div>
+              <div class="col-6">
+                <button class="btn btn-primary btn-sm">btn-sm</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <h3 class="mb-3">Select & Checks</h3>
+        <div class="mb-3">
+          <label for="exampleSelect" class="form-label">Select</label>
+          <select class="form-select" id="exampleSelect">
+            <option selected>Open this select menu</option>
+            <option value="1">One</option>
+            <option value="2">Two</option>
+            <option value="3">Three</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault">
+            <label class="form-check-label" for="flexCheckDefault">
+              Default checkbox
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="" id="flexCheckChecked" checked>
+            <label class="form-check-label" for="flexCheckChecked">
+              Checked checkbox
+            </label>
+          </div>
+        </div>
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault1">
+            <label class="form-check-label" for="flexRadioDefault1">
+              Default radio
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault2" checked>
+            <label class="form-check-label" for="flexRadioDefault2">
+              Default checked radio
+            </label>
+          </div>
+        </div>
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
+            <label class="form-check-label" for="flexSwitchCheckDefault">Default switch checkbox input</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="flexSwitchCheckChecked" checked>
+            <label class="form-check-label" for="flexSwitchCheckChecked">Checked switch checkbox input</label>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="customRange1" class="form-label">Example range</label>
+          <input type="range" class="form-range" id="customRange1">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tables -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Tables</h2>
+
+    <h3 class="mb-3">Basic table</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">First</th>
+          <th scope="col">Last</th>
+          <th scope="col">Handle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">1</th>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr>
+          <th scope="row">2</th>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="mt-4 mb-3">Table variants</h3>
+    <table class="table table-striped table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">First</th>
+          <th scope="col">Last</th>
+          <th scope="col">Handle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="table-primary">
+          <th scope="row">1</th>
+          <td>Mark</td>
+          <td>Otto</td>
+          <td>@mdo</td>
+        </tr>
+        <tr class="table-success">
+          <th scope="row">2</th>
+          <td>Jacob</td>
+          <td>Thornton</td>
+          <td>@fat</td>
+        </tr>
+        <tr class="table-danger">
+          <th scope="row">3</th>
+          <td>Larry</td>
+          <td>Bird</td>
+          <td>@twitter</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Progress -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Progress bars</h2>
+
+    <div class="progress mb-3">
+      <div class="progress-bar" role="progressbar" style="width: 25%">25%</div>
+    </div>
+    <div class="progress mb-3">
+      <div class="progress-bar bg-success" role="progressbar" style="width: 50%">50%</div>
+    </div>
+    <div class="progress mb-3">
+      <div class="progress-bar bg-info" role="progressbar" style="width: 75%">75%</div>
+    </div>
+    <div class="progress mb-3">
+      <div class="progress-bar bg-warning" role="progressbar" style="width: 90%">90%</div>
+    </div>
+    <div class="progress mb-3" style="height: 30px;">
+      <div class="progress-bar bg-danger" role="progressbar" style="width: 100%">Large progress bar</div>
+    </div>
+    <div class="progress">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 75%">Animated</div>
+    </div>
+  </section>
+
+  <!-- Spinners -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Spinners</h2>
+
+    <h3 class="mb-3">Border spinner</h3>
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-border text-secondary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-border text-success" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-border text-danger" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-border text-warning" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-border text-info" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+
+    <h3 class="mt-4 mb-3">Growing spinner</h3>
+    <div class="spinner-grow text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-grow text-secondary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-grow text-success" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-grow text-danger" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+
+    <h3 class="mt-4 mb-3">Spinner sizes</h3>
+    <div class="spinner-border spinner-border-sm" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="spinner-grow spinner-grow-sm" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </section>
+
+  <!-- List groups -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">List groups</h2>
+
+    <div class="row">
+      <div class="col-md-6">
+        <h3 class="mb-3">Basic list group</h3>
+        <ul class="list-group">
+          <li class="list-group-item">An item</li>
+          <li class="list-group-item active">An active item</li>
+          <li class="list-group-item disabled">A disabled item</li>
+          <li class="list-group-item">A fourth item</li>
+          <li class="list-group-item">And a fifth one</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <h3 class="mb-3">List group with badges</h3>
+        <ul class="list-group">
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            A list item
+            <span class="badge bg-primary rounded-pill">14</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            A second list item
+            <span class="badge bg-success rounded-pill">2</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            A third list item
+            <span class="badge bg-danger rounded-pill">1</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modals -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Modals</h2>
+
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">
+      Launch demo modal
+    </button>
+    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#exampleModalLg">
+      Large modal
+    </button>
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#exampleModalSm">
+      Small modal
+    </button>
+
+    <!-- Standard Modal -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Modal title</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Modal body text goes here.
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Large Modal -->
+    <div class="modal fade" id="exampleModalLg" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Large modal</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Large modal content
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Small Modal -->
+    <div class="modal fade" id="exampleModalSm" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Small modal</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Small modal content
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tooltips & Popovers -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Tooltips & Popovers</h2>
+
+    <h3 class="mb-3">Tooltips</h3>
+    <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="Tooltip on top">
+      Tooltip on top
+    </button>
+    <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">
+      Tooltip on right
+    </button>
+    <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Tooltip on bottom">
+      Tooltip on bottom
+    </button>
+    <button type="button" class="btn btn-secondary" data-bs-toggle="tooltip" data-bs-placement="left" title="Tooltip on left">
+      Tooltip on left
+    </button>
+
+    <h3 class="mt-4 mb-3">Popovers</h3>
+    <button type="button" class="btn btn-lg btn-danger" data-bs-toggle="popover" title="Popover title" data-bs-content="And here's some amazing content. It's very engaging. Right?">Click to toggle popover</button>
+  </section>
+
+  <!-- Toasts -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Toasts</h2>
+
+    <button type="button" class="btn btn-primary" id="liveToastBtn">Show live toast</button>
+
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+      <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+          <strong class="me-auto">Bootstrap</strong>
+          <small>11 mins ago</small>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+          Hello, world! This is a toast message.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Accordion -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Accordion</h2>
+
+    <div class="accordion" id="accordionExample">
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingOne">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne">
+            Accordion Item #1
+          </button>
+        </h2>
+        <div id="collapseOne" class="accordion-collapse collapse show" data-bs-parent="#accordionExample">
+          <div class="accordion-body">
+            This is the first item's accordion body.
+          </div>
+        </div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="headingTwo">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo">
+            Accordion Item #2
+          </button>
+        </h2>
+        <div id="collapseTwo" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+          <div class="accordion-body">
+            This is the second item's accordion body.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Breadcrumb -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Breadcrumb</h2>
+
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="#">Home</a></li>
+        <li class="breadcrumb-item"><a href="#">Library</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Data</li>
+      </ol>
+    </nav>
+  </section>
+
+  <!-- Pagination -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Pagination</h2>
+
+    <h3 class="mb-3">Default pagination</h3>
+    <nav aria-label="Page navigation">
+      <ul class="pagination">
+        <li class="page-item"><a class="page-link" href="#">Previous</a></li>
+        <li class="page-item"><a class="page-link" href="#">1</a></li>
+        <li class="page-item active"><a class="page-link" href="#">2</a></li>
+        <li class="page-item"><a class="page-link" href="#">3</a></li>
+        <li class="page-item"><a class="page-link" href="#">Next</a></li>
+      </ul>
+    </nav>
+
+    <h3 class="mb-3">Pagination sizes</h3>
+    <nav aria-label="Large pagination">
+      <ul class="pagination pagination-lg">
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">1</span>
+        </li>
+        <li class="page-item"><a class="page-link" href="#">2</a></li>
+        <li class="page-item"><a class="page-link" href="#">3</a></li>
+      </ul>
+    </nav>
+    <nav aria-label="Small pagination">
+      <ul class="pagination pagination-sm">
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">1</span>
+        </li>
+        <li class="page-item"><a class="page-link" href="#">2</a></li>
+        <li class="page-item"><a class="page-link" href="#">3</a></li>
+      </ul>
+    </nav>
+  </section>
+
+  <!-- Dropdowns -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Dropdowns</h2>
+
+    <div class="btn-group me-2">
+      <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+        Primary Dropdown
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="#">Action</a></li>
+        <li><a class="dropdown-item" href="#">Another action</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="#">Something else here</a></li>
+      </ul>
+    </div>
+
+    <div class="btn-group me-2">
+      <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+        Success Dropdown
+      </button>
+      <ul class="dropdown-menu">
+        <li><h6 class="dropdown-header">Dropdown header</h6></li>
+        <li><a class="dropdown-item" href="#">Action</a></li>
+        <li><a class="dropdown-item" href="#">Another action</a></li>
+      </ul>
+    </div>
+
+    <div class="btn-group dropup">
+      <button type="button" class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown">
+        Dropup
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="#">Action</a></li>
+        <li><a class="dropdown-item" href="#">Another action</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Navs & Tabs -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Navs & Tabs</h2>
+
+    <h3 class="mb-3">Nav tabs</h3>
+    <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home" type="button">Home</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button">Profile</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact" type="button">Contact</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link disabled" type="button" disabled>Disabled</button>
+      </li>
+    </ul>
+    <div class="tab-content" id="myTabContent">
+      <div class="tab-pane fade show active" id="home" role="tabpanel">
+        Home tab content
+      </div>
+      <div class="tab-pane fade" id="profile" role="tabpanel">
+        Profile tab content
+      </div>
+      <div class="tab-pane fade" id="contact" role="tabpanel">
+        Contact tab content
+      </div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Nav pills</h3>
+    <ul class="nav nav-pills mb-3">
+      <li class="nav-item">
+        <a class="nav-link active" aria-current="page" href="#">Active</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#">Link</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#">Link</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled">Disabled</a>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Offcanvas -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Offcanvas</h2>
+
+    <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasExample">
+      Toggle offcanvas
+    </button>
+
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasExample">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title">Offcanvas</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <div>
+          Some text as placeholder. In real life you can have the elements you have chosen.
+        </div>
+        <div class="dropdown mt-3">
+          <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
+            Dropdown button
+          </button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="#">Action</a></li>
+            <li><a class="dropdown-item" href="#">Another action</a></li>
+            <li><a class="dropdown-item" href="#">Something else here</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Spacing -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Spacing</h2>
+
+    <h3 class="mb-3">Padding</h3>
+    <div class="bg-light p-1 mb-1">Padding 1</div>
+    <div class="bg-light p-2 mb-1">Padding 2</div>
+    <div class="bg-light p-3 mb-1">Padding 3</div>
+    <div class="bg-light p-4 mb-1">Padding 4</div>
+    <div class="bg-light p-5 mb-1">Padding 5</div>
+
+    <h3 class="mt-4 mb-3">Margin</h3>
+    <div class="bg-light p-2 m-1 d-inline-block">Margin 1</div>
+    <div class="bg-light p-2 m-2 d-inline-block">Margin 2</div>
+    <div class="bg-light p-2 m-3 d-inline-block">Margin 3</div>
+    <div class="bg-light p-2 m-4 d-inline-block">Margin 4</div>
+    <div class="bg-light p-2 m-5 d-inline-block">Margin 5</div>
+  </section>
+
+  <!-- Borders -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Borders</h2>
+
+    <h3 class="mb-3">Border styles</h3>
+    <div class="p-3 mb-2 bg-light border">Regular border</div>
+    <div class="p-3 mb-2 bg-light border-top">Border top</div>
+    <div class="p-3 mb-2 bg-light border-end">Border end</div>
+    <div class="p-3 mb-2 bg-light border-bottom">Border bottom</div>
+    <div class="p-3 mb-2 bg-light border-start">Border start</div>
+
+    <h3 class="mt-4 mb-3">Border colors</h3>
+    <div class="p-3 mb-2 bg-light border border-primary">Primary border</div>
+    <div class="p-3 mb-2 bg-light border border-secondary">Secondary border</div>
+    <div class="p-3 mb-2 bg-light border border-success">Success border</div>
+    <div class="p-3 mb-2 bg-light border border-danger">Danger border</div>
+    <div class="p-3 mb-2 bg-light border border-warning">Warning border</div>
+    <div class="p-3 mb-2 bg-light border border-info">Info border</div>
+
+    <h3 class="mt-4 mb-3">Border width</h3>
+    <div class="p-3 mb-2 bg-light border border-1">Border width 1</div>
+    <div class="p-3 mb-2 bg-light border border-2">Border width 2</div>
+    <div class="p-3 mb-2 bg-light border border-3">Border width 3</div>
+    <div class="p-3 mb-2 bg-light border border-4">Border width 4</div>
+    <div class="p-3 mb-2 bg-light border border-5">Border width 5</div>
+  </section>
+
+  <!-- Shadows -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Shadows</h2>
+
+    <div class="p-3 mb-3 bg-white rounded shadow-none">No shadow</div>
+    <div class="p-3 mb-3 bg-white rounded shadow-sm">Small shadow</div>
+    <div class="p-3 mb-3 bg-white rounded shadow">Regular shadow</div>
+    <div class="p-3 mb-3 bg-white rounded shadow-lg">Large shadow</div>
+  </section>
+
+  <!-- Position -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Position</h2>
+
+    <div class="position-relative p-5 bg-light">
+      <div class="position-absolute top-0 start-0 p-2 bg-primary text-light">Top start</div>
+      <div class="position-absolute top-0 end-0 p-2 bg-success text-light">Top end</div>
+      <div class="position-absolute bottom-0 start-0 p-2 bg-danger text-light">Bottom start</div>
+      <div class="position-absolute bottom-0 end-0 p-2 bg-warning text-dark">Bottom end</div>
+      <div class="position-absolute top-50 start-50 translate-middle p-2 bg-info text-dark">Center</div>
+    </div>
+  </section>
+
+  <!-- Flex -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Flexbox</h2>
+
+    <h3 class="mb-3">Flex direction</h3>
+    <div class="d-flex flex-row mb-3 bg-light">
+      <div class="p-2 bg-primary text-light">Flex item 1</div>
+      <div class="p-2 bg-success text-light">Flex item 2</div>
+      <div class="p-2 bg-danger text-light">Flex item 3</div>
+    </div>
+
+    <h3 class="mt-4 mb-3">Justify content</h3>
+    <div class="d-flex justify-content-start mb-2 bg-light">
+      <div class="p-2 bg-primary text-light">Start</div>
+    </div>
+    <div class="d-flex justify-content-center mb-2 bg-light">
+      <div class="p-2 bg-primary text-light">Center</div>
+    </div>
+    <div class="d-flex justify-content-end mb-2 bg-light">
+      <div class="p-2 bg-primary text-light">End</div>
+    </div>
+    <div class="d-flex justify-content-between mb-2 bg-light">
+      <div class="p-2 bg-primary text-light">Between</div>
+      <div class="p-2 bg-primary text-light">Between</div>
+    </div>
+    <div class="d-flex justify-content-around mb-2 bg-light">
+      <div class="p-2 bg-primary text-light">Around</div>
+      <div class="p-2 bg-primary text-light">Around</div>
+    </div>
+    <div class="d-flex justify-content-evenly mb-2 bg-light">
+      <div class="p-2 bg-primary text-light">Evenly</div>
+      <div class="p-2 bg-primary text-light">Evenly</div>
+    </div>
+  </section>
+
+  <!-- Cursor utilities -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Cursor utilities</h2>
+    <p class="text-muted mb-4">Test all CSS cursor classes. Hover over each box to see the cursor. If the cursor doesn't change, that class needs to be added to the theme utilities.</p>
+
+    <h3 class="mb-3">General</h3>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-auto">
+          <code>.cursor-auto</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-default">
+          <code>.cursor-default</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-none">
+          <code>.cursor-none</code>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-3">Links & Status</h3>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-context-menu">
+          <code>.cursor-context-menu</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-help">
+          <code>.cursor-help</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-pointer">
+          <code>.cursor-pointer</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-progress">
+          <code>.cursor-progress</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-wait">
+          <code>.cursor-wait</code>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-3">Selection</h3>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-cell">
+          <code>.cursor-cell</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-crosshair">
+          <code>.cursor-crosshair</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-text">
+          <code>.cursor-text</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-vertical-text">
+          <code>.cursor-vertical-text</code>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-3">Drag & Drop</h3>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-alias">
+          <code>.cursor-alias</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-copy">
+          <code>.cursor-copy</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-move">
+          <code>.cursor-move</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-no-drop">
+          <code>.cursor-no-drop</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-not-allowed">
+          <code>.cursor-not-allowed</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-grab">
+          <code>.cursor-grab</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-grabbing">
+          <code>.cursor-grabbing</code>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-3">Resizing & Scrolling</h3>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-all-scroll">
+          <code>.cursor-all-scroll</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-col-resize">
+          <code>.cursor-col-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-row-resize">
+          <code>.cursor-row-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-n-resize">
+          <code>.cursor-n-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-e-resize">
+          <code>.cursor-e-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-s-resize">
+          <code>.cursor-s-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-w-resize">
+          <code>.cursor-w-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-ne-resize">
+          <code>.cursor-ne-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-nw-resize">
+          <code>.cursor-nw-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-se-resize">
+          <code>.cursor-se-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-sw-resize">
+          <code>.cursor-sw-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-ew-resize">
+          <code>.cursor-ew-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-ns-resize">
+          <code>.cursor-ns-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-nesw-resize">
+          <code>.cursor-nesw-resize</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-nwse-resize">
+          <code>.cursor-nwse-resize</code>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-3">Zooming</h3>
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-zoom-in">
+          <code>.cursor-zoom-in</code>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="p-3 bg-body-tertiary border rounded text-center cursor-zoom-out">
+          <code>.cursor-zoom-out</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Grid -->
+  <section>
+    <h2 class="border-bottom pb-2 mb-4">Grid system</h2>
+
+    <div class="row mb-3">
+      <div class="col">
+        <div class="p-3 bg-light border">.col</div>
+      </div>
+      <div class="col">
+        <div class="p-3 bg-light border">.col</div>
+      </div>
+      <div class="col">
+        <div class="p-3 bg-light border">.col</div>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <div class="p-3 bg-primary text-light mb-3">Responsive column</div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <div class="p-3 bg-secondary text-light mb-3">Responsive column</div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <div class="p-3 bg-success text-light mb-3">Responsive column</div>
+      </div>
+      <div class="col-12 col-sm-6 col-md-12 col-lg-3">
+        <div class="p-3 bg-danger text-light mb-3">Responsive column</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</section>

@@ -1,0 +1,11 @@
+{
+  actions: [
+    {
+      type: 'account',
+      attributes: [
+        ['data-wm-bind', '@show auth.user'],
+        ['hidden', '']
+      ],
+    }
+  ]
+}

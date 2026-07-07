@@ -18,8 +18,8 @@ const CORPUS = path.join(ROOT, 'spikes', 'bakeoff-shared', 'corpus');
 
 const TOUCH_TARGETS = [
   ['1 post', path.join(CORPUS, '_posts', '2022')],
-  ['1 layout', path.join(ROOT, 'packages', 'web', 'themes', 'classy', '_layouts', 'core', 'base.html')],
-  ['1 include', path.join(ROOT, 'packages', 'web', 'themes', 'classy', '_includes', 'head.html')],
+  ['1 layout', path.join(ROOT, 'packages', 'web', 'core', '_layouts', 'blueprint', 'index.html')],
+  ['1 include', path.join(ROOT, 'packages', 'web', 'themes', 'classy', '_includes', 'frontend', 'sections', 'nav.html')],
 ];
 
 async function main() {

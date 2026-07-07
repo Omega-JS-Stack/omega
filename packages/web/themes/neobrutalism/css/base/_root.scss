@@ -1,0 +1,80 @@
+// Neobrutalism Theme — CSS Custom Properties
+// Bridges SCSS config into runtime CSS variables so light/dark mode switching
+// works without recompilation. Components read these var(--nb-*) tokens, never
+// the raw SCSS values, so dark mode is a single block of overrides.
+
+// ============================================
+// Light Mode (default)
+// ============================================
+:root,
+[data-bs-theme="light"] {
+  // Structural tokens
+  --nb-ink: #{$nb-ink};
+  --nb-paper: #{$nb-paper};
+  --nb-surface: #{$nb-surface};
+  --nb-surface-alt: #{$nb-surface-alt};
+
+  // Height of the fixed navbar — the first section adds this to its top padding
+  // so content clears the overlapping nav (see _general.scss "Section rhythm").
+  --nb-navbar-height: 4.5rem;
+
+  // Border + shadow color follow the ink
+  --nb-border-color: var(--nb-ink);
+  --nb-shadow-color: var(--nb-ink);
+
+  // Border + shadow recipes (used by components)
+  --nb-border-width: #{$nb-border-width};
+  --nb-border: #{$nb-border-width} solid var(--nb-border-color);
+  --nb-shadow-sm: #{$nb-shadow-offset-sm} #{$nb-shadow-offset-sm} 0 var(--nb-shadow-color);
+  --nb-shadow: #{$nb-shadow-offset} #{$nb-shadow-offset} 0 var(--nb-shadow-color);
+  --nb-shadow-lg: #{$nb-shadow-offset-lg} #{$nb-shadow-offset-lg} 0 var(--nb-shadow-color);
+
+  // Accent palette (for color-block sections)
+  --nb-accent-blue: #{$nb-accent-blue};
+  --nb-accent-pink: #{$nb-accent-pink};
+  --nb-accent-yellow: #{$nb-accent-yellow};
+  --nb-accent-green: #{$nb-accent-green};
+  --nb-accent-purple: #{$nb-accent-purple};
+  --nb-accent-orange: #{$nb-accent-orange};
+
+  // INTERACTIVE accent — the single token every hover/active fill points at
+  // (nav links, footer links, dropdown items, body links, mobile toggler). It
+  // tracks the rendered primary blue (--bs-primary), NOT the yellow signature
+  // accent. Retune all interactive states from this one line. Yellow stays
+  // reserved for static signature blocks (kicker, highlight, hero, badges).
+  --nb-accent-interactive: var(--bs-primary);
+  --nb-accent-interactive-ink: #ffffff; // readable text on the interactive fill
+
+  // Map onto Bootstrap surfaces
+  --bs-body-bg: #{$nb-paper};
+  --bs-body-bg-rgb: #{red($nb-paper)}, #{green($nb-paper)}, #{blue($nb-paper)};
+  --bs-body-color: #{$nb-ink};
+  --bs-secondary-bg: #{$nb-surface};
+  --bs-tertiary-bg: #{$nb-surface-alt};
+  --bs-border-color: var(--nb-ink);
+  --bs-card-bg: #{$nb-surface};
+  --bs-emphasis-color: #{$nb-ink};
+}
+
+// ============================================
+// Dark Mode
+// ============================================
+// Ink flips to near-white: borders and hard shadows become light on dark paper.
+[data-bs-theme="dark"] {
+  --nb-ink: #{$nb-ink-dark};
+  --nb-paper: #{$nb-paper-dark};
+  --nb-surface: #{$nb-surface-dark};
+  --nb-surface-alt: #{$nb-surface-alt-dark};
+
+  --nb-border-color: var(--nb-ink);
+  --nb-shadow-color: var(--nb-ink);
+
+  --bs-body-bg: #{$nb-paper-dark};
+  --bs-body-bg-rgb: #{red($nb-paper-dark)}, #{green($nb-paper-dark)}, #{blue($nb-paper-dark)};
+  --bs-body-color: #{$nb-ink-dark};
+  --bs-secondary-bg: #{$nb-surface-dark};
+  --bs-tertiary-bg: #{$nb-surface-alt-dark};
+  --bs-border-color: var(--nb-ink);
+  --bs-card-bg: #{$nb-surface-dark};
+  --bs-emphasis-color: #{$nb-ink-dark};
+}

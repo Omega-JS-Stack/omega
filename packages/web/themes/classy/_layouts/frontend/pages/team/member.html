@@ -1,0 +1,151 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+---
+
+<!-- Hero Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="text-center">
+          <!-- Member Image -->
+          <div class="mb-4 avatar avatar-5xl">
+            {%- uj_member resolved.member.id, "image-tag", class="rounded-circle object-fit-cover shadow-lg team-member-image" -%}
+          </div>
+
+          <!-- Member Name -->
+          <h1 class="h1 mb-3">
+            {%- uj_member resolved.member.id, "name" -%}
+          </h1>
+
+          <!-- Member Position -->
+          <p class="text-primary fs-4 fw-semibold mb-4">{{ resolved.member.position }}</p>
+
+          <!-- Social Links -->
+          {% iftruthy resolved.member.links %}
+            <div class="d-flex justify-content-center gap-2 mb-4">
+              {% for link in resolved.member.links %}
+                {% assign link_icon = link.id %}
+                {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
+                <a href="{{ link.url }}" class="btn btn-outline-primary avatar avatar-lg rounded-circle d-flex align-items-center justify-content-center" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
+                  {% uj_icon link_icon, "" %}
+                </a>
+              {% endfor %}
+            </div>
+          {% endiftruthy %}
+
+          <!-- Member Description -->
+          {% iftruthy resolved.member.description %}
+            <p class="fs-5 text-muted mb-0">{{ resolved.member.description }}</p>
+          {% endiftruthy %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Member Details Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="row g-4">
+          {% iftruthy resolved.member.location %}
+            <div class="col-md-6">
+              <div class="card h-100 border-0 shadow-sm text-center">
+                <div class="card-body p-4">
+                  <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                    {% uj_icon "map-marker-alt", "text-light fs-2" %}
+                  </div>
+                  <h4 class="mb-2">Location</h4>
+                  <p class="text-muted mb-0">{{ resolved.member.location }}</p>
+                </div>
+              </div>
+            </div>
+          {% endiftruthy %}
+
+          {% iftruthy resolved.member.joined %}
+            <div class="col-md-6">
+              <div class="card h-100 border-0 shadow-sm text-center">
+                <div class="card-body p-4">
+                  <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                    {% uj_icon "calendar", "text-light fs-2" %}
+                  </div>
+                  <h4 class="mb-2">Joined</h4>
+                  <p class="text-muted mb-0">{{ resolved.member.joined | date: "%B %Y" }}</p>
+                </div>
+              </div>
+            </div>
+          {% endiftruthy %}
+
+          {% iftruthy resolved.member.skills %}
+            <div class="col-md-6">
+              <div class="card h-100 border-0 shadow-sm text-center">
+                <div class="card-body p-4">
+                  <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                    {% uj_icon "briefcase", "text-light fs-2" %}
+                  </div>
+                  <h4 class="mb-2">Skills</h4>
+                  <p class="text-muted mb-0">{{ resolved.member.skills | join: ", " }}</p>
+                </div>
+              </div>
+            </div>
+          {% endiftruthy %}
+
+          {% iftruthy resolved.member.hobbies %}
+            <div class="col-md-6">
+              <div class="card h-100 border-0 shadow-sm text-center">
+                <div class="card-body p-4">
+                  <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
+                    {% uj_icon "heart", "text-light fs-2" %}
+                  </div>
+                  <h4 class="mb-2">Hobbies</h4>
+                  <p class="text-muted mb-0">{{ resolved.member.hobbies | join: ", " }}</p>
+                </div>
+              </div>
+            </div>
+          {% endiftruthy %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Bio Section -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-5">
+            {%- capture member_name -%}{%- uj_member resolved.member.id, "name" -%}{%- endcapture -%}
+            {%- assign first_name = member_name | split: ' ' | first -%}
+            <h2 class="h2 mb-4 text-center">
+              About <span class="text-gradient-rainbow">{{ first_name }}</span>
+            </h2>
+            <div class="fs-5 text-muted">
+              {{ content | uj_content_format }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Back to Team CTA -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center text-center">
+      <div class="col-lg-8">
+        <a href="/team" class="btn btn-outline-adaptive btn-lg px-5 py-3">
+          {% uj_icon "arrow-left", "me-2" %}
+          Back to team
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

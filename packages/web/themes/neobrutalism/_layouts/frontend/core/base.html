@@ -1,0 +1,31 @@
+---
+### ALL PAGES ###
+layout: core/root
+
+### THEME CONFIG ###
+theme:
+  # html:
+  #   class: ""
+  head:
+    content: |
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" media="print" onload="this.media='all'">
+  body:
+    class: "d-flex flex-column min-vh-100"
+  # main:
+  #   class: "flex-fill"
+---
+
+<!-- Nav (controlled by page/layout front matter) -->
+{% unless resolved.theme.nav.enabled == false %}
+  {%- include frontend/sections/nav.html -%}
+{% endunless %}
+
+<!-- Main Content -->
+<main id="main-content" class="flex-fill {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
+  {{ content | uj_content_format }}
+</main>
+
+<!-- Footer (controlled by page/layout front matter) -->
+{% unless resolved.theme.footer.enabled == false %}
+  {%- include frontend/sections/footer.html -%}
+{% endunless %}

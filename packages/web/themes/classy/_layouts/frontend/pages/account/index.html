@@ -1,0 +1,1933 @@
+---
+### ALL PAGES ###
+layout: frontend/core/cover
+
+### THEME CONFIG ###
+theme:
+  main:
+    align: "start"
+
+### WEB MANAGER CONFIG ###
+web_manager:
+  auth:
+    config:
+      policy: "authenticated"
+
+### ICON PRE-RENDERING ###
+prerender_icons:
+  - name: "apple"
+  - name: "android"
+  - name: "windows"
+  - name: "linux"
+  - name: "chrome"
+  - name: "desktop"
+  - name: "circle-check"
+  - name: "clock"
+  - name: "triangle-exclamation"
+  - name: "circle-xmark"
+  - name: "credit-card"
+  - name: "arrow-up-right-from-square"
+  - name: "rotate-right"
+  - name: "ban"
+  - name: "circle-info"
+
+### PAGE CONFIG ###
+sections:
+  - id: "profile"
+    name: "Profile"
+    icon: "user-circle"
+  - id: "security"
+    name: "Security"
+    icon: "shield-halved"
+  - id: "connections"
+    name: "Connections"
+    icon: "link"
+  - id: "billing"
+    name: "Billing"
+    icon: "credit-card"
+  - id: "referrals"
+    name: "Referrals"
+    icon: "user-plus"
+  - id: "team"
+    name: "Team"
+    icon: "users"
+  - id: "notifications"
+    name: "Notifications"
+    icon: "bell"
+  - id: "api-keys"
+    name: "API & MCP"
+    icon: "key"
+  - id: "data-request"
+    name: "Data request"
+    icon: "file-export"
+  - id: "delete"
+    name: "Delete account"
+    icon: "trash"
+  - id: "refund"
+    name: "Refund"
+    icon: "rotate-left"
+
+connections:
+  - id: "google"
+    name: "Google"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/google.svg"
+  - id: "discord"
+    name: "Discord"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/discord.svg"
+  - id: "github"
+    name: "GitHub"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/github.svg"
+  - id: "twitter"
+    name: "Twitter"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/twitter.svg"
+  - id: "facebook"
+    name: "Facebook"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/facebook.svg"
+  - id: "spotify"
+    name: "Spotify"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/spotify.svg"
+  - id: "apple"
+    name: "Apple"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/apple.svg"
+  - id: "microsoft"
+    name: "Microsoft"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/microsoft.svg"
+  - id: "linkedin"
+    name: "LinkedIn"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/linkedin.svg"
+  - id: "twitch"
+    name: "Twitch"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/twitch.svg"
+  - id: "slack"
+    name: "Slack"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/slack.svg"
+
+signin_methods:
+  - id: "password"
+    name: "Password"
+    icon: "key"
+  - id: "google"
+    name: "Google"
+    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/google.svg"
+
+badges:
+  - id: "member"
+    name: "Member"
+    icon: "sailboat"
+    bg_class: "bg-primary"
+    always_visible: true
+  - id: "admin"
+    name: "Admin"
+    icon: "hat-wizard"
+    bg_class: "bg-danger"
+  - id: "premium"
+    name: "Premium"
+    icon: "crown"
+    bg_class: "bg-success"
+  - id: "beta"
+    name: "Beta"
+    icon: "bolt"
+    bg_color: "#6f42c1"
+  - id: "coder"
+    name: "Developer"
+    icon: "code"
+    bg_color: "#20c997"
+  - id: "moderator"
+    name: "Moderator"
+    icon: "shield-halved"
+    bg_color: "#fd7e14"
+  - id: "vip"
+    name: "VIP"
+    icon: "award"
+    bg_color: "#ffc107"
+---
+
+{% assign hidden_sections = "delete,data-request,refund" | split: "," %}
+
+<!-- Fixed Header -->
+<header class="position-fixed top-0 start-0 w-100 bg-body-secondary border-bottom shadow-sm" style="z-index: 1030;">
+  <div class="container-fluid px-4">
+    <div class="d-flex align-items-center justify-content-between py-3">
+      <!-- Left: Brand -->
+      <a href="/" class="d-flex align-items-center text-decoration-none text-body">
+        <span class="avatar avatar-md me-3 filter-adaptive">
+          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }}"/>
+        </span>
+        <h1 class="h5 mb-0 fw-semibold">{{ site.brand.name }} Account</h1>
+      </a>
+
+      <!-- Right: Close button -->
+      <button type="button" class="btn-close" aria-label="Close" onclick="window.location.href='/'"></button>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile Navigation Dropdown -->
+<div class="d-lg-none pt-5">
+  <div class="container-fluid px-0">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-3">
+        <div class="d-flex gap-2">
+          <select class="form-select flex-grow-1" id="mobile-nav-select" aria-label="Select account section">
+            {% for section in resolved.sections %}
+              {% unless hidden_sections contains section.id %}
+                <option value="{{ section.id }}" {% if forloop.first %}selected{% endif %}>
+                  {{ section.name }}
+                </option>
+              {% endunless %}
+            {% endfor %}
+            <!-- Hidden section options are added dynamically by JavaScript when needed -->
+          </select>
+          <button class="btn btn-danger auth-signout-btn">
+            {% uj_icon "arrow-right-from-bracket", "fa-sm" %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content with Sidebar -->
+<div class="pt-3 d-lg-none"></div>
+<div class="pt-8 d-none d-lg-block"></div>
+<div class="container-fluid">
+  <div class="row">
+    <!-- Desktop Sidebar -->
+    <nav class="col-lg-3 d-none d-lg-block px-3 pb-3 pt-0" aria-label="Account navigation">
+      <div class="card border-0 shadow-sm position-sticky" style="top: 90px;">
+        <div class="card-body p-3">
+          <ul class="nav nav-pills flex-column" id="account-nav" role="tablist" aria-label="Account sections">
+            {% for section in resolved.sections %}
+              <li class="nav-item {% if hidden_sections contains section.id %}d-none{% endif %}" id="{{ section.id }}-nav-item">
+                <a class="nav-link d-flex align-items-center {% if forloop.first %}active{% endif %}"
+                  href="#{{ section.id }}"
+                  data-section="{{ section.id }}"
+                  role="tab">
+                  <span class="me-2 d-inline-flex align-items-center justify-content-center">{% uj_icon section.icon, "fa-lg" %}</span>
+                  <span>{{ section.name }}</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+
+          <!-- Sign out Button -->
+          <div class="mt-3 pt-3 border-top">
+            <button class="btn btn-danger w-100 d-flex align-items-center justify-content-center auth-signout-btn">
+              {% uj_icon "arrow-right-from-bracket", "me-2" %}
+              <span class="button-text">Sign out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Content Area -->
+    <div class="col-lg-9 text-start">
+      <div class="_px-3 py-4 pt-0">
+
+      <!-- Loading Section (visible initially) -->
+      <section id="loading-section" class="account-section">
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 400px;">
+          <div class="spinner-border spinner-border-lg text-primary mb-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <h4 class="text-muted">Loading your account...</h4>
+        </div>
+      </section>
+
+      <!-- Profile Section -->
+      <section id="profile-section" class="account-section d-none">
+        <h2 class="h3 mb-4" >My profile</h2>
+
+        <form id="profile-form" novalidate data-form-state="initializing" onsubmit="return false">
+          <!-- Avatar and Edit Button -->
+          <div class="mb-4">
+            <div class="d-flex align-items-center">
+              <div id="avatar-container" class="me-3 position-relative d-flex align-items-center">
+                <!-- Avatar always available from getUser() -->
+                <div class="avatar avatar-lg rounded-circle overflow-hidden border">
+                  <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ site.brand.name }} profile picture"/>
+                </div>
+                <!-- Active status indicator -->
+                <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
+                  <span class="visually-hidden">Active status</span>
+                </span>
+              </div>
+              <div>
+                <h5 class="mb-1" data-wm-bind="@text auth.user.displayName">Loading...</h5>
+                <small class="text-muted" id="profile-join-date">Member since Loading...</small>
+              </div>
+            </div>
+
+            <!-- Role Badges -->
+            <div id="role-badges" class="mt-2 d-flex gap-2 flex-wrap">
+              {% for badge in resolved.badges %}
+                <span id="badge-{{ badge.id }}" class="badge {{ badge.bg_class }} {% unless badge.always_visible %}d-none{% endunless %}" {% iftruthy badge.bg_color %}style="background-color: {{ badge.bg_color }};"{% endiftruthy %}>
+                  {% uj_icon badge.icon, "fa-sm" %}
+                  {{ badge.name }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Account Details Section -->
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5 class="card-title text-body mb-3">Account details</h5>
+
+              <!-- Email and UID Fields Row -->
+              <div class="row g-3">
+                <!-- Email Field -->
+                <div class="col-lg-6">
+                  <label for="email-input" class="form-label small text-muted">
+                    Email
+                  </label>
+                  <input type="email" class="form-control" id="email-input" name="auth.email" autocomplete="email" readonly>
+                </div>
+
+                <!-- UID Field -->
+                <div class="col-lg-6">
+                  <label for="uid-input" class="form-label small text-muted">
+                    User ID
+                  </label>
+                  <div class="input-group">
+                    <input type="text" class="form-control font-monospace" id="uid-input" name="auth.uid" readonly>
+                    <button type="button" class="btn btn-outline-adaptive" id="copy-uid-btn">
+                      {% uj_icon "copy", "me-2" %}
+                      <span class="button-text d-none d-sm-inline">Copy</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Personal Information Section -->
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5 class="card-title text-body mb-3">Personal information</h5>
+
+              <!-- Name Fields Row -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="first-name-input" class="form-label small text-muted">First name</label>
+                  <input type="text" class="form-control" id="first-name-input" name="personal.name.first" autocomplete="given-name" placeholder="Enter first name">
+                </div>
+                <div class="col-md-6">
+                  <label for="last-name-input" class="form-label small text-muted">Last name</label>
+                  <input type="text" class="form-control" id="last-name-input" name="personal.name.last" autocomplete="family-name" placeholder="Enter last name">
+                </div>
+              </div>
+
+              <!-- Birthday and Gender Row -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="birthday-input" class="form-label small text-muted">Birthday</label>
+                  <input type="date" class="form-control" id="birthday-input" name="personal.birthday" autocomplete="bday">
+                </div>
+                <div class="col-md-6">
+                  <label for="gender-select" class="form-label small text-muted">Gender</label>
+                  <select class="form-select" id="gender-select" name="personal.gender" autocomplete="sex">
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Country and Region Row -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="country-select" class="form-label small text-muted">Country</label>
+                  <select class="form-select" id="country-select" name="personal.location.country" autocomplete="country" data-uj-no-translate>
+                    <option value="">Select country</option>
+                    <option value="AF">Afghanistan</option>
+                    <option value="AL">Albania</option>
+                    <option value="DZ">Algeria</option>
+                    <option value="AD">Andorra</option>
+                    <option value="AO">Angola</option>
+                    <option value="AG">Antigua and Barbuda</option>
+                    <option value="AR">Argentina</option>
+                    <option value="AM">Armenia</option>
+                    <option value="AU">Australia</option>
+                    <option value="AT">Austria</option>
+                    <option value="AZ">Azerbaijan</option>
+                    <option value="BS">Bahamas</option>
+                    <option value="BH">Bahrain</option>
+                    <option value="BD">Bangladesh</option>
+                    <option value="BB">Barbados</option>
+                    <option value="BY">Belarus</option>
+                    <option value="BE">Belgium</option>
+                    <option value="BZ">Belize</option>
+                    <option value="BJ">Benin</option>
+                    <option value="BT">Bhutan</option>
+                    <option value="BO">Bolivia</option>
+                    <option value="BA">Bosnia and Herzegovina</option>
+                    <option value="BW">Botswana</option>
+                    <option value="BR">Brazil</option>
+                    <option value="BN">Brunei</option>
+                    <option value="BG">Bulgaria</option>
+                    <option value="BF">Burkina Faso</option>
+                    <option value="BI">Burundi</option>
+                    <option value="KH">Cambodia</option>
+                    <option value="CM">Cameroon</option>
+                    <option value="CA">Canada</option>
+                    <option value="CV">Cape Verde</option>
+                    <option value="CF">Central African Republic</option>
+                    <option value="TD">Chad</option>
+                    <option value="CL">Chile</option>
+                    <option value="CN">China</option>
+                    <option value="CO">Colombia</option>
+                    <option value="KM">Comoros</option>
+                    <option value="CG">Congo</option>
+                    <option value="CR">Costa Rica</option>
+                    <option value="HR">Croatia</option>
+                    <option value="CU">Cuba</option>
+                    <option value="CY">Cyprus</option>
+                    <option value="CZ">Czech Republic</option>
+                    <option value="DK">Denmark</option>
+                    <option value="DJ">Djibouti</option>
+                    <option value="DM">Dominica</option>
+                    <option value="DO">Dominican Republic</option>
+                    <option value="EC">Ecuador</option>
+                    <option value="EG">Egypt</option>
+                    <option value="SV">El Salvador</option>
+                    <option value="GQ">Equatorial Guinea</option>
+                    <option value="ER">Eritrea</option>
+                    <option value="EE">Estonia</option>
+                    <option value="ET">Ethiopia</option>
+                    <option value="FJ">Fiji</option>
+                    <option value="FI">Finland</option>
+                    <option value="FR">France</option>
+                    <option value="GA">Gabon</option>
+                    <option value="GM">Gambia</option>
+                    <option value="GE">Georgia</option>
+                    <option value="DE">Germany</option>
+                    <option value="GH">Ghana</option>
+                    <option value="GR">Greece</option>
+                    <option value="GD">Grenada</option>
+                    <option value="GT">Guatemala</option>
+                    <option value="GN">Guinea</option>
+                    <option value="GW">Guinea-Bissau</option>
+                    <option value="GY">Guyana</option>
+                    <option value="HT">Haiti</option>
+                    <option value="HN">Honduras</option>
+                    <option value="HU">Hungary</option>
+                    <option value="IS">Iceland</option>
+                    <option value="IN">India</option>
+                    <option value="ID">Indonesia</option>
+                    <option value="IR">Iran</option>
+                    <option value="IQ">Iraq</option>
+                    <option value="IE">Ireland</option>
+                    <option value="IL">Israel</option>
+                    <option value="IT">Italy</option>
+                    <option value="JM">Jamaica</option>
+                    <option value="JP">Japan</option>
+                    <option value="JO">Jordan</option>
+                    <option value="KZ">Kazakhstan</option>
+                    <option value="KE">Kenya</option>
+                    <option value="KI">Kiribati</option>
+                    <option value="KP">North Korea</option>
+                    <option value="KR">South Korea</option>
+                    <option value="KW">Kuwait</option>
+                    <option value="KG">Kyrgyzstan</option>
+                    <option value="LA">Laos</option>
+                    <option value="LV">Latvia</option>
+                    <option value="LB">Lebanon</option>
+                    <option value="LS">Lesotho</option>
+                    <option value="LR">Liberia</option>
+                    <option value="LY">Libya</option>
+                    <option value="LI">Liechtenstein</option>
+                    <option value="LT">Lithuania</option>
+                    <option value="LU">Luxembourg</option>
+                    <option value="MK">Macedonia</option>
+                    <option value="MG">Madagascar</option>
+                    <option value="MW">Malawi</option>
+                    <option value="MY">Malaysia</option>
+                    <option value="MV">Maldives</option>
+                    <option value="ML">Mali</option>
+                    <option value="MT">Malta</option>
+                    <option value="MH">Marshall Islands</option>
+                    <option value="MR">Mauritania</option>
+                    <option value="MU">Mauritius</option>
+                    <option value="MX">Mexico</option>
+                    <option value="FM">Micronesia</option>
+                    <option value="MD">Moldova</option>
+                    <option value="MC">Monaco</option>
+                    <option value="MN">Mongolia</option>
+                    <option value="ME">Montenegro</option>
+                    <option value="MA">Morocco</option>
+                    <option value="MZ">Mozambique</option>
+                    <option value="MM">Myanmar</option>
+                    <option value="NA">Namibia</option>
+                    <option value="NR">Nauru</option>
+                    <option value="NP">Nepal</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="NZ">New Zealand</option>
+                    <option value="NI">Nicaragua</option>
+                    <option value="NE">Niger</option>
+                    <option value="NG">Nigeria</option>
+                    <option value="NO">Norway</option>
+                    <option value="OM">Oman</option>
+                    <option value="PK">Pakistan</option>
+                    <option value="PW">Palau</option>
+                    <option value="PA">Panama</option>
+                    <option value="PG">Papua New Guinea</option>
+                    <option value="PY">Paraguay</option>
+                    <option value="PE">Peru</option>
+                    <option value="PH">Philippines</option>
+                    <option value="PL">Poland</option>
+                    <option value="PT">Portugal</option>
+                    <option value="QA">Qatar</option>
+                    <option value="RO">Romania</option>
+                    <option value="RU">Russia</option>
+                    <option value="RW">Rwanda</option>
+                    <option value="KN">Saint Kitts and Nevis</option>
+                    <option value="LC">Saint Lucia</option>
+                    <option value="VC">Saint Vincent and the Grenadines</option>
+                    <option value="WS">Samoa</option>
+                    <option value="SM">San Marino</option>
+                    <option value="ST">Sao Tome and Principe</option>
+                    <option value="SA">Saudi Arabia</option>
+                    <option value="SN">Senegal</option>
+                    <option value="RS">Serbia</option>
+                    <option value="SC">Seychelles</option>
+                    <option value="SL">Sierra Leone</option>
+                    <option value="SG">Singapore</option>
+                    <option value="SK">Slovakia</option>
+                    <option value="SI">Slovenia</option>
+                    <option value="SB">Solomon Islands</option>
+                    <option value="SO">Somalia</option>
+                    <option value="ZA">South Africa</option>
+                    <option value="ES">Spain</option>
+                    <option value="LK">Sri Lanka</option>
+                    <option value="SD">Sudan</option>
+                    <option value="SR">Suriname</option>
+                    <option value="SZ">Swaziland</option>
+                    <option value="SE">Sweden</option>
+                    <option value="CH">Switzerland</option>
+                    <option value="SY">Syria</option>
+                    <option value="TW">Taiwan</option>
+                    <option value="TJ">Tajikistan</option>
+                    <option value="TZ">Tanzania</option>
+                    <option value="TH">Thailand</option>
+                    <option value="TL">Timor-Leste</option>
+                    <option value="TG">Togo</option>
+                    <option value="TO">Tonga</option>
+                    <option value="TT">Trinidad and Tobago</option>
+                    <option value="TN">Tunisia</option>
+                    <option value="TR">Turkey</option>
+                    <option value="TM">Turkmenistan</option>
+                    <option value="TV">Tuvalu</option>
+                    <option value="UG">Uganda</option>
+                    <option value="UA">Ukraine</option>
+                    <option value="AE">United Arab Emirates</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="US">United States</option>
+                    <option value="UY">Uruguay</option>
+                    <option value="UZ">Uzbekistan</option>
+                    <option value="VU">Vanuatu</option>
+                    <option value="VA">Vatican City</option>
+                    <option value="VE">Venezuela</option>
+                    <option value="VN">Vietnam</option>
+                    <option value="YE">Yemen</option>
+                    <option value="ZM">Zambia</option>
+                    <option value="ZW">Zimbabwe</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label for="region-input" class="form-label small text-muted">Region</label>
+                  <input type="text" class="form-control" id="region-input" name="personal.location.region" autocomplete="address-level1" placeholder="State, Province, or Region">
+                </div>
+              </div>
+
+              <!-- City and Phone Row -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label for="city-input" class="form-label small text-muted">City</label>
+                  <input type="text" class="form-control" id="city-input" name="personal.location.city" autocomplete="address-level2" placeholder="City">
+                </div>
+                <div class="col-md-6">
+                  <label for="phone-input" class="form-label small text-muted">Phone</label>
+                  <div class="input-group">
+                    <select class="form-select flex-shrink-1" id="phone-country-code" name="personal.telephone.countryCode" autocomplete="tel-country-code" style="max-width: 140px;" data-uj-no-translate>
+                      <option value="+1">+1 (USA/CAN)</option>
+                      <option value="+7">+7 (RUS/KAZ)</option>
+                      <option value="+20">+20 (EGY)</option>
+                      <option value="+27">+27 (ZAF)</option>
+                      <option value="+30">+30 (GRC)</option>
+                      <option value="+31">+31 (NLD)</option>
+                      <option value="+32">+32 (BEL)</option>
+                      <option value="+33">+33 (FRA)</option>
+                      <option value="+34">+34 (ESP)</option>
+                      <option value="+36">+36 (HUN)</option>
+                      <option value="+39">+39 (ITA)</option>
+                      <option value="+40">+40 (ROU)</option>
+                      <option value="+41">+41 (CHE)</option>
+                      <option value="+43">+43 (AUT)</option>
+                      <option value="+44">+44 (GBR)</option>
+                      <option value="+45">+45 (DNK)</option>
+                      <option value="+46">+46 (SWE)</option>
+                      <option value="+47">+47 (NOR)</option>
+                      <option value="+48">+48 (POL)</option>
+                      <option value="+49">+49 (DEU)</option>
+                      <option value="+51">+51 (PER)</option>
+                      <option value="+52">+52 (MEX)</option>
+                      <option value="+53">+53 (CUB)</option>
+                      <option value="+54">+54 (ARG)</option>
+                      <option value="+55">+55 (BRA)</option>
+                      <option value="+56">+56 (CHL)</option>
+                      <option value="+57">+57 (COL)</option>
+                      <option value="+58">+58 (VEN)</option>
+                      <option value="+60">+60 (MYS)</option>
+                      <option value="+61">+61 (AUS)</option>
+                      <option value="+62">+62 (IDN)</option>
+                      <option value="+63">+63 (PHL)</option>
+                      <option value="+64">+64 (NZL)</option>
+                      <option value="+65">+65 (SGP)</option>
+                      <option value="+66">+66 (THA)</option>
+                      <option value="+81">+81 (JPN)</option>
+                      <option value="+82">+82 (KOR)</option>
+                      <option value="+84">+84 (VNM)</option>
+                      <option value="+86">+86 (CHN)</option>
+                      <option value="+90">+90 (TUR)</option>
+                      <option value="+91">+91 (IND)</option>
+                      <option value="+92">+92 (PAK)</option>
+                      <option value="+93">+93 (AFG)</option>
+                      <option value="+94">+94 (LKA)</option>
+                      <option value="+95">+95 (MMR)</option>
+                      <option value="+98">+98 (IRN)</option>
+                      <option value="+212">+212 (MAR)</option>
+                      <option value="+213">+213 (DZA)</option>
+                      <option value="+216">+216 (TUN)</option>
+                      <option value="+218">+218 (LBY)</option>
+                      <option value="+220">+220 (GMB)</option>
+                      <option value="+221">+221 (SEN)</option>
+                      <option value="+222">+222 (MRT)</option>
+                      <option value="+223">+223 (MLI)</option>
+                      <option value="+224">+224 (GIN)</option>
+                      <option value="+225">+225 (CIV)</option>
+                      <option value="+226">+226 (BFA)</option>
+                      <option value="+227">+227 (NER)</option>
+                      <option value="+228">+228 (TGO)</option>
+                      <option value="+229">+229 (BEN)</option>
+                      <option value="+230">+230 (MUS)</option>
+                      <option value="+231">+231 (LBR)</option>
+                      <option value="+232">+232 (SLE)</option>
+                      <option value="+233">+233 (GHA)</option>
+                      <option value="+234">+234 (NGA)</option>
+                      <option value="+235">+235 (TCD)</option>
+                      <option value="+236">+236 (CAF)</option>
+                      <option value="+237">+237 (CMR)</option>
+                      <option value="+238">+238 (CPV)</option>
+                      <option value="+239">+239 (STP)</option>
+                      <option value="+240">+240 (GNQ)</option>
+                      <option value="+241">+241 (GAB)</option>
+                      <option value="+242">+242 (COG)</option>
+                      <option value="+243">+243 (COD)</option>
+                      <option value="+244">+244 (AGO)</option>
+                      <option value="+245">+245 (GNB)</option>
+                      <option value="+246">+246 (IOT)</option>
+                      <option value="+248">+248 (SYC)</option>
+                      <option value="+249">+249 (SDN)</option>
+                      <option value="+250">+250 (RWA)</option>
+                      <option value="+251">+251 (ETH)</option>
+                      <option value="+252">+252 (SOM)</option>
+                      <option value="+253">+253 (DJI)</option>
+                      <option value="+254">+254 (KEN)</option>
+                      <option value="+255">+255 (TZA)</option>
+                      <option value="+256">+256 (UGA)</option>
+                      <option value="+257">+257 (BDI)</option>
+                      <option value="+258">+258 (MOZ)</option>
+                      <option value="+260">+260 (ZMB)</option>
+                      <option value="+261">+261 (MDG)</option>
+                      <option value="+262">+262 (REU)</option>
+                      <option value="+263">+263 (ZWE)</option>
+                      <option value="+264">+264 (NAM)</option>
+                      <option value="+265">+265 (MWI)</option>
+                      <option value="+266">+266 (LSO)</option>
+                      <option value="+267">+267 (BWA)</option>
+                      <option value="+268">+268 (SWZ)</option>
+                      <option value="+269">+269 (COM)</option>
+                      <option value="+290">+290 (SHN)</option>
+                      <option value="+291">+291 (ERI)</option>
+                      <option value="+297">+297 (ABW)</option>
+                      <option value="+298">+298 (FRO)</option>
+                      <option value="+299">+299 (GRL)</option>
+                      <option value="+350">+350 (GIB)</option>
+                      <option value="+351">+351 (PRT)</option>
+                      <option value="+352">+352 (LUX)</option>
+                      <option value="+353">+353 (IRL)</option>
+                      <option value="+354">+354 (ISL)</option>
+                      <option value="+355">+355 (ALB)</option>
+                      <option value="+356">+356 (MLT)</option>
+                      <option value="+357">+357 (CYP)</option>
+                      <option value="+358">+358 (FIN)</option>
+                      <option value="+359">+359 (BGR)</option>
+                      <option value="+370">+370 (LTU)</option>
+                      <option value="+371">+371 (LVA)</option>
+                      <option value="+372">+372 (EST)</option>
+                      <option value="+373">+373 (MDA)</option>
+                      <option value="+374">+374 (ARM)</option>
+                      <option value="+375">+375 (BLR)</option>
+                      <option value="+376">+376 (AND)</option>
+                      <option value="+377">+377 (MCO)</option>
+                      <option value="+378">+378 (SMR)</option>
+                      <option value="+380">+380 (UKR)</option>
+                      <option value="+381">+381 (SRB)</option>
+                      <option value="+382">+382 (MNE)</option>
+                      <option value="+385">+385 (HRV)</option>
+                      <option value="+386">+386 (SVN)</option>
+                      <option value="+387">+387 (BIH)</option>
+                      <option value="+389">+389 (MKD)</option>
+                      <option value="+420">+420 (CZE)</option>
+                      <option value="+421">+421 (SVK)</option>
+                      <option value="+423">+423 (LIE)</option>
+                      <option value="+500">+500 (FLK)</option>
+                      <option value="+501">+501 (BLZ)</option>
+                      <option value="+502">+502 (GTM)</option>
+                      <option value="+503">+503 (SLV)</option>
+                      <option value="+504">+504 (HND)</option>
+                      <option value="+505">+505 (NIC)</option>
+                      <option value="+506">+506 (CRI)</option>
+                      <option value="+507">+507 (PAN)</option>
+                      <option value="+509">+509 (HTI)</option>
+                      <option value="+590">+590 (GLP/BLF/MAF)</option>
+                      <option value="+591">+591 (BOL)</option>
+                      <option value="+592">+592 (GUY)</option>
+                      <option value="+593">+593 (ECU)</option>
+                      <option value="+594">+594 (GUF)</option>
+                      <option value="+595">+595 (PRY)</option>
+                      <option value="+596">+596 (MTQ)</option>
+                      <option value="+597">+597 (SUR)</option>
+                      <option value="+598">+598 (URY)</option>
+                      <option value="+599">+599 (CUW/BES)</option>
+                      <option value="+670">+670 (TLS)</option>
+                      <option value="+673">+673 (BRN)</option>
+                      <option value="+674">+674 (NRU)</option>
+                      <option value="+675">+675 (PNG)</option>
+                      <option value="+676">+676 (TON)</option>
+                      <option value="+677">+677 (SLB)</option>
+                      <option value="+678">+678 (VUT)</option>
+                      <option value="+679">+679 (FJI)</option>
+                      <option value="+680">+680 (PLW)</option>
+                      <option value="+681">+681 (WLF)</option>
+                      <option value="+682">+682 (COK)</option>
+                      <option value="+683">+683 (NIU)</option>
+                      <option value="+685">+685 (WSM)</option>
+                      <option value="+686">+686 (KIR)</option>
+                      <option value="+687">+687 (NCL)</option>
+                      <option value="+688">+688 (TUV)</option>
+                      <option value="+689">+689 (PYF)</option>
+                      <option value="+690">+690 (TKL)</option>
+                      <option value="+691">+691 (FSM)</option>
+                      <option value="+692">+692 (MHL)</option>
+                      <option value="+850">+850 (PRK)</option>
+                      <option value="+852">+852 (HKG)</option>
+                      <option value="+853">+853 (MAC)</option>
+                      <option value="+855">+855 (KHM)</option>
+                      <option value="+856">+856 (LAO)</option>
+                      <option value="+880">+880 (BGD)</option>
+                      <option value="+886">+886 (TWN)</option>
+                      <option value="+960">+960 (MDV)</option>
+                      <option value="+961">+961 (LBN)</option>
+                      <option value="+962">+962 (JOR)</option>
+                      <option value="+963">+963 (SYR)</option>
+                      <option value="+964">+964 (IRQ)</option>
+                      <option value="+965">+965 (KWT)</option>
+                      <option value="+966">+966 (SAU)</option>
+                      <option value="+967">+967 (YEM)</option>
+                      <option value="+968">+968 (OMN)</option>
+                      <option value="+970">+970 (PSE)</option>
+                      <option value="+971">+971 (ARE)</option>
+                      <option value="+972">+972 (ISR)</option>
+                      <option value="+973">+973 (BHR)</option>
+                      <option value="+974">+974 (QAT)</option>
+                      <option value="+975">+975 (BTN)</option>
+                      <option value="+976">+976 (MNG)</option>
+                      <option value="+977">+977 (NPL)</option>
+                      <option value="+992">+992 (TJK)</option>
+                      <option value="+993">+993 (TKM)</option>
+                      <option value="+994">+994 (AZE)</option>
+                      <option value="+995">+995 (GEO)</option>
+                      <option value="+996">+996 (KGZ)</option>
+                      <option value="+998">+998 (UZB)</option>
+                    </select>
+                    <input type="tel" class="form-control" id="phone-input" name="personal.telephone.national" autocomplete="tel-national" placeholder="Phone number">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Save Button -->
+              <div class="mt-3 d-grid d-sm-block">
+                <button type="submit" class="btn btn-primary">
+                  {% uj_icon "floppy-disk", "me-2" %}
+                  <span class="button-text">Save changes</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Security Section -->
+      <section id="security-section" class="account-section d-none">
+        <h2 class="h3 mb-4" >Security and data</h2>
+
+        <!-- Sign-in Methods Section -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Sign-in methods</h5>
+            <p class="text-muted mb-0">Manage how you sign in to your account. You can connect multiple methods for added convenience and security.</p>
+
+            <div id="signin-methods-list">
+              {% for method in resolved.signin_methods %}
+                <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3 py-3 {% unless forloop.first %}border-top{% endunless %}">
+                  <div class="d-flex align-items-center">
+                    <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0 {% iftruthy method.icon %}text-muted{% endiftruthy %} fa fa-3xl">
+                      {% iftruthy method.icon %}
+                        {% uj_icon method.icon, "fa-3xl" %}
+                      {% endiftruthy %}
+                      {% iftruthy method.logo %}
+                        <img src="{{ method.logo | uj_cachebreak }}" class="object-fit-contain" alt="{{ method.name }} Logo"/>
+                      {% endiftruthy %}
+                    </div>
+                    <div>
+                      <h6 class="mb-0">{{ method.name }}</h6>
+                      <div class="text-muted small" id="{{ method.id }}-email"></div>
+                    </div>
+                  </div>
+                  <div class="flex-shrink-0">
+                    <form id="signin-method-{{ method.id }}-form" class="d-grid d-sm-inline-block" novalidate data-form-state="initializing" onsubmit="return false">
+                      <input type="hidden" name="method" value="{{ method.id }}">
+                      {% if method.id == "password" %}
+                        <button type="submit" class="btn btn-primary btn-sm" data-action="change">
+                          {% uj_icon "key", "me-1" %}
+                          <span class="button-text">Change</span>
+                        </button>
+                      {% else %}
+                        <!-- Connect button -->
+                        <button type="submit" class="btn btn-primary btn-sm" data-action="connect">
+                          {% uj_icon "link", "me-1" %}
+                          <span class="button-text">Connect</span>
+                        </button>
+                        <!-- Disconnect button (hidden by default) -->
+                        <button type="submit" class="btn btn-sm btn-outline-danger d-none" data-action="disconnect">
+                          {% uj_icon "unlink", "me-1" %}
+                          <span class="button-text">Disconnect</span>
+                        </button>
+                      {% endif %}
+                    </form>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- <div class="card mb-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="card-title mb-0">Two-Factor Authentication</h5>
+              <span id="2fa-status"></span>
+            </div>
+            <p class="card-text">Add an extra layer of security to your account.</p>
+            <button id="2fa-btn" class="btn btn-primary">Enable 2FA</button>
+          </div>
+        </div> -->
+
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="card-title mb-0">Active sessions</h5>
+              <form id="signout-all-sessions-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
+                <input type="hidden" name="action" value="signout-all">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                  {% uj_icon "right-from-bracket", "me-1" %}
+                  <span class="button-text">
+                    Sign out<span class="d-none d-md-inline"> of all sessions</span>
+                  </span>
+                </button>
+              </form>
+            </div>
+            <p class="card-text text-muted">Manage your active sessions across devices. Review and revoke access from unrecognized devices.</p>
+
+            <div id="active-sessions-list" class="list-group list-group-flush mb-3">
+              <!-- Sessions will be loaded here -->
+              <div class="text-center py-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading sessions...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Generate Signin Link (advanced) -->
+        <div id="generate-signin-link-trigger" class="text-center">
+          <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="modal" data-bs-target="#generate-signin-link-modal">
+            Generate signin link
+          </button>
+        </div>
+
+        <!-- Generate Signin Link Modal -->
+        <div class="modal fade" id="generate-signin-link-modal" tabindex="-1" aria-labelledby="generate-signin-link-title" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border border-danger">
+              <div class="modal-header">
+                <h5 class="modal-title text-danger" id="generate-signin-link-title">
+                  {% uj_icon "triangle-exclamation", "fa-lg me-2" %}
+                  Generate signin link
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <!-- Warning view -->
+                <div id="generate-signin-link-warning">
+                  <div class="alert alert-danger">
+                    <strong>This is a dangerous feature for advanced users.</strong>
+                    <p class="mb-2 mt-2 small">
+                      Generating a signin link creates a single URL that lets <strong>anyone who has it</strong> sign in to your account — no password, no 2FA, no email verification.
+                    </p>
+                    <ul class="small mb-0">
+                      <li>Use it only to sign in to your own account on another browser or device.</li>
+                      <li><strong>Never share, message, email, or paste this link anywhere.</strong> Anyone with the link gets full access to your account.</li>
+                      <li>The link expires in 1 hour, but treat it as a live key until then.</li>
+                      <li>If you suspect the link was exposed, sign out of all sessions immediately.</li>
+                    </ul>
+                  </div>
+
+                  <p class="mb-2">Type the following phrase exactly to confirm you understand the risks:</p>
+                  <p class="mb-2"><code id="signin-link-confirm-phrase">I will not share this link</code></p>
+
+                  <input type="text" class="form-control" id="signin-link-confirm-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Type the phrase above">
+                </div>
+
+                <!-- Result view (hidden until generated) -->
+                <div id="generate-signin-link-result" class="d-none">
+                  <div class="alert alert-warning small mb-3">
+                    {% uj_icon "clock", "me-1" %}
+                    This link expires in <strong>1 hour</strong>. Use it immediately and do not share it.
+                  </div>
+                  <label for="signin-link-output" class="form-label small text-muted mb-1">Your signin link:</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control font-monospace small" id="signin-link-output" readonly>
+                    <button type="button" class="btn btn-outline-primary" id="signin-link-copy-btn">
+                      {% uj_icon "copy", "me-1" %}
+                      <span class="button-text">Copy</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="signin-link-generate-btn" disabled>
+                  {% uj_icon "key", "me-1" %}
+                  <span class="button-text">Generate link</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Connections Section -->
+      <section id="connections-section" class="account-section d-none">
+        <h2 class="h3 mb-4" >Connected accounts</h2>
+
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Manage connections</h5>
+            <p class="text-muted mb-0">Connect your external accounts to access additional features.</p>
+
+            <div id="connections-list">
+              <!-- Loading state -->
+              <div id="connections-loading" class="text-center py-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading connections...</span>
+                </div>
+              </div>
+
+              <!-- No connections message (hidden by default) -->
+              <div id="connections-empty" class="text-center py-4 text-muted d-none">
+                <p>No connections are available right now.</p>
+              </div>
+
+              {% for connection in resolved.connections %}
+                <div id="connection-{{ connection.id }}" class="{% unless forloop.first %}border-top{% endunless %} px-0 py-3 d-none">
+                  <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center">
+                      <div class="d-flex align-items-center justify-content-center me-3 flex-shrink-0 fa fa-3xl">
+                        <img src="{{ connection.logo | uj_cachebreak }}" class="object-fit-contain" alt="{{ connection.name }} Logo"/>
+                      </div>
+                      <div>
+                        <h6 class="mb-0">{{ connection.name }}</h6>
+                        <small class="text-muted d-block" id="{{ connection.id }}-connection-description"></small>
+                      </div>
+                    </div>
+                    <div class="text-start text-sm-end flex-shrink-0">
+                      <div>
+                        <form id="connection-form-{{ connection.id }}" class="d-grid d-sm-inline-block" novalidate data-form-state="initializing" onsubmit="return false">
+                          <input type="hidden" name="provider" value="{{ connection.id }}">
+                          <!-- Connect button -->
+                          <button type="submit" class="btn btn-sm btn-primary" data-action="connect">
+                            {% uj_icon "link", "fa-sm" %}
+                            <span class="button-text">Connect</span>
+                          </button>
+                          <!-- Disconnect button (hidden by default) -->
+                          <button type="submit" class="btn btn-sm btn-outline-danger d-none" data-action="disconnect">
+                            {% uj_icon "unlink", "fa-sm" %}
+                            <span class="button-text">Disconnect</span>
+                          </button>
+                        </form>
+                        <small class="text-muted d-block mt-1" id="{{ connection.id }}-connection-status"></small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Billing Section -->
+      <section id="billing-section" class="account-section d-none">
+        <h2 class="h3 mb-4">Billing and usage</h2>
+
+        <!-- Plan Overview Card -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h5 class="card-title mb-1 d-flex align-items-center flex-wrap gap-2">
+                  <span><span data-wm-bind="@text billing.plan.name" class="wm-binding-skeleton">Current</span> plan</span>
+                  <span data-wm-bind="@attr class billing.status.badgeClass, @text billing.status.label" class="badge bg-secondary wm-binding-skeleton">&nbsp;</span>
+                </h5>
+                <p class="card-text mb-0" data-wm-bind="@show billing.description.free" hidden>
+                  You are currently on the <strong data-wm-bind="@text billing.plan.name">Free</strong> plan. Upgrade to unlock premium features.
+                </p>
+                <p class="card-text mb-0" data-wm-bind="@show billing.description.active" hidden>
+                  You are currently on the <strong data-wm-bind="@text billing.plan.name">Current</strong> plan.
+                </p>
+                <p class="card-text mb-0" data-wm-bind="@show billing.description.suspended" hidden>
+                  Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has been suspended and access has been revoked due to a payment issue. Please update your payment method to restore access.
+                </p>
+                <p class="card-text mb-0" data-wm-bind="@show billing.description.cancelled" hidden>
+                  Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has ended. Resubscribe to regain access to premium features.
+                </p>
+              </div>
+            </div>
+
+            <!-- Billing details (next billing, amount) -->
+            <div id="billing-details" class="mb-3" data-wm-bind="@show billing.details.visible" hidden>
+              <div class="row small text-muted">
+                <div class="col-sm-6 mb-1">
+                  <strong>Next billing:&nbsp;</strong> <span data-wm-bind="@text billing.details.nextDate"></span>
+                </div>
+                <div class="col-sm-6 mb-1">
+                  <strong>Amount:&nbsp;</strong> <span data-wm-bind="@text billing.details.amount"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- State-specific alerts -->
+            <div class="mb-3">
+              <!-- Suspended (payment issue) alert -->
+              <div class="alert alert-danger d-flex align-items-start" data-wm-bind="@show billing.alerts.suspended" hidden>
+                <span class="me-2 flex-shrink-0">{% uj_icon "triangle-exclamation", "fa-md" %}</span>
+                <div>
+                  <strong>Payment failed</strong>
+                  <p class="mb-0 small">Your payment method was declined. Please update your payment method to keep your subscription active.</p>
+                </div>
+              </div>
+
+              <!-- Cancellation pending alert -->
+              <div class="alert alert-warning d-flex align-items-start" data-wm-bind="@show billing.alerts.cancelling" hidden>
+                <span class="me-2 flex-shrink-0">{% uj_icon "clock", "fa-md" %}</span>
+                <div>
+                  <strong>Cancellation scheduled</strong>
+                  <p class="mb-0 small">Your subscription will end on <strong data-wm-bind="@text billing.alerts.cancelDate"></strong>. You'll continue to have full access until then. If you change your mind, you can reactivate through billing management.</p>
+                </div>
+              </div>
+
+              <!-- Free trial alert -->
+              <div class="alert alert-success d-flex align-items-start" data-wm-bind="@show billing.alerts.trialing" hidden>
+                <span class="me-2 flex-shrink-0">{% uj_icon "circle-check", "fa-md" %}</span>
+                <div>
+                  <strong>Free trial</strong>
+                  <p class="mb-0 small" data-wm-bind="@show billing.alerts.trialHasEndDate" hidden>You're on a free trial that ends on <strong data-wm-bind="@text billing.alerts.trialEndDate"></strong>. You won't be charged until your trial ends.</p>
+                  <p class="mb-0 small" data-wm-bind="@hide billing.alerts.trialHasEndDate">You're on a free trial. You won't be charged until your trial ends.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-grid d-sm-flex gap-2">
+              <button id="upgrade-plan-btn" class="btn btn-success plan-action-btn" data-wm-bind="@show billing.buttons.upgrade" hidden>
+                {% uj_icon "crown", "me-2" %}
+                <span class="button-text">Upgrade plan</span>
+              </button>
+              <button id="change-plan-btn" class="btn btn-outline-adaptive plan-action-btn" data-wm-bind="@show billing.buttons.change" hidden>
+                {% uj_icon "arrow-right-arrow-left", "me-2" %}
+                <span class="button-text">Change plan</span>
+              </button>
+              <button id="manage-billing-btn" class="btn btn-primary plan-action-btn" data-wm-bind="@show billing.buttons.manage" hidden>
+                {% uj_icon "credit-card", "me-2" %}
+                <span class="button-text">Manage billing</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Usage Metrics Card -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Usage</h5>
+            <div id="usage-metrics-container">
+              <div class="text-muted">Loading usage data...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cancel Subscription (only visible for paid users) -->
+        <div id="cancel-subscription-trigger" class="text-center" data-wm-bind="@show billing.buttons.cancel" hidden>
+          <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion" aria-expanded="false" aria-controls="cancel-subscription-accordion">
+            Cancel subscription
+          </button>
+        </div>
+
+        <div class="collapse" id="cancel-subscription-accordion">
+          <div class="card card-form-border border-danger mt-4">
+            <div class="card-body">
+              <h5 class="card-title text-danger">
+                {% uj_icon "ban", "fa-lg me-2" %}
+                Cancel your subscription
+              </h5>
+
+              <p class="card-text small text-muted">
+                If you cancel, your subscription will remain active until the end of your current billing period. After that, you'll be downgraded to the free plan and will lose access to premium features. You can resubscribe at any time.
+              </p>
+
+              <form id="cancel-subscription-form" novalidate data-form-state="initializing" onsubmit="return false">
+                <!-- Cancellation Reasons (randomized by JS) -->
+                <div class="mb-3">
+                  <label class="form-label">Why are you cancelling?</label>
+                  <div id="cancel-reasons-container">
+                    <!-- Radio buttons injected by JS in random order -->
+                  </div>
+                </div>
+
+                <!-- Additional Feedback -->
+                <div class="mb-3">
+                  <label for="cancel-feedback" class="form-label">Anything else you'd like us to know?</label>
+                  <textarea class="form-control" id="cancel-feedback" name="feedback" rows="3" placeholder="Optional feedback to help us improve..."></textarea>
+                </div>
+
+                <!-- Required Confirmation -->
+                <div class="mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="cancel-confirm-checkbox" name="confirm_cancellation" required>
+                    <label class="form-check-label" for="cancel-confirm-checkbox">
+                      I confirm I want to cancel my subscription and agree to the <a href="/legal/terms" target="_blank">Terms of Service</a>. I understand my access will continue until the end of the current billing period, after which I'll be moved to the free plan.
+                    </label>
+                    <div class="invalid-feedback">You must confirm before cancelling.</div>
+                  </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="row g-2">
+                  <div class="col-12 col-md-6 order-md-2">
+                    <button type="submit" class="btn btn-outline-adaptive w-100" id="cancel-subscription-btn">
+                      {% uj_icon "ban", "fa-sm me-2" %}
+                      <span class="button-text">Cancel subscription</span>
+                    </button>
+                  </div>
+                  <div class="col-12 col-md-6 order-md-1">
+                    <button type="button" class="btn btn-primary w-100" id="keep-plan-btn" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion">
+                      {% uj_icon "circle-check", "fa-sm me-2" %}
+                      <span>Keep my plan</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Referrals Section -->
+      <section id="referrals-section" class="account-section d-none">
+        <h2 class="h3 mb-4" >Referrals</h2>
+
+        <!-- Referral Code Card -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Your referral code</h5>
+            <p class="card-text text-muted">Share your referral code with friends to earn rewards.</p>
+
+            <div class="mb-0">
+              <div class="input-group">
+                <input type="text" class="form-control font-monospace" id="referral-code-input" readonly value="Loading..." aria-label="Your referral code">
+                <button type="button" class="btn btn-outline-adaptive" id="copy-referral-code-btn">
+                  {% uj_icon "copy", "me-2" %}
+                  <span class="button-text d-none d-sm-inline">Copy</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Referrals Stats Card -->
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Referral statistics</h5>
+
+            <!-- Stats Summary -->
+            <div class="row text-center mb-4">
+              <div class="col">
+                <div class="h3 mb-0" id="total-referrals">0</div>
+                <div class="text-muted small">Total referrals</div>
+              </div>
+              <div class="col">
+                <div class="h3 mb-0" id="recent-referrals">0</div>
+                <div class="text-muted small">This month</div>
+              </div>
+            </div>
+
+            <!-- Referrals List Accordion -->
+            <div class="accordion" id="referrals-accordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="referrals-list-heading">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#referrals-list-collapse" aria-expanded="false" aria-controls="referrals-list-collapse">
+                    <span class="me-2">{% uj_icon "users", "fa-sm" %}</span>
+                    View referral details
+                    <span class="badge bg-primary ms-2" id="referrals-badge">0</span>
+                  </button>
+                </h2>
+                <div id="referrals-list-collapse" class="accordion-collapse collapse" aria-labelledby="referrals-list-heading" data-bs-parent="#referrals-accordion">
+                  <div class="accordion-body">
+                    <div id="referrals-list" class="list-group list-group-flush">
+                      <!-- Referrals will be loaded here -->
+                      <div class="text-center text-muted py-3">
+                        No referrals yet. Share your code to get started!
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Team Section -->
+      <section id="team-section" class="account-section d-none">
+        <h2 class="h3 mb-4" >Team</h2>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="card-title mb-0">Team members</h5>
+              <button class="btn btn-primary btn-sm" id="invite-team-member-btn">
+                {% uj_icon "user-plus", "me-2" %}
+                <span class="button-text">
+                  Invite<span class="d-none d-md-inline"> team member</span>
+                </span>
+              </button>
+            </div>
+
+            <div class="list-group" id="team-list">
+              <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <strong>You</strong>
+                    <small class="text-muted d-block">Owner</small>
+                  </div>
+                  <span class="badge bg-primary">Owner</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Notifications Section -->
+      <section id="notifications-section" class="account-section d-none">
+        <h2 class="h3 mb-4" >Notifications</h2>
+
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">Email preferences</h5>
+
+            <form id="marketing-emails-form" novalidate data-form-state="initializing" onsubmit="return false">
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="marketing-emails" name="enabled">
+                <label class="form-check-label" for="marketing-emails">
+                  Product updates, newsletters, and marketing communications
+                  <small class="d-block text-muted">You can withdraw consent at any time.</small>
+                  <small id="marketing-emails-grant-date" class="d-block text-muted d-none"></small>
+                </label>
+              </div>
+              <button type="submit" class="btn btn-primary">
+                {% uj_icon "floppy-disk", "me-2" %}
+                <span class="button-text">Save preferences</span>
+              </button>
+            </form>
+          </div>
+        </div>
+        <div class="card mt-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <h5 class="card-title mb-0">Push notifications</h5>
+              <span id="push-notification-status"><span class="badge bg-secondary">Checking...</span></span>
+            </div>
+            <p class="text-muted small mb-3">Receive push notifications in your browser for important updates.</p>
+
+            <form id="push-subscribe-form" novalidate data-form-state="initializing" onsubmit="return false" style="display:none">
+              <button type="submit" class="btn btn-adaptive btn-sm" id="push-subscribe-btn">
+                {% uj_icon "bell", "me-1" %}
+                <span class="button-text">Enable push notifications</span>
+              </button>
+            </form>
+
+            <div class="mt-3 pt-3 border-top">
+              <a class="small text-muted text-decoration-none d-flex align-items-center" data-bs-toggle="collapse" href="#push-token-details" role="button" aria-expanded="false">
+                {% uj_icon "code", "fa-xs me-1" %} Token details
+              </a>
+              <div class="collapse mt-2" id="push-token-details">
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control font-monospace bg-body-tertiary" id="push-token-value" readonly value="No token" style="font-size: 0.65rem;">
+                  <button type="button" class="btn btn-outline-adaptive" id="copy-push-token-btn">
+                    {% uj_icon "copy" %}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- API Keys Section -->
+      <section id="api-keys-section" class="account-section d-none">
+        <h2 class="h3 mb-4">API & MCP</h2>
+
+        <!-- API Key Card -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="card-title mb-0">Your API key</h5>
+              <form id="reset-api-key-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
+                <button type="submit" class="btn btn-outline-danger btn-sm" id="reset-api-key-btn">
+                  {% uj_icon "rotate", "me-1" %}
+                  <span class="button-text">
+                    Reset<span class="d-none d-md-inline"> API key</span>
+                  </span>
+                </button>
+              </form>
+            </div>
+            <p class="card-text text-muted">Use this private key to authenticate API requests. Keep it secure and never share it publicly.</p>
+
+            <!-- API Key Display -->
+            <div class="mb-3">
+              <label for="api-key-input" class="form-label small text-muted">Private API key</label>
+              <div class="input-group">
+                <input type="text" class="form-control font-monospace" id="api-key-input" readonly value="Loading...">
+                <button type="button" class="btn btn-outline-adaptive" id="copy-api-key-btn">
+                  {% uj_icon "copy", "me-2" %}
+                  <span class="button-text d-none d-sm-inline">Copy</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Reset API Key -->
+            <div class="alert alert-warning d-flex align-items-center" role="alert">
+              <div class="me-3">
+                {% uj_icon "triangle-exclamation", "fa-2xl" %}
+              </div>
+              <div class="flex-grow-1">
+                <strong>Warning:</strong> Resetting your API key will invalidate the current key. Any applications using the old key will stop working.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MCP Integration Card -->
+        <div class="card" data-brand-id="{{ site.brand.id }}" id="mcp-card">
+          <div class="card-body">
+            <h5 class="card-title mb-2">MCP integration</h5>
+            <p class="card-text text-muted mb-3">Connect AI assistants to your account using the Model Context Protocol. Paste the URL below into your preferred AI tool.</p>
+
+            <!-- MCP URL display -->
+            <div class="mb-4">
+              <label for="mcp-url-input" class="form-label small text-muted">MCP server URL</label>
+              <div class="input-group">
+                <input type="text" class="form-control font-monospace" id="mcp-url-input" readonly data-mcp-url value="Loading...">
+                <button type="button" class="btn btn-outline-adaptive" id="copy-mcp-url-btn">
+                  {% uj_icon "copy", "me-2" %}
+                  <span class="button-text d-none d-sm-inline">Copy</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Provider Tabs -->
+            <div class="border rounded">
+              <ul class="nav nav-tabs px-3 pt-2 flex-nowrap overflow-auto" id="mcp-provider-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active small text-nowrap" id="mcp-claude-tab" data-bs-toggle="tab" data-bs-target="#mcp-claude" type="button" role="tab">Claude</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-cursor-tab" data-bs-toggle="tab" data-bs-target="#mcp-cursor" type="button" role="tab">Cursor</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-vscode-tab" data-bs-toggle="tab" data-bs-target="#mcp-vscode" type="button" role="tab">VS Code</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-codex-tab" data-bs-toggle="tab" data-bs-target="#mcp-codex" type="button" role="tab">Codex</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-gemini-tab" data-bs-toggle="tab" data-bs-target="#mcp-gemini" type="button" role="tab">Gemini CLI</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-opencode-tab" data-bs-toggle="tab" data-bs-target="#mcp-opencode" type="button" role="tab">OpenCode</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-windsurf-tab" data-bs-toggle="tab" data-bs-target="#mcp-windsurf" type="button" role="tab">Windsurf</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-zed-tab" data-bs-toggle="tab" data-bs-target="#mcp-zed" type="button" role="tab">Zed</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link small text-nowrap" id="mcp-other-tab" data-bs-toggle="tab" data-bs-target="#mcp-other" type="button" role="tab">Other</button>
+                </li>
+              </ul>
+              <div class="tab-content p-3">
+                <!-- Claude -->
+                <div class="tab-pane fade show active" id="mcp-claude" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Open your terminal and run:
+                      <div class="input-group mt-1 mb-1">
+                        <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-claude" readonly data-mcp-cmd="claude" value="Loading...">
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-claude">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li class="mb-2">This will trigger an OAuth flow to connect Claude to your account.</li>
+                  </ol>
+                  <div class="position-relative my-3">
+                    <hr class="text-muted">
+                    <span class="position-absolute top-50 start-50 translate-middle px-3 text-muted small bg-body-secondary">OR</span>
+                  </div>
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Go to <strong>Claude Desktop &rarr; Settings &rarr; Integrations &rarr; Add</strong>.</li>
+                    <li>Paste the MCP URL above and connect.</li>
+                  </ol>
+                </div>
+                <!-- Cursor -->
+                <div class="tab-pane fade" id="mcp-cursor" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Open Cursor Settings: <kbd>&#8984;</kbd> + <kbd>Shift</kbd> + <kbd>J</kbd></li>
+                    <li class="mb-2">Select <strong>Skills and Integrations</strong>.</li>
+                    <li class="mb-2">Select <strong>New MCP Server</strong> and paste:
+                      <div class="position-relative mt-1">
+                        <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-cursor" data-mcp-cmd="cursor"><code>Loading...</code></pre>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-cursor">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+                <!-- VS Code -->
+                <div class="tab-pane fade" id="mcp-vscode" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2"><kbd>&#8984;</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> and search for <strong>MCP: Add Server</strong>.</li>
+                    <li class="mb-2">Select <strong>HTTP (HTTP or Server-Sent Events)</strong>.</li>
+                    <li class="mb-2">Enter the MCP URL and hit enter.</li>
+                  </ol>
+                  <div class="position-relative my-3">
+                    <hr class="text-muted">
+                    <span class="position-absolute top-50 start-50 translate-middle px-3 text-muted small bg-body-secondary">OR</span>
+                  </div>
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Add to your <code>settings.json</code>:
+                      <div class="position-relative mt-1">
+                        <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-vscode" data-mcp-cmd="vscode"><code>Loading...</code></pre>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-vscode">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li>Save the file and restart VS Code.</li>
+                  </ol>
+                </div>
+                <!-- Codex -->
+                <div class="tab-pane fade" id="mcp-codex" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Open your terminal and run:
+                      <div class="input-group mt-1 mb-1">
+                        <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-codex" readonly data-mcp-cmd="codex" value="Loading...">
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-codex">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li>The MCP server will be available next time you run <code>codex</code>.</li>
+                  </ol>
+                </div>
+                <!-- Gemini CLI -->
+                <div class="tab-pane fade" id="mcp-gemini" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Edit <code>~/.gemini/settings.json</code> and add the HTTP MCP server configuration:
+                      <div class="position-relative mt-1">
+                        <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-gemini" data-mcp-cmd="gemini"><code>Loading...</code></pre>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-gemini">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li class="mb-2">Save the file and restart Gemini CLI.</li>
+                    <li class="mb-2">Authenticate by running:
+                      <div class="input-group mt-1 mb-1">
+                        <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-gemini-auth" readonly data-mcp-cmd="gemini-auth" value="Loading...">
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-gemini-auth">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li>This will open a browser window to complete the OAuth flow.</li>
+                  </ol>
+                </div>
+                <!-- OpenCode -->
+                <div class="tab-pane fade" id="mcp-opencode" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Edit <code>~/.config/opencode/opencode.json</code> and add the remote MCP server configuration:
+                      <div class="position-relative mt-1">
+                        <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-opencode" data-mcp-cmd="opencode"><code>Loading...</code></pre>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-opencode">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li class="mb-2">Save the file and restart OpenCode.</li>
+                    <li class="mb-2">Authenticate by running:
+                      <div class="input-group mt-1 mb-1">
+                        <input type="text" class="form-control form-control-sm font-monospace bg-dark text-light" id="mcp-cmd-opencode-auth" readonly data-mcp-cmd="opencode-auth" value="Loading...">
+                        <button type="button" class="btn btn-outline-adaptive btn-sm" data-copy-target="mcp-cmd-opencode-auth">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li>This will open a browser window to complete the OAuth flow.</li>
+                  </ol>
+                </div>
+                <!-- Windsurf -->
+                <div class="tab-pane fade" id="mcp-windsurf" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2">Open Windsurf Settings.</li>
+                    <li class="mb-2">Under <strong>Cascade</strong>, find <strong>Model Context Protocol Servers</strong>.</li>
+                    <li class="mb-2">Select <strong>Add Server</strong> and paste:
+                      <div class="position-relative mt-1">
+                        <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-windsurf" data-mcp-cmd="windsurf"><code>Loading...</code></pre>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-windsurf">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+                <!-- Zed -->
+                <div class="tab-pane fade" id="mcp-zed" role="tabpanel">
+                  <ol class="small text-muted mb-0">
+                    <li class="mb-2"><kbd>&#8984;</kbd> + <kbd>,</kbd> to open Zed settings.</li>
+                    <li class="mb-2">Add the MCP server configuration:
+                      <div class="position-relative mt-1">
+                        <pre class="bg-dark text-light rounded p-3 small mb-0" id="mcp-cmd-zed" data-mcp-cmd="zed"><code>Loading...</code></pre>
+                        <button type="button" class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2" data-copy-target="mcp-cmd-zed">{% uj_icon "copy" %}</button>
+                      </div>
+                    </li>
+                    <li>Restart Zed to activate the server.</li>
+                  </ol>
+                </div>
+                <!-- Other -->
+                <div class="tab-pane fade" id="mcp-other" role="tabpanel">
+                  <p class="small text-muted mb-2">Use these details to configure any MCP-compatible client:</p>
+                  <table class="table table-sm small mb-0">
+                    <tbody>
+                      <tr>
+                        <td class="text-muted fw-medium w-25">Server URL</td>
+                        <td class="font-monospace" id="mcp-detail-url" data-mcp-detail="url">Loading...</td>
+                      </tr>
+                      <tr>
+                        <td class="text-muted fw-medium">Transport</td>
+                        <td class="font-monospace">Streamable HTTP</td>
+                      </tr>
+                      <tr>
+                        <td class="text-muted fw-medium">Authentication</td>
+                        <td>OAuth 2.1 (automatic)</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Request Section (Hidden by default) -->
+      <section id="data-request-section" class="account-section d-none">
+        <h2 class="h3 mb-4">Request your data</h2>
+
+        <!-- Info card (always shown) -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title text-primary">
+              {% uj_icon "file-export", "fa-lg me-2" %}
+              Data request policy
+            </h5>
+            <p class="card-text small text-muted">
+              Under applicable data protection regulations including the General Data Protection Regulation (GDPR), the California Consumer Privacy Act (CCPA), and other similar legislative frameworks enacted by governmental bodies around the world, you may have the right to request a copy of the personal data we hold about you. This process is commonly referred to as a Subject Access Request (SAR) or a Data Portability Request. It is important that you understand the full scope, limitations, and procedural requirements of this request before proceeding. Please read the following information carefully and in its entirety before submitting a request.
+            </p>
+            <p class="card-text small text-muted">
+              When you submit a data request, our data processing team will begin the process of compiling the personal information associated with your account. This may include, but is not limited to: your name, email address, account creation date, account activity logs, subscription and billing history (including payment processor identifiers and transaction records), geolocation data collected during your use of our services (such as IP address, approximate location derived from IP, continent, country, region, and city), device and browser information (including user agent strings, platform identifiers, and viewport characteristics), API usage statistics and rate limiting data, referral and affiliate information, OAuth2 connection records, and any other data points stored in connection with your account in our systems.
+            </p>
+            <p class="card-text small text-muted">
+              The compilation and verification process is performed by our data processing team to ensure the accuracy, completeness, and security of the information provided to you. Due to the manual verification steps involved in this process and the need to ensure that data is being released to the correct account holder, this process may take up to <strong>14 business days</strong> from the date of your request submission to complete. We appreciate your patience during this time and ask that you do not submit duplicate requests, as this will not expedite the process and may in fact delay it.
+            </p>
+            <p class="card-text small text-muted">
+              Once your data has been compiled, verified, and is ready for retrieval, you will need to <strong>return to this page</strong> to download it. For security purposes, we do not transmit personal data via email, SMS, or any other communication channel, as these methods are not considered sufficiently secure mediums for the transmission of personally identifiable information. The data will be made available exclusively through this authenticated account interface to ensure that only the verified account holder can access it. Your data package will be provided as a JSON file containing all of the aforementioned data categories.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Important notice regarding account deletion:</strong> If you choose to delete your account at any point, all personal data associated with your account will be permanently and irreversibly removed from our systems in accordance with our data retention policy. Once your account has been deleted, we will no longer be able to process any pending data requests, nor will we be able to provide you with a copy of your data retroactively. There is no mechanism to recover data after account deletion. If you are considering both requesting your data and deleting your account, you must complete the data request process in full and download your data package <strong>before</strong> initiating the account deletion process. We strongly recommend downloading and verifying your data before taking any irreversible actions with your account.
+            </p>
+            <p class="card-text small text-muted">
+              You are limited to one active data request at a time. If you have previously submitted a request that is still being processed, you will not be able to submit a new request until the current one has been completed or has expired. Additionally, after a completed data request, there is a 30-day cooldown period before a new request can be submitted. These limitations exist to prevent abuse of the system and to ensure that our data processing team can handle all requests in a timely and thorough manner. Excessive or abusive use of this feature may result in additional restrictions being applied to your account in accordance with our Terms of Service.
+            </p>
+
+            <hr>
+
+            <h6 class="text-muted">Summary of key points:</h6>
+            <ul class="small text-muted">
+              <li>Processing time: up to <strong>14 business days</strong></li>
+              <li>You must return to this page to download your data</li>
+              <li>Data is <strong>not</strong> sent via email for security reasons</li>
+              <li>Data is permanently unavailable after account deletion</li>
+              <li>Only one active request at a time</li>
+              <li>30-day cooldown between completed requests</li>
+              <li>Data is provided as a downloadable JSON file</li>
+            </ul>
+
+            <p id="data-request-form-trigger" class="card-text small text-muted mb-0">
+              If you have read and understood all of the information above and still wish to proceed with your data subject access request, you may proceed to <button type="button" class="accordion-trigger small text-muted text-decoration-underline" data-bs-toggle="collapse" data-bs-target="#data-request-form-accordion" aria-expanded="false" aria-controls="data-request-form-accordion">submit your request &rarr;</button>.
+            </p>
+          </div>
+        </div>
+
+        <!-- Status area (shown when a request exists) -->
+        <div id="data-request-status" class="d-none mb-4">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">
+                {% uj_icon "clock", "fa-lg me-2" %}
+                <span id="data-request-status-title">Request status</span>
+              </h5>
+              <p id="data-request-status-message" class="card-text text-muted"></p>
+              <div id="data-request-download" class="d-none">
+                <form id="data-request-download-form" data-form-state="initializing" onsubmit="return false">
+                  <button type="submit" class="btn btn-primary btn-sm" id="data-request-download-btn">
+                    {% uj_icon "download", "fa-sm me-2" %}
+                    <span class="button-text">Download your data</span>
+                  </button>
+                </form>
+              </div>
+              <div id="data-request-cancel" class="d-none">
+                <form id="data-request-cancel-form" data-form-state="initializing" onsubmit="return false">
+                  <button type="submit" class="btn btn-primary btn-sm" id="data-request-cancel-btn">
+                    {% uj_icon "rotate-left", "fa-sm me-2" %}
+                    <span class="button-text">Request withdrawal</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Request form (hidden when a request is pending) -->
+        <div id="data-request-form-container">
+          <div class="collapse" id="data-request-form-accordion">
+            <div class="card card-form-border border-primary mt-4">
+              <div class="card-body">
+                <h5 class="card-title text-primary">
+                  {% uj_icon "file-export", "fa-lg me-2" %}
+                  Confirm data request
+                </h5>
+
+                <form id="data-request-form" novalidate data-form-state="initializing" onsubmit="return false">
+                  <div class="mb-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="data-request-confirm-checkbox" name="confirm_processing_time" required>
+                      <label class="form-check-label small" for="data-request-confirm-checkbox">
+                        I understand that this request may take up to 14 business days to process and that I must return to this page to download my data. I acknowledge that data will not be sent to me via email or any other channel.
+                      </label>
+                      <div class="invalid-feedback">You must acknowledge this before proceeding.</div>
+                    </div>
+                  </div>
+
+                  <div class="mb-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="data-request-deletion-checkbox" name="confirm_deletion_warning" required>
+                      <label class="form-check-label small" for="data-request-deletion-checkbox">
+                        I understand that if I delete my account before downloading my data, the data will be permanently lost and cannot be recovered under any circumstances.
+                      </label>
+                      <div class="invalid-feedback">You must acknowledge this before proceeding.</div>
+                    </div>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="data-request-reason" class="form-label">Reason for request</label>
+                    <textarea class="form-control" id="data-request-reason" name="reason" rows="3" placeholder="Help us understand why you're requesting your data..."></textarea>
+                  </div>
+
+                  <div class="row g-2">
+                    <div class="col-12 col-md-6 order-md-2">
+                      <button type="submit" class="btn btn-outline-adaptive w-100" id="data-request-submit-btn">
+                        {% uj_icon "file-export", "fa-sm me-2" %}
+                        <span class="button-text">Submit data request</span>
+                      </button>
+                    </div>
+                    <div class="col-12 col-md-6 order-md-1">
+                      <a href="/account" class="btn btn-primary w-100">
+                        {% uj_icon "arrow-left", "fa-sm me-2" %}
+                        <span>Return to profile</span>
+                      </a>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Delete Account Section (Hidden by default) -->
+      <section id="delete-section" class="account-section d-none">
+        <h2 class="h3 mb-4">Delete account</h2>
+
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title text-danger">
+              {% uj_icon "trash", "fa-lg me-2" %}
+              Account deletion policy
+            </h5>
+            <p class="card-text small text-muted">
+              Under applicable data protection regulations including the General Data Protection Regulation (GDPR) and the California Consumer Privacy Act (CCPA), you have the right to request the deletion of the personal data we hold about you. Account deletion is a permanent, irreversible action that cannot be undone under any circumstances. Please read the following important information carefully before proceeding.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Permanent and irreversible:</strong> Once your account is deleted, all personal data associated with your account will be permanently removed from our systems. This includes, but is not limited to, your profile information, subscription and billing history, activity logs, API keys, OAuth2 connections, referral data, saved preferences, and all other stored information. There is no mechanism to recover any data after deletion. Our support team cannot restore deleted accounts or retrieve any associated data, regardless of the circumstances.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Active subscriptions:</strong> You must cancel any active paid subscriptions before deleting your account. Accounts with active or suspended paid subscriptions cannot be deleted until the subscription is cancelled or expires. If you have a subscription that is currently in a billing cycle, you will need to wait for the cycle to complete or cancel the subscription first. No refunds will be issued for unused portions of cancelled subscriptions in connection with account deletion. <strong>Deleting your account permanently forfeits your right to request a refund</strong>, as all payment records and subscription history will be irreversibly removed from our systems and we will no longer be able to verify or process any refund requests. If you wish to request a refund, you must do so <strong>before</strong> deleting your account.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Pending data requests:</strong> If you have a pending data request (Subject Access Request), it will be permanently cancelled upon account deletion. We will not be able to fulfill data requests after your account has been deleted. If you wish to obtain a copy of your data, you must complete the data request and download process <strong>before</strong> initiating account deletion. You can request a copy of your data from the <a href="#data-request">data request section</a>.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Immediate effect:</strong> Account deletion takes effect immediately upon confirmation. You will be signed out of all active sessions across all devices and platforms, and will no longer be able to access any services, features, content, or data associated with your account. Any active API integrations or third-party connections will cease to function immediately.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Third-party services:</strong> While we will remove your data from our systems, we cannot guarantee the removal of data that has already been shared with or collected by third-party services you may have used in connection with your account. This includes, but is not limited to, analytics providers, payment processors, authentication providers, and any external services you authorized. Please refer to the privacy policies of those services for information about their data retention and deletion practices.
+            </p>
+
+            <hr>
+
+            <h6 class="text-muted">Summary of consequences:</h6>
+            <ul class="small text-muted">
+              <li>All personal information, account data, and stored content will be permanently erased</li>
+              <li>Your subscription and complete billing history will be permanently removed</li>
+              <li>All API keys, OAuth2 connections, and integrations will be revoked</li>
+              <li>Access to all services, features, and platforms will be terminated immediately</li>
+              <li>Any pending data requests will be cancelled and cannot be fulfilled</li>
+              <li>Your right to request a refund will be permanently forfeited</li>
+              <li>This action cannot be reversed, appealed, or undone by our support team</li>
+            </ul>
+
+            <p class="card-text small text-muted mb-0">
+              If you have read and understood all of the information above and still wish to proceed with deleting your account, you may proceed to <button type="button" class="accordion-trigger small text-muted text-decoration-underline" data-bs-toggle="collapse" data-bs-target="#delete-form-accordion" aria-expanded="false" aria-controls="delete-form-accordion">confirm account deletion &rarr;</button>.
+            </p>
+          </div>
+        </div>
+
+        <div class="collapse" id="delete-form-accordion">
+          <div class="card card-form-border border-danger mt-4">
+            <div class="card-body">
+              <h5 class="card-title text-danger">
+                {% uj_icon "trash", "fa-lg me-2" %}
+                Confirm account deletion
+              </h5>
+
+              <form id="delete-account-form" novalidate data-form-state="initializing" onsubmit="return false">
+                <div class="mb-3">
+                  <label for="delete-reason" class="form-label">Reason for leaving</label>
+                  <textarea class="form-control" id="delete-reason" name="reason" rows="3" placeholder="Help us improve by sharing why you're leaving..."></textarea>
+                </div>
+
+                <div class="mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="delete-confirm-checkbox" name="confirm_deletion" required>
+                    <label class="form-check-label" for="delete-confirm-checkbox">
+                      I understand that deleting my account is permanent and cannot be reversed. All my data, including personal information, subscription history, API keys, and stored content, will be permanently and irreversibly erased.
+                    </label>
+                    <div class="invalid-feedback">You must acknowledge this before proceeding.</div>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="delete-data-request-checkbox" name="confirm_data_loss" required>
+                    <label class="form-check-label" for="delete-data-request-checkbox">
+                      I acknowledge that any pending data requests will be cancelled and I will not be able to request or download a copy of my data after my account is deleted.
+                    </label>
+                    <div class="invalid-feedback">You must acknowledge this before proceeding.</div>
+                  </div>
+                </div>
+
+                <div class="row g-2">
+                  <div class="col-12 col-md-6 order-md-2">
+                    <button type="submit" class="btn btn-outline-adaptive w-100" id="delete-account-btn">
+                      {% uj_icon "trash", "fa-sm me-2" %}
+                      <span class="button-text">Delete my account permanently</span>
+                    </button>
+                  </div>
+                  <div class="col-12 col-md-6 order-md-1">
+                    <a href="/account" class="btn btn-danger w-100" id="cancel-delete-btn">
+                      {% uj_icon "arrow-left", "fa-sm me-2" %}
+                      <span>Return to profile</span>
+                    </a>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Refund Section (Hidden by default) -->
+      <section id="refund-section" class="account-section d-none">
+        <h2 class="h3 mb-4">Request a refund</h2>
+
+        <!-- Refund policy info card -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title text-primary">
+              {% uj_icon "rotate-left", "fa-lg me-2" %}
+              Refund policy
+            </h5>
+            <p class="card-text small text-muted">
+              We understand that circumstances may change after making a purchase, and we want to ensure that our refund process is as transparent and fair as possible. Before submitting a refund request, please carefully read the following information in its entirety. By proceeding with a refund request, you acknowledge that you have read, understood, and agree to the terms and conditions outlined below. Our refund policy is governed by and subject to our <a href="/legal/terms" target="_blank">Terms of Service</a> and <a href="/legal/privacy" target="_blank">Privacy Policy</a>.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Eligibility requirements:</strong> To be eligible for a refund, your subscription must first be cancelled or have a pending cancellation. Refunds cannot be issued for active subscriptions that have not been cancelled. If you have not yet cancelled your subscription, you must do so before initiating a refund request. You can cancel your subscription from the <a href="#billing">billing section</a> of your account. We require cancellation prior to refund processing to ensure that the subscription lifecycle is properly terminated and that no further charges are incurred during the refund processing window.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Refund amount calculation:</strong> The amount of your refund is determined by how recently your most recent payment was processed. If your refund request is submitted within <strong>7 days</strong> of your last payment, you will receive a full refund of the entire payment amount. If your refund request is submitted after 7 days from the date of your last payment, you will receive a prorated refund calculated based on the remaining unused portion of your current billing period. The prorated amount is calculated proportionally based on the number of days remaining in your billing cycle relative to the total number of days in the cycle. <strong>Payments older than 6 months are not eligible for refunds under any circumstances.</strong> If your most recent payment was processed more than 6 months ago, your refund request will be automatically denied and cannot be overridden by our support team. All refund calculations are performed automatically by our payment processing system and are final.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Processing and timeline:</strong> Refunds are processed through your original payment method, which is the same payment instrument (credit card, debit card, or other payment method) that was used to make the original purchase. Once a refund has been approved and initiated on our end, the actual processing time depends on your financial institution and payment provider. In most cases, refunds will appear on your statement within <strong>5&ndash;10 business days</strong>, although some financial institutions may take longer. We have no control over the processing timelines of your bank or payment provider. If your refund has not appeared after 10 business days, we recommend contacting your financial institution directly for further information.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Immediate subscription cancellation:</strong> Upon successful processing of your refund, your subscription will be <strong>immediately and permanently cancelled</strong>. This means that you will instantly lose access to all premium features, content, elevated rate limits, priority support, and any other benefits associated with your paid subscription plan. Your account will be reverted to the free plan with its corresponding limitations. This action takes effect immediately upon refund approval and cannot be reversed, deferred, or scheduled for a later date.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>One refund per subscription period:</strong> Only one refund may be issued per subscription billing period. If you have already received a refund for the current billing period, you will not be eligible for an additional refund until a new billing period begins with a new payment. Additionally, refunds are only applicable to the most recent payment on your account. Payments from previous billing cycles are not eligible for refund through this self-service process.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Account deletion and refunds:</strong> If you choose to delete your account, all personal data associated with your account will be permanently and irreversibly removed from our systems, including all payment and subscription records. Once your account has been deleted, we will no longer be able to look up your payment information, verify previous transactions, or process any refund requests. <strong>Account deletion permanently forfeits your right to request a refund</strong>, as we will have no means to verify or process such a request. If you are considering both requesting a refund and deleting your account, you must complete the refund process in full <strong>before</strong> initiating account deletion. For more information about account deletion, please visit the <a href="#delete">account deletion section</a>.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Fraud and abuse prevention:</strong> We reserve the right to deny refund requests that we determine, in our sole discretion, to be fraudulent, abusive, or inconsistent with normal usage patterns. This includes, but is not limited to, repeated subscription and refund cycles, chargebacks filed in conjunction with refund requests, and any other activity that violates our <a href="/legal/terms" target="_blank">Terms of Service</a>. Abuse of the refund system may result in suspension or termination of your account.
+            </p>
+            <p class="card-text small text-muted">
+              <strong>Contact and support:</strong> If you have questions about this refund policy, need assistance with your refund request, or believe there has been an error in your refund calculation, please contact our support team through our <a href="/contact" target="_blank">contact page</a> before submitting a refund request. Our support team can help clarify your eligibility, explain the expected refund amount, and address any other concerns you may have. Please note that our support team is unable to override the automated refund calculation system or issue refunds outside the parameters of this policy.
+            </p>
+
+            <hr>
+
+            <h6 class="text-muted">Summary of key points:</h6>
+            <ul class="small text-muted">
+              <li>Your subscription must be cancelled or pending cancellation before requesting a refund</li>
+              <li>Full refund if requested within <strong>7 days</strong> of your last payment</li>
+              <li>Prorated refund based on remaining billing period if requested after 7 days</li>
+              <li><strong>Payments older than 6 months are not eligible</strong> for refunds under any circumstances</li>
+              <li>Refunds are processed to your original payment method within <strong>5&ndash;10 business days</strong></li>
+              <li>Your subscription will be <strong>immediately cancelled</strong> upon refund</li>
+              <li>Account deletion permanently forfeits your right to a refund</li>
+              <li>Only one refund per billing period; only the most recent payment is eligible</li>
+            </ul>
+
+            <!-- Ineligible message (shown when not eligible) -->
+            <div id="refund-ineligible" class="d-none">
+              <hr>
+              <div class="d-flex align-items-start text-warning">
+                <span class="me-2 flex-shrink-0">{% uj_icon "triangle-exclamation", "fa-md" %}</span>
+                <div>
+                  <strong>Not eligible for refund</strong>
+                  <p class="mb-0 small text-muted">To request a refund, you must first cancel your subscription. Refunds are only available for cancelled or pending-cancellation subscriptions. You can cancel your subscription from the <a href="#billing">billing section</a> of your account.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Eligible: show refund form trigger -->
+            <div id="refund-eligible" class="d-none">
+              <p class="card-text small text-muted mb-0">
+                If you have read and understood all of the information above and still wish to proceed with requesting a refund, you may proceed to <button type="button" class="accordion-trigger small text-muted text-decoration-underline" data-bs-toggle="collapse" data-bs-target="#refund-form-accordion" aria-expanded="false" aria-controls="refund-form-accordion">submit your refund request &rarr;</button>.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="collapse" id="refund-form-accordion">
+          <div class="card card-form-border border-primary mt-4">
+            <div class="card-body">
+              <h5 class="card-title text-primary">
+                {% uj_icon "rotate-left", "fa-lg me-2" %}
+                Confirm refund request
+              </h5>
+
+              <form id="refund-form" novalidate data-form-state="initializing" onsubmit="return false">
+                <!-- Refund reasons (randomized by JS) -->
+                <div class="mb-3">
+                  <label class="form-label">Why are you requesting a refund? <span class="text-danger">*</span></label>
+                  <div id="refund-reasons-container">
+                    <!-- Radio buttons injected by JS in random order -->
+                  </div>
+                </div>
+
+                <!-- Additional feedback -->
+                <div class="mb-3">
+                  <label for="refund-feedback" class="form-label">Anything else you'd like us to know? <span class="text-danger">*</span></label>
+                  <textarea class="form-control" id="refund-feedback" name="feedback" rows="3" placeholder="Help us understand what we could do better..." required></textarea>
+                  <div class="invalid-feedback">Please provide feedback before requesting a refund.</div>
+                </div>
+
+                <!-- Required confirmation -->
+                <div class="mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="refund-confirm-checkbox" name="confirm_refund" required>
+                    <label class="form-check-label" for="refund-confirm-checkbox">
+                      I understand that my subscription will be immediately cancelled and I will lose access to premium features. The refund amount will be determined by my refund eligibility and may be prorated.
+                    </label>
+                    <div class="invalid-feedback">You must confirm before requesting a refund.</div>
+                  </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="row g-2">
+                  <div class="col-12 col-md-6 order-md-2">
+                    <button type="submit" class="btn btn-outline-adaptive w-100" id="refund-submit-btn">
+                      {% uj_icon "rotate-left", "fa-sm me-2" %}
+                      <span class="button-text">Request refund</span>
+                  </button>
+                </div>
+                <div class="col-12 col-md-6 order-md-1">
+                  <a href="#billing" class="btn btn-primary w-100">
+                    {% uj_icon "arrow-left", "fa-sm me-2" %}
+                    <span>Return to billing</span>
+                  </a>
+                </div>
+              </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      </div>
+    </div>
+  </div>
+</div>

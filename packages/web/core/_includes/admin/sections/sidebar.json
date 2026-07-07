@@ -1,0 +1,66 @@
+{
+  logo: {
+    href: '/',
+    class: 'filter-adaptive',
+  },
+  links: [
+    {
+      label: 'Dashboard',
+      href: '/admin/dashboard',
+      icon: 'gauge-high'
+    },
+    {
+      header: true,
+      label: 'Manage'
+    },
+    {
+      label: 'Users',
+      href: null,
+      icon: 'users',
+      dropdown: [
+        {
+          label: 'All users',
+          href: '/admin/users',
+          icon: 'list'
+        },
+        {
+          label: 'Create new',
+          href: '/admin/users/new',
+          icon: 'plus'
+        }
+      ]
+    },
+    {
+      label: 'Firebase Explorer',
+      href: '/admin/firebase',
+      icon: 'fire'
+    },
+    {
+      header: true,
+      label: 'Marketing'
+    },
+    {
+      label: 'Calendar',
+      href: '/admin/calendar',
+      icon: 'calendar-days'
+    },
+    {
+      header: true,
+      label: 'Content'
+    },
+    {
+      label: 'Animation Studio',
+      href: '/admin/studio',
+      icon: 'clapperboard',
+    },
+    {
+      header: true,
+      label: 'External tools'
+    },
+    {
+      label: 'Stackblitz',
+      href: '/admin/stackblitz',
+      icon: 'bolt',
+    },
+  ]
+}

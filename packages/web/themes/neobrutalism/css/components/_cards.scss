@@ -1,0 +1,69 @@
+// Neobrutalism Theme — Cards
+// Cards are the canonical "box": surface + hard ink border + offset shadow.
+// Restyles Bootstrap .card so feature grids, pricing tables, blog cards, and
+// the account UI all pick it up automatically.
+
+.card {
+  background: var(--nb-surface);
+  border-radius: 0;
+  @include nb-border();
+  @include nb-shadow(md);
+
+  .card-header {
+    background: transparent;
+    border-bottom: $nb-border-width solid var(--nb-border-color);
+    font-family: $nb-font-display;
+    font-weight: 800;
+    padding: 1.1rem 1.35rem;
+  }
+
+  .card-body {
+    padding: 1.35rem;
+  }
+
+  .card-footer {
+    background: transparent;
+    border-top: $nb-border-width solid var(--nb-border-color);
+    padding: 1rem 1.35rem;
+  }
+
+  // Card images sit flush against the top border
+  .card-img-top {
+    border-radius: 0;
+    border-bottom: $nb-border-width solid var(--nb-border-color);
+  }
+}
+
+// Clickable cards press like buttons
+a.card,
+.card.nb-pressable {
+  @include nb-press();
+  text-decoration: none;
+}
+
+// Emphasis card — thicker frame + bigger shadow (use for "featured"/popular tiers)
+.card.nb-card-feature {
+  @include nb-border($nb-border-width-lg);
+  @include nb-shadow(lg);
+}
+
+// Accent-headed card: colored header strip
+@each $name, $color in (
+  blue: $nb-accent-blue,
+  pink: $nb-accent-pink,
+  yellow: $nb-accent-yellow,
+  green: $nb-accent-green,
+  purple: $nb-accent-purple,
+  orange: $nb-accent-orange,
+) {
+  .card.nb-card-#{$name} > .card-header {
+    background: var(--nb-accent-#{$name});
+    color: #111111;
+  }
+}
+
+// List groups inside cards keep hard dividers
+.list-group-item {
+  border-radius: 0;
+  border-color: var(--nb-border-color);
+}

@@ -1,0 +1,17 @@
+---
+### ALL PAGES ###
+layout: frontend/pages/contact
+
+### REGULAR PAGES ###
+meta:
+  title: "Contact - {{ site.brand.name }}"
+  description: "Contact {{ site.brand.name }} if you need assistance with anything."
+  breadcrumb: "Contact"
+
+### SCHEMA ###
+schema:
+  faq_page:
+    enabled: true
+---
+
+{{ content | uj_content_format }}

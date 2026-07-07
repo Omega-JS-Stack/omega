@@ -1,0 +1,138 @@
+// Newsflash Theme Configuration
+// ALL customizable variables are defined here with !default.
+// Consuming projects override any of these BEFORE the theme is imported.
+//
+// Design language: warm paper surfaces; ink text + hairline ink frames;
+// vermilion accents with volt highlights; serif display type over a clean
+// grotesk; pill controls sitting on small hard offset shadows that "lift"
+// on hover. An editorial newsroom — modern front page, not a brochure.
+
+// ============================================
+// Bootstrap Color Overrides
+// ============================================
+// Editorial ink-and-accent palette mapped onto Bootstrap's semantic colors.
+$primary:    #F03612 !default;   // vermilion — the signature accent
+$secondary:  #5C544A !default;   // ink-soft — muted secondary actions
+$success:    #2E7D4F !default;   // editorial green
+$info:       #2742F5 !default;   // electric blue
+$warning:    #D9F24E !default;   // volt — highlighter yellow-green
+$danger:     #C81E1E !default;   // deep red (distinct from vermilion)
+$light:      #F7F2E7 !default;   // paper
+$dark:       #171310 !default;   // ink
+
+// ============================================
+// Paper & Ink (the structural neutrals)
+// ============================================
+// "Paper" = the page surface. "Ink" = text, frames, and hard shadows.
+$nf-paper:          #F7F2E7 !default;   // body background (light mode)
+$nf-paper-2:        #EFE8D8 !default;   // wells / alt surfaces (light mode)
+$nf-ink:            #171310 !default;   // text + frames (light mode)
+$nf-ink-soft:       #5C544A !default;   // deks, metas, muted text (light mode)
+
+// Dark mode counterparts — deep warm near-black paper, cream ink.
+$nf-paper-dark:     #181210 !default;
+$nf-paper-2-dark:   #221A14 !default;
+$nf-ink-dark:       #F2E8D9 !default;
+$nf-ink-soft-dark:  #A8998A !default;
+
+// ============================================
+// Accent Palette
+// ============================================
+$nf-vermilion:           #F03612 !default;
+$nf-vermilion-dark-mode: #FF4A26 !default;  // brightened for contrast on dark paper
+$nf-blue:                #2742F5 !default;
+$nf-blue-dark-mode:      #5B72FF !default;
+$nf-volt:                #D9F24E !default;  // stays vibrant in both modes
+$nf-volt-ink:            #171310 !default;  // readable text on volt
+
+// Ink panels (footer, ticker, big-read band) — dark slabs in BOTH modes.
+$nf-panel-bg:         #171310 !default;
+$nf-panel-color:      #F7F2E7 !default;
+$nf-panel-bg-dark:    #0E0B09 !default;     // deeper than dark paper so it still reads as a slab
+$nf-panel-color-dark: #F2E8D9 !default;
+
+// ============================================
+// Borders — hairline ink frames
+// ============================================
+$nf-border-width: 1.5px !default;
+$nf-radius:       18px !default;   // frames, cards, panels
+$nf-radius-sm:    12px !default;   // small frames, inputs
+
+// ============================================
+// Shadows — small hard offsets (controls) + soft pop (frames)
+// ============================================
+// Controls rest on a 3px hard ink shadow and LIFT on hover (shadow grows to
+// 6px while the element translates up-left). Frames use a soft "pop" blur.
+$nf-shadow-offset:       3px !default;
+$nf-shadow-offset-hover: 6px !default;
+$nf-shadow-pop: 0 18px 40px -18px rgba(23, 19, 16, .35) !default;
+
+// ============================================
+// Typography
+// ============================================
+// Fraunces (optical-sized serif) for display; Schibsted Grotesk for body/UI.
+$font-family-sans-serif: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !default;
+$nf-font-display: 'Fraunces', Georgia, 'Times New Roman', serif !default;
+
+$headings-font-weight: 600 !default;
+$nf-heading-letter-spacing: -0.02em !default;
+$font-weight-bold: 700 !default;
+
+// ============================================
+// Motion — smooth editorial easing
+// ============================================
+$nf-transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1) !default;
+
+// ============================================
+// Component Sizing
+// ============================================
+// Avatar sizes map (matches Classy so shared layouts/includes render correctly)
+$avatar-sizes: (
+  null: 3rem,
+  2xs: 0.5rem,
+  xs: 1.5rem,
+  sm: 2rem,
+  md: 2.5rem,
+  lg: 3.5rem,
+  xl: 5rem,
+  2xl: 7.5rem,
+  3xl: 10rem,
+  4xl: 12.5rem,
+  5xl: 15rem
+) !default;
+
+// ============================================
+// Forward Bootstrap with our configuration
+// ============================================
+@forward '../bootstrap/scss/bootstrap.scss' with (
+  $primary: $primary,
+  $secondary: $secondary,
+  $success: $success,
+  $info: $info,
+  $warning: $warning,
+  $danger: $danger,
+  $light: $light,
+  $dark: $dark,
+  $font-family-sans-serif: $font-family-sans-serif,
+  $headings-font-family: $nf-font-display,
+  $headings-font-weight: $headings-font-weight,
+  $font-weight-bold: $font-weight-bold,
+  // Type metrics MUST live in Bootstrap vars (not element rules in the main
+  // bundle): page bundles re-emit Bootstrap AFTER main, so Bootstrap's own
+  // .display-*/.lead/body rules would win there with the stock 300 weights.
+  $headings-line-height: 1.1,
+  $display-font-family: $nf-font-display,
+  $display-font-weight: 550,
+  $display-line-height: 1.04,
+  $lead-font-weight: 400,
+  $line-height-base: 1.55,
+  // Hairline ink borders everywhere; editorial radii (controls go pill in
+  // component SCSS — cards/frames keep these).
+  $border-width: $nf-border-width,
+  $border-radius: $nf-radius-sm,
+  $border-radius-sm: 8px,
+  $border-radius-lg: $nf-radius,
+  $border-radius-xl: 24px,
+  $enable-shadows: false,
+  $enable-negative-margins: true
+);

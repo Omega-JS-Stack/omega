@@ -1,0 +1,23 @@
+// <Theme Name> — Components
+// Restyle Bootstrap's own classes here so all inherited markup (nav, hero,
+// cards, forms, buttons) picks up your look with NO HTML changes. Add files
+// like _buttons.scss / _cards.scss as your theme grows and @import them in
+// _theme.scss. This starter keeps everything in one file to stay minimal.
+
+// Example: give buttons your theme's personality
+.btn {
+  font-weight: 600;
+  // ...your button styling...
+}
+
+// Example: cards
+.card {
+  background: var(--bs-secondary-bg);
+  // ...your card styling...
+}
+
+// Example: a theme-namespaced helper for your own page layouts
+.theme-box {
+  background: var(--bs-secondary-bg);
+  padding: 1.5rem;
+}

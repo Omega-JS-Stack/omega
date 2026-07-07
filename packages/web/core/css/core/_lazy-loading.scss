@@ -1,0 +1,95 @@
+// Core Lazy Loading Styles
+// Progressive image loading with shimmer effects
+
+// ============================================
+// Base Image Configuration
+// ============================================
+
+// Prevent layout shift for lazy images
+img[data-lazy] {
+  display: block; // Prevents inline gap
+  width: 100%; // Maintain width
+  height: auto; // Maintain aspect ratio
+}
+
+// Hide elements with pending animation classes to prevent flash
+// (visible → disappear → fade-in) when IntersectionObserver fires
+[data-lazy*="animation-"] {
+  opacity: 0;
+}
+
+// Hide video/audio elements until loaded to prevent ugly native controls showing during shimmer
+[data-lazy-load-container].lazy-loading video,
+[data-lazy-load-container].lazy-loading audio {
+  opacity: 0;
+}
+
+// Show video/audio elements once loaded with fade-in
+[data-lazy-load-container].lazy-loaded video,
+[data-lazy-load-container].lazy-loaded audio {
+  opacity: 1;
+  transition: opacity 0.25s ease-in;
+}
+
+// ============================================
+// Loading States
+// ============================================
+
+// Loading state with shimmer animation using CSS variables
+.lazy-loading {
+  --lazy-color-1: rgba(0, 0, 0, 0.03);
+  --lazy-color-2: rgba(0, 0, 0, 0.06);
+  --lazy-color-3: rgba(0, 0, 0, 0.03);
+
+  background: linear-gradient(
+    90deg,
+    var(--lazy-color-1) 25%,
+    var(--lazy-color-2) 50%,
+    var(--lazy-color-3) 75%
+  );
+  background-size: 200% 100%;
+  animation: lazy-shimmer 1.5s infinite;
+  min-height: 100px; // Default minimum height for loading state
+}
+
+// Dark theme overrides
+[data-bs-theme="dark"] .lazy-loading {
+  --lazy-color-1: rgba(255, 255, 255, 0.03);
+  --lazy-color-2: rgba(255, 255, 255, 0.08);
+  --lazy-color-3: rgba(255, 255, 255, 0.03);
+}
+
+// ============================================
+// Loaded State
+// ============================================
+
+// Loaded state with fade in
+// Ensure no fade-in if .lazy-loaded-no-fade is present (which is added when ANIMATION CLASSES are used in the lazy load)
+.lazy-loaded:not(.lazy-loaded-no-fade) {
+  animation: lazy-fadein 0.25s ease-in;
+}
+
+
+// ============================================
+// Animations
+// ============================================
+
+// Shimmer animation
+@keyframes lazy-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+// Fade in animation
+@keyframes lazy-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

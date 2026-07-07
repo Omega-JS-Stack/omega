@@ -1,0 +1,116 @@
+// Core Utility Styles
+// Common utility classes and helpers
+
+// ============================================
+// Display Utilities
+// ============================================
+
+// Properly hide things
+.hidden, [hidden] {
+  display: none !important;
+}
+
+// Interaction guard: block clicks on disabled elements while allowing cursor feedback
+.disabled,
+[disabled],
+:disabled,
+[aria-disabled="true"],
+[data-page-loading] button.btn,
+[data-page-loading] .btn-action,
+form[data-form-state]:not([data-form-state="ready"]) [type="submit"] {
+  cursor: not-allowed !important;
+  pointer-events: all !important;
+
+  // Children get pointer-events:none so click events bubble to the guarded parent
+  * {
+    pointer-events: none !important;
+  }
+}
+
+// Visual guard: match Bootstrap's native :disabled appearance before JS sets the attribute
+[data-page-loading] button.btn,
+[data-page-loading] .btn-action,
+form[data-form-state]:not([data-form-state="ready"]) [type="submit"] {
+  opacity: var(--bs-btn-disabled-opacity);
+  color: var(--bs-btn-disabled-color);
+  background-color: var(--bs-btn-disabled-bg);
+  border-color: var(--bs-btn-disabled-border-color);
+}
+
+// Prevent pointer events on all children inside buttons and links
+// This helps fix event bubbling issues for click listeners
+button *, a * {
+  pointer-events: none !important;
+}
+
+// ============================================
+// Filter Utilities
+// ============================================
+
+// Filter white
+.filter-white {
+  filter: brightness(0) invert(1);
+}
+
+// Filter black
+.filter-black {
+  filter: brightness(0);
+}
+
+// ============================================
+// Adaptive Theming
+// ============================================
+.filter-adaptive {
+  @extend .filter-black;
+}
+
+[data-bs-theme="dark"] .filter-adaptive {
+  @extend .filter-white;
+}
+
+// .filter-adaptive-inverse {
+//   @extend .filter-white;
+// }
+
+// [data-bs-theme="dark"] .filter-adaptive-inverse {
+//   @extend .filter-black;
+// }
+
+// ============================================
+// Opacity Utilities
+// ============================================
+@for $i from 0 through 10 {
+  .opacity-#{$i * 10} {
+    opacity: $i * 0.1 !important;
+  }
+}
+
+// ============================================
+// Sidebar
+// ============================================
+// Inner content area MUST be > 250px to fit a 250px-wide Google AdSense unit.
+// Math: 250px content + 2 × 16px (p-3 horizontal padding) + 1px safety = 283px outer.
+.sidebar {
+  width: 283px;
+  min-width: 283px;
+}
+
+// Mobile offcanvas sidebar — override Bootstrap's default 400px.
+// Same math as above: 283px outer → ~251px inner content after p-3 padding.
+#mobileSidebar {
+  --bs-offcanvas-width: 283px;
+}
+
+.sidebar-logo {
+  min-height: 57px;
+
+  a {
+    overflow: hidden;
+  }
+
+  span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

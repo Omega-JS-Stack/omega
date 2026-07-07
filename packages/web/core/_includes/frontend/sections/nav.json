@@ -1,0 +1,70 @@
+{
+  logo: {
+    href: '/',
+    class: 'filter-adaptive',
+    text: '{{ site.brand.name }}',
+  },
+  links: [
+    {
+      label: 'Pricing',
+      href: '/pricing'
+    },
+    {
+      label: 'About',
+      href: '/about'
+    },
+    {
+      label: 'Contact',
+      href: '/contact'
+    },
+    {
+      label: 'Explore',
+      href: null,
+      dropdown: [
+        {
+          label: 'Blog',
+          href: '/blog',
+          icon: 'newspaper'
+        },
+        {
+          label: 'Team',
+          href: '/team',
+          icon: 'users'
+        },
+        {
+          label: 'Careers',
+          href: '/careers',
+          icon: 'briefcase'
+        },
+      ]
+    },
+  ],
+  actions: [
+    {
+      label: 'Sign up',
+      href: '/signup',
+      class: 'btn-adaptive',
+      icon: 'user-plus',
+      attributes: [
+        ['data-wm-bind', '@show !auth.user']
+      ]
+    },
+    // {
+    //   label: 'Premium',
+    //   href: '/pricing',
+    //   class: 'btn-adaptive',
+    //   icon: 'crown',
+    //   attributes: [
+    //     ['data-wm-bind', '@show auth.account.subscription.product.id === basic'],
+    //     ['hidden', '']
+    //   ]
+    // },
+    {
+      type: 'account',
+      attributes: [
+        ['data-wm-bind', '@show auth.user'],
+        ['hidden', '']
+      ],
+    }
+  ]
+}

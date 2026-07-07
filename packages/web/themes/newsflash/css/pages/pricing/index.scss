@@ -1,0 +1,194 @@
+// Newsflash Theme — Pricing page-specific CSS
+// The "subscription desk" treatment for
+// (_layouts/themes/newsflash/frontend/pages/pricing.html): pill billing
+// toggle, framed plan cards with the vermilion "Editor's pick", and the
+// enterprise strip. Compiles standalone — theme tokens + mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// ============================================
+// Billing toggle — pill segmented control
+// ============================================
+.billing-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  width: fit-content;
+  margin: 0 auto 1.25rem;
+  padding: 0.35rem;
+  border: var(--nf-border);
+  border-radius: 50rem;
+  background: var(--bs-card-bg);
+
+  .billing-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5rem 1.25rem;
+    border-radius: 50rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: $nf-transition;
+
+    &:hover {
+      background: var(--nf-paper-2);
+    }
+  }
+
+  .btn-check:checked + .billing-option {
+    background: var(--nf-ink);
+    color: var(--nf-paper);
+  }
+
+  .billing-save {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.3em 0.7em;
+    border-radius: 50rem;
+    background: var(--nf-volt);
+    color: var(--nf-volt-ink);
+  }
+}
+
+// ============================================
+// Plan grid + cards
+// ============================================
+.pricing-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  margin-bottom: 2rem;
+
+  @media (max-width: 1199.98px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 767.98px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricing-plan {
+  position: relative;
+  padding: 1.75rem;
+
+  &--popular {
+    border-color: var(--bs-primary);
+    border-width: 2.5px;
+    box-shadow: var(--nf-shadow-hard-hover);
+  }
+}
+
+.pricing-plan-flag {
+  position: absolute;
+  top: -0.85rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  white-space: nowrap;
+}
+
+.pricing-plan-name {
+  font-size: 1.4rem;
+  margin-bottom: 0.1rem;
+}
+
+.pricing-plan-tagline {
+  margin-bottom: 1.25rem;
+}
+
+.pricing-plan-price {
+  font-family: $nf-font-display;
+  margin-bottom: 0.25rem;
+
+  .pricing-plan-currency {
+    font-size: 1.4rem;
+    font-weight: 600;
+    vertical-align: super;
+  }
+
+  .pricing-plan-amount {
+    font-size: 3rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .pricing-plan-per {
+    font-family: $font-family-sans-serif;
+    font-size: 0.95rem;
+    color: var(--bs-secondary-color);
+  }
+}
+
+.pricing-plan-ppu {
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+  min-height: 1.3em;
+  margin-bottom: 1.25rem;
+
+  .price-per-unit {
+    font-weight: 700;
+    color: var(--bs-primary);
+  }
+}
+
+.pricing-plan-billing,
+.pricing-plan-guarantee {
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+
+.pricing-plan-rule {
+  margin: 1.25rem 0;
+}
+
+.pricing-plan-inherit {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.75rem;
+}
+
+.pricing-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+
+  li {
+    display: flex;
+    gap: 0.6em;
+    align-items: baseline;
+    padding: 0.3rem 0;
+    font-size: 0.92rem;
+  }
+
+  .pricing-plan-feature-icon {
+    color: var(--bs-primary);
+    flex: none;
+  }
+}
+
+// ============================================
+// Enterprise strip
+// ============================================
+.enterprise-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.75rem;
+
+  @media (max-width: 767.98px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

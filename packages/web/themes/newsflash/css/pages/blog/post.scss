@@ -1,0 +1,164 @@
+// Newsflash Theme — Blog post page-specific CSS
+// The editorial article treatment for
+// (_layouts/themes/newsflash/frontend/pages/blog/post.html): reading-progress
+// bar, drop cap, serif crossheads with the vermilion dash, framed in-content
+// images, and the centered pullquote. NOTE: flat file shape — the post layout
+// sets `asset_path: blog/post`, so this compiles to pages/blog/post.<id>.bundle.css.
+// Compiles standalone, so it pulls in the theme tokens + mixins via loadPaths.
+@use 'config' as *;
+@import 'css/base/mixins';
+
+// ============================================
+// Reading progress — fixed vermilion rule across the very top
+// ============================================
+// Sits above the sticky masthead (z-index 1030); driven by pages/blog/post.js.
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 1040;
+  pointer-events: none;
+  background: transparent;
+
+  span {
+    display: block;
+    height: 100%;
+    background: var(--bs-primary);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+}
+
+// ============================================
+// Article hero — wide cinematic frame
+// ============================================
+.article-hero {
+  aspect-ratio: 21 / 10;
+
+  img {
+    height: 100%;
+    // Lift the framework's generic .blog-post-image cap (max-height: 480px in
+    // the main bundle) — the 21/10 frame is the size authority here, and the
+    // cap leaves a blank strip inside the frame on wide viewports.
+    max-height: none;
+  }
+}
+
+// ============================================
+// Article body — the editorial reading column
+// ============================================
+.blog-post-content {
+  font-size: 1.13rem;
+  line-height: 1.78;
+
+  p {
+    margin-bottom: 1.5em;
+  }
+
+  // Drop cap on the opening paragraph
+  > p:first-of-type::first-letter {
+    font-family: $nf-font-display;
+    font-weight: 600;
+    font-size: 4.2rem;
+    line-height: 0.82;
+    color: var(--bs-primary);
+    float: left;
+    padding: 8px 12px 0 0;
+  }
+
+  // Serif crossheads with the vermilion dash
+  h2, h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 1.7rem;
+    letter-spacing: -0.014em;
+    line-height: 1.25;
+    margin: 2em 0 0.8em;
+
+    &::before {
+      content: "";
+      width: 0.55em;
+      height: 0.18em;
+      background: var(--bs-primary);
+      border-radius: 50rem;
+      flex: none;
+    }
+  }
+
+  h3 {
+    font-size: 1.35rem;
+  }
+
+  // In-content images get the editorial frame
+  img {
+    border: var(--nf-border);
+    border-radius: $nf-radius;
+  }
+
+  figcaption {
+    font-size: 0.78rem;
+    color: var(--bs-secondary-color);
+    padding-top: 10px;
+    text-align: right;
+  }
+
+  // Pullquote — centered italic serif with the oversized quote mark
+  blockquote {
+    margin: 2.4em 0;
+    padding: 0 1em;
+    text-align: center;
+    border: 0;
+
+    &::before {
+      content: "\201C";
+      display: block;
+      font-family: $nf-font-display;
+      font-weight: 900;
+      font-size: 4rem;
+      line-height: 0.6;
+      color: var(--bs-primary);
+      margin-bottom: 0.25em;
+    }
+
+    p {
+      font-family: $nf-font-display;
+      font-style: italic;
+      font-weight: 550;
+      font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+      margin: 0;
+    }
+
+    cite {
+      display: block;
+      margin-top: 1.1em;
+      font-family: $font-family-sans-serif;
+      font-style: normal;
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--bs-secondary-color);
+    }
+  }
+
+  // List markers pick up the accent
+  li::marker {
+    color: var(--bs-primary);
+  }
+}
+
+// Tag row sits on a hairline rule
+.tag-row {
+  border-top: var(--nf-border);
+}
+
+@media (max-width: 767.98px) {
+  .blog-post-content {
+    font-size: 1.05rem;
+  }
+}

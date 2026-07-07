@@ -1,0 +1,83 @@
+---
+### ALL PAGES ###
+layout: frontend/core/cover
+asset_path: app/index
+
+### PAGE CONFIG ###
+app:
+  protocol: "{{ site.brand.id | default: site.brand.name | slugify }}://"
+---
+
+<!-- App Launch Section -->
+<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
+  <div class="card border-0 shadow-lg">
+    <div class="card-body p-3 p-md-5">
+      <!-- Logo -->
+      <div class="text-center mb-3">
+        <div class="avatar avatar-xl">
+          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <div class="text-center mb-4">
+        <h1 class="h3 mb-2">Opening {{ site.brand.name }}...</h1>
+        <p class="text-muted">Launching your desktop application</p>
+      </div>
+
+      <!-- Loading Spinner -->
+      <div class="text-center mb-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Error Alert (Hidden by default) -->
+      <div id="error-alert" class="alert alert-warning mb-4" role="alert" hidden>
+        <div class="d-flex align-items-center">
+          {% uj_icon "triangle-exclamation", "me-2" %}
+          <div>
+            <strong>App not installed?</strong><br>
+            <small>Download {{ site.brand.name }} for your platform below.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="d-grid gap-2 mb-4">
+        <a id="launch-button" href="{{ resolved.app.protocol }}" class="btn btn-primary">
+          {% uj_icon "rocket", "me-2" %}
+          <span>Launch app</span>
+        </a>
+      </div>
+
+      <!-- Download Section -->
+      <div class="text-center">
+        <p class="text-muted small mb-3">Don't have the app?</p>
+
+        <a id="download-button" href="/download" class="btn btn-adaptive">
+          {% uj_icon "download", "me-2" %}
+          <span>Download app</span>
+        </a>
+      </div>
+
+      <!-- Alternative Actions -->
+      <div class="mt-4 pt-4 border-top text-center">
+        <p class="text-muted small mb-2">Having trouble?</p>
+        <div class="btn-group" role="group">
+          <a href="/" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "house", "me-1" %}
+            <span>Go to website</span>
+          </a>
+          <a href="/contact" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "headset", "me-1" %}
+            <span>Get help</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}
+

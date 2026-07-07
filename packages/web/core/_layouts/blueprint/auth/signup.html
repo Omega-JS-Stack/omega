@@ -1,0 +1,20 @@
+---
+### ALL PAGES ###
+layout: frontend/pages/auth/signup
+
+### REGULAR PAGES ###
+meta:
+  title: "Signup - {{ site.brand.name }}"
+  description: "Create an account with {{ site.brand.name }} to get started."
+  breadcrumb: "Signup"
+
+### WEB MANAGER CONFIG ###
+web_manager:
+  auth:
+    config:
+      policy: "unauthenticated"
+      redirects:
+        authenticated: "/"
+---
+
+{{ content | uj_content_format }}

@@ -7,6 +7,10 @@
  * forms, include leading slash, interpolated-tag-arg fix-forward).
  * Assertions target REAL data: the UJM default team member via uj_member,
  * adsense slots via include params, and the full JSON-LD Recipe schema.
+ *
+ * Since B2 the two ported layouts live in the fixture's own `_layouts/` —
+ * CONSUMER-LOCAL layouts (the sweet-saucy pattern), resolved as the top
+ * layout layer above the packaged themes.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -33,7 +37,7 @@ async function buildPorts() {
         consumerDir: PORTS,
         siteData,
         farmDir: path.join(PKG, '.omega', 'layout-farm-ports'),
-        assetManifest: { js: {}, css: { theme: '/assets/css/theme-TEST.css' } },
+        assetManifest: { js: { pages: {} }, css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} } },
       });
     },
   });

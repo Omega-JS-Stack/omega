@@ -115,9 +115,9 @@ const ujPost = {
 
     switch (property) {
       case 'title':
-        return post.data.title || '';
+        return (post.data.post && post.data.post.title) || post.data.title || '';
       case 'description':
-        return post.data.description || post.data.excerpt || '';
+        return (post.data.post && post.data.post.description) || post.data.description || post.data.excerpt || '';
       case 'url': {
         const siteUrl = ctx.site.config.url || '';
         return siteUrl + post.url;

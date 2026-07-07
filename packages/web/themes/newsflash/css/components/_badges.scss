@@ -1,0 +1,65 @@
+// Newsflash Theme — Badges, Chips & Pagination
+// Badges become uppercase pill chips with hairline ink frames (the "FEATURED"
+// sticker from the masthead design). Pagination becomes a row of pills.
+
+.badge {
+  border-radius: 50rem;
+  font-weight: 800;
+  font-size: 0.68em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.55em 0.95em;
+  @include nf-border();
+}
+
+// Tertiary "superheadline" badges (inherited layouts emit these above
+// headlines) become the volt sticker chip.
+.badge.bg-body-tertiary {
+  background: var(--nf-volt) !important;
+  color: var(--nf-volt-ink) !important;
+}
+
+// Soft category chips (blog cards) keep their soft fill but read editorial
+.badge[class*="-soft"] {
+  border-color: currentColor;
+}
+
+// ============================================
+// Pagination — pill links, vermilion active
+// ============================================
+.pagination {
+  gap: 0.4rem;
+
+  .page-link {
+    border: var(--nf-border);
+    border-radius: 50rem !important; // beats Bootstrap's first/last corner rounding
+    background: transparent;
+    color: var(--bs-body-color);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.95rem;
+    transition: $nf-transition;
+
+    &:hover {
+      background: var(--nf-ink);
+      color: var(--nf-paper);
+      border-color: var(--nf-border-color);
+    }
+
+    &:focus {
+      box-shadow: 0 0 0 3px var(--nf-volt);
+    }
+  }
+
+  .page-item.active .page-link {
+    background: var(--nf-accent-interactive);
+    color: var(--nf-accent-interactive-ink);
+    border-color: var(--nf-border-color);
+  }
+
+  .page-item.disabled .page-link {
+    background: transparent;
+    border-color: var(--nf-line);
+    color: var(--bs-secondary-color);
+  }
+}

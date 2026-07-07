@@ -1,0 +1,7 @@
+// /test — Theme (newsflash) page CSS — the #theme layer.
+// Loads AFTER the universal layer and turns the "css-theme" dot green.
+// Compiles standalone, so no theme tokens are needed here — just the proof.
+
+.layer-dot[data-layer="css-theme"] {
+  background: #30a46c; // green
+}

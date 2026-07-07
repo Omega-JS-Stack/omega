@@ -1,0 +1,485 @@
+---
+### ALL PAGES ###
+layout: frontend/core/base
+
+### PAGE CONFIG ###
+# Hero Section — memberships fund the journalism. News voice throughout: a
+# theme's frontmatter defaults are part of its identity (see docs/themes.md).
+hero:
+  headline: "Journalism worth"
+  headline_accent: "paying for"
+  subheadline: "Simple memberships that keep the reporting independent. No hidden fees, cancel anytime."
+
+# Pricing Section — reader membership tiers
+pricing:
+  price_per_unit:
+    enabled: false
+    feature_id: "stories"
+    label: "story"
+  definitions:
+    - id: "stories"
+      definition: "Member-only stories you can read each month, on top of our free coverage."
+    - id: "briefing"
+      definition: "The daily morning briefing delivered to your inbox before 6am."
+    - id: "ad_free"
+      definition: "Read every page without ads or sponsored placements."
+    - id: "archive"
+      definition: "Full access to every story we've ever published."
+    - id: "comments"
+      definition: "Join the discussion with our reporters and fellow members."
+    - id: "events"
+      definition: "Invites to member-only briefings, AMAs, and live events."
+  plans:
+    - id: "reader"
+      name: "Reader"
+      tagline: "best for casual readers"
+      url: "/signup"
+      features:
+        - id: "stories"
+          name: "Free stories"
+          icon: "newspaper"
+        - id: "briefing"
+          name: "Daily briefing"
+          icon: "envelope"
+    - id: "supporter"
+      name: "Supporter"
+      tagline: "best for daily readers"
+      url: null
+      features:
+        - id: "stories"
+          name: "Member stories"
+          icon: "newspaper"
+        - id: "briefing"
+          name: "Daily briefing"
+          icon: "envelope"
+        - id: "ad_free"
+          name: "Ad-free reading"
+          icon: "eye-slash"
+        - id: "comments"
+          name: "Comments"
+          icon: "comments"
+    - id: "insider"
+      name: "Insider"
+      tagline: "best for news junkies"
+      url: null
+      popular: true
+      features:
+        - id: "stories"
+          name: "Member stories"
+          icon: "newspaper"
+        - id: "briefing"
+          name: "Daily briefing"
+          icon: "envelope"
+        - id: "archive"
+          name: "Full archive"
+          icon: "box-archive"
+    - id: "newsroom"
+      name: "Newsroom"
+      tagline: "best for teams"
+      url: null
+      features:
+        - id: "stories"
+          name: "Member stories"
+          icon: "newspaper"
+        - id: "briefing"
+          name: "Daily briefing"
+          icon: "envelope"
+        - id: "events"
+          name: "Member events"
+          icon: "calendar-star"
+        - id: "seats"
+          name: "Team seats"
+          icon: "users"
+
+# Feature Comparison Section
+feature_comparison:
+  superheadline:
+    icon: "sparkles"
+    text: "Features"
+  headline: "Compare all"
+  headline_accent: "memberships"
+  subheadline: "See exactly what's included in each membership"
+
+# Social Proof Section
+social_proof:
+  items:
+    - number: "2M"
+      label: "Monthly readers"
+    - number: "#1"
+      label: "Independent newsroom"
+    - number: "4.8"
+      label: "Apple News"
+    - number: "4.8"
+      label: "Google News"
+
+# CTA Section
+cta:
+  superheadline:
+    icon: "comments"
+    text: "Support"
+  headline: "Questions about your"
+  headline_accent: "membership?"
+  subheadline: "The support desk answers 24/7"
+  button:
+    text: "Talk to us"
+    icon: "headset"
+    href: "/contact"
+
+# FAQs Section
+faqs:
+  superheadline:
+    icon: "messages-question"
+    text: "FAQs"
+  headline: "Frequently asked"
+  headline_accent: "questions"
+  subheadline: "Everything you need to know about {{ site.brand.name }} memberships & billing."
+  items:
+    - question: "Can I cancel my membership anytime?"
+      answer: "Yes, you can cancel anytime, no questions asked. Your member benefits stay active until the end of the billing period."
+    - question: "Is there a free way to read?"
+      answer: "Always. The Reader tier is free forever — our core coverage and the daily briefing stay open to everyone. Memberships unlock the extras and keep the lights on."
+    - question: "Do memberships really fund the journalism?"
+      answer: "Directly. Reader memberships are our primary source of revenue, which is exactly why no advertiser or owner gets a say in what we publish."
+---
+
+{% comment %}
+  NEWSFLASH PRICING
+  Same data contract + price-resolution Liquid as the classy pricing page,
+  presented as the "subscription desk": pill billing toggle, framed paper plan
+  cards (the popular plan is the vermilion-framed "Editor's pick"), an
+  enterprise strip, stroked-numeral social proof, FAQ accordion, and the dark
+  big-read CTA band. See docs/themes.md "Per-page HTML layout overrides".
+{% endcomment %}
+
+<!-- ============================================ -->
+<!-- PROMO BANNER — revealed + populated by the framework pricing JS
+     (sale name, countdown, navbar offset). The ids are the contract;
+     ship it hidden and let the JS do the rest. -->
+<!-- ============================================ -->
+<div id="pricing-promo-banner" class="position-fixed top-0 start-0 w-100 text-center animation-slide-down" style="z-index: 1050;" hidden>
+  <div class="bg-primary text-white py-2 position-relative">
+    <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 mt-2 me-2" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;document.querySelector('.navbar-wrapper').style.marginTop='';document.querySelector('main > section:first-of-type').style.paddingTop=''"></button>
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-4">
+        <span id="pricing-promo-badge" class="badge bg-warning text-dark px-2 py-1 fs-6 animation-wiggle">
+          15% OFF!
+        </span>
+        <span id="pricing-promo-text" class="fw-bold">
+          Flash sale
+        </span>
+        <span class="text-white-50">
+          Ending in <span id="pricing-promo-countdown" class="fw-semibold text-white">--</span>
+        </span>
+        <span class="text-white-50">
+          Use code <span id="pricing-promo-code" class="badge bg-white bg-opacity-25 px-2 py-1 fs-6">WELCOME15</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- HERO -->
+<!-- ============================================ -->
+<section class="pb-4">
+  <div class="container text-center" data-lazy="@class animation-slide-up">
+    <span class="kicker mb-3">{% uj_icon "tag", "me-1" %}Pricing</span>
+    <h1 class="display-4 my-3">
+      {{ resolved.hero.headline }}
+      <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="lead mb-0">{{ resolved.hero.subheadline }}</p>
+    {% endiftruthy %}
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- PLANS -->
+<!-- ============================================ -->
+<section class="pt-0">
+  <div class="container">
+    <!-- Billing toggle: pill segmented control -->
+    <div class="billing-toggle" role="group" aria-label="Billing toggle">
+      <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly">
+      <label class="billing-option" for="monthly">Monthly</label>
+      <input type="radio" class="btn-check" name="billing" id="annually" autocomplete="off" checked data-billing="annually">
+      <label class="billing-option" for="annually">Annually <span class="billing-save">up to 20% off</span></label>
+    </div>
+
+    <p class="text-center fw-medium mb-5">
+      {% uj_icon "shield-check", "me-1 text-success" %}
+      Every paid membership backed by a 7-day money-back guarantee
+    </p>
+
+    {% assign plan_count = resolved.pricing.plans | size %}
+
+    {% comment %} Detect common features across ALL plans (same logic as classy) {% endcomment %}
+    {% assign common_feature_ids = "" | split: "," %}
+    {% if plan_count > 0 %}
+      {% assign first_plan = resolved.pricing.plans[0] %}
+      {% for first_feature in first_plan.features %}
+        {% assign is_common = true %}
+        {% for check_plan in resolved.pricing.plans %}
+          {% assign found_in_plan = false %}
+          {% for check_feature in check_plan.features %}
+            {% if check_feature.id == first_feature.id %}{% assign found_in_plan = true %}{% break %}{% endif %}
+          {% endfor %}
+          {% unless found_in_plan %}{% assign is_common = false %}{% break %}{% endunless %}
+        {% endfor %}
+        {% if is_common %}{% assign common_feature_ids = common_feature_ids | push: first_feature.id %}{% endif %}
+      {% endfor %}
+    {% endif %}
+
+    <div class="pricing-plan-grid">
+      {% for plan in resolved.pricing.plans %}
+        {% comment %} Shared pricing math (assigns _plan_monthly/_plan_annually/per-unit into this scope) {% endcomment %}
+        {% include core/pricing/resolve-plan.html plan=plan %}
+
+        <article class="card pricing-plan {% if plan.popular %}pricing-plan--popular{% endif %}">
+          {% if plan.popular %}
+            <span class="pricing-plan-flag badge bg-body-tertiary">Editor's pick</span>
+          {% endif %}
+
+          <!-- .card-title is load-bearing: the framework pricing JS reads the plan
+               name for analytics via `.h3, .h2, .card-title` inside the card. -->
+          <h3 class="card-title pricing-plan-name">{{ plan.name }}</h3>
+          <p class="pricing-plan-tagline kicker">{{ plan.tagline }}</p>
+
+          <!-- Price -->
+          <div class="pricing-plan-price">
+            {% if _plan_monthly == 0 %}
+              <span class="pricing-plan-amount">Free</span>
+            {% else %}
+              <span class="pricing-plan-currency">$</span><span class="pricing-plan-amount amount" data-monthly="{{ _plan_monthly }}" data-annually="{{ _plan_annually | divided_by: 12 | round }}">{{ _plan_annually | divided_by: 12 | round }}</span><span class="pricing-plan-per">/mo</span>
+            {% endif %}
+          </div>
+
+          {% if resolved.pricing.price_per_unit.enabled %}
+            <p class="pricing-plan-ppu">
+              {% if monthly_price_per_unit %}
+                <span class="price-per-unit" data-monthly="${{ monthly_price_per_unit }}" data-annually="${{ annual_price_per_unit }}">${{ annual_price_per_unit }}</span> per {{ resolved.pricing.price_per_unit.label }}
+              {% elsif _plan_monthly == 0 %}
+                Perfect for trying out
+              {% endif %}
+            </p>
+          {% endif %}
+
+          <!-- CTA: paid plans use the solid vermilion button; only the FREE
+               plan uses the outline variant so it reads as the entry-level option. -->
+          <div class="d-grid mb-3">
+            {% if _plan_monthly == 0 %}{% assign _cta_class = "btn-outline-dark" %}{% else %}{% assign _cta_class = "btn-primary" %}{% endif %}
+            {% iftruthy plan.url %}
+              <a href="{{ plan.url }}" class="btn {{ _cta_class }} btn-lg fw-bold">
+                {% if _plan_monthly == 0 %}Get started{% elsif plan.trial.days > 0 %}Get free trial{% else %}Get started{% endif %}
+              </a>
+            {% endiftruthy %}
+            {% iffalsy plan.url %}
+              <button class="btn {{ _cta_class }} btn-lg fw-bold" data-plan-id="{{ plan.id }}">
+                {% if plan.trial.days > 0 %}Get free trial{% else %}Get started{% endif %}
+              </button>
+            {% endiffalsy %}
+          </div>
+
+          <!-- Billing info -->
+          <p class="pricing-plan-billing">
+            {% if _plan_monthly == 0 %}
+              No credit card required
+            {% else %}
+              <span class="billing-info" data-monthly="Billed ${{ _plan_monthly | uj_commaify }} monthly" data-annually="Billed ${{ _plan_annually | uj_commaify }} annually">
+                Billed ${{ _plan_annually | uj_commaify }} annually
+              </span>
+            {% endif %}
+          </p>
+
+          <!-- Guarantee (every plan) -->
+          <p class="pricing-plan-guarantee">
+            {% if _plan_monthly > 0 %}
+              {% uj_icon "shield-check", "me-1 text-success" %}7-day money-back guarantee
+            {% else %}
+              {% uj_icon "rocket", "me-1 text-success" %}Upgrade any time
+            {% endif %}
+          </p>
+
+          <hr class="pricing-plan-rule">
+
+          {% comment %}
+            Feature list — same tier-inheritance logic as classy:
+              1. Common features (vary by plan, shown on every card)
+              2. Basic (first plan): "What you get:" + its unique features
+              3. Other plans: "Everything in <prev>, and more:" + only the ADDED features
+            Helpers below render a value + the name (wrapped in a tooltip span when the
+            feature has a definition).
+          {% endcomment %}
+
+          <!-- 1. Common features -->
+          <ul class="pricing-plan-features">
+            {% for feature in plan.features %}
+              {% if common_feature_ids contains feature.id %}
+                {% assign _feature_value = feature.value %}
+                {% if _config_product and _feature_value == nil %}
+                  {% assign _config_limit = nil %}{% for _lim in _config_product.limits %}{% if _lim[0] == feature.id %}{% assign _config_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                  {% if _config_limit == -1 %}{% assign _feature_value = "Unlimited" %}{% elsif _config_limit %}{% assign _feature_value = _config_limit %}{% endif %}
+                {% endif %}
+                {% assign feature_definition = nil %}
+                {% for def in resolved.pricing.definitions %}{% if def.id == feature.id %}{% assign feature_definition = def.definition %}{% break %}{% endif %}{% endfor %}
+                <li>
+                  <span class="pricing-plan-feature-icon">{% uj_icon feature.icon, "fa-sm" %}</span>
+                  <span>
+                    {% if _feature_value == "Unlimited" %}Unlimited{% elsif _feature_value == "24/7" %}{{ _feature_value }}{% elsif _feature_value == true or _feature_value == "Included" or _feature_value == "Available" or _feature_value == "Full" %}{% else %}{{ _feature_value | uj_commaify }}{% endif %}
+                    {% iftruthy feature_definition %}<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature_definition }}">{{ feature.name }}</span>{% endiftruthy %}
+                    {% iffalsy feature_definition %}{{ feature.name }}{% endiffalsy %}
+                  </span>
+                </li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+
+          {% comment %} Does this plan add any non-common (unique) features? {% endcomment %}
+          {% assign has_additional = false %}
+          {% for feature in plan.features %}{% unless common_feature_ids contains feature.id %}{% assign has_additional = true %}{% break %}{% endunless %}{% endfor %}
+
+          <!-- 2/3. Inheritance label + the plan's additional features -->
+          {% if forloop.index == 1 %}
+            {% if has_additional %}
+              <p class="pricing-plan-inherit">What you get:</p>
+            {% endif %}
+          {% else %}
+            {% assign _prev_index = forloop.index0 | minus: 1 %}
+            {% assign _prev_plan = resolved.pricing.plans[_prev_index] %}
+            <p class="pricing-plan-inherit">Everything in <strong>{{ _prev_plan.name }}</strong>{% if has_additional %}, and more:{% endif %}</p>
+          {% endif %}
+
+          {% if has_additional %}
+            <ul class="pricing-plan-features">
+              {% for feature in plan.features %}
+                {% unless common_feature_ids contains feature.id %}
+                  {% assign _feature_value = feature.value %}
+                  {% if _config_product and _feature_value == nil %}
+                    {% assign _config_limit = nil %}{% for _lim in _config_product.limits %}{% if _lim[0] == feature.id %}{% assign _config_limit = _lim[1] %}{% break %}{% endif %}{% endfor %}
+                    {% if _config_limit == -1 %}{% assign _feature_value = "Unlimited" %}{% elsif _config_limit %}{% assign _feature_value = _config_limit %}{% endif %}
+                  {% endif %}
+                  {% assign feature_definition = nil %}
+                  {% for def in resolved.pricing.definitions %}{% if def.id == feature.id %}{% assign feature_definition = def.definition %}{% break %}{% endif %}{% endfor %}
+                  <li>
+                    <span class="pricing-plan-feature-icon">{% uj_icon feature.icon, "fa-sm" %}</span>
+                    <span>
+                      {% if _feature_value == "Unlimited" %}Unlimited{% elsif _feature_value == "24/7" %}{{ _feature_value }}{% elsif _feature_value == true or _feature_value == "Included" or _feature_value == "Available" or _feature_value == "Full" %}{% else %}{{ _feature_value | uj_commaify }}{% endif %}
+                      {% iftruthy feature_definition %}<span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature_definition }}">{{ feature.name }}</span>{% endiftruthy %}
+                      {% iffalsy feature_definition %}{{ feature.name }}{% endiffalsy %}
+                    </span>
+                  </li>
+                {% endunless %}
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+
+    <!-- Group access strip -->
+    <div class="card enterprise-panel" data-lazy="@class animation-slide-up">
+      <div>
+        <h3 class="h3 mb-1">Group & campus access</h3>
+        <p class="mb-0 text-body-secondary">Bulk memberships for companies, newsrooms, schools, and libraries — custom invoicing and easy seat management.</p>
+      </div>
+      <button class="btn btn-primary btn-lg fw-bold flex-shrink-0" data-plan-id="enterprise">
+        {% uj_icon "envelope", "me-2" %}Contact us
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SOCIAL PROOF — by the numbers -->
+<!-- ============================================ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="section-head" data-lazy="@class animation-slide-up">
+      <h2>The receipts</h2>
+      <span class="rule"></span>
+    </div>
+    <div class="row g-4 text-center">
+      {% for item in resolved.social_proof.items %}
+        <div class="col-6 col-lg-3" data-lazy="@class animation-slide-up">
+          <div class="stat-num">{{ item.number }}</div>
+          <div class="fw-bold">{{ item.label }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- FAQ -->
+<!-- ============================================ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-9">
+        <div class="section-head" data-lazy="@class animation-slide-up">
+          {% iftruthy resolved.faqs.superheadline.text %}
+            <h2>{{ resolved.faqs.superheadline.text }}</h2>
+          {% endiftruthy %}
+          <span class="rule"></span>
+        </div>
+        <header class="mb-4" data-lazy="@class animation-slide-up">
+          <h2 class="h1 mb-2">
+            {{ resolved.faqs.headline }}
+            <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
+          </h2>
+          {% iftruthy resolved.faqs.subheadline %}
+            <p class="lead mb-0">{{ resolved.faqs.subheadline }}</p>
+          {% endiftruthy %}
+        </header>
+
+        {% if resolved.faqs.items %}
+          <div class="accordion" id="faqAccordion">
+            {% for faq in resolved.faqs.items %}
+              <div class="accordion-item mb-3" data-lazy="@class animation-slide-up">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                    <span class="fw-bold">{{ faq.question }}</span>
+                  </button>
+                </h2>
+                <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body">{{ faq.answer }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- CTA — the dark big-read band -->
+<!-- ============================================ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="cta-panel" data-lazy="@class animation-slide-up">
+      <div class="cta-rings" aria-hidden="true"></div>
+      <div class="position-relative">
+        {% iftruthy resolved.cta.superheadline.text %}
+          <span class="kicker mb-3">{% uj_icon resolved.cta.superheadline.icon, "me-1" %}{{ resolved.cta.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="cta-title">
+          {{ resolved.cta.headline }}
+          <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
+        </h2>
+        {% iftruthy resolved.cta.subheadline %}
+          <p class="cta-desc">{{ resolved.cta.subheadline }}</p>
+        {% endiftruthy %}
+        <div class="d-flex flex-wrap gap-3">
+          <a href="{{ resolved.cta.button.href }}" class="btn btn-warning btn-lg">
+            {% uj_icon resolved.cta.button.icon, "me-2" %}{{ resolved.cta.button.text }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ content | uj_content_format }}

@@ -1,0 +1,41 @@
+---
+### FULLSCREEN LAYOUT ###
+layout: frontend/core/base
+
+### FULLSCREEN PAGES ###
+theme:
+  nav:
+    enabled: false
+  main:
+    class: "d-flex align-items-{{ resolved.theme.main.align | default: 'center' }} py-5"
+  footer:
+    enabled: false
+---
+
+<!-- Critical inline CSS to prevent FOUC on cover pages -->
+<style>
+  main.d-flex {
+    display: flex !important;
+  }
+  .min-vh-100 {
+    min-height: 100vh !important; /* Fallback for older browsers */
+    min-height: 100dvh !important; /* Dynamic viewport height for mobile */
+  }
+
+  main.d-flex.align-items-center {
+    align-items: center !important;
+  }
+
+  main.d-flex.justify-content-center {
+    justify-content: center !important;
+  }
+</style>
+
+<!-- Cover container with flexible column sizing -->
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    {{ content | uj_content_format }}
+  </div>
+</div>
+
+

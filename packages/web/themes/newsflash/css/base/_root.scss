@@ -1,0 +1,134 @@
+// Newsflash Theme — CSS Custom Properties
+// Bridges SCSS config into runtime CSS variables so light/dark mode switching
+// works without recompilation. Components read these var(--nf-*) tokens, never
+// the raw SCSS values, so dark mode is a single block of overrides.
+
+// ============================================
+// Light Mode (default)
+// ============================================
+// DOUBLED selectors (:root:root / [data-bs-theme][data-bs-theme]) on purpose:
+// every theme page bundle re-emits Bootstrap's own :root/[data-bs-theme=dark]
+// variable blocks (because page SCSS @uses config → Bootstrap) and those load
+// AFTER the main bundle. The doubled selector (0,2,0) beats Bootstrap's
+// (0,1,0) regardless of load order, so the paper/ink surfaces always win.
+:root:root,
+[data-bs-theme="light"][data-bs-theme="light"] {
+  // Paper & ink
+  --nf-paper: #{$nf-paper};
+  --nf-paper-2: #{$nf-paper-2};
+  --nf-ink: #{$nf-ink};
+  --nf-ink-soft: #{$nf-ink-soft};
+
+  // Translucent paper for the blurred sticky masthead
+  --nf-paper-translucent: #{rgba($nf-paper, 0.88)};
+
+  // Soft hairline for in-content dividers (feed rows, hr, table rules) —
+  // frames use the full-strength ink via --nf-border-color instead.
+  --nf-line: #{rgba($nf-ink, 0.16)};
+
+  // Accents
+  --nf-vermilion: #{$nf-vermilion};
+  --nf-blue: #{$nf-blue};
+  --nf-volt: #{$nf-volt};
+  --nf-volt-ink: #{$nf-volt-ink};
+
+  // Ink panels (ticker, footer, big-read band) — dark slabs in both modes
+  --nf-panel-bg: #{$nf-panel-bg};
+  --nf-panel-color: #{$nf-panel-color};
+
+  // Frame + shadow color follow the ink
+  --nf-border-color: var(--nf-ink);
+  --nf-shadow-color: var(--nf-ink);
+
+  // Frame + shadow recipes (used by components)
+  --nf-border-width: #{$nf-border-width};
+  --nf-border: #{$nf-border-width} solid var(--nf-border-color);
+  --nf-shadow-hard: #{$nf-shadow-offset} #{$nf-shadow-offset} 0 var(--nf-shadow-color);
+  --nf-shadow-hard-hover: #{$nf-shadow-offset-hover} #{$nf-shadow-offset-hover} 0 var(--nf-shadow-color);
+  --nf-shadow-pop: #{$nf-shadow-pop};
+
+  // Film grain strength (see _utilities.scss)
+  --nf-grain-opacity: 0.05;
+
+  // INTERACTIVE accent — the single token every hover/active fill points at
+  // (nav links, dropdown items, pagination). It tracks the rendered primary
+  // (--bs-primary), NOT the raw SCSS value, so consumer overrides flow through.
+  --nf-accent-interactive: var(--bs-primary);
+  --nf-accent-interactive-ink: #ffffff; // readable text on the interactive fill
+
+  // Map onto Bootstrap surfaces. The -rgb companions MUST be remapped too —
+  // Bootstrap's .bg-body-* / .text-body-* utilities paint from
+  // rgba(var(--bs-*-rgb), opacity), not the hex vars.
+  --bs-body-bg: #{$nf-paper};
+  --bs-body-bg-rgb: #{red($nf-paper)}, #{green($nf-paper)}, #{blue($nf-paper)};
+  --bs-body-color: #{$nf-ink};
+  --bs-body-color-rgb: #{red($nf-ink)}, #{green($nf-ink)}, #{blue($nf-ink)};
+  --bs-secondary-color: #{$nf-ink-soft};      // .text-body-secondary / muted metas
+  --bs-secondary-color-rgb: #{red($nf-ink-soft)}, #{green($nf-ink-soft)}, #{blue($nf-ink-soft)};
+  --bs-secondary-bg: #{$nf-paper-2};
+  --bs-secondary-bg-rgb: #{red($nf-paper-2)}, #{green($nf-paper-2)}, #{blue($nf-paper-2)};
+  --bs-tertiary-bg: #{$nf-paper-2};
+  --bs-tertiary-bg-rgb: #{red($nf-paper-2)}, #{green($nf-paper-2)}, #{blue($nf-paper-2)};
+  --bs-border-color: var(--nf-line);          // soft dividers; frames opt into full ink
+  --bs-card-bg: #{$nf-paper};
+  --bs-emphasis-color: #{$nf-ink};
+  --bs-emphasis-color-rgb: #{red($nf-ink)}, #{green($nf-ink)}, #{blue($nf-ink)};
+}
+
+// ============================================
+// Dark Mode
+// ============================================
+// Paper flips to deep warm near-black, ink to cream; vermilion/blue brighten
+// for contrast; volt stays vibrant. Frames + hard shadows auto-flip because
+// they reference var(--nf-border-color) → var(--nf-ink).
+// Doubled selector: see the light-mode block note.
+
+// Dark-mode primary derives from the COMPILE-TIME $primary so a consumer's
+// brand override survives dark mode (the stock vermilion keeps its hand-tuned
+// brightening; any other brand color gets a generic white-mix lift).
+$nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mix(white, $primary, 15%));
+
+[data-bs-theme="dark"][data-bs-theme="dark"] {
+  --nf-paper: #{$nf-paper-dark};
+  --nf-paper-2: #{$nf-paper-2-dark};
+  --nf-ink: #{$nf-ink-dark};
+  --nf-ink-soft: #{$nf-ink-soft-dark};
+
+  --nf-paper-translucent: #{rgba($nf-paper-dark, 0.88)};
+  --nf-line: #{rgba($nf-ink-dark, 0.18)};
+
+  --nf-vermilion: #{$nf-vermilion-dark-mode};
+  --nf-blue: #{$nf-blue-dark-mode};
+
+  --nf-panel-bg: #{$nf-panel-bg-dark};
+  --nf-panel-color: #{$nf-panel-color-dark};
+
+  // Pop shadows barely read on dark paper; lean on a deeper, tighter blur.
+  --nf-shadow-pop: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+
+  --nf-grain-opacity: 0.07;
+
+  // Brighten the rendered primary so it stays vivid on dark paper
+  // (--bs-primary is compile-time; these runtime link/button reads cover the
+  // places that matter most for legibility).
+  --bs-primary: #{$nf-primary-dark-mode};
+  --bs-primary-rgb: #{red($nf-primary-dark-mode)}, #{green($nf-primary-dark-mode)}, #{blue($nf-primary-dark-mode)};
+  --bs-link-color: #{$nf-primary-dark-mode};
+  --bs-link-color-rgb: #{red($nf-primary-dark-mode)}, #{green($nf-primary-dark-mode)}, #{blue($nf-primary-dark-mode)};
+  --bs-link-hover-color: #{lighten($nf-primary-dark-mode, 8%)};
+
+  --bs-body-bg: #{$nf-paper-dark};
+  --bs-body-bg-rgb: #{red($nf-paper-dark)}, #{green($nf-paper-dark)}, #{blue($nf-paper-dark)};
+  --bs-body-color: #{$nf-ink-dark};
+  --bs-body-color-rgb: #{red($nf-ink-dark)}, #{green($nf-ink-dark)}, #{blue($nf-ink-dark)};
+  --bs-secondary-color: #{$nf-ink-soft-dark};
+  --bs-secondary-color-rgb: #{red($nf-ink-soft-dark)}, #{green($nf-ink-soft-dark)}, #{blue($nf-ink-soft-dark)};
+  --bs-secondary-bg: #{$nf-paper-2-dark};
+  --bs-secondary-bg-rgb: #{red($nf-paper-2-dark)}, #{green($nf-paper-2-dark)}, #{blue($nf-paper-2-dark)};
+  --bs-tertiary-bg: #{$nf-paper-2-dark};
+  --bs-tertiary-bg-rgb: #{red($nf-paper-2-dark)}, #{green($nf-paper-2-dark)}, #{blue($nf-paper-2-dark)};
+  --bs-border-color: var(--nf-line);
+  --bs-card-bg: #{$nf-paper-2-dark};
+  --bs-emphasis-color: #{$nf-ink-dark};
+  --bs-emphasis-color-rgb: #{red($nf-ink-dark)}, #{green($nf-ink-dark)}, #{blue($nf-ink-dark)};
+}
