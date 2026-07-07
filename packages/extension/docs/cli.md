@@ -16,18 +16,18 @@
 
 [bin/browser-extension-manager](../bin/browser-extension-manager) — yargs-based shim that loads [src/cli.js](../src/cli.js).
 
-[src/cli.js](../src/cli.js) is the alias resolver: it maps short flags and positional args to a command module under [src/commands/](../src/commands/), then invokes it with the parsed options.
+[src/cli.js](../src/cli.js) owns only the alias table and the commands directory — dispatch (positional/flag alias resolution, command loading, error surfacing) is the shared devkit router (`createCliRouter`, vendored into `dist/vendor/devkit/cli-router.js` at prepare time). The returned Main class exposes the resolved dispatch table as `Main.config` for structure tests.
 
 ## Adding a new command
 
 1. Create `src/commands/<name>.js` exporting `async function (options) { /* ... */ }`
-2. Add to `ALIASES` in [src/cli.js](../src/cli.js):
+2. Add to the `aliases` table in [src/cli.js](../src/cli.js):
    ```js
-   const ALIASES = {
+   aliases: {
      clean:   ['-c', '--clean'],
      setup:   ['-s', '--setup'],
      <name>:  ['-x', '--<name>'],
-   };
+   },
    ```
 3. Optionally add to `projectScripts` in [package.json](../package.json) so consumers get a wrapper npm script on `npx bxm setup`.
 4. Document under this page.

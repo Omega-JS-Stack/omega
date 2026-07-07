@@ -14,22 +14,18 @@ module.exports = {
     {
       name: 'every alias has a corresponding command file',
       run: (ctx) => {
-        const cliSrc = fs.readFileSync(path.join(root, 'dist', 'cli.js'), 'utf8');
-        const aliasMatch = cliSrc.match(/const ALIASES = \{([\s\S]*?)\};/);
-        if (!aliasMatch) throw new Error('Could not parse ALIASES block from dist/cli.js');
+        // The devkit router exposes its resolved dispatch table as Main.config —
+        // introspect it instead of scraping the cli.js source.
+        const Main = require(path.join(root, 'dist', 'cli.js'));
+        const { commandsDir, aliases, defaultCommand } = Main.config;
 
-        const commands = [];
-        for (const line of aliasMatch[1].split('\n')) {
-          const m = line.match(/^\s*['"]?([a-z-]+)['"]?:/);
-          if (m) commands.push(m[1]);
-        }
-
+        const commands = [...new Set([...Object.keys(aliases), defaultCommand])];
         ctx.expect(commands.length).toBeGreaterThan(0);
 
         for (const cmd of commands) {
-          const file = path.join(root, 'dist', 'commands', `${cmd}.js`);
+          const file = path.join(commandsDir, `${cmd}.js`);
           if (!fs.existsSync(file)) {
-            throw new Error(`Command "${cmd}" registered in ALIASES but no dist/commands/${cmd}.js exists.`);
+            throw new Error(`Command "${cmd}" registered in the alias table but no ${file} exists.`);
           }
         }
       },

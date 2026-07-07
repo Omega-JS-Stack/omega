@@ -24,6 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Dockless hidden login launches** — `build-config` now injects `mac.extendInfo.LSUIElement: true` when `startup.openAtLogin.mode === 'hidden'` too (previously only `startup.mode: 'hidden'`). Without the plist key, a `mode: 'normal'` app launched hidden at login still FLASHED the dock: the bounce is a native animation that starts before any JS runs, so `applyEarly()`'s `dock.hide()` was always too late. Manual launches start dockless and the dock icon appears the moment a window surfaces (every surface path already runs `_ensureDockVisible()` → `app.dock.show()`). Extracted the pure `shouldInjectLSUIElement(config)` helper (exported for tests; new build-config test) and documented the behavior in docs/startup.md.
 - **Classy theme: configurable `$min-contrast-ratio`** — declared `!default` in `themes/classy/_config.scss` and forwarded into Bootstrap, so consumers with a light brand color (e.g. Somiibo blue `#1FB7F2`) can keep white button/badge text: `@use 'electron-manager' as * with ($primary: #1FB7F2, $min-contrast-ratio: 2)`.
 
+### Changed
+- **CLI dispatch is now the shared devkit router** (vendored into `dist/vendor/devkit/cli-router.js`) — `cli.js` owns only the alias table and commands directory (the bin's `ELECTRON_RUN_AS_NODE` strip is unchanged). One visible tweak: command failures now print `Error executing command "<name>": …` (the message previously omitted the command name).
+
 ---
 ## 1.12.0 — session persistence (safeStorage vault) · full WM auth cycle in renderers · real plan in main
 

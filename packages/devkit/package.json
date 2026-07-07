@@ -9,6 +9,7 @@
     "./logger": "./src/logger.js",
     "./safe-install": "./src/safe-install.js",
     "./attach-log-file": "./src/attach-log-file.js",
+    "./cli-router": "./src/cli-router.js",
     "./test/runner-core": "./src/test/runner-core.js",
     "./test/assert": "./src/test/assert.js",
     "./test/extended-mode-warning": "./src/test/extended-mode-warning.js",

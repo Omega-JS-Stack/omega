@@ -30,6 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - **`browser-extension-manager/config` export** — the vendored `@omegajs/config` loader (`loadConfig`, `validateConfig`, …) for consumer workflows, so brand-monorepo resolution always applies instead of raw JSON5 reads.
 
+### Changed
+- **CLI dispatch is now the shared devkit router** (vendored into `dist/vendor/devkit/cli-router.js`) — `cli.js` owns only the alias table and commands directory. Behavior unchanged: same aliases, same `setup` default, same error surfacing.
+
 ### Fixed
 - **`bxm setup` config merge no longer drops consumer-only keys.** The defaults merge started from the framework template and only walked template keys, so any consumer key absent from the template (e.g. `liveReloadPort`, or anything under `targets.extension`) was silently deleted on every setup. Consumer-only keys now survive at every nesting level.
 
