@@ -1,7 +1,8 @@
 /**
- * Eleventy CLI config — used by `npm run dev` (serve/watch). Production builds
- * go through src/build.js (which runs the asset pipeline first); this config
- * reads the manifest that build left behind.
+ * Eleventy CLI config — used by `npm run dev` (serve/watch) over the corpus.
+ * Production builds go through src/build.js (which runs the asset pipeline
+ * first); this config reads the manifest that build left behind. The engine
+ * itself is @omegajs/web (promoted from this spike in B1).
  *
  * Dev-mode notes:
  * - layouts default to the symlink FARM (watchable); virtual templates capture
@@ -11,7 +12,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { configureOmega } = require('./src/omega-web.js');
+const { configureOmega, PATHS } = require('@omegajs/web');
 
 const SPIKE = __dirname;
 const ROOT = path.resolve(SPIKE, '..', '..');
@@ -27,16 +28,13 @@ module.exports = function (eleventyConfig) {
   configureOmega(eleventyConfig, {
     consumerDir: CORPUS,
     siteData,
-    themesDir: path.join(SPIKE, 'themes'),
-    coreDir: path.join(SPIKE, 'core'),
-    defaultsDir: path.join(SPIKE, 'defaults'),
     activeTheme: process.env.OMEGA_THEME,
     layoutMode: process.env.OMEGA_LAYOUT_MODE || 'farm',
     farmDir: path.join(SPIKE, '.omega', 'layout-farm'),
     assetManifest,
   });
 
-  eleventyConfig.addWatchTarget('./themes/');
+  eleventyConfig.addWatchTarget(PATHS.themes);
 
   if (process.env.OMEGA_HTTPS_KEY && process.env.OMEGA_HTTPS_CERT) {
     eleventyConfig.setServerOptions({

@@ -1,84 +1,29 @@
-# bakeoff-eleventy — candidate 1 (Eleventy v3 + LiquidJS + template-kit)
+# bakeoff-eleventy — bench harness (engine promoted to @omegajs/web)
 
-The A1 slice built on Eleventy 3 against the shared corpus
-([spikes/bakeoff-shared](../bakeoff-shared)). Numbers + checklist live in
-[RESULTS.md](../bakeoff-shared/RESULTS.md); this README is the architecture and
-the migration findings.
+**The engine core built here WON the bake-off and was promoted to
+[packages/web](../../packages/web) in Phase B1** (decision:
+[../bakeoff-shared/DECISION.md](../bakeoff-shared/DECISION.md)). Architecture,
+module map, engine facts, and the 22-test suite now live with the package —
+this directory is the remaining **corpus-scale harness**:
 
 ```bash
-npm run build   # corpus (if absent) → esbuild+sass → Eleventy → PurgeCSS
-npm run dev     # eleventy --serve (farm layouts, watchable)
+npm run build   # corpus (if absent) → @omegajs/web buildSite (assets → Eleventy → PurgeCSS)
+npm run dev     # eleventy --serve over the corpus (farm layouts, watchable)
 npm run bench   # cold ×3 (+warmup) + watch-mode incremental touches
-npm test        # 17 tests against the shared mini-site fixture
 ```
 
-## Architecture (`src/omega-web.js` = the engine core)
+- `src/build.js` — corpus-consumer wiring around `buildSite()` (prints the
+  `OMEGA_TIMINGS` line the bench parses).
+- `src/bench-run.js` — cold benches + `--watch --incremental` touch probes
+  (touch targets point at the packaged themes in `packages/web/themes`).
+- `eleventy.config.js` — dev-serve config (`configureOmega` + symlink farm +
+  native HTTPS via `OMEGA_HTTPS_KEY`/`CERT`).
 
-- **Layered themes, zero copying** — layer chain `active theme → classy → core`;
-  the winning `_layouts/**` file per relative path is registered as an Eleventy
-  **virtual template** under `_includes/…` (build) or composed as a **symlink
-  farm** used as the includes dir (dev — virtual template content is captured at
-  config time and is not watchable). Farm lives OUTSIDE the input dir (inside
-  it, Eleventy processes the symlinked layouts as content).
-- **Includes layering** — LiquidJS `root:` array over the layers' `_includes`
-  dirs + `jekyllInclude: true`; template-kit registers via `amendLibrary`.
-- **`page.resolved`** — Eleventy's data cascade already deep-merges layout
-  frontmatter under page frontmatter; `eleventyComputed.resolved` exposes the
-  merged data minus engine machinery. Migration: `page.resolved.` → `resolved.`
-  (mechanical; 967 refs in UJM; `layout.*` refs: zero).
-- **Frontmatter Liquid** — preprocessor renders `{{ site.* }}` (and legacy
-  `[ site.* ]` brackets) in frontmatter VALUES, cached per raw string; skips
-  `permalink`/`pagination` (Eleventy renders dynamic permalinks itself) and
-  machinery keys (globals/collections hold other templates' raw content).
-- **Jekyll conventions** — dated `_posts` filenames → `/blog/<slug>/` via
-  computed permalink (`fileSlug` strips the date natively); `/about` →
-  `/about/`; collections tagged by input path; blog taxonomy aggregated from
-  `post.categories`/`post.tags` into paginated default pages.
-- **Default pages** — `defaults/pages/**` registered as virtual templates
-  UNLESS the consumer owns the same URL (cheap frontmatter permalink scan).
-- **Assets** — 3-layer page modules (site → theme → core) union-resolved,
-  esbuild-bundled (`web-manager` aliased to the real `@omegajs/client` —
-  bundles clean), content-hashed, manifest-mapped; layouts declare
-  `pageModule:` in frontmatter (cascades). Sass layering via the `omega:`
-  scheme importer. PurgeCSS post-pass over rendered HTML.
+Recorded numbers (A2 final): cold full build **3.52 s** (σ0.035) over the
+1,135-document corpus → 1,279 HTML files, vs the 332 s somiibo Jekyll
+baseline (~94×). Raw tables: [../bakeoff-shared/RESULTS.md](../bakeoff-shared/RESULTS.md).
 
-## Migration findings (feed the A2 scorecard + B4 codemod)
-
-1. `page.resolved.` → `resolved.` — one mechanical rewrite.
-2. Bracket-layout hack (`themes/[ site.theme.id ]/frontend/core/base`) →
-   `addLayoutAlias` table; layout values resolve BEFORE preprocessors, so no
-   data transform can handle them. Codemod rewrites them away.
-3. `timezoneOffset: 0` in Liquid options — filename dates are UTC midnights;
-   local rendering shifts them a day (CI Jekyll renders UTC).
-4. Layout frontmatter cascades natively (no `layout.` namespace — zero usage
-   anyway); page keys override layout keys deep-merged = frontmatter-only
-   override for free.
-5. Bare sass `@use 'x'` resolves file-relative BEFORE loadPaths — theme
-   layering needs the explicit `omega:` importer scheme.
-6. Same-process multi-builds need `setUseTemplateCache(false)` (module-level
-   layout cache keyed by inputDir+layout) — tests only; CLI is per-process.
-7. `--incremental` doesn't narrow under collection-paginated templates (all
-   1,279 files re-render, ~2 s). B-phase optimization, not a blocker.
-8. HTTPS dev: native `https: { key, cert }` (mkcert) in the dev server.
-
-From the A2 real-layout ports (see `test/ports.test.js` + shared DECISION.md):
-
-9. LiquidJS has NO `forloop.parentloop` (renders empty) → hoist outer-loop
-   values into `{% assign %}` vars (codemod rule).
-10. `{{ }}` inside QUOTED tag args is a silent no-op upstream too (live
-    somiibo ships `class="fa text- display-4"`) → `{% capture %}` hoist.
-11. Include paths lose their leading slash (`include /modules/…` resolves
-    outside LiquidJS roots).
-12. Liquid include roots must be EXISTING dirs — a nonexistent root costs
-    +1.05 s/corpus in per-include stat probes (measured 3.60 → 4.65 s).
-13. Preprocessors receive the FULL cascade (layout frontmatter included), and
-    layout data objects are SHARED across pages → page-referencing frontmatter
-    values (`{{ page.recipe.title }}` in the real sweet-saucy meta) defer to a
-    per-page copy-on-write render in `resolved`; site-scoped refs stay cached.
-
-## Not in the slice (deliberate)
-
-imagemin, translation, minifyHtml (scored under asset-pipeline integration in
-A2 — Eleventy has transform hooks for minify; imagemin is SSG-agnostic),
-sitemap/feeds. (uj_member now runs against a real UJM team doc in the A2
-ports fixture — corpus `_team` stays empty for somiibo parity.)
+Historical: the A1/A2 findings this spike produced (LiquidJS edge cases,
+virtual-template layering, preprocessor cascade behavior, include-root perf)
+are recorded in the packages/web README ("Engine facts"), RESULTS.md, and
+DECISION.md (codemod rules).

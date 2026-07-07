@@ -13,7 +13,7 @@ import path from 'node:path';
 import { Liquid } from 'liquidjs';
 import MarkdownIt from 'markdown-it';
 import templateKit from '@omegajs/template-kit';
-import frontmatterLiquid from '@omegajs/bakeoff-shared/src/frontmatter-liquid.js';
+import frontmatterLiquid from '@omegajs/web/frontmatter-liquid';
 import { SPIKE, consumerDir, layerDirs } from './paths.mjs';
 import { getCollection, getCollectionNames } from './collections.mjs';
 

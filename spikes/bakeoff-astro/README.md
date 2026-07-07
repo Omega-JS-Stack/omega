@@ -1,5 +1,12 @@
 # bakeoff-astro — candidate 2 (Astro 5 + content collections + template-kit direct imports)
 
+**Retained as a reference implementation** — the bake-off went to Eleventy
+([../bakeoff-shared/DECISION.md](../bakeoff-shared/DECISION.md)); this spike
+proved the layered-theme model is engine-portable and holds the Astro-specific
+findings if the decision is ever revisited. Since B1 it imports the
+SSG-agnostic pieces (asset pipeline, frontmatter Liquid, consumer scan) and
+the mini-site/ports-site test fixtures from `@omegajs/web`.
+
 The A1 slice built on Astro against the shared corpus
 ([spikes/bakeoff-shared](../bakeoff-shared)). Numbers + checklist live in
 [RESULTS.md](../bakeoff-shared/RESULTS.md); this README is the architecture and

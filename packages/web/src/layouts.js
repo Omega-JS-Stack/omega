@@ -1,7 +1,6 @@
 /**
- * Layered layout DELIVERY for the Eleventy candidate — ZERO file copying.
- * (The layered resolution itself is the shared `collectLayered()` in
- * @omegajs/bakeoff-shared.) Two delivery modes:
+ * Layered layout DELIVERY — ZERO file copying. (The layered resolution
+ * itself is `collectLayered()` in ./layers.js.) Two delivery modes:
  *
  * - `virtual` (build): each winning layout file is registered as an Eleventy
  *   v3 virtual template under `_includes/<rel>` — validated in the A1 probe

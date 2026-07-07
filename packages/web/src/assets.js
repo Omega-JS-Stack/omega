@@ -1,8 +1,9 @@
 /**
- * Asset pipeline shared by both bake-off candidates: 3-layer page-module JS
- * via esbuild (content-hashed, manifest-mapped), layered sass (`omega:`
- * scheme importer across theme layers), and a PurgeCSS post-pass over the
- * rendered HTML. SSG-agnostic — runs before the SSG, feeds it the manifest.
+ * The @omegajs/web asset pipeline: 3-layer page-module JS via esbuild
+ * (content-hashed, manifest-mapped), layered sass (`omega:` scheme importer
+ * across theme layers), and a PurgeCSS post-pass over the rendered HTML.
+ * SSG-agnostic — runs before the SSG, feeds it the manifest (the retained
+ * Astro reference spike consumes it too).
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');

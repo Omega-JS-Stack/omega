@@ -9,6 +9,7 @@ A0–A2). Private workspace package — never published.
 |------|---------|
 | [BASELINE.md](BASELINE.md) | The real somiibo-website Jekyll build measurement (332 s cold) — the number to beat |
 | [RESULTS.md](RESULTS.md) | A2 scorecard (weights, decision rule, raw measurement tables) |
+| [DECISION.md](DECISION.md) | The A2 decision memo — Eleventy wins; codemod-rule table; disposition (engine promoted to packages/web in B1) |
 | [src/corpus-spec.js](src/corpus-spec.js) | SSOT for the corpus shape — every number measured from the real somiibo-website |
 | [src/generate-corpus.js](src/generate-corpus.js) | Deterministic corpus generator (seeded PRNG, byte-reproducible) |
 | [src/prng.js](src/prng.js) | mulberry32 + sampling helpers |

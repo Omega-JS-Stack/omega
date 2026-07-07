@@ -38,13 +38,13 @@ jobs:
       - name: template-kit suite (incl. registerLiquid vs real liquidjs)
         run: npm test --workspace=packages/template-kit
 
+      - name: web suite (engine core + real-layout ports + asset pipeline vs real Eleventy 3)
+        run: npm test --workspace=packages/web
+
       - name: bakeoff-shared suite (corpus generator)
         run: npm test --workspace=spikes/bakeoff-shared
 
-      - name: bakeoff-eleventy suite (A1 slice vs real Eleventy 3)
-        run: npm test --workspace=spikes/bakeoff-eleventy
-
-      - name: bakeoff-astro suite (A1 slice vs real Astro 5)
+      - name: bakeoff-astro suite (retained reference implementation vs real Astro 5)
         run: npm test --workspace=spikes/bakeoff-astro
 
       - name: client suite

@@ -13,7 +13,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { generateCorpus } = require('@omegajs/bakeoff-shared');
-const { buildAssets, purgeCss } = require('@omegajs/bakeoff-shared/src/assets.js');
+const { buildAssets, purgeCss } = require('@omegajs/web/assets');
 
 const SPIKE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(SPIKE, '..', '..');

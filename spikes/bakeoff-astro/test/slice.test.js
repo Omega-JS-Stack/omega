@@ -14,7 +14,7 @@ const path = require('node:path');
 const { test, before } = require('node:test');
 
 const SPIKE = path.resolve(__dirname, '..');
-const MINI = path.resolve(SPIKE, '..', 'bakeoff-shared', 'fixtures', 'mini-site');
+const MINI = path.resolve(SPIKE, '..', '..', 'packages', 'web', 'test', 'fixtures', 'mini-site');
 
 const TEST_MANIFEST = {
   js: { signin: '/assets/js/pages/signin-TEST.js' },

@@ -1,11 +1,10 @@
 {
   "name": "@omegajs/bakeoff-eleventy",
   "version": "1.0.0",
-  "description": "Bake-off candidate 1: Eleventy v3 + LiquidJS building the shared corpus with @omegajs/template-kit — validates layered layouts (virtual templates), jekyllInclude, and the full A1 slice",
+  "description": "Bench harness for the winning bake-off candidate — builds the shared corpus through @omegajs/web (the engine core promoted from this spike in Phase B1); cold benches + watch-mode incremental probes",
   "private": true,
   "main": "./eleventy.config.js",
   "scripts": {
-    "test": "node --test",
     "build": "node src/build.js",
     "build:ssg": "npx @11ty/eleventy",
     "dev": "npx @11ty/eleventy --serve",
@@ -14,9 +13,7 @@
   "dependencies": {
     "@11ty/eleventy": "^3.1.6",
     "@omegajs/bakeoff-shared": "*",
-    "@omegajs/config": "*",
-    "@omegajs/template-kit": "*",
-    "markdown-it": "^14.3.0"
+    "@omegajs/web": "*"
   },
   "engines": {
     "node": ">=22"

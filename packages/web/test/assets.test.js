@@ -8,11 +8,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
-const { buildAssets, purgeCss } = require('@omegajs/bakeoff-shared/src/assets.js');
+const { buildAssets, purgeCss } = require('../src/assets.js');
 
-const SPIKE = path.resolve(__dirname, '..');
-const ROOT = path.resolve(SPIKE, '..', '..');
-const OUT = path.join(SPIKE, '.omega', 'assets-test-out');
+const PKG = path.resolve(__dirname, '..');
+const ROOT = path.resolve(PKG, '..', '..');
+const OUT = path.join(PKG, '.omega', 'assets-test-out');
 
 /**
  * Run buildAssets for a theme layer chain.
@@ -20,14 +20,14 @@ const OUT = path.join(SPIKE, '.omega', 'assets-test-out');
  * @returns {Promise<object>} manifest
  */
 function build(themeIds) {
-  const themeDirs = themeIds.map((id) => path.join(SPIKE, 'themes', id));
+  const themeDirs = themeIds.map((id) => path.join(PKG, 'themes', id));
   return buildAssets({
     jsLayers: [
-      path.join(SPIKE, 'site-assets', 'js'),
+      path.join(__dirname, 'fixtures', 'site-assets', 'js'),
       ...themeDirs.map((dir) => path.join(dir, 'js')),
-      path.join(SPIKE, 'core', 'js'),
+      path.join(PKG, 'core', 'js'),
     ],
-    cssLayers: [...themeDirs.map((dir) => path.join(dir, 'css')), path.join(SPIKE, 'core', 'css')],
+    cssLayers: [...themeDirs.map((dir) => path.join(dir, 'css')), path.join(PKG, 'core', 'css')],
     outDir: OUT,
     clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
   });

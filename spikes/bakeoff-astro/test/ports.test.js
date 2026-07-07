@@ -12,7 +12,7 @@ const path = require('node:path');
 const { test, before } = require('node:test');
 
 const SPIKE = path.resolve(__dirname, '..');
-const PORTS = path.resolve(SPIKE, '..', 'bakeoff-shared', 'fixtures', 'ports-site');
+const PORTS = path.resolve(SPIKE, '..', '..', 'packages', 'web', 'test', 'fixtures', 'ports-site');
 
 const TEST_MANIFEST = {
   js: {},

@@ -9,10 +9,10 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
-const { configureOmega } = require('../src/omega-web.js');
+const { configureOmega } = require('../src/index.js');
 
-const SPIKE = path.resolve(__dirname, '..');
-const MINI = path.resolve(__dirname, '..', '..', 'bakeoff-shared', 'fixtures', 'mini-site');
+const PKG = path.resolve(__dirname, '..');
+const MINI = path.join(__dirname, 'fixtures', 'mini-site');
 const siteData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8'));
 
 /**
@@ -22,7 +22,7 @@ const siteData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), '
  */
 async function buildMini(overrides = {}) {
   const Eleventy = require('@11ty/eleventy').default;
-  const elev = new Eleventy(MINI, path.join(SPIKE, '.omega', 'test-out'), {
+  const elev = new Eleventy(MINI, path.join(PKG, '.omega', 'test-out'), {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
@@ -33,10 +33,7 @@ async function buildMini(overrides = {}) {
       return configureOmega(eleventyConfig, {
         consumerDir: MINI,
         siteData,
-        themesDir: path.join(SPIKE, 'themes'),
-        coreDir: path.join(SPIKE, 'core'),
-        defaultsDir: path.join(SPIKE, 'defaults'),
-        farmDir: path.join(SPIKE, '.omega', 'layout-farm'),
+        farmDir: path.join(PKG, '.omega', 'layout-farm'),
         assetManifest: { js: { signin: '/assets/js/pages/signin-TEST.js' }, css: { theme: '/assets/css/theme-TEST.css' } },
         ...overrides,
       });
@@ -144,6 +141,6 @@ test('farm mode (symlinks, dev): identical output to virtual mode', async () => 
   const farm = await buildMini({ layoutMode: 'farm' });
   assert.strictEqual(farm.get('/404.html'), pages.get('/404.html'), '404 byte-identical');
   assert.strictEqual(farm.get('/pricing/'), pages.get('/pricing/'), 'pricing byte-identical');
-  const link = path.join(SPIKE, '.omega', 'layout-farm', 'core', 'base.html');
+  const link = path.join(PKG, '.omega', 'layout-farm', 'core', 'base.html');
   assert.ok(fs.lstatSync(link).isSymbolicLink(), 'farm is symlinks, not copies');
 });

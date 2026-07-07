@@ -12,10 +12,10 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before } = require('node:test');
-const { configureOmega } = require('../src/omega-web.js');
+const { configureOmega } = require('../src/index.js');
 
-const SPIKE = path.resolve(__dirname, '..');
-const PORTS = path.resolve(SPIKE, '..', 'bakeoff-shared', 'fixtures', 'ports-site');
+const PKG = path.resolve(__dirname, '..');
+const PORTS = path.join(__dirname, 'fixtures', 'ports-site');
 const siteData = JSON.parse(fs.readFileSync(path.join(PORTS, 'site-data.json'), 'utf8'));
 
 /**
@@ -24,7 +24,7 @@ const siteData = JSON.parse(fs.readFileSync(path.join(PORTS, 'site-data.json'), 
  */
 async function buildPorts() {
   const Eleventy = require('@11ty/eleventy').default;
-  const elev = new Eleventy(PORTS, path.join(SPIKE, '.omega', 'test-out-ports'), {
+  const elev = new Eleventy(PORTS, path.join(PKG, '.omega', 'test-out-ports'), {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
@@ -32,10 +32,7 @@ async function buildPorts() {
       return configureOmega(eleventyConfig, {
         consumerDir: PORTS,
         siteData,
-        themesDir: path.join(SPIKE, 'themes'),
-        coreDir: path.join(SPIKE, 'core'),
-        defaultsDir: path.join(SPIKE, 'defaults'),
-        farmDir: path.join(SPIKE, '.omega', 'layout-farm-ports'),
+        farmDir: path.join(PKG, '.omega', 'layout-farm-ports'),
         assetManifest: { js: {}, css: { theme: '/assets/css/theme-TEST.css' } },
       });
     },
