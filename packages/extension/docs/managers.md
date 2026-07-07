@@ -43,7 +43,7 @@ The contexts that include `web-manager` (popup / options / sidepanel / page) als
 ```js
 const Manager = require('browser-extension-manager/build');
 
-Manager.getConfig();         // → parsed config/browser-extension-manager.json
+Manager.getConfig();         // → RESOLVED config/omega.json5 (targets.extension overlaid; via @omegajs/config)
 Manager.getManifest();       // → parsed src/manifest.json (JSON5)
 Manager.getPackage('project');   // → cwd's package.json
 Manager.getPackage('main');      // → BXM's own package.json

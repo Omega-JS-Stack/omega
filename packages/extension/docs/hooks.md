@@ -30,7 +30,7 @@ The hook receives a build-info object with:
 
 - `index.package` — parsed `package.json`
 - `index.manifest` — parsed `src/manifest.json` (JSON5)
-- `index.config` — parsed `config/browser-extension-manager.json`
+- `index.config` — resolved `config/omega.json5` (targets.extension overlaid onto the top level)
 - `index.brand` — shorthand for `index.config.brand`
 - `index.paths` — `{ root, src, dist, packaged }` absolute paths
 - `index.env` — `'production'` or `'development'`

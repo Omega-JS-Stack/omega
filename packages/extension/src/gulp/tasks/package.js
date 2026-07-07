@@ -63,7 +63,7 @@ async function generateBuildJs(outputDir) {
         environment: Manager.getEnvironment(),
         buildTime: Date.now(),
 
-        // Brand configuration (from browser-extension-manager.json or manifest)
+        // Brand configuration (from config/omega.json5 or manifest)
         brand: config.brand || {},
 
         // BXM-specific config
@@ -98,10 +98,12 @@ async function generateBuildJs(outputDir) {
         refreshNewVersion: { enabled: true, config: {} },
         serviceWorker: { enabled: false, config: {} },
 
-        // Analytics
+        // Analytics. The Measurement Protocol API secret comes from .env
+        // (GOOGLE_ANALYTICS_SECRET — matches BEM/EM convention; secrets never live
+        // in omega.json5) and is baked into the snapshot here at build time.
         analytics: {
           google: config.analytics?.providers?.google?.id || '',
-          googleSecret: config.analytics?.providers?.google?.secret || '',
+          googleSecret: process.env.GOOGLE_ANALYTICS_SECRET || '',
         },
 
         // Theme config

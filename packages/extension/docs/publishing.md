@@ -104,7 +104,7 @@ Safari (Apple) uses a different extension model and requires Xcode-based packagi
 
 ## Store listing description (`config/description.md`)
 
-`config/description.md` is the Chrome Web Store listing description. When writing or rewriting it, first read `config/browser-extension-manager.json` (brand), `config/messages.json` (extension name + short description), `src/manifest.json` (permissions/features), and the component JS under `src/assets/js/components/` to understand what the extension actually does — be specific about real features, not generic copy.
+`config/description.md` is the Chrome Web Store listing description. When writing or rewriting it, first read `config/omega.json5` (brand), `config/messages.json` (extension name + short description), `src/manifest.json` (permissions/features), and the component JS under `src/assets/js/components/` to understand what the extension actually does — be specific about real features, not generic copy.
 
 **Format:**
 

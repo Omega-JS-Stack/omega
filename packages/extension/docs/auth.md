@@ -64,7 +64,7 @@ All contexts sign out
 
 ## Required setup
 
-1. **Add `authDomain`** to your Firebase config in `config/browser-extension-manager.json`:
+1. **Add `authDomain`** to your Firebase config in `config/omega.json5`:
    ```jsonc
    {
      firebaseConfig: {

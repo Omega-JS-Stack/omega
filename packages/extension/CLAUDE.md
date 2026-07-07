@@ -26,7 +26,7 @@ Browser Extension Manager (BXM) is a comprehensive framework for building modern
 ### For Consuming Projects
 
 1. `npm install browser-extension-manager --save-dev`
-2. `npx bxm setup` — scaffolds the project (copies `src/defaults/` into the project: `src/manifest.json`, `src/views/`, `src/assets/`, `config/browser-extension-manager.json`, etc.)
+2. `npx bxm setup` — scaffolds the project (copies `src/defaults/` into the project: `src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.)
 3. `npm start` — dev (gulp → webpack → serve with live reload)
 4. `npm run build` — production build (compiles `dist/`, packages per-browser into `packaged/<browser>/raw/` + `.zip`)
 5. `BXM_IS_PUBLISH=true npm run build` — also uploads to Chrome / Firefox / Edge stores (see [docs/publishing.md](docs/publishing.md))

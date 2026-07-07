@@ -76,7 +76,7 @@ const FILE_MAP = {
   },
 
   // Config files
-  'config/browser-extension-manager.json': {
+  'config/omega.json5': {
     overwrite: true,
     merge: true,
   },
@@ -320,6 +320,15 @@ function mergeConfigs(existingConfig, newConfig) {
           // User doesn't have this option or has 'default', use new default
           target[key] = newValue;
         }
+      }
+    }
+
+    // Preserve consumer-only keys at every level — anything not in the new
+    // defaults (custom settings under targets.extension, custom top-level keys
+    // like liveReloadPort) must survive re-running setup.
+    for (const key in source) {
+      if (!Object.prototype.hasOwnProperty.call(newDefaults, key)) {
+        target[key] = source[key];
       }
     }
   }

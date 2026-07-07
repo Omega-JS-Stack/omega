@@ -1,7 +1,14 @@
+// config/omega.json5 — the single OMEGA config file (JSON5: comments + trailing commas OK).
+//
+// Shape: SHARED sections at the top level (identical spelling in every OMEGA project
+// type — website, backend, extension, desktop), then a `targets` object whose KEY
+// PRESENCE says which targets this brand enables and whose values hold target-scoped
+// settings. Any shared key may also appear inside a target entry to override it for
+// that surface only (e.g. an extension-specific sentry.dsn under targets.extension).
+//
+// Secrets NEVER live here — they live in .env. The validator hard-fails on
+// secret-shaped keys (…Secret, …privateKey).
 {
-  theme: {
-    id: 'classy',
-  },
   brand: {
     id: 'ultimate-jekyll',
     name: 'Ultimate Jekyll',
@@ -15,17 +22,22 @@
       combomark: 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/logo/itw-creative-works-combomark-blue-1024x.png',
     },
   },
+
   sentry: {
     dsn: '',
   },
+
+  // GA4 analytics. Measurement ID lives in config (not secret); the API secret
+  // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (.env — matches BEM/EM convention)
+  // and is baked into the build snapshot (build.json / BXM_BUILD_JSON) at build time.
   analytics: {
     providers: {
       google: {
         id: '',
-        secret: '',
       },
     },
   },
+
   firebaseConfig: {
     apiKey: 'AIzaSyD1MvM-EQC_eVWqaTe5ImWALwhBr7iXgh8',
     authDomain: 'universal-auth.itwcreativeworks.com',
@@ -35,5 +47,15 @@
     messagingSenderId: '195162582358',
     appId: '1:195162582358:web:6f9320c516d9ab4838baf7',
     measurementId: 'G-W08HGRW4S',
+  },
+
+  theme: {
+    id: 'classy',
+  },
+
+  // KEY PRESENCE = enabled. `extension: {}` = enabled with defaults (the extension
+  // target section is near-empty by design — extension-specific settings land here).
+  targets: {
+    extension: {},
   },
 }

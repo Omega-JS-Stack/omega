@@ -142,7 +142,7 @@ BXM provides built-in cross-context authentication that syncs across all extensi
 
 ### Setup
 
-1. Add `authDomain` to your Firebase config in `config/browser-extension-manager.json`
+1. Add `authDomain` to your Firebase config in `config/omega.json5`
 2. Add `tabs` permission to `src/manifest.json`
 
 ### Auth button classes

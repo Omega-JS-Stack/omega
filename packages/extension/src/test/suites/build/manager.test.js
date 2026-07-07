@@ -1,5 +1,5 @@
 // Build-layer tests for Manager.getConfig() / getManifest() / getPackage() / getEnvironment().
-// Stages a temp project dir with config/browser-extension-manager.json + src/manifest.json
+// Stages a temp project dir with config/omega.json5 + src/manifest.json
 // + package.json, sets process.cwd() to it, then exercises Manager's getters.
 
 const path    = require('path');
@@ -10,7 +10,7 @@ function stageProject(opts = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-getconfig-'));
   if (opts.config !== undefined) {
     fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, 'config', 'browser-extension-manager.json'), opts.config);
+    fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), opts.config);
   }
   if (opts.manifest !== undefined) {
     fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
@@ -44,14 +44,52 @@ module.exports = {
   description: 'Manager — config / manifest / package / environment getters',
   tests: [
     {
-      name: 'getConfig returns parsed JSON5',
+      name: 'getConfig resolves config/omega.json5 with the targets.extension overlay',
       run: (ctx) => {
-        const tmp = stageProject({ config: `{ brand: { id: 'somiibo', name: 'Somiibo' } }` });
+        const tmp = stageProject({ config: `{
+          // JSON5 comment on purpose
+          brand: { id: 'somiibo', name: 'Somiibo' },
+          theme: { id: 'classy' },
+          liveReloadPort: 40000,
+          targets: { extension: { theme: { id: 'custom' } } },
+        }` });
         try {
           inDir(tmp, (Manager) => {
             const cfg = Manager.getConfig();
             ctx.expect(cfg.brand.id).toBe('somiibo');
             ctx.expect(cfg.brand.name).toBe('Somiibo');
+            // targets.extension overlays the top level
+            ctx.expect(cfg.theme.id).toBe('custom');
+            // custom top-level keys pass through
+            ctx.expect(cfg.liveReloadPort).toBe(40000);
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'getConfig returns {} when no omega.json5 exists',
+      run: (ctx) => {
+        const tmp = stageProject({});
+        try {
+          inDir(tmp, (Manager) => {
+            ctx.expect(Manager.getConfig()).toEqual({});
+          });
+        } finally {
+          fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'getConfig hard-fails on secret-shaped keys',
+      run: (ctx) => {
+        const tmp = stageProject({ config: `{ brand: { id: 'x', name: 'X' }, analytics: { providers: { google: { id: '', secret: 'leak' } } }, targets: { extension: {} } }` });
+        try {
+          inDir(tmp, (Manager) => {
+            let threw = null;
+            try { Manager.getConfig(); } catch (e) { threw = e; }
+            ctx.expect(threw ? threw.message : '').toMatch(/[Ss]ecret/);
           });
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });

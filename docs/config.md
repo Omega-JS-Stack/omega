@@ -85,9 +85,10 @@ slug) and `brand.name` are the only universally required fields.
 
 ## Consumer access
 
-Each framework exposes the vendored loader — e.g. EM: `require('electron-manager/config')`
-→ `{ loadConfig, validateConfig, … }`. Consumer workflows use this instead of raw JSON5
-reads so brand-monorepo resolution always applies.
+Each framework exposes the vendored loader — EM: `require('electron-manager/config')`,
+BXM: `require('browser-extension-manager/config')` → `{ loadConfig, validateConfig, … }`.
+Consumer workflows use this instead of raw JSON5 reads so brand-monorepo resolution
+always applies.
 
 ## Migration — legacy configs → omega.json5
 
@@ -123,6 +124,22 @@ the same loader and passed as `options.defaults`; `Manager.init()`'s
 schema findings, `npx mgr setup` is the hard audit. The sandbox brand dogfoods the full
 hierarchy: shared sections live in `apps/sandbox-brand/config/omega.json5` (brand level),
 the backend app file carries only `targets.backend`.
+
+### browser-extension-manager (`config/browser-extension-manager.json` → `config/omega.json5`) — DONE (checkpoint 20)
+
+| Legacy | New |
+|---|---|
+| `brand`, `firebaseConfig`, `analytics`, `sentry`, `theme` | top level, unchanged |
+| custom keys (`liveReloadPort`, …) | top level, unchanged |
+| `analytics.providers.google.secret` | **`.env` → `GOOGLE_ANALYTICS_SECRET`** (secrets never in omega.json5; loader hard-fails) |
+| *(no extension-specific keys yet)* | `targets.extension: {}` — presence = enabled; extension-specific settings land here |
+
+Notes: `Manager.getConfig()` returns the RESOLVED config (missing file → `{}`; schema
+findings warn once per process — BXM has no separate audit surface). The build snapshot
+(`build.json` / `BXM_BUILD_JSON`) bakes `GOOGLE_ANALYTICS_SECRET` from the environment at
+build time, same value flow as before. `bxm setup` scaffolds + merges `config/omega.json5`
+(the defaults merge now preserves consumer-only keys at every level — it previously
+dropped them).
 
 ### ultimate-jekyll-manager (`_config.yml` + `ultimate-jekyll-manager.json`) — via `omega migrate` (Phase 2/4)
 

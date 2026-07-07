@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
+    "./config": "./dist/vendor/config/index.js",
     "./build": "./dist/build.js",
     "./background": "./dist/background.js",
     "./content": "./dist/content.js",
@@ -113,6 +114,7 @@
     "gulp": "^5.0.1"
   },
   "devDependencies": {
+    "@omegajs/config": "*",
     "@omegajs/devkit": "*",
     "prepare-package": "^2.1.0",
     "puppeteer": "^24.43.1"

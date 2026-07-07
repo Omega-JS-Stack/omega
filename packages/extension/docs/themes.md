@@ -12,7 +12,7 @@ BXM ships two themes plus a template for new ones. Themes vendor their own SCSS 
 
 ## Activating a theme
 
-Set in `config/browser-extension-manager.json`:
+Set in `config/omega.json5`:
 
 ```jsonc
 {
@@ -43,7 +43,7 @@ src/assets/themes/<theme-id>/
 3. Customize `_config.scss` — variables like `$primary`, `$font-family-base`, etc.
 4. Add theme-specific styles under `scss/`.
 5. Update `_theme.scss` to forward your overrides.
-6. Activate via `config/browser-extension-manager.json` → `theme.id: 'my-theme'`.
+6. Activate via `config/omega.json5` → `theme.id: 'my-theme'`.
 
 ## Overriding theme variables
 

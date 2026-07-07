@@ -13,9 +13,9 @@ HTML views go through a two-step `{{ }}` token replacement during the `gulp/html
 
 | Token | Source | Example |
 |---|---|---|
-| `{{ brand.name }}` | `config/browser-extension-manager.json` → `brand.name` | `Tabblar` |
-| `{{ brand.url }}` | `config/browser-extension-manager.json` → `brand.url` | `https://tabblar.com` |
-| `{{ brand.id }}` | `config/browser-extension-manager.json` → `brand.id` | `tabblar` |
+| `{{ brand.name }}` | `config/omega.json5` → `brand.name` | `Tabblar` |
+| `{{ brand.url }}` | `config/omega.json5` → `brand.url` | `https://tabblar.com` |
+| `{{ brand.id }}` | `config/omega.json5` → `brand.id` | `tabblar` |
 | `{{ page.name }}` | Component name (e.g. `popup`, `pages/dashboard`) | `popup` |
 | `{{ page.path }}` | Full view path | `views/popup/index.html` |
 | `{{ page.title }}` | Page title — defaults to brand name | `Tabblar` |

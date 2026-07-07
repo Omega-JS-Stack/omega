@@ -100,9 +100,30 @@ Manager.getManifest = function () {
 }
 Manager.prototype.getManifest = Manager.getManifest;
 
-// getConfig: requires and parses browser-extension-manager.json
+// getConfig: the consumer's RESOLVED config/omega.json5 via @omegajs/config —
+// shared sections at the top level, targets.extension overlaid onto them (brand
+// walk-up applies in brand monorepos). Secrets never live in the file; the loader
+// hard-fails on secret-shaped keys.
+let warnedConfigSchema = false;
 Manager.getConfig = function () {
-  return JSON5.parse(jetpack.read(path.join(process.cwd(), 'config', 'browser-extension-manager.json')));
+  const { hasOmegaConfig, loadConfig, formatErrors } = require('@omegajs/config');
+
+  // No config at all (fresh dir, non-consumer cwd) → empty shape; callers
+  // optional-chain and the defaults task scaffolds the real file on setup.
+  const cwd = process.cwd();
+  if (!hasOmegaConfig(cwd)) {
+    return {};
+  }
+
+  const { config, errors } = loadConfig(cwd, 'extension');
+
+  // Warn ONCE per process — gulp tasks each call getConfig() at require time.
+  if (errors.length && !warnedConfigSchema) {
+    warnedConfigSchema = true;
+    console.warn(`[browser-extension-manager] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+  }
+
+  return config;
 }
 Manager.prototype.getConfig = Manager.getConfig;
 
