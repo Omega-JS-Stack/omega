@@ -41,6 +41,9 @@ jobs:
       - name: bakeoff-shared suite (corpus generator)
         run: npm test --workspace=spikes/bakeoff-shared
 
+      - name: bakeoff-eleventy suite (A1 slice vs real Eleventy 3)
+        run: npm test --workspace=spikes/bakeoff-eleventy
+
       - name: client suite
         run: npm test --workspace=packages/client
 

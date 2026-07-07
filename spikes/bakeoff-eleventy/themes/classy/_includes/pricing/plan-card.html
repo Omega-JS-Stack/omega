@@ -1,0 +1,18 @@
+{% comment %} resolve-plan math: annual per-month, total, and savings % from the raw plan prices {% endcomment %}
+{% assign plan = include.plan %}
+{% assign annualPerMonth = plan.price_annually | divided_by: 12.0 | round: 2 %}
+{% assign fullYear = plan.price_monthly | times: 12.0 %}
+{% assign savings = fullYear | minus: plan.price_annually | divided_by: fullYear | times: 100 | round %}
+<div class="col-md-4 mb-4">
+  <div class="card plan-card h-100" data-plan="{{ plan.id }}">
+    <div class="card-body text-center">
+      <h3 class="card-title">{{ plan.name | uj_title_case }}</h3>
+      <p class="plan-price display-6">${{ plan.price_monthly }}<small>/mo</small></p>
+      <p class="plan-annual text-muted">${{ annualPerMonth }}/mo billed annually (${{ plan.price_annually }}/yr — save {{ savings }}%)</p>
+      <ul class="list-unstyled">
+        {% for feature in plan.features %}<li>{% uj_icon star %} {{ feature }}</li>{% endfor %}
+      </ul>
+      <a class="btn btn-primary" href="/signup/?plan={{ plan.id }}">Choose {{ plan.name }}</a>
+    </div>
+  </div>
+</div>

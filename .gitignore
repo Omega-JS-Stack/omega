@@ -21,3 +21,6 @@ logs/
 
 # Bake-off generated corpus (deterministic — regenerate via `npm run generate` in spikes/bakeoff-shared)
 spikes/bakeoff-shared/corpus/
+
+# Bake-off candidate build output
+spikes/bakeoff-eleventy/_site/

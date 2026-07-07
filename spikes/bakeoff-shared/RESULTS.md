@@ -26,30 +26,49 @@ Baseline to beat: **332 s cold build** (see [BASELINE.md](BASELINE.md)).
 | Candidate | mean | stddev | min | max | runs |
 |-----------|-----:|-------:|----:|----:|-----:|
 | Jekyll (real somiibo, reference) | 332 s | — | — | — | 1 |
-| Eleventy | — | — | — | — | — |
+| Eleventy (full: assets+eleventy+purge) | **3.60 s** | 0.025 | 3.58 | 3.64 | 3 (+1 warmup) |
 | Astro | — | — | — | — | — |
 
-### Incremental rebuild
+Eleventy phase split (single run): assets (esbuild+sass) 0.60 s, Eleventy 2.64 s,
+PurgeCSS 0.42 s → 1,279 HTML files (1030 posts + 105 pages + 20 alternatives +
+103 blog-index pages + 18 taxonomy pages + 3 defaults). ~92× the Jekyll baseline.
+2026-07-06, same M1 Max as BASELINE.md, Node v24.15.0, Eleventy 3.1.6.
 
-| Candidate | 1 post touched | 1 layout touched | 1 data file touched |
-|-----------|---------------:|-----------------:|--------------------:|
-| Eleventy | — | — | — |
-| Astro | — | — | — |
+### Incremental rebuild (watch mode, `--incremental`, farm layouts)
+
+| Candidate | initial | 1 post touched | 1 layout touched | 1 include touched |
+|-----------|--------:|---------------:|-----------------:|------------------:|
+| Eleventy | 2.51 s | 1.95 s | 2.04 s | 1.89 s |
+| Astro | — | — | — | — |
+
+Eleventy caveat: `--incremental` does NOT narrow here — every touch re-renders
+all 1,279 files (the collection-paginated templates make everything depend on
+the posts collection). Full re-render at ~2 s makes dev reload fine anyway;
+narrowing is a B-phase optimization (dependency hints). Data-file note: the
+site global is read at config time (like `_config.yml`) — changing it means a
+dev-server restart; there is no corpus `_data/` to hot-touch.
 
 ### A1 slice checklist (both candidates must build the identical slice)
 
-- [ ] Base layout chain
-- [ ] blueprint/index + pricing (incl. resolve-plan math)
-- [ ] Auth signin/signup (FormManager + web-manager boot)
-- [ ] Blog with pagination + taxonomy
-- [ ] 404
-- [ ] One frontmatter-only override page (consumer data over layout defaults)
-- [ ] TWO themes, layered resolution, zero file copying
-- [ ] 3-layer page-module JS/CSS via esbuild manifest
-- [ ] `page.resolved` equivalent
-- [ ] Frontmatter-value Liquid rendering (cached) — corpus has `{{ site.* }}` refs in frontmatter
-- [ ] sass loadPaths + PurgeCSS
-- [ ] HTTPS dev-server story decided
+| Item | Eleventy | Astro |
+|------|:--------:|:-----:|
+| Base layout chain | ✅ | — |
+| blueprint/index + pricing (incl. resolve-plan math) | ✅ | — |
+| Auth signin/signup (FormManager + web-manager boot) | ✅ real @omegajs/client bundled via `web-manager` esbuild alias | — |
+| Blog with pagination + taxonomy | ✅ | — |
+| 404 | ✅ | — |
+| One frontmatter-only override page (consumer data over layout defaults) | ✅ native data cascade | — |
+| TWO themes, layered resolution, zero file copying | ✅ virtual templates (build) + symlink farm (dev, watchable) | — |
+| 3-layer page-module JS/CSS via esbuild manifest | ✅ | — |
+| `page.resolved` equivalent | ✅ cascade + `eleventyComputed.resolved`; migration = `page.resolved.` → `resolved.` (967 refs in UJM, one mechanical rewrite; `layout.*` refs: zero) | — |
+| Frontmatter-value Liquid rendering (cached) | ✅ preprocessor + per-string cache | — |
+| sass loadPaths + PurgeCSS | ✅ `omega:` scheme importer (bare `@use` resolves file-relative before loadPaths — layering needs the scheme) | — |
+| HTTPS dev-server story decided | ✅ native: `@11ty/eleventy-dev-server` `https: { key, cert }` (+ http/2) with mkcert — no BrowserSync proxy | — |
+
+Eleventy spike: `spikes/bakeoff-eleventy` (17/17 tests). Migration findings
+logged in its README: bracket-layout hack → `addLayoutAlias` table (layout
+values resolve before preprocessors); `timezoneOffset: 0` for CI-parity dates;
+Eleventy layout data cascades natively (no `layout.` namespace).
 
 ## Decision
 

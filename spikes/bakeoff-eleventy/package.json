@@ -1,0 +1,31 @@
+{
+  "name": "@omegajs/bakeoff-eleventy",
+  "version": "1.0.0",
+  "description": "Bake-off candidate 1: Eleventy v3 + LiquidJS building the shared corpus with @omegajs/template-kit — validates layered layouts (virtual templates), jekyllInclude, and the full A1 slice",
+  "private": true,
+  "main": "./eleventy.config.js",
+  "scripts": {
+    "test": "node --test",
+    "build": "node src/build.js",
+    "build:ssg": "npx @11ty/eleventy",
+    "dev": "npx @11ty/eleventy --serve",
+    "bench": "node src/bench-run.js"
+  },
+  "dependencies": {
+    "@11ty/eleventy": "^3.1.6",
+    "@omegajs/bakeoff-shared": "*",
+    "@omegajs/config": "*",
+    "@omegajs/template-kit": "*",
+    "esbuild": "^0.28.1",
+    "fs-jetpack": "^5.1.0",
+    "liquidjs": "^10.27.1",
+    "markdown-it": "^14.3.0",
+    "purgecss": "^8.0.0",
+    "sass": "^1.101.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "ITW Creative Works",
+  "license": "MIT"
+}
