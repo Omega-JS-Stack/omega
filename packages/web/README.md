@@ -8,7 +8,10 @@ winning spike; **B2 ported the REAL UJM content** — the full blueprint layout
 set, 3 Liquid themes + the bootstrap asset layer, ~60 default pages, and the
 real core chrome (head/body/foot) — through the B4 codemod rules. **B3 added
 the `omega` CLI, consumer scaffolding, the ESM boot runtime, and the Ruby-free
-CI template.**
+CI template. B4 made the conversion plan executable: `omega migrate` (legacy
+configs → omega.json5, the codemod rule table over `src/**`, the liquid-lint
+scanner, legacy-file removal) — live-proven on real consumers (somiibo:
+migrate → 2,556 pages, ~3.2× the whole Jekyll pipeline).**
 
 ```bash
 # In a consumer project (scaffolded scripts call these):
@@ -19,9 +22,11 @@ npx omega test      # production build + smoke checks + consumer test/ (node --t
 npx omega deploy    # refuse file: deps → npm run build → `npu sync --message='Deploy'`
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
+npx omega migrate           # UJM (Jekyll) consumer → @omegajs/web, in place
+npx omega migrate --check   # full report (config + codemod preview + lint), zero writes
 # translate / audit: explicit not-ported-yet stubs (subsystems ride later checkpoints)
 
-npm test    # 38 tests: engine slice (13) + assets/ESM (6) + CLI/scaffold (7) + ports (5) + theme contract (7)
+npm test    # 52 tests: engine slice (13) + assets/ESM (6) + CLI/scaffold (7) + migrate (14) + ports (5) + theme contract (7)
 ```
 
 A bare consumer (`omega setup` in an empty dir, edit brand in
@@ -48,6 +53,7 @@ see the harness README for the honest before/after numbers.
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
+| [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/config.md](../../docs/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registerLiquid path), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
 | [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (webManager + mode helpers) |
 
 ## Packaged content (the real UJM port, B2)
@@ -130,6 +136,21 @@ see the harness README for the honest before/after numbers.
   .nvmrc re-template every run, `src/**` is consumer-owned after seeding.
   NO pages are copied — the default set stays virtual. package.json scripts
   sync to the omega commands.
+- **Migration (`omega migrate`)** — one command converts a UJM consumer in
+  place: legacy configs → validated omega.json5 (shared sections extracted
+  with unified spellings — `analytics.providers.<p>.id`, `firebaseConfig`,
+  `payment` at the top level; the `web_manager` client blob + presentation
+  sections + build settings under `targets.web`), the codemod rule table over
+  `src/**` templates, seed `main.js` removal (the core main + boot runtime
+  replace it), the `@use 'omega:main' with (…)` rewrite for theme-variable
+  customization (the layered sass importer skips the requesting file, so a
+  consumer main.scss configures the layers below it), page-css self-@use
+  drops, liquid-lint, and legacy-file removal (Gemfile & co). `--check` runs
+  everything in memory. The ENGINE composes the runtime shape back
+  (firebaseConfig → `web_manager.firebase.app.config`, payment →
+  `web_manager.payment`, providers → the client's flat analytics) so the
+  chrome/client contract is unchanged — one home per value in the config,
+  same bridge pattern as the extension framework.
 
 ## Engine facts worth knowing (test-pinned)
 
@@ -161,17 +182,25 @@ see the harness README for the honest before/after numbers.
     data-init: mutate arrays in place (site collections), never reassign.
 
 The full findings log + scorecard: [RESULTS.md](../../spikes/bakeoff-shared/RESULTS.md),
-[DECISION.md](../../spikes/bakeoff-shared/DECISION.md). The B4 `omega migrate`
-codemod rules table lives in DECISION.md (B2 added: `layout: none` → drop,
-`page.<key>` → `resolved.<key>` in template bodies only, `page.canonical.*` →
-`site.url`/`page.url` forms).
+[DECISION.md](../../spikes/bakeoff-shared/DECISION.md). The codemod rule
+table (DECISION.md) is EXECUTABLE as of B4 — [src/migrate/rules.js](src/migrate/rules.js),
+semantically proven in the suite (the capture hoist renders byte-identical to
+a literal arg; the parentloop hoist renders the right outer indexes). B4 also
+killed two real-data bugs: taxonomy terms now dedupe by slug (somiibo mixes
+"Marketing" ×673 / "marketing" ×11 — Jekyll silently last-write-won, Eleventy
+hard-errors), and the live somiibo interpolated-icon bug
+(`class="fa text- display-4"`) is fixed in the packaged classy layouts (12
+latent copies) AND forward in consumer files by the codemod.
 
-## Not here yet (B4–B5 + follow-ups)
+## Not here yet (B5 + follow-ups)
 
-`omega migrate` codemod + liquid-lint (B4) · `omega verify` parity harness
-(B5) · translate/audit subsystem ports (commands exist as explicit
-not-ported-yet stubs) · UJM-setup extras (CNAME, firebase auth handler fetch,
-GitHub secret publishing, post dedupe) · imagemin w/ content-hash cache,
-minifyHtml-as-transform, sitemap/feeds, named css bundles, full icon set,
-theme-variable customization via a consumer main.scss (B-phase pipeline) ·
-dev-loop re-render narrowing + browser live-reload on asset rebuilds.
+`omega verify --against <jekyll-dist>` parity harness (B5 — the per-site
+migration gate; the real somiibo URL-set diff, 2,556 vs Jekyll's 2,608 files,
+is its first job) · translate/audit subsystem ports (commands exist as
+explicit not-ported-yet stubs) · UJM-setup extras (CNAME, firebase auth
+handler fetch, GitHub secret publishing, post dedupe) · imagemin w/
+content-hash cache, minifyHtml-as-transform, sitemap/feeds, named css
+bundles, full icon set (B-phase pipeline) · engine consumption of
+`targets.web.collections`/`defaults`/`generators` (migrate carries the config;
+custom collections land with the sweet-saucy wave) · dev-loop re-render
+narrowing + browser live-reload on asset rebuilds.

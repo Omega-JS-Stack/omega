@@ -19,7 +19,8 @@
     "./consumer-scan": "./src/consumer-scan.js",
     "./paths": "./src/paths.js",
     "./consumer": "./src/consumer.js",
-    "./scaffold": "./src/scaffold.js"
+    "./scaffold": "./src/scaffold.js",
+    "./migrate": "./src/migrate/index.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
@@ -35,6 +36,8 @@
     "dotenv": "^17.4.2",
     "esbuild": "^0.28.1",
     "fs-jetpack": "^5.1.0",
+    "js-yaml": "^5.2.1",
+    "json5": "^2.2.3",
     "liquidjs": "^10.27.1",
     "lodash": "^4.17.21",
     "markdown-it": "^14.3.0",

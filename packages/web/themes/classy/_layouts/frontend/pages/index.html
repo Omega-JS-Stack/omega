@@ -321,7 +321,11 @@ cta:
     <div class="{% unless is_side_layout %}mx-auto{% endunless %} {{ demo.options.class }}">
       <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
         <div class="ratio ratio-16x9">
-          {% uj_video demo.options.src, class="w-100 d-block object-fit-cover border-0", controls="{{ demo.options.controls }}", loop="{{ demo.options.loop }}", autoplay="{{ demo.options.autoplay }}", playsinline="true", muted="{{ demo.options.muted }}", preload="metadata" %}
+          {% capture uj_migrate_arg_1 %}{{ demo.options.controls }}{% endcapture %}
+          {% capture uj_migrate_arg_2 %}{{ demo.options.loop }}{% endcapture %}
+          {% capture uj_migrate_arg_3 %}{{ demo.options.autoplay }}{% endcapture %}
+          {% capture uj_migrate_arg_4 %}{{ demo.options.muted }}{% endcapture %}
+          {% uj_video demo.options.src, class="w-100 d-block object-fit-cover border-0", controls=uj_migrate_arg_1, loop=uj_migrate_arg_2, autoplay=uj_migrate_arg_3, playsinline="true", muted=uj_migrate_arg_4, preload="metadata" %}
         </div>
       </div>
     </div>
@@ -540,7 +544,8 @@ cta:
         {% assign ratio = resolved.showcase.image_ratio | default: "4x3" %}
         {% assign object_position = resolved.showcase.image_object_position | default: "center" %}
         <div class="card border-0 shadow-sm ratio ratio-{{ ratio }}">
-          {% uj_image item.image, class="w-100 h-100 object-fit-cover rounded", style="object-position: {{ object_position }};", alt=item.title %}
+          {% capture uj_migrate_arg_5 %}object-position: {{ object_position }};{% endcapture %}
+          {% uj_image item.image, class="w-100 h-100 object-fit-cover rounded", style=uj_migrate_arg_5, alt=item.title %}
         </div>
       {% endcapture %}
 
@@ -620,13 +625,15 @@ cta:
       {% for stat in resolved.stats %}
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="mb-3">
-            {% uj_icon stat.icon, "text-{{ stat.color }} display-4" %}
+            {% capture uj_migrate_arg_6 %}text-{{ stat.color }} display-4{% endcapture %}
+            {% uj_icon stat.icon, uj_migrate_arg_6 %}
           </div>
           <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
           {% iftruthy stat.show_stars %}
             <div class="mb-0">
               {% for i in (1..5) %}
-                {% uj_icon "star", "text-{{ stat.color }}" %}
+                {% capture uj_migrate_arg_7 %}text-{{ stat.color }}{% endcapture %}
+                {% uj_icon "star", uj_migrate_arg_7 %}
               {% endfor %}
             </div>
           {% endiftruthy %}

@@ -49,6 +49,11 @@ function registerCollections(eleventyConfig, collectionsHolder) {
 
 /**
  * Aggregate the blog taxonomy from posts' `post.categories` / `post.tags`.
+ * Terms are keyed by SLUG — real corpora mix spellings ("Marketing" ×673 vs
+ * "marketing" ×11 in somiibo) and case variants would generate duplicate
+ * taxonomy pages at the same permalink (Jekyll silently last-write-won;
+ * Eleventy hard-errors). The most frequent spelling becomes the display
+ * name; a post never lands in the same term twice.
  * @param {object} api - Eleventy collection API
  * @param {string} field
  * @returns {Array<{ name: string, slug: string, posts: object[] }>}
@@ -58,13 +63,25 @@ function aggregateTaxonomy(api, field) {
   const posts = api.getFilteredByTag('posts').sort(byDateThenSlug);
 
   for (const item of posts) {
-    for (const name of (item.data.post && item.data.post[field]) || []) {
-      if (!groups.has(name)) groups.set(name, { name, slug: slugify(name), posts: [] });
-      groups.get(name).posts.push(item);
+    const names = (item.data.post && item.data.post[field]) || [];
+    const seen = new Set();
+    for (const name of names) {
+      const slug = slugify(name);
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      if (!groups.has(slug)) groups.set(slug, { name, slug, posts: [], spellings: new Map() });
+      const group = groups.get(slug);
+      group.spellings.set(name, (group.spellings.get(name) || 0) + 1);
+      group.posts.push(item);
     }
   }
 
-  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...groups.values()]
+    .map(({ spellings, ...group }) => ({
+      ...group,
+      name: [...spellings.entries()].sort((a, b) => b[1] - a[1])[0][0],
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**

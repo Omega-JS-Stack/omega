@@ -221,22 +221,29 @@ async function purgeCss(options) {
 /**
  * Sass FileImporter resolving `omega:<name>` through the ordered layer roots
  * (first layer containing _<name>.scss / <name>.scss at its root or under
- * css/ wins). `omega:theme` → the active theme's _theme.scss.
+ * css/ wins). `omega:theme` → the active theme's _theme.scss. A candidate
+ * that IS the requesting file is skipped, so a consumer main.scss can
+ * `@use 'omega:main' with (…)` to configure and extend the main bundle from
+ * the layers below it (the migrated form of UJM's
+ * `@use 'ultimate-jekyll-manager' with (…)` theme customization).
  * @param {string[]} layers - layer roots
  * @returns {object}
  */
 function layeredFileImporter(layers) {
-  const { pathToFileURL } = require('node:url');
+  const { pathToFileURL, fileURLToPath } = require('node:url');
   return {
-    findFileUrl(url) {
+    findFileUrl(url, context) {
       if (!url.startsWith('omega:')) return null;
       const name = url.slice('omega:'.length);
+      const containing = context && context.containingUrl ? fileURLToPath(context.containingUrl) : null;
       for (const root of layers) {
         for (const candidate of [path.join(root, name), path.join(root, 'css', name)]) {
           const dir = path.dirname(candidate);
           const base = path.basename(candidate);
-          if (fs.existsSync(path.join(dir, `_${base}.scss`)) || fs.existsSync(path.join(dir, `${base}.scss`))) {
-            return pathToFileURL(candidate);
+          for (const file of [path.join(dir, `_${base}.scss`), path.join(dir, `${base}.scss`)]) {
+            if (!fs.existsSync(file)) continue;
+            if (containing && path.resolve(file) === path.resolve(containing)) continue;
+            return pathToFileURL(file);
           }
         }
       }

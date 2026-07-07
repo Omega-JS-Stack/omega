@@ -276,7 +276,8 @@ faqs:
       {% for stat in resolved.stats.items %}
         <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
           <div class="mb-3">
-            {% uj_icon stat.icon, "text-{{ stat.color }} display-4" %}
+            {% capture uj_migrate_arg_1 %}text-{{ stat.color }} display-4{% endcapture %}
+            {% uj_icon stat.icon, uj_migrate_arg_1 %}
           </div>
           <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
           <p class="text-muted mb-0">{{ stat.label }}</p>

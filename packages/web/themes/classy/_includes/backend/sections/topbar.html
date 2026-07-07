@@ -67,7 +67,8 @@
                           <div class="d-flex">
                             {% if notification.icon %}
                               <div class="me-3">
-                                {% uj_icon notification.icon, "fa-lg {{ notification.icon_class | default: 'text-primary' }}" %}
+                                {% capture uj_migrate_arg_1 %}fa-lg {{ notification.icon_class | default: 'text-primary' }}{% endcapture %}
+                                {% uj_icon notification.icon, uj_migrate_arg_1 %}
                               </div>
                             {% endif %}
                             <div class="flex-fill">
@@ -87,7 +88,8 @@
                           <div class="d-flex">
                             {% if notification.icon %}
                               <div class="me-3">
-                                {% uj_icon notification.icon, "fa-lg {{ notification.icon_class | default: 'text-primary' }}" %}
+                                {% capture uj_migrate_arg_2 %}fa-lg {{ notification.icon_class | default: 'text-primary' }}{% endcapture %}
+                                {% uj_icon notification.icon, uj_migrate_arg_2 %}
                               </div>
                             {% endif %}
                             <div class="flex-fill">

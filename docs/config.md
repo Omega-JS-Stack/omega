@@ -141,9 +141,32 @@ build time, same value flow as before. `bxm setup` scaffolds + merges `config/om
 (the defaults merge now preserves consumer-only keys at every level — it previously
 dropped them).
 
-### ultimate-jekyll-manager (`_config.yml` + `ultimate-jekyll-manager.json`) — via `omega migrate` (Phase 2/4)
+### ultimate-jekyll-manager (`src/_config.yml` + `config/ultimate-jekyll-manager.json`) — `omega migrate` (B4, checkpoint 32)
 
-Handled by the `@omegajs/web` migration codemod, not by hand.
+One command converts the consumer in place (and `--check` previews without
+writing). The converted file is validated through `loadConfig(root, 'web')`
+before the report prints.
+
+| Legacy | New |
+|---|---|
+| `url` | `brand.url` (site.url derives; empty `baseurl` dropped) |
+| `brand`, `theme`, `oauth2` | top level, verbatim |
+| `analytics.{google,meta,tiktok}` (flat scalars) | `analytics.providers.<p>.id` — the unified spelling; the web chrome emits the client's flat shape from it |
+| `web_manager.firebase.app.config` | **`firebaseConfig`** (top level); the engine composes it back into `web_manager.firebase.app.config` at build |
+| `web_manager.payment` | **`payment`** (top level); composed back into `web_manager.payment` (pricing layouts + the client read it there); credential keys set to `false` (legacy "disabled") are dropped |
+| `web_manager` (rest: auth, chatsy, sentry, cookieConsent, exitPopup, …) | `targets.web.web_manager` — the client-runtime settings blob, whole |
+| `meta`, `socials`, `download`, `extension`, `favicon`, `manifest`, `icons`, `recaptcha`, `cloudflare`, `translation` | `targets.web.<same key>` (target overlay puts them back at the top level for web loads) |
+| `permalink`, `pagination`, `collections`, `defaults`, `generators` | `targets.web.<same key>` (codemod rule 8's home — engine consumption of custom collections rides the consumer-theme waves) |
+| UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{distribute,purgecss,imagemin,workflows}` |
+| UJM-json `webpack`, `gems`; `_config.yml` Jekyll machinery (`plugins`, `exclude`, …) | dropped, noted in the report |
+| secret-shaped keys anywhere | dropped + warned — move to `.env` |
+
+Beyond config: the codemod rule table runs over `src/**` templates, the seed
+`src/assets/js/main.js` is deleted (core main + boot runtime replace it;
+customized ones are flagged with the port recipe), `main.scss`'s
+`@use 'ultimate-jekyll-manager' with (…)` becomes `@use 'omega:main' with (…)`,
+page-css self-`@use` lines are dropped, and Gemfile/Gemfile.lock/the legacy
+configs are removed.
 
 ### omega-manager brand configs (`.brands/{id}/config.json`)
 

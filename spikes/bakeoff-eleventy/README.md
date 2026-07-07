@@ -40,6 +40,14 @@ Recorded numbers, two eras — the corpus CONTENT changed at B2:
   ESM with shared chunks for the boot runtime/web-manager singleton) left the
   corpus at **18.6 s total** single-run (assets 0.91 s — faster: page bundles
   are thin stubs) — within the B2 baseline's range.
+- **B4 spot-check + THE FIRST REAL SOMIIBO BUILD**: post-migrate-checkpoint
+  corpus single-run **18.14 s** (no regression from the taxonomy slug-dedupe /
+  sass-importer / chrome changes). And the headline: a REAL somiibo copy,
+  converted by `omega migrate`, built **2,556 pages in ~96–104 s** vs the
+  **332 s** Jekyll baseline (~3.2× whole-pipeline on the real site — heavier
+  per-page than the corpus: real chrome + 456-line index + per-page css).
+  Jekyll's output was 2,608 files; the 52-file URL-set diff is B5
+  `omega verify`'s first job.
 
 Historical: the A1/A2 findings this spike produced (LiquidJS edge cases,
 virtual-template layering, preprocessor cascade behavior, include-root perf)

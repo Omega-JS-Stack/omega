@@ -794,7 +794,8 @@ faqs:
           {% iftruthy item.show_stars %}
             <div class="mb-0">
               {% for i in (1..5) %}
-                {% uj_icon "star", "text-{{ item.star_color }}" %}
+                {% capture uj_migrate_arg_1 %}text-{{ item.star_color }}{% endcapture %}
+                {% uj_icon "star", uj_migrate_arg_1 %}
               {% endfor %}
             </div>
           {% endiftruthy %}
