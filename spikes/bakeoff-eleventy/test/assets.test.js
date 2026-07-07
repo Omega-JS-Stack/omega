@@ -8,7 +8,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
-const { buildAssets, purgeCss } = require('../src/assets.js');
+const { buildAssets, purgeCss } = require('@omegajs/bakeoff-shared/src/assets.js');
 
 const SPIKE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(SPIKE, '..', '..');

@@ -1,0 +1,32 @@
+---
+/** blueprint/alternatives/alternative — competitor comparison table. */
+import Base, { defaults as baseDefaults } from 'omega:layouts/core/base.astro';
+import { ujTag } from '@omega/uj.mjs';
+
+export const defaults = { ...baseDefaults };
+
+const { site, resolved } = Astro.props;
+const competitor = resolved.alternative.competitor;
+const features = (resolved.alternative.comparison && resolved.alternative.comparison.features) || [];
+---
+<Base {...Astro.props}>
+  <section class="alternative py-5">
+    <div class="container">
+      <h1>{site.brand.name} vs {competitor.name}</h1>
+      <p class="lead">{competitor.description}</p>
+      <table class="table comparison-table mt-4">
+        <thead><tr><th>Feature</th><th>{site.brand.name}</th><th>{competitor.name}</th></tr></thead>
+        <tbody>
+          {features.map((feature) => (
+            <tr>
+              <td><Fragment set:html={ujTag('uj_icon', JSON.stringify(feature.icon), {})} /> {feature.name}</td>
+              <td>{feature.ours}</td>
+              <td>{feature.theirs}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <slot />
+</Base>

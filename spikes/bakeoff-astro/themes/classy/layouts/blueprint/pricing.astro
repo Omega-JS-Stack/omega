@@ -1,0 +1,32 @@
+---
+/**
+ * blueprint/pricing — the plan defaults live HERE (layout-level data, the
+ * "classy pricing carries ~200 lines" pattern); consumers override any of it
+ * from page frontmatter through `resolved`.
+ */
+import Base, { defaults as baseDefaults } from 'omega:layouts/core/base.astro';
+import PlanCard from 'omega:components/pricing/plan-card.astro';
+import { deepMerge } from '@omega/resolve.mjs';
+
+export const defaults = deepMerge(baseDefaults, {
+  pageModule: 'pricing',
+  plans: [
+    { id: 'basic', name: 'basic', price_monthly: 12, price_annually: 96, features: ['Automation', 'Scheduling'] },
+    { id: 'premium', name: 'premium', price_monthly: 29, price_annually: 228, features: ['Automation', 'Scheduling', 'Analytics', 'Priority support'] },
+    { id: 'enterprise', name: 'enterprise', price_monthly: 99, price_annually: 948, features: ['Everything in premium', 'SSO', 'SLA'] },
+  ],
+});
+
+const { resolved } = Astro.props;
+---
+<Base {...Astro.props}>
+  <section class="pricing py-5">
+    <div class="container">
+      <h1 class="text-center">{(resolved.hero && resolved.hero.headline) || 'Pricing'}</h1>
+      <div class="row mt-4 pricing-plans">
+        {resolved.plans.map((plan) => <PlanCard plan={plan} />)}
+      </div>
+    </div>
+  </section>
+  <slot />
+</Base>

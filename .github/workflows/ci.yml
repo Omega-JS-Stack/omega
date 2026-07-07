@@ -44,6 +44,9 @@ jobs:
       - name: bakeoff-eleventy suite (A1 slice vs real Eleventy 3)
         run: npm test --workspace=spikes/bakeoff-eleventy
 
+      - name: bakeoff-astro suite (A1 slice vs real Astro 5)
+        run: npm test --workspace=spikes/bakeoff-astro
+
       - name: client suite
         run: npm test --workspace=packages/client
 

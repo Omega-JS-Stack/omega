@@ -12,8 +12,10 @@ const path = require('node:path');
 const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omegajs/template-kit/register-liquid');
 const { toSiteGlobal } = require('@omegajs/config/site-global');
-const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
-const { collectLayered, registerVirtualLayouts, composeSymlinkFarm } = require('./themes.js');
+const { createFrontmatterResolver } = require('@omegajs/bakeoff-shared/src/frontmatter-liquid.js');
+const { collectLayered } = require('@omegajs/bakeoff-shared/src/layers.js');
+const { permalinkOf, scanConsumerPermalinks } = require('@omegajs/bakeoff-shared/src/consumer-scan.js');
+const { registerVirtualLayouts, composeSymlinkFarm } = require('./themes.js');
 
 // Data-cascade keys that are engine machinery, not page/layout data — everything
 // else IS the resolved page data (the cascade already deep-merged layout
@@ -196,42 +198,6 @@ function aggregateTaxonomy(api, field) {
   }
 
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Scan the consumer dir for page permalinks (cheap frontmatter regex — used
- * only to decide default-page suppression, ~100 files).
- * @param {string} consumerDir
- * @returns {Set<string>} normalized URLs (`/about` → `/about/`)
- */
-function scanConsumerPermalinks(consumerDir) {
-  const urls = new Set();
-  const pagesDir = path.join(consumerDir, 'pages');
-  if (!fs.existsSync(pagesDir)) return urls;
-
-  for (const entry of fs.readdirSync(pagesDir, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !/\.(md|html)$/.test(entry.name)) continue;
-
-    const raw = fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8');
-    const url = permalinkOf(raw);
-    if (url) urls.add(url);
-  }
-
-  return urls;
-}
-
-/**
- * Extract and normalize the `permalink:` value from raw frontmatter.
- * @param {string} raw
- * @returns {string|null}
- */
-function permalinkOf(raw) {
-  const match = raw.match(/^permalink:\s*(\S+)\s*$/m);
-  if (!match) return null;
-
-  let url = match[1].replace(/^["']|["']$/g, '');
-  if (!path.extname(url) && !url.endsWith('/')) url += '/';
-  return url;
 }
 
 /**

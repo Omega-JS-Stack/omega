@@ -1,14 +1,15 @@
 /**
- * Asset pipeline for the Eleventy candidate: 3-layer page-module JS via
- * esbuild (content-hashed, manifest-mapped), layered sass (loadPaths across
- * theme layers), and a PurgeCSS post-pass over the rendered HTML.
+ * Asset pipeline shared by both bake-off candidates: 3-layer page-module JS
+ * via esbuild (content-hashed, manifest-mapped), layered sass (`omega:`
+ * scheme importer across theme layers), and a PurgeCSS post-pass over the
+ * rendered HTML. SSG-agnostic — runs before the SSG, feeds it the manifest.
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const sass = require('sass');
-const { collectLayered } = require('./themes.js');
+const { collectLayered } = require('./layers.js');
 
 /**
  * Build page-module JS + theme CSS, returning the asset manifest.

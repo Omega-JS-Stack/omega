@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { generateCorpus } = require('@omegajs/bakeoff-shared');
-const { buildAssets, purgeCss } = require('./assets.js');
+const { buildAssets, purgeCss } = require('@omegajs/bakeoff-shared/src/assets.js');
 const { configureOmega } = require('./omega-web.js');
 
 const SPIKE = path.resolve(__dirname, '..');

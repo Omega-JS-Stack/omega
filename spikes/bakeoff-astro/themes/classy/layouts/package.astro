@@ -1,0 +1,17 @@
+---
+/**
+ * package — chains through solution (3-deep layout chain: package →
+ * solution → core/base), defaults merged up the chain at module scope.
+ */
+import Solution, { defaults as solutionDefaults } from 'omega:layouts/solution.astro';
+
+export const defaults = { ...solutionDefaults };
+
+const { site } = Astro.props;
+---
+<Solution {...Astro.props}>
+  <section class="package-note py-3 bg-body-tertiary">
+    <div class="container"><em>Part of the {site.brand.name} package line.</em></div>
+  </section>
+  <slot />
+</Solution>

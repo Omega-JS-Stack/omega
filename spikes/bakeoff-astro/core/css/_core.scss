@@ -1,0 +1,33 @@
+// Core component layer — minimal Bootstrap-ish subset the slice uses, with
+// deliberately-unused selectors so the PurgeCSS step has something to prove.
+$accent: #0d6efd !default;
+$body-bg: #ffffff !default;
+$body-color: #1a1a2e !default;
+
+body {
+  background: $body-bg;
+  color: $body-color;
+  font-family: system-ui, sans-serif;
+  margin: 0;
+}
+
+.container { max-width: 1140px; margin: 0 auto; padding: 0 1rem; }
+.btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 0.375rem; text-decoration: none; }
+.btn-primary { background: $accent; color: #fff; border: 0; }
+.text-accent { color: $accent; }
+.card { border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 0.5rem; }
+.badge { padding: 0.25em 0.5em; border-radius: 0.25rem; font-size: 0.85em; text-decoration: none; }
+.text-bg-primary { background: $accent; color: #fff; }
+.text-bg-secondary { background: #6c757d; color: #fff; }
+.site-header { border-bottom: 1px solid rgba(0, 0, 0, 0.1); }
+.site-footer { opacity: 0.85; }
+.auth-form input { display: block; width: 100%; margin-bottom: 0.75rem; }
+.comparison-table { width: 100%; border-collapse: collapse; }
+.comparison-table td, .comparison-table th { padding: 0.5rem; border-bottom: 1px solid rgba(0, 0, 0, 0.1); }
+
+// --- Unused on every slice page: PurgeCSS must strip these ---
+.carousel-inner { transition: transform 0.6s ease-in-out; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); }
+.tooltip-arrow { width: 0.8rem; height: 0.4rem; }
+.accordion-flush { border-radius: 0; }
+.offcanvas-backdrop { position: fixed; inset: 0; }

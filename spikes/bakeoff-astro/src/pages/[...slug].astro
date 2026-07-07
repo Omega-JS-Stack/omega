@@ -1,0 +1,43 @@
+---
+/**
+ * The catch-all route: consumer pages + content-shaped framework default
+ * pages (suppressed when the consumer owns the same URL). Layout dispatch,
+ * `resolved`, and the Liquid content pipeline all live in @omega/render.mjs.
+ */
+import { getCollection } from 'astro:content';
+import { renderPage } from '@omega/render.mjs';
+
+export async function getStaticPaths() {
+  const pages = await getCollection('pages');
+  const defaults = await getCollection('defaults');
+
+  const paths = [];
+  const owned = new Set();
+
+  const normalize = (permalink, fallback) => {
+    let url = permalink || fallback;
+    if (!/\.[a-z0-9]+$/i.test(url) && !url.endsWith('/')) url += '/';
+    return url;
+  };
+  const slugOf = (url) => url.replace(/^\/|\/$/g, '') || undefined;
+
+  for (const entry of pages) {
+    const url = normalize(entry.data.permalink, `/${entry.id}/`);
+    owned.add(url);
+    paths.push({ params: { slug: slugOf(url) }, props: { entry, url } });
+  }
+
+  for (const entry of defaults) {
+    const url = normalize(entry.data.permalink, `/${entry.id}/`);
+    // /404.html is Astro's reserved 404 route — src/pages/404.astro owns it
+    if (owned.has(url) || url === '/404.html') continue;
+    paths.push({ params: { slug: slugOf(url) }, props: { entry, url } });
+  }
+
+  return paths;
+}
+
+const { entry, url } = Astro.props;
+const { Layout, site, page, resolved, contentHtml, assetManifest } = renderPage(entry, url);
+---
+<Layout site={site} page={page} resolved={resolved} assetManifest={assetManifest}><Fragment set:html={contentHtml} /></Layout>

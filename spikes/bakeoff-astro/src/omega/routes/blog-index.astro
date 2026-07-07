@@ -1,0 +1,9 @@
+---
+/** Injected /blog route — page 1 of the blog index. */
+import { sortedPosts, paginate } from '../blog.mjs';
+import BlogList from './blog-list.astro';
+
+const posts = await sortedPosts();
+const pages = paginate(posts);
+---
+<BlogList page={pages[0]} totalPosts={posts.length} />

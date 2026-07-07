@@ -1,0 +1,44 @@
+---
+/** solution — preview stats + pain points. */
+import Base, { defaults as baseDefaults } from 'omega:layouts/core/base.astro';
+import { ujTag } from '@omega/uj.mjs';
+
+export const defaults = { ...baseDefaults };
+
+const { resolved } = Astro.props;
+const solution = resolved.solution || {};
+const painPoints = solution.pain_points || {};
+---
+<Base {...Astro.props}>
+  <section class="solution-hero py-5">
+    <div class="container">
+      <p class="text-accent fw-bold">{solution.label}</p>
+      <h1 class="display-5">{solution.headline} <span class="text-accent">{solution.headline_accent}</span></h1>
+      <p class="lead">{solution.subheadline}</p>
+      <div class="d-flex gap-4 mt-4">
+        {(solution.preview_stats || []).map((stat) => (
+          <div class="preview-stat text-center">
+            <span class="fs-4"><Fragment set:html={ujTag('uj_icon', JSON.stringify(stat.icon), {})} /></span>
+            <p class="fw-bold mb-0">{stat.value}</p>
+            <p class="text-muted">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+  <section class="py-5 bg-body-tertiary">
+    <div class="container">
+      <h2>{painPoints.headline}</h2>
+      <p class="text-muted">{painPoints.subheadline}</p>
+      <div class="row mt-4">
+        {(painPoints.items || []).map((item) => (
+          <div class="col-md-6 mb-3 pain-point">
+            <span class={`text-${item.color}`}><Fragment set:html={ujTag('uj_icon', JSON.stringify(item.icon), {})} /></span>
+            <strong>{item.title}</strong> — {item.description}
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+  <slot />
+</Base>

@@ -1,0 +1,17 @@
+---
+/** classy head — meta, canonical, favicon, theme css + page-module script. */
+import { uj, ujTag } from '@omega/uj.mjs';
+
+const { site, page, resolved, assetManifest } = Astro.props;
+const title = (resolved.meta && resolved.meta.title) || site.meta.title;
+const description = (resolved.meta && resolved.meta.description) || site.meta.description;
+const moduleSrc = resolved.pageModule ? assetManifest.js[resolved.pageModule] : null;
+---
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content={description}>
+<link rel="canonical" href={ujTag('uj_external', 'page.url', { site, page })}>
+<link rel="icon" href={uj.ujCachebreak('/favicon.ico')}>
+<link rel="stylesheet" href={assetManifest.css.theme}>
+{moduleSrc && <script defer is:inline src={moduleSrc}></script>}

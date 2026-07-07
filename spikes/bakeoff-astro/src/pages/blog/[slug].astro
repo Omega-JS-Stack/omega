@@ -1,0 +1,18 @@
+---
+/**
+ * Blog posts: Jekyll dated-filename convention → /blog/<slug>/, rendered
+ * through the blueprint/blog/post layout with the post date from the
+ * filename.
+ */
+import { sortedPosts } from '@omega/blog.mjs';
+import { renderPage } from '@omega/render.mjs';
+
+export async function getStaticPaths() {
+  const posts = await sortedPosts();
+  return posts.map((post) => ({ params: { slug: post.slug }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Layout, site, page, resolved, contentHtml, assetManifest } = renderPage(post.entry, post.url, { date: post.date });
+---
+<Layout site={site} page={page} resolved={resolved} assetManifest={assetManifest}><Fragment set:html={contentHtml} /></Layout>

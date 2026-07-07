@@ -24,3 +24,5 @@ spikes/bakeoff-shared/corpus/
 
 # Bake-off candidate build output
 spikes/bakeoff-eleventy/_site/
+spikes/bakeoff-astro/_site/
+spikes/bakeoff-astro/.astro/

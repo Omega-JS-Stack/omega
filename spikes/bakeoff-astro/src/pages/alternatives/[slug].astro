@@ -1,0 +1,17 @@
+---
+/**
+ * Alternatives collection: /alternatives/<slug>/ through the
+ * blueprint/alternatives/alternative layout.
+ */
+import { getCollection } from 'astro:content';
+import { renderPage } from '@omega/render.mjs';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('alternatives');
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Layout, site, page, resolved, contentHtml, assetManifest } = renderPage(entry, `/alternatives/${entry.id}/`);
+---
+<Layout site={site} page={page} resolved={resolved} assetManifest={assetManifest}><Fragment set:html={contentHtml} /></Layout>

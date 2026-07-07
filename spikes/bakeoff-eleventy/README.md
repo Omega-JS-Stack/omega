@@ -9,7 +9,7 @@ the migration findings.
 npm run build   # corpus (if absent) → esbuild+sass → Eleventy → PurgeCSS
 npm run dev     # eleventy --serve (farm layouts, watchable)
 npm run bench   # cold ×3 (+warmup) + watch-mode incremental touches
-npm test        # 17 tests against test/fixtures/mini-site
+npm test        # 17 tests against the shared mini-site fixture
 ```
 
 ## Architecture (`src/omega-web.js` = the engine core)

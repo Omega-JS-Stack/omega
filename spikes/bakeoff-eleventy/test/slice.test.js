@@ -12,7 +12,7 @@ const { test, before } = require('node:test');
 const { configureOmega } = require('../src/omega-web.js');
 
 const SPIKE = path.resolve(__dirname, '..');
-const MINI = path.join(__dirname, 'fixtures', 'mini-site');
+const MINI = path.resolve(__dirname, '..', '..', 'bakeoff-shared', 'fixtures', 'mini-site');
 const siteData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8'));
 
 /**

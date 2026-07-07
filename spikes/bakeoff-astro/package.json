@@ -1,0 +1,27 @@
+{
+  "name": "@omegajs/bakeoff-astro",
+  "version": "1.0.0",
+  "description": "Bake-off candidate 2: Astro building the shared corpus with @omegajs/template-kit as direct helper imports — validates theme layering via an omega: Vite resolver, content collections, and the full A1 slice",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "build": "node src/build.js",
+    "build:ssg": "npx astro build",
+    "dev": "npx astro dev",
+    "bench": "node src/bench-run.js"
+  },
+  "dependencies": {
+    "@omegajs/bakeoff-shared": "*",
+    "@omegajs/config": "*",
+    "@omegajs/template-kit": "*",
+    "astro": "^5.0.0",
+    "gray-matter": "^4.0.3",
+    "liquidjs": "^10.27.1",
+    "markdown-it": "^14.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "ITW Creative Works",
+  "license": "MIT"
+}

@@ -1,0 +1,18 @@
+---
+/** dusk 404 — theme layout override; chains to CLASSY's core/base through
+ * the omega: layer chain (dusk has no base of its own). */
+import Base, { defaults as baseDefaults } from 'omega:layouts/core/base.astro';
+
+export const defaults = { ...baseDefaults };
+
+const { site } = Astro.props;
+---
+<Base {...Astro.props}>
+  <section class="error-404 dusk-404 py-5 text-center">
+    <div class="container">
+      <h1 class="display-1">404 — lost in the dusk</h1>
+      <p class="lead">{site.brand.name} couldn't find that page.</p>
+      <a class="btn btn-primary" href="/">Back to the light</a>
+    </div>
+  </section>
+</Base>

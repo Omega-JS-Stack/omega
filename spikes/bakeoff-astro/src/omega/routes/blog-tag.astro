@@ -1,0 +1,13 @@
+---
+/** Injected /blog/tag/[slug] route — one page per post tag. */
+import { sortedPosts, aggregateTaxonomy } from '../blog.mjs';
+import TaxonomyPage from './taxonomy-page.astro';
+
+export async function getStaticPaths() {
+  const posts = await sortedPosts();
+  return aggregateTaxonomy(posts, 'tags').map((group) => ({ params: { slug: group.slug }, props: { group } }));
+}
+
+const { group } = Astro.props;
+---
+<TaxonomyPage group={group} kind="tag" />
