@@ -16,8 +16,9 @@
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
- * services github and cloudflare. External-API services join this list one
- * at a time, keeping their omega-manager names and operation granularity.
+ * services github, cloudflare, and domain. External-API services join this
+ * list one at a time, keeping their omega-manager names and operation
+ * granularity.
  */
 
 // =============================================================================
@@ -56,10 +57,11 @@ const DEFAULTS = {
     private: true, // brand repo visibility
   },
 
-  // Domain registrar + email (the domain service ports later; the cloudflare
-  // dns/email-routing operations already read email.provider from here)
+  // Domain registrar + email. The domain service reconciles registrar
+  // nameservers from `provider`; the cloudflare dns/email-routing operations
+  // read `email.provider` + `email.forwarding`
   domain: {
-    provider: null, // 'squarespace' | 'namecheap' | null (not chosen yet)
+    provider: null, // 'squarespace' | 'namecheap' | null (not chosen yet — the service skips)
     email: {
       provider: null, // 'squarespace' | 'privateemail' | 'cloudflare' | null
       forwarding: [], // [{ from: 'support' | '*', to: 'inbox@example.com' }]
@@ -226,6 +228,7 @@ const SERVICE_ORDER = [
   'workspace',   // brand monorepo structure + config health — everything depends on a sane workspace
   'github',      // the brand repo must exist before services that write to it
   'cloudflare',  // zone must exist before DNS-dependent services
+  'domain',      // registrar nameservers point at the zone cloudflare just created/verified
   'update',      // installs deps + builds every app
   'testing',     // health checks after everything else ran
 ];
@@ -259,6 +262,10 @@ const OPERATIONS = {
     { name: 'rules-security', ensure: true },
     { name: 'speed-scheduled-tests', ensure: true },    // Custom Speed API endpoint
     { name: 'workers', ensure: true },                  // Worker scripts + routes (only when cloudflare.workers configured)
+  ],
+
+  domain: [
+    { name: 'nameservers', ensure: true }, // Registrar nameservers → Cloudflare (namecheap via API, manual registrars get instructions)
   ],
 
   update: [
