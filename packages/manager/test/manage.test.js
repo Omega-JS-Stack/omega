@@ -13,6 +13,10 @@ const path = require('node:path');
 const { resolveBrandRoot, loadBrand, targetFromDirName } = require('../src/lib/brand.js');
 const { runManage } = require('../src/manage.js');
 
+// Fixture brands must never reach a real Cloudflare account via a shell-
+// exported token — the service must skip in every e2e run here
+delete process.env.CLOUDFLARE_TOKEN;
+
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
 const BRAND_CONFIG = `{
@@ -166,6 +170,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No github.org configured (manager defaults alone don't enable it) → clean skip
   assert.equal(report.results.github.status, 'skipped');
   assert.match(report.results.github.reason, /github\.org/);
+  // No CLOUDFLARE_TOKEN in the environment → clean skip
+  assert.equal(report.results.cloudflare.status, 'skipped');
+  assert.match(report.results.cloudflare.reason, /CLOUDFLARE_TOKEN/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -184,7 +191,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

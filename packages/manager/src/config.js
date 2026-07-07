@@ -15,9 +15,9 @@
  *
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
- * testing (per-target health checks) — plus github, the first external
- * provisioning service. External-API services join this list one at a time,
- * keeping their omega-manager names and operation granularity.
+ * testing (per-target health checks) — plus the external provisioning
+ * services github and cloudflare. External-API services join this list one
+ * at a time, keeping their omega-manager names and operation granularity.
  */
 
 // =============================================================================
@@ -55,16 +55,179 @@ const DEFAULTS = {
     shared: false, // true = the org is shared with other brands; skips org-level reconciliation
     private: true, // brand repo visibility
   },
+
+  // Domain registrar + email (the domain service ports later; the cloudflare
+  // dns/email-routing operations already read email.provider from here)
+  domain: {
+    provider: null, // 'squarespace' | 'namecheap' | null (not chosen yet)
+    email: {
+      provider: null, // 'squarespace' | 'privateemail' | 'cloudflare' | null
+      forwarding: [], // [{ from: 'support' | '*', to: 'inbox@example.com' }]
+    },
+  },
+
+  // Cloudflare settings — the engine defaults are PLATFORM defaults only.
+  // Company-specific records (DMARC report addresses, BIMI logo, SendGrid
+  // domain-auth CNAMEs, verification TXTs, extra CSP hosts) belong in company/
+  // brand config, NOT here — omega-manager hardcoded them; the port moved them
+  // to config: dns.dmarcReports { rua, ruf }, dns.bimiLogo, dns.sendgrid
+  // { id, whitelabel }, dns.records [...], and the responseHeaders rules.
+  cloudflare: {
+    dns: {
+      spf: 'strict', // 'strict' (-all) | 'soft' (~all)
+      dmarcPolicy: 'quarantine', // 'none' | 'quarantine' | 'reject'
+      spfIncludes: ['_spf.google.com', 'sendgrid.net'], // provider include appended automatically
+    },
+    // Zone settings — flat map matching the Cloudflare API setting IDs exactly.
+    // Managed by the generic `zone-settings` operation which diffs all keys in
+    // one pass. Includes both bulk settings (from /zones/{id}/settings) and
+    // addon settings (speed_brain, fonts) fetched individually.
+    // Any brand can override with `cloudflare.settings.{setting_id}`.
+    settings: {
+      // SSL / TLS
+      ssl: 'full',
+      min_tls_version: '1.2',
+      always_use_https: 'on',
+      automatic_https_rewrites: 'on',
+      opportunistic_encryption: 'on',
+      opportunistic_onion: 'on',
+      tls_1_3: 'zrt',
+      tls_1_2_only: 'off',
+      tls_client_auth: 'off',
+      ech: 'on',                  // Encrypted Client Hello
+      pq_keyex: 'on',             // Post-quantum key exchange
+      replace_insecure_js: 'on',  // Block mixed content by rewriting http:// → https://
+
+      // Scrape Shield
+      email_obfuscation: 'off',   // Injects cloudflare-static/email-decode.min.js — breaks clean HTML
+      server_side_exclude: 'on',
+      hotlink_protection: 'off',  // Breaks legit embeds (Slack unfurls, etc.)
+
+      // Speed
+      brotli: 'on',
+      early_hints: 'on',
+      rocket_loader: 'off',       // Rewrites <script> tags — causes issues with modern frameworks
+      speed_brain: 'on',          // Speculation Rules API — addon setting (not in bulk endpoint)
+      fonts: 'on',                // Cloudflare Fonts — addon setting (not in bulk endpoint)
+
+      // Network
+      http3: 'on',
+      '0rtt': 'on',
+      ipv6: 'on',
+      websockets: 'on',
+      ip_geolocation: 'on',
+      pseudo_ipv4: 'off',
+      orange_to_orange: 'off',
+      visitor_ip: 'on',
+
+      // Caching
+      cache_level: 'aggressive',
+      browser_cache_ttl: 432000,  // 5 days
+      always_online: 'on',
+      development_mode: 'off',
+      edge_cache_ttl: 7200,       // 2 hours — only applies without cache rules
+
+      // Security
+      security_level: 'low',
+      browser_check: 'on',
+      challenge_ttl: 1800,
+      privacy_pass: 'on',
+      waf: 'off',                 // Legacy WAF — Cloudflare replaced with rulesets
+      max_upload: 100,
+      security_header: {
+        strict_transport_security: {
+          enabled: true,
+          max_age: 0,
+          include_subdomains: true,
+          preload: true,
+          nosniff: true,
+        },
+      },
+
+      // Logging
+      log_to_cloudflare: 'on',
+      filter_logs_to_cloudflare: 'off',
+    },
+    // Speed scheduled tests — custom API endpoint, kept as separate operation
+    speedTest: {
+      frequency: 'WEEKLY',
+      region: 'us-central1',
+    },
+    // Cache rules — complex ruleset, kept as separate operation
+    cacheRules: [
+      {
+        name: 'Assets: Cache for 1 Year',
+        expression: '(http.request.uri.path wildcard r"/assets/*") or (http.request.uri.path eq "/__/auth/iframe.js")',
+        edgeTtl: 31536000,
+        browserTtl: 31536000,
+        enabled: true,
+        priority: 100,
+      },
+    ],
+    rules: {
+      managedTransforms: {
+        request: {
+          addClientCertificateHeaders: false,
+          addVisitorLocationHeaders: true,
+          removeVisitorIpHeaders: false,
+          addWafCredentialCheckStatusHeader: false,
+        },
+        response: {
+          removeXPoweredByHeader: true,
+          addSecurityHeaders: false,
+        },
+      },
+      responseHeaders: [
+        {
+          name: 'CSP: Allow iframe from self',
+          expression: 'true',
+          headers: {
+            // Brand/company config overrides this rule to append extra hosts
+            'Content-Security-Policy': "frame-ancestors 'self' https://localhost:* https://{ domain } https://*.{ domain }",
+          },
+          enabled: true,
+          priority: 100,
+        },
+      ],
+      redirect: [
+        {
+          name: 'Redirect: Remove Trailing Slash',
+          expression: '(ends_with(http.request.uri.path, "/") and http.request.uri.path ne "/")',
+          statusCode: 301,
+          preserveQueryString: true,
+          targetUrl: {
+            expression: 'concat("https://", http.host, substring(http.request.uri.path, 0, -1))',
+          },
+          enabled: true,
+          priority: 100,
+        },
+      ],
+      security: [
+        {
+          name: 'API: Minimal Security',
+          action: 'skip',
+          expression: '(http.host eq "api.{ domain }")',
+          skipProducts: ['uaBlock', 'bic', 'hot', 'securityLevel', 'rateLimit', 'zoneLockdown', 'waf'],
+          skipPhases: ['http_ratelimit', 'http_request_firewall_managed', 'http_request_sbfm'],
+          skipRuleset: 'current',
+          logging: true,
+          enabled: true,
+          priority: 100,
+        },
+      ],
+    },
+  },
 };
 
 // =============================================================================
 // SERVICE ORDER - Services run in this order due to dependencies
 // =============================================================================
 const SERVICE_ORDER = [
-  'workspace',  // brand monorepo structure + config health — everything depends on a sane workspace
-  'github',     // the brand repo must exist before services that write to it
-  'update',     // installs deps + builds every app
-  'testing',    // health checks after everything else ran
+  'workspace',   // brand monorepo structure + config health — everything depends on a sane workspace
+  'github',      // the brand repo must exist before services that write to it
+  'cloudflare',  // zone must exist before DNS-dependent services
+  'update',      // installs deps + builds every app
+  'testing',     // health checks after everything else ran
 ];
 
 // =============================================================================
@@ -81,6 +244,21 @@ const OPERATIONS = {
     { name: 'org', ensure: true },        // Org profile matches the brand (skipped for shared orgs)
     { name: 'repo', ensure: true },       // The brand-monorepo repo exists with the right settings
     { name: 'pages', ensure: true },      // GitHub Pages on gh-pages + custom domain (web target)
+  ],
+
+  cloudflare: [
+    { name: 'zone', ensure: true },                     // Zone exists (created when missing; nameservers reported when pending)
+    { name: 'dns-records', ensure: true },              // Required + custom records diff-synced
+    { name: 'email-routing', ensure: true },            // Cloudflare Email Routing (only when domain.email.provider === 'cloudflare')
+    { name: 'zone-settings', ensure: true },            // Generic — diffs all /zones/{id}/settings values + addons
+    { name: 'cache-rules', ensure: true },
+    { name: 'rules-managed-transforms', ensure: true },
+    { name: 'rules-redirect', ensure: true },
+    { name: 'rules-configuration', ensure: true },
+    { name: 'rules-response-headers', ensure: true },
+    { name: 'rules-security', ensure: true },
+    { name: 'speed-scheduled-tests', ensure: true },    // Custom Speed API endpoint
+    { name: 'workers', ensure: true },                  // Worker scripts + routes (only when cloudflare.workers configured)
   ],
 
   update: [
