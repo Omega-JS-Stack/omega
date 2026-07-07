@@ -14,7 +14,8 @@ import { Liquid } from 'liquidjs';
 import MarkdownIt from 'markdown-it';
 import templateKit from '@omegajs/template-kit';
 import frontmatterLiquid from '@omegajs/bakeoff-shared/src/frontmatter-liquid.js';
-import { SPIKE, consumerDir } from './paths.mjs';
+import { SPIKE, consumerDir, layerDirs } from './paths.mjs';
+import { getCollection, getCollectionNames } from './collections.mjs';
 
 const { registerLiquid } = templateKit;
 const { createFrontmatterResolver } = frontmatterLiquid;
@@ -33,11 +34,22 @@ let engineCache = null;
 export function contentEngine(site) {
   if (engineCache && engineCache.site === site) return engineCache;
 
-  const engine = new Liquid({ jekyllInclude: true, timezoneOffset: 0 });
+  // Consumer _includes first (somiibo's index includes its own
+  // frontend/components/hero-demo.html), then the theme/core layers.
+  // EXISTING dirs only — LiquidJS probes every root per include lookup, and
+  // a nonexistent root costs ~1s over the corpus (measured on Eleventy).
+  const engine = new Liquid({
+    jekyllInclude: true,
+    timezoneOffset: 0,
+    root: [
+      path.join(consumerDir(), '_includes'),
+      ...layerDirs().map((layer) => path.join(layer, '_includes')),
+    ].filter((dir) => fs.existsSync(dir)),
+  });
   registerLiquid(engine, {
     site,
-    getCollection: () => [],
-    getCollectionNames: () => [],
+    getCollection,
+    getCollectionNames,
     fileExists: (file) => fs.existsSync(path.join(consumerDir(), file)),
     markdown: (content) => md.render(content),
     icons: {

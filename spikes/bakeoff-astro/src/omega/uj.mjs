@@ -10,6 +10,7 @@
 import path from 'node:path';
 import templateKit from '@omegajs/template-kit';
 import { SPIKE } from './paths.mjs';
+import { getCollection, getCollectionNames } from './collections.mjs';
 
 const { filters, TAGS } = templateKit;
 
@@ -29,8 +30,8 @@ export function ujTag(name, markup, scope = {}) {
     page: scope.page || null,
     site: {
       config: scope.site || {},
-      getCollection: () => [],
-      getCollectionNames: () => [],
+      getCollection,
+      getCollectionNames,
       fileExists: () => false,
     },
     options: {
@@ -57,7 +58,7 @@ export function formatPostDate(date) {
     timeZone: 'UTC',
     year: 'numeric',
     month: 'long',
-    day: 'numeric',
+    day: '2-digit', // Jekyll's %d zero-pads ("September 05, 2024")
   });
 }
 

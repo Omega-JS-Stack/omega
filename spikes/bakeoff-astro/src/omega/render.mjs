@@ -40,15 +40,24 @@ export function renderPage(entry, url, extra = {}) {
   const { frontmatter } = contentEngine(site);
 
   // The content layer freezes entry data — clone before the in-place
-  // frontmatter Liquid pass
+  // frontmatter Liquid pass. Page-referencing values ({{ page.recipe.* }})
+  // render against the page scope, mirroring the Eleventy candidate.
+  const slug = String(entry.id).split('/').filter(Boolean).pop();
   const data = structuredClone(entry.data);
-  frontmatter.resolveData(data);
+  frontmatter.resolveData(data, undefined, { page: { ...data, url, slug } });
 
   const layoutName = normalizeLayout(data.layout) || 'core/base';
   const layoutModule = resolveLayoutModule(layoutName);
   const resolved = computeResolved(layoutModule.defaults, data);
 
-  const page = { url, inputPath: entry.filePath || entry.id, ...extra };
+  const page = {
+    url,
+    inputPath: entry.filePath || entry.id,
+    slug,
+    date: data.date,
+    canonical: { url: site.url + url },
+    ...extra,
+  };
   const contentHtml = renderBody(entry, site, { page, resolved });
 
   return {

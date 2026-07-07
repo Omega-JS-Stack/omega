@@ -18,7 +18,7 @@ const url = `/blog/${kind}/${group.slug}/`;
 ---
 <Layout site={site} page={{ url }} resolved={resolved} assetManifest={loadAssetManifest()}>
   <div class="container py-5 taxonomy-page" data-taxonomy={kind}>
-    <h1>{uj.ujTitleCase(group.name)}</h1>
+    <h1>{kind === 'tag' ? `#${group.name}` : uj.ujTitleCase(group.name)}</h1>
     <p class="text-muted">{group.posts.length} posts</p>
     {group.posts.map((post) => (
       <article class="mb-3"><a href={post.url}>{post.entry.data.post.title}</a></article>

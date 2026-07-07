@@ -17,6 +17,9 @@ const DEFAULT_SKIP = new Set([
   'content', 'site', 'assetManifest', 'eleventyComputed', 'resolved',
 ]);
 
+// Legacy bracket refs ([ site.theme.id ] → {{ site.theme.id }})
+const BRACKET_RE = /\[\s*(site\.[a-zA-Z0-9_.]+)\s*\]/g;
+
 /**
  * Create a resolver bound to a site global.
  * @param {object} options
@@ -30,14 +33,28 @@ function createFrontmatterResolver(options) {
 
   /**
    * Render a single frontmatter string value (bracket refs + Liquid), cached.
+   * Values that reference `page.*` (the real sweet-saucy recipe layout puts
+   * `{{ page.recipe.title }}` in its meta values) render UNCACHED against
+   * `extraScope` — they are page-dependent, so the raw-string cache would
+   * serve the first page's rendering to every page.
    * @param {string} value
+   * @param {object} [extraScope] - per-page scope ({ page }) for page refs
    * @returns {string}
    */
-  function render(value) {
+  function render(value, extraScope) {
+    if (/\bpage\./.test(value)) {
+      // Page-dependent: WITHOUT a page scope, defer (leave raw) — the
+      // Eleventy preprocessor sees the full cascade, so rendering here would
+      // both empty the refs and mutate layout objects SHARED across pages.
+      if (!extraScope) return value;
+      const source = value.replace(BRACKET_RE, '{{ $1 }}');
+      return engine.parseAndRenderSync(source, { ...scope, ...extraScope });
+    }
+
     if (cache.has(value)) return cache.get(value);
 
     // Legacy bracket refs first ([ site.theme.id ] → {{ site.theme.id }})
-    let rendered = value.replace(/\[\s*(site\.[a-zA-Z0-9_.]+)\s*\]/g, '{{ $1 }}');
+    let rendered = value.replace(BRACKET_RE, '{{ $1 }}');
     if (rendered.includes('{{') || rendered.includes('{%')) {
       rendered = engine.parseAndRenderSync(rendered, scope);
     }
@@ -55,38 +72,76 @@ function createFrontmatterResolver(options) {
    * @param {object} data
    * @param {Set<string>} [skip]
    */
-  function resolveData(data, skip = DEFAULT_SKIP) {
+  function resolveData(data, skip = DEFAULT_SKIP, extraScope) {
     const seen = new WeakSet();
     for (const key of Object.keys(data)) {
       if (skip.has(key)) continue;
-      if (typeof data[key] === 'string') data[key] = maybeRender(data[key]);
-      else walk(data[key], seen);
+      if (typeof data[key] === 'string') data[key] = maybeRender(data[key], extraScope);
+      else walk(data[key], seen, extraScope);
     }
   }
 
-  function walk(node, seen) {
+  function walk(node, seen, extraScope) {
     if (node === null || typeof node !== 'object' || seen.has(node)) return;
     seen.add(node);
 
     if (Array.isArray(node)) {
       for (let i = 0; i < node.length; i++) {
-        if (typeof node[i] === 'string') node[i] = maybeRender(node[i]);
-        else walk(node[i], seen);
+        if (typeof node[i] === 'string') node[i] = maybeRender(node[i], extraScope);
+        else walk(node[i], seen, extraScope);
       }
       return;
     }
 
     for (const key of Object.keys(node)) {
-      if (typeof node[key] === 'string') node[key] = maybeRender(node[key]);
-      else walk(node[key], seen);
+      if (typeof node[key] === 'string') node[key] = maybeRender(node[key], extraScope);
+      else walk(node[key], seen, extraScope);
     }
   }
 
-  function maybeRender(value) {
-    return (value.includes('{{') || value.includes('[ site.')) ? render(value) : value;
+  function maybeRender(value, extraScope) {
+    return (value.includes('{{') || value.includes('[ site.')) ? render(value, extraScope) : value;
   }
 
-  return { render, resolveData, cacheSize: () => cache.size };
+  /**
+   * Copy-on-write render pass over a data tree: returns the SAME references
+   * wherever nothing needed rendering, and shallow copies only along paths
+   * where a string rendered. Safe for per-page `resolved` computation —
+   * cascade sub-objects shared across pages are never mutated, and foreign
+   * objects with throwing getters (Eleventy collection items expose a
+   * templateContent getter that throws before render) stay opaque.
+   * @param {object} data
+   * @param {object} [extraScope] - per-page scope ({ page }) for page refs
+   * @returns {object} rendered tree (original object when nothing changed)
+   */
+  function renderData(data, extraScope) {
+    const seen = new WeakSet();
+
+    const transform = (node) => {
+      if (typeof node === 'string') return maybeRender(node, extraScope);
+      if (node === null || typeof node !== 'object' || seen.has(node)) return node;
+      seen.add(node);
+
+      let entries;
+      try {
+        entries = Object.entries(node);
+      } catch {
+        return node; // foreign object (throwing getter) — leave opaque
+      }
+
+      let copy = null;
+      for (const [key, value] of entries) {
+        const next = transform(value);
+        if (next !== value && copy === null) copy = Array.isArray(node) ? [...node] : { ...node };
+        if (copy !== null && next !== value) copy[key] = next;
+      }
+      return copy === null ? node : copy;
+    };
+
+    return transform(data);
+  }
+
+  return { render, resolveData, renderData, cacheSize: () => cache.size };
 }
 
 module.exports = { createFrontmatterResolver };

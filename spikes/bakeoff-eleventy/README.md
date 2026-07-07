@@ -61,9 +61,24 @@ npm test        # 17 tests against the shared mini-site fixture
    1,279 files re-render, ~2 s). B-phase optimization, not a blocker.
 8. HTTPS dev: native `https: { key, cert }` (mkcert) in the dev server.
 
+From the A2 real-layout ports (see `test/ports.test.js` + shared DECISION.md):
+
+9. LiquidJS has NO `forloop.parentloop` (renders empty) → hoist outer-loop
+   values into `{% assign %}` vars (codemod rule).
+10. `{{ }}` inside QUOTED tag args is a silent no-op upstream too (live
+    somiibo ships `class="fa text- display-4"`) → `{% capture %}` hoist.
+11. Include paths lose their leading slash (`include /modules/…` resolves
+    outside LiquidJS roots).
+12. Liquid include roots must be EXISTING dirs — a nonexistent root costs
+    +1.05 s/corpus in per-include stat probes (measured 3.60 → 4.65 s).
+13. Preprocessors receive the FULL cascade (layout frontmatter included), and
+    layout data objects are SHARED across pages → page-referencing frontmatter
+    values (`{{ page.recipe.title }}` in the real sweet-saucy meta) defer to a
+    per-page copy-on-write render in `resolved`; site-scoped refs stay cached.
+
 ## Not in the slice (deliberate)
 
 imagemin, translation, minifyHtml (scored under asset-pipeline integration in
 A2 — Eleventy has transform hooks for minify; imagemin is SSG-agnostic),
-sitemap/feeds, uj_member with a real team collection (corpus `_team` is empty,
-somiibo parity; the tag is template-kit-tested).
+sitemap/feeds. (uj_member now runs against a real UJM team doc in the A2
+ports fixture — corpus `_team` stays empty for somiibo parity.)

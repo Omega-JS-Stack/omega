@@ -5,6 +5,8 @@ pagination:
   data: collections.postCategories
   size: 1
   alias: taxonomy
+meta:
+  title: "{{ page.taxonomy.name }}"
 eleventyExcludeFromCollections: true
 ---
 <div class="container py-5 taxonomy-page" data-taxonomy="category">

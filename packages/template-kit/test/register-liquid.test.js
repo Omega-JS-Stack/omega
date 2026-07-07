@@ -157,9 +157,9 @@ test('Jekyll-compat pack renders through the engine', async () => {
   );
   assert.strictEqual(filtered, '2');
 
-  assert.match(
+  assert.strictEqual(
     await engine.parseAndRender('{{ date | date_to_xmlschema }}', { date: new Date('2024-01-15T12:00:00Z') }),
-    /^2024-01-1[456]T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/ // local-TZ dependent day/time, shape pinned
+    '2024-01-15T12:00:00+00:00' // UTC, CI-Jekyll parity (OMEGA date convention)
   );
 });
 

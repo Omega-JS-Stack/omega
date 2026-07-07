@@ -24,7 +24,8 @@ export async function sortedPosts() {
     return { entry, date, slug, url: `/blog/${slug}/` };
   });
 
-  return posts.sort((a, b) => b.date - a.date);
+  // Slug tie-break: same-date posts must order identically across engines
+  return posts.sort((a, b) => (b.date - a.date) || a.slug.localeCompare(b.slug));
 }
 
 /**

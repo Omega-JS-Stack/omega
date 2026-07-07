@@ -1,0 +1,46 @@
+---
+/**
+ * AdSense unit — the .astro rewrite of the framework's adsense.html include
+ * (display / in-article / in-feed / multiplex), reading the client + slots
+ * from resolved.advertising['google-adsense'] like the Liquid original.
+ */
+import { uj } from '@omega/uj.mjs';
+
+const { site, resolved, type = 'display', slot: slotOverride, style = '', layout: layoutInput, 'vert-size': vertSize = '' } = Astro.props;
+const adsense = ((resolved && resolved.advertising) || {})['google-adsense'] || {};
+
+const CONFIGS = {
+  display: { slotKey: 'display-slot', layout: '', layoutKey: '', format: 'auto', fullWidth: 'true' },
+  'in-article': { slotKey: 'in-article-slot', layout: 'in-article', layoutKey: '', format: 'fluid', fullWidth: '' },
+  'in-feed': { slotKey: 'in-feed-slot', layout: '', layoutKey: null, format: 'fluid', fullWidth: '' },
+  multiplex: { slotKey: 'multiplex-slot', layout: '', layoutKey: '', format: 'autorelaxed', fullWidth: '' },
+};
+const LAYOUT_KEYS = { 'image-above': '-6t+ed+2x-11-88', 'image-side': '-fb+5w+4e-db+86' };
+
+const config = CONFIGS[type] || CONFIGS.display;
+const layoutKey = config.layoutKey === null
+  ? (LAYOUT_KEYS[layoutInput || 'image-above'] || layoutInput)
+  : config.layoutKey;
+
+const lazyConfig = JSON.stringify({
+  src: uj.ujCachebreak(`${site.url}/assets/js/modules/vert.bundle.js`),
+  attributes: {
+    'data-ad-client': adsense.client,
+    'data-ad-type': type,
+    'data-ad-slot': slotOverride || adsense[config.slotKey],
+    'data-ad-layout': config.layout,
+    'data-ad-layout-key': layoutKey,
+    'data-ad-style': style,
+    'data-ad-format': config.format,
+    'data-ad-size': vertSize,
+    'data-full-width-responsive': config.fullWidth,
+    'async': '',
+  },
+}, null, 4);
+
+// Raw emit (set:html): Astro attribute escaping would &quot; the JSON —
+// functionally fine, but the Liquid original emits raw quotes in a
+// single-quoted attribute, and output parity is an A2 dimension.
+const adHtml = `<div data-lazy='@script ${lazyConfig}'></div>`;
+---
+{adsense.client && <Fragment set:html={adHtml} />}

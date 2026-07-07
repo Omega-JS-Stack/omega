@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% iftruthy meta.title %}{{ meta.title }}{% endiftruthy %}{% iffalsy meta.title %}{{ site.meta.title }}{% endiffalsy %}</title>
-<meta name="description" content="{{ meta.description | default: site.meta.description }}">
+<title>{% iftruthy resolved.meta.title %}{{ resolved.meta.title }}{% endiftruthy %}{% iffalsy resolved.meta.title %}{{ site.meta.title }}{% endiffalsy %}</title>
+<meta name="description" content="{{ resolved.meta.description | default: site.meta.description }}">
 <link rel="canonical" href="{% uj_external page.url %}">
 <link rel="icon" href="{{ '/favicon.ico' | uj_cachebreak }}">
 <link rel="stylesheet" href="{{ assetManifest.css.theme }}">

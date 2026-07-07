@@ -1,0 +1,404 @@
+---
+/**
+ * ports/recipe — the REAL sweet-saucy recipe layout (412-line Liquid
+ * original) rewritten as .astro for the A2 migration-cost dimension.
+ * The Liquid original's page-templated meta ({{ page.recipe.title }} in
+ * layout frontmatter) has no data home in Astro — it's computed here and
+ * grafted onto `resolved` before Base renders the head. The JSON-LD schema
+ * is BUILT as a JS object (cleaner than the Liquid capture/jsonify chains).
+ * The adsense include becomes the AdUnit component (see components/adunit).
+ */
+import Base, { defaults as baseDefaults } from 'omega:layouts/core/base.astro';
+import AdUnit from 'omega:components/adunit.astro';
+import { deepMerge } from '@omega/resolve.mjs';
+import { ujTag } from '@omega/uj.mjs';
+
+export const defaults = deepMerge(baseDefaults, {
+  asset_path: 'recipes/recipe',
+  theme: { main: { class: 'pt-0' } },
+});
+
+const { site, page, resolved: resolvedIn } = Astro.props;
+const recipe = resolvedIn.recipe;
+
+const recipeImage = `/assets/images/recipes/recipe-${recipe.id}/${page.slug}.jpg`;
+const totalTime = recipe.time.prep + recipe.time.cook;
+const content = await Astro.slots.render('default');
+const fakeVotes = Math.floor(content.length / 10) + 47;
+const cuisineSlug = String(recipe.cuisine).toLowerCase().replace(/ /g, '-');
+const canonicalUrl = page.canonical.url;
+
+// Page-templated meta from the Liquid original's layout frontmatter
+const resolved = {
+  ...resolvedIn,
+  meta: {
+    title: `${recipe.title} Recipe - ${site.brand.name}`,
+    description: recipe.description,
+    image: recipeImage,
+    ...(resolvedIn.meta || {}),
+  },
+};
+
+const icon = (name, classes) => ujTag('uj_icon', `${JSON.stringify(name)}, ${JSON.stringify(classes)}`, {});
+const image = (src, options) => ujTag('uj_image', `${JSON.stringify(src)}, ${Object.entries(options).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')}`, {});
+const member = (id, property) => ujTag('uj_member', `${JSON.stringify(id)}, ${JSON.stringify(property)}`, { site });
+
+const stars = (activeClasses, inactiveClasses) =>
+  [1, 2, 3, 4, 5].map((i) => icon('star', i <= recipe.rating ? activeClasses : inactiveClasses)).join('');
+
+const ingredientText = (item) =>
+  `${item.amount ? `${item.amount} ` : ''}${item.unit ? `${item.unit} ` : ''}${item.name}`;
+
+let stepCounter = 0;
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'Recipe',
+  '@id': `${canonicalUrl}#Recipe`,
+  url: canonicalUrl,
+  name: recipe.title,
+  description: recipe.description,
+  image: [`${site.url}${recipeImage}`],
+  author: { '@type': 'Person', name: member(recipe.author, 'name'), url: member(recipe.author, 'url') },
+  datePublished: new Date(page.date).toISOString().replace(/\.\d{3}Z$/, '+00:00'),
+  prepTime: `PT${recipe.time.prep}M`,
+  cookTime: `PT${recipe.time.cook}M`,
+  totalTime: `PT${totalTime}M`,
+  recipeCategory: recipe.course,
+  recipeCuisine: recipe.cuisine,
+  recipeYield: `${recipe.servings.amount} ${recipe.servings.unit || 'servings'}`,
+  keywords: (recipe.keywords || []).join(', '),
+  nutrition: { '@type': 'NutritionInformation', calories: `${recipe.calories} calories` },
+  aggregateRating: { '@type': 'AggregateRating', ratingValue: recipe.rating, ratingCount: fakeVotes },
+  recipeIngredient: (recipe.ingredients || []).flatMap((group) => (group.items || []).map(ingredientText)),
+  recipeInstructions: (recipe.instructions || []).flatMap((group) => (group.steps || []).map((step) => ({
+    '@type': 'HowToStep',
+    position: ++stepCounter,
+    text: String(step).replace(/\r?\n/g, ''),
+  }))),
+  publisher: { '@id': `${site.url}#${site.brand.type}` },
+};
+---
+<Base {...Astro.props} resolved={resolved}>
+  <!-- Hero Section -->
+  <section class="bg-body-tertiary overflow-hidden position-relative d-flex align-items-center rounded-bottom-4 shadow-lg pb-5 pt-5">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-10 text-center">
+          <div data-lazy="@class animation-slide-up">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb" class="mb-3">
+              <ol class="breadcrumb justify-content-center mb-0 small">
+                <li class="breadcrumb-item"><a href="/recipes" class="text-primary text-decoration-none">Recipes</a></li>
+                <li class="breadcrumb-item"><a href={`/recipes/cuisines/${cuisineSlug}`} class="text-primary text-decoration-none">{recipe.cuisine}</a></li>
+                <li class="breadcrumb-item text-body-secondary">{recipe.course}</li>
+              </ol>
+            </nav>
+
+            <!-- Title -->
+            <h1 class="display-4 fw-bold mb-3 text-body">{recipe.title} Recipe</h1>
+
+            <!-- Description -->
+            <p class="fs-5 mb-4 text-body-secondary">{recipe.description}</p>
+
+            <!-- Recipe Meta -->
+            <div class="d-flex flex-wrap justify-content-center gap-4 mb-4 text-body">
+              <!-- Rating -->
+              <div class="text-center">
+                <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
+                  <Fragment set:html={stars('text-warning', 'text-body-tertiary')} />
+                </div>
+                <small class="text-body-secondary">{recipe.rating} from {fakeVotes} votes</small>
+              </div>
+
+              <!-- Divider -->
+              <div class="vr text-body-tertiary d-none d-sm-block"></div>
+
+              <!-- Total Time -->
+              <div class="text-center">
+                <div class="fs-4 fw-bold">{totalTime} mins</div>
+                <small class="text-body-secondary">Total Time</small>
+              </div>
+
+              <!-- Divider -->
+              <div class="vr text-body-tertiary d-none d-sm-block"></div>
+
+              <!-- Servings -->
+              <div class="text-center">
+                <div class="fs-4 fw-bold">{recipe.servings.amount}</div>
+                <small class="text-body-secondary">{recipe.servings.unit || 'Servings'}</small>
+              </div>
+            </div>
+
+            <!-- Jump to Recipe Button -->
+            <a href="#recipe-card" class="btn btn-primary btn-lg px-5 py-3 fw-semibold">
+              <Fragment set:html={icon('arrow-down', 'me-2')} />
+              Jump to Recipe
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Recipe Image -->
+  <section class="pt-5 pb-0">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10" data-lazy="@class animation-slide-up">
+          <div class="ratio ratio-16x9 rounded-4 overflow-hidden shadow">
+            <Fragment set:html={image(recipeImage, { class: 'w-100 object-fit-cover', alt: recipe.title })} />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ad Unit - After Image -->
+  <div class="container py-4">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <AdUnit site={site} resolved={resolved} type="in-article" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Recipe Content (SEO description) -->
+  <section>
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="recipe-content fs-5" data-lazy="@class animation-slide-up">
+            <h2>How to Make the Best {recipe.title}</h2>
+            <Fragment set:html={content} />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ad Unit - Before Recipe Card -->
+  <div class="container pb-4">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <AdUnit site={site} resolved={resolved} type="display" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Recipe Card -->
+  <section id="recipe-card" class="scroll-mt-5">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card border-0 shadow-lg rounded-4 overflow-hidden bg-body-secondary" data-lazy="@class animation-slide-up">
+            <!-- Card Header -->
+            <div class="card-header bg-body-tertiary p-4 text-center border-0">
+              <!-- Recipe Image in Card -->
+              <div class="mb-4">
+                <div class="mx-auto rounded-3 overflow-hidden shadow" style="max-width: 200px;">
+                  <Fragment set:html={image(recipeImage, { class: 'w-100', alt: recipe.title })} />
+                </div>
+              </div>
+
+              <h2 class="h2 fw-bold mb-2">{recipe.title}</h2>
+              <p class="mb-3 opacity-90">{recipe.description}</p>
+
+              <!-- Rating -->
+              <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
+                <Fragment set:html={stars('text-warning', 'opacity-50')} />
+              </div>
+              <small class="opacity-75">{recipe.rating} from {fakeVotes} votes</small>
+
+              <!-- Action Buttons -->
+              <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+                <button class="btn btn-adaptive btn-sm" onclick="window.print()">
+                  <Fragment set:html={icon('print', 'me-1')} /> Print
+                </button>
+                <button class="btn btn-adaptive btn-sm recipe-save-btn">
+                  <Fragment set:html={icon('bookmark', 'me-1')} /> Save
+                </button>
+                <button class="btn btn-adaptive btn-sm recipe-rate-btn">
+                  <Fragment set:html={icon('star', 'me-1')} /> Rate
+                </button>
+              </div>
+
+              <!-- Recipe Meta Grid -->
+              <div class="row g-3 mt-4 text-center">
+                <div class="col-6 col-md-4">
+                  <small class="d-block opacity-75">Course</small>
+                  <span class="fw-semibold">{recipe.course}</span>
+                </div>
+                <div class="col-6 col-md-4">
+                  <small class="d-block opacity-75">Cuisine</small>
+                  <a href={`/recipes/cuisines/${cuisineSlug}`} class="fw-semibold text-body text-decoration-underline">{recipe.cuisine}</a>
+                </div>
+                <div class="col-12 col-md-4">
+                  <small class="d-block opacity-75">Keyword</small>
+                  <span class="fw-semibold">{(recipe.keywords || []).join(', ')}</span>
+                </div>
+              </div>
+
+              <div class="row g-3 mt-2 text-center">
+                <div class="col-4">
+                  <small class="d-block opacity-75">Prep Time</small>
+                  <span class="fw-semibold">{recipe.time.prep} mins</span>
+                </div>
+                <div class="col-4">
+                  <small class="d-block opacity-75">Cook Time</small>
+                  <span class="fw-semibold">{recipe.time.cook} mins</span>
+                </div>
+                <div class="col-4">
+                  <small class="d-block opacity-75">Total Time</small>
+                  <span class="fw-semibold">{totalTime} mins</span>
+                </div>
+              </div>
+
+              <div class="row g-3 mt-2 text-center">
+                <div class="col-4">
+                  <small class="d-block opacity-75">Servings</small>
+                  <span class="fw-semibold">{recipe.servings.amount} {recipe.servings.unit || 'servings'}</span>
+                </div>
+                <div class="col-4">
+                  <small class="d-block opacity-75">Calories</small>
+                  <span class="fw-semibold">{recipe.calories}kcal</span>
+                </div>
+                <div class="col-4">
+                  <small class="d-block opacity-75">Author</small>
+                  <a href={member(recipe.author, 'url')} class="fw-semibold text-decoration-underline text-body">{member(recipe.author, 'name')}</a>
+                </div>
+              </div>
+
+              <!-- Servings Multiplier -->
+              <div class="d-flex align-items-center justify-content-center gap-2 mt-4">
+                <button class="btn btn-outline-adaptive btn-sm recipe-multiplier-btn" data-multiplier="0.5">½x</button>
+                <button class="btn btn-adaptive btn-sm recipe-multiplier-btn" data-multiplier="1">1x</button>
+                <button class="btn btn-outline-adaptive btn-sm recipe-multiplier-btn" data-multiplier="2">2x</button>
+                <button class="btn btn-outline-adaptive btn-sm recipe-multiplier-btn" data-multiplier="3">3x</button>
+              </div>
+
+              <!-- Cook Mode Toggle -->
+              <div class="d-flex align-items-center justify-content-center gap-2 mt-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" id="cookModeToggle">
+                  <label class="form-check-label fw-semibold" for="cookModeToggle" id="cookModeLabel">
+                    <Fragment set:html={icon('pot-food', 'me-1')} />
+                    Cook Mode
+                  </label>
+                </div>
+                <small class="opacity-75">Prevent your screen from going dark</small>
+              </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="card-body p-4">
+              <!-- Ingredients Section -->
+              <div class="mb-5">
+                <h3 class="h4 fw-bold mb-4">
+                  <Fragment set:html={icon('basket-shopping', 'me-2 text-primary')} />
+                  Ingredients
+                </h3>
+
+                {(recipe.ingredients || []).map((group, groupIndex) => (
+                  <Fragment>
+                    {group.section && (
+                      <h4 class="h6 fw-bold text-primary mt-4 mb-3">{group.section}</h4>
+                    )}
+
+                    <ul class="list-unstyled recipe-ingredients-list">
+                      {(group.items || []).map((item, itemIndex) => (
+                        <li class="form-check mb-2">
+                          <input class="form-check-input recipe-ingredient-check" type="checkbox" id={`ingredient-${groupIndex + 1}-${itemIndex + 1}`}>
+                          <label class="ms-2 form-check-label" for={`ingredient-${groupIndex + 1}-${itemIndex + 1}`}>
+                            {item.amount && <Fragment><span class="recipe-ingredient-amount" data-amount={item.amount}>{item.amount}</span>{' '}</Fragment>}{item.unit && <Fragment><span class="recipe-ingredient-unit">{item.unit}</span>{' '}</Fragment>}<span class="recipe-ingredient-name">{item.name}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </Fragment>
+                ))}
+              </div>
+
+              <!-- Instructions Section -->
+              <div class="mb-5">
+                <h3 class="h4 fw-bold mb-4">
+                  <Fragment set:html={icon('list-ol', 'me-2 text-primary')} />
+                  Instructions
+                </h3>
+
+                {(recipe.instructions || []).map((group) => (
+                  <Fragment>
+                    {group.section && (
+                      <h4 class="h6 fw-bold text-primary mt-4 mb-3">{group.section}</h4>
+                    )}
+
+                    <ol class="recipe-instructions-list">
+                      {(group.steps || []).map((step) => (
+                        <li class="mb-3 pb-3 border-bottom">
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </Fragment>
+                ))}
+              </div>
+
+              <!-- Notes Section -->
+              {recipe.notes && (
+                <div class="mb-0">
+                  <h3 class="h4 fw-bold mb-4">
+                    <Fragment set:html={icon('lightbulb', 'me-2 text-primary')} />
+                    Notes
+                  </h3>
+
+                  <ul class="recipe-notes-list">
+                    {recipe.notes.map((note) => (
+                      <li class="mb-2">{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ad Unit - After Recipe Card -->
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <AdUnit site={site} resolved={resolved} type="multiplex" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Looking for More Section -->
+  <section class="bg-body-tertiary py-5">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+          <div data-lazy="@class animation-slide-up">
+            <h2 class="h3 fw-bold mb-3">Looking for more?</h2>
+            <p class="text-body-secondary mb-4">Explore our full collection of recipes or browse other categories.</p>
+            <a href="/recipes" class="btn btn-warning px-4 py-2 fw-semibold">
+              <Fragment set:html={icon('grid', 'me-2')} />
+              View all recipes
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Floating Jump to Recipe Button -->
+  <div id="floating-recipe-btn" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 d-none" style="z-index: 1040;">
+    <a href="#recipe-card" class="btn btn-primary btn-lg btn-glow px-5 py-3 fw-semibold rounded-pill">
+      <Fragment set:html={icon('arrow-down', 'me-2')} />
+      Jump to Recipe
+    </a>
+  </div>
+
+  <!-- Schema - Recipe -->
+  <script is:inline id="uj-schema-recipe" type="application/ld+json" set:html={JSON.stringify(schema, null, 2)}></script>
+</Base>

@@ -57,9 +57,15 @@ function configureOmega(eleventyConfig, options) {
   // ---- LiquidJS: Jekyll include syntax + layered include roots.
   // timezoneOffset 0: filename dates are UTC midnights; rendering them in UTC
   // matches CI-built Jekyll output (Actions runners are UTC).
+  // Consumer _includes first (somiibo's index includes
+  // frontend/components/hero-demo.html from its own _includes), then layers.
+  // EXISTING dirs only — LiquidJS probes every root per include lookup, and
+  // a nonexistent root costs ~1s over the corpus (measured: 3.60→4.65s).
+  const includeRoots = [path.join(options.consumerDir, '_includes'), ...layers.map((layer) => path.join(layer, '_includes'))]
+    .filter((dir) => fs.existsSync(dir));
   eleventyConfig.setLiquidOptions({
     jekyllInclude: true,
-    root: layers.map((layer) => path.join(layer, '_includes')),
+    root: includeRoots,
     timezoneOffset: 0,
   });
 
@@ -116,6 +122,7 @@ function configureOmega(eleventyConfig, options) {
     const inputPath = data.page.inputPath;
     if (inputPath.includes('/_posts/')) data.tags = ['posts'];
     else if (inputPath.includes('/_alternatives/')) data.tags = ['alternatives'];
+    else if (inputPath.includes('/_team/')) data.tags = ['team'];
 
     frontmatter.resolveData(data);
   });
@@ -138,7 +145,16 @@ function configureOmega(eleventyConfig, options) {
       for (const key of Object.keys(data)) {
         if (!RESOLVED_OMIT.has(key)) out[key] = data[key];
       }
-      return out;
+
+      // Layout-frontmatter Liquid: the preprocessor only sees PAGE frontmatter,
+      // so cascade data contributed by layouts (real classy contact carries
+      // `{{ site.brand.name }}`, real sweet-saucy recipe carries
+      // `{{ page.recipe.title }}` in meta values) still holds raw refs here.
+      // Copy-on-write: shared cascade sub-objects are never mutated, and
+      // pages with no remaining refs return `out` untouched.
+      return frontmatter.renderData(out, {
+        page: { ...out, url: data.page.url, slug: data.page.fileSlug, fileSlug: data.page.fileSlug },
+      });
     },
   });
 
@@ -146,7 +162,9 @@ function configureOmega(eleventyConfig, options) {
   const toDoc = (item) => ({ id: item.inputPath, url: item.url, data: item.data });
 
   eleventyConfig.addCollection('posts', (api) => {
-    const posts = api.getFilteredByTag('posts').sort((a, b) => b.date - a.date);
+    // Slug tie-break: same-date posts must order identically across engines
+    const posts = api.getFilteredByTag('posts')
+      .sort((a, b) => (b.date - a.date) || a.page.fileSlug.localeCompare(b.page.fileSlug));
     collectionsHolder.set('posts', posts.map(toDoc));
     return posts;
   });
@@ -154,6 +172,12 @@ function configureOmega(eleventyConfig, options) {
   eleventyConfig.addCollection('alternatives', (api) => {
     const docs = api.getFilteredByTag('alternatives').sort((a, b) => a.url.localeCompare(b.url));
     collectionsHolder.set('alternatives', docs.map(toDoc));
+    return docs;
+  });
+
+  eleventyConfig.addCollection('team', (api) => {
+    const docs = api.getFilteredByTag('team').sort((a, b) => a.url.localeCompare(b.url));
+    collectionsHolder.set('team', docs.map(toDoc));
     return docs;
   });
 
@@ -190,7 +214,12 @@ function configureOmega(eleventyConfig, options) {
 function aggregateTaxonomy(api, field) {
   const groups = new Map();
 
-  for (const item of api.getFilteredByTag('posts')) {
+  // Same order as the posts collection (date desc, slug tie-break) so
+  // taxonomy listings match across engines
+  const posts = api.getFilteredByTag('posts')
+    .sort((a, b) => (b.date - a.date) || a.page.fileSlug.localeCompare(b.page.fileSlug));
+
+  for (const item of posts) {
     for (const name of (item.data.post && item.data.post[field]) || []) {
       if (!groups.has(name)) groups.set(name, { name, slug: slugify(name), posts: [] });
       groups.get(name).posts.push(item);

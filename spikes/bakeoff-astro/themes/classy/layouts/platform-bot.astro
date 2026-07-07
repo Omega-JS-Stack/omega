@@ -13,14 +13,17 @@ const features = resolved.features || {};
   <section class="platform-hero py-5 text-light" style={`background: ${platform.gradient}`}>
     <div class="container">
       <p class="fw-bold"><Fragment set:html={ujTag('uj_icon', JSON.stringify(platform.icon || ''), {})} /> {platform.name}</p>
-      <h1 class="display-5">{resolved.hero && resolved.hero.headline}</h1>
-      <p class="lead">{resolved.hero && resolved.hero.subheadline}</p>
+      {/* set:html — Liquid {{ }} does NOT escape, so frontmatter headlines
+          may carry inline HTML (corpus platform pages embed <span> accents);
+          Astro's {expr} escapes by default (migration finding) */}
+      <h1 class="display-5"><Fragment set:html={(resolved.hero && resolved.hero.headline) || ''} /></h1>
+      <p class="lead"><Fragment set:html={(resolved.hero && resolved.hero.subheadline) || ''} /></p>
     </div>
   </section>
   <section class="py-5">
     <div class="container">
-      <h2 class="text-center mb-2">{features.heading}</h2>
-      <p class="text-center text-muted mb-4">{features.subheading}</p>
+      <h2 class="text-center mb-2"><Fragment set:html={features.heading || ''} /></h2>
+      <p class="text-center text-muted mb-4"><Fragment set:html={features.subheading || ''} /></p>
       <div class="row">
         {(features.cards || []).map((card) => (
           <div class="col-md-4 mb-4 feature-card">

@@ -41,17 +41,9 @@ function pad(value) {
 }
 
 /**
- * Timezone offset suffix for a date, e.g. "-08:00" (rfc822: "-0800").
- */
-function tzOffset(date, separator) {
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? '+' : '-';
-  const abs = Math.abs(offset);
-  return `${sign}${pad(Math.floor(abs / 60))}${separator}${pad(abs % 60)}`;
-}
-
-/**
- * ISO-8601 with local offset, Jekyll parity: "2008-11-07T13:07:54-08:00".
+ * ISO-8601 in UTC, CI-Jekyll parity: "2008-11-07T13:07:54+00:00".
+ * OMEGA convention: content dates are UTC midnights (dated filenames) and CI
+ * builds run UTC — rendering in the builder's local zone would shift days.
  * @param {Date|string} input
  * @returns {string}
  */
@@ -59,13 +51,13 @@ function dateToXmlschema(input) {
   const date = toDate(input);
   if (!date) return input;
 
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-    + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-    + tzOffset(date, ':');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
+    + `T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`
+    + '+00:00';
 }
 
 /**
- * RFC-822, Jekyll parity: "Fri, 07 Nov 2008 13:07:54 -0800".
+ * RFC-822 in UTC, CI-Jekyll parity: "Fri, 07 Nov 2008 13:07:54 +0000".
  * @param {Date|string} input
  * @returns {string}
  */
@@ -73,8 +65,8 @@ function dateToRfc822(input) {
   const date = toDate(input);
   if (!date) return input;
 
-  return `${DAYS[date.getDay()]}, ${pad(date.getDate())} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`
-    + ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ${tzOffset(date, '')}`;
+  return `${DAYS[date.getUTCDay()]}, ${pad(date.getUTCDate())} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+    + ` ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} +0000`;
 }
 
 /**

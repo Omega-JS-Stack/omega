@@ -1,0 +1,416 @@
+---
+layout: themes/[ site.theme.id ]/frontend/core/base
+asset_path: recipes/recipe
+
+### THEME CONFIG ###
+theme:
+  main:
+    class: "pt-0"
+
+### PAGE CONFIG ###
+meta:
+  title: "{{ page.recipe.title }} Recipe - {{ site.brand.name }}"
+  description: "{{ page.recipe.description }}"
+  image: "/assets/images/recipes/recipe-{{ page.recipe.id }}/{{ page.slug }}.jpg"
+---
+
+{% assign recipe = recipe %}
+{% assign recipe_image = "/assets/images/recipes/recipe-" | append: recipe.id | append: "/" | append: page.fileSlug | append: ".jpg" %}
+{% assign total_time = recipe.time.prep | plus: recipe.time.cook %}
+{% assign fake_votes = content | size | divided_by: 10 | plus: 47 %}
+
+<!-- Hero Section -->
+<section class="bg-body-tertiary overflow-hidden position-relative d-flex align-items-center rounded-bottom-4 shadow-lg pb-5 pt-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-10 text-center">
+        <div data-lazy="@class animation-slide-up">
+          <!-- Breadcrumb -->
+          {% assign cuisine_slug = recipe.cuisine | downcase | replace: " ", "-" %}
+          <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb justify-content-center mb-0 small">
+              <li class="breadcrumb-item"><a href="/recipes" class="text-primary text-decoration-none">Recipes</a></li>
+              <li class="breadcrumb-item"><a href="/recipes/cuisines/{{ cuisine_slug }}" class="text-primary text-decoration-none">{{ recipe.cuisine }}</a></li>
+              <li class="breadcrumb-item text-body-secondary">{{ recipe.course }}</li>
+            </ol>
+          </nav>
+
+          <!-- Title -->
+          <h1 class="display-4 fw-bold mb-3 text-body">{{ recipe.title }} Recipe</h1>
+
+          <!-- Description -->
+          <p class="fs-5 mb-4 text-body-secondary">{{ recipe.description }}</p>
+
+          <!-- Recipe Meta -->
+          <div class="d-flex flex-wrap justify-content-center gap-4 mb-4 text-body">
+            <!-- Rating -->
+            <div class="text-center">
+              <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
+                {% for i in (1..5) %}
+                  {% if i <= recipe.rating %}
+                    {% uj_icon "star", "text-warning" %}
+                  {% else %}
+                    {% uj_icon "star", "text-body-tertiary" %}
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <small class="text-body-secondary">{{ recipe.rating }} from {{ fake_votes }} votes</small>
+            </div>
+
+            <!-- Divider -->
+            <div class="vr text-body-tertiary d-none d-sm-block"></div>
+
+            <!-- Total Time -->
+            <div class="text-center">
+              <div class="fs-4 fw-bold">{{ total_time }} mins</div>
+              <small class="text-body-secondary">Total Time</small>
+            </div>
+
+            <!-- Divider -->
+            <div class="vr text-body-tertiary d-none d-sm-block"></div>
+
+            <!-- Servings -->
+            <div class="text-center">
+              <div class="fs-4 fw-bold">{{ recipe.servings.amount }}</div>
+              <small class="text-body-secondary">{{ recipe.servings.unit | default: "Servings" }}</small>
+            </div>
+          </div>
+
+          <!-- Jump to Recipe Button -->
+          <a href="#recipe-card" class="btn btn-primary btn-lg px-5 py-3 fw-semibold">
+            {% uj_icon "arrow-down", "me-2" %}
+            Jump to Recipe
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Recipe Image -->
+<section class="pt-5 pb-0">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 col-md-10" data-lazy="@class animation-slide-up">
+        <div class="ratio ratio-16x9 rounded-4 overflow-hidden shadow">
+          {% uj_image recipe_image, class="w-100 object-fit-cover", alt=recipe.title %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Ad Unit - After Image -->
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      {% include modules/adunits/adsense.html type="in-article" %}
+    </div>
+  </div>
+</div>
+
+<!-- Recipe Content (SEO description) -->
+<section>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="recipe-content fs-5" data-lazy="@class animation-slide-up">
+          <h2>How to Make the Best {{ recipe.title }}</h2>
+          {{ content }}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Ad Unit - Before Recipe Card -->
+<div class="container pb-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      {% include modules/adunits/adsense.html type="display" %}
+    </div>
+  </div>
+</div>
+
+<!-- Recipe Card -->
+<section id="recipe-card" class="scroll-mt-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-lg rounded-4 overflow-hidden bg-body-secondary" data-lazy="@class animation-slide-up">
+          <!-- Card Header -->
+          <div class="card-header bg-body-tertiary p-4 text-center border-0">
+            <!-- Recipe Image in Card -->
+            <div class="mb-4">
+              <div class="mx-auto rounded-3 overflow-hidden shadow" style="max-width: 200px;">
+                {% uj_image recipe_image, class="w-100", alt=recipe.title %}
+              </div>
+            </div>
+
+            <h2 class="h2 fw-bold mb-2">{{ recipe.title }}</h2>
+            <p class="mb-3 opacity-90">{{ recipe.description }}</p>
+
+            <!-- Rating -->
+            <div class="d-flex align-items-center justify-content-center gap-1 mb-1">
+              {% for i in (1..5) %}
+                {% if i <= recipe.rating %}
+                  {% uj_icon "star", "text-warning" %}
+                {% else %}
+                  {% uj_icon "star", "opacity-50" %}
+                {% endif %}
+              {% endfor %}
+            </div>
+            <small class="opacity-75">{{ recipe.rating }} from {{ fake_votes }} votes</small>
+
+            <!-- Action Buttons -->
+            <div class="d-flex flex-wrap justify-content-center gap-2 mt-4">
+              <button class="btn btn-adaptive btn-sm" onclick="window.print()">
+                {% uj_icon "print", "me-1" %} Print
+              </button>
+              <button class="btn btn-adaptive btn-sm recipe-save-btn">
+                {% uj_icon "bookmark", "me-1" %} Save
+              </button>
+              <button class="btn btn-adaptive btn-sm recipe-rate-btn">
+                {% uj_icon "star", "me-1" %} Rate
+              </button>
+            </div>
+
+            <!-- Recipe Meta Grid -->
+            <div class="row g-3 mt-4 text-center">
+              <div class="col-6 col-md-4">
+                <small class="d-block opacity-75">Course</small>
+                <span class="fw-semibold">{{ recipe.course }}</span>
+              </div>
+              <div class="col-6 col-md-4">
+                <small class="d-block opacity-75">Cuisine</small>
+                <a href="/recipes/cuisines/{{ cuisine_slug }}" class="fw-semibold text-body text-decoration-underline">{{ recipe.cuisine }}</a>
+              </div>
+              <div class="col-12 col-md-4">
+                <small class="d-block opacity-75">Keyword</small>
+                <span class="fw-semibold">{{ recipe.keywords | join: ", " }}</span>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-2 text-center">
+              <div class="col-4">
+                <small class="d-block opacity-75">Prep Time</small>
+                <span class="fw-semibold">{{ recipe.time.prep }} mins</span>
+              </div>
+              <div class="col-4">
+                <small class="d-block opacity-75">Cook Time</small>
+                <span class="fw-semibold">{{ recipe.time.cook }} mins</span>
+              </div>
+              <div class="col-4">
+                <small class="d-block opacity-75">Total Time</small>
+                <span class="fw-semibold">{{ total_time }} mins</span>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-2 text-center">
+              <div class="col-4">
+                <small class="d-block opacity-75">Servings</small>
+                <span class="fw-semibold">{{ recipe.servings.amount }} {{ recipe.servings.unit | default: "servings" }}</span>
+              </div>
+              <div class="col-4">
+                <small class="d-block opacity-75">Calories</small>
+                <span class="fw-semibold">{{ recipe.calories }}kcal</span>
+              </div>
+              <div class="col-4">
+                <small class="d-block opacity-75">Author</small>
+                <a href="{%- uj_member recipe.author, 'url' -%}" class="fw-semibold text-decoration-underline text-body">{%- uj_member recipe.author, "name" -%}</a>
+              </div>
+            </div>
+
+            <!-- Servings Multiplier -->
+            <div class="d-flex align-items-center justify-content-center gap-2 mt-4">
+              <button class="btn btn-outline-adaptive btn-sm recipe-multiplier-btn" data-multiplier="0.5">½x</button>
+              <button class="btn btn-adaptive btn-sm recipe-multiplier-btn" data-multiplier="1">1x</button>
+              <button class="btn btn-outline-adaptive btn-sm recipe-multiplier-btn" data-multiplier="2">2x</button>
+              <button class="btn btn-outline-adaptive btn-sm recipe-multiplier-btn" data-multiplier="3">3x</button>
+            </div>
+
+            <!-- Cook Mode Toggle -->
+            <div class="d-flex align-items-center justify-content-center gap-2 mt-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="cookModeToggle">
+                <label class="form-check-label fw-semibold" for="cookModeToggle" id="cookModeLabel">
+                  {% uj_icon "pot-food", "me-1" %}
+                  Cook Mode
+                </label>
+              </div>
+              <small class="opacity-75">Prevent your screen from going dark</small>
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="card-body p-4">
+            <!-- Ingredients Section -->
+            <div class="mb-5">
+              <h3 class="h4 fw-bold mb-4">
+                {% uj_icon "basket-shopping", "me-2 text-primary" %}
+                Ingredients
+              </h3>
+
+              {% for group in recipe.ingredients %}
+                {% comment %}LiquidJS has no forloop.parentloop — hoist outer index{% endcomment %}
+                {% assign group_index = forloop.index %}
+                {% iftruthy group.section %}
+                  <h4 class="h6 fw-bold text-primary mt-4 mb-3">{{ group.section }}</h4>
+                {% endiftruthy %}
+
+                <ul class="list-unstyled recipe-ingredients-list">
+                  {% for item in group.items %}
+                    <li class="form-check mb-2">
+                      <input class="form-check-input recipe-ingredient-check" type="checkbox" id="ingredient-{{ group_index }}-{{ forloop.index }}">
+                      <label class="ms-2 form-check-label" for="ingredient-{{ group_index }}-{{ forloop.index }}">
+                        {% if item.amount %}<span class="recipe-ingredient-amount" data-amount="{{ item.amount }}">{{ item.amount }}</span> {% endif %}{% if item.unit %}<span class="recipe-ingredient-unit">{{ item.unit }}</span> {% endif %}<span class="recipe-ingredient-name">{{ item.name }}</span>
+                      </label>
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endfor %}
+            </div>
+
+            <!-- Instructions Section -->
+            <div class="mb-5">
+              <h3 class="h4 fw-bold mb-4">
+                {% uj_icon "list-ol", "me-2 text-primary" %}
+                Instructions
+              </h3>
+
+              {% for group in recipe.instructions %}
+                {% iftruthy group.section %}
+                  <h4 class="h6 fw-bold text-primary mt-4 mb-3">{{ group.section }}</h4>
+                {% endiftruthy %}
+
+                <ol class="recipe-instructions-list">
+                  {% for step in group.steps %}
+                    <li class="mb-3 pb-3 border-bottom">
+                      {{ step }}
+                    </li>
+                  {% endfor %}
+                </ol>
+              {% endfor %}
+            </div>
+
+            <!-- Notes Section -->
+            {% iftruthy recipe.notes %}
+            <div class="mb-0">
+              <h3 class="h4 fw-bold mb-4">
+                {% uj_icon "lightbulb", "me-2 text-primary" %}
+                Notes
+              </h3>
+
+              <ul class="recipe-notes-list">
+                {% for note in recipe.notes %}
+                  <li class="mb-2">{{ note }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endiftruthy %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Ad Unit - After Recipe Card -->
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      {% include modules/adunits/adsense.html type="multiplex" %}
+    </div>
+  </div>
+</div>
+
+<!-- Looking for More Section -->
+<section class="bg-body-tertiary py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 text-center">
+        <div data-lazy="@class animation-slide-up">
+          <h2 class="h3 fw-bold mb-3">Looking for more?</h2>
+          <p class="text-body-secondary mb-4">Explore our full collection of recipes or browse other categories.</p>
+          <a href="/recipes" class="btn btn-warning px-4 py-2 fw-semibold">
+            {% uj_icon "grid", "me-2" %}
+            View all recipes
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Floating Jump to Recipe Button -->
+<div id="floating-recipe-btn" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 d-none" style="z-index: 1040;">
+  <a href="#recipe-card" class="btn btn-primary btn-lg btn-glow px-5 py-3 fw-semibold rounded-pill">
+    {% uj_icon "arrow-down", "me-2" %}
+    Jump to Recipe
+  </a>
+</div>
+
+<!-- Schema - Recipe -->
+{%- capture recipe_yield -%}{{ recipe.servings.amount }} {{ recipe.servings.unit | default: 'servings' }}{%- endcapture -%}
+{%- capture recipe_calories -%}{{ recipe.calories }} calories{%- endcapture -%}
+{%- capture author_name -%}{%- uj_member recipe.author, "name" -%}{%- endcapture -%}
+{%- capture author_url -%}{%- uj_member recipe.author, "url" -%}{%- endcapture -%}
+<script id="uj-schema-recipe" type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    "@id": "{{ site.url }}{{ page.url }}#Recipe",
+    "url": "{{ site.url }}{{ page.url }}",
+    "name": {{ recipe.title | jsonify }},
+    "description": {{ recipe.description | jsonify }},
+    "image": [{{ recipe_image | absolute_url | jsonify }}],
+    "author": {
+      "@type": "Person",
+      "name": {{ author_name | jsonify }},
+      "url": {{ author_url | jsonify }}
+    },
+    "datePublished": "{{ page.date | date_to_xmlschema }}",
+    "prepTime": "PT{{ recipe.time.prep }}M",
+    "cookTime": "PT{{ recipe.time.cook }}M",
+    "totalTime": "PT{{ total_time }}M",
+    "recipeCategory": {{ recipe.course | jsonify }},
+    "recipeCuisine": {{ recipe.cuisine | jsonify }},
+    "recipeYield": {{ recipe_yield | jsonify }},
+    "keywords": {{ recipe.keywords | join: ', ' | jsonify }},
+    "nutrition": {
+      "@type": "NutritionInformation",
+      "calories": {{ recipe_calories | jsonify }}
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": {{ recipe.rating }},
+      "ratingCount": {{ fake_votes }}
+    },
+    "recipeIngredient": [
+      {%- for group in recipe.ingredients -%}
+        {%- assign group_last = forloop.last -%}
+        {%- for item in group.items -%}
+          {%- capture ingredient_text -%}{% if item.amount %}{{ item.amount }} {% endif %}{% if item.unit %}{{ item.unit }} {% endif %}{{ item.name }}{%- endcapture -%}
+          {{ ingredient_text | jsonify }}{% unless forloop.last and group_last %},{% endunless %}
+        {%- endfor -%}
+      {%- endfor -%}
+    ],
+    "recipeInstructions": [
+      {%- assign step_counter = 0 -%}
+      {%- for group in recipe.instructions -%}
+        {%- assign group_last = forloop.last -%}
+        {%- for step in group.steps -%}
+          {%- assign step_counter = step_counter | plus: 1 -%}
+          {
+            "@type": "HowToStep",
+            "position": {{ step_counter }},
+            "text": {{ step | strip_newlines | jsonify }}
+          }{% unless forloop.last and group_last %},{% endunless %}
+        {%- endfor -%}
+      {%- endfor -%}
+    ],
+    "publisher": {
+      "@id": "{{ site.url }}#{{ site.brand.type }}"
+    }
+  }
+</script>

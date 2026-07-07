@@ -69,11 +69,31 @@ npm test        # 13 tests against the shared mini-site fixture (real astro buil
    same-process builds with different themes work (test-proven).
 8. HTTPS dev: native Vite `server.https` (mkcert) — no proxy.
 9. Test-harness ergonomics: every test build is a real `astro build`
-   (~25 s suite) vs Eleventy's in-process `toJSON()` (~1 s suite).
+   (~25 s suite, serialized — parallel test files collide on the shared
+   `.astro` store) vs Eleventy's in-process `toJSON()` (~1 s suite).
+
+From the A2 real-layout ports (see `test/ports.test.js` + shared DECISION.md):
+
+10. Astro auto-escapes `{expr}` but Liquid `{{ }}` NEVER escapes — frontmatter
+    values carrying inline HTML (corpus platform headlines embed `<span>`)
+    need `set:html` at every render site (a per-field audit in any migration);
+    attribute values entity-escape too, so the AdUnit component raw-emits its
+    div for output parity.
+11. Site-templated layout defaults (`{{ site.brand.name }}` in the real
+    contact frontmatter) have no data home — they move into component code via
+    the `??` pattern; page-templated meta (`{{ page.recipe.title }}` in the
+    real recipe) is computed in-component and grafted onto `resolved`.
+12. Consumer-LOCAL layouts (sweet-saucy ships `src/_layouts/recipe.html`)
+    can't be dispatched dynamically — `import.meta.glob` is compile-time, so
+    consumer layouts must join the Astro project graph (a restructuring cost
+    the Eleventy candidate doesn't have).
+13. `ujTag` needs real collections in its ctx for `uj_member` —
+    collections.mjs reads `_team` directly, outside the content layer.
 
 ## Not in the slice (deliberate)
 
 Same exclusions as the Eleventy candidate: imagemin, translation, minifyHtml,
-sitemap/feeds, uj_member with a real team collection. Also not modeled:
+sitemap/feeds (uj_member now runs against a real team doc in the A2 ports
+fixture). Also not modeled:
 Astro islands/client directives (the slice ships zero client-side framework
 JS — page modules come from the esbuild pipeline, like production).
