@@ -29,6 +29,9 @@ jobs:
       - name: devkit suite
         run: npm test --workspace=packages/devkit
 
+      - name: manager suite (service-runner contract + brand loading + e2e manage over fixture brands)
+        run: npm test --workspace=packages/manager
+
       - name: account suite (incl. golden master vs live BEM user.js)
         run: npm test --workspace=packages/account
 

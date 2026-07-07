@@ -8,7 +8,7 @@ Published packages live under the `@omegajs` npm scope. Shared internals are pri
 
 | Directory | Contents |
 |-----------|----------|
-| `packages/` | Framework packages (`web`, `backend`, `extension`, `desktop`) + shared internals (`client`, `account`, `config`, `devkit`, `template-kit`) |
+| `packages/` | Framework packages (`web`, `backend`, `extension`, `desktop`) + the orchestration engine (`manager`) + shared internals (`client`, `account`, `config`, `devkit`, `template-kit`) |
 | `spikes/` | Time-boxed experiments (Eleventy vs Astro bake-off) |
 | `apps/` | Sandbox brand for dogfooding and cross-stack e2e |
 | `docs/` | Shared-concept deep references |

@@ -1,0 +1,35 @@
+{
+  "name": "@omegajs/manager",
+  "version": "0.1.0",
+  "description": "The OMEGA orchestration engine — walks every service in dependency order and reconciles each to the brand's omega.json5, idempotently, against a brand monorepo. omega-manager's brains, ported service by service. Private until first publish.",
+  "private": true,
+  "main": "./src/index.js",
+  "bin": {
+    "omega-manager": "./bin/omega-manager"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./service-runner": "./src/lib/service-runner.js",
+    "./run-summary": "./src/lib/run-summary.js",
+    "./brand": "./src/lib/brand.js",
+    "./state": "./src/lib/state.js",
+    "./manage": "./src/manage.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@omegajs/config": "*",
+    "@omegajs/devkit": "*",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.4.2",
+    "fs-jetpack": "^5.1.0",
+    "json5": "^2.2.3",
+    "yargs": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "author": "ITW Creative Works",
+  "license": "MIT"
+}
