@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 - **The setup defaults scaffold now runs through the shared devkit defaults engine** — `copyDefaults` owns only EM's file map (preserve-if-exists catch-all, marker merges for `.env`/`.gitignore`/`CLAUDE.md`, always-re-render workflow YAMLs); `_.` renames, `_mas/` archive skips, and write-only-if-changed are engine built-ins. `utils/merge-line-files.js` is now a shim over the devkit module (EM's implementation was the canonical seed — behavior unchanged). One structural tweak: `.gitkeep` files now create the target directory instead of copying the placeholder file itself.
+- **Marker merge gains custom-key promotion (via devkit, from BEM)** — when the framework's `.env` template newly adopts a key the user already had in their `Custom Values` section, the merge now promotes the user's line UP into the `Default Values` section and drops the Custom copy (previously the key appeared empty in Default AND set in Custom). Effective dotenv values are unchanged — the file just stops carrying duplicates. A key present in BOTH sections keeps its Custom copy.
 - **CLI dispatch is now the shared devkit router** (vendored into `dist/vendor/devkit/cli-router.js`) — `cli.js` owns only the alias table and commands directory (the bin's `ELECTRON_RUN_AS_NODE` strip is unchanged). One visible tweak: command failures now print `Error executing command "<name>": …` (the message previously omitted the command name).
 
 ---

@@ -36,7 +36,7 @@ class GitignoreTest extends BaseTest {
     }
 
     // Get the template
-    const templatePath = path.resolve(__dirname, '../../../../templates/_.gitignore');
+    const templatePath = path.resolve(__dirname, '../../../defaults/_.gitignore');
     const templateContent = jetpack.read(templatePath);
 
     if (!templateContent) {
@@ -94,7 +94,7 @@ class GitignoreTest extends BaseTest {
   async fix() {
     const gitignorePath = `${this.self.firebaseProjectPath}/.gitignore`;
     const oldGitignorePath = `${this.self.firebaseProjectPath}/functions/.gitignore`;
-    const templatePath = path.resolve(__dirname, '../../../../templates/_.gitignore');
+    const templatePath = path.resolve(__dirname, '../../../defaults/_.gitignore');
 
     const templateContent = jetpack.read(templatePath);
     if (!templateContent) {

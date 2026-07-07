@@ -22,7 +22,7 @@ class EnvFileTest extends BaseTest {
     }
 
     // Get the template
-    const templatePath = path.resolve(__dirname, '../../../../templates/_.env');
+    const templatePath = path.resolve(__dirname, '../../../defaults/functions/_.env');
     const templateContent = jetpack.read(templatePath);
 
     if (!templateContent) {
@@ -81,7 +81,7 @@ class EnvFileTest extends BaseTest {
 
   async fix() {
     const envPath = `${this.self.firebaseProjectPath}/functions/.env`;
-    const templatePath = path.resolve(__dirname, '../../../../templates/_.env');
+    const templatePath = path.resolve(__dirname, '../../../defaults/functions/_.env');
 
     const templateContent = jetpack.read(templatePath);
     if (!templateContent) {

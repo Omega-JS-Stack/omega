@@ -1,7 +1,10 @@
 // Merge line-based files (.env, .gitignore, CLAUDE.md) during framework setup —
 // the OMEGA marker-section protocol. Canonical version is EM's (it added .env
 // double-quote normalization and order-safe key substitution over the older
-// BXM/UJM inline copies).
+// BXM/UJM inline copies) plus BEM's custom-key promotion (a key the framework
+// newly adopts into its Default section is promoted UP from the user's Custom
+// section with their value, instead of appearing empty in Default and set in
+// Custom).
 //
 // Convention:
 //
@@ -26,6 +29,8 @@
 //       KEY=                  →   KEY=                  (empty stays empty/unquoted)
 //     This protects values containing spaces, #, $, or other shell-meaningful chars.
 //   - .gitignore: same logic, line-based instead of key-based (no quoting).
+//   - CLAUDE.md: same logic as .gitignore (line-based, no quoting). The markers
+//     render as visible H1 headings in markdown — that's intentional UX.
 //   - First setup (no existing file): the framework template lands as-is.
 
 const DEFAULT_MARKER = '# ========== Default Values ==========';
@@ -62,8 +67,10 @@ function mergeLineBasedFiles(existingContent, newContent, fileName) {
           continue;
         }
         if (existingCustomKeys.has(key)) {
-          // Key the user moved to custom — leave it in custom; emit empty default value.
-          emit(line);
+          // The framework newly adopted a key the user had in their Custom section.
+          // Promote it UP into Default with the user's value, and drop the Custom copy
+          // (handled below) so the key isn't duplicated / left empty.
+          emit(findKeyLine(existingCustom, key));
           continue;
         }
       }
@@ -98,10 +105,20 @@ function mergeLineBasedFiles(existingContent, newContent, fileName) {
     }
   }
 
-  // The user's Custom section is preserved verbatim — except .env values get
-  // normalized to double-quoted form so the file's quoting style is consistent.
+  // The user's Custom section is preserved — except (a) .env values get normalized
+  // to double-quoted form for consistent quoting, and (b) any key that was promoted
+  // UP into the Default section above is dropped here so it isn't duplicated. Keys
+  // present in BOTH sections are NOT dropped (the Default copy's value won there,
+  // so removing the Custom copy would silently change dotenv's effective value).
   const finalCustom = isEnvFile
-    ? existingCustom.map((line) => normalizeEnvLine(line))
+    ? existingCustom
+        .filter((line) => {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) return true;
+          const key = trimmed.split('=')[0].trim();
+          return !(key && newDefaultKeys.has(key) && !existingDefaultKeys.has(key));
+        })
+        .map((line) => normalizeEnvLine(line))
     : existingCustom;
 
   const result = [];
@@ -209,4 +226,17 @@ function findKeyLine(lines, key) {
   return `${key}=`;
 }
 
-module.exports = { mergeLineBasedFiles, normalizeEnvLine, DEFAULT_MARKER, CUSTOM_MARKER };
+/**
+ * Check whether a file already carries both section markers (i.e. has been
+ * through the merge protocol at least once). Setup validators use this to
+ * distinguish legacy/no-marker files from protocol-managed ones.
+ * @param {string} content
+ * @returns {boolean}
+ */
+function hasSectionMarkers(content) {
+  return typeof content === 'string'
+    && content.includes(DEFAULT_MARKER)
+    && content.includes(CUSTOM_MARKER);
+}
+
+module.exports = { mergeLineBasedFiles, normalizeEnvLine, hasSectionMarkers, DEFAULT_MARKER, CUSTOM_MARKER };

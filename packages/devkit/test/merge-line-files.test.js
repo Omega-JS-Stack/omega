@@ -3,7 +3,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mergeLineBasedFiles, normalizeEnvLine, DEFAULT_MARKER, CUSTOM_MARKER } = require('../src/merge-line-files');
+const { mergeLineBasedFiles, normalizeEnvLine, hasSectionMarkers, DEFAULT_MARKER, CUSTOM_MARKER } = require('../src/merge-line-files');
 
 test('preserves user value in default section across merges (and quotes it)', () => {
   const existing = `${DEFAULT_MARKER}\nGH_TOKEN=ghp_secret123\nBACKEND_MANAGER_KEY=\n\n${CUSTOM_MARKER}\n`;
@@ -36,14 +36,36 @@ test('custom section is preserved verbatim (env values normalized to quotes)', (
   assert.match(merged, /MY_SECRET="raw value"/);
 });
 
-test('key the user moved to custom stays in custom; default emits framework line', () => {
+test('custom key newly adopted by the framework is promoted UP into default (BEM behavior)', () => {
   const existing = `${DEFAULT_MARKER}\n${CUSTOM_MARKER}\nGH_TOKEN="moved"\n`;
   const incoming = `${DEFAULT_MARKER}\nGH_TOKEN=""\n${CUSTOM_MARKER}\n`;
   const merged = mergeLineBasedFiles(existing, incoming, '.env');
   const defaultPart = merged.slice(0, merged.indexOf(CUSTOM_MARKER));
   const customPart = merged.slice(merged.indexOf(CUSTOM_MARKER));
-  assert.match(defaultPart, /GH_TOKEN=""/);
-  assert.match(customPart, /GH_TOKEN="moved"/);
+  assert.match(defaultPart, /GH_TOKEN="moved"/);
+  assert.doesNotMatch(customPart, /GH_TOKEN/);
+  // Promotion is idempotent: the next merge preserves the value from Default.
+  const again = mergeLineBasedFiles(merged, incoming, '.env');
+  assert.equal(again, merged);
+});
+
+test('key present in BOTH sections: default value wins, custom copy is kept (no silent value flip)', () => {
+  // dotenv resolves the LAST occurrence, so the effective value was the custom
+  // "b". Dropping the custom copy would flip the effective value to "a" — keep it.
+  const existing = `${DEFAULT_MARKER}\nGH_TOKEN="a"\n${CUSTOM_MARKER}\nGH_TOKEN="b"\n`;
+  const incoming = `${DEFAULT_MARKER}\nGH_TOKEN=""\n${CUSTOM_MARKER}\n`;
+  const merged = mergeLineBasedFiles(existing, incoming, '.env');
+  const defaultPart = merged.slice(0, merged.indexOf(CUSTOM_MARKER));
+  const customPart = merged.slice(merged.indexOf(CUSTOM_MARKER));
+  assert.match(defaultPart, /GH_TOKEN="a"/);
+  assert.match(customPart, /GH_TOKEN="b"/);
+});
+
+test('hasSectionMarkers: true only when both markers present', () => {
+  assert.equal(hasSectionMarkers(`${DEFAULT_MARKER}\n${CUSTOM_MARKER}\n`), true);
+  assert.equal(hasSectionMarkers(`${DEFAULT_MARKER}\n`), false);
+  assert.equal(hasSectionMarkers('KEY=value\n'), false);
+  assert.equal(hasSectionMarkers(''), false);
 });
 
 test('.gitignore merges line-based: new defaults win, user lines migrate to custom', () => {

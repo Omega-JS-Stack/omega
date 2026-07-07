@@ -159,15 +159,11 @@ class SetupCommand extends BaseCommand {
     self.default.databaseRulesCore = self.default.databaseRulesWhole.match(bem_allRulesRegex)[0];
   }
 
-  // Copy default files (src/defaults/**) into the consumer project root.
-  // For files in MERGEABLE_BASENAMES, route through `mergeLineBasedFiles` so the
-  // framework's section stays live-synced while the consumer's Custom section is
-  // preserved verbatim. For non-mergeable files: copy on first setup, skip if exists.
-  //
-  // Mirrors EM's copyDefaults pattern (src/commands/setup.js in electron-manager).
-  // Same marker convention as .env/.gitignore in EM/BXM/UJM:
-  //   # ========== Default Values ==========   (framework-owned)
-  //   # ========== Custom Values ==========    (consumer-owned)
+  // Copy default files (src/defaults/**) into the consumer project root via the
+  // shared devkit defaults engine (same engine as EM/BXM). The file map lives in
+  // src/utils/scaffold-defaults.js: copy-if-missing for everything, marker-section
+  // merge (Default = framework-owned, Custom = consumer-owned) for CLAUDE.md,
+  // .gitignore, and functions/.env on every setup.
   copyDefaults() {
     const self = this.main;
     const ui = this.ui;
@@ -179,66 +175,25 @@ class SetupCommand extends BaseCommand {
       return;
     }
 
-    const { mergeLineBasedFiles } = require('../../utils/merge-line-files.js');
-    // Files routed through the marker-based merge (vs verbatim copy / skip-if-exists).
-    // .env / .gitignore aren't currently shipped by BEM but are included here so this
-    // matches the EM/BXM/UJM contract if we ever add them.
-    const MERGEABLE_BASENAMES = new Set(['.env', '.gitignore', 'CLAUDE.md']);
+    const { scaffoldDefaults } = require('../../utils/scaffold-defaults.js');
+    const result = scaffoldDefaults({
+      outputDir: self.firebaseProjectPath,
+      // ui owns the per-file output below; route engine errors through it too.
+      logger: {
+        log: () => {},
+        warn: (m) => ui.status('warn', m, { level: 2 }),
+        error: (m) => ui.status('warn', m, { level: 2 }),
+      },
+    });
 
-    // Track whether we emitted any line so we can show an "up to date" note when nothing changed.
-    let touched = 0;
-
-    const files = jetpack.find(defaultsDir, { matching: '**/*', recursive: true, files: true, directories: false });
-
-    for (const src of files) {
-      const rel = path.relative(defaultsDir, src);
-      const segments = rel.split(path.sep);
-
-      // Skip "archive" DIRECTORIES — any non-final path segment starting with `_` and
-      // followed by a non-`.` character (e.g. `_legacy/`). Matches EM/BXM/UJM convention.
-      // The check is restricted to directory segments (all but the last) so a `_`-prefixed
-      // FILENAME still ships — e.g. `test/_init.js` copies verbatim (the test runner skips
-      // it from discovery on its own). The `_.env` / `_.gitignore` files are likewise not
-      // skipped; their leading `_` strips on copy below.
-      const dirSegments = segments.slice(0, -1);
-      if (dirSegments.some((s) => s.startsWith('_') && !s.startsWith('_.'))) {
-        continue;
-      }
-
-      // Convert leading `_.` to `.` so dotfiles ship past npm's filter.
-      const target = segments.map((part) => part.startsWith('_.') ? part.slice(1) : part).join(path.sep);
-      const dest = path.join(self.firebaseProjectPath, target);
-      const basename = path.basename(target);
-
-      if (jetpack.exists(dest)) {
-        if (MERGEABLE_BASENAMES.has(basename)) {
-          try {
-            const existing = jetpack.read(dest, 'utf8');
-            const incoming = jetpack.read(src, 'utf8');
-            const merged   = mergeLineBasedFiles(existing, incoming, basename);
-            if (merged !== existing) {
-              jetpack.write(dest, merged);
-              ui.status('change', `Merged ${chalk.cyan(target)}`, { level: 2 });
-              touched++;
-            }
-          } catch (e) {
-            ui.status('warn', `Failed to merge ${chalk.cyan(target)}`, { detail: e.message, level: 2 });
-            touched++;
-          }
-          continue;
-        }
-
-        // Non-mergeable, already exists → preserve consumer's version.
-        continue;
-      }
-
-      // First time: copy as-is.
-      jetpack.copy(src, dest);
-      ui.status('add', `Copied ${chalk.cyan(target)}`, { level: 2 });
-      touched++;
+    for (const file of result.written) {
+      ui.status('add', `Copied ${chalk.cyan(file)}`, { level: 2 });
+    }
+    for (const file of result.merged) {
+      ui.status('change', `Merged ${chalk.cyan(file)}`, { level: 2 });
     }
 
-    if (touched === 0) {
+    if (result.written.length + result.merged.length === 0) {
       ui.note('All defaults up to date', 2);
     }
   }
