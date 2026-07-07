@@ -1,0 +1,17 @@
+{
+  "name": "@omegajs/bakeoff-shared",
+  "version": "0.1.0",
+  "description": "Shared corpus generator + bench harness + scorecard for the Eleventy vs Astro bake-off (Phase 2 A0)",
+  "private": true,
+  "main": "./src/generate-corpus.js",
+  "scripts": {
+    "generate": "node src/generate-corpus.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "fs-jetpack": "^5.1.0"
+  }
+}

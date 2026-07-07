@@ -18,3 +18,6 @@ logs/
 .temp/
 .cache/
 .omega/
+
+# Bake-off generated corpus (deterministic — regenerate via `npm run generate` in spikes/bakeoff-shared)
+spikes/bakeoff-shared/corpus/
