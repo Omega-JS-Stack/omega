@@ -1,0 +1,20 @@
+{
+  // OMEGA config — one file, one shape, every project type.
+  // Docs: node_modules/@omegajs/web/README.md + docs/config.md in the Omega repo.
+  // Secrets NEVER live here — they go in .env (the validator hard-fails on
+  // secret-shaped keys).
+  brand: {
+    id: 'my-brand',
+    name: 'My Brand',
+    url: 'https://example.com',
+  },
+
+  theme: {
+    id: 'classy',
+  },
+
+  // Key presence = this project enables this target
+  targets: {
+    web: {},
+  },
+}

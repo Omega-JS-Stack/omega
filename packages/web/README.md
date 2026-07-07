@@ -6,12 +6,26 @@ decision ([spikes/bakeoff-shared/DECISION.md](../../spikes/bakeoff-shared/DECISI
 Eleventy 4.70 vs Astro 3.55 weighted). B1 promoted the engine core from the
 winning spike; **B2 ported the REAL UJM content** — the full blueprint layout
 set, 3 Liquid themes + the bootstrap asset layer, ~60 default pages, and the
-real core chrome (head/body/foot) — through the B4 codemod rules. The CLI
-lands in B3.
+real core chrome (head/body/foot) — through the B4 codemod rules. **B3 added
+the `omega` CLI, consumer scaffolding, the ESM boot runtime, and the Ruby-free
+CI template.**
 
 ```bash
-npm test    # 30 tests: engine slice (13) + asset pipeline (5) + real-layout ports (5) + theme contract (7)
+# In a consumer project (scaffolded scripts call these):
+npx omega setup     # scaffold/refresh defaults + sync package.json scripts
+npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds (--port=N)
+npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → dist/
+npx omega test      # production build + smoke checks + consumer test/ (node --test)
+npx omega deploy    # refuse file: deps → npm run build → `npu sync --message='Deploy'`
+npx omega clean     # remove dist/ + .omega/
+npx omega version   # framework version
+# translate / audit: explicit not-ported-yet stubs (subsystems ride later checkpoints)
+
+npm test    # 38 tests: engine slice (13) + assets/ESM (6) + CLI/scaffold (7) + ports (5) + theme contract (7)
 ```
+
+A bare consumer (`omega setup` in an empty dir, edit brand in
+config/omega.json5) builds the full ~56-page default set in under 2 s.
 
 Corpus-scale benching lives in [spikes/bakeoff-eleventy](../../spikes/bakeoff-eleventy)
 (the promoted spike, now a thin harness). With the REAL content the corpus
@@ -29,8 +43,12 @@ see the harness README for the honest before/after numbers.
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `web-manager` → @omegajs/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
-| [build.js](src/build.js) | `buildSite()` — assets → Eleventy → PurgeCSS orchestration with per-phase timings (the `omega build` seed) |
-| [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults) — engine defaults |
+| [build.js](src/build.js) | `buildSite()` — assets → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
+| [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime) + `resolveClientEntry()` |
+| [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
+| [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
+| [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
+| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (webManager + mode helpers) |
 
 ## Packaged content (the real UJM port, B2)
 
@@ -86,14 +104,32 @@ see the harness README for the honest before/after numbers.
   `/404.html` (static hosts need the file).
 - **Assets** — every layer root follows one convention (`js/main.js`,
   `js/pages/**`, `css/main.scss`, `css/pages/**`, theme roots add
-  `_theme.scss`/`_theme.js`). Entries are wrapped in boot stubs (import the
-  module, call a default-function export with the web-manager singleton — the
-  full runtime Manager handshake is B3); `__main_assets__/*` resolves to the
-  core layer / themes dir, `__theme__/*` to the active theme (classy
-  fallback), `web-manager` (subpaths included) to @omegajs/client. Manifest:
+  `_theme.scss`/`_theme.js`). `__main_assets__/*` resolves to the core layer /
+  themes dir, `__theme__/*` to the active theme (classy fallback),
+  `web-manager` (subpaths included) to @omegajs/client. Manifest:
   `{ js: { main, pages }, css: { main, pages, themePages } }` — base page css
   and the active theme's page css BOTH load. The engine's `pageAssets`
   computed resolves each page's entries (`asset_path` override honored).
+  Dev mode (`omega dev`): stable un-hashed names + no minify, so in-place
+  asset rebuilds keep their URLs without an HTML re-render.
+- **Boot runtime (ESM + code splitting)** — all bundles come out of ONE
+  esbuild call with `splitting: true`, so web-manager and `runtime/boot.js`
+  land in a shared chunk the browser evaluates ONCE per page: every
+  `import webManager from 'web-manager'` — in the main bundle, a page module,
+  anywhere — is the SAME initialized singleton (webpack's single module
+  graph, reproduced with `<script type="module">` semantics; both scripts are
+  deferred and execute in document order). The handshake: main stub →
+  `bootMain(mod)` (webManager.initialize(window.Configuration) → dev lib in
+  development → global module), page stub → `bootPage(mod)` (awaits the main
+  boot, then `mod({ manager, options })` — the UJM page-module contract,
+  with `manager` the frontend Manager wrapper carrying mode helpers).
+- **Scaffolding (`omega setup`)** — devkit's defaults engine over
+  `scaffold/`: marker-section merges live-sync .gitignore/.env/CLAUDE.md
+  (Custom sections preserved verbatim), config/omega.json5 seeds then
+  JSON5-defaults-merges (consumer values win), the Ruby-free CI workflow +
+  .nvmrc re-template every run, `src/**` is consumer-owned after seeding.
+  NO pages are copied — the default set stays virtual. package.json scripts
+  sync to the omega commands.
 
 ## Engine facts worth knowing (test-pinned)
 
@@ -130,10 +166,12 @@ codemod rules table lives in DECISION.md (B2 added: `layout: none` → drop,
 `page.<key>` → `resolved.<key>` in template bodies only, `page.canonical.*` →
 `site.url`/`page.url` forms).
 
-## Not here yet (B3–B5)
+## Not here yet (B4–B5 + follow-ups)
 
-CLI (`omega dev/build/...`) + FILE_MAP consumer scaffolding + the runtime
-Manager boot handshake + Ruby-free CI template (B3) · `omega migrate` codemod
-+ liquid-lint (B4) · `omega verify` parity harness (B5) · imagemin w/
-content-hash cache, translation, minifyHtml-as-transform, sitemap/feeds,
-named css bundles, full icon set (B-phase pipeline).
+`omega migrate` codemod + liquid-lint (B4) · `omega verify` parity harness
+(B5) · translate/audit subsystem ports (commands exist as explicit
+not-ported-yet stubs) · UJM-setup extras (CNAME, firebase auth handler fetch,
+GitHub secret publishing, post dedupe) · imagemin w/ content-hash cache,
+minifyHtml-as-transform, sitemap/feeds, named css bundles, full icon set,
+theme-variable customization via a consumer main.scss (B-phase pipeline) ·
+dev-loop re-render narrowing + browser live-reload on asset rebuilds.

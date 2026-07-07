@@ -1,8 +1,8 @@
 /**
- * @omegajs/web — the OMEGA web framework engine core: Eleventy 3 + LiquidJS +
- * @omegajs/template-kit, promoted from the winning bake-off spike (decision
- * memo: spikes/bakeoff-shared/DECISION.md). This surface is the B1 seed —
- * the CLI (`omega dev/build/...`) arrives in B3 and consumes these same
+ * @omegajs/web — the OMEGA web framework: Eleventy 3 + LiquidJS +
+ * @omegajs/template-kit engine core (promoted from the winning bake-off
+ * spike — decision memo: spikes/bakeoff-shared/DECISION.md) plus the `omega`
+ * CLI (bin/omega → src/cli.js → src/commands/), which consumes these same
  * entry points.
  */
 const { configureOmega } = require('./engine.js');
@@ -12,7 +12,9 @@ const { collectLayered } = require('./layers.js');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
-const { PATHS } = require('./paths.js');
+const { PATHS, resolveClientEntry } = require('./paths.js');
+const { consumerPaths, loadSiteData } = require('./consumer.js');
+const { scaffoldDefaults } = require('./scaffold.js');
 
 module.exports = {
   configureOmega,
@@ -26,4 +28,8 @@ module.exports = {
   registerVirtualLayouts,
   composeSymlinkFarm,
   PATHS,
+  resolveClientEntry,
+  consumerPaths,
+  loadSiteData,
+  scaffoldDefaults,
 };

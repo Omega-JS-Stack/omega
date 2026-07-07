@@ -1,10 +1,11 @@
 /**
  * Asset-pipeline invariants over LAYER ROOTS (site → theme(s) → core): page
- * modules layered via esbuild boot stubs, the real UJM main bundle (core
- * runtime + dynamic theme import via __theme__), the real @omegajs/client
- * via the web-manager alias (subpaths included), layered sass through
- * omega:theme (per-theme main css + theme page css namespaces), and the
- * PurgeCSS pass stripping unused selectors.
+ * modules layered via esbuild boot stubs, ESM + code splitting (web-manager
+ * and the boot runtime in ONE shared chunk — the cross-bundle singleton),
+ * the real UJM main bundle (core runtime + dynamic theme import via
+ * __theme__), the real @omegajs/client via the web-manager alias (subpaths
+ * included), layered sass through omega:theme (per-theme main css + theme
+ * page css namespaces), dev-mode stable names, and the PurgeCSS pass.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -51,21 +52,57 @@ test('layered page modules: site layer wins, core fills the rest, all content-ha
   assert.ok(indexBundle.includes('consumer wins'), 'SITE layer index.js beat the core layer');
 });
 
-test('main bundle: real UJM runtime + theme via __theme__ + web-manager subpaths', async () => {
+// Read an entry bundle plus every chunk it transitively imports (the module
+// graph the browser would evaluate for that <script type="module">).
+function readGraph(manifestUrl) {
+  const seen = new Map();
+  const visit = (file) => {
+    if (seen.has(file)) return;
+    const content = fs.readFileSync(file, 'utf8');
+    seen.set(file, content);
+    // Shared chunks (chunk-HASH) AND dynamic-import chunks (_theme-HASH, dev-HASH, ...)
+    for (const m of content.matchAll(/["']([^"']*chunks\/[\w.-]+-[A-Z0-9]+\.js)["']/g)) {
+      visit(path.resolve(path.dirname(file), m[1]));
+    }
+  };
+  visit(path.join(OUT, manifestUrl.slice(1)));
+  return [...seen.values()].join('\n');
+}
+
+function walkJs(dir) {
+  return fs.readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.js'))
+    .map((e) => path.join(e.parentPath, e.name));
+}
+
+test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runtime', async () => {
   const manifest = await build(['classy']);
   assert.ok(manifest.js.main, 'main bundle in manifest');
 
-  const mainBundle = fs.readFileSync(path.join(OUT, manifest.js.main.slice(1)), 'utf8');
-  assert.ok(mainBundle.includes('Global module loaded successfully'), 'core runtime module bundled');
-  assert.ok(mainBundle.includes('Classy theme loaded successfully'), 'active theme _theme.js inlined via __theme__');
-  assert.ok(mainBundle.length > 50000, `real runtime is IN the bundle (${mainBundle.length} bytes)`);
+  const graph = readGraph(manifest.js.main);
+  assert.ok(graph.includes('Global module loaded successfully'), 'core runtime module in the graph');
+  assert.ok(graph.includes('Classy theme loaded successfully'), 'active theme _theme.js inlined via __theme__');
+  assert.ok(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph');
 });
 
-test('signin bundles the real @omegajs/client via the web-manager alias', async () => {
+test('ESM splitting: web-manager singleton lives in exactly ONE shared chunk', async () => {
   const manifest = await build(['classy']);
-  const signinBundle = fs.readFileSync(path.join(OUT, manifest.js.pages['signin/index'].slice(1)), 'utf8');
-  assert.ok(signinBundle.length > 100000, `client is IN the bundle (${signinBundle.length} bytes)`);
-  assert.ok(signinBundle.includes('Email is required'), 'real UJM auth page module code present');
+
+  // Page entries are thin boot stubs importing shared chunks
+  const signinEntry = fs.readFileSync(path.join(OUT, manifest.js.pages['signin/index'].slice(1)), 'utf8');
+  assert.ok(signinEntry.length < 2000, `page entry is a thin stub (${signinEntry.length} bytes)`);
+  assert.ok(/chunks\/chunk-/.test(signinEntry), 'stub imports shared chunks');
+
+  // The client (`_authReady` is its constructor marker) appears in exactly one
+  // file across ALL bundles — the shared chunk both main and pages import.
+  const withClient = walkJs(path.join(OUT, 'assets', 'js')).filter((f) => fs.readFileSync(f, 'utf8').includes('_authReady'));
+  assert.strictEqual(withClient.length, 1, `client code in exactly one file (found ${withClient.length})`);
+  assert.ok(withClient[0].includes(`${path.sep}chunks${path.sep}`), 'client lives in a shared chunk');
+
+  // The page's own code is still in its graph (via the web-manager alias)
+  const graph = readGraph(manifest.js.pages['signin/index']);
+  assert.ok(graph.includes('Email is required'), 'real UJM auth page module code present');
+  assert.ok(graph.includes('_authReady'), 'client reachable from the page graph');
 });
 
 test('layered sass: main css compiles per theme through omega:theme', async () => {
@@ -83,6 +120,23 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
   assert.ok(classy.css.pages['blog/post'], 'core page css entry (blog/post)');
   assert.ok(newsflash.css.themePages['blog/post'], 'newsflash theme page css for blog/post');
   assert.ok(!classy.css.themePages['blog/post'], 'classy ships no page css');
+});
+
+test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () => {
+  fs.rmSync(OUT, { recursive: true, force: true });
+  const manifest = await buildAssets({
+    layers: [path.join(__dirname, 'fixtures', 'site-assets'), path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')],
+    themesDir: path.join(PKG, 'themes'),
+    coreDir: path.join(PKG, 'core'),
+    outDir: OUT,
+    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+    dev: true,
+  });
+
+  assert.strictEqual(manifest.js.main, '/assets/js/main.js', 'main js un-hashed');
+  assert.strictEqual(manifest.js.pages['signin/index'], '/assets/js/pages/signin/index.js', 'page js un-hashed');
+  assert.strictEqual(manifest.css.main, '/assets/css/main.css', 'main css un-hashed');
+  fs.rmSync(OUT, { recursive: true, force: true });
 });
 
 test('PurgeCSS strips selectors unused by the rendered HTML', async () => {

@@ -20,10 +20,14 @@
  *   __main_assets__/themes/…→ the packaged themes dir (e.g. bootstrap js)
  *   __theme__/...           → active theme root, classy fallback
  *
- * Every js entry is wrapped in a boot stub: the module is imported (top-level
- * side effects run), and a default-function export is called with
- * ({ manager: webManager, options: window.Configuration }). The full runtime
- * Manager handshake (boot ordering, auth timing) arrives with the B3 CLI.
+ * Every js entry is wrapped in a boot stub around the runtime handshake
+ * (runtime/boot.js): the main bundle calls bootMain(mod) — web-manager
+ * initialize + global module — and page bundles call bootPage(mod), which
+ * awaits the main boot before running the page module with
+ * ({ manager, options }). Bundles are ESM with code splitting: web-manager
+ * and the boot runtime land in a shared chunk that evaluates once per page,
+ * so every bundle sees the SAME initialized singleton (webpack's single
+ * module graph, reproduced with `<script type="module">` semantics).
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -53,6 +57,8 @@ function pageKey(rel) {
  * @param {string} options.coreDir - the core layer root (for __main_assets__)
  * @param {string} options.outDir - the site output dir (_site)
  * @param {string} options.clientEntry - path to @omegajs/client's entry (aliased as `web-manager`)
+ * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
+ *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
  * @returns {Promise<{ js: object, css: object }>}
  */
 async function buildAssets(options) {
@@ -76,22 +82,29 @@ async function buildAssets(options) {
     keyBySpecifier.set(mainJs, ['main']);
   }
 
+  const bootRuntime = path.resolve(__dirname, '..', 'runtime', 'boot.js');
+
   const bootPlugin = {
     name: 'omega-boot',
     setup(build) {
-      // Boot stubs: import the module, call a default-function export.
+      // Boot stubs: main → bootMain (initialize + global module), pages →
+      // bootPage (awaits the main boot). The runtime import is what pulls
+      // web-manager into the shared chunk.
       build.onResolve({ filter: /^omega-boot:/ }, (args) => ({
         path: args.path.slice('omega-boot:'.length),
         namespace: 'omega-boot',
       }));
-      build.onLoad({ filter: /.*/, namespace: 'omega-boot' }, (args) => ({
-        resolveDir: path.dirname(args.path),
-        contents: [
-          `import webManager from 'web-manager';`,
-          `import mod from ${JSON.stringify(args.path)};`,
-          `if (typeof mod === 'function') mod({ manager: webManager, options: (typeof window !== 'undefined' && window.Configuration) || {} });`,
-        ].join('\n'),
-      }));
+      build.onLoad({ filter: /.*/, namespace: 'omega-boot' }, (args) => {
+        const isMain = args.path === mainJs;
+        return {
+          resolveDir: path.dirname(args.path),
+          contents: [
+            `import { ${isMain ? 'bootMain' : 'bootPage'} } from ${JSON.stringify(bootRuntime)};`,
+            `import mod from ${JSON.stringify(args.path)};`,
+            `${isMain ? 'bootMain' : 'bootPage'}(mod);`,
+          ].join('\n'),
+        };
+      });
 
       // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (classy fallback)
       build.onResolve({ filter: /^__main_assets__\// }, (args) => {
@@ -114,16 +127,21 @@ async function buildAssets(options) {
   const result = await esbuild.build({
     entryPoints,
     bundle: true,
-    minify: true,
-    format: 'iife',
+    minify: !options.dev,
+    // ESM + splitting is load-bearing: shared modules (web-manager, the boot
+    // runtime) go into one chunk the browser evaluates once — the singleton
+    // survives across the main and page bundles.
+    format: 'esm',
+    splitting: true,
     outdir: path.join(options.outDir, 'assets', 'js'),
-    entryNames: '[dir]/[name]-[hash]',
+    entryNames: options.dev ? '[dir]/[name]' : '[dir]/[name]-[hash]',
+    chunkNames: 'chunks/[name]-[hash]',
     metafile: true,
     // Directory alias so SUBPATH imports work too (web-manager/modules/dom.js)
     alias: { 'web-manager': path.dirname(options.clientEntry) },
     plugins: [bootPlugin],
     logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"' },
+    define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
   });
 
   for (const [outFile, meta] of Object.entries(result.metafile.outputs)) {
@@ -144,7 +162,7 @@ async function buildAssets(options) {
   const importers = [layeredFileImporter(options.layers)];
   const emitCss = (css, rel) => {
     const hash = crypto.createHash('md5').update(css).digest('hex').slice(0, 8);
-    const outRel = path.join('assets', 'css', rel.replace(/(\.css)?$/, `-${hash}.css`));
+    const outRel = path.join('assets', 'css', options.dev ? `${rel}.css` : rel.replace(/(\.css)?$/, `-${hash}.css`));
     fs.mkdirSync(path.dirname(path.join(options.outDir, outRel)), { recursive: true });
     fs.writeFileSync(path.join(options.outDir, outRel), css);
     return `/${outRel}`;
@@ -152,7 +170,7 @@ async function buildAssets(options) {
   const compileScss = (file, ownerRoot) => sass.compile(file, {
     importers,
     loadPaths: [ownerRoot, path.join(ownerRoot, 'css'), ...options.layers, ...cssDirs],
-    style: 'compressed',
+    style: options.dev ? 'expanded' : 'compressed',
     quietDeps: true,
     silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'mixed-decls', 'legacy-js-api'],
   }).css;

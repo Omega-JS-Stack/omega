@@ -79,7 +79,7 @@ test('manifest-injected assets on every theme (hashed main css/js, valid Configu
   for (const theme of THEMES) {
     const html = page(theme, 'pricing/index.html');
     assert.match(html, /href="\/assets\/css\/main-[a-f0-9]{8}\.css"/, `${theme}: hashed main css linked`);
-    assert.match(html, /src="\/assets\/js\/main-[A-Z0-9]{8}\.js"/, `${theme}: hashed main js linked`);
+    assert.match(html, /<script type="module" src="\/assets\/js\/main-[A-Z0-9]{8}\.js"><\/script>/, `${theme}: hashed main js linked as an ESM module`);
     assert.ok(html.includes('brand: {"id":"contract","name":"Contract"}'), `${theme}: Configuration brand`);
     assert.ok(html.includes(`data-theme-id="${theme}"`), `${theme}: active theme id in chrome`);
   }

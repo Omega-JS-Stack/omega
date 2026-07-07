@@ -36,6 +36,10 @@ Recorded numbers, two eras — the corpus CONTENT changed at B2:
   Watch-mode re-render is now ~15.8 s (the known full-re-render behavior ×
   real chrome) — the dev-loop optimization (incremental narrowing / chrome
   memoization) is a flagged B-phase work item.
+- **B3 spot-check (ESM + splitting assets)**: the bundle format switch (IIFE →
+  ESM with shared chunks for the boot runtime/web-manager singleton) left the
+  corpus at **18.6 s total** single-run (assets 0.91 s — faster: page bundles
+  are thin stubs) — within the B2 baseline's range.
 
 Historical: the A1/A2 findings this spike produced (LiquidJS edge cases,
 virtual-template layering, preprocessor cascade behavior, include-root perf)

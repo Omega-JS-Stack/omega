@@ -1,0 +1,127 @@
+/**
+ * CLI + scaffolding invariants: the dispatch table maps every alias to a
+ * real command file, scaffoldDefaults applies the REAL file map to a temp
+ * consumer (rename rules, marker merges, templating, idempotency), the
+ * omega.json5 seed passes the real config loader, and the CI template is
+ * genuinely Ruby-free. The bin itself is exercised once end-to-end.
+ */
+const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { test } = require('node:test');
+
+const Main = require('../src/cli.js');
+const { scaffoldDefaults, FILE_MAP, NODE_VERSION } = require('../src/scaffold.js');
+const { loadConfig } = require('@omegajs/config');
+
+const PKG = path.resolve(__dirname, '..');
+const quiet = { log() {}, warn() {}, error() {} };
+
+function tmpConsumer() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-cli-'));
+}
+
+test('dispatch table: every aliased command has a command file', () => {
+  const { commandsDir, aliases, defaultCommand } = Main.config;
+  assert.strictEqual(defaultCommand, 'setup', 'OMEGA convention: bare `omega` runs setup');
+
+  for (const name of Object.keys(aliases)) {
+    assert.ok(fs.existsSync(path.join(commandsDir, `${name}.js`)), `commands/${name}.js exists`);
+  }
+
+  // The full B3 surface is present
+  for (const name of ['setup', 'dev', 'build', 'deploy', 'translate', 'audit', 'test', 'clean', 'version']) {
+    assert.ok(aliases[name], `${name} is routed`);
+  }
+});
+
+test('scaffold: files land with rename rules applied, no pages, no Ruby', () => {
+  const root = tmpConsumer();
+  const result = scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  // `_.` renames + templating
+  for (const file of ['.gitignore', '.env', 'CLAUDE.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
+    assert.ok(fs.existsSync(path.join(root, file)), `${file} scaffolded`);
+  }
+  assert.strictEqual(fs.readFileSync(path.join(root, '.nvmrc'), 'utf8').trim(), `v${NODE_VERSION}`, '.nvmrc templated');
+
+  // src/ seed dirs exist (via .gitkeep), but NO default pages are copied —
+  // the ~60-page default set is virtual, served from the package
+  assert.ok(fs.existsSync(path.join(root, 'src', 'pages')), 'src/pages seeded');
+  assert.strictEqual(fs.readdirSync(path.join(root, 'src', 'pages')).length, 0, 'zero pages copied');
+
+  // Ruby is gone
+  assert.ok(!fs.existsSync(path.join(root, 'Gemfile')), 'no Gemfile');
+  assert.ok(!fs.existsSync(path.join(root, 'src', '_config.yml')), 'no _config.yml');
+  const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'build.yml'), 'utf8');
+  assert.ok(!/setup-ruby|bundle install|gem install|RUBY_VERSION|BUNDLER_VERSION/.test(workflow), 'CI workflow has no Ruby steps');
+  assert.ok(workflow.includes(`NODE_VERSION: '${NODE_VERSION}'`), 'CI workflow node version templated');
+  assert.ok(workflow.includes('${{ secrets.GH_TOKEN }}'), 'GitHub secret syntax survived templating');
+  assert.ok(workflow.includes('npx omega setup && npm run build'), 'CI builds through the omega CLI');
+  assert.ok(workflow.includes('publish_dir: ./dist'), 'CI publishes dist/');
+
+  assert.ok(result.written.length >= 6, `first run writes the tree (${result.written.length})`);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('scaffold: omega.json5 seed passes the real config loader for target web', () => {
+  const root = tmpConsumer();
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  const { config, errors, enabled } = loadConfig(root, 'web');
+  assert.deepStrictEqual(errors, [], 'seed validates clean');
+  assert.strictEqual(enabled, true, 'web target enabled by key presence');
+  assert.strictEqual(config.theme.id, 'classy', 'theme seeded');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('scaffold: marker merges preserve the Custom section; reruns are idempotent', () => {
+  const root = tmpConsumer();
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  // Consumer customizes below the markers
+  fs.appendFileSync(path.join(root, '.env'), 'MY_CUSTOM_KEY="hello"\n');
+  fs.appendFileSync(path.join(root, '.gitignore'), '/my-custom-dir\n');
+
+  const second = scaffoldDefaults({ outputDir: root, logger: quiet });
+  assert.ok(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('MY_CUSTOM_KEY="hello"'), '.env custom preserved');
+  assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf8').includes('/my-custom-dir'), '.gitignore custom preserved');
+  assert.strictEqual(second.written.length, 0, 'no rewrites on rerun');
+
+  // omega.json5 stabilizes after one merge cycle: run three, expect the third clean
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+  const third = scaffoldDefaults({ outputDir: root, logger: quiet });
+  assert.strictEqual(third.written.length + third.merged.length, 0, 'fully idempotent');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('scaffold: consumer omega.json5 values win the JSON5 merge', () => {
+  const root = tmpConsumer();
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  const configPath = path.join(root, 'config', 'omega.json5');
+  fs.writeFileSync(configPath, fs.readFileSync(configPath, 'utf8').replace("id: 'my-brand'", "id: 'real-brand'"));
+  scaffoldDefaults({ outputDir: root, logger: quiet });
+
+  const { config } = loadConfig(root, 'web');
+  assert.strictEqual(config.brand.id, 'real-brand', 'consumer value survived the defaults merge');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('FILE_MAP: src/ is consumer-owned after seeding', () => {
+  assert.strictEqual(FILE_MAP['**/*'].overwrite, false, 'nothing clobbers consumer files by default');
+  assert.strictEqual(FILE_MAP['.github/workflows/build.yml'].overwrite, true, 'CI workflow re-syncs every setup');
+});
+
+test('bin: `omega setup` end-to-end in a fresh consumer (real process, real bin)', () => {
+  const root = tmpConsumer();
+  execFileSync(process.execPath, [path.join(PKG, 'bin', 'omega'), 'setup'], { cwd: root, stdio: 'pipe' });
+
+  assert.ok(fs.existsSync(path.join(root, 'config', 'omega.json5')), 'config seeded');
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  assert.strictEqual(pkg.scripts.build, 'omega build', 'scripts synced');
+  assert.strictEqual(pkg.scripts.start, 'omega dev', 'start → omega dev');
+  fs.rmSync(root, { recursive: true, force: true });
+});

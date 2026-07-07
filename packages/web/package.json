@@ -1,9 +1,12 @@
 {
   "name": "@omegajs/web",
   "version": "0.1.0",
-  "description": "The OMEGA web framework (UJM successor) — Eleventy 3 + LiquidJS + @omegajs/template-kit engine core: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, and the esbuild/sass/PurgeCSS asset pipeline. Private until first publish (B3 CLI).",
+  "description": "The OMEGA web framework (UJM successor) — Eleventy 3 + LiquidJS + @omegajs/template-kit engine core with the `omega` CLI: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, the esbuild/sass/PurgeCSS asset pipeline, and the ESM boot runtime. Private until first publish.",
   "private": true,
   "main": "./src/index.js",
+  "bin": {
+    "omega": "./bin/omega"
+  },
   "exports": {
     ".": "./src/index.js",
     "./engine": "./src/engine.js",
@@ -14,7 +17,9 @@
     "./collections": "./src/collections.js",
     "./frontmatter-liquid": "./src/frontmatter-liquid.js",
     "./consumer-scan": "./src/consumer-scan.js",
-    "./paths": "./src/paths.js"
+    "./paths": "./src/paths.js",
+    "./consumer": "./src/consumer.js",
+    "./scaffold": "./src/scaffold.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
@@ -22,17 +27,21 @@
   "dependencies": {
     "@11ty/eleventy": "^3.1.6",
     "@omegajs/config": "*",
+    "@omegajs/devkit": "*",
     "@omegajs/template-kit": "*",
     "@popperjs/core": "^2.11.8",
     "chart.js": "^4.5.1",
     "dompurify": "^3.4.11",
+    "dotenv": "^17.4.2",
     "esbuild": "^0.28.1",
+    "fs-jetpack": "^5.1.0",
     "liquidjs": "^10.27.1",
     "lodash": "^4.17.21",
     "markdown-it": "^14.3.0",
     "purgecss": "^8.0.0",
     "sass": "^1.101.0",
-    "wonderful-fetch": "^2.0.5"
+    "wonderful-fetch": "^2.0.5",
+    "yargs": "^18.0.0"
   },
   "engines": {
     "node": ">=22"

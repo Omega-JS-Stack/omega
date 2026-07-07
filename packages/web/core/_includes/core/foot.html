@@ -106,12 +106,15 @@
   };
 </script>
 
-<!-- JS Bundle: content-hashed by the asset pipeline, mapped via the manifest -->
-<script type="text/javascript" src="{{ assetManifest.js.main }}" async></script>
+<!-- JS bundles: ESM with code splitting — web-manager + the boot runtime live
+     in a shared chunk both bundles import, so the singleton initializes once.
+     Module scripts are deferred and execute in document order: main (bootMain)
+     always runs before the page module (bootPage). -->
+<script type="module" src="{{ assetManifest.js.main }}"></script>
 
 <!-- Page module (present only when a js/pages entry exists for this page) -->
 {% iftruthy pageAssets.js %}
-  <script type="text/javascript" src="{{ pageAssets.js }}" defer></script>
+  <script type="module" src="{{ pageAssets.js }}"></script>
 {% endiftruthy %}
 
 <!-- Script to quickly handle nav user state -->
