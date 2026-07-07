@@ -24,6 +24,7 @@ const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
+const { toSiteGlobal } = require('./site-global.js');
 
 module.exports = {
   // Loading
@@ -33,6 +34,9 @@ module.exports = {
   getEnabledTargets,
   FILE_NAME,
   CONFIG_LOCATIONS,
+
+  // Template surface
+  toSiteGlobal,
 
   // Validation
   validateConfig,

@@ -1,0 +1,26 @@
+{
+  "name": "@omegajs/template-kit",
+  "version": "1.0.0",
+  "description": "The uj_* template filters/tags as plain engine-neutral JS + registerLiquid() adapter + Jekyll-compat filter pack — ported from jekyll-uj-powertools for the SSG bake-off and @omegajs/web (private workspace package, vendored/bundled into frameworks at prepare time)",
+  "private": true,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./filters": "./src/filters.js",
+    "./tags": "./src/tags.js",
+    "./jekyll-compat": "./src/jekyll-compat.js",
+    "./register-liquid": "./src/register-liquid.js",
+    "./variable-resolver": "./src/variable-resolver.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "liquidjs": "^10.24.0"
+  },
+  "author": "ITW Creative Works",
+  "license": "MIT"
+}

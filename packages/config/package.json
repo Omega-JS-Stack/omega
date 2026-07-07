@@ -10,7 +10,8 @@
     "./merge": "./src/merge.js",
     "./secrets": "./src/secrets.js",
     "./validate": "./src/validate.js",
-    "./load": "./src/load.js"
+    "./load": "./src/load.js",
+    "./site-global": "./src/site-global.js"
   },
   "scripts": {
     "test": "node --test"
