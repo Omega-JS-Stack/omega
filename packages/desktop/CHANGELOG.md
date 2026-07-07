@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Classy theme: configurable `$min-contrast-ratio`** — declared `!default` in `themes/classy/_config.scss` and forwarded into Bootstrap, so consumers with a light brand color (e.g. Somiibo blue `#1FB7F2`) can keep white button/badge text: `@use 'electron-manager' as * with ($primary: #1FB7F2, $min-contrast-ratio: 2)`.
 
 ### Changed
+- **The setup defaults scaffold now runs through the shared devkit defaults engine** — `copyDefaults` owns only EM's file map (preserve-if-exists catch-all, marker merges for `.env`/`.gitignore`/`CLAUDE.md`, always-re-render workflow YAMLs); `_.` renames, `_mas/` archive skips, and write-only-if-changed are engine built-ins. `utils/merge-line-files.js` is now a shim over the devkit module (EM's implementation was the canonical seed — behavior unchanged). One structural tweak: `.gitkeep` files now create the target directory instead of copying the placeholder file itself.
 - **CLI dispatch is now the shared devkit router** (vendored into `dist/vendor/devkit/cli-router.js`) — `cli.js` owns only the alias table and commands directory (the bin's `ELECTRON_RUN_AS_NODE` strip is unchanged). One visible tweak: command failures now print `Error executing command "<name>": …` (the message previously omitted the command name).
 
 ---

@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`browser-extension-manager/config` export** — the vendored `@omegajs/config` loader (`loadConfig`, `validateConfig`, …) for consumer workflows, so brand-monorepo resolution always applies instead of raw JSON5 reads.
 
 ### Changed
+- **The defaults scaffold (`bxm setup` / `gulp defaults`) now runs through the shared devkit defaults engine** (vendored into `dist/vendor/devkit/defaults-engine.js`) — the gulp task owns only its `FILE_MAP` and the `[ site.x ]` token pass; `_.` renames, `.gitkeep`/`.DS_Store` handling, and write-only-if-changed are engine built-ins. The marker-section merge (.env/.gitignore/CLAUDE.md) is now the canonical devkit implementation, which additionally normalizes `.env` values to double-quoted form (`KEY=raw` → `KEY="raw"`) and substitutes preserved values order-safely. `.nvmrc` template tokens normalized to the `{{ versions.node }}` standard (rendered output unchanged).
 - **CLI dispatch is now the shared devkit router** (vendored into `dist/vendor/devkit/cli-router.js`) — `cli.js` owns only the alias table and commands directory. Behavior unchanged: same aliases, same `setup` default, same error surfacing.
 
 ### Fixed

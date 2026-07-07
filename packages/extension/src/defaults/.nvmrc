@@ -1,1 +1,1 @@
-v{ versions.node }/*
+v{{ versions.node }}/*

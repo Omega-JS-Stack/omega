@@ -5,19 +5,20 @@
 ## How it works
 
 1. During BXM's own build (`prepare-package`), files in `src/defaults/` are copied to `dist/defaults/`.
-2. When a consumer runs `npx bxm setup`, the `gulp defaults` task copies files from `dist/defaults/` into the consumer's project root.
-3. File behavior (overwrite, skip, template, rename) is controlled by `FILE_MAP` in [src/gulp/tasks/defaults.js](../src/gulp/tasks/defaults.js).
+2. When a consumer runs `npx bxm setup`, the `gulp defaults` task scaffolds files from `dist/defaults/` into the consumer's project root — dispatch runs through the shared devkit defaults engine (`applyDefaults`, vendored into `dist/vendor/devkit/`).
+3. File behavior (overwrite, skip, template, rename, merge) is controlled by `FILE_MAP` in [src/gulp/tasks/defaults.js](../src/gulp/tasks/defaults.js) — minimatch patterns, last-match-wins.
 
 ## FILE_MAP rules
 
 ```js
 const FILE_MAP = {
-  'src/**/*':       { overwrite: false },                  // never overwrite user code
-  'hooks/**/*':     { overwrite: false },                  // never overwrite hooks
-  '_.gitignore':    { name: () => '.gitignore' },          // rename on copy
-  '_.env':          { name: () => '.env', overwrite: false },
-  '.nvmrc':         { template: { node: '22' } },          // run templating against the source
-  'package.json':   { skip: (cwd) => /* dynamic skip */ },
+  'src/**/*':            { overwrite: false },      // never overwrite user code
+  'hooks/**/*':          { overwrite: false },      // never overwrite hooks
+  '_.gitignore':         { mergeLines: true },      // marker-section merge (rename is an engine built-in)
+  '_.env':               { mergeLines: true },
+  'CLAUDE.md':           { mergeLines: true },
+  'config/omega.json5':  { overwrite: true, merge: true },  // JSON5 defaults merge
+  '.nvmrc':              { template: cleanVersions },       // `{{ versions.node }}` render
 };
 ```
 
@@ -26,14 +27,18 @@ const FILE_MAP = {
 | Rule | Behavior |
 |---|---|
 | `overwrite: false` | Never replace if the file exists in the project. Default for `src/**`. |
-| `overwrite: true` | Always overwrite — for files BXM owns (e.g. `.github/workflows/build.yml`). |
-| `skip: function` | Dynamic skip — `(cwd) => boolean`. Skip in monorepo subdirs, etc. |
-| `template: data` | Run the source through templating with `data` as the var bag, then write. |
-| `name: function` | Rename on copy — typically used to add a leading `.` (`_.gitignore` → `.gitignore`). |
+| `overwrite: true` | Always overwrite — for files BXM owns (writes are skipped when byte-identical). |
+| `skip: bool\|function` | Never process — `(item) => boolean` for dynamic decisions. |
+| `template: data` | Render `{{ key.path }}` tokens with `data` (tolerant — unknown keys survive). |
+| `merge: true` | JSON5 defaults merge — consumer values and consumer-only keys survive, framework template provides shape. |
+| `mergeLines: true` | OMEGA marker-section merge (`Default Values` framework-owned / `Custom Values` consumer-owned). |
+| `name`/`path: function` | Rename / re-destination on copy. |
+
+Engine built-ins (no rule needed): `_.foo` → `.foo` renames, `.gitkeep` creates the directory without copying the file, `.DS_Store` never copies, archive dirs (non-final `_x` segments) never ship, and every write is skipped when the content is unchanged. On top of the per-rule handling, the task's site-token pass (`[ site.x ]` brackets) runs on `html/md/liquid/json/yml/yaml` files via the engine's `transform` hook.
 
 ## Why the underscore prefix?
 
-Files like `_.gitignore`, `_.env` are stored with a `_` prefix in `src/defaults/` so they don't interfere with BXM's own development (the framework repo doesn't want its `.env` overwritten by the template). The `name` rule renames them to the real `.foo` filename on copy.
+Files like `_.gitignore`, `_.env` are stored with a `_` prefix in `src/defaults/` so they don't interfere with BXM's own development (the framework repo doesn't want its `.env` overwritten by the template) and so npm's tarball filter doesn't drop them. The engine strips the leading `_` on copy.
 
 ## Adding a new default
 

@@ -259,7 +259,7 @@ function setupScripts() {
   jetpack.write(path.join(process.cwd(), 'package.json'), project);
 }
 
-async function copyDefaults() {
+async function copyDefaults(targetDir) {
   const defaultsDir = path.resolve(__dirname, '..', 'defaults');
 
   if (!jetpack.exists(defaultsDir)) {
@@ -267,100 +267,42 @@ async function copyDefaults() {
     return;
   }
 
-  const { mergeLineBasedFiles } = require('../utils/merge-line-files.js');
-  // CLAUDE.md is merged via the same marker-based protocol as .env/.gitignore.
-  // Framework owns everything between `# ========== Default Values ==========` and
-  // `# ========== Custom Values ==========`; consumer owns everything below the Custom marker.
-  // Re-running `npx mgr setup` keeps the framework section live-synced without clobbering the consumer's notes.
-  const MERGEABLE_BASENAMES = new Set(['.env', '.gitignore', 'CLAUDE.md']);
-
   // Template substitution context — `{{ versions.node }}` etc. resolved at scaffold time.
   // Source of truth is EM's own package.json `engines` block. EM auto-syncs `engines.node`
   // to whatever Electron's bundled Node version is via scripts/sync-nvmrc.js, so consumers'
-  // workflows + .nvmrc track Electron-Node automatically without manual bumps.
+  // workflows track Electron-Node automatically without manual bumps.
   const templateContext = { versions: package.engines || {} };
-  // Files we run substitution on. Anything else copies byte-for-byte.
-  const TEMPLATABLE_EXTS = new Set(['.yml', '.yaml']);
-  const TEMPLATABLE_BASENAMES = new Set(['.nvmrc']);
 
-  const files = jetpack.find(defaultsDir, { matching: '**/*', recursive: true, files: true, directories: false });
+  // Scaffolding runs through the shared devkit engine (vendored at prepare time).
+  // Engine built-ins cover EM's structural rules: `_.` renames (`_.env` → `.env`),
+  // archive-dir skips (`_mas/` reference plists ship in the package, never to
+  // consumers — `_`-prefixed FILENAMES like `test/_init.js` still copy), and
+  // write-only-if-changed.
+  const { applyDefaults } = require('@omegajs/devkit/defaults-engine');
 
-  for (const src of files) {
-    const rel = path.relative(defaultsDir, src);
-    const segments = rel.split(path.sep);
-    // Skip "archive" DIRECTORIES — any non-final path segment starting with `_` and
-    // followed by a non-`.` character. Used for reference material that ships in EM's npm
-    // package but should NOT be copied to consumers (e.g. `_mas/` reference plists).
-    // The check is restricted to directory segments (all but the last) so a `_`-prefixed
-    // FILENAME still ships — e.g. `test/_init.js` copies verbatim (the test runner skips it
-    // from discovery on its own). The `_.env` / `_.gitignore` FILES are likewise not
-    // skipped; their leading `_` strips on copy below.
-    const dirSegments = segments.slice(0, -1);
-    if (dirSegments.some((s) => s.startsWith('_') && !s.startsWith('_.'))) {
-      continue;
-    }
-    // Convert leading `_.` to `.` so dotfiles ship past npm's filter
-    const target = segments.map((part) => part.startsWith('_.') ? part.slice(1) : part).join(path.sep);
-    const dest = path.join(rootPathProject, target);
-    const basename = path.basename(target);
-    const ext      = path.extname(target).toLowerCase();
-    const templatable = TEMPLATABLE_EXTS.has(ext) || TEMPLATABLE_BASENAMES.has(basename);
-
-    if (jetpack.exists(dest)) {
-      // Line-based files (.env, .gitignore) merge instead of skipping so the framework's
-      // default keys/lines stay in sync without clobbering the user's custom values.
-      if (MERGEABLE_BASENAMES.has(basename)) {
-        try {
-          const existing = jetpack.read(dest, 'utf8');
-          const incoming = renderTemplate(jetpack.read(src, 'utf8'), templateContext);
-          const merged   = mergeLineBasedFiles(existing, incoming, basename);
-          if (merged !== existing) {
-            jetpack.write(dest, merged);
-            logger.log(`Merged default → ${target}`);
-          }
-        } catch (e) {
-          logger.warn(`Failed to merge ${target}: ${e.message}`);
-        }
-        continue;
-      }
-
-      // Templatable files (workflow YAMLs, .nvmrc) are EM-owned: always re-render so they
-      // track changes in EM's defaults (e.g. engines.node bumping when Electron updates).
-      // Skip the write if the rendered contents are byte-identical to what's already there.
-      if (templatable) {
-        const incoming = renderTemplate(jetpack.read(src, 'utf8'), templateContext);
-        const existing = jetpack.read(dest, 'utf8');
-        if (incoming !== existing) {
-          jetpack.write(dest, incoming);
-          logger.log(`Re-rendered template → ${target}`);
-        }
-        continue;
-      }
-
-      // Non-mergeable, non-templatable, already exists → preserve consumer's version.
-      continue;
-    }
-
-    if (templatable) {
-      const contents = renderTemplate(jetpack.read(src, 'utf8'), templateContext);
-      jetpack.write(dest, contents);
-    } else {
-      jetpack.copy(src, dest);
-    }
-    logger.log(`Copied default → ${target}`);
-  }
-}
-
-// Minimal `{{ key.path }}` substitution — same syntax as UJM, no dependencies.
-// Whitespace inside the braces is tolerated. Unknown keys render as the original
-// `{{ ... }}` string (no error) so non-template content with literal braces survives.
-function renderTemplate(content, context) {
-  if (typeof content !== 'string' || !content.includes('{{')) return content;
-  return content.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (full, keyPath) => {
-    const value = keyPath.split('.').reduce((acc, k) => (acc == null ? acc : acc[k]), context);
-    return (value === undefined || value === null) ? full : String(value);
+  applyDefaults({
+    defaultsDir,
+    outputDir: targetDir || rootPathProject,
+    fileMap: {
+      // Consumers own their files — never overwrite what exists.
+      '**/*': { overwrite: false },
+      // Marker-section merges: framework owns the Default section, consumer owns
+      // everything below the Custom marker. Re-running `npx mgr setup` keeps the
+      // framework section live-synced without clobbering the consumer's values.
+      '_.env': { mergeLines: true, template: templateContext },
+      '_.gitignore': { mergeLines: true, template: templateContext },
+      'CLAUDE.md': { mergeLines: true, template: templateContext },
+      // Workflow YAMLs are EM-owned: always re-rendered so they track changes in
+      // EM's defaults (e.g. engines.node bumping when Electron updates). The
+      // renderer is tolerant — GitHub Actions' `${{ secrets.X }}` survives — and
+      // the engine skips the write when the rendered content is byte-identical.
+      '**/*.{yml,yaml}': { overwrite: true, template: templateContext },
+    },
+    logger,
   });
 }
+// Exported for the build-layer scaffold test (runs the real map into a temp dir).
+module.exports.copyDefaults = copyDefaults;
 
 function checkLocality() {
   const installedVersion = project.devDependencies[package.name];
