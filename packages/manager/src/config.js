@@ -15,8 +15,9 @@
  *
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
- * testing (per-target health checks). External-API services join this list
- * one at a time, keeping their omega-manager names and operation granularity.
+ * testing (per-target health checks) — plus github, the first external
+ * provisioning service. External-API services join this list one at a time,
+ * keeping their omega-manager names and operation granularity.
  */
 
 // =============================================================================
@@ -47,6 +48,13 @@ const TARGET_APP_DIRS = Object.fromEntries(
 const DEFAULTS = {
   // Whether the brand is active (disabled brands are skipped)
   enabled: true,
+
+  // GitHub settings (brand omega.json5 `github` key; org has no default — the
+  // service skips with a message until it's configured)
+  github: {
+    shared: false, // true = the org is shared with other brands; skips org-level reconciliation
+    private: true, // brand repo visibility
+  },
 };
 
 // =============================================================================
@@ -54,6 +62,7 @@ const DEFAULTS = {
 // =============================================================================
 const SERVICE_ORDER = [
   'workspace',  // brand monorepo structure + config health — everything depends on a sane workspace
+  'github',     // the brand repo must exist before services that write to it
   'update',     // installs deps + builds every app
   'testing',    // health checks after everything else ran
 ];
@@ -66,6 +75,12 @@ const OPERATIONS = {
     { name: 'structure', ensure: true },  // Root workspaces + an app per enabled target
     { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-app)
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
+  ],
+
+  github: [
+    { name: 'org', ensure: true },        // Org profile matches the brand (skipped for shared orgs)
+    { name: 'repo', ensure: true },       // The brand-monorepo repo exists with the right settings
+    { name: 'pages', ensure: true },      // GitHub Pages on gh-pages + custom domain (web target)
   ],
 
   update: [
