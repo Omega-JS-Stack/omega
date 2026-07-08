@@ -16,9 +16,9 @@
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
- * services github, cloudflare, domain, firebase, recaptcha, and analytics.
- * External-API services join this list one at a time, keeping their
- * omega-manager names and operation granularity.
+ * services github, cloudflare, domain, firebase, recaptcha, analytics, and
+ * search-console. External-API services join this list one at a time,
+ * keeping their omega-manager names and operation granularity.
  */
 
 // =============================================================================
@@ -107,6 +107,16 @@ const DEFAULTS = {
       meta: { id: null },   // Meta Pixel ID
       tiktok: { id: null }, // TikTok Pixel Code
     },
+  },
+
+  // Search Console. The domain property (sc-domain:) covers every subdomain;
+  // DNS TXT verification writes through Cloudflare. Auth: the same
+  // GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET as firebase/analytics (own token
+  // cache — webmasters + siteverification scopes). omega-manager also carried
+  // a `subdomains: []` key here that nothing ever read — dropped.
+  searchConsole: {
+    submitSitemap: true,          // false = skip sitemap submission
+    sitemapPaths: ['/sitemap.xml'], // submitted as https://{domain}{path}
   },
 
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
@@ -275,15 +285,16 @@ const DEFAULTS = {
 // SERVICE ORDER - Services run in this order due to dependencies
 // =============================================================================
 const SERVICE_ORDER = [
-  'workspace',   // brand monorepo structure + config health — everything depends on a sane workspace
-  'github',      // the brand repo must exist before services that write to it
-  'cloudflare',  // zone must exist before DNS-dependent services
-  'domain',      // registrar nameservers point at the zone cloudflare just created/verified
-  'firebase',    // project must exist before analytics/backend-dependent services
-  'recaptcha',   // validates the shared keys the frontend/backend consume from .env
-  'analytics',   // GA4 streams need the firebase link; search-console links to analytics next
-  'update',      // installs deps + builds every app
-  'testing',     // health checks after everything else ran
+  'workspace',       // brand monorepo structure + config health — everything depends on a sane workspace
+  'github',          // the brand repo must exist before services that write to it
+  'cloudflare',      // zone must exist before DNS-dependent services
+  'domain',          // registrar nameservers point at the zone cloudflare just created/verified
+  'firebase',        // project must exist before analytics/backend-dependent services
+  'recaptcha',       // validates the shared keys the frontend/backend consume from .env
+  'analytics',       // GA4 streams need the firebase link; search-console links to analytics next
+  'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
+  'update',          // installs deps + builds every app
+  'testing',         // health checks after everything else ran
 ];
 
 // =============================================================================
@@ -346,6 +357,12 @@ const OPERATIONS = {
     { name: 'google-firebase-link', ensure: true }, // GA property ↔ Firebase project link (+ auto-stream normalization)
     { name: 'meta-pixel', ensure: true },           // Pixel ID + META_ACCESS_TOKEN presence
     { name: 'tiktok-pixel', ensure: true },         // Pixel Code + TIKTOK_ACCESS_TOKEN presence
+  ],
+
+  'search-console': [
+    { name: 'property', ensure: true }, // sc-domain property exists (DNS TXT verification via Cloudflare, one-pass)
+    { name: 'ga-link', ensure: true },  // GA association — no API exists; warned + URL until confirmed
+    { name: 'sitemaps', ensure: true }, // Missing sitemaps submitted (existing ones are converged, not resubmitted)
   ],
 
   update: [
