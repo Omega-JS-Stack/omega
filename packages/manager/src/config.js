@@ -18,7 +18,7 @@
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
  * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * replyify, and server. External-API
+ * replyify, server, and assets. External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -271,6 +271,17 @@ const DEFAULTS = {
     enabled: true,
   },
 
+  // Derived visual collateral generated locally from the brand's logo
+  // sources (assets/logo/*.svg in the brand repo → .omega/assets/):
+  // wordmark/combomark from brand.font (omega-manager packaged the
+  // company's commercial fonts and defaulted every brand to CromaSans —
+  // the port has no packaged fonts, the brand owns its font choice), logo
+  // variants + PNG ladders, app icons, social icons, favicons. Every
+  // operation is mtime-diffed; no brandmark → clean skip.
+  assets: {
+    enabled: true,
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -453,6 +464,7 @@ const SERVICE_ORDER = [
   'chatsy',          // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
   'replyify',        // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
   'server',          // brand registry entry on the company server's Firestore (company-server operators only)
+  'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -576,6 +588,14 @@ const OPERATIONS = {
 
   server: [
     { name: 'brands', ensure: true }, // Registry entry replace-synced against the company server's Firestore
+  ],
+
+  assets: [
+    { name: 'logo-gen', ensure: true },     // Wordmark + combomark from brandmark + brand.font (missing-only)
+    { name: 'process', write: true },       // Color/black SVG variants + PNG size ladders per logo source
+    { name: 'icons', write: true },         // macOS .icns + Windows .ico app icons
+    { name: 'social-icons', write: true },  // Brandmark-on-white social profile icons
+    { name: 'favicons', write: true },      // Web favicon set + site.webmanifest
   ],
 
   update: [

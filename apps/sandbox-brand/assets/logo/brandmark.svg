@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Sandbox brand mark: a generic rounded square + orbit dot, no company identity -->
+  <rect x="8" y="8" width="84" height="84" rx="20" fill="#4a5df9"/>
+  <circle cx="50" cy="50" r="18" fill="#ffffff"/>
+  <circle cx="72" cy="28" r="8" fill="#ffd166"/>
+</svg>

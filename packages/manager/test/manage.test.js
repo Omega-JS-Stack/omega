@@ -230,6 +230,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No company-server service account → clean skip
   assert.equal(report.results.server.status, 'skipped');
   assert.match(report.results.server.reason, /SERVER_SERVICE_ACCOUNT/);
+  // Fixture has no logo sources → clean skip with guidance
+  assert.equal(report.results.assets.status, 'skipped');
+  assert.match(report.results.assets.reason, /brandmark\.svg/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -248,7 +251,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
