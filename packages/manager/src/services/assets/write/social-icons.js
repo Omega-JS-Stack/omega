@@ -9,7 +9,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const { SOCIAL_ICON_CONFIG } = require('../lib/assets-config.js');
-const { isStale } = require('../lib/stale.js');
+const { isStale } = require('../../../lib/stale.js');
 
 module.exports = async function writeSocialIcons(context) {
   const { brandmarkPath, outDir, options } = context;

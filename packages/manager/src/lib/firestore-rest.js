@@ -14,9 +14,10 @@
  * encoding is internal. Handlers call named methods (getDoc/patchDoc/setDoc)
  * so tests fake this surface method-for-method.
  */
-const { createSign } = require('node:crypto');
 const { isAbsolute, join } = require('node:path');
 const fs = require('node:fs');
+
+const { signJwt } = require('./jwt.js');
 
 const FIRESTORE_API_BASE = 'https://firestore.googleapis.com/v1';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -125,25 +126,24 @@ class FirestoreREST {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-    const claims = Buffer.from(JSON.stringify({
-      iss: this.serviceAccount.client_email,
-      scope: SCOPE,
-      aud: GOOGLE_TOKEN_URL,
-      iat: now,
-      exp: now + 3600,
-    })).toString('base64url');
-
-    const signer = createSign('RSA-SHA256');
-    signer.update(`${header}.${claims}`);
-    const signature = signer.sign(this.serviceAccount.private_key, 'base64url');
+    const assertion = signJwt(
+      { alg: 'RS256', typ: 'JWT' },
+      {
+        iss: this.serviceAccount.client_email,
+        scope: SCOPE,
+        aud: GOOGLE_TOKEN_URL,
+        iat: now,
+        exp: now + 3600,
+      },
+      this.serviceAccount.private_key,
+    );
 
     const response = await fetch(GOOGLE_TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: `${header}.${claims}.${signature}`,
+        assertion,
       }),
     });
 

@@ -34,6 +34,11 @@ delete process.env.SLAPFORM_SERVICE_ACCOUNT;
 delete process.env.CHATSY_SERVICE_ACCOUNT;
 delete process.env.REPLYIFY_SERVICE_ACCOUNT;
 delete process.env.SERVER_SERVICE_ACCOUNT;
+delete process.env.APPLE_API_ISSUER;
+delete process.env.APPLE_API_KEY_ID;
+delete process.env.APPLE_TEAM_ID;
+delete process.env.CSC_KEY_PASSWORD;
+delete process.env.APPLE_KEYCHAIN_PASSWORD;
 
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
@@ -233,6 +238,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Fixture has no logo sources → clean skip with guidance
   assert.equal(report.results.assets.status, 'skipped');
   assert.match(report.results.assets.reason, /brandmark\.svg/);
+  // Web-only fixture → no desktop/mobile target to sign for
+  assert.equal(report.results.certificates.status, 'skipped');
+  assert.match(report.results.certificates.reason, /no desktop or mobile target/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -251,7 +259,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'certificates', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

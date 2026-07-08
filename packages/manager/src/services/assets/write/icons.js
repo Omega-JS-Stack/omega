@@ -11,7 +11,7 @@ const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const png2icons = require('png2icons');
 const { ICON_PLATFORMS } = require('../lib/assets-config.js');
-const { isStale } = require('../lib/stale.js');
+const { isStale } = require('../../../lib/stale.js');
 
 module.exports = async function writeIcons(context) {
   const { brandmarkPath, outDir, options } = context;

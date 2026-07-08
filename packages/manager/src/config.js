@@ -18,7 +18,7 @@
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
  * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * replyify, server, and assets. External-API
+ * replyify, server, assets, and certificates. External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -282,6 +282,37 @@ const DEFAULTS = {
     enabled: true,
   },
 
+  // Apple signing certificates, bundle IDs, and provisioning profiles for
+  // brands with desktop/mobile targets, reconciled via the App Store
+  // Connect API. Credentials live in the brand .env (APPLE_API_ISSUER,
+  // APPLE_API_KEY_ID, APPLE_TEAM_ID) plus an AuthKey_*.p8 placed in
+  // .omega/certificates/apple/. bundleIdPrefix MUST be set by the brand
+  // (e.g. 'com.mycompany') — omega-manager hardcoded the company prefix
+  // and kept one shared cert set in its company-instance .output/_shared/;
+  // the port keeps everything brand-local.
+  certificates: {
+    enabled: true,
+    apple: {
+      // Full bundle ID = `${bundleIdPrefix}.${brand.id}`
+      bundleIdPrefix: null,
+      // Capabilities enabled on the brand's bundle ID
+      capabilities: ['APPLE_ID_AUTH'],
+      // Cert types that get a provisioning profile per applicable platform
+      profiles: ['IOS_DISTRIBUTION', 'MAC_APP_DISTRIBUTION', 'DEVELOPER_ID_APPLICATION_G2'],
+      // Certificate types to manage (one set per Apple Developer account).
+      // manual: Apple's API cannot create these — the Account Holder
+      // downloads the .cer from the developer portal.
+      certificates: [
+        { type: 'DEVELOPMENT' },
+        { type: 'IOS_DISTRIBUTION' },
+        { type: 'MAC_INSTALLER_DISTRIBUTION' },
+        { type: 'MAC_APP_DISTRIBUTION' },
+        { type: 'DEVELOPER_ID_APPLICATION_G2', manual: true },
+        { type: 'DEVELOPER_ID_INSTALLER_G2', manual: true },
+      ],
+    },
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -465,6 +496,7 @@ const SERVICE_ORDER = [
   'replyify',        // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
   'server',          // brand registry entry on the company server's Firestore (company-server operators only)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
+  'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -596,6 +628,13 @@ const OPERATIONS = {
     { name: 'icons', write: true },         // macOS .icns + Windows .ico app icons
     { name: 'social-icons', write: true },  // Brandmark-on-white social profile icons
     { name: 'favicons', write: true },      // Web favicon set + site.webmanifest
+  ],
+
+  certificates: [
+    { name: 'api-key', ensure: true },      // App Store Connect creds resolved + client ready
+    { name: 'certificates', ensure: true }, // Signing certs — download or create via CSR, export .p12, keychain import
+    { name: 'bundle-ids', ensure: true },   // Brand bundle ID exists with the required capabilities
+    { name: 'profiles', ensure: true },     // Provisioning profiles per platform × cert type
   ],
 
   update: [

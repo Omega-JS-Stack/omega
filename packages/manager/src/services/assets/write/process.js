@@ -10,7 +10,7 @@ const jetpack = require('fs-jetpack');
 const sharp = require('sharp');
 const { PROCESSING_RULES } = require('../lib/assets-config.js');
 const { convertSvgToBlack } = require('../lib/svg-to-black.js');
-const { isStale } = require('../lib/stale.js');
+const { isStale } = require('../../../lib/stale.js');
 
 module.exports = async function writeProcess(context) {
   const { brandRoot, outDir, options } = context;

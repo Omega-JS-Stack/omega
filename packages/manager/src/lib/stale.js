@@ -1,10 +1,10 @@
 /**
- * Freshness check for derived asset files — a derived file needs
- * regeneration when it's missing or older than its source. This is what
- * makes every assets operation an idempotent diff-sync: omega-manager
- * regenerated blindly and therefore gated the write operations on
- * `--onboarding`; the port regenerates only what's stale, so a converged
- * brand is a zero-work no-op on every run.
+ * Freshness check for derived files — a derived file needs regeneration
+ * when it's missing or older than its source. This is what makes local
+ * file-producing operations idempotent diff-syncs (assets: logo variants
+ * from their SVG sources; certificates: .p12 exports from their .cer):
+ * omega-manager regenerated blindly; the port regenerates only what's
+ * stale, so a converged brand is a zero-work no-op on every run.
  */
 const { statSync } = require('node:fs');
 const jetpack = require('fs-jetpack');
