@@ -33,6 +33,7 @@ delete process.env.CHARGEBEE_API_KEY;
 delete process.env.SLAPFORM_SERVICE_ACCOUNT;
 delete process.env.CHATSY_SERVICE_ACCOUNT;
 delete process.env.REPLYIFY_SERVICE_ACCOUNT;
+delete process.env.SERVER_SERVICE_ACCOUNT;
 
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
@@ -226,6 +227,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Web-only fixture → the email agent has no backend to answer for
   assert.equal(report.results.replyify.status, 'skipped');
   assert.match(report.results.replyify.reason, /no backend target/);
+  // No company-server service account → clean skip
+  assert.equal(report.results.server.status, 'skipped');
+  assert.match(report.results.server.reason, /SERVER_SERVICE_ACCOUNT/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -244,7 +248,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

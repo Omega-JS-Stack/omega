@@ -18,7 +18,7 @@
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
  * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * and replyify. External-API
+ * replyify, and server. External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -261,6 +261,16 @@ const DEFAULTS = {
     discount: null,
   },
 
+  // Company-server brand registry — publishes the brand's registry entry
+  // (brand identity, github, sponsorships) to the company server's Firestore
+  // at brands/{brand.id}, where the parent backend reads it (webhook fan-out,
+  // cross-brand features). Needs SERVER_SERVICE_ACCOUNT in the brand .env
+  // (path to the company server's Firebase service-account JSON — omega-
+  // manager hardcoded the company project and read company-instance secrets).
+  server: {
+    enabled: true,
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -442,6 +452,7 @@ const SERVICE_ORDER = [
   'slapform',        // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
   'chatsy',          // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
   'replyify',        // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
+  'server',          // brand registry entry on the company server's Firestore (company-server operators only)
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -561,6 +572,10 @@ const OPERATIONS = {
   replyify: [
     { name: 'agent', ensure: true }, // Agent filter + knowledge diffed against Replyify Firestore
     { name: 'user', ensure: true },  // Agent-owner account set to replyify.plan (internal comp)
+  ],
+
+  server: [
+    { name: 'brands', ensure: true }, // Registry entry replace-synced against the company server's Firestore
   ],
 
   update: [

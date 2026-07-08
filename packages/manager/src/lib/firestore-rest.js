@@ -11,8 +11,8 @@
  *
  * Auth is a plain RS256 JWT-bearer grant (node:crypto — no SDK dependency).
  * Documents cross the API as plain JS objects; the Firestore typed-value
- * encoding is internal. Handlers call named methods (getDoc/patchDoc) so
- * tests fake this surface method-for-method.
+ * encoding is internal. Handlers call named methods (getDoc/patchDoc/setDoc)
+ * so tests fake this surface method-for-method.
  */
 const { createSign } = require('node:crypto');
 const { isAbsolute, join } = require('node:path');
@@ -215,6 +215,20 @@ class FirestoreREST {
   async patchDoc(docPath, data, fieldPaths) {
     return this.request('PATCH', docPath, {
       query: { 'updateMask.fieldPaths': fieldPaths },
+      body: { fields: encodeFields(data) },
+    });
+  }
+
+  /**
+   * Replace-write a whole document (created if missing) — the REST
+   * equivalent of the admin SDK's `set(data, { merge: false })`: no
+   * updateMask, so fields absent from `data` are removed from the document.
+   *
+   * @param {string} docPath - e.g. 'brands/my-brand'
+   * @param {Object} data - Plain nested object; becomes the ENTIRE document
+   */
+  async setDoc(docPath, data) {
+    return this.request('PATCH', docPath, {
       body: { fields: encodeFields(data) },
     });
   }
