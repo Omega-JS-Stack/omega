@@ -241,6 +241,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Web-only fixture → no desktop/mobile target to sign for
   assert.equal(report.results.certificates.status, 'skipped');
   assert.match(report.results.certificates.reason, /no desktop or mobile target/);
+  // No parasite SEO content configured → clean skip with sidecar guidance
+  assert.equal(report.results.seo.status, 'skipped');
+  assert.match(report.results.seo.reason, /no SEO content configured/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -259,7 +262,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'certificates', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'certificates', 'seo', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

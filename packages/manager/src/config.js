@@ -18,7 +18,7 @@
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
  * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * replyify, server, assets, and certificates. External-API
+ * replyify, server, assets, certificates, and seo. External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -313,6 +313,15 @@ const DEFAULTS = {
     },
   },
 
+  // Parasite SEO content — programmatically created GitHub repos with
+  // templated READMEs. Content definitions live in seo.github.content
+  // (config/omega.json5) or the config/seo.json5 sidecar (omega-manager
+  // kept them in .brands/{id}/seo.json and auto-created a default entry
+  // for every brand; the port never writes config — no content = skip).
+  seo: {
+    enabled: true,
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -497,6 +506,7 @@ const SERVICE_ORDER = [
   'server',          // brand registry entry on the company server's Firestore (company-server operators only)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
+  'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -635,6 +645,10 @@ const OPERATIONS = {
     { name: 'certificates', ensure: true }, // Signing certs — download or create via CSR, export .p12, keychain import
     { name: 'bundle-ids', ensure: true },   // Brand bundle ID exists with the required capabilities
     { name: 'profiles', ensure: true },     // Provisioning profiles per platform × cert type
+  ],
+
+  seo: [
+    { name: 'github-repos', ensure: true }, // Parasite SEO repos exist + match their template
   ],
 
   update: [
