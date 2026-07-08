@@ -17,7 +17,8 @@
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
- * search-console, adsense, sendgrid, beehiiv, and payment. External-API
+ * search-console, adsense, sendgrid, beehiiv, payment, and slapform.
+ * External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -211,6 +212,18 @@ const DEFAULTS = {
     products: [], // [{ id, name, type: 'subscription'|'one-time', prices: { monthly, annually, once }, trial: { days }, ... }]
   },
 
+  // Slapform contact form (slapform.com) — Slapform-operator integration:
+  // needs SLAPFORM_SERVICE_ACCOUNT in the brand .env (path to the Slapform
+  // Firebase project's service-account JSON). formId comes from the Slapform
+  // dashboard; plan = the tier granted to the form-owner account (Slapform's
+  // top tier by default — omega-manager resolved it from the slapform brand's
+  // own config in `.brands/`, a company-mode read).
+  slapform: {
+    enabled: true,
+    formId: null,
+    plan: { id: 'grandmaster', name: 'Grandmaster' },
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -389,6 +402,7 @@ const SERVICE_ORDER = [
   'sendgrid',        // email marketing: domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
   'beehiiv',         // newsletter publication: access, fields, segments (verify-only), webhook
   'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
+  'slapform',        // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -493,6 +507,11 @@ const OPERATIONS = {
     { name: 'chargebee-account', ensure: true },  // API access probe + site info
     { name: 'chargebee-webhook', ensure: true },  // Webhook endpoint → brand backend (&brand= URL; events set on create only)
     { name: 'chargebee-products', ensure: true }, // Item family → items → item prices (deterministic IDs; legacy plans reported)
+  ],
+
+  slapform: [
+    { name: 'form', ensure: true }, // Form name + enabled diffed against Slapform Firestore
+    { name: 'user', ensure: true }, // Form-owner account set to slapform.plan (internal comp)
   ],
 
   update: [

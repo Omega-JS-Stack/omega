@@ -30,6 +30,7 @@ delete process.env.BEEHIIV_API_KEY;
 delete process.env.STRIPE_SECRET_KEY;
 delete process.env.PAYPAL_CLIENT_SECRET;
 delete process.env.CHARGEBEE_API_KEY;
+delete process.env.SLAPFORM_SERVICE_ACCOUNT;
 
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
@@ -214,6 +215,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Fixture has no priced products → clean skip before any processor check
   assert.equal(report.results.payment.status, 'skipped');
   assert.match(report.results.payment.reason, /no paid products/);
+  // No slapform.formId configured → clean skip
+  assert.equal(report.results.slapform.status, 'skipped');
+  assert.match(report.results.slapform.reason, /slapform\.formId/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -232,7 +236,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
