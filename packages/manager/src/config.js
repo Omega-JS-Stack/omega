@@ -17,8 +17,9 @@
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
- * search-console, and adsense. External-API services join this list one at a
- * time, keeping their omega-manager names and operation granularity.
+ * search-console, adsense, and sendgrid. External-API services join this
+ * list one at a time, keeping their omega-manager names and operation
+ * granularity.
  */
 
 // =============================================================================
@@ -49,6 +50,12 @@ const TARGET_APP_DIRS = Object.fromEntries(
 const DEFAULTS = {
   // Whether the brand is active (disabled brands are skipped)
   enabled: true,
+
+  // Parent brand URL — the central backend that children fan webhook events
+  // to (sendgrid event-webhook, beehiiv webhook) and newsletter generators
+  // fetch sources from. The parent brand itself uses 'self'. omega-manager
+  // defaulted this to the company's parent URL — it's config now, no default.
+  parent: null,
 
   // GitHub settings (brand omega.json5 `github` key; org has no default — the
   // service skips with a message until it's configured)
@@ -127,6 +134,20 @@ const DEFAULTS = {
   // scope, own token cache).
   adsense: {
     accountId: null, // 'pub-XXXXXXXXXXXXXXXX' — the service skips until set
+  },
+
+  // Marketing. campaigns = the email-marketing provider (the sendgrid
+  // service). listId is durable derived data — the list operation resolves
+  // it into state until the config-serializer port can write it back here.
+  // Auth: SENDGRID_API_KEY in the brand .env (+ BACKEND_MANAGER_WEBHOOK_KEY
+  // for the event-webhook operation). The newsletter half arrives with the
+  // beehiiv service port.
+  marketing: {
+    campaigns: {
+      enabled: true,
+      platform: 'sendgrid',
+      listId: null,
+    },
   },
 
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
@@ -304,6 +325,7 @@ const SERVICE_ORDER = [
   'analytics',       // GA4 streams need the firebase link; search-console links to analytics next
   'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
   'adsense',         // domain present in the AdSense account + approval state (read-only API)
+  'sendgrid',        // email marketing: domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -378,6 +400,15 @@ const OPERATIONS = {
 
   adsense: [
     { name: 'sites', ensure: true }, // Domain present in AdSense + approval state (read-only API — adding is manual)
+  ],
+
+  sendgrid: [
+    { name: 'domain-auth', ensure: true },     // Domain authentication (DKIM CNAMEs via Cloudflare, one-pass validate)
+    { name: 'sender-identity', ensure: true }, // Verified sender for Single Sends (offers@{contact domain})
+    { name: 'list', ensure: true },            // The brand's marketing list (id → state until config writeback)
+    { name: 'custom-fields', ensure: true },   // BEM custom fields (backend-manager's marketing SSOT)
+    { name: 'segments', ensure: true },        // BEM segments (query_dsl diffed; __temp_ orphans swept)
+    { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent BEM forwarder (min-diff PATCH)
   ],
 
   update: [
