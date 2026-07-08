@@ -26,6 +26,7 @@ delete process.env.META_ACCESS_TOKEN;
 delete process.env.TIKTOK_ACCESS_TOKEN;
 delete process.env.SENDGRID_API_KEY;
 delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+delete process.env.BEEHIIV_API_KEY;
 
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
@@ -204,6 +205,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No SendGrid API key in the environment → clean skip
   assert.equal(report.results.sendgrid.status, 'skipped');
   assert.match(report.results.sendgrid.reason, /SENDGRID_API_KEY/);
+  // No Beehiiv API key in the environment → clean skip
+  assert.equal(report.results.beehiiv.status, 'skipped');
+  assert.match(report.results.beehiiv.reason, /BEEHIIV_API_KEY/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -222,7 +226,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

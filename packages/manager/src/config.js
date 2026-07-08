@@ -17,9 +17,9 @@
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
- * search-console, adsense, and sendgrid. External-API services join this
- * list one at a time, keeping their omega-manager names and operation
- * granularity.
+ * search-console, adsense, sendgrid, and beehiiv. External-API services
+ * join this list one at a time, keeping their omega-manager names and
+ * operation granularity.
  */
 
 // =============================================================================
@@ -137,16 +137,24 @@ const DEFAULTS = {
   },
 
   // Marketing. campaigns = the email-marketing provider (the sendgrid
-  // service). listId is durable derived data — the list operation resolves
-  // it into state until the config-serializer port can write it back here.
-  // Auth: SENDGRID_API_KEY in the brand .env (+ BACKEND_MANAGER_WEBHOOK_KEY
-  // for the event-webhook operation). The newsletter half arrives with the
-  // beehiiv service port.
+  // service); newsletter = the newsletter provider (the beehiiv service).
+  // listId/publicationId are durable derived data — the services resolve
+  // them into state until the config-serializer port can write them back
+  // here. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
+  // (+ BACKEND_MANAGER_WEBHOOK_KEY for the webhook operations).
+  // omega-manager also carried a newsletter.content generator blob here —
+  // it's BEM newsletter-generator data, not service config; it rides the
+  // config-hierarchy dispersal story.
   marketing: {
     campaigns: {
       enabled: true,
       platform: 'sendgrid',
       listId: null,
+    },
+    newsletter: {
+      enabled: true,
+      platform: 'beehiiv',
+      publicationId: null,
     },
   },
 
@@ -326,6 +334,7 @@ const SERVICE_ORDER = [
   'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
   'adsense',         // domain present in the AdSense account + approval state (read-only API)
   'sendgrid',        // email marketing: domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
+  'beehiiv',         // newsletter publication: access, fields, segments (verify-only), webhook
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -409,6 +418,13 @@ const OPERATIONS = {
     { name: 'custom-fields', ensure: true },   // BEM custom fields (backend-manager's marketing SSOT)
     { name: 'segments', ensure: true },        // BEM segments (query_dsl diffed; __temp_ orphans swept)
     { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent BEM forwarder (min-diff PATCH)
+  ],
+
+  beehiiv: [
+    { name: 'publication', ensure: true },   // Publication access (config/state id, auto-match by name; creation is manual)
+    { name: 'custom-fields', ensure: true }, // BEM custom fields (backend-manager's marketing SSOT, diffed by display)
+    { name: 'segments', ensure: true },      // BEM segments verified (no create API — instructions when missing)
+    { name: 'webhook', ensure: true },       // Publication webhook → parent BEM forwarder (min-diff PATCH)
   ],
 
   update: [
