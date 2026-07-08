@@ -196,6 +196,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No Google credentials in the environment → clean skip
   assert.equal(report.results['search-console'].status, 'skipped');
   assert.match(report.results['search-console'].reason, /GOOGLE_CLIENT_ID/);
+  // No adsense.accountId configured → clean skip
+  assert.equal(report.results.adsense.status, 'skipped');
+  assert.match(report.results.adsense.reason, /adsense\.accountId/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -214,7 +217,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');

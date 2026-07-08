@@ -16,9 +16,9 @@
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
- * services github, cloudflare, domain, firebase, recaptcha, analytics, and
- * search-console. External-API services join this list one at a time,
- * keeping their omega-manager names and operation granularity.
+ * services github, cloudflare, domain, firebase, recaptcha, analytics,
+ * search-console, and adsense. External-API services join this list one at a
+ * time, keeping their omega-manager names and operation granularity.
  */
 
 // =============================================================================
@@ -117,6 +117,16 @@ const DEFAULTS = {
   searchConsole: {
     submitSitemap: true,          // false = skip sitemap submission
     sitemapPaths: ['/sitemap.xml'], // submitted as https://{domain}{path}
+  },
+
+  // AdSense. The Management API v2 is read-only — sites can't be added or
+  // configured programmatically — so the service verifies the domain is
+  // present and reports its approval state; adding is a console deep-link.
+  // accountId is required config (omega-manager defaulted it to the company's
+  // shared pub- account). Auth: the same GOOGLE creds (adsense.readonly
+  // scope, own token cache).
+  adsense: {
+    accountId: null, // 'pub-XXXXXXXXXXXXXXXX' — the service skips until set
   },
 
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
@@ -293,6 +303,7 @@ const SERVICE_ORDER = [
   'recaptcha',       // validates the shared keys the frontend/backend consume from .env
   'analytics',       // GA4 streams need the firebase link; search-console links to analytics next
   'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
+  'adsense',         // domain present in the AdSense account + approval state (read-only API)
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -363,6 +374,10 @@ const OPERATIONS = {
     { name: 'property', ensure: true }, // sc-domain property exists (DNS TXT verification via Cloudflare, one-pass)
     { name: 'ga-link', ensure: true },  // GA association — no API exists; warned + URL until confirmed
     { name: 'sitemaps', ensure: true }, // Missing sitemaps submitted (existing ones are converged, not resubmitted)
+  ],
+
+  adsense: [
+    { name: 'sites', ensure: true }, // Domain present in AdSense + approval state (read-only API — adding is manual)
   ],
 
   update: [
