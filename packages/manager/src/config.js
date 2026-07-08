@@ -16,9 +16,9 @@
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
- * services github, cloudflare, domain, firebase, and recaptcha. External-API
- * services join this list one at a time, keeping their omega-manager names
- * and operation granularity.
+ * services github, cloudflare, domain, firebase, recaptcha, and analytics.
+ * External-API services join this list one at a time, keeping their
+ * omega-manager names and operation granularity.
  */
 
 // =============================================================================
@@ -79,6 +79,34 @@ const DEFAULTS = {
     organizationId: null, // GCloud org ID for project creation (onboarding port)
     billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — required to auto-upgrade to Blaze
     apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
+  },
+
+  // Analytics providers. Google auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
+  // in the brand .env (analytics.edit scope, tokens cached separately from
+  // firebase's). propertyId is required config — property selection/creation
+  // rides the prompting port (auto-creating without config writeback would
+  // mint a new property every run). Meta/TikTok pixel IDs are public config;
+  // their access tokens live in the brand .env (META_ACCESS_TOKEN /
+  // TIKTOK_ACCESS_TOKEN — the names backend-manager reads).
+  analytics: {
+    providers: {
+      google: {
+        accountId: null,  // GA account number — used for console deep-links
+        propertyId: null, // GA4 property number — google operations skip until set
+        enhancedMeasurement: {
+          streamEnabled: true,
+          scrollsEnabled: true,
+          outboundClicksEnabled: true,
+          siteSearchEnabled: true,
+          videoEngagementEnabled: true,
+          fileDownloadsEnabled: true,
+          pageChangesEnabled: true,
+          formInteractionsEnabled: true,
+        },
+      },
+      meta: { id: null },   // Meta Pixel ID
+      tiktok: { id: null }, // TikTok Pixel Code
+    },
   },
 
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
@@ -253,6 +281,7 @@ const SERVICE_ORDER = [
   'domain',      // registrar nameservers point at the zone cloudflare just created/verified
   'firebase',    // project must exist before analytics/backend-dependent services
   'recaptcha',   // validates the shared keys the frontend/backend consume from .env
+  'analytics',   // GA4 streams need the firebase link; search-console links to analytics next
   'update',      // installs deps + builds every app
   'testing',     // health checks after everything else ran
 ];
@@ -310,6 +339,13 @@ const OPERATIONS = {
 
   recaptcha: [
     { name: 'site-key', ensure: true }, // Secret key proven valid via siteverify; domain list is manual guidance (no classic API)
+  ],
+
+  analytics: [
+    { name: 'google-streams', ensure: true },       // One GA4 web stream per target (+ enhanced measurement + MP secret)
+    { name: 'google-firebase-link', ensure: true }, // GA property ↔ Firebase project link (+ auto-stream normalization)
+    { name: 'meta-pixel', ensure: true },           // Pixel ID + META_ACCESS_TOKEN presence
+    { name: 'tiktok-pixel', ensure: true },         // Pixel Code + TIKTOK_ACCESS_TOKEN presence
   ],
 
   update: [
