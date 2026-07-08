@@ -17,10 +17,9 @@
 const { isAbsolute, join } = require('node:path');
 const fs = require('node:fs');
 
-const { signJwt } = require('./jwt.js');
+const { createTokenProvider } = require('./google-token.js');
 
 const FIRESTORE_API_BASE = 'https://firestore.googleapis.com/v1';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/datastore';
 
 /**
@@ -113,50 +112,14 @@ class FirestoreREST {
   constructor(serviceAccount) {
     this.serviceAccount = serviceAccount;
     this.projectId = serviceAccount.project_id;
-    this.accessToken = null;
-    this.tokenExpiry = 0;
+    this.tokenProvider = createTokenProvider(serviceAccount, SCOPE);
   }
 
   /**
-   * Exchange a signed RS256 JWT for an access token (cached until expiry).
+   * Access token for the datastore scope (cached by the shared provider).
    */
-  async getAccessToken() {
-    if (this.accessToken && Date.now() < this.tokenExpiry - 60000) {
-      return this.accessToken;
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    const assertion = signJwt(
-      { alg: 'RS256', typ: 'JWT' },
-      {
-        iss: this.serviceAccount.client_email,
-        scope: SCOPE,
-        aud: GOOGLE_TOKEN_URL,
-        iat: now,
-        exp: now + 3600,
-      },
-      this.serviceAccount.private_key,
-    );
-
-    const response = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-      throw new Error(`Service-account auth failed: ${data.error_description || data.error}`);
-    }
-
-    this.accessToken = data.access_token;
-    this.tokenExpiry = Date.now() + (data.expires_in * 1000);
-
-    return this.accessToken;
+  getAccessToken() {
+    return this.tokenProvider.getAccessToken();
   }
 
   async request(method, docPath, { query, body } = {}) {
@@ -231,6 +194,44 @@ class FirestoreREST {
     return this.request('PATCH', docPath, {
       body: { fields: encodeFields(data) },
     });
+  }
+
+  /**
+   * Run a structured query and return matching documents as plain objects.
+   * The `documents:runQuery` endpoint is a colon method on the documents
+   * root, so it can't go through request()'s docPath URL builder.
+   *
+   * @param {Object} structuredQuery - Firestore StructuredQuery, e.g.
+   *   { from: [{ collectionId: 'users' }], where: { fieldFilter: ... } }
+   * @returns {Promise<Array<{ id: string, data: Object }>>}
+   */
+  async runQuery(structuredQuery) {
+    const token = await this.getAccessToken();
+    const url = `${FIRESTORE_API_BASE}/projects/${this.projectId}/databases/(default)/documents:runQuery`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ structuredQuery }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`Firestore API error: ${data.error?.message || JSON.stringify(data)}`);
+    }
+
+    // Streamed response: one entry per result, some carry only readTime
+    return data
+      .filter((entry) => entry.document)
+      .map((entry) => ({
+        id: entry.document.name.split('/').pop(),
+        data: decodeFields(entry.document.fields || {}),
+      }));
   }
 }
 

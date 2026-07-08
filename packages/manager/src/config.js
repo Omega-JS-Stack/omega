@@ -18,7 +18,7 @@
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
  * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * replyify, server, assets, certificates, and seo. External-API
+ * replyify, server, assets, certificates, seo, and account. External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -322,6 +322,22 @@ const DEFAULTS = {
     enabled: true,
   },
 
+  // Required accounts in the brand's Firebase Auth — created/converged with
+  // deterministic passwords derived from ACCOUNT_PASSWORD_SEED (brand .env,
+  // auto-generated on the first real run). `{domain}` in emails resolves to
+  // the brand's domain. Per entry: account: true = ensure the auth user
+  // exists with the derived password + roles.admin + the highest plan;
+  // marketing: true = push the contact to the marketing providers via the
+  // brand backend. Any OTHER user holding roles.admin fails the service.
+  // (omega-manager hardcoded the company's personal emails as ADMIN_EMAILS
+  // and derived passwords from a company-specific formula in code.)
+  account: {
+    enabled: true,
+    admins: [
+      { email: 'support@{domain}', account: true, marketing: true },
+    ],
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -508,6 +524,7 @@ const SERVICE_ORDER = [
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every app
+  'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
   'testing',         // health checks after everything else ran
 ];
 
@@ -653,6 +670,10 @@ const OPERATIONS = {
 
   update: [
     { name: 'targets', write: true },     // Installs deps, builds every app
+  ],
+
+  account: [
+    { name: 'users', ensure: true },      // Auth accounts exist + passwords/admin roles converged + admin audit
   ],
 
   testing: [

@@ -28,6 +28,7 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { writeEnvValue } = require('../../lib/env-secret.js');
 const { createAppleClient } = require('./lib/apple-api.js');
 const { importP12Files } = require('./lib/keychain.js');
 
@@ -61,17 +62,7 @@ function findAuthKey(appleDir) {
  */
 function ensureCertPassword(brandRoot) {
   const password = randomBytes(24).toString('base64url');
-  const envPath = join(brandRoot, '.env');
-  const line = `CSC_KEY_PASSWORD="${password}"`;
-
-  let envContent = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
-  if (/^CSC_KEY_PASSWORD\s*=.*$/m.test(envContent)) {
-    envContent = envContent.replace(/^CSC_KEY_PASSWORD\s*=.*$/m, line);
-  } else {
-    envContent = envContent.replace(/\n*$/, '\n');
-    envContent += `${line}\n`;
-  }
-  jetpack.write(envPath, envContent);
+  writeEnvValue(brandRoot, 'CSC_KEY_PASSWORD', password);
   console.log(`      ${chalk.green('✓')} Generated CSC_KEY_PASSWORD and saved to the brand .env`);
 
   return password;
