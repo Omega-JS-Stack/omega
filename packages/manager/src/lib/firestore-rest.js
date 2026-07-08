@@ -156,6 +156,34 @@ class FirestoreREST {
   }
 
   /**
+   * POST to a colon method on the documents root (documents:runQuery,
+   * documents:runAggregationQuery) — those can't go through request()'s
+   * docPath URL builder.
+   */
+  async rootRequest(method, body) {
+    const token = await this.getAccessToken();
+    const url = `${FIRESTORE_API_BASE}/projects/${this.projectId}/databases/(default)/documents:${method}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`Firestore API error: ${data.error?.message || JSON.stringify(data)}`);
+    }
+
+    return data;
+  }
+
+  /**
    * Read a document as a plain JS object. Missing document → null.
    *
    * @param {string} docPath - e.g. 'forms/abc123'
@@ -163,6 +191,85 @@ class FirestoreREST {
   async getDoc(docPath) {
     const doc = await this.request('GET', docPath);
     return doc ? decodeFields(doc.fields || {}) : null;
+  }
+
+  /**
+   * Read a document with its server metadata — the REST stand-in for the
+   * admin SDK's DocumentSnapshot (create/update times are ISO strings).
+   * Missing document → null.
+   *
+   * @param {string} docPath - e.g. 'users/uid123'
+   * @returns {Promise<{ id, createTime, updateTime, data }|null>}
+   */
+  async getDocWithMeta(docPath) {
+    const doc = await this.request('GET', docPath);
+    if (!doc) {
+      return null;
+    }
+    return {
+      id: doc.name.split('/').pop(),
+      createTime: doc.createTime,
+      updateTime: doc.updateTime,
+      data: decodeFields(doc.fields || {}),
+    };
+  }
+
+  /**
+   * List one page of a collection's documents (ordered by name — Firestore's
+   * listDocuments default), with server metadata like getDocWithMeta.
+   *
+   * @param {string} collectionPath - e.g. 'users'
+   * @param {Object} [options]
+   * @param {number} [options.pageSize=500]
+   * @param {string} [options.pageToken] - From the previous page's nextPageToken
+   * @returns {Promise<{ docs: Array<{ id, createTime, updateTime, data }>, nextPageToken: string|null }>}
+   */
+  async listDocs(collectionPath, { pageSize = 500, pageToken } = {}) {
+    const query = { pageSize };
+    if (pageToken) {
+      query.pageToken = pageToken;
+    }
+
+    const data = (await this.request('GET', collectionPath, { query })) || {};
+
+    return {
+      docs: (data.documents || []).map((doc) => ({
+        id: doc.name.split('/').pop(),
+        createTime: doc.createTime,
+        updateTime: doc.updateTime,
+        data: decodeFields(doc.fields || {}),
+      })),
+      nextPageToken: data.nextPageToken || null,
+    };
+  }
+
+  /**
+   * Count a collection's documents server-side (aggregation query — no
+   * document reads billed beyond the aggregation).
+   *
+   * @param {string} collectionId - Top-level collection id, e.g. 'users'
+   * @returns {Promise<number>}
+   */
+  async countDocs(collectionId) {
+    const data = await this.rootRequest('runAggregationQuery', {
+      structuredAggregationQuery: {
+        structuredQuery: { from: [{ collectionId }] },
+        aggregations: [{ alias: 'count', count: {} }],
+      },
+    });
+
+    const entry = (data || []).find((e) => e.result);
+    return entry ? parseInt(entry.result.aggregateFields.count.integerValue, 10) : 0;
+  }
+
+  /**
+   * Delete a document. Deleting a missing document is a no-op (Firestore
+   * returns success either way).
+   *
+   * @param {string} docPath - e.g. 'users/uid123'
+   */
+  async deleteDoc(docPath) {
+    return this.request('DELETE', docPath);
   }
 
   /**
@@ -198,32 +305,13 @@ class FirestoreREST {
 
   /**
    * Run a structured query and return matching documents as plain objects.
-   * The `documents:runQuery` endpoint is a colon method on the documents
-   * root, so it can't go through request()'s docPath URL builder.
    *
    * @param {Object} structuredQuery - Firestore StructuredQuery, e.g.
    *   { from: [{ collectionId: 'users' }], where: { fieldFilter: ... } }
    * @returns {Promise<Array<{ id: string, data: Object }>>}
    */
   async runQuery(structuredQuery) {
-    const token = await this.getAccessToken();
-    const url = `${FIRESTORE_API_BASE}/projects/${this.projectId}/databases/(default)/documents:runQuery`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ structuredQuery }),
-      signal: AbortSignal.timeout(30000),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(`Firestore API error: ${data.error?.message || JSON.stringify(data)}`);
-    }
+    const data = await this.rootRequest('runQuery', { structuredQuery });
 
     // Streamed response: one entry per result, some carry only readTime
     return data

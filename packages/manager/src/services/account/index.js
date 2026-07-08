@@ -22,7 +22,7 @@ const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { writeEnvValue } = require('../../lib/env-secret.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
-const { createAuthAdmin } = require('./lib/auth-admin.js');
+const { createAuthAdmin } = require('../../lib/auth-admin.js');
 const { createBackendClient } = require('./lib/backend-client.js');
 
 const SERVICE_ACCOUNT_PATH = join('.omega', 'secrets', 'service-account.json');

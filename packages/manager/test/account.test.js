@@ -19,7 +19,7 @@ const jetpack = require('fs-jetpack');
 
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { derivePassword } = require('../src/services/account/lib/password.js');
-const { createAuthAdmin, CUSTOM_TOKEN_AUD } = require('../src/services/account/lib/auth-admin.js');
+const { createAuthAdmin, CUSTOM_TOKEN_AUD } = require('../src/lib/auth-admin.js');
 const { writeEnvValue } = require('../src/lib/env-secret.js');
 const service = require('../src/services/account/index.js');
 
@@ -150,7 +150,7 @@ async function runService(config, { root, auth, firestore, backend, options = {}
 
 test('account: registered after update, before testing, with the users operation', () => {
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('update') + 1], 'account');
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('account') + 1], 'testing');
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('account') + 1], 'migrations');
   assert.deepEqual(OPERATIONS.account.map((o) => o.name), ['users']);
   assert.deepEqual(DEFAULTS.account, {
     enabled: true,

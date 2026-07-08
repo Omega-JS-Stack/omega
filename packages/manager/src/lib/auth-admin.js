@@ -5,13 +5,15 @@
  * (.omega/secrets/service-account.json, provisioned by the firebase
  * service) via the shared google-token provider; custom tokens are signed
  * locally with the shared jwt helper, so there is no SDK dependency.
+ * Shared by the account service (required accounts) and the migrations
+ * service (orphaned-doc detection + creation-time reconciliation).
  *
  * Handlers call named methods, so tests fake this surface
  * method-for-method. Lookups return null for missing users (instead of
  * firebase-admin's auth/user-not-found throw).
  */
-const { createTokenProvider } = require('../../../lib/google-token.js');
-const { signJwt } = require('../../../lib/jwt.js');
+const { createTokenProvider } = require('./google-token.js');
+const { signJwt } = require('./jwt.js');
 
 const IDENTITY_TOOLKIT_BASE = 'https://identitytoolkit.googleapis.com/v1';
 const SCOPE = 'https://www.googleapis.com/auth/identitytoolkit';
@@ -20,13 +22,18 @@ const SCOPE = 'https://www.googleapis.com/auth/identitytoolkit';
 const CUSTOM_TOKEN_AUD = 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit';
 
 /**
- * Map an Identity Toolkit user record to the subset the service uses.
+ * Map an Identity Toolkit user record to the subset the services use.
+ * createdAt is Identity Toolkit's ms-since-epoch string; it surfaces as
+ * metadata.creationTime (ISO) to mirror firebase-admin's UserRecord shape.
  */
 function toUser(record) {
   return {
     uid: record.localId,
     email: record.email,
     providerData: (record.providerUserInfo || []).map((p) => ({ providerId: p.providerId })),
+    metadata: {
+      creationTime: record.createdAt ? new Date(Number(record.createdAt)).toISOString() : null,
+    },
   };
 }
 

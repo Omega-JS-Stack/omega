@@ -18,9 +18,10 @@
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
  * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * replyify, server, assets, certificates, seo, and account. External-API
- * services join this list one at a time, keeping their omega-manager names
- * and operation granularity.
+ * replyify, server, assets, certificates, seo, account, and migrations
+ * (--migration-gated Firestore data migrations). External-API services join
+ * this list one at a time, keeping their omega-manager names and operation
+ * granularity.
  */
 
 // =============================================================================
@@ -525,6 +526,7 @@ const SERVICE_ORDER = [
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every app
   'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
+  'migrations',      // Firestore data migrations — only with --migration, after the deployed backend is current
   'testing',         // health checks after everything else ran
 ];
 
@@ -674,6 +676,11 @@ const OPERATIONS = {
 
   account: [
     { name: 'users', ensure: true },      // Auth accounts exist + passwords/admin roles converged + admin audit
+  ],
+
+  migrations: [
+    { name: 'notifications', ensure: true }, // uid→owner + metadata/context/attribution + validate schema
+    { name: 'users', ensure: true },         // plan→subscription + BEM-schema backfill + orphan cleanup + validate
   ],
 
   testing: [

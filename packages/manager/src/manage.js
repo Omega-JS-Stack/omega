@@ -70,7 +70,8 @@ async function runService(serviceName, brand, brandState, options = {}) {
  * Run all services (in order) against the brand monorepo containing startDir.
  *
  * @param {string} startDir - Any directory inside the brand monorepo
- * @param {Object} options - { service?, continueOnError?, dryRun?, verbose? }
+ * @param {Object} options - { service?, continueOnError?, dryRun?, verbose?,
+ *   migration? (true = all, string = one), limit?, ids? (migrations service) }
  * @returns {{ hasErrors: boolean, results: Object, brand: Object }}
  */
 async function runManage(startDir, options = {}) {

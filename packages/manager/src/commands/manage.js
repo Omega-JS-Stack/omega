@@ -11,6 +11,9 @@ module.exports = async (options) => {
     continueOnError: options.continueOnError,
     dryRun: options.dryRun,
     verbose: options.verbose,
+    migration: options.migration,
+    limit: options.limit,
+    ids: options.ids,
   });
 
   if (report.hasErrors) {

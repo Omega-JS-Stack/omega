@@ -249,6 +249,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // Web-only fixture → no backend whose Firebase Auth accounts to manage
   assert.equal(report.results.account.status, 'skipped');
   assert.match(report.results.account.reason, /no backend target/);
+  // Data migrations never run without the explicit --migration flag
+  assert.equal(report.results.migrations.status, 'skipped');
+  assert.match(report.results.migrations.reason, /--migration flag not set/);
   assert.equal(report.results.testing.status, 'success');
 
   // The build actually produced the site
@@ -266,7 +269,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'certificates', 'seo', 'update', 'account', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'analytics', 'search-console', 'adsense', 'sendgrid', 'beehiiv', 'payment', 'slapform', 'chatsy', 'replyify', 'server', 'assets', 'certificates', 'seo', 'update', 'account', 'migrations', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
