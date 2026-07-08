@@ -16,9 +16,9 @@
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
- * services github, cloudflare, domain, and firebase. External-API services
- * join this list one at a time, keeping their omega-manager names and
- * operation granularity.
+ * services github, cloudflare, domain, firebase, and recaptcha. External-API
+ * services join this list one at a time, keeping their omega-manager names
+ * and operation granularity.
  */
 
 // =============================================================================
@@ -79,6 +79,15 @@ const DEFAULTS = {
     organizationId: null, // GCloud org ID for project creation (onboarding port)
     billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — required to auto-upgrade to Blaze
     apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
+  },
+
+  // Classic reCAPTCHA — keys shared across brands, read from the brand .env
+  // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
+  // skips). `project` = the GCP project hosting the shared key, used only for
+  // the console deep-link in guidance (omega-manager hardcoded the company
+  // project here).
+  recaptcha: {
+    project: null,
   },
 
   // Cloudflare settings — the engine defaults are PLATFORM defaults only.
@@ -243,6 +252,7 @@ const SERVICE_ORDER = [
   'cloudflare',  // zone must exist before DNS-dependent services
   'domain',      // registrar nameservers point at the zone cloudflare just created/verified
   'firebase',    // project must exist before analytics/backend-dependent services
+  'recaptcha',   // validates the shared keys the frontend/backend consume from .env
   'update',      // installs deps + builds every app
   'testing',     // health checks after everything else ran
 ];
@@ -296,6 +306,10 @@ const OPERATIONS = {
     { name: 'functions', ensure: true },        // Cloud Functions readiness check (read-only)
     { name: 'cloud-messaging', ensure: true },  // FCM API + VAPID key pair (from state)
     { name: 'sdk-config', ensure: true },       // Web SDK config → state + omega.json5 drift check
+  ],
+
+  recaptcha: [
+    { name: 'site-key', ensure: true }, // Secret key proven valid via siteverify; domain list is manual guidance (no classic API)
   ],
 
   update: [

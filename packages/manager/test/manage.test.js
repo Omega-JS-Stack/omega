@@ -20,6 +20,8 @@ delete process.env.NAMECHEAP_USERNAME;
 delete process.env.NAMECHEAP_API_KEY;
 delete process.env.GOOGLE_CLIENT_ID;
 delete process.env.GOOGLE_CLIENT_SECRET;
+delete process.env.RECAPTCHA_SITE_KEY;
+delete process.env.RECAPTCHA_SECRET_KEY;
 
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
@@ -183,6 +185,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No firebase.projectId configured → clean skip
   assert.equal(report.results.firebase.status, 'skipped');
   assert.match(report.results.firebase.reason, /firebase\.projectId/);
+  // No shared reCAPTCHA keys in the environment → clean skip
+  assert.equal(report.results.recaptcha.status, 'skipped');
+  assert.match(report.results.recaptcha.reason, /RECAPTCHA_SITE_KEY/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -201,7 +206,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'recaptcha', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
