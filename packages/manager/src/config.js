@@ -17,9 +17,9 @@
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
- * search-console, adsense, sendgrid, and beehiiv. External-API services
- * join this list one at a time, keeping their omega-manager names and
- * operation granularity.
+ * search-console, adsense, sendgrid, beehiiv, and payment. External-API
+ * services join this list one at a time, keeping their omega-manager names
+ * and operation granularity.
  */
 
 // =============================================================================
@@ -156,6 +156,59 @@ const DEFAULTS = {
       platform: 'beehiiv',
       publicationId: null,
     },
+  },
+
+  // Payment processors + products. Public halves live here (publishableKey,
+  // clientId, site); secrets come from the brand .env (STRIPE_SECRET_KEY,
+  // PAYPAL_CLIENT_SECRET, CHARGEBEE_API_KEY — omega-manager kept them in
+  // .output/*/secrets/ behind interactive prompts, which ride the prompting
+  // port). Set a processor to `false` to disable it. Product IDs resolve to
+  // state until the config-serializer port can write them back here.
+  // omega-manager's DEFAULTS also carried the company's Stripe organizationId
+  // (dashboard deep-links use the account ID from state now) and hardcoded
+  // the company CDN for product images (brand.images.brandmark now).
+  payment: {
+    enabled: true,
+    processors: {
+      stripe: {
+        publishableKey: null,
+        updateAccountInfo: true, // false = leave the account's business profile alone
+        // Radar fraud-prevention rules — Dashboard-only (no API); the
+        // stripe-radar operation prints these as guidance until confirmed.
+        // Actions: 'block', 'allow', 'review', 'request_three_d_secure'.
+        // Predicate syntax: https://docs.stripe.com/radar/rules/reference
+        radar: [
+          // --- Card type restrictions ---
+          { action: 'block', predicate: ":card_funding: = 'prepaid'", description: 'Block prepaid cards' },
+          { action: 'block', predicate: ":card_brand: = 'mastercard' AND :card_funding: = 'debit'", description: 'Block Mastercard debit' },
+
+          // --- Risk-based rules ---
+          { action: 'block', predicate: ":risk_level: = 'highest'", description: 'Block highest risk payments' },
+          { action: 'review', predicate: ":risk_level: = 'elevated'", description: 'Review elevated risk payments' },
+
+          // --- Address/CVC verification ---
+          { action: 'block', predicate: ":cvc_check: = 'fail'", description: 'Block failed CVC checks' },
+          { action: 'block', predicate: ":address_zip_check: = 'fail'", description: 'Block failed ZIP checks' },
+
+          // --- Velocity / abuse ---
+          { action: 'block', predicate: ':total_charges_per_card_number_daily: > 5', description: 'Block >5 charges per card per day' },
+          { action: 'block', predicate: ':total_charges_per_ip_address_daily: > 10', description: 'Block >10 charges per IP per day' },
+
+          // --- 3D Secure for risky but not blocked ---
+          { action: 'request_three_d_secure', predicate: ":risk_level: = 'elevated'", description: 'Require 3DS for elevated risk' },
+        ],
+      },
+      paypal: {
+        clientId: null,
+      },
+      chargebee: {
+        site: null,
+      },
+      coinbase: {
+        enabled: false,
+      },
+    },
+    products: [], // [{ id, name, type: 'subscription'|'one-time', prices: { monthly, annually, once }, trial: { days }, ... }]
   },
 
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
@@ -335,6 +388,7 @@ const SERVICE_ORDER = [
   'adsense',         // domain present in the AdSense account + approval state (read-only API)
   'sendgrid',        // email marketing: domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
   'beehiiv',         // newsletter publication: access, fields, segments (verify-only), webhook
+  'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -425,6 +479,20 @@ const OPERATIONS = {
     { name: 'custom-fields', ensure: true }, // BEM custom fields (backend-manager's marketing SSOT, diffed by display)
     { name: 'segments', ensure: true },      // BEM segments verified (no create API — instructions when missing)
     { name: 'webhook', ensure: true },       // Publication webhook → parent BEM forwarder (min-diff PATCH)
+  ],
+
+  payment: [
+    { name: 'paypal-account', ensure: true },     // Auth probe (live/sandbox detection) + app info
+    { name: 'paypal-webhook', ensure: true },     // Webhook endpoint → brand backend (event_types diffed)
+    { name: 'paypal-products', ensure: true },    // Catalog products + billing plans (config → state → name match → create)
+    { name: 'stripe-account', ensure: true },     // Business profile diffed to brand config
+    { name: 'stripe-radar', ensure: true },       // Radar rules guidance (no API — warned until confirmed)
+    { name: 'stripe-disputes', ensure: true },    // Enhanced Dispute Protection guidance (no API — warned until confirmed)
+    { name: 'stripe-webhook', ensure: true },     // Webhook endpoint → brand backend (re-enable + enabled_events diffed)
+    { name: 'stripe-products', ensure: true },    // Products + prices (config → state → metadata match → create; stale prices archived)
+    { name: 'chargebee-account', ensure: true },  // API access probe + site info
+    { name: 'chargebee-webhook', ensure: true },  // Webhook endpoint → brand backend (&brand= URL; events set on create only)
+    { name: 'chargebee-products', ensure: true }, // Item family → items → item prices (deterministic IDs; legacy plans reported)
   ],
 
   update: [
