@@ -16,9 +16,9 @@
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
- * services github, cloudflare, and domain. External-API services join this
- * list one at a time, keeping their omega-manager names and operation
- * granularity.
+ * services github, cloudflare, domain, and firebase. External-API services
+ * join this list one at a time, keeping their omega-manager names and
+ * operation granularity.
  */
 
 // =============================================================================
@@ -66,6 +66,19 @@ const DEFAULTS = {
       provider: null, // 'squarespace' | 'privateemail' | 'cloudflare' | null
       forwarding: [], // [{ from: 'support' | '*', to: 'inbox@example.com' }]
     },
+  },
+
+  // Firebase settings. Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the
+  // brand .env. projectId has no default — the service skips until it's set
+  // (project selection/creation rides the onboarding port). Company values
+  // omega-manager hardcoded (billing account, googlegroup support email,
+  // GCloud org) are config now — they land in company/brand config.
+  firebase: {
+    shared: false,        // true = project shared with other brands; only per-brand ops run (service-account, sdk-config)
+    supportEmail: null,   // OAuth consent screen support email (defaults to support@{domain}; must be the authed user's email or a Google Group they own)
+    organizationId: null, // GCloud org ID for project creation (onboarding port)
+    billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — required to auto-upgrade to Blaze
+    apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
   },
 
   // Cloudflare settings — the engine defaults are PLATFORM defaults only.
@@ -229,6 +242,7 @@ const SERVICE_ORDER = [
   'github',      // the brand repo must exist before services that write to it
   'cloudflare',  // zone must exist before DNS-dependent services
   'domain',      // registrar nameservers point at the zone cloudflare just created/verified
+  'firebase',    // project must exist before analytics/backend-dependent services
   'update',      // installs deps + builds every app
   'testing',     // health checks after everything else ran
 ];
@@ -266,6 +280,22 @@ const OPERATIONS = {
 
   domain: [
     { name: 'nameservers', ensure: true }, // Registrar nameservers → Cloudflare (namecheap via API, manual registrars get instructions)
+  ],
+
+  firebase: [
+    { name: 'billing', ensure: true },          // Blaze plan (links firebase.billingAccount when configured)
+    { name: 'services', ensure: true },         // Required Google Cloud APIs + compute deploy roles
+    { name: 'project-settings', ensure: true }, // GCP display name + the 'Web App' web app
+    { name: 'oauth-consent', ensure: true },    // OAuth consent screen (support email)
+    { name: 'service-account', ensure: true },  // Admin SDK service account + key → .omega/secrets + backend functions/
+    { name: 'hosting', ensure: true },          // Hosting site + api.{domain} custom domains (DNS via Cloudflare)
+    { name: 'firestore', ensure: true },        // Firestore database + PITR
+    { name: 'database', ensure: true },         // Realtime Database
+    { name: 'authentication', ensure: true },   // Identity Platform + sign-in methods + authorized domains
+    { name: 'storage', ensure: true },          // Default storage bucket
+    { name: 'functions', ensure: true },        // Cloud Functions readiness check (read-only)
+    { name: 'cloud-messaging', ensure: true },  // FCM API + VAPID key pair (from state)
+    { name: 'sdk-config', ensure: true },       // Web SDK config → state + omega.json5 drift check
   ],
 
   update: [

@@ -13,11 +13,13 @@ const path = require('node:path');
 const { resolveBrandRoot, loadBrand, targetFromDirName } = require('../src/lib/brand.js');
 const { runManage } = require('../src/manage.js');
 
-// Fixture brands must never reach a real Cloudflare or Namecheap account via
-// shell-exported credentials — those services must skip in every e2e run here
+// Fixture brands must never reach a real Cloudflare/Namecheap/Google account
+// via shell-exported credentials — those services must skip in every e2e run
 delete process.env.CLOUDFLARE_TOKEN;
 delete process.env.NAMECHEAP_USERNAME;
 delete process.env.NAMECHEAP_API_KEY;
+delete process.env.GOOGLE_CLIENT_ID;
+delete process.env.GOOGLE_CLIENT_SECRET;
 
 // ─── Fixture staging ─────────────────────────────────────────────────────────
 
@@ -178,6 +180,9 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No domain.provider configured → clean skip
   assert.equal(report.results.domain.status, 'skipped');
   assert.match(report.results.domain.reason, /domain\.provider/);
+  // No firebase.projectId configured → clean skip
+  assert.equal(report.results.firebase.status, 'skipped');
+  assert.match(report.results.firebase.reason, /firebase\.projectId/);
   assert.equal(report.results.update.status, 'success');
   assert.equal(report.results.testing.status, 'success');
 
@@ -196,7 +201,7 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   assert.equal(fs.readdirSync(runsDir).length, 1);
   const run = JSON.parse(fs.readFileSync(path.join(runsDir, fs.readdirSync(runsDir)[0]), 'utf8'));
   assert.equal(run.brandId, 'fixture-brand');
-  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'update', 'testing']);
+  assert.deepEqual(run.services.map((s) => s.service), ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'update', 'testing']);
 
   // .omega/ got gitignored
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
