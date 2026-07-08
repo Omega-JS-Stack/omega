@@ -17,8 +17,8 @@
  * workspace (structure/config health), update (install + build every app),
  * testing (per-target health checks) — plus the external provisioning
  * services github, cloudflare, domain, firebase, recaptcha, analytics,
- * search-console, adsense, sendgrid, beehiiv, payment, slapform, and
- * chatsy. External-API
+ * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
+ * and replyify. External-API
  * services join this list one at a time, keeping their omega-manager names
  * and operation granularity.
  */
@@ -242,6 +242,25 @@ const DEFAULTS = {
     sponsorshipsUrl: null,
   },
 
+  // Replyify customer-service email agent (replyify.app) — Replyify-operator
+  // integration: needs REPLYIFY_SERVICE_ACCOUNT in the brand .env (path to
+  // the Replyify Firebase project's service-account JSON). agentId comes from
+  // the Replyify dashboard; plan = the tier granted to the agent-owner
+  // account (Replyify's top tier by default — omega-manager resolved it from
+  // the replyify brand's own config in `.brands/`, a company-mode read).
+  // updateAgentInfo: false = the agent is shared and managed by another
+  // brand. discount renders the baseline's discount section only when set
+  // ({ code, label } — omega-manager hardcoded the company's code for every
+  // brand); the company sponsorship block left the packaged baseline
+  // entirely — that prose belongs in config/replyify.md.
+  replyify: {
+    enabled: true,
+    updateAgentInfo: true,
+    agentId: null,
+    plan: { id: 'max', name: 'Max' },
+    discount: null,
+  },
+
   // Classic reCAPTCHA — keys shared across brands, read from the brand .env
   // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
   // skips). `project` = the GCP project hosting the shared key, used only for
@@ -422,6 +441,7 @@ const SERVICE_ORDER = [
   'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
   'slapform',        // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
   'chatsy',          // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
+  'replyify',        // brand's Replyify email agent filter + knowledge + owner-account plan (Replyify operator only)
   'update',          // installs deps + builds every app
   'testing',         // health checks after everything else ran
 ];
@@ -536,6 +556,11 @@ const OPERATIONS = {
   chatsy: [
     { name: 'chat', ensure: true }, // Agent settings + knowledge diffed against Chatsy Firestore
     { name: 'user', ensure: true }, // Agent-owner account set to chatsy.plan (internal comp)
+  ],
+
+  replyify: [
+    { name: 'agent', ensure: true }, // Agent filter + knowledge diffed against Replyify Firestore
+    { name: 'user', ensure: true },  // Agent-owner account set to replyify.plan (internal comp)
   ],
 
   update: [
