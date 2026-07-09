@@ -1,9 +1,9 @@
 /**
- * Brand .env writeback — persist a generated secret so every future run
- * (and CI) sees the same value. Used for machine-generated secrets that
- * only have to stay stable, never be memorable: CSC_KEY_PASSWORD
- * (certificates) and ACCOUNT_PASSWORD_SEED (account). Replaces the
- * variable's line in place when it already exists, appends otherwise.
+ * Brand .env writeback — persist a secret so every future run (and CI)
+ * sees the same value. Used for machine-generated secrets that only have
+ * to stay stable (CSC_KEY_PASSWORD, ACCOUNT_PASSWORD_SEED) and for
+ * interactively-entered ones (the payment processor-setup flows). Replaces
+ * the variable's line in place when it already exists, appends otherwise.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');

@@ -8,8 +8,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const { setBrowserOpener } = require('@omegajs/devkit/flows');
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/adsense/index.js');
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.GOOGLE_CLIENT_ID;
@@ -41,10 +44,10 @@ function fakeAdsense({ sites = [] } = {}) {
   return api;
 }
 
-function runService(config, { adsense, options = {} } = {}) {
+function runService(config, { adsense, options = {}, brandRoot } = {}) {
   return service.run({
     brandId: 'fixture-brand',
-    brandRoot: '/tmp/omega-manager-adsense-unused', // no handler touches disk
+    brandRoot: brandRoot || '/tmp/omega-manager-adsense-unused', // the selection flow writes config/omega.json5 when given a real root
     brandConfig: config,
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
@@ -157,4 +160,43 @@ test('adsense: dry-run behaves identically — the API has no writes at all', as
   assert.equal(missingResult.status, 'warned');
   assert.equal(missingResult.output.sites.addUrl, SITES_URL);
   assert.equal(missing.calls.length, 1);
+});
+
+// ─── Interactive account selection (config-landing flow) ─────────────────────
+
+test('setup: interactive run offers account selection and lands adsense.accountId in omega.json5', async () => {
+  const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
+  api.listAccounts = async () => {
+    api.calls.push({ method: 'listAccounts' });
+    return [
+      { name: 'accounts/pub-1111111111111111', displayName: 'Other Org' },
+      { name: `accounts/${ACCOUNT_ID}`, displayName: 'Fixture Brand' },
+    ];
+  };
+  const brandRoot = makeBrandRoot(`{
+  // Fixture Brand — adsense writeback target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  adsense: { enabled: true }, // accountId lands here
+  targets: { web: {} },
+}
+`);
+  setBrowserOpener(async () => true); // create-new is never picked, but a test must never launch a real browser
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig({ accountId: null }), { adsense: api, brandRoot });
+    await tty.answer('Set up now?', '\r'); // Yes
+    // Cursor lands on the brand match "Fixture Brand (pub-…)" — ENTER picks it
+    await tty.answer('Select AdSense account:', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success'); // READY site via the landed account
+    assert.deepEqual(api.calls.at(-1), { method: 'listSites', accountId: ACCOUNT_ID });
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes(`accountId: "${ACCOUNT_ID}"`));
+    assert.ok(written.includes('// accountId lands here'));
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
 });

@@ -392,3 +392,38 @@ test('replyify: dry run on a fully drifted brand performs zero mutations', async
   // no durable state lands in a dry run
   assert.equal(result.state, null);
 });
+
+// ─── Interactive setup flow (config-landing) ─────────────────────────────────
+
+const { setBrowserOpener: setOpener } = require('@omegajs/devkit/flows');
+const { makeBrandRoot: makeRoot, readConfigSource: readSource } = require('./lib/config-fixture.js');
+const { openTtyPrompt: openTty } = require('./lib/interactive.js');
+
+test('setup: interactive run lands the pasted agent id in omega.json5 and proceeds', async () => {
+  const config = brandConfig({ replyify: { agentId: null } });
+  const db = fakeDb(convergedResponses(config));
+  const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  replyify: { enabled: true }, // agentId lands here
+}
+`);
+  const opened = [];
+  setOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTty();
+
+  try {
+    const run = runService(config, { db, brandRoot });
+    await tty.answer('Set up now?', '\r'); // Yes
+    await tty.answer('Replyify agent ID:', `${AGENT_ID}\r`);
+    const result = await run;
+
+    assert.equal(result.state.agentId, AGENT_ID);
+    assert.deepEqual(opened, ['https://replyify.app']);
+    const written = readSource(brandRoot);
+    assert.ok(written.includes(`agentId: "${AGENT_ID}"`));
+    assert.ok(written.includes('// agentId lands here'));
+  } finally {
+    tty.close();
+    setOpener(null);
+  }
+});

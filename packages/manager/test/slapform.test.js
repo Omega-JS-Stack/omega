@@ -89,10 +89,10 @@ function convergedResponses({ form, user } = {}) {
   };
 }
 
-function runService(config, { db, options = {}, serviceData = {} } = {}) {
+function runService(config, { db, options = {}, serviceData = {}, brandRoot } = {}) {
   return service.run({
     brandId: 'fixture-brand',
-    brandRoot: '/tmp/omega-manager-slapform-unused', // no handler touches disk
+    brandRoot: brandRoot || '/tmp/omega-manager-slapform-unused', // the setup flow writes config/omega.json5 when given a real root
     brandConfig: config,
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
@@ -326,4 +326,39 @@ test('firestore-rest: typed-value encode/decode round-trips a nested document', 
   assert.deepEqual(encoded.resourceId, { nullValue: null });
 
   assert.deepEqual(decodeFields(encoded), doc);
+});
+
+// ─── Interactive setup flow (config-landing) ─────────────────────────────────
+
+const { setBrowserOpener: setOpener } = require('@omegajs/devkit/flows');
+const { makeBrandRoot: makeRoot, readConfigSource: readSource } = require('./lib/config-fixture.js');
+const { openTtyPrompt: openTty } = require('./lib/interactive.js');
+
+test('setup: interactive run lands the pasted form id in omega.json5 and proceeds', async () => {
+  const config = brandConfig({ slapform: { formId: null } });
+  const db = fakeDb(convergedResponses());
+  const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  slapform: { enabled: true }, // formId lands here
+}
+`);
+  const opened = [];
+  setOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTty();
+
+  try {
+    const run = runService(config, { db, brandRoot });
+    await tty.answer('Set up now?', '\r'); // Yes
+    await tty.answer('Slapform form ID:', `${FORM_ID}\r`);
+    const result = await run;
+
+    assert.equal(result.state.formId, FORM_ID);
+    assert.deepEqual(opened, ['https://slapform.com']);
+    const written = readSource(brandRoot);
+    assert.ok(written.includes(`formId: "${FORM_ID}"`));
+    assert.ok(written.includes('// formId lands here'));
+  } finally {
+    tty.close();
+    setOpener(null);
+  }
 });

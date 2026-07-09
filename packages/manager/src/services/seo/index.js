@@ -8,7 +8,7 @@
  * content sections in their own file; the sidecar's keys merge over the
  * config's seo section). omega-manager kept the sidecar at
  * .brands/{id}/seo.json and auto-created a default entry for every brand
- * — the port never writes config (that rides the onboarding port); no
+ * — the port never writes config (auto-creating entries is a parked onboarding follow-up); no
  * content → clean skip.
  *
  * Auth: the default `gh` CLI auth, with per-item author overrides

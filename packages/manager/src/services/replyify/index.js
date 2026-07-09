@@ -13,12 +13,17 @@
  * company-mode `.output/replyify/secrets/service-account.json` instead.
  *
  * The agent id comes from config (replyify.agentId) — agents are created
- * in the Replyify dashboard. omega-manager's interactive setup flow rides
- * the onboarding-flows port (the writeback itself is live —
- * lib/config-write.js); until then a missing id is a clean skip.
+ * in the Replyify dashboard. Interactive runs offer the setup flow when
+ * it's missing (open replyify.app, paste the agent id back —
+ * comment-preserving writeback into omega.json5, with a Disable option
+ * that sets `replyify: false`); non-interactive and dry runs skip cleanly.
  */
+const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
+const { resolveConfigValue } = require('../../lib/config-flow.js');
+
+const REPLYIFY_URL = 'https://replyify.app';
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -39,9 +44,21 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no backend target' };
     }
 
-    const agentId = config?.agentId;
+    let agentId = config?.agentId;
     if (!agentId) {
-      return { skip: true, reason: 'no replyify.agentId configured (create an agent at https://replyify.app, then set it in omega.json5)' };
+      agentId = await resolveConfigValue(context, {
+        path: 'replyify.agentId',
+        label: 'Replyify email agent',
+        instructions: [
+          `1. Create an account at ${chalk.cyan(REPLYIFY_URL)} (if you haven't already)`,
+          `2. Create an email agent for ${chalk.cyan(context.brandConfig.brand?.name || context.brandId)}`,
+        ],
+        entry: { url: REPLYIFY_URL, message: 'Replyify agent ID:' },
+        disablePath: 'replyify',
+      });
+    }
+    if (!agentId) {
+      return { skip: true, reason: 'no replyify.agentId configured (create an agent at https://replyify.app, then set it in omega.json5 — or rerun interactively)' };
     }
 
     // Tests inject a fake client via context.replyifyDb

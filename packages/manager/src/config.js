@@ -89,30 +89,33 @@ const DEFAULTS = {
   },
 
   // Firebase settings. Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the
-  // brand .env. projectId has no default — the service skips until it's set
-  // (project selection/creation rides the onboarding port). Company values
-  // omega-manager hardcoded (billing account, googlegroup support email,
-  // GCloud org) are config now — they land in company/brand config.
+  // brand .env. projectId has no default — interactive runs offer the
+  // project selection/creation flow and land it here; non-interactive runs
+  // skip until it's set. Company values omega-manager hardcoded (billing
+  // account, googlegroup support email, GCloud org) are config now — they
+  // land in company/brand config.
   firebase: {
     shared: false,        // true = project shared with other brands; only per-brand ops run (service-account, sdk-config)
     supportEmail: null,   // OAuth consent screen support email (defaults to support@{domain}; must be the authed user's email or a Google Group they own)
-    organizationId: null, // GCloud org ID for project creation (onboarding port)
+    organizationId: null, // GCloud org ID — the project-create flow creates projects inside it (proper default permissions)
     billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — required to auto-upgrade to Blaze
     apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
   },
 
   // Analytics providers. Google auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
   // in the brand .env (analytics.edit scope, tokens cached separately from
-  // firebase's). propertyId is required config — property selection/creation
-  // is interactive and rides the onboarding-flows port (the omega.json5
-  // writeback it needs is live). Meta/TikTok pixel IDs are public config;
+  // firebase's). propertyId is required config — interactive runs offer the
+  // account + property selection/creation flow and land both ids here
+  // (comment-preserving writeback). Meta/TikTok pixel IDs are public config;
   // their access tokens live in the brand .env (META_ACCESS_TOKEN /
   // TIKTOK_ACCESS_TOKEN — the names backend-manager reads).
   analytics: {
     providers: {
       google: {
-        accountId: null,  // GA account number — used for console deep-links
-        propertyId: null, // GA4 property number — google operations skip until set
+        accountId: null,  // GA account number — console deep-links; the selection flow lands it
+        propertyId: null, // GA4 property number — google operations skip until set (the selection/create flow lands it)
+        timeZone: 'America/Los_Angeles', // GA4 property reporting time zone (used when the flow creates the property)
+        currency: 'USD',                 // GA4 property reporting currency (used when the flow creates the property)
         enhancedMeasurement: {
           streamEnabled: true,
           scrollsEnabled: true,
@@ -143,10 +146,11 @@ const DEFAULTS = {
   // configured programmatically — so the service verifies the domain is
   // present and reports its approval state; adding is a console deep-link.
   // accountId is required config (omega-manager defaulted it to the company's
-  // shared pub- account). Auth: the same GOOGLE creds (adsense.readonly
-  // scope, own token cache).
+  // shared pub- account; put it in company config for that). Interactive
+  // runs offer the account selection flow. Auth: the same GOOGLE creds
+  // (adsense.readonly scope, own token cache).
   adsense: {
-    accountId: null, // 'pub-XXXXXXXXXXXXXXXX' — the service skips until set
+    accountId: null, // 'pub-XXXXXXXXXXXXXXXX' — the service skips until set (the selection flow lands it)
   },
 
   // Marketing. campaigns = the email-marketing provider (the sendgrid
@@ -173,9 +177,10 @@ const DEFAULTS = {
 
   // Payment processors + products. Public halves live here (publishableKey,
   // clientId, site); secrets come from the brand .env (STRIPE_SECRET_KEY,
-  // PAYPAL_CLIENT_SECRET, CHARGEBEE_API_KEY — omega-manager kept them in
-  // .output/*/secrets/ behind interactive prompts; the key-collection flow
-  // rides the onboarding port). Set a processor to `false` to disable it.
+  // PAYPAL_CLIENT_SECRET, CHARGEBEE_API_KEY). Interactive runs offer the
+  // key-collection flow when an enabled processor is missing credentials
+  // (public keys land here, secrets in the .env). Set a processor to
+  // `false` to disable it — the flow's Disable answer writes that.
   // Product IDs are written back here by the services (state keeps a mirror).
   // omega-manager's DEFAULTS also carried the company's Stripe organizationId
   // (dashboard deep-links use the account ID from state now) and hardcoded
@@ -227,7 +232,8 @@ const DEFAULTS = {
   // Slapform contact form (slapform.com) — Slapform-operator integration:
   // needs SLAPFORM_SERVICE_ACCOUNT in the brand .env (path to the Slapform
   // Firebase project's service-account JSON). formId comes from the Slapform
-  // dashboard; plan = the tier granted to the form-owner account (Slapform's
+  // dashboard (interactive runs offer the paste-back flow and land it
+  // here); plan = the tier granted to the form-owner account (Slapform's
   // top tier by default — omega-manager resolved it from the slapform brand's
   // own config in `.brands/`, a company-mode read).
   slapform: {
@@ -238,7 +244,8 @@ const DEFAULTS = {
 
   // Chatsy support chat (chatsy.ai) — Chatsy-operator integration: needs
   // CHATSY_SERVICE_ACCOUNT in the brand .env (path to the Chatsy Firebase
-  // project's service-account JSON). agentId comes from the Chatsy dashboard;
+  // project's service-account JSON). agentId comes from the Chatsy dashboard
+  // (interactive runs offer the paste-back flow and land it here);
   // plan = the tier granted to the agent-owner account (Chatsy's top tier by
   // default — omega-manager resolved it from the chatsy brand's own config in
   // `.brands/`, a company-mode read). updateAgentInfo: false = the agent is
@@ -257,7 +264,8 @@ const DEFAULTS = {
   // Replyify customer-service email agent (replyify.app) — Replyify-operator
   // integration: needs REPLYIFY_SERVICE_ACCOUNT in the brand .env (path to
   // the Replyify Firebase project's service-account JSON). agentId comes from
-  // the Replyify dashboard; plan = the tier granted to the agent-owner
+  // the Replyify dashboard (interactive runs offer the paste-back flow and
+  // land it here); plan = the tier granted to the agent-owner
   // account (Replyify's top tier by default — omega-manager resolved it from
   // the replyify brand's own config in `.brands/`, a company-mode read).
   // updateAgentInfo: false = the agent is shared and managed by another

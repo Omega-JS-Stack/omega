@@ -12,13 +12,17 @@
  * company-mode `.output/slapform/secrets/service-account.json` instead.
  *
  * The form id comes from config (slapform.formId) — forms are created in
- * the Slapform dashboard. omega-manager's interactive setup flow (open
- * slapform.com, enter the form id, write it back to config) rides the
- * onboarding-flows port (the writeback itself is live — lib/config-write.js);
- * until then a missing id is a clean skip.
+ * the Slapform dashboard. Interactive runs offer the setup flow when it's
+ * missing (open slapform.com, paste the form id back — comment-preserving
+ * writeback into omega.json5, with a Disable option that sets
+ * `slapform: false`); non-interactive and dry runs skip cleanly.
  */
+const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
+const { resolveConfigValue } = require('../../lib/config-flow.js');
+
+const SLAPFORM_URL = 'https://slapform.com';
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -34,9 +38,21 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no web target' };
     }
 
-    const formId = config?.formId;
+    let formId = config?.formId;
     if (!formId) {
-      return { skip: true, reason: 'no slapform.formId configured (create a form at https://slapform.com, then set it in omega.json5)' };
+      formId = await resolveConfigValue(context, {
+        path: 'slapform.formId',
+        label: 'Slapform contact form',
+        instructions: [
+          `1. Create an account at ${chalk.cyan(SLAPFORM_URL)} (if you haven't already)`,
+          `2. Create a contact form for ${chalk.cyan(context.brandConfig.brand?.name || context.brandId)}`,
+        ],
+        entry: { url: SLAPFORM_URL, message: 'Slapform form ID:' },
+        disablePath: 'slapform',
+      });
+    }
+    if (!formId) {
+      return { skip: true, reason: 'no slapform.formId configured (create a form at https://slapform.com, then set it in omega.json5 — or rerun interactively)' };
     }
 
     // Tests inject a fake client via context.slapformDb

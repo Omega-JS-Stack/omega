@@ -1,49 +1,14 @@
 // Tests for src/prompt.js — the TTY-safe wrapper around @inquirer/prompts.
 //
 // Interactive tests drive the REAL inquirer prompts through fake streams
-// (setPromptStreams + isTTY-flagged PassThroughs): keystrokes go in, rendered
-// output comes out, no mocks. waitForOutput() guarantees a prompt has rendered
-// (and is listening) before keystrokes are written.
+// (setPromptStreams + the src/test/prompt-streams harness): keystrokes go
+// in, rendered output comes out, no mocks. waitForOutput() guarantees a
+// prompt has rendered (and is listening) before keystrokes are written.
 
 const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { PassThrough } = require('node:stream');
 const prompt = require('../src/prompt');
-
-const DOWN_ARROW = '\x1B[B';
-
-/**
- * A fake stream pair. `tty: true` marks the input as a TTY so the wrapper
- * treats the session as interactive; output collects everything rendered.
- */
-function makeStreams({ tty }) {
-  const input = new PassThrough();
-  const output = new PassThrough();
-  if (tty) {
-    input.isTTY = true;
-    output.isTTY = true;
-  }
-  // Inquirer pipes an internal stream into `output` and ends it when each
-  // prompt completes; real TTY streams ignore end(), so the fake must too —
-  // otherwise the second prompt on the same pair renders nothing.
-  output.end = () => {};
-  let rendered = '';
-  output.on('data', (chunk) => { rendered += chunk.toString(); });
-  return { input, output, getRendered: () => rendered };
-}
-
-/**
- * Poll until the collected output contains `text` (prompt has rendered).
- */
-async function waitForOutput(streams, text, timeoutMs = 2000) {
-  const start = Date.now();
-  while (!streams.getRendered().includes(text)) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(`Timed out waiting for output containing ${JSON.stringify(text)}. Got: ${JSON.stringify(streams.getRendered())}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-}
+const { makeStreams, waitForOutput, DOWN_ARROW } = require('../src/test/prompt-streams');
 
 afterEach(() => {
   prompt.setPromptStreams(null);

@@ -7,7 +7,7 @@
  * added — the website hosts elsewhere (GitHub Pages).
  *
  * Per domain, ONE reconciliation pass (omega-manager's interactive
- * verification poll rides the onboarding port):
+ * verification poll is next up as a verification-poll adoption):
  *   verified  → ensure the Cloudflare CNAME is proxied
  *   pending   → write Firebase's required DNS records (TXT ownership/ACME +
  *               unproxied CNAME), report state, warned — rerun converges

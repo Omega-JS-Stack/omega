@@ -405,7 +405,9 @@ test('stripe-disputes: warned with settings deep-link until confirmed', async ()
 
 test('stripe-radar + disputes: interactive confirms stamp both flags, service passes', async () => {
   const stripe = fakeStripe(stripeConverged());
-  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+  // paypal/chargebee disabled — enabled-but-unconfigured processors would
+  // offer their credential-entry flow first in an interactive run
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { processors: { paypal: false, chargebee: false } } });
   const tty = openTtyPrompt();
 
   try {
@@ -425,7 +427,7 @@ test('stripe-radar + disputes: interactive confirms stamp both flags, service pa
 
 test('stripe-radar: interactive decline stays warned and unstamped', async () => {
   const stripe = fakeStripe(stripeConverged());
-  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { processors: { paypal: false, chargebee: false } } });
   const tty = openTtyPrompt();
 
   try {
@@ -935,4 +937,99 @@ test('payment: dry-run on a fully drifted account — zero mutations on all thre
   // Dry-run persists no product-ID state either
   assert.equal(result.state.stripeProducts, undefined);
   assert.equal(result.state.paypalProducts, undefined);
+});
+
+// ─── Interactive processor credential entry (config-landing flow) ────────────
+
+const { processorSetupFlow } = require('../src/services/payment/lib/processor-setup.js');
+const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { readFileSync } = require('node:fs');
+const { join: joinPath } = require('node:path');
+
+const PROCESSOR_FLOW_CONFIG = `{
+  // Fixture Brand — processor writeback target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  payment: {
+    processors: {
+      stripe: { updateAccountInfo: true }, // publishableKey lands here
+    },
+  },
+}
+`;
+
+function processorFlowContext(brandRoot) {
+  return {
+    brandId: 'fixture-brand',
+    brandRoot,
+    options: {},
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+      payment: { processors: { stripe: { updateAccountInfo: true } } },
+    },
+  };
+}
+
+test('processor-setup: stripe flow lands the publishable key in config and the secret in .env + process.env', async () => {
+  const saved = process.env.STRIPE_SECRET_KEY;
+  delete process.env.STRIPE_SECRET_KEY;
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const brandRoot = makeBrandRoot(PROCESSOR_FLOW_CONFIG);
+  const context = processorFlowContext(brandRoot);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = processorSetupFlow(context, 'stripe');
+    await tty.answer('Set up now?', '\r'); // Yes
+    await tty.answer('Stripe publishable key', 'pk_test_fixture123\r');
+    await tty.answer('Stripe secret key', 'sk_test_fixture456\r');
+    const landed = await run;
+
+    assert.equal(landed, true);
+    assert.deepEqual(opened, ['https://dashboard.stripe.com/apikeys']);
+    // Public half → omega.json5 (comment preserved), in-memory patched
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes('publishableKey: "pk_test_fixture123"'));
+    assert.ok(written.includes('// publishableKey lands here'));
+    assert.equal(context.brandConfig.payment.processors.stripe.publishableKey, 'pk_test_fixture123');
+    // Secret half → brand .env + the current process
+    assert.ok(readFileSync(joinPath(brandRoot, '.env'), 'utf8').includes('STRIPE_SECRET_KEY="sk_test_fixture456"'));
+    assert.equal(process.env.STRIPE_SECRET_KEY, 'sk_test_fixture456');
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+    if (saved === undefined) {
+      delete process.env.STRIPE_SECRET_KEY;
+    } else {
+      process.env.STRIPE_SECRET_KEY = saved;
+    }
+  }
+});
+
+test('processor-setup: Disable writes payment.processors.stripe: false and lands nothing', async () => {
+  const brandRoot = makeBrandRoot(PROCESSOR_FLOW_CONFIG);
+  const context = processorFlowContext(brandRoot);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = processorSetupFlow(context, 'stripe');
+    await tty.answer('Set up now?', '\x1B[B\x1B[B\r'); // Disable (stop prompting)
+    const landed = await run;
+
+    assert.equal(landed, false);
+    assert.equal(context.brandConfig.payment.processors.stripe, false);
+    assert.ok(readConfigSource(brandRoot).includes('stripe: false, // publishableKey lands here'));
+  } finally {
+    tty.close();
+  }
+});
+
+test('processor-setup: non-interactive returns false without touching anything', async () => {
+  const brandRoot = makeBrandRoot(PROCESSOR_FLOW_CONFIG);
+  const context = processorFlowContext(brandRoot);
+
+  const landed = await processorSetupFlow(context, 'stripe');
+
+  assert.equal(landed, false);
+  assert.equal(readConfigSource(brandRoot), PROCESSOR_FLOW_CONFIG);
 });

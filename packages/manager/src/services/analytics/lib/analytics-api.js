@@ -41,6 +41,19 @@ class GoogleAnalyticsAPI {
     return data.properties || [];
   }
 
+  /** Create a GA4 property under an account; returns the property resource */
+  async createProperty(accountId, { displayName, timeZone, currencyCode }) {
+    return this.makeRequest('/properties', {
+      method: 'POST',
+      body: JSON.stringify({
+        parent: `accounts/${accountId}`,
+        displayName,
+        timeZone,
+        currencyCode,
+      }),
+    });
+  }
+
   async getProperty(propertyId) {
     try {
       return await this.makeRequest(`/properties/${propertyId}`);

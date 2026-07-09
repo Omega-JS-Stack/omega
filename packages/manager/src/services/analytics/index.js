@@ -9,9 +9,9 @@
  * (OAuth2; tokens cache to .omega/auth/google-analytics-tokens.json — the
  * analytics.edit scope is separate from the firebase service's tokens).
  * The GA4 property itself is required config (`analytics.providers.google.
- * propertyId`): property selection/creation is interactive, so it rides the
- * onboarding-flows port (the omega.json5 writeback it needs is live —
- * lib/config-write.js). Without a propertyId
+ * propertyId`): interactive runs offer the account + property
+ * selection/creation flow (lib/property-flow.js) and land the ids in
+ * omega.json5. Without a propertyId (non-interactive/skipped)
  * or without Google credentials the two google operations are filtered out;
  * meta-pixel/tiktok-pixel are pure local checks and always run when their
  * provider ID is configured.
@@ -20,6 +20,7 @@ const { join } = require('node:path');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { GoogleAnalyticsAPI } = require('./lib/analytics-api.js');
+const { resolveGoogleProperty } = require('./lib/property-flow.js');
 
 // Operations that need the GA Admin API (and therefore propertyId + creds)
 const GOOGLE_OPERATIONS = new Set(['google-streams', 'google-firebase-link']);
@@ -38,7 +39,22 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    const providers = analytics.providers || {};
+    const haveGoogleAuth = Boolean(
+      context.analyticsApi
+      || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    );
+
+    // Missing property + creds available → offer the interactive account +
+    // property selection/creation flow (lands both ids in omega.json5, and
+    // in the in-memory config re-read just below)
+    if (!analytics.providers?.google?.propertyId && haveGoogleAuth) {
+      const flowApi = context.analyticsApi || new GoogleAnalyticsAPI({
+        tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-analytics-tokens.json'),
+      });
+      await resolveGoogleProperty(context, flowApi);
+    }
+
+    const providers = context.brandConfig.analytics?.providers || {};
     const google = providers.google || {};
     const metaId = providers.meta?.id;
     const tiktokId = providers.tiktok?.id;
@@ -47,15 +63,10 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no analytics providers configured (analytics.providers.google.propertyId / meta.id / tiktok.id)' };
     }
 
-    const haveGoogleAuth = Boolean(
-      context.analyticsApi
-      || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    );
-
     // Decide whether the google operations can run this pass
     let operations = context.operations;
     if (!google.propertyId) {
-      console.log(chalk.dim('    ⊘ google operations skipped — no analytics.providers.google.propertyId (property selection/creation rides the onboarding-flows port)'));
+      console.log(chalk.dim('    ⊘ google operations skipped — no analytics.providers.google.propertyId (rerun interactively to select/create the property)'));
       operations = operations.filter((op) => !GOOGLE_OPERATIONS.has(op.name));
     } else if (!haveGoogleAuth) {
       if (!metaId && !tiktokId) {

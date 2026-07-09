@@ -8,8 +8,10 @@
  *
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env (OAuth2;
  * tokens cache to .omega/auth/google-tokens.json — the first run prints an
- * auth URL). No credentials → the service skips. Project creation rides the
- * onboarding port: no firebase.projectId → skip with guidance.
+ * auth URL). No credentials → the service skips. No firebase.projectId →
+ * interactive runs offer the project selection/creation flow
+ * (lib/project-flow.js, lands the id in omega.json5); otherwise skip with
+ * guidance.
  *
  * `firebase.shared: true` (project shared by multiple brands) filters to the
  * per-brand operations only (service-account, sdk-config) so one brand never
@@ -21,6 +23,7 @@ const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { FirebaseAPI } = require('./lib/firebase-api.js');
+const { resolveFirebaseProject } = require('./lib/project-flow.js');
 
 // Operations that stay on for shared projects (per-brand, not project-level)
 const SHARED_OPERATIONS = new Set(['service-account', 'sdk-config']);
@@ -34,11 +37,29 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'firebase.enabled = false' };
     }
 
-    if (!firebase.projectId) {
-      return { skip: true, reason: 'no firebase.projectId configured (project selection/creation rides the onboarding port)' };
+    const haveCreds = Boolean(
+      context.firebaseApi
+      || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    );
+
+    // Tests inject fake clients via context.firebaseApi / context.cloudflareApi.
+    // Cloudflare is only needed by the hosting operation (custom-domain DNS);
+    // without a token the operation reports the required records instead.
+    const makeApi = () => context.firebaseApi || new FirebaseAPI({
+      tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-tokens.json'),
+    });
+
+    // Missing project → offer the interactive selection/creation flow
+    // (lands firebase.projectId in omega.json5); needs credentials
+    let projectId = firebase.projectId;
+    if (!projectId && haveCreds) {
+      projectId = await resolveFirebaseProject(context, makeApi());
+    }
+    if (!projectId) {
+      return { skip: true, reason: 'no firebase.projectId configured (rerun interactively to select/create the project)' };
     }
 
-    if (!context.firebaseApi && (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)) {
+    if (!haveCreds) {
       return { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
     }
 
@@ -47,15 +68,10 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    const shared = firebase.shared === true;
-    console.log(`    Project: ${chalk.cyan(firebase.projectId)}${shared ? chalk.dim(' (shared)') : ''}`);
+    const firebaseApi = makeApi();
 
-    // Tests inject fake clients via context.firebaseApi / context.cloudflareApi.
-    // Cloudflare is only needed by the hosting operation (custom-domain DNS);
-    // without a token the operation reports the required records instead.
-    const firebaseApi = context.firebaseApi || new FirebaseAPI({
-      tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-tokens.json'),
-    });
+    const shared = firebase.shared === true;
+    console.log(`    Project: ${chalk.cyan(projectId)}${shared ? chalk.dim(' (shared)') : ''}`);
     const cloudflareApi = context.cloudflareApi
       || (process.env.CLOUDFLARE_TOKEN ? new CloudflareAPI() : null);
 
@@ -64,7 +80,7 @@ module.exports.run = createServiceRunner({
     return {
       firebaseApi,
       cloudflareApi,
-      projectId: firebase.projectId,
+      projectId,
       domain,
       apexDomain,
       isSubdomainProject: domain !== apexDomain,

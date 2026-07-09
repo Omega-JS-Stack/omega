@@ -14,9 +14,12 @@ const { mkdtempSync, mkdirSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
+const { setBrowserOpener } = require('@omegajs/devkit/flows');
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { getBaselineKnowledge } = require('../src/services/chatsy/lib/baseline-knowledge.js');
 const service = require('../src/services/chatsy/index.js');
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.CHATSY_SERVICE_ACCOUNT;
@@ -376,4 +379,57 @@ test('chatsy: dry run on a fully drifted brand performs zero mutations', async (
   assert.equal(result.output.user.planned, 'max');
   // no durable state lands in a dry run
   assert.equal(result.state, null);
+});
+
+// ─── Interactive setup flow (config-landing) ─────────────────────────────────
+
+const DOWN_KEY = '\x1B[B';
+
+const WRITEBACK_CONFIG = `{
+  // Fixture Brand — chatsy writeback target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  chatsy: { enabled: true }, // agentId lands here
+}
+`;
+
+test('setup: interactive run lands the pasted agent id in omega.json5 and proceeds', async () => {
+  const config = brandConfig({ chatsy: { agentId: null } });
+  const db = fakeDb(convergedResponses(config));
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(config, { db, brandRoot });
+    await tty.answer('Set up now?', '\r'); // Yes
+    await tty.answer('Chatsy agent ID:', `${AGENT_ID}\r`);
+    const result = await run;
+
+    assert.equal(result.state.agentId, AGENT_ID); // the landed id drove the run
+    assert.deepEqual(opened, ['https://chatsy.ai']);
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes(`agentId: "${AGENT_ID}"`));
+    assert.ok(written.includes('// agentId lands here')); // comment survived
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('setup: interactive Disable writes chatsy: false and skips the service', async () => {
+  const config = brandConfig({ chatsy: { agentId: null } });
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(config, { db: fakeDb({}), brandRoot });
+    await tty.answer('Set up now?', `${DOWN_KEY}${DOWN_KEY}\r`); // Disable (stop prompting)
+    const result = await run;
+
+    assert.equal(result.status, 'skipped');
+    assert.ok(readConfigSource(brandRoot).includes('chatsy: false, // agentId lands here'));
+  } finally {
+    tty.close();
+  }
 });

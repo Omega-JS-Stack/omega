@@ -77,6 +77,41 @@ class FirebaseAPI {
     }
   }
 
+  /** All Firebase projects visible to the authed user */
+  async listProjects() {
+    const response = await this.request(`${FIREBASE_API_BASE}/projects`);
+    return response.results || [];
+  }
+
+  /**
+   * Create a GCP project (inside the organization when configured — that's
+   * what gives the compute service account its default roles) and add
+   * Firebase to it. Both are long-running operations, awaited.
+   */
+  async createProject(projectId, displayName, organizationId = null) {
+    const payload = { projectId, name: displayName };
+    if (organizationId) {
+      payload.parent = { type: 'organization', id: organizationId };
+    }
+
+    const gcpResponse = await this.request(`${RESOURCE_MANAGER_V1}/projects`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (gcpResponse.name) {
+      await this.waitForOperation(gcpResponse.name, RESOURCE_MANAGER_V1);
+    }
+
+    const firebaseResponse = await this.request(`${FIREBASE_API_BASE}/projects/${projectId}:addFirebase`, {
+      method: 'POST',
+    });
+    if (firebaseResponse.name) {
+      await this.waitForOperation(firebaseResponse.name, FIREBASE_API_BASE);
+    }
+
+    return { projectId, displayName };
+  }
+
   async listWebApps(projectId) {
     const response = await this.request(`${FIREBASE_API_BASE}/projects/${projectId}/webApps`);
     return response.apps || [];

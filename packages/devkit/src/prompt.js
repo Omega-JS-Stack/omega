@@ -42,6 +42,19 @@ function isInteractive() {
   return Boolean(effectiveInput().isTTY);
 }
 
+/**
+ * The effective { input, output } streams prompts run on (the test seam
+ * when set, process stdio otherwise). Flow helpers (flows.js) read
+ * keypresses and draw spinners on these so the same fake-stream harness
+ * drives them.
+ */
+function getPromptStreams() {
+  return {
+    input: effectiveInput(),
+    output: _streams?.output || process.stdout,
+  };
+}
+
 function assertInteractive() {
   if (!isInteractive()) {
     throw new Error(
@@ -91,6 +104,7 @@ function confirm(opts) {
 
 module.exports = {
   isInteractive,
+  getPromptStreams,
   input,
   select,
   checkbox,

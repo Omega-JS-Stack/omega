@@ -29,6 +29,12 @@ class GoogleAdsenseAPI {
     return this.auth.makeRequest(`${ADSENSE_API_BASE}${endpoint}`, options);
   }
 
+  /** AdSense accounts visible to the authed user (name: 'accounts/pub-…') */
+  async listAccounts() {
+    const data = await this.makeRequest('/accounts');
+    return data.accounts || [];
+  }
+
   /** accountId: 'pub-…' (the accounts/ prefix already stripped) */
   async listSites(accountId) {
     const data = await this.makeRequest(`/accounts/${accountId}/sites`);

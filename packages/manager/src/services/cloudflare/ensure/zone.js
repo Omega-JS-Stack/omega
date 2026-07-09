@@ -5,8 +5,8 @@
  * require the parent zone to exist already). A pending zone reports its
  * nameservers and moves on: the domain service configures them at the
  * registrar when it ports (API providers), or a later run picks the zone up
- * once it activates. omega-manager's interactive browser-open + poll rides
- * the onboarding port.
+ * once it activates. omega-manager's interactive browser-open + poll is next
+ * up as a verification-poll adoption.
  *
  * State: { zoneId } — later operations in THIS run read it via getZoneId.
  */

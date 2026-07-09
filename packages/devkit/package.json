@@ -11,11 +11,13 @@
     "./attach-log-file": "./src/attach-log-file.js",
     "./cli-router": "./src/cli-router.js",
     "./prompt": "./src/prompt.js",
+    "./flows": "./src/flows.js",
     "./defaults-engine": "./src/defaults-engine.js",
     "./merge-line-files": "./src/merge-line-files.js",
     "./test/runner-core": "./src/test/runner-core.js",
     "./test/assert": "./src/test/assert.js",
     "./test/extended-mode-warning": "./src/test/extended-mode-warning.js",
+    "./test/prompt-streams": "./src/test/prompt-streams.js",
     "./vendor": "./tools/vendor.js"
   },
   "scripts": {

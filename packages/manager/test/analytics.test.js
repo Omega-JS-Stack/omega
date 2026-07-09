@@ -11,6 +11,9 @@ const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/analytics/index.js');
+const { resolveGoogleProperty } = require('../src/services/analytics/lib/property-flow.js');
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.GOOGLE_CLIENT_ID;
@@ -122,7 +125,7 @@ function convergedResponses() {
   };
 }
 
-function runService(config, { analytics, brandState = {}, options = {}, metaToken, tiktokToken } = {}) {
+function runService(config, { analytics, brandState = {}, options = {}, metaToken, tiktokToken, brandRoot } = {}) {
   if (metaToken) {
     process.env.META_ACCESS_TOKEN = metaToken;
   } else {
@@ -136,7 +139,7 @@ function runService(config, { analytics, brandState = {}, options = {}, metaToke
 
   return service.run({
     brandId: 'fixture-brand',
-    brandRoot: '/tmp/omega-manager-analytics-unused', // no handler touches disk
+    brandRoot: brandRoot || '/tmp/omega-manager-analytics-unused', // the selection flow writes config/omega.json5 when given a real root
     brandConfig: config,
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState,
@@ -469,4 +472,80 @@ test('analytics: dry-run on a fully drifted brand performs zero mutations', asyn
     'unlink from property 777',
     `link to property ${PROPERTY}`,
   ]);
+});
+
+// ─── Interactive account + property flow (config-landing) ────────────────────
+
+const FLOW_WRITEBACK_CONFIG = `{
+  // Fixture Brand — analytics writeback target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  firebase: { projectId: 'fixture-proj' },
+  targets: { web: {}, backend: {} },
+}
+`;
+
+test('setup: interactive run lands account + property in omega.json5 and the google ops run in the same pass', async () => {
+  const api = fakeAnalytics({
+    ...convergedResponses(),
+    listAccounts: [{ name: `accounts/${ACCOUNT}`, displayName: 'Fixture Account' }],
+    listProperties: [{ name: `properties/${PROPERTY}`, displayName: 'Fixture Brand' }],
+  });
+  const brandRoot = makeBrandRoot(FLOW_WRITEBACK_CONFIG);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig({ google: false }), { analytics: api, brandRoot, brandState: FIREBASE_STATE });
+    await tty.answer('Set up now?', '\r'); // one gate covers the account + property pair
+    await tty.answer('Select Google Analytics account:', '\r');
+    await tty.answer('Select GA4 property:', '\r'); // no second "Set up now?" gate
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.ok(api.callsTo('listDataStreams').length >= 1); // google ops ran with the landed property
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes(`accountId: "${ACCOUNT}"`));
+    assert.ok(written.includes(`propertyId: "${PROPERTY}"`));
+    assert.ok(written.includes('// Fixture Brand — analytics writeback target'));
+  } finally {
+    tty.close();
+  }
+});
+
+test('property-flow: create-new property calls the Admin API with config time zone + currency', async () => {
+  const created = [];
+  const api = {
+    listProperties: async () => [],
+    createProperty: async (accountId, body) => {
+      created.push({ accountId, body });
+      return { name: 'properties/424242' };
+    },
+  };
+  const brandRoot = makeBrandRoot(FLOW_WRITEBACK_CONFIG);
+  const context = {
+    brandId: 'fixture-brand',
+    brandRoot,
+    options: {},
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: `https://${DOMAIN}` },
+      analytics: { providers: { google: { accountId: ACCOUNT, propertyId: null, timeZone: 'America/Los_Angeles', currency: 'USD' } } },
+    },
+  };
+  const tty = openTtyPrompt();
+
+  try {
+    const run = resolveGoogleProperty(context, api);
+    // account is pre-configured → the property step carries the gate
+    await tty.answer('Set up now?', '\r');
+    await tty.answer('Select GA4 property:', '\r'); // "+ Create new property" is the only choice
+    const propertyId = await run;
+
+    assert.equal(propertyId, '424242');
+    assert.deepEqual(created, [{
+      accountId: ACCOUNT,
+      body: { displayName: `Fixture Brand (${DOMAIN})`, timeZone: 'America/Los_Angeles', currencyCode: 'USD' },
+    }]);
+    assert.ok(readConfigSource(brandRoot).includes('propertyId: "424242"'));
+  } finally {
+    tty.close();
+  }
 });

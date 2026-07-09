@@ -330,3 +330,41 @@ test('beehiiv: dry-run on a fully drifted brand performs zero mutations', async 
   assert.equal(result.output.segments.missing.length, BEEHIIV_SEGMENTS.length); // verify-only op: dry-run ≡ normal run
   assert.deepEqual(result.output.webhook.planned, ['create']);
 });
+
+// ─── Interactive create-publication flow (browser open + poll) ────────────────
+
+const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { openTtyPrompt } = require('./lib/interactive.js');
+
+test('publication: interactive run opens the create page and polls until the new publication auto-matches', async () => {
+  const api = fakeBeehiiv(convergedResponses());
+  // First list: nothing matches; after the user "creates" it in the browser,
+  // the poll's re-list finds it
+  let listCalls = 0;
+  api.listPublications = async () => {
+    api.calls.push({ method: 'listPublications', args: [] });
+    listCalls++;
+    return listCalls === 1
+      ? [{ id: 'pub_other', name: 'Unrelated' }]
+      : [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }];
+  };
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig(), { beehiiv: api, brandRoot });
+    await tty.answer('Open browser now?', '\r'); // yes (default)
+    const result = await run;
+
+    assert.equal(result.state.publicationId, PUB_ID);
+    assert.deepEqual(opened, ['https://app.beehiiv.com/settings/workspace/overview?create_publication=true']);
+    assert.equal(listCalls, 2); // initial match attempt + one poll check
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes(`publicationId: "${PUB_ID}",`));
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});

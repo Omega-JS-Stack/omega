@@ -599,3 +599,83 @@ test('firebase: dry-run on a fully drifted project performs zero mutations', asy
   // No key file or secrets materialized either
   assert.equal(jetpack.exists(path.join(brandRoot, '.omega', 'secrets')), false);
 });
+
+// ─── Interactive project selection/creation (config-landing flow) ────────────
+
+const { resolveFirebaseProject } = require('../src/services/firebase/lib/project-flow.js');
+
+const PROJECT_FLOW_CONFIG = `{
+  // Fixture Brand — firebase writeback target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  firebase: { organizationId: "123456789" }, // projectId lands next to this
+}
+`;
+
+function projectFlowContext(brandRoot) {
+  return {
+    brandId: 'fixture-brand',
+    brandRoot,
+    options: {},
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+      firebase: { organizationId: '123456789' },
+    },
+  };
+}
+
+test('project-flow: selecting an existing project lands firebase.projectId in omega.json5', async () => {
+  const api = {
+    listProjects: async () => [
+      { projectId: 'other-proj', displayName: 'Other' },
+      { projectId: 'fixture-brand', displayName: 'Fixture Brand' },
+    ],
+  };
+  const brandRoot = makeBrandRoot(PROJECT_FLOW_CONFIG);
+  const context = projectFlowContext(brandRoot);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = resolveFirebaseProject(context, api);
+    await tty.answer('Set up now?', '\r'); // Yes
+    // Cursor lands on the brand match "Fixture Brand (fixture-brand)"
+    await tty.answer('Select Firebase project:', '\r');
+    const projectId = await run;
+
+    assert.equal(projectId, 'fixture-brand');
+    assert.equal(context.brandConfig.firebase.projectId, 'fixture-brand');
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes('projectId: "fixture-brand"'));
+    assert.ok(written.includes('// projectId lands next to this'));
+  } finally {
+    tty.close();
+  }
+});
+
+test('project-flow: create-new prompts id + name and creates inside the configured organization', async () => {
+  const created = [];
+  const api = {
+    listProjects: async () => [], // also drives the quota print (0/30)
+    createProject: async (projectId, displayName, organizationId) => {
+      created.push({ projectId, displayName, organizationId });
+      return { projectId, displayName };
+    },
+  };
+  const brandRoot = makeBrandRoot(PROJECT_FLOW_CONFIG);
+  const context = projectFlowContext(brandRoot);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = resolveFirebaseProject(context, api);
+    await tty.answer('Set up now?', '\r');
+    await tty.answer('Select Firebase project:', '\r'); // "+ Create new" is the only choice
+    await tty.answer('Enter project ID', '\r');   // accept the default (brand id)
+    await tty.answer('Enter display name', '\r'); // accept the default (brand name)
+    const projectId = await run;
+
+    assert.equal(projectId, 'fixture-brand');
+    assert.deepEqual(created, [{ projectId: 'fixture-brand', displayName: 'Fixture Brand', organizationId: '123456789' }]);
+    assert.ok(readConfigSource(brandRoot).includes('projectId: "fixture-brand"'));
+  } finally {
+    tty.close();
+  }
+});
