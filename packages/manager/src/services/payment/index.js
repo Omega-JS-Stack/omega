@@ -13,8 +13,8 @@
  * A processor without credentials (or set to `false` in config) is skipped
  * per-operation; the service only skips when NO processor is configured.
  * The webhook operations additionally need BACKEND_MANAGER_WEBHOOK_KEY.
- * omega-manager's interactive account setup (browser + key prompts + secrets
- * writeback) rides the prompting port.
+ * omega-manager's interactive account setup (browser flow + .env secrets
+ * writeback) rides the onboarding port.
  *
  * --processor=stripe|paypal|chargebee narrows the run to one processor's
  * operations (omega-manager's flag, unchanged).

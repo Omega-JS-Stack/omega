@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/search-console/index.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.GOOGLE_CLIENT_ID;
@@ -293,6 +294,26 @@ test('search-console: unconfirmed GA association warns with the associations URL
   assert.match(result.output.gaLink.associationsUrl, /resource_id=sc-domain%3A/);
   assert.equal(result.state.gaLinked, false);
   assert.equal(gsc.mutations().length, 0);
+});
+
+test('search-console: interactive GA-association confirm stamps gaLinked, service passes', async () => {
+  const gsc = fakeGsc({
+    listSites: [{ siteUrl: PROPERTY_URL, permissionLevel: 'siteOwner' }],
+    listSitemaps: [{ path: SITEMAP_URL }],
+  });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig(), { gsc });
+    await tty.answer(`Search Console associated with GA property ${GA_PROPERTY}?`, 'y\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.state.gaLinked, true);
+    assert.equal(gsc.mutations().length, 0);
+  } finally {
+    tty.close();
+  }
 });
 
 test('search-console: no GA property configured → nothing to associate, no warn', async () => {

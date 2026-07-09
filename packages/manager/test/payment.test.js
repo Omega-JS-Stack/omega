@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/payment/index.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.STRIPE_SECRET_KEY;
@@ -392,6 +393,61 @@ test('stripe-disputes: warned with settings deep-link until confirmed', async ()
   assert.equal(result.output.stripeDisputes.disputesUrl, 'https://dashboard.stripe.com/acct_1/settings/disputes');
   assert.equal(result.state.disputesConfirmed, false);
   assert.deepEqual(stripe.mutations(), []);
+});
+
+test('stripe-radar + disputes: interactive confirms stamp both flags, service passes', async () => {
+  const stripe = fakeStripe(stripeConverged());
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(config, { stripe });
+    await tty.answer('Radar rules added in the Dashboard?', 'y\r');
+    await tty.answer('Enhanced Dispute Protection activated in the Dashboard?', 'y\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.state.radarConfirmed, true);
+    assert.equal(result.state.disputesConfirmed, true);
+    assert.deepEqual(stripe.mutations(), []);
+  } finally {
+    tty.close();
+  }
+});
+
+test('stripe-radar: interactive decline stays warned and unstamped', async () => {
+  const stripe = fakeStripe(stripeConverged());
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(config, { stripe, serviceData: { disputesConfirmed: true } });
+    await tty.answer('Radar rules added in the Dashboard?', 'n\r');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.state.radarConfirmed, false);
+  } finally {
+    tty.close();
+  }
+});
+
+test('stripe-radar: dry-run never prompts, even with a TTY', async () => {
+  const stripe = fakeStripe(stripeConverged());
+  const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
+  const tty = openTtyPrompt();
+
+  try {
+    // No tty.answer — if the handler wrongly prompted, this would time out
+    const result = await runService(config, {
+      stripe, serviceData: { disputesConfirmed: true }, options: { dryRun: true },
+    });
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.state.radarConfirmed, false);
+  } finally {
+    tty.close();
+  }
 });
 
 test('stripe-account: business profile drift → minimal update payload', async () => {

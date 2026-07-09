@@ -6,7 +6,7 @@
  *
  * Unverified destination addresses: a verification email is sent and the
  * operation returns warned with the dashboard URL — rerun after verifying
- * (omega-manager's browser-open + poll rides the prompting port).
+ * (omega-manager's browser-open + poll rides the onboarding port).
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');

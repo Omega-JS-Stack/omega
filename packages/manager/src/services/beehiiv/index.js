@@ -3,7 +3,7 @@
  * auto-matched by name), BEM's custom fields provisioned, BEM's segments
  * verified (Beehiiv has no segment-create API — missing ones get readable
  * instructions; the browser automation omega-manager drove through the
- * Chrome extension rides the extension/prompting port), and the publication
+ * Chrome extension rides the extension port), and the publication
  * webhook pointed at the parent BEM's forwarder.
  *
  * Publications are created manually in the dashboard (no API) — the service

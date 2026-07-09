@@ -10,8 +10,8 @@
  * analytics.edit scope is separate from the firebase service's tokens).
  * The GA4 property itself is required config (`analytics.providers.google.
  * propertyId`): auto-creating one would mint a new property every run until
- * the config-serializer port can write the ID back to omega.json5, so
- * property selection/creation rides the prompting port. Without a propertyId
+ * the config-writeback port can write the ID back to omega.json5, so
+ * property selection/creation rides that port. Without a propertyId
  * or without Google credentials the two google operations are filtered out;
  * meta-pixel/tiktok-pixel are pure local checks and always run when their
  * provider ID is configured.
@@ -55,7 +55,7 @@ module.exports.run = createServiceRunner({
     // Decide whether the google operations can run this pass
     let operations = context.operations;
     if (!google.propertyId) {
-      console.log(chalk.dim('    ⊘ google operations skipped — no analytics.providers.google.propertyId (property selection/creation rides the prompting port)'));
+      console.log(chalk.dim('    ⊘ google operations skipped — no analytics.providers.google.propertyId (property selection/creation rides the config-writeback port)'));
       operations = operations.filter((op) => !GOOGLE_OPERATIONS.has(op.name));
     } else if (!haveGoogleAuth) {
       if (!metaId && !tiktokId) {

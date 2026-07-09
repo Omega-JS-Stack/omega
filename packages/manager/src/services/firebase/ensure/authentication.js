@@ -5,11 +5,11 @@
  * Identity Toolkit API — plus Google sign-in.
  *
  * Google sign-in's OAuth client CANNOT be created programmatically (no Google
- * API exists); omega-manager opened a browser and polled. Non-interactive
- * here: not-enabled prints the console instructions and warns — reruns
- * converge once it's enabled. Same for the OAuth client's redirect URIs
- * (no API either): instructions + warned until the prompting port adds the
- * confirm flow that records completion in state.
+ * API exists); omega-manager opened a browser and polled. Not-enabled prints
+ * the console instructions and warns — reruns converge once it's enabled
+ * (the API verifies). The OAuth client's redirect URIs have no API either:
+ * instructions + an interactive confirm that records completion in state
+ * (`authentication.oauthRedirectsConfigured`); non-interactive runs warn.
  *
  * OAuth client credentials land in the brand's gitignored
  * .omega/secrets/google-oauth.json (never in state or omega.json5).
@@ -17,6 +17,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
 
 module.exports = async function ensureAuthentication(context) {
   const { firebaseApi: api, brandRoot, projectId, domain, serviceData = {}, options = {} } = context;
@@ -158,7 +159,7 @@ module.exports = async function ensureAuthentication(context) {
     warned = true;
   }
 
-  // === OAuth client redirect URIs (no API — instructions until done) ===
+  // === OAuth client redirect URIs (no API — instructions + confirm until done) ===
   let oauthRedirectsConfigured = serviceData.authentication?.oauthRedirectsConfigured || false;
   if (googleClientId && !oauthRedirectsConfigured) {
     const gcpCredentialsUrl = `https://console.cloud.google.com/apis/credentials/oauthclient/${googleClientId}?project=${projectId}`;
@@ -166,7 +167,19 @@ module.exports = async function ensureAuthentication(context) {
     console.log(`      ${chalk.dim('→')} ${chalk.cyan(gcpCredentialsUrl)}`);
     console.log(`      ${chalk.dim('→')} Authorized origins: https://localhost, https://localhost:5000, https://${projectId}.firebaseapp.com, https://${domain}`);
     console.log(`      ${chalk.dim('→')} Redirect URIs: https://localhost:5000/__/auth/handler, https://${projectId}.firebaseapp.com/__/auth/handler, https://${domain}/__/auth/handler`);
-    warned = true;
+
+    if (isInteractive() && !options.dryRun) {
+      const done = await confirm({ message: 'Origins + redirect URIs configured in the OAuth client?', default: false });
+      if (done) {
+        oauthRedirectsConfigured = true;
+        console.log(`      ${chalk.green('✓')} OAuth client redirect URIs confirmed`);
+      } else {
+        warned = true;
+      }
+    } else {
+      console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
+      warned = true;
+    }
   } else if (googleClientId) {
     console.log(`      ${chalk.green('✓')} OAuth client redirect URIs configured`);
   }

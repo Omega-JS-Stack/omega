@@ -3,15 +3,16 @@
  *
  * Stripe has no Radar rules API (Dashboard-only), so this follows the
  * no-API manual-action pattern (search-console ga-link): print the desired
- * rules + the Dashboard deep-link and stay warned until the setup is
- * confirmed (`radarConfirmed` in state; the confirm prompt rides the
- * prompting port). Rules come from payment.processors.stripe.radar —
- * manager defaults with per-brand override. Cannot mutate by construction.
+ * rules + the Dashboard deep-link, confirm interactively, and stay warned
+ * until confirmed (`radarConfirmed` in state). Rules come from
+ * payment.processors.stripe.radar — manager defaults with per-brand
+ * override. Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
+const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
 
 module.exports = async function ensureStripeRadar(context) {
-  const { brandConfig, stripeApi: api, serviceData } = context;
+  const { brandConfig, stripeApi: api, serviceData, options = {} } = context;
 
   if (!api) {
     console.log(`      ${chalk.dim('⊘ Stripe not configured')}`);
@@ -46,7 +47,16 @@ module.exports = async function ensureStripeRadar(context) {
   }
   console.log('');
   console.log(`      ${chalk.dim('→')} Radar rules: ${chalk.cyan(radarUrl)}`);
-  console.log(`      ${chalk.dim('→')} (the confirmation prompt rides the prompting port)`);
+
+  if (isInteractive() && !options.dryRun) {
+    const done = await confirm({ message: 'Radar rules added in the Dashboard?', default: false });
+    if (done) {
+      console.log(`      ${chalk.green('✓')} Radar rules confirmed (${desiredRules.length} rules)`);
+      return { state: { radarConfirmed: true } };
+    }
+  } else {
+    console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
+  }
 
   return {
     status: 'warned',

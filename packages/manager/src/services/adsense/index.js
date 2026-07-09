@@ -5,10 +5,10 @@
  * The Management API v2 is read-only (sites can't be added or configured
  * programmatically), so this service proves presence + state and deep-links
  * the console for the manual half; the add-site browser poll loop rides the
- * prompting port. Never mutates — dry-run is identical to a normal run.
+ * onboarding port. Never mutates — dry-run is identical to a normal run.
  *
  * accountId (pub-…) is required config — omega-manager defaulted it to the
- * company's shared account; account selection rides the prompting port.
+ * company's shared account; account selection rides the config-writeback port.
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env
  * (adsense.readonly scope, own token cache).
  */

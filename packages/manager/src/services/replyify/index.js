@@ -14,7 +14,7 @@
  *
  * The agent id comes from config (replyify.agentId) — agents are created
  * in the Replyify dashboard. omega-manager's interactive setup flow rides
- * the prompting port; until then a missing id is a clean skip.
+ * the config-writeback port; until then a missing id is a clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');

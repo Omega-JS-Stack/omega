@@ -15,6 +15,7 @@ const jetpack = require('fs-jetpack');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/firebase/index.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.GOOGLE_CLIENT_ID;
@@ -415,6 +416,23 @@ test('authentication: wrong-project OAuth client is flagged, credentials not sav
   assert.equal(jetpack.exists(path.join(context.brandRoot, '.omega', 'secrets', 'google-oauth.json')), false);
 });
 
+test('authentication: interactive redirect-URI confirm records completion in state', async () => {
+  const handler = require('../src/services/firebase/ensure/authentication.js');
+  const api = fakeFirebase(convergedResponses());
+  const tty = openTtyPrompt();
+
+  try {
+    const run = handler(handlerContext(brandConfig(), api));
+    await tty.answer('Origins + redirect URIs configured in the OAuth client?', 'y\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.state.authentication.oauthRedirectsConfigured, true);
+  } finally {
+    tty.close();
+  }
+});
+
 // ─── Cloud messaging ─────────────────────────────────────────────────────────
 
 test('cloud-messaging: missing VAPID key pair warns with console guidance', async () => {
@@ -425,6 +443,30 @@ test('cloud-messaging: missing VAPID key pair warns with console guidance', asyn
 
   assert.equal(result.status, 'warned');
   assert.equal(api.mutations().length, 0);
+});
+
+test('cloud-messaging: interactive paste-back validates lengths and lands both keys in state', async () => {
+  const handler = require('../src/services/firebase/ensure/cloud-messaging.js');
+  const api = fakeFirebase({ isServiceEnabled: () => true });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = handler(handlerContext(brandConfig(), api));
+    await tty.answer('VAPID public key:', 'too-short\r');
+    // \x15 (ctrl-U) clears the rejected line before retyping
+    await tty.answer('must be exactly 87 characters', `\x15${'B'.repeat(87)}\r`);
+    await tty.answer('VAPID private key:', `${'p'.repeat(43)}\r`);
+    const result = await run;
+
+    assert.deepEqual(result.state.cloudMessaging, {
+      vapidPublicKey: 'B'.repeat(87),
+      vapidPrivateKey: 'p'.repeat(43),
+    });
+    assert.notEqual(result.status, 'warned');
+    assert.equal(api.mutations().length, 0);
+  } finally {
+    tty.close();
+  }
 });
 
 // ─── SDK config drift check ──────────────────────────────────────────────────

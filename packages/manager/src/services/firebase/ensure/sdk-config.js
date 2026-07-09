@@ -5,7 +5,7 @@
  * authDomain is replaced with the brand's own domain (custom auth domain).
  * The fetched config is durable state; drift against omega.json5 prints the
  * paste-able block and warns — auto-writing the committed config file needs
- * the comment-preserving serializer, which rides the schema-prompting port.
+ * the comment-preserving serializer, which rides the config-writeback port.
  */
 const chalk = require('chalk').default;
 

@@ -6,7 +6,7 @@
  * invalid-input-response when the secret is valid and invalid-input-secret
  * when it isn't. The key's domain list has no read API (classic reCAPTCHA),
  * so domain membership stays printed guidance — the interactive add-domain
- * flow rides the prompting port.
+ * flow rides the onboarding port.
  *
  * The probe is a pure read (no assessment is created), so dry-run behaves
  * identically to a normal run.

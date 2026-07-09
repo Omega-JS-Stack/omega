@@ -5,8 +5,8 @@
  * ships in the frontend); the conversions/events access token is a secret
  * and lives in the brand .env under the exact name backend-manager reads.
  * There's no practical validation API for either token, so this is a
- * presence check with where-to-get guidance — the interactive paste-in
- * prompt rides the prompting port.
+ * presence check with where-to-get guidance — the interactive paste-in flow
+ * rides the disperse port (.env writeback).
  */
 const chalk = require('chalk').default;
 

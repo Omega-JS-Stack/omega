@@ -4,13 +4,14 @@
  * There is NO API for this on either side (the GA Admin API supports
  * Firebase/Ads/BigQuery links but not Search Console; the Search Console API
  * can't read associations either) — so the check follows the firebase
- * OAuth-redirect pattern: instructions + warned until the link is confirmed
- * (`gaLinked` in state; the confirm prompt rides the prompting port).
+ * OAuth-redirect pattern: instructions + interactive confirm, warned until
+ * the link is confirmed (`gaLinked` in state).
  */
 const chalk = require('chalk').default;
+const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
 
 module.exports = async function ensureGaLink(context) {
-  const { brandConfig, serviceData } = context;
+  const { brandConfig, serviceData, options = {} } = context;
 
   if (!serviceData.propertyUrl) {
     console.log(chalk.dim('      ⊘ No Search Console property yet — nothing to associate'));
@@ -32,7 +33,16 @@ module.exports = async function ensureGaLink(context) {
 
   console.log(`      ${chalk.yellow('⚠')} No API exists to check the Search Console ↔ GA association`);
   console.log(`      ${chalk.dim('→')} Associate with GA property ${chalk.cyan(propertyId)} at: ${chalk.cyan(associationsUrl)}`);
-  console.log(`      ${chalk.dim('→')} (the confirmation prompt rides the prompting port)`);
+
+  if (isInteractive() && !options.dryRun) {
+    const done = await confirm({ message: `Search Console associated with GA property ${propertyId}?`, default: false });
+    if (done) {
+      console.log(`      ${chalk.green('✓')} GA association confirmed`);
+      return { state: { gaLinked: true } };
+    }
+  } else {
+    console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
+  }
 
   return { status: 'warned', state: { gaLinked: false }, output: { gaLink: { associationsUrl } } };
 };

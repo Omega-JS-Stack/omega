@@ -38,7 +38,7 @@ module.exports.run = createServiceRunner({
 
     // The brandmark is the root of every derived asset
     if (!jetpack.exists(brandmarkPath)) {
-      return { skip: true, reason: 'no assets/logo/brandmark.svg in the brand repo (add the brand\'s logo source — the AI logo-generation onboarding flow rides the prompting port)' };
+      return { skip: true, reason: 'no assets/logo/brandmark.svg in the brand repo (add the brand\'s logo source — the AI logo-generation flow rides the onboarding port)' };
     }
 
     return {

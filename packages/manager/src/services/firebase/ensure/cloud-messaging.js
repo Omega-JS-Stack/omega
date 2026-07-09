@@ -2,12 +2,14 @@
  * Ensure Firebase Cloud Messaging is ready: the FCM API is enabled and a
  * VAPID key pair (web push) is in state.
  *
- * There is no public API for Web Push certificates — omega-manager opened
- * the console and prompted for both keys. Non-interactive here: missing keys
- * print the console URL and warn; the paste-back prompt rides the prompting
- * port. The private key lives in gitignored state, never omega.json5.
+ * There is no public API for Web Push certificates — missing keys print the
+ * console URL and, in an interactive terminal, prompt to paste both back
+ * (length-validated; omega-manager's auto-open of the console is dropped —
+ * the URL is printed and clickable). Non-interactive runs warn and move on.
+ * The private key lives in gitignored state, never omega.json5.
  */
 const chalk = require('chalk').default;
+const { input, isInteractive } = require('@omegajs/devkit/prompt');
 
 module.exports = async function ensureCloudMessaging(context) {
   const { firebaseApi: api, projectId, serviceData = {}, options = {} } = context;
@@ -49,7 +51,49 @@ module.exports = async function ensureCloudMessaging(context) {
   console.log(`      ${chalk.yellow('⚠')} No VAPID key pair in state — web push won't work without one`);
   console.log(`      ${chalk.dim('→')} ${chalk.cyan(consoleUrl)}`);
   console.log(`      ${chalk.dim('→')} Under "Web Push certificates": generate (or reveal via ⋮) the key pair`);
-  console.log(`      ${chalk.dim('→')} The paste-back prompt rides the prompting port; keys land in .omega/state.json`);
 
-  return { status: 'warned', output: { cloudMessaging: { note: 'no VAPID key pair in state' } } };
+  if (!isInteractive() || options.dryRun) {
+    console.log(`      ${chalk.dim('→')} Rerun in an interactive terminal to paste both keys; they land in .omega/state.json`);
+    return { status: 'warned', output: { cloudMessaging: { note: 'no VAPID key pair in state' } } };
+  }
+
+  const vapidPublicKey = await input({
+    message: '    VAPID public key:',
+    validate: (value) => {
+      if (!value?.trim()) {
+        return 'Required — copy the Key pair value from the Firebase Console';
+      }
+      if (value.trim().length !== 87) {
+        return `VAPID public key must be exactly 87 characters (got ${value.trim().length})`;
+      }
+      return true;
+    },
+  });
+
+  const vapidPrivateKey = await input({
+    message: '    VAPID private key:',
+    validate: (value) => {
+      if (!value?.trim()) {
+        return 'Required — click the ⋮ menu next to the key pair to reveal it';
+      }
+      if (value.trim() === vapidPublicKey.trim()) {
+        return 'That\'s the public key again — click ⋮ to reveal the private key (shorter, 43 chars)';
+      }
+      if (value.trim().length !== 43) {
+        return `VAPID private key must be exactly 43 characters (got ${value.trim().length})`;
+      }
+      return true;
+    },
+  });
+
+  console.log(`      ${chalk.green('✓')} VAPID key pair saved`);
+
+  return {
+    state: {
+      cloudMessaging: {
+        vapidPublicKey: vapidPublicKey.trim(),
+        vapidPrivateKey: vapidPrivateKey.trim(),
+      },
+    },
+  };
 };

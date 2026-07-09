@@ -5,7 +5,7 @@
  * list can't be reconciled; this service proves what it can (the secret key
  * in .env is valid, via the documented siteverify endpoint) and prints the
  * console link + domains for the manual half. The onboarding add-domain
- * browser flow rides the prompting port.
+ * browser flow rides the onboarding port.
  *
  * Auth: RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY in the brand .env.
  * Missing keys → the service skips with guidance.

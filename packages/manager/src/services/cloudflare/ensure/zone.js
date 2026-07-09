@@ -6,7 +6,7 @@
  * nameservers and moves on: the domain service configures them at the
  * registrar when it ports (API providers), or a later run picks the zone up
  * once it activates. omega-manager's interactive browser-open + poll rides
- * the prompting port.
+ * the onboarding port.
  *
  * State: { zoneId } — later operations in THIS run read it via getZoneId.
  */

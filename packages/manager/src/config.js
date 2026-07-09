@@ -104,8 +104,8 @@ const DEFAULTS = {
   // Analytics providers. Google auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
   // in the brand .env (analytics.edit scope, tokens cached separately from
   // firebase's). propertyId is required config — property selection/creation
-  // rides the prompting port (auto-creating without config writeback would
-  // mint a new property every run). Meta/TikTok pixel IDs are public config;
+  // rides the config-writeback port (auto-creating without the writeback
+  // would mint a new property every run). Meta/TikTok pixel IDs are public config;
   // their access tokens live in the brand .env (META_ACCESS_TOKEN /
   // TIKTOK_ACCESS_TOKEN — the names backend-manager reads).
   analytics: {
@@ -174,8 +174,8 @@ const DEFAULTS = {
   // Payment processors + products. Public halves live here (publishableKey,
   // clientId, site); secrets come from the brand .env (STRIPE_SECRET_KEY,
   // PAYPAL_CLIENT_SECRET, CHARGEBEE_API_KEY — omega-manager kept them in
-  // .output/*/secrets/ behind interactive prompts, which ride the prompting
-  // port). Set a processor to `false` to disable it. Product IDs resolve to
+  // .output/*/secrets/ behind interactive prompts; the key-collection flow
+  // rides the onboarding port). Set a processor to `false` to disable it. Product IDs resolve to
   // state until the config-serializer port can write them back here.
   // omega-manager's DEFAULTS also carried the company's Stripe organizationId
   // (dashboard deep-links use the account ID from state now) and hardcoded

@@ -5,7 +5,7 @@
  * present = converged success; missing segments warn with human-readable
  * conditions to build in the dashboard (the browser automation
  * omega-manager drove through the Chrome extension rides the
- * extension/prompting port). Never mutates, so dry-run is the normal run.
+ * extension port). Never mutates, so dry-run is the normal run.
  */
 const chalk = require('chalk').default;
 const { segmentsFor, BEM_FIELDS_MAP } = require('../../../lib/bem-marketing.js');

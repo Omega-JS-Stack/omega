@@ -3,14 +3,14 @@
  *
  * The Stripe API has no dispute-protection management (Dashboard-only), so
  * this follows the no-API manual-action pattern: print the settings
- * deep-link and stay warned until activation is confirmed
- * (`disputesConfirmed` in state; the confirm prompt rides the prompting
- * port). Cannot mutate by construction.
+ * deep-link, confirm interactively, and stay warned until activation is
+ * confirmed (`disputesConfirmed` in state). Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
+const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
 
 module.exports = async function ensureStripeDisputes(context) {
-  const { stripeApi: api, serviceData } = context;
+  const { stripeApi: api, serviceData, options = {} } = context;
 
   if (!api) {
     console.log(`      ${chalk.dim('⊘ Stripe not configured')}`);
@@ -28,7 +28,16 @@ module.exports = async function ensureStripeDisputes(context) {
 
   console.log(`      ${chalk.yellow('⚠')} No API for dispute protection — activate ${chalk.bold('Enhanced Dispute Protection')} in the Dashboard`);
   console.log(`      ${chalk.dim('→')} Dispute settings: ${chalk.cyan(disputesUrl)}`);
-  console.log(`      ${chalk.dim('→')} (the confirmation prompt rides the prompting port)`);
+
+  if (isInteractive() && !options.dryRun) {
+    const done = await confirm({ message: 'Enhanced Dispute Protection activated in the Dashboard?', default: false });
+    if (done) {
+      console.log(`      ${chalk.green('✓')} Enhanced Dispute Protection confirmed`);
+      return { state: { disputesConfirmed: true } };
+    }
+  } else {
+    console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
+  }
 
   return {
     status: 'warned',
