@@ -10,7 +10,8 @@ const { createCliRouter } = require('@omegajs/devkit/cli-router');
 
 // Command name → positional/flag aliases
 const ALIASES = {
-  manage: ['-m', '--manage', 'start', 'run'],
+  manage: ['-m', 'start', 'run'],
+  onboard: ['-o', '--onboard', 'create', 'new'],
   version: ['-v', '--version'],
 };
 

@@ -5,8 +5,8 @@
 - (idle — next queue item starts on Ian's "continue")
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Onboarding port — brand-creation wizard → the plan-§0 "Use this template" story; unlocks fresh-brand dogfooding + the parked browser flows
-2. Config-writeback port (comment-preserving serializer) — IDs parked in .omega/state.json (sendgrid list, beehiiv publication, payment products, agent ids) → omega.json5
+1. Config-writeback port (comment-preserving serializer) — IDs parked in .omega/state.json (sendgrid list, beehiiv publication, payment products, agent ids) → omega.json5
+2. Onboarding flows — the port's remaining slice: browser-open/poll flows + interactive credential entry (config-landing selections want writeback first)
 3. Disperse remnants — cert files into desktop/mobile apps; .env composition
 4. Extension port (beehiiv segment automation) + assets PSD template trio (needs company binaries)
 5. Master-plan resumption (each on Ian's go): B5 `omega verify` → Phase 4 website migrations (somiibo scale test) → Phase 3 rename cutovers (extension → desktop → backend) → Phase 5 template product
@@ -32,14 +32,14 @@
 - web-manager tarball ships src/ with bare @omegajs imports — exports-unaware consumers would fail loudly; revisit at the client cutover (1.3b)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 57 prompting port — devkit prompt module (TTY-safe inquirer), 5 confirm/paste-back flows live (this commit) → CHANGELOG
+- [x] 58 onboarding wizard — `omega-manager onboard` scaffolds the plan-§0 brand monorepo (company/resume/in-place, fill-missing) (this commit) → CHANGELOG
+- [x] 57 prompting port — devkit prompt module (TTY-safe inquirer), 5 confirm/paste-back flows live (0325d14) → CHANGELOG
 - [x] 56 PROGRESS.md → status board; global docs conventions + change-tracker hook reworked (c5c6c25)
 - [x] 55 company mode — one manage child per brand, stamps, --brand/--parallel (99dc015) → CHANGELOG
 - [x] 54 testing-live checks — omega-manager's SERVICE ORDER FULLY DRAINED, checkpoints 33–54 (76bd830) → CHANGELOG
-- [x] 53 migrations · 52 account · 51 seo · 50 certificates · 49 assets · 45–48 slapform/chatsy/replyify/server · 34–44 github…payment → CHANGELOG
-- [x] 33 @omegajs/manager core — service runner, brand loading, .omega store, workspace/update/testing → CHANGELOG
+- [x] 53 migrations · 52 account · 51 seo · 50 certificates · 49 assets · 45–48 slapform/chatsy/replyify/server · 33–44 manager core + github…payment → CHANGELOG
 - [x] Phase 2 A0–B4: Eleventy wins the bake-off (3.6s vs 332s Jekyll); @omegajs/web engine + real UJM content + CLI + `omega migrate` (somiibo 2,556 pages ~100s) → CHANGELOG; B5 PAUSED
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-09 2:15 PM (checkpoint 57)*
+*Last updated: 2026-07-09 3:05 PM (checkpoint 58)*

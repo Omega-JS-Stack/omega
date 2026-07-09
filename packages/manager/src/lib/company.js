@@ -213,6 +213,7 @@ function filterChildArgs(argv) {
 }
 
 module.exports = {
+  DEFAULT_BRAND_ROOTS,
   readRawConfig,
   isCompanyRoot,
   resolveManageRoot,
