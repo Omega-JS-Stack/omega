@@ -3,8 +3,8 @@
  * payment.products: Stripe (account settings, products + prices, webhook,
  * plus manual-guidance Radar/dispute checks), PayPal (catalog products +
  * billing plans, webhook), and Chargebee (item family → items → item prices,
- * webhook). Product IDs land in state until the config-serializer port can
- * write them back to omega.json5.
+ * webhook). Product IDs are written back to omega.json5
+ * (payment.products[id=…] — comment-preserving) and mirrored in state.
  *
  * Auth is per processor, non-interactively, from config + the brand .env:
  *   - Stripe:    STRIPE_SECRET_KEY

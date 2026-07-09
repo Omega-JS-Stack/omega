@@ -74,7 +74,22 @@ function convergedResponses() {
   };
 }
 
-function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKey = true } = {}) {
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+
+// Writeback target — the publication op edits config/omega.json5 in the
+// brand root; these comments must survive every service write.
+const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
+{
+  brand: { id: 'fixture-brand', name: "Fixture Brand" },
+  marketing: {
+    newsletter: {
+      enabled: true, // the resolved id lands next to this
+    },
+  },
+}
+`;
+
+function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
     process.env.BACKEND_MANAGER_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
@@ -83,7 +98,7 @@ function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKe
 
   return service.run({
     brandId: 'fixture-brand',
-    brandRoot: '/tmp/omega-manager-beehiiv-unused', // no handler touches disk
+    brandRoot: brandRoot || makeBrandRoot(WRITEBACK_CONFIG), // the publication op writes into config/omega.json5 here
     brandConfig: config,
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
@@ -165,12 +180,27 @@ test('beehiiv: no configured id auto-matches a publication by brand name into st
     listPublications: [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }],
   });
 
-  const result = await runService(brandConfig(), { beehiiv: api });
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const result = await runService(brandConfig(), { beehiiv: api, brandRoot });
 
   assert.equal(result.status, 'success');
   assert.equal(result.state.publicationId, PUB_ID);
   assert.equal(api.callsTo('getPublication').length, 0); // nothing known to verify
   assert.deepEqual(api.mutations(), []);
+
+  const written = readConfigSource(brandRoot);
+  assert.ok(written.includes(`publicationId: "${PUB_ID}",`));
+  assert.ok(written.includes('enabled: true, // the resolved id lands next to this'));
+});
+
+test('beehiiv: a state-known id is promoted into omega.json5 on verify', async () => {
+  const api = fakeBeehiiv(convergedResponses());
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+
+  const result = await runService(brandConfig(), { beehiiv: api, serviceData: { publicationId: PUB_ID }, brandRoot });
+
+  assert.equal(result.state.publicationId, PUB_ID);
+  assert.ok(readConfigSource(brandRoot).includes(`publicationId: "${PUB_ID}",`));
 });
 
 test('beehiiv: no matching publication warns with the values to copy into the dashboard', async () => {

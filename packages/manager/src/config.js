@@ -104,8 +104,8 @@ const DEFAULTS = {
   // Analytics providers. Google auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
   // in the brand .env (analytics.edit scope, tokens cached separately from
   // firebase's). propertyId is required config — property selection/creation
-  // rides the config-writeback port (auto-creating without the writeback
-  // would mint a new property every run). Meta/TikTok pixel IDs are public config;
+  // is interactive and rides the onboarding-flows port (the omega.json5
+  // writeback it needs is live). Meta/TikTok pixel IDs are public config;
   // their access tokens live in the brand .env (META_ACCESS_TOKEN /
   // TIKTOK_ACCESS_TOKEN — the names backend-manager reads).
   analytics: {
@@ -151,9 +151,9 @@ const DEFAULTS = {
 
   // Marketing. campaigns = the email-marketing provider (the sendgrid
   // service); newsletter = the newsletter provider (the beehiiv service).
-  // listId/publicationId are durable derived data — the services resolve
-  // them into state until the config-serializer port can write them back
-  // here. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
+  // listId/publicationId are resolved by the services and written back here
+  // (comment-preserving writeback), with a state mirror as the resolution
+  // cache. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
   // (+ BACKEND_MANAGER_WEBHOOK_KEY for the webhook operations).
   // omega-manager also carried a newsletter.content generator blob here —
   // it's BEM newsletter-generator data, not service config; it rides the
@@ -175,8 +175,8 @@ const DEFAULTS = {
   // clientId, site); secrets come from the brand .env (STRIPE_SECRET_KEY,
   // PAYPAL_CLIENT_SECRET, CHARGEBEE_API_KEY — omega-manager kept them in
   // .output/*/secrets/ behind interactive prompts; the key-collection flow
-  // rides the onboarding port). Set a processor to `false` to disable it. Product IDs resolve to
-  // state until the config-serializer port can write them back here.
+  // rides the onboarding port). Set a processor to `false` to disable it.
+  // Product IDs are written back here by the services (state keeps a mirror).
   // omega-manager's DEFAULTS also carried the company's Stripe organizationId
   // (dashboard deep-links use the account ID from state now) and hardcoded
   // the company CDN for product images (brand.images.brandmark now).
@@ -616,7 +616,7 @@ const OPERATIONS = {
   sendgrid: [
     { name: 'domain-auth', ensure: true },     // Domain authentication (DKIM CNAMEs via Cloudflare, one-pass validate)
     { name: 'sender-identity', ensure: true }, // Verified sender for Single Sends (offers@{contact domain})
-    { name: 'list', ensure: true },            // The brand's marketing list (id → state until config writeback)
+    { name: 'list', ensure: true },            // The brand's marketing list (id written back to omega.json5)
     { name: 'custom-fields', ensure: true },   // BEM custom fields (backend-manager's marketing SSOT)
     { name: 'segments', ensure: true },        // BEM segments (query_dsl diffed; __temp_ orphans swept)
     { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent BEM forwarder (min-diff PATCH)

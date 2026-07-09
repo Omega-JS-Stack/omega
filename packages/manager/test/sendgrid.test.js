@@ -131,7 +131,25 @@ function convergedResponses() {
   };
 }
 
-function runService(config, { sendgrid, cloudflare = null, options = {}, serviceData = {}, webhookKey = true } = {}) {
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+
+// Writeback target — the list op edits config/omega.json5 in the brand root;
+// these comments must survive every service write byte-for-byte.
+const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
+{
+  brand: {
+    id: 'fixture-brand', // stays single-quoted
+    name: "Fixture Brand",
+  },
+  marketing: {
+    campaigns: {
+      enabled: true,
+    },
+  },
+}
+`;
+
+function runService(config, { sendgrid, cloudflare = null, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
     process.env.BACKEND_MANAGER_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
@@ -140,7 +158,7 @@ function runService(config, { sendgrid, cloudflare = null, options = {}, service
 
   return service.run({
     brandId: 'fixture-brand',
-    brandRoot: '/tmp/omega-manager-sendgrid-unused', // no handler touches disk
+    brandRoot: brandRoot || makeBrandRoot(WRITEBACK_CONFIG), // the list op writes into config/omega.json5 here
     brandConfig: config,
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
@@ -327,10 +345,15 @@ test('sendgrid: a stale known id falls back to name lookup', async () => {
     getListByName: { id: 'lst_2', name: BRAND_NAME },
   });
 
-  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_gone' } });
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_gone' }, brandRoot });
 
   assert.equal(result.state.listId, 'lst_2');
   assert.equal(api.callsTo('createList').length, 0);
+
+  const written = readConfigSource(brandRoot);
+  assert.ok(written.includes('listId: "lst_2",'));
+  assert.ok(written.includes("id: 'fixture-brand', // stays single-quoted"));
 });
 
 test('sendgrid: no list anywhere → created and stored in state', async () => {
@@ -340,11 +363,29 @@ test('sendgrid: no list anywhere → created and stored in state', async () => {
     createList: { id: 'lst_new', name: BRAND_NAME },
   });
 
-  const result = await runService(brandConfig(), { sendgrid: api });
+  const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const result = await runService(brandConfig(), { sendgrid: api, brandRoot });
 
   assert.deepEqual(api.callsTo('createList')[0].args, [BRAND_NAME]);
   assert.equal(result.state.listId, 'lst_new');
   assert.equal(api.callsTo('getList').length, 0); // nothing known to verify
+
+  const written = readConfigSource(brandRoot);
+  assert.ok(written.includes('listId: "lst_new",'));
+  assert.ok(written.includes('// Fixture Brand — hand-edited writeback target'));
+});
+
+test('sendgrid: config-known id writes nothing; a state-known id is promoted into omega.json5', async () => {
+  // Config already carries the id — the file stays byte-identical
+  const configuredRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  const before = readConfigSource(configuredRoot);
+  await runService(brandConfig({ listId: 'lst_1' }), { sendgrid: fakeSendgrid(convergedResponses()), brandRoot: configuredRoot });
+  assert.equal(readConfigSource(configuredRoot), before);
+
+  // The same id known only from state — promoted into the file
+  const stateRoot = makeBrandRoot(WRITEBACK_CONFIG);
+  await runService(brandConfig(), { sendgrid: fakeSendgrid(convergedResponses()), serviceData: { listId: 'lst_1' }, brandRoot: stateRoot });
+  assert.ok(readConfigSource(stateRoot).includes('listId: "lst_1",'));
 });
 
 // ─── custom-fields ───────────────────────────────────────────────────────────

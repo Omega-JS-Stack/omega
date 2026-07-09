@@ -16,7 +16,8 @@
  * The agent id comes from config (chatsy.agentId) — agents are created in
  * the Chatsy dashboard. omega-manager's interactive setup flow (open
  * chatsy.ai, enter the agent id, write it back to config) rides the
- * config-writeback port; until then a missing id is a clean skip.
+ * onboarding-flows port (the writeback itself is live — lib/config-write.js);
+ * until then a missing id is a clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');

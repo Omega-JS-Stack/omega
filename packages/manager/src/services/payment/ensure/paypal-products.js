@@ -4,15 +4,16 @@
  *
  * Product resolution: config productId → state (paypalProducts map) →
  * exact-name match against the catalog (self-heal when state is lost) →
- * create. Created/matched IDs land in state until the config-serializer
- * port can write them back to omega.json5. Plans are managed by
- * interval + amount + trial — matching active plans are kept, duplicates
- * and stale plans deactivated, missing ones created. Legacy products
- * (product.paypal.legacyProductIds) get their active plans deactivated so
- * no new subscriptions land on them.
+ * create. Created/matched IDs are written back into omega.json5
+ * (payment.products[id=…].paypal.productId — comment-preserving) and
+ * mirrored in state. Plans are managed by interval + amount + trial —
+ * matching active plans are kept, duplicates and stale plans deactivated,
+ * missing ones created. Legacy products (product.paypal.legacyProductIds)
+ * get their active plans deactivated so no new subscriptions land on them.
  */
 const chalk = require('chalk').default;
 const { paidProducts, productDisplayName, productImage } = require('../lib/payment-utils.js');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 
 // Map config interval names to PayPal interval units
 const FREQUENCY_TO_INTERVAL = {
@@ -236,6 +237,7 @@ module.exports = async function ensurePayPalProducts(context) {
 
   const products = paidProducts(brandConfig);
   const knownIds = { ...(serviceData.paypalProducts || {}) };
+  const configEdits = {};
   let stateChanged = false;
   let catalog = null; // Lazy-listed only when a product has no known ID
 
@@ -295,12 +297,20 @@ module.exports = async function ensurePayPalProducts(context) {
       stateChanged = true;
     }
 
+    if (paypalProduct.id !== product.paypal?.productId) {
+      configEdits[`payment.products[id=${product.id}].paypal.productId`] = paypalProduct.id;
+    }
+
     // --- Ensure billing plans match config (subscriptions only) ---
     if (product.type === 'subscription') {
       await ensurePlans(api, paypalProduct.id, product, brandConfig, dryRun);
     } else {
       console.log(`        ${chalk.dim('⊘ One-time — no plans needed (Orders API)')}`);
     }
+  }
+
+  if (Object.keys(configEdits).length > 0) {
+    writeBrandConfig(context, configEdits);
   }
 
   // --- Deactivate plans on legacy products ---

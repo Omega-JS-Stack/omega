@@ -5,18 +5,21 @@
  * from state → auto-match by brand name/id across the account's
  * publications. Publications can't be created via API — when nothing
  * matches, the exact values to copy into the dashboard are printed and the
- * operation warns (the select/create browser flow rides the prompting
- * port). The resolved id lands in state; the config writeback rides the
- * config-serializer port.
+ * operation warns (the select/create browser flow rides the onboarding-flows
+ * port). The resolved id is written back into omega.json5
+ * (marketing.newsletter.publicationId — comment-preserving) and mirrored in
+ * state.
  */
 const chalk = require('chalk').default;
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 
 module.exports = async function ensurePublication(context) {
   const { beehiivApi: api, brandConfig, serviceData } = context;
 
   const brandName = brandConfig.brand?.name || '';
   const brandId = brandConfig.brand?.id || '';
-  const knownId = brandConfig.marketing?.newsletter?.publicationId || serviceData.publicationId;
+  const configuredId = brandConfig.marketing?.newsletter?.publicationId;
+  const knownId = configuredId || serviceData.publicationId;
 
   // 1. Known id (config or state) — verify access
   if (knownId) {
@@ -28,6 +31,9 @@ module.exports = async function ensurePublication(context) {
     }
 
     console.log(`      ${chalk.green('✓')} ${chalk.cyan(publication.name)} ${chalk.dim(`(${publication.id})`)}`);
+    if (publication.id !== configuredId) {
+      writeBrandConfig(context, { 'marketing.newsletter.publicationId': publication.id });
+    }
     return { state: { publicationId: publication.id, publicationName: publication.name } };
   }
 
@@ -46,7 +52,7 @@ module.exports = async function ensurePublication(context) {
 
   if (match) {
     console.log(`      ${chalk.green('✓')} Auto-matched ${chalk.cyan(match.name)} ${chalk.dim(`(${match.id})`)}`);
-    console.log(`      ${chalk.dim('→')} publicationId lives in state until the config-serializer port writes it into omega.json5`);
+    writeBrandConfig(context, { 'marketing.newsletter.publicationId': match.id });
     return { state: { publicationId: match.id, publicationName: match.name } };
   }
 

@@ -5,11 +5,10 @@
 - (idle — next queue item starts on Ian's "continue")
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Config-writeback port (comment-preserving serializer) — IDs parked in .omega/state.json (sendgrid list, beehiiv publication, payment products, agent ids) → omega.json5
-2. Onboarding flows — the port's remaining slice: browser-open/poll flows + interactive credential entry (config-landing selections want writeback first)
-3. Disperse remnants — cert files into desktop/mobile apps; .env composition
-4. Extension port (beehiiv segment automation) + assets PSD template trio (needs company binaries)
-5. Master-plan resumption (each on Ian's go): B5 `omega verify` → Phase 4 website migrations (somiibo scale test) → Phase 3 rename cutovers (extension → desktop → backend) → Phase 5 template product
+1. Onboarding flows — the port's remaining slice: browser-open/poll flows + interactive credential entry + config-landing selections (the writeback they need is live)
+2. Disperse remnants — cert files into desktop/mobile apps; .env composition
+3. Extension port (beehiiv segment automation) + assets PSD template trio (needs company binaries)
+4. Master-plan resumption (each on Ian's go): B5 `omega verify` → Phase 4 website migrations (somiibo scale test) → Phase 3 rename cutovers (extension → desktop → backend) → Phase 5 template product
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - electron-manager@1.12.1 publish — 1.12.0 on npm breaks fresh installs (files fix sits in the monorepo copy)
@@ -32,7 +31,8 @@
 - web-manager tarball ships src/ with bare @omegajs imports — exports-unaware consumers would fail loudly; revisit at the client cutover (1.3b)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 58 onboarding wizard — `omega-manager onboard` scaffolds the plan-§0 brand monorepo (company/resume/in-place, fill-missing) (this commit) → CHANGELOG
+- [x] 59 config-writeback — comment-preserving omega.json5 editor in @omegajs/config; sendgrid/beehiiv/payment/firebase IDs land in config (this commit) → CHANGELOG
+- [x] 58 onboarding wizard — `omega-manager onboard` scaffolds the plan-§0 brand monorepo (company/resume/in-place, fill-missing) (3d38e27) → CHANGELOG
 - [x] 57 prompting port — devkit prompt module (TTY-safe inquirer), 5 confirm/paste-back flows live (0325d14) → CHANGELOG
 - [x] 56 PROGRESS.md → status board; global docs conventions + change-tracker hook reworked (c5c6c25)
 - [x] 55 company mode — one manage child per brand, stamps, --brand/--parallel (99dc015) → CHANGELOG
@@ -42,4 +42,4 @@
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-09 3:05 PM (checkpoint 58)*
+*Last updated: 2026-07-09 3:19 PM (checkpoint 59)*

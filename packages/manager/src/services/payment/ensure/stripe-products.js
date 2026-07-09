@@ -4,15 +4,16 @@
  * Product resolution: config productId → state (stripeProducts map) →
  * metadata match against the account's products (self-heal when state is
  * lost — every product we create carries { brandId, productId } metadata) →
- * create. Created/matched IDs land in state until the config-serializer
- * port can write them back to omega.json5. Prices are managed by
- * interval + amount — matching active prices are kept, stale ones archived
- * (Stripe can't delete prices), missing ones created. omega-manager's
- * version had no dry-run guard and no archived-product skip here; both are
- * standard now.
+ * create. Created/matched IDs are written back into omega.json5
+ * (payment.products[id=…].stripe.productId — comment-preserving) and
+ * mirrored in state. Prices are managed by interval + amount — matching
+ * active prices are kept, stale ones archived (Stripe can't delete prices),
+ * missing ones created. omega-manager's version had no dry-run guard and no
+ * archived-product skip here; both are standard now.
  */
 const chalk = require('chalk').default;
 const { paidProducts, productDisplayName, productImage } = require('../lib/payment-utils.js');
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 
 // Map config interval names to Stripe price intervals
 const FREQUENCY_TO_INTERVAL = {
@@ -170,6 +171,7 @@ module.exports = async function ensureStripeProducts(context) {
 
   const products = paidProducts(brandConfig);
   const knownIds = { ...(serviceData.stripeProducts || {}) };
+  const configEdits = {};
   let stateChanged = false;
   let catalog = null; // Lazy-listed only when a product has no known ID
 
@@ -234,8 +236,16 @@ module.exports = async function ensureStripeProducts(context) {
       stateChanged = true;
     }
 
+    if (stripeProduct.id !== product.stripe?.productId) {
+      configEdits[`payment.products[id=${product.id}].stripe.productId`] = stripeProduct.id;
+    }
+
     // --- Ensure prices match config amounts ---
     await ensurePrices(api, stripeProduct.id, product, dryRun);
+  }
+
+  if (Object.keys(configEdits).length > 0) {
+    writeBrandConfig(context, configEdits);
   }
 
   const result = { output: { stripeSync: { productsProcessed: products.length } } };

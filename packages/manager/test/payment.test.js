@@ -234,7 +234,15 @@ const CONVERGED_IDS = {
   credits: { stripe: { productId: 'prod_credits' }, paypal: { productId: 'PROD-CREDITS' } },
 };
 
-function runService(config, { stripe = null, paypal = null, chargebee = null, options = {}, serviceData = {}, webhookKey = true } = {}) {
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+
+/** Writeback target mirroring the config's products — matcher paths self-locate by id. */
+function writebackSource(config) {
+  const rows = (config.payment?.products || []).map((p) => `      { id: '${p.id}' }, // ${p.name || p.id}`).join('\n');
+  return `// Payment fixture — comments must survive product-id writeback\n{\n  payment: {\n    products: [\n${rows}\n    ],\n  },\n}\n`;
+}
+
+function runService(config, { stripe = null, paypal = null, chargebee = null, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
     process.env.BACKEND_MANAGER_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
@@ -243,7 +251,7 @@ function runService(config, { stripe = null, paypal = null, chargebee = null, op
 
   return service.run({
     brandId: BRAND_ID,
-    brandRoot: '/tmp/omega-manager-payment-unused', // no handler touches disk
+    brandRoot: brandRoot || makeBrandRoot(writebackSource(config)), // product ops write into config/omega.json5 here
     brandConfig: config,
     brand: { id: BRAND_ID, config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
@@ -478,8 +486,10 @@ test('stripe-products: missing everywhere → exact create payloads + prices + s
   responses.createRecurringPrice = (productId, amount, interval) => ({ id: `price_${interval}` });
   const stripe = fakeStripe(responses);
 
-  const result = await runService(brandConfig({ products }), {
-    stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true },
+  const config = brandConfig({ products });
+  const brandRoot = makeBrandRoot(writebackSource(config));
+  const result = await runService(config, {
+    stripe, serviceData: { radarConfirmed: true, disputesConfirmed: true }, brandRoot,
   });
 
   assert.deepEqual(stripe.callsTo('createProduct').map((c) => c.args), [[{
@@ -495,6 +505,10 @@ test('stripe-products: missing everywhere → exact create payloads + prices + s
     ['prod_new', 100, 'annually'],
   ]);
   assert.deepEqual(result.state.stripeProducts, { plus: 'prod_new' });
+
+  const written = readConfigSource(brandRoot);
+  assert.ok(written.includes(`{ id: 'plus', stripe: { productId: "prod_new" } }, // Plus`));
+  assert.ok(written.includes('// Payment fixture — comments must survive product-id writeback'));
 });
 
 test('stripe-products: lost state self-heals by metadata match — no create', async () => {
@@ -512,6 +526,22 @@ test('stripe-products: lost state self-heals by metadata match — no create', a
   assert.equal(stripe.callsTo('createProduct').length, 0);
   assert.equal(stripe.callsTo('getProduct').length, 0); // list objects are full — no refetch
   assert.deepEqual(result.state.stripeProducts, { plus: 'prod_plus' });
+});
+
+test('stripe-products: a self-healed id is also written back into omega.json5', async () => {
+  const products = [
+    { id: 'plus', name: 'Plus', type: 'subscription', trial: { days: 14 }, prices: { monthly: 10, annually: 100 } },
+  ];
+  const responses = stripeConverged();
+  responses.listAllProducts = [structuredClone(responses.getProduct('prod_plus'))];
+  const config = brandConfig({ products });
+  const brandRoot = makeBrandRoot(writebackSource(config));
+
+  await runService(config, {
+    stripe: fakeStripe(responses), serviceData: { radarConfirmed: true, disputesConfirmed: true }, brandRoot,
+  });
+
+  assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', stripe: { productId: "prod_plus" } }, // Plus`));
 });
 
 test('stripe-products: price drift → stale actives archived, correct price created', async () => {
@@ -646,7 +676,9 @@ test('paypal-products: missing everywhere → exact product + plan create payloa
   responses.createPlan = ({ interval }) => ({ id: `P-NEW-${interval}` });
   const paypal = fakePaypal(responses);
 
-  const result = await runService(brandConfig({ products }), { paypal, options: { processor: 'paypal' } });
+  const config = brandConfig({ products });
+  const brandRoot = makeBrandRoot(writebackSource(config));
+  const result = await runService(config, { paypal, options: { processor: 'paypal' }, brandRoot });
 
   assert.deepEqual(paypal.callsTo('createProduct').map((c) => c.args), [[{
     name: `${BRAND_NAME} - Plus`,
@@ -660,6 +692,7 @@ test('paypal-products: missing everywhere → exact product + plan create payloa
     [{ productId: 'PROD-NEW', name: `${BRAND_NAME} - Plus (Annually)`, interval: 'annually', amount: 100, trialDays: 14 }],
   ]);
   assert.deepEqual(result.state.paypalProducts, { plus: 'PROD-NEW' });
+  assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', paypal: { productId: "PROD-NEW" } }, // Plus`));
 });
 
 test('paypal-products: lost state self-heals by exact name match — no create', async () => {
@@ -670,11 +703,14 @@ test('paypal-products: lost state self-heals by exact name match — no create',
   responses.listProducts = [{ id: 'PROD-PLUS', name: `${BRAND_NAME} - Plus` }]; // summarized list entry
   const paypal = fakePaypal(responses);
 
-  const result = await runService(brandConfig({ products }), { paypal, options: { processor: 'paypal' } });
+  const config = brandConfig({ products });
+  const brandRoot = makeBrandRoot(writebackSource(config));
+  const result = await runService(config, { paypal, options: { processor: 'paypal' }, brandRoot });
 
   assert.equal(paypal.callsTo('createProduct').length, 0);
   assert.equal(paypal.callsTo('getProduct').length, 1); // list is summarized — full fetch before diffing
   assert.deepEqual(result.state.paypalProducts, { plus: 'PROD-PLUS' });
+  assert.ok(readConfigSource(brandRoot).includes(`{ id: 'plus', paypal: { productId: "PROD-PLUS" } }, // Plus`));
 });
 
 test('paypal-products: plan drift → stale + duplicate deactivated, correct plan created', async () => {

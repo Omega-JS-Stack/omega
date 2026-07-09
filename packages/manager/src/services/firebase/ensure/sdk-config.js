@@ -3,11 +3,12 @@
  * omega.json5 `firebaseConfig` section matches it.
  *
  * authDomain is replaced with the brand's own domain (custom auth domain).
- * The fetched config is durable state; drift against omega.json5 prints the
- * paste-able block and warns — auto-writing the committed config file needs
- * the comment-preserving serializer, which rides the config-writeback port.
+ * The fetched config is durable state; drift against omega.json5 is written
+ * back into the file key-by-key (comment-preserving), so per-key comments
+ * survive. Dry-run prints the paste-able block instead and warns.
  */
 const chalk = require('chalk').default;
+const { writeBrandConfig } = require('../../../lib/config-write.js');
 
 // The canonical firebaseConfig keys frameworks read from omega.json5
 const SDK_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
@@ -58,13 +59,27 @@ module.exports = async function ensureSdkConfig(context) {
     return { state: { sdkConfig } };
   }
 
-  console.log(`      ${chalk.yellow('⚠')} omega.json5 firebaseConfig ${Object.keys(configured).length === 0 ? 'is missing' : `drifts (${drifted.join(', ')})`}`);
-  console.log(`      ${chalk.dim('→')} Set this in config/omega.json5:`);
-  console.log(chalk.cyan(`      firebaseConfig: ${JSON.stringify(sdkConfig, null, 2).replace(/\n/g, '\n      ')},`));
+  console.log(`      ${chalk.yellow('↻')} omega.json5 firebaseConfig ${Object.keys(configured).length === 0 ? 'is missing' : `drifts (${drifted.join(', ')})`}`);
+
+  const edits = {};
+  for (const key of drifted) {
+    edits[`firebaseConfig.${key}`] = sdkConfig[key];
+  }
+  writeBrandConfig(context, edits);
+
+  if (options.dryRun) {
+    // The file wasn't touched — hand over the paste block
+    console.log(`      ${chalk.dim('→')} Set this in config/omega.json5:`);
+    console.log(chalk.cyan(`      firebaseConfig: ${JSON.stringify(sdkConfig, null, 2).replace(/\n/g, '\n      ')},`));
+    return {
+      status: 'warned',
+      state: { sdkConfig },
+      output: { sdkConfig: { drifted } },
+    };
+  }
 
   return {
-    status: 'warned',
     state: { sdkConfig },
-    output: { sdkConfig: { drifted } },
+    output: { sdkConfig: { updated: drifted } },
   };
 };

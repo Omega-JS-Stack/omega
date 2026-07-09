@@ -137,6 +137,15 @@ function runService(config, { firebase, cloudflare, options = {}, serviceData = 
 }
 
 // Direct-handler context (bypasses setup — for focused per-operation tests)
+const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
+
+// Writeback target for the sdk-config drift tests.
+const FIREBASE_WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
+{
+  brand: { id: 'fixture-brand' },
+}
+`;
+
 function handlerContext(config, firebase, extra = {}) {
   return {
     firebaseApi: firebase,
@@ -471,15 +480,35 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
 
 // ─── SDK config drift check ──────────────────────────────────────────────────
 
-test('sdk-config: missing omega.json5 firebaseConfig warns but still lands state', async () => {
+test('sdk-config: missing omega.json5 firebaseConfig is written back, comments intact', async () => {
   const handler = require('../src/services/firebase/ensure/sdk-config.js');
   const api = fakeFirebase(convergedResponses());
+  const brandRoot = makeBrandRoot(FIREBASE_WRITEBACK_CONFIG);
 
-  const result = await handler(handlerContext(brandConfig(), api)); // no firebaseConfig in config
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot })); // no firebaseConfig in config
+
+  assert.equal(result.status, undefined); // drift healed — success, not warned
+  assert.deepEqual(result.state.sdkConfig, EXPECTED_SDK);
+  assert.deepEqual(result.output.sdkConfig.updated.slice().sort(), Object.keys(EXPECTED_SDK).filter((k) => EXPECTED_SDK[k]).sort());
+  assert.equal(api.callsTo('createWebApp').length, 0);
+
+  const written = readConfigSource(brandRoot);
+  assert.ok(written.includes(`apiKey: "${EXPECTED_SDK.apiKey}"`));
+  assert.ok(written.includes(`authDomain: "${DOMAIN}"`)); // the custom auth domain, not firebaseapp.com
+  assert.ok(written.includes('// Fixture Brand — hand-edited writeback target'));
+});
+
+test('sdk-config: dry run warns with the paste block and leaves omega.json5 untouched', async () => {
+  const handler = require('../src/services/firebase/ensure/sdk-config.js');
+  const api = fakeFirebase(convergedResponses());
+  const brandRoot = makeBrandRoot(FIREBASE_WRITEBACK_CONFIG);
+  const before = readConfigSource(brandRoot);
+
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot, options: { dryRun: true } }));
 
   assert.equal(result.status, 'warned');
   assert.deepEqual(result.state.sdkConfig, EXPECTED_SDK);
-  assert.equal(api.callsTo('createWebApp').length, 0);
+  assert.equal(readConfigSource(brandRoot), before);
 });
 
 // ─── Hosting (one-pass converge) ─────────────────────────────────────────────

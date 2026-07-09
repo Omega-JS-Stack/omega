@@ -14,7 +14,8 @@
  * The form id comes from config (slapform.formId) — forms are created in
  * the Slapform dashboard. omega-manager's interactive setup flow (open
  * slapform.com, enter the form id, write it back to config) rides the
- * config-writeback port; until then a missing id is a clean skip.
+ * onboarding-flows port (the writeback itself is live — lib/config-write.js);
+ * until then a missing id is a clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');

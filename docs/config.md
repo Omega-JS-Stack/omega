@@ -90,6 +90,34 @@ BXM: `require('browser-extension-manager/config')` → `{ loadConfig, validateCo
 Consumer workflows use this instead of raw JSON5 reads so brand-monorepo resolution
 always applies.
 
+## Writeback (comment-preserving edits)
+
+omega.json5 is hand-edited — comments, key order, and quote style carry meaning — so
+programmatic writes are surgical text edits, not a re-stringify (omega-manager's
+serializer rewrote the whole file in canonical order and lost comments; this replaces
+it). The manager's services use it to land resolved IDs in config: the SendGrid list,
+the Beehiiv publication, Stripe/PayPal product IDs, the Firebase SDK config.
+
+`applyConfigEdits(source, edits)` applies `{ 'dot.path': value }` edits to JSON5 text:
+existing leaves get their value span replaced; missing branches insert as one property
+before the containing object's closing brace (matching indent; house style: unquoted
+keys, JSON.stringify strings, trailing commas). Every byte outside the edited spans
+survives. Paths take dots, numeric array indexes, and `[key=value]` matchers that select
+an array element by its own key — `payment.products[id=plus].stripe.productId` — so
+writes self-locate in the file being edited instead of trusting an index computed from a
+merged config. Array elements are never created.
+
+Guarantees: edits whose value already matches are skipped entirely (reruns are
+byte-identical); after every edit the result must JSON5-parse and hold the requested
+value at the requested path, or the call throws and nothing is returned — a corrupted
+config can't land on disk.
+
+`writeConfigValues(projectDir, edits, { dryRun }?)` is the file-level form: resolves the
+standard locations, skips the write when nothing changes, and returns
+`{ path, changed, applied }` (`applied` = the paths that actually differed). The manager
+wraps it in `lib/config-write.js` (`writeBrandConfig(context, edits)`) for the uniform
+dry-run gate + logging.
+
 ## Migration — legacy configs → omega.json5
 
 No framework reads the legacy files anymore. Convert once, delete the old file. General
@@ -187,6 +215,8 @@ const {
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block
   findSecretKeys,      // (object) → dot-paths of secret-shaped keys
+  applyConfigEdits,    // (source, edits) → edited source — comment-preserving (see Writeback)
+  writeConfigValues,   // (projectDir, edits, { dryRun }?) → { path, changed, applied }
   deepMerge,           // agnostic layer merge
   TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS,
 } = require('@omegajs/config');

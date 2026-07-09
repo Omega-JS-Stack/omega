@@ -8,7 +8,7 @@
  * onboarding port. Never mutates — dry-run is identical to a normal run.
  *
  * accountId (pub-…) is required config — omega-manager defaulted it to the
- * company's shared account; account selection rides the config-writeback port.
+ * company's shared account; account selection rides the onboarding-flows port.
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env
  * (adsense.readonly scope, own token cache).
  */
