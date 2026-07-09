@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 
-const { loadConfig, resolveConfigPath, getEnabledTargets } = require('@omegajs/config');
+const { loadConfig, resolveConfigPath, getEnabledTargets, deepMerge } = require('@omegajs/config');
 const { DEFAULTS, APP_DIR_TARGETS, templateObject } = require('../config.js');
 
 /**
@@ -131,27 +131,34 @@ function discoverApps(brandRoot) {
 }
 
 /**
- * Load a brand monorepo: config (defaults ← brand file, whole-file merge with
- * `{ domain }` templating applied), enabled targets, discovered apps.
+ * Load a brand monorepo: config (defaults ← [company ←] brand file,
+ * whole-file merge with `{ domain }` templating applied), enabled targets,
+ * discovered apps. `companyConfig` is the inheritable layer from a company
+ * workspace (its omega.json5 minus the `brands` key) — runManage resolves it
+ * from the brand's `.omega/company.json` stamp.
  *
  * Config load failures (parse error, secret-shaped keys, legacy targets
  * array) do NOT throw here — they land in `configError` so the workspace
  * service reports them through the normal status flow.
  *
  * @param {string} brandRoot - Absolute brand-monorepo root
+ * @param {Object} [options] - { companyConfig? }
  * @returns {{ root, id, config, configError, configErrors, targets, apps, files }}
  */
-function loadBrand(brandRoot) {
+function loadBrand(brandRoot, { companyConfig = null } = {}) {
   let loaded = null;
   let configError = null;
 
+  // deepMerge skips falsy layers, so a standalone brand passes straight through
+  const defaults = deepMerge(DEFAULTS, companyConfig);
+
   try {
-    loaded = loadConfig(brandRoot, undefined, { defaults: DEFAULTS });
+    loaded = loadConfig(brandRoot, undefined, { defaults });
   } catch (error) {
     configError = error.message;
   }
 
-  let config = loaded ? loaded.config : { ...DEFAULTS, brand: { id: path.basename(brandRoot) } };
+  let config = loaded ? loaded.config : { ...defaults, brand: { id: path.basename(brandRoot) } };
 
   // Template `{ domain }` placeholders from brand.url (omega-manager parity)
   const url = config.brand?.url || '';

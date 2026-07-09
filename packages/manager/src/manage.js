@@ -17,6 +17,7 @@ const chalk = require('chalk').default;
 
 const { SERVICE_ORDER, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
+const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
 const { readState, writeState, writeRunOutput } = require('./lib/state.js');
 const { RunSummary } = require('./lib/run-summary.js');
 
@@ -84,10 +85,27 @@ async function runManage(startDir, options = {}) {
     );
   }
 
-  // Brand-root .env is the secrets home (loaded before any service touches an API)
-  require('dotenv').config({ path: join(brandRoot, '.env'), quiet: true });
+  // Company layer: a company-managed brand carries a .omega/company.json
+  // stamp (written idempotently by company runs) pointing at its company
+  // root — its config becomes the layer between manager DEFAULTS and the
+  // brand file, and its .env fills the gaps under the brand .env.
+  const marker = readCompanyMarker(brandRoot);
+  let companyConfig = null;
 
-  const brand = loadBrand(brandRoot);
+  if (marker?.stale) {
+    console.log(chalk.yellow(`⚠ .omega/company.json points at ${marker.companyRoot}, which is no longer a company workspace — running standalone (delete the file to silence this)`));
+  } else if (marker) {
+    companyConfig = loadCompanyConfig(marker.companyRoot);
+  }
+
+  // Secrets chain: shell env > brand .env > company .env (dotenv never
+  // overrides keys that are already set, so load order = precedence)
+  require('dotenv').config({ path: join(brandRoot, '.env'), quiet: true });
+  if (companyConfig) {
+    require('dotenv').config({ path: join(marker.companyRoot, '.env'), quiet: true });
+  }
+
+  const brand = loadBrand(brandRoot, { companyConfig });
 
   console.log('');
   console.log(chalk.bold.cyan('🚀 Omega Manager'));
@@ -112,6 +130,9 @@ async function runManage(startDir, options = {}) {
   console.log(`  ${chalk.bold.white(brand.config.brand?.name || brand.id)} ${chalk.cyan(brand.config.brand?.url || '')} ${chalk.dim('@ ' + new Date().toLocaleTimeString())}`);
   console.log(chalk.cyan('━'.repeat(70)));
   console.log(`  ${chalk.dim('Root:')}     ${brand.root}`);
+  if (companyConfig) {
+    console.log(`  ${chalk.dim('Company:')}  ${marker.companyRoot}`);
+  }
   console.log(`  ${chalk.dim('Targets:')}  ${brand.targets.join(', ') || chalk.yellow('none enabled')}`);
   console.log(`  ${chalk.dim('Apps:')}     ${brand.apps.map((a) => `${a.name}${a.target ? chalk.dim(`→${a.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
   console.log(`  ${chalk.dim('Services:')} ${options.service || servicesToRun.join(chalk.dim(' → '))}`);
