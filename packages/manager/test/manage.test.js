@@ -184,10 +184,14 @@ test('loadBrand: templates { domain } from brand.url', () => {
 
 // ─── End-to-end manage ───────────────────────────────────────────────────────
 
+// Testing's live checks read fetch/retryDelayMs from runManage options — a
+// canned 200 keeps the full loop network-free (the fixture URL never resolves)
+const FAKE_FETCH_200 = { fetch: async () => ({ status: 200, json: async () => ({}) }), retryDelayMs: 0 };
+
 test('runManage: full loop — workspace, update (build), testing all pass; run output + gitignore written', async () => {
   const root = stageBrand();
 
-  const report = await runManage(root, {});
+  const report = await runManage(root, { ...FAKE_FETCH_200 });
 
   assert.equal(report.hasErrors, false);
   assert.equal(report.results.workspace.status, 'success');
@@ -279,8 +283,8 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
 test('runManage: rerun is idempotent — same statuses, single gitignore entry', async () => {
   const root = stageBrand();
 
-  await runManage(root, {});
-  const second = await runManage(root, {});
+  await runManage(root, { ...FAKE_FETCH_200 });
+  const second = await runManage(root, { ...FAKE_FETCH_200 });
 
   assert.equal(second.hasErrors, false);
   assert.equal(second.results.workspace.status, 'success');

@@ -15,13 +15,13 @@
  *
  * Ported so far: the local trio that makes a brand monorepo itself work —
  * workspace (structure/config health), update (install + build every app),
- * testing (per-target health checks) — plus the external provisioning
- * services github, cloudflare, domain, firebase, recaptcha, analytics,
- * search-console, adsense, sendgrid, beehiiv, payment, slapform, chatsy,
- * replyify, server, assets, certificates, seo, account, and migrations
- * (--migration-gated Firestore data migrations). External-API services join
- * this list one at a time, keeping their omega-manager names and operation
- * granularity.
+ * testing (per-app local + live health checks) — plus the external
+ * provisioning services github, cloudflare, domain, firebase, recaptcha,
+ * analytics, search-console, adsense, sendgrid, beehiiv, payment, slapform,
+ * chatsy, replyify, server, assets, certificates, seo, account, and
+ * migrations (--migration-gated Firestore data migrations). That drains
+ * omega-manager's service order; onboarding/disperse/company mode ride
+ * later ports.
  */
 
 // =============================================================================
@@ -41,6 +41,17 @@ const APP_DIR_TARGETS = {
 const TARGET_APP_DIRS = Object.fromEntries(
   Object.entries(APP_DIR_TARGETS).map(([dir, target]) => [target, dir]),
 );
+
+// Framework package per target — used by the testing service to compare each
+// app's installed framework against the npm latest. Names flip to their
+// @omegajs/* successors at each rename cutover; mobile is reserved (MAM
+// parked, no framework to check).
+const TARGET_FRAMEWORKS = {
+  web: '@omegajs/web',
+  backend: 'backend-manager',
+  extension: 'browser-extension-manager',
+  desktop: 'electron-manager',
+};
 
 // =============================================================================
 // DEFAULT SETTINGS - The manager defaults layer under every brand config
@@ -684,7 +695,7 @@ const OPERATIONS = {
   ],
 
   testing: [
-    { name: 'target-checks', ensure: true }, // Per-target health checks (build output, backend files)
+    { name: 'target-checks', ensure: true }, // Per-app local checks (build output, backend files, framework version) + live checks (homepage, API health, GitHub Actions)
   ],
 };
 
@@ -726,6 +737,7 @@ function templateObject(obj, data) {
 module.exports = {
   APP_DIR_TARGETS,
   TARGET_APP_DIRS,
+  TARGET_FRAMEWORKS,
   DEFAULTS,
   SERVICE_ORDER,
   OPERATIONS,
