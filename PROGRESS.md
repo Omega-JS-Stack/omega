@@ -1,5 +1,5 @@
 # Project Progress Tracker
-> Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: `~/.claude/plans/i-need-you-to-jiggly-salamander.md` (Phases 0–5).
+> Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
 - (idle — next queue item starts on Ian's "continue")
@@ -43,4 +43,4 @@
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-09 4:34 PM (checkpoint 60)*
+*Last updated: 2026-07-09 4:41 PM (master plan vendored into plans/)*

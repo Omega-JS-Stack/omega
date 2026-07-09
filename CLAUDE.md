@@ -21,4 +21,4 @@ Single config format everywhere: shared sections (brand, firebaseConfig, analyti
 
 ## The plan
 
-The full redesign plan (context, architecture, phases, gates): `/Users/ian/.claude/plans/i-need-you-to-jiggly-salamander.md` (to be migrated into `docs/` as work lands). Track progress in [PROGRESS.md](PROGRESS.md).
+The full redesign plan (context, architecture, phases, gates, amendments): [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) — vendored in-repo so it survives chat resets. Live status: [PROGRESS.md](PROGRESS.md).
