@@ -129,6 +129,30 @@ const DEFAULTS = {
     },
   },
 
+  // Devlog — auto-generated commit-digest blog posts (standalone
+  // `omega-manager devlog`). Stateless: each run fetches commits from the
+  // last `lookbackDays` days, has the platform (Ghostii) write the article,
+  // and publishes to `destinations`. Not a service — never runs during manage.
+  devlog: {
+    enabled: false,
+    platform: 'ghostii',        // Article writer (only ghostii supported)
+    lookbackDays: 5,
+    orgs: [],                   // GitHub orgs/users to fully scan — for NON-brand repos (frameworks, tooling); brand repos are always scanned via the brand configs
+    excludeRepos: [],           // Repo names never fetched or mentioned
+    excludeCommits: [],         // Regex patterns (case-insensitive) — matching commit messages never reach the digest
+    excludeTopics: [],          // Topics the writer must never discuss
+    includePrivate: true,       // Scan private repos too — exclude rules govern what gets WRITTEN, not what gets read
+    postPath: 'devlog',         // Sub-folder under src/_posts/{year}/ in the website app
+    destinations: ['website'],  // website | devto | hashnode | medium (planned)
+    overrides: {                // Ghostii API overrides
+      length: 'long',
+      research: false,          // The digest is the source — no web research
+      insertImages: false,      // Local publisher doesn't mirror images into the repo (yet)
+      headerImageUrl: 'disabled',
+      maxLinks: 10,             // Backlinks are the point — allow more than Ghostii's default 6
+    },
+  },
+
   // Search Console. The domain property (sc-domain:) covers every subdomain;
   // DNS TXT verification writes through Cloudflare. Auth: the same
   // GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET as firebase/analytics (own token

@@ -5,9 +5,9 @@
 - (idle — next queue item starts on Ian's "continue")
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. @omegajs/desktop cutover, local half (electron-manager → @omegajs/desktop; incl. the test/** copy-once port + old-name 1.12.1 lane note)
-2. @omegajs/backend cutover, local half (backend-manager → @omegajs/backend)
-3. @omegajs/client cutover, local half (web-manager → @omegajs/client; freeze 4.x story)
+1. @omegajs/desktop cutover, local half (electron-manager → @omegajs/desktop; incl. test/** copy-once port, old-name 1.12.1 lane note, upstream fold: v1.12.1+v1.13.0 +2 dirty — 65's survey)
+2. @omegajs/backend cutover, local half (backend-manager → @omegajs/backend; upstream fold: v5.12.0 +1 dirty — 65's survey)
+3. @omegajs/client cutover, local half (web-manager → @omegajs/client; freeze 4.x story; upstream fold: v4.3.5–v4.3.6)
 4. Local-linking DX: root `npm start` all-package watch + `omega dev --local` auto-linking (plan §8)
 5. Phase 5 template product + full local dogfood (template → wizard → brand monorepo runs end-to-end on local packages)
 
@@ -35,6 +35,7 @@
 - web-manager tarball ships src/ with bare @omegajs imports — exports-unaware consumers would fail loudly; revisit at the client cutover (1.3b)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 65 upstream sync sweep + devlog port — legacy merges pinned: BXM/web/manager already covered EXCEPT devlog → ported to @omegajs/manager (564 tests); EM/BEM/WM deltas annotated onto their cutovers (this commit) → CHANGELOG
 - [x] 64 @omegajs/extension cutover (local) — first Phase-3 rename: 2.0.0, consumer canary builds MV3 ×3 browsers, pack-smoke green; devkit vendor ×2 + gulp5 icons fixes (this commit) → CHANGELOG
 - [x] 63 extension port + PSD templates + AI brandmark — omega-manager FULLY ported, nothing parked; company PSD binaries land in ITW's company repo at migration, live MrLogo mint on Ian's go (ec9a223) → CHANGELOG
 - [x] 62 disperse remnants — certs into desktop/mobile apps, per-app .env composition, pixel-token paste-in (feb8e36) → CHANGELOG
@@ -51,4 +52,4 @@
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-09 8:05 PM (checkpoint 64)*
+*Last updated: 2026-07-10 (checkpoint 65)*
