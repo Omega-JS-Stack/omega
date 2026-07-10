@@ -28,13 +28,13 @@
 - Checkpoint discipline (structure unchanged): survey (read-only) → design (de-ITW, non-interactive, .env creds, dry-run) → implement → tests → sandbox/fixture proof → docs → commit.
 - Git: explicit `git -C` always (post-incident rule: a checkpoint-5 commit briefly landed in omega-manager via a stray cwd — reverted, nothing pushed); commit-and-continue is standing for THIS repo; `Co-Authored-By: Claude Fable 5` trailer.
 - De-ITW'ing hardcoded company values into config = standard scope; best-implementation-wins normalization is licensed (pick the better behavior, don't keep both quirks).
+- CI runner-minutes (Ian 2026-07-10): the emulator jobs (backend suite + sandbox) are MANUAL-DISPATCH ONLY (`gh workflow run CI`) until the 2-core worker-load problem is fixed — pushes run the lean matrix (~15 min); don't re-enable them on push without Ian.
 - npu, never raw npm install/npx. Secrets never in omega.json5 — .env / .omega/secrets only (@omega.js/config hard-fails on secret-shaped keys).
 - Local-first (Ian 2026-07-09): build the NEW system locally — zero npm publishes until Ian finalizes versions (orgs now claimed; `@omega.js` names land at N2); migrators/verifiers pinned.
 
 ## ⚠ Parked findings (detail: the named task's CHANGELOG entry)
 - ~~Env prefixes + backend wire format~~ SHIPPED (72); ~~BEM hardcoded emulator ports~~ GRADUATED to queue N7 (70)
 - Ghostii devlog auth still sends the `backendManagerKey` payload field — live external API contract; rename when Ghostii itself migrates to the new stack (72)
-- `omega-api-proxy` worker DEPRECATED (D5 addendum 2) — hosting rewrites suffice; delete the worker + its ensure warning once no brand config references it (72)
 - CI emulator jobs on 2-core runners: 'Failed to load function.' worker-load storms (run 6: 104×, machine otherwise clean — leak theory dead); run 7 = FUNCTIONS_DISCOVERY_TIMEOUT=120 + on-failure post-mortems; if still failing: throttle the trigger storms or split/beef the jobs (73a)
 - push-secrets under D15: it pushes only the APP .env Default section to repo secrets, but brand/company-level values no longer live there — revisit when the dogfood arc reaches CI publish (D13) (73a)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
@@ -69,4 +69,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 4:05 PM (checkpoint 73a done; N4 sweep continues — DRY/SSOT, zod schemas, D12)*
+*Last updated: 2026-07-10 4:10 PM (73a done; omega-api-proxy un-deprecated per Ian — proxifly's separate-backend shape; CI emulator jobs → manual dispatch)*

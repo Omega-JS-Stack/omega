@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual runs additionally include the emulator jobs (backend suite + sandbox):
+  #   gh workflow run CI -R Omega-JS-Stack/omega
+  workflow_dispatch:
 
 # A newer push supersedes the running verification of the same branch.
 concurrency:
@@ -14,13 +17,9 @@ jobs:
   test:
     name: Package suites
     runs-on: ubuntu-latest
-    # Hangs must die fast and labeled (the emulator suites stalled silently on the first runs)
-    timeout-minutes: 45
-    env:
-      # Run-6 evidence: 104× "Failed to load function." — functions workers time
-      # out REQUIRING the heavy module on the 2-core runner (fine locally). Give
-      # the emulator's codebase load a longer leash.
-      FUNCTIONS_DISCOVERY_TIMEOUT: 120
+    # Runner-minute control (Ian 2026-07-10): this is the LEAN matrix — the
+    # backend emulator suite lives in its own manual-dispatch job below.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -28,17 +27,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-
-      # @omega.js/backend's suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      # The backend suite spawns the `firebase` CLI to boot the emulators — not a
-      # package dependency, so the runner needs it globally (same as a dev machine).
-      - name: Install firebase-tools
-        run: npm install -g firebase-tools@15.22.4
 
       - name: Install
         run: npm ci
@@ -76,23 +64,53 @@ jobs:
       - name: desktop suite (xvfb for Electron)
         run: xvfb-run --auto-servernum npm test --workspace=packages/desktop
 
-      # Run 6 proved the machine is CLEAN here (6.9 GB available, no leaked
-      # processes) — the trouble starts DURING the backend suite: functions
-      # workers fail to load under the event storms, the emulator respawns
-      # them, and the job hangs (SIGTERM'd at ~23 min) or the runner dies.
-      # Keep the sweep as belt-and-suspenders and the snapshot as the baseline.
-      - name: Preflight for backend suite (kill leaked emulators, show headroom)
+  # Runner-minute control (Ian 2026-07-10): the two emulator workloads burned
+  # 20–50 min per push while hanging (run-6 evidence: the runner is CLEAN going
+  # in — 6.9 GB free — then functions workers fail to LOAD under the event
+  # storms on 2-core runners, the emulator respawns them, and the job hangs or
+  # the runner VM dies). Manual dispatch only until the fix is proven:
+  #   gh workflow run CI -R Omega-JS-Stack/omega
+  backend-suite:
+    name: Backend suite (emulators — manual dispatch only)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Run-6 evidence: 104× "Failed to load function." — functions workers time
+      # out REQUIRING the heavy module on the 2-core runner (fine locally). Give
+      # the emulator's codebase load a longer leash.
+      FUNCTIONS_DISCOVERY_TIMEOUT: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # The suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # The suite spawns the `firebase` CLI to boot the emulators — not a
+      # package dependency, so the runner needs it globally (same as a dev machine).
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@15.22.4
+
+      - name: Install
+        run: npm ci
+
+      - name: Headroom baseline
         run: |
-          pkill -f 'firebase|cloud-firestore-emulator|pubsub-emulator|cloud-database-emulator' || true
-          pkill -f 'java.*emulator' || true
-          sleep 2
           free -m
           ps aux --sort=-rss | head -12
 
       - name: backend suite
         run: npm test --workspace=packages/backend
 
-      # Catch the resource spike in the act — run-6 snapshots only show the
+      # Catch the resource spike in the act — the baseline only shows the
       # BEFORE picture; if the worker-respawn spiral eats the memory, this
       # shows it (when the step fails but the runner survives).
       - name: Post-mortem headroom
@@ -102,11 +120,12 @@ jobs:
           ps aux --sort=-rss | head -15
 
   sandbox:
-    name: Sandbox brand (@omega.js/backend corpus + cross-stack e2e)
+    name: Sandbox brand (@omega.js/backend corpus + cross-stack e2e — manual dispatch only)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
-      # Same worker-load-timeout leash as the suites job (see run-6 evidence there)
+      # Same worker-load-timeout leash as the backend-suite job (run-6 evidence there)
       FUNCTIONS_DISCOVERY_TIMEOUT: 120
     steps:
       - uses: actions/checkout@v4

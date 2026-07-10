@@ -2,8 +2,9 @@
  * Ensure Firebase Hosting serves the brand's API domains.
  *
  * The default hosting site ({projectId}) gets api.{domain} (Cloud Functions'
- * public endpoint via Firebase Hosting rewrites; the legacy omega-api-proxy
- * worker chain is deprecated) plus
+ * public endpoint via Firebase Hosting rewrites; a brand whose api domain
+ * fronts a dedicated non-Firebase backend routes /omega through the
+ * cloudflare omega-api-proxy worker instead) plus
  * api.{sub}.{domain} for each brand.subdomains entry. The main domain is NOT
  * added — the website hosts elsewhere (GitHub Pages).
  *
