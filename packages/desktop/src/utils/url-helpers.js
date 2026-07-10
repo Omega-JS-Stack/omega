@@ -3,7 +3,7 @@
 // UJM and BXM consumers.
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
-// (alongside the is*() family; mirrors BEM/UJM/BXM). It returns exactly ONE of
+// (alongside the is*() family; mirrors @omegajs/backend/UJM/BXM). It returns exactly ONE of
 // 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
 //
 // `getFunctionsUrl()` / `getApiUrl()` / `getWebsiteUrl()` route through
@@ -44,7 +44,7 @@ function getApiUrl(environment) {
   return `https://api.${authDomain}`;
 }
 
-// Marketing-site / brand website URL. Dev → `https://localhost:4000` (matches BEM's
+// Marketing-site / brand website URL. Dev → `https://localhost:4000` (matches @omegajs/backend's
 // jekyll-emulator port convention). Prod → `config.brand.url`. Use this whenever app
 // code wants to link out to "the website" (Help → Website tray/menu items, "Open in
 // browser," billing portal landings) so dev runs don't punch out to the real domain.

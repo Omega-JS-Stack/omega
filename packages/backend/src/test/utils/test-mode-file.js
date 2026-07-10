@@ -9,7 +9,7 @@
  * code-branch refactor needed.
  *
  * File lives at `<consumerProject>/.temp/test-mode.json` — `.temp/` is the
- * standard transient cache directory across UJM/BXM/EM/BEM consumer projects
+ * standard transient cache directory across UJM/BXM/EM/@omegajs/backend consumer projects
  * (sits at the repo root, gitignored by default).
  *
  * ## Allowlist

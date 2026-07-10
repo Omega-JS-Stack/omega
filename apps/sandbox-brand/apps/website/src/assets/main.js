@@ -39,7 +39,7 @@ function setStatus(text) {
 /**
  * Await one settled auth state ({ user, account, resolved }). Each call re-fetches
  * the account from Firestore — the driver polls this to observe the user doc
- * created by backend-manager's auth onCreate trigger.
+ * created by @omegajs/backend's auth onCreate trigger.
  */
 function authState() {
   return new Promise((resolve) => {
@@ -53,7 +53,7 @@ window.__omega = {
   manager,
 
   // Signup is page-side in the real stack too: pages create the Firebase auth
-  // user directly; BEM's auth onCreate trigger then creates the Firestore doc.
+  // user directly; @omegajs/backend's auth onCreate trigger then creates the Firestore doc.
   signUp(email, password) {
     return createUserWithEmailAndPassword(manager.firebaseAuth, email, password)
       .then((credential) => credential.user.uid);

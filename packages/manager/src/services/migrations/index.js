@@ -5,7 +5,7 @@
  * never touches collection data.
  *
  * The framework (runner, validator, snapshots) plus the two canonical
- * BEM-schema migrations (notifications, users) are ported from
+ * @omegajs/backend-schema migrations (notifications, users) are ported from
  * omega-manager; its other 25 registered migrations are company-instance
  * one-offs (per-app data repairs) and stay there. firebase-admin is
  * replaced by the shared Identity Toolkit + FirestoreREST clients over the

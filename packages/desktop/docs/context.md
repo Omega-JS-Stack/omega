@@ -1,6 +1,6 @@
 # Context
 
-Runtime info block. Mirrors BEM's `assistant.request.{geolocation,client}` shape so @omegajs/desktop apps + sister projects (BEM, UJM, web-manager) all reference the same property paths when reading user info.
+Runtime info block. Mirrors @omegajs/backend's `assistant.request.{geolocation,client}` shape so @omegajs/desktop apps + sister projects (@omegajs/backend, UJM, web-manager) all reference the same property paths when reading user info.
 
 Populated asynchronously during `manager.initialize()`.
 
@@ -66,13 +66,13 @@ const snap = await window.em.context.get();
 console.log(snap.session.deviceId);
 ```
 
-## Why the BEM shape
+## Why the @omegajs/backend shape
 
-Sister projects (BEM, web-manager, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. @omegajs/desktop matches the leaf names so consumer code can write logic that works across all four runtimes:
+Sister projects (@omegajs/backend, web-manager, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. @omegajs/desktop matches the leaf names so consumer code can write logic that works across all four runtimes:
 
 ```js
 const country = manager.context.geolocation.country
-             || assistant.request.geolocation.country  // BEM
+             || assistant.request.geolocation.country  // @omegajs/backend
              || webManager.context.geolocation.country;
 ```
 

@@ -10,7 +10,7 @@ Usage is tracked per-metric (e.g., `requests`, `sponsorships`) with four fields:
 
 ## Core API
 
-Routes receive `usage` in their context object, already initialized for the authenticated user. **Always use these methods** — never manually read/write `usage` fields on Firestore docs; the field path is always `{doc}.usage.{metric}`, and BEM creates the structure on first write (do NOT pre-initialize usage fields on document creation).
+Routes receive `usage` in their context object, already initialized for the authenticated user. **Always use these methods** — never manually read/write `usage` fields on Firestore docs; the field path is always `{doc}.usage.{metric}`, and @omegajs/backend creates the structure on first write (do NOT pre-initialize usage fields on document creation).
 
 | Method | Sync? | What it does |
 |--------|-------|--------------|
@@ -26,6 +26,8 @@ For anonymous-to-owner billing, call `setUser()` BEFORE `validate()` — validat
 ## Limits & Daily Caps
 
 Limits are always specified as **monthly** values in product config (e.g., `limits.requests = 100` means 100/month).
+
+**Negative limits are unlimited.** `limits.requests = -1` means the metric is never rate-limited for that product — `validate()` always resolves and no daily caps apply. A limit of `0` (or a metric missing from `limits`) always rejects.
 
 By default, limits are enforced with **daily caps** to prevent users from burning their entire monthly quota in a single day. Two checks are applied:
 

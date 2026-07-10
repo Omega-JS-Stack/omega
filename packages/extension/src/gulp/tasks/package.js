@@ -99,7 +99,7 @@ async function generateBuildJs(outputDir) {
         serviceWorker: { enabled: false, config: {} },
 
         // Analytics. The Measurement Protocol API secret comes from .env
-        // (GOOGLE_ANALYTICS_SECRET — matches BEM/EM convention; secrets never live
+        // (GOOGLE_ANALYTICS_SECRET — matches @omegajs/backend/EM convention; secrets never live
         // in omega.json5) and is baked into the snapshot here at build time.
         analytics: {
           google: config.analytics?.providers?.google?.id || '',

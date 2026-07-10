@@ -4,7 +4,7 @@ const powertools = require('node-powertools');
  * Expire PayPal pending cancellations
  *
  * PayPal has no cancel_at_period_end like Stripe — cancellation is immediate on PayPal's side.
- * BEM keeps users active with cancellation.pending=true until the billing period ends.
+ * @omegajs/backend keeps users active with cancellation.pending=true until the billing period ends.
  * Since PayPal does NOT fire a webhook at period end, this cron job transitions those
  * users to 'cancelled' status once their paid period has expired.
  *

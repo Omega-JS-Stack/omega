@@ -25,7 +25,7 @@ class TestCommand extends BaseCommand {
       process.env.TEST_EXTENDED_MODE = 'true';
     }
 
-    // Framework self-test: when `npx mgr test` is run from the backend-manager repo
+    // Framework self-test: when `npx mgr test` is run from the @omegajs/backend repo
     // (no firebase.json in cwd), boot the bundled fixture project under
     // src/test/fixtures/firebase-project. Mirrors BXM/UJM *_TEST_BOOT_PROJECT.
     const isSelfTest = this.setupSelfTest();
@@ -37,7 +37,7 @@ class TestCommand extends BaseCommand {
     // full routes/events/rules suites need a real consumer backend, not the
     // minimal fixture.
     if (isSelfTest && testPaths.length === 0) {
-      testPaths.push('bem:boot');
+      testPaths.push('backend:boot');
     }
 
     // Determine the project directory
@@ -196,10 +196,10 @@ class TestCommand extends BaseCommand {
    * Framework self-test detection + fixture wiring.
    *
    * When `npx mgr test` runs from a directory that is NOT a Firebase project
-   * (no firebase.json) AND is the backend-manager repo (or BEM_TEST_BOOT_PROJECT
+   * (no firebase.json) AND is the @omegajs/backend repo (or BEM_TEST_BOOT_PROJECT
    * is set), point the run at the bundled fixture project and link the local
    * framework + firebase deps into it so the emulator's function workers resolve
-   * them. This is BEM's equivalent of BXM's BXM_TEST_BOOT_PROJECT / UJM's
+   * them. This is @omegajs/backend's equivalent of BXM's BXM_TEST_BOOT_PROJECT / UJM's
    * UJ_TEST_BOOT_PROJECT. Returns true if self-test wiring was applied.
    */
   setupSelfTest() {
@@ -210,11 +210,11 @@ class TestCommand extends BaseCommand {
       return false;
     }
 
-    // Self-test if BEM_TEST_BOOT_PROJECT is set, or cwd is the backend-manager repo.
+    // Self-test if BEM_TEST_BOOT_PROJECT is set, or cwd is the @omegajs/backend repo.
     let isSelfTest = !!process.env.BEM_TEST_BOOT_PROJECT;
     if (!isSelfTest) {
       try {
-        isSelfTest = require(path.join(process.cwd(), 'package.json')).name === 'backend-manager';
+        isSelfTest = require(path.join(process.cwd(), 'package.json')).name === '@omegajs/backend';
       } catch (_) { /* no package.json — not a self-test */ }
     }
     if (!isSelfTest) {
@@ -251,7 +251,7 @@ class TestCommand extends BaseCommand {
 
   /**
    * Write a throwaway service-account.json into the fixture so firebase-admin's
-   * `cert()` can parse it. BEM's manager uses the cert path when
+   * `cert()` can parse it. @omegajs/backend's manager uses the cert path when
    * GOOGLE_APPLICATION_CREDENTIALS is unset (as in the functions emulator). The
    * key is a freshly-generated RSA key — emulator-only, never authenticates
    * against Google (the project is a `demo-` project), so it is generated at
@@ -260,7 +260,7 @@ class TestCommand extends BaseCommand {
   ensureFixtureServiceAccount(fixture) {
     const crypto = require('crypto');
     const saPath = path.join(fixture, 'functions', 'service-account.json');
-    const projectId = 'demo-backend-manager';
+    const projectId = 'demo-omega-backend';
     const { privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
@@ -290,23 +290,26 @@ class TestCommand extends BaseCommand {
    * functions/node_modules so the emulator's function workers can resolve them.
    * Mirrors what `npx mgr install dev` does in a real consumer, but for the
    * fixture and without an npm install (firebase-admin/firebase-functions come
-   * from BEM's own node_modules; backend-manager points at the repo root).
+   * from @omegajs/backend's own node_modules; @omegajs/backend points at the repo root).
    */
   linkFixtureDeps(fixture) {
     const fnNodeModules = path.join(fixture, 'functions', 'node_modules');
     jetpack.dir(fnNodeModules);
 
-    const bemRoot = path.resolve(__dirname, '..', '..', '..'); // src/cli/commands -> repo root
+    const frameworkRoot = path.resolve(__dirname, '..', '..', '..'); // src/cli/commands -> repo root
     const links = {
-      'backend-manager': bemRoot,
-      'firebase-admin': path.join(bemRoot, 'node_modules', 'firebase-admin'),
-      'firebase-functions': path.join(bemRoot, 'node_modules', 'firebase-functions'),
+      '@omegajs/backend': frameworkRoot,
+      'firebase-admin': path.join(frameworkRoot, 'node_modules', 'firebase-admin'),
+      'firebase-functions': path.join(frameworkRoot, 'node_modules', 'firebase-functions'),
     };
 
     for (const [name, target] of Object.entries(links)) {
       const linkPath = path.join(fnNodeModules, name);
       try { fs.rmSync(linkPath, { recursive: true, force: true }); } catch (_) { /* nothing to remove */ }
       try {
+        // The link's PARENT, not just node_modules — a scoped name like
+        // @omegajs/backend needs its node_modules/@omegajs dir to exist first
+        fs.mkdirSync(path.dirname(linkPath), { recursive: true });
         fs.symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
       } catch (e) {
         this.logWarning(`Could not link ${name} into fixture: ${e.message}`);
@@ -349,7 +352,7 @@ class TestCommand extends BaseCommand {
    * own perspective — avoids the sparse-file problem caused by external truncation).
    *
    * Waits up to 2s for the sentinel to be consumed. If it's still there after 2s
-   * the emulator isn't watching (probably running an older BEM or started outside
+   * the emulator isn't watching (probably running an older @omegajs/backend or started outside
    * `npx mgr emulator`); we delete the sentinel and proceed — tests still run, the
    * log just won't be reset for this run.
    */
@@ -386,7 +389,7 @@ class TestCommand extends BaseCommand {
 
     // Ask the running emulator process to roll emulator.log so this test run gets a
     // clean slate. We touch a sentinel file the emulator polls for (every ~500ms) and
-    // wait briefly for it to be consumed. If the emulator isn't watching (older BEM
+    // wait briefly for it to be consumed. If the emulator isn't watching (older @omegajs/backend
     // version, or not started via `npx mgr emulator`), we time out silently — the log
     // just won't be fresh, tests still run normally.
     await this.requestEmulatorLogReset(projectDir);

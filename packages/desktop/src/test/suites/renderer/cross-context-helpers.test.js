@@ -100,7 +100,7 @@ module.exports = {
       },
     },
     {
-      name: 'getWebsiteUrl: dev → https://localhost:4000 (BEM convention)',
+      name: 'getWebsiteUrl: dev → https://localhost:4000 (@omegajs/backend convention)',
       run: (ctx) => {
         ctx.expect(window.__emTestManager.getWebsiteUrl('development')).toBe('https://localhost:4000');
       },

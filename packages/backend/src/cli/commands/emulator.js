@@ -44,7 +44,7 @@ class EmulatorCommand extends BaseCommand {
       this.log('');
     }
 
-    // Start BEM watcher in background
+    // Start @omegajs/backend watcher in background
     const watcher = new WatchCommand(this.main);
     watcher.startBackground();
 
@@ -119,7 +119,7 @@ class EmulatorCommand extends BaseCommand {
       throw new Error('Port conflicts could not be resolved');
     }
 
-    // Wipe stale firebase-tools debug logs + any leftover BEM logs from older versions.
+    // Wipe stale firebase-tools debug logs + any leftover @omegajs/backend logs from older versions.
     this.sweepStaleLogs();
 
     // Set up log file + reset-sentinel watcher.

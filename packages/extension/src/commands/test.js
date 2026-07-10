@@ -9,7 +9,7 @@ const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.j
 
 module.exports = async function (options) {
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
-  // EM's test.log and BEM's test.log pattern.
+  // EM's test.log and @omegajs/backend's test.log pattern.
   attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
 
   const layer       = options.layer    || 'all';
@@ -22,7 +22,7 @@ module.exports = async function (options) {
   // Extended mode — opt into tests that hit REAL external services (Firebase via web-manager,
   // push, any network call) instead of skipping them. Off by default so `npx mgr test` stays
   // fast and offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var
-  // — the SAME name across BEM/BXM/UJM/EM (cross-framework parity); `--extended` is the CLI
+  // — the SAME name across @omegajs/backend/BXM/UJM/EM (cross-framework parity); `--extended` is the CLI
   // shorthand. Once set on process.env it propagates to every spawned test environment (the
   // in-process Node runner, and Puppeteer's Chromium which inherits process.env).
   const extended    = options.extended === true

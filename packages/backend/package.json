@@ -1,7 +1,7 @@
 {
-  "name": "backend-manager",
-  "version": "5.11.7",
-  "description": "Quick tools for developing Firebase functions",
+  "name": "@omegajs/backend",
+  "version": "6.0.0",
+  "description": "OMEGA backend framework — build, test, and deploy Firebase Cloud Functions backends",
   "main": "dist/manager/index.js",
   "files": [
     "bin/",
@@ -13,14 +13,12 @@
     "CLAUDE.md"
   ],
   "bin": {
-    "bm": "./bin/backend-manager",
-    "bem": "./bin/backend-manager",
-    "backend-manager": "./bin/backend-manager",
-    "mgr": "./bin/backend-manager"
+    "omega-backend": "./bin/omega-backend",
+    "mgr": "./bin/omega-backend"
   },
   "scripts": {
     "start": "npm run prepare:watch",
-    "test": "node bin/backend-manager test",
+    "test": "node bin/omega-backend test",
     "prepare": "node -e \"require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "prepublishOnly": "node -e \"['src', 'dist'].forEach((d) => require('fs').rmSync(d + '/test/fixtures/firebase-project/functions/node_modules', { recursive: true, force: true }))\""
@@ -35,11 +33,8 @@
     "test": "npx mgr setup && npx mgr test",
     "setup": "npx mgr setup"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/itw-creative-works/backend-manager.git"
-  },
   "keywords": [
+    "omega",
     "firebase",
     "firebase-functions",
     "cloud-functions",
@@ -51,11 +46,7 @@
     "cli"
   ],
   "author": "ITW Creative Works",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/itw-creative-works/backend-manager/issues"
-  },
-  "homepage": "https://itwcreativeworks.com",
+  "license": "MIT",
   "preparePackage": {
     "input": "./src",
     "output": "./dist",

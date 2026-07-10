@@ -37,7 +37,7 @@ npx mgr test project:             # run ONLY your project tests (all of them)
 npx mgr test project:custom-test  # run only consumer project tests matching a path
 npx mgr test mgr:                 # run ONLY framework tests (universal alias; em:/framework: are equivalent)
 npx mgr test desktop:build/config      # run only framework tests matching a path
-npx mgr test --extended           # also run tests that hit REAL external services (off by default; TEST_EXTENDED_MODE=true is the env equivalent — shared name across BEM/BXM/UJM/@omegajs/desktop)
+npx mgr test --extended           # also run tests that hit REAL external services (off by default; TEST_EXTENDED_MODE=true is the env equivalent — shared name across @omegajs/backend, @omegajs/extension, UJM, and @omegajs/desktop)
 # (output is teed to logs/ — dev.log on `npm start`, build.log on `npm run build`, test.log on `npx mgr test`; cat instead of scrolling scrollback)
 npx mgr install dev  # use LOCAL @omegajs/desktop source (to test framework edits)
 npx mgr install live # restore the published @omegajs/desktop from npm

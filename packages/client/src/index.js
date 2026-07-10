@@ -95,8 +95,8 @@ class Manager {
       // Set platform and runtime on HTML element
       this._setHtmlDataAttributes();
 
-      // Initialize Firebase if a config blob is present (presence-driven — matches BEM
-      // convention). Reads flat `firebaseConfig` (BEM/BXM/EM canonical shape) and falls
+      // Initialize Firebase if a config blob is present (presence-driven — matches @omegajs/backend
+      // convention). Reads flat `firebaseConfig` (@omegajs/backend/BXM/EM canonical shape) and falls
       // back to nested `firebase.app.config` (UJM's current `_config.yml` shape).
       // Once UJM migrates to the flat shape this fallback can be dropped.
       if (this._resolveFirebaseConfig()) {
@@ -393,7 +393,7 @@ class Manager {
   }
 
   // Resolve the Firebase web SDK config blob. Flat `firebaseConfig` first (canonical
-  // shape — BEM/BXM/EM), then nested `firebase.app.config` (UJM legacy yaml shape).
+  // shape — @omegajs/backend/BXM/EM), then nested `firebase.app.config` (UJM legacy yaml shape).
   // Returns the blob when it has at least one own key, otherwise null.
   _resolveFirebaseConfig() {
     const flat = this.config.firebaseConfig;
@@ -520,8 +520,8 @@ class Manager {
       || this.config.environment;
 
     if (env === 'development') {
-      // BEM's `mgr serve` exposes the local API over HTTPS (mkcert proxy on 5002,
-      // since backend-manager 5.7.0) — plain http:// cannot connect to it.
+      // @omegajs/backend's `mgr serve` exposes the local API over HTTPS (mkcert proxy on 5002,
+      // since @omegajs/backend 5.7.0) — plain http:// cannot connect to it.
       return 'https://localhost:5002';
     }
 

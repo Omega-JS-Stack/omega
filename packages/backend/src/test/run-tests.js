@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * BEM Test Runner Entry Point
+ * @omegajs/backend Test Runner Entry Point
  * This script is executed by the CLI test command inside the Firebase emulator
  * It reads configuration from BEM_TEST_CONFIG environment variable and runs the test suite
  */
 
-// Mark this process as the test runner BEFORE loading any BEM code. Manager.init()
+// Mark this process as the test runner BEFORE loading any @omegajs/backend code. Manager.init()
 // auto-detects this and skips Firebase Functions / server / Sentry wiring (which
 // can't run outside a real Functions runtime). This is what lets tests receive a
 // fully-wired Manager + assistant in their context — no per-test stub.
@@ -56,9 +56,9 @@ async function main() {
       cwd: path.join(projectDir, 'functions'),
       log: false,
     });
-    assistant = Manager.Assistant({}, { functionName: 'bem-test-runner', accept: 'json' });
+    assistant = Manager.Assistant({}, { functionName: 'backend-test-runner', accept: 'json' });
   } catch (error) {
-    console.error('Warning: Could not initialize BEM Manager for tests:', error.message);
+    console.error('Warning: Could not initialize @omegajs/backend Manager for tests:', error.message);
   }
 
   // Create and run the test runner
@@ -71,8 +71,8 @@ async function main() {
 
   const results = await runner.run();
 
-  // Exit with appropriate code
-  process.exit(results.failed > 0 ? 1 : 0);
+  // Exit with appropriate code (a pre-flight abort ran zero tests — that is a failure)
+  process.exit(results.failed > 0 || results.aborted ? 1 : 0);
 }
 
 main().catch(error => {

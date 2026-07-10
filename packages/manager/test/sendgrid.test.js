@@ -12,7 +12,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
-const { fieldsFor, segmentsFor } = require('../src/lib/bem-marketing.js');
+const { fieldsFor, segmentsFor } = require('../src/lib/backend-marketing.js');
 const { buildQueryDsl } = require('../src/services/sendgrid/lib/segment-query.js');
 const service = require('../src/services/sendgrid/index.js');
 

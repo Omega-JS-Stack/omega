@@ -46,7 +46,7 @@ This is identical strictness in dev and production. There's no separate `'publis
 
 They **only run when the value is present**. A missing field with `required: false` is silent. A missing field with `required: true` fires the "missing" error and nothing else — so consumers don't see a confusing flood of "missing AND wrong type AND doesn't match" for the same field.
 
-## Presence-driven feature flags (BEM convention)
+## Presence-driven feature flags (@omegajs/backend convention)
 
 A non-empty credential value enables a feature — there is no separate `enabled: true/false` flag for credential-gated features:
 
@@ -94,9 +94,9 @@ Field present but invalid:
 
 Errors are numbered so you can fix everything in one pass instead of fix-rebuild-fix-rebuild.
 
-## Adding payment fields (BEM-shaped)
+## Adding payment fields (@omegajs/backend-shaped)
 
-@omegajs/desktop's schema mirrors [BEM's `manager-config.example.json`](https://github.com/itw-creative-works/backend-manager) shape for payment so the same product catalog reads identically on backend, web, and desktop:
+@omegajs/desktop's schema mirrors [@omegajs/backend's `manager-config.example.json`](https://github.com/itw-creative-works/backend-manager) shape for payment so the same product catalog reads identically on backend, web, and desktop:
 
 ```js
 {
@@ -112,7 +112,7 @@ Errors are numbered so you can fix everything in one pass instead of fix-rebuild
 }
 ```
 
-The schema only enforces shape for the few well-defined publishable keys — the product catalog itself is freeform so BEM can extend it without @omegajs/desktop caring.
+The schema only enforces shape for the few well-defined publishable keys — the product catalog itself is freeform so @omegajs/backend can extend it without @omegajs/desktop caring.
 
 ## Source
 

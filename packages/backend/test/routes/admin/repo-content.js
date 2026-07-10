@@ -61,7 +61,7 @@ module.exports = {
       timeout: 60000,
 
       async run({ http, assert, state }) {
-        const uniqueContent = `BEM Test - ${new Date().toISOString()}`;
+        const uniqueContent = `@omegajs/backend Test - ${new Date().toISOString()}`;
         const response = await http.post('backend-manager/admin/repo/content', {
           path: '_test/bem-write-test.txt',
           content: uniqueContent,
@@ -183,7 +183,7 @@ module.exports = {
               owner,
               repo,
               path: filePath,
-              message: `🧹 BEM test cleanup: ${filePath}`,
+              message: `🧹 @omegajs/backend test cleanup: ${filePath}`,
               sha: fileData.sha,
             });
           } catch (e) {
@@ -202,7 +202,7 @@ module.exports = {
 
           for (const run of runs.workflow_runs) {
             if (run.head_commit?.message?.includes('admin:write-repo-content')
-                || run.head_commit?.message?.includes('BEM test cleanup')) {
+                || run.head_commit?.message?.includes('@omegajs/backend test cleanup')) {
               try {
                 await octokit.rest.actions.cancelWorkflowRun({
                   owner,

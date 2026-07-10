@@ -54,7 +54,7 @@ Only when auditing the @omegajs/extension repo itself. Mirrored across the four 
 
 | ID | Sev | Check |
 |----|-----|-------|
-| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / BEM / EM; deviations are deliberate and documented |
+| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / @omegajs/backend / EM; deviations are deliberate and documented |
 | F-02 | HIGH | Consumer-shipped defaults in sync — what `npx mgr setup` scaffolds (`src/defaults/` via `FILE_MAP`) matches current conventions and docs ([defaults.md](defaults.md)) |
 | F-03 | MED | Docs completeness — every `docs/*.md` indexed in CLAUDE.md; every subsystem has a doc; no "(planned)" links for things that have shipped |
 | F-04 | HIGH | `npx mgr test mgr:` green before treating the audit as complete |

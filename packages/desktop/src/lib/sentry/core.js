@@ -13,7 +13,7 @@ const DEFAULTS = {
 
 // Resolve runtime config + decide whether sentry should boot.
 // Presence-driven: a non-empty `dsn` enables sentry. No separate `enabled` flag —
-// matches BEM convention (a config block's credentials are its enable signal).
+// matches @omegajs/backend convention (a config block's credentials are its enable signal).
 // Returns { shouldEnable, options, reason } where options is the resolved sentry-init opts.
 function resolveConfig(manager) {
   const cfg = (manager && manager.config && manager.config.sentry) || {};

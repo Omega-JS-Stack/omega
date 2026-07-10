@@ -1,7 +1,7 @@
 /**
  * @omegajs/web's defaults scaffolding — applies the framework's scaffold tree
  * (scaffold/ in the package) to the consumer project root via the shared
- * devkit engine. Exported standalone (BEM/BXM pattern) so the framework
+ * devkit engine. Exported standalone (@omegajs/backend/BXM pattern) so the framework
  * test suite can exercise the REAL file map against a temp dir.
  *
  * UJM-setup semantics preserved, minus what the new architecture deletes:

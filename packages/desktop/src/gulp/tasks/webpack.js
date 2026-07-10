@@ -97,7 +97,7 @@ function buildJsonPlugins(buildJson) {
     EM_BUILD_JSON: literal,
   };
   // Bake build-time analytics secret into bundles when present in the build env.
-  // Mirror BEM's env-var name (`GOOGLE_ANALYTICS_SECRET`).
+  // Mirror @omegajs/backend's env-var name (`GOOGLE_ANALYTICS_SECRET`).
   if (process.env.GOOGLE_ANALYTICS_SECRET) {
     definitions['process.env.GOOGLE_ANALYTICS_SECRET'] = JSON.stringify(process.env.GOOGLE_ANALYTICS_SECRET);
   }

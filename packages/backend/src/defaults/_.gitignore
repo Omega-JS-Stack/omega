@@ -44,10 +44,10 @@ node_modules/
 # dotenv environment variables file
 .env*
 
-# BEM specific
+# @omegajs/backend specific
 .runtimeconfig.json
 service-account*.json
-bem-reload-trigger.js
+omega-reload-trigger.js
 .temp/
 _legacy
 

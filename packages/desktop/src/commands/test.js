@@ -9,7 +9,7 @@ const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.j
 
 module.exports = async function (options) {
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
-  // BEM's test.log and @omegajs/desktop's own dev.log pattern.
+  // @omegajs/backend's test.log and @omegajs/desktop's own dev.log pattern.
   attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
 
   const layer       = options.layer    || 'all';
@@ -23,7 +23,7 @@ module.exports = async function (options) {
   // Extended mode — opt into tests that hit REAL external services (Firebase, analytics,
   // update feeds) instead of skipping them. Off by default so `npx mgr test` stays fast and
   // offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var — the
-  // SAME name across BEM/BXM/UJM/@omegajs/desktop (cross-framework parity); `--extended` is the CLI
+  // SAME name across @omegajs/backend, @omegajs/extension, UJM, and @omegajs/desktop (cross-framework parity); `--extended` is the CLI
   // shorthand. Once set on process.env it propagates to every spawned child (electron
   // main/renderer/boot, the gulp boot build) automatically via `{ ...process.env }`.
   const extended    = options.extended === true

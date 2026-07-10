@@ -42,7 +42,7 @@ class FirebaseAdminTest extends BaseTest {
 
   bemPackageVersionWarning(packageName, current, latest) {
     if (wonderfulVersion.greaterThan(latest, current)) {
-      console.log(chalk.yellow(`${packageName} needs to be updated in backend-manager: ${current} => ${latest}`));
+      console.log(chalk.yellow(`${packageName} needs to be updated in @omegajs/backend: ${current} => ${latest}`));
     }
   }
 

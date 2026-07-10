@@ -190,7 +190,7 @@ async function seedTestAccounts(accounts) {
 }
 
 /**
- * Create a rules testing context for use in BEM tests
+ * Create a rules testing context for use in @omegajs/backend tests
  *
  * @param {object} options
  * @param {string} options.projectId - Firebase project ID

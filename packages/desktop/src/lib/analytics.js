@@ -1,6 +1,6 @@
-// Analytics — GA4 via Measurement Protocol. Mirrors BEM's
+// Analytics — GA4 via Measurement Protocol. Mirrors @omegajs/backend's
 // `Manager.config.analytics.providers.google.id` shape so the same person can be
-// tracked across desktop (@omegajs/desktop) + web (UJM/web-manager) + backend (BEM) by
+// tracked across desktop (@omegajs/desktop) + web (UJM/web-manager) + backend (@omegajs/backend) by
 // referencing a single namespaced UUIDv5 identity.
 //
 // Cross-platform identity (the key feature):
@@ -8,7 +8,7 @@
 //   user_id   = uuidv5(firebaseUid, namespace) // same human across all surfaces
 //
 // `namespace` is the consumer's `firebaseConfig.projectId` re-encoded as a UUIDv5
-// namespace via uuidv5.URL of the projectId string. Same projectId in BEM/web-manager/@omegajs/desktop
+// namespace via uuidv5.URL of the projectId string. Same projectId in @omegajs/backend/web-manager/@omegajs/desktop
 // → identical uuidv5 outputs everywhere → unified analytics.
 //
 // Anonymous (web-manager-bridge hasn't reported auth yet) → user_id stays null.
@@ -36,7 +36,7 @@
 //     },
 //   }
 //
-// Secret comes from `process.env.GOOGLE_ANALYTICS_SECRET` (matches BEM). Webpack's
+// Secret comes from `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omegajs/backend). Webpack's
 // DefinePlugin injects it at build time so packaged apps don't need .env at runtime.
 // Without the secret, the module logs a warning + becomes a no-op.
 
@@ -72,7 +72,7 @@ const analytics = {
     const cfg = manager.config.analytics || {};
 
     // Presence-driven: providers.google.id presence enables analytics. No separate
-    // `enabled` flag (matches BEM convention — credentials are the enable signal).
+    // `enabled` flag (matches @omegajs/backend convention — credentials are the enable signal).
     analytics._measurementId = cfg.providers?.google?.id || null;
     // Secret comes from env. In packaged builds, webpack's DefinePlugin replaces
     // `process.env.GOOGLE_ANALYTICS_SECRET` with the build-time literal so the
@@ -92,7 +92,7 @@ const analytics = {
     analytics._enabled = true;
 
     // Namespace = uuidv5 of the firebase project ID (or app id as fallback). Same
-    // projectId in BEM/web-manager/@omegajs/desktop → same namespace → same per-uid UUIDv5
+    // projectId in @omegajs/backend/web-manager/@omegajs/desktop → same namespace → same per-uid UUIDv5
     // everywhere. UUIDv5 needs a UUID-shaped namespace — we derive one from the
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
     const projectId = manager.config.firebaseConfig?.projectId

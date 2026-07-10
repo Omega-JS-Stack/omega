@@ -3,7 +3,7 @@
 // Every framework bin parses argv (yargs) and hands the result to a Main class
 // whose process() resolves a command name and runs commands/<name>.js from the
 // framework's dist. That router was copy-pasted per framework (UJM/BXM/EM,
-// drift-identical); this is the single implementation. BEM's CLI is a different
+// drift-identical); this is the single implementation. @omegajs/backend's CLI is a different
 // design (colon-style utility commands dispatching stateful command classes)
 // and does not use this.
 //

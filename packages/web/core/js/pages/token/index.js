@@ -77,7 +77,7 @@ export default function () {
           return;
         }
 
-        // Standard flow: generate custom token via BEM API
+        // Standard flow: generate custom token via @omegajs/backend API
         updateStatus('Generating secure token...');
         const token = await generateCustomToken();
 
@@ -119,7 +119,7 @@ export default function () {
     });
   });
 
-  // Generate custom token via backend-manager API
+  // Generate custom token via @omegajs/backend API
   async function generateCustomToken() {
     const serverApiURL = `${webManager.getApiUrl()}/backend-manager/user/token`;
 

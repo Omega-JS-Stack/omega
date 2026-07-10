@@ -1,5 +1,5 @@
 /**
- * BemRouter
+ * BackendRouter
  * Routes incoming requests to either the legacy command-based API
  * or the new RESTful middleware system.
  *
@@ -10,7 +10,7 @@
  * - New: URL path like /backend-manager/user/sign-up (has path after prefix)
  */
 
-function BemRouter(Manager, req, res) {
+function BackendRouter(Manager, req, res) {
   const self = this;
 
   self.Manager = Manager;
@@ -18,7 +18,7 @@ function BemRouter(Manager, req, res) {
   self.res = res;
 }
 
-BemRouter.prototype.resolve = function () {
+BackendRouter.prototype.resolve = function () {
   const self = this;
   const req = self.req;
 
@@ -48,4 +48,4 @@ BemRouter.prototype.resolve = function () {
   };
 };
 
-module.exports = BemRouter;
+module.exports = BackendRouter;

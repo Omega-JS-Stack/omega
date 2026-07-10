@@ -1,6 +1,6 @@
 # CLI Output Styling (`src/cli/utils/ui.js`)
 
-BEM's CLI shares a single styling module so every command renders with the same
+@omegajs/backend's CLI shares a single styling module so every command renders with the same
 look as the **OMEGA Manager** (`omega-manager`): `🚀` banner, 70-char `━`
 dividers, indented tree output, dimmed labels, timestamps, and a consistent set
 of status symbols. This is the **SSOT for console output** — commands should pull
@@ -39,7 +39,7 @@ also be `require('../utils/ui')`'d directly (e.g. from setup-test files).
 ```js
 const ui = require('../utils/ui'); // or this.ui inside a command
 
-ui.banner('Backend Manager v5.2.18');          // 🚀 bold-cyan banner + blank lines
+ui.banner('OMEGA Backend v5.2.18');          // 🚀 bold-cyan banner + blank lines
 ui.header('Somiibo', { subtitle: url });        // ━ divider / title @ time / ━ divider
 ui.section('Checks');                            // blank line + bold-magenta [CHECKS]
 ui.field('Project', 'somiibo-91d13', { pad: 9 });// dimmed "Label:" + value (pad aligns columns)
@@ -121,7 +121,7 @@ which lists the missing `config/omega.json5` keys.
 `--continue` records the failure but keeps going instead of halting.
 
 > **No more `UnhandledPromiseRejection`.** Hard failures exit cleanly via
-> `haltSetup()` / `process.exit(1)`, and `bin/backend-manager` wraps the run in a
+> `haltSetup()` / `process.exit(1)`, and `bin/omega-backend` wraps the run in a
 > `try/catch` that prints a one-line `✗ <message>` instead of Node's raw rejection
 > dump.
 

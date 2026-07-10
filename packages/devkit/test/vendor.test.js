@@ -236,7 +236,7 @@ test('rewrites ESM import forms and vendors multiple packages (devkit + account)
   assert.equal(typeof mod.logger.log, 'function');
 });
 
-test('host scan skips node_modules and never follows symlinks (BEM fixture tree)', (t) => {
+test('host scan skips node_modules and never follows symlinks (@omegajs/backend fixture tree)', (t) => {
   const root = makeFixture('vendor-symlink', {
     packageJSON: { name: 'fixture-symlink', version: '1.0.0', dependencies: HOST_DEPS },
     files: {
@@ -248,7 +248,7 @@ test('host scan skips node_modules and never follows symlinks (BEM fixture tree)
   });
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  // BEM's self-test fixture ships a circular self-symlink (backend-manager -> package root)
+  // @omegajs/backend's self-test fixture ships a circular self-symlink (@omegajs/backend -> package root)
   fs.symlinkSync(root, path.join(root, 'dist', 'test', 'fixtures', 'project', 'node_modules', 'circular'));
 
   const result = vendorDevkit({ cwd: root }); // used to die with ENAMETOOLONG

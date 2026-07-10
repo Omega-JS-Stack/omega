@@ -13,7 +13,7 @@ class WatchCommand extends BaseCommand {
     const functionsDir = path.join(projectDir, 'functions');
     const bemDir = path.resolve(__dirname, '..', '..', '..');
     const bemSrcDir = path.join(bemDir, 'src');
-    const triggerFile = path.join(functionsDir, 'bem-reload-trigger.js');
+    const triggerFile = path.join(functionsDir, 'omega-reload-trigger.js');
 
     return { projectDir, functionsDir, bemDir, bemSrcDir, triggerFile };
   }
@@ -37,18 +37,18 @@ class WatchCommand extends BaseCommand {
     const nodemonPath = this.getNodemonPath();
 
     if (!nodemonPath) {
-      this.log(chalk.gray('  (BEM watch disabled - install nodemon globally to enable)\n'));
+      this.log(chalk.gray('  (@omegajs/backend watch disabled - install nodemon globally to enable)\n'));
       return null;
     }
 
-    this.log(chalk.gray(`  BEM watch: ${config.bemSrcDir}\n`));
+    this.log(chalk.gray(`  @omegajs/backend watch: ${config.bemSrcDir}\n`));
 
     // Create trigger file if it doesn't exist
     if (!jetpack.exists(config.triggerFile)) {
-      jetpack.write(config.triggerFile, `// BEM reload trigger\n`);
+      jetpack.write(config.triggerFile, `// @omegajs/backend reload trigger\n`);
     }
 
-    // Use nodemon to watch the BEM src directory and update trigger file on changes
+    // Use nodemon to watch the @omegajs/backend src directory and update trigger file on changes
     // Note: Firebase only triggers on file content changes (not create/delete)
     // So we must: 1) ensure file exists, 2) wait for FS to settle, 3) write new content
     // --on-change-only: only run exec when files change, not on initial startup
@@ -67,7 +67,7 @@ class WatchCommand extends BaseCommand {
       '--delay', '1',
       '--watch', config.bemSrcDir,
       '--ext', 'js,json',
-      '--exec', `node -e "var f='${triggerFile}',fs=require('fs');if(!fs.existsSync(f)){fs.writeFileSync(f,'// init');require('child_process').execSync('sleep 0.1');}fs.writeFileSync(f,'// '+Date.now());try{fs.writeFileSync('${devLogResetPath}','');}catch(e){}try{fs.writeFileSync('${emulatorLogResetPath}','');}catch(e){}" && echo "  [BEM] Triggered hot reload"`,
+      '--exec', `node -e "var f='${triggerFile}',fs=require('fs');if(!fs.existsSync(f)){fs.writeFileSync(f,'// init');require('child_process').execSync('sleep 0.1');}fs.writeFileSync(f,'// '+Date.now());try{fs.writeFileSync('${devLogResetPath}','');}catch(e){}try{fs.writeFileSync('${emulatorLogResetPath}','');}catch(e){}" && echo "  [@omegajs/backend] Triggered hot reload"`,
     ], {
       stdio: 'inherit',
       detached: false,
@@ -90,18 +90,18 @@ class WatchCommand extends BaseCommand {
       return;
     }
 
-    this.log(chalk.cyan('\n  BEM Watch Mode\n'));
+    this.log(chalk.cyan('\n  @omegajs/backend Watch Mode\n'));
     this.log(chalk.gray(`  Watching: ${config.bemSrcDir}`));
     this.log(chalk.gray(`  Trigger:  ${config.triggerFile}\n`));
-    this.log(chalk.gray('  When BEM source files change, this will trigger Firebase emulator hot reload.'));
+    this.log(chalk.gray('  When @omegajs/backend source files change, this will trigger Firebase emulator hot reload.'));
     this.log(chalk.gray('  Press Ctrl+C to stop watching.\n'));
 
     // Create trigger file if it doesn't exist
     if (!jetpack.exists(config.triggerFile)) {
-      jetpack.write(config.triggerFile, `// BEM reload trigger\n`);
+      jetpack.write(config.triggerFile, `// @omegajs/backend reload trigger\n`);
     }
 
-    // Use nodemon to watch the BEM src directory and touch the trigger file on changes.
+    // Use nodemon to watch the @omegajs/backend src directory and touch the trigger file on changes.
     // Also drop <log>.reset sentinels so any sibling serve/emulator command rolls its
     // log file on each reload (mirrors the test runner's log-roll pattern).
     const devLogResetPath = this.getTempPath('dev.log.reset');

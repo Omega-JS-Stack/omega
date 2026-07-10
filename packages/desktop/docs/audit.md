@@ -18,7 +18,7 @@ Scope: **C** consumer · **F** framework repo · **B** both.
 
 ## Universal checks (U-xx)
 
-Mirrored across all four OMEGA frameworks (UJM / BEM / BXM / @omegajs/desktop) — same ID means the same check everywhere.
+Mirrored across all four OMEGA frameworks (UJM / @omegajs/backend / BXM / @omegajs/desktop) — same ID means the same check everywhere.
 
 | ID | Sev | Scope | Check |
 |----|-----|-------|-------|
@@ -56,7 +56,7 @@ Only when auditing the @omegajs/desktop repo itself. Mirrored across the four fr
 
 | ID | Sev | Check |
 |----|-----|-------|
-| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / BEM / BXM; deviations are deliberate and documented |
+| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / @omegajs/backend / BXM; deviations are deliberate and documented |
 | F-02 | HIGH | Consumer-shipped defaults in sync — what `npx mgr setup` scaffolds (`src/defaults/`) matches current conventions and docs |
 | F-03 | MED | Docs completeness — every `docs/*.md` indexed in CLAUDE.md; every lib module has a doc; no "(planned)" links for things that have shipped |
 | F-04 | HIGH | `npx mgr test mgr:` green before treating the audit as complete |

@@ -18,8 +18,8 @@ module.exports = {
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/notification', {
           notification: {
-            title: 'BEM Test Notification',
-            body: 'Testing from BEM test suite',
+            title: '@omegajs/backend Test Notification',
+            body: 'Testing from @omegajs/backend test suite',
             clickAction: 'https://example.com/test',
           },
         });
@@ -124,7 +124,7 @@ module.exports = {
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/notification', {
           notification: {
-            title: 'BEM Test Notification',
+            title: '@omegajs/backend Test Notification',
             body: `Test sent at ${new Date().toISOString()}`,
             clickAction: `https://${config.domain}/?test-notification=true`,
           },

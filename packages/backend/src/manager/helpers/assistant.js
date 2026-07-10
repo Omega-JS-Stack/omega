@@ -673,7 +673,7 @@ BackendAssistant.prototype.authenticate = async function (options) {
   // Get shortcuts
   const authHeader = req?.headers?.authorization || '';
 
-  // Extract the BEM token
+  // Extract the @omegajs/backend token
   // Having this is separate from the ID token allows for the user to be authenticated as an ADMIN
   if (options.backendManagerKey || data.backendManagerKey) {
     // Read token from backendManagerKey or authenticationToken or apiKey

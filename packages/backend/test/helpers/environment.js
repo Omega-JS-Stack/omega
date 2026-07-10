@@ -4,7 +4,7 @@
  * builders (getApiUrl / getFunctionsUrl / getWebsiteUrl + parent variants), and the
  * assistant→Manager forwarding.
  *
- * Run: npx mgr test bem:helpers/environment
+ * Run: npx mgr test backend:helpers/environment
  *
  * Contract (see docs/environment-detection.md):
  *   - getEnvironment() is the SINGLE SOURCE OF TRUTH — the only reader of the raw env

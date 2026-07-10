@@ -405,7 +405,7 @@ function initializeSignoutAllForm() {
 // Initialize signin link generator (advanced feature).
 // Creates a temporary signin URL using a Firebase custom token. The link grants
 // full account access to anyone who holds it, so we gate it behind a typed
-// confirmation phrase before hitting BEM's /user/token route.
+// confirmation phrase before hitting @omegajs/backend's /user/token route.
 function initializeSigninLinkGenerator() {
   const $modal = document.getElementById('generate-signin-link-modal');
   if (!$modal) {

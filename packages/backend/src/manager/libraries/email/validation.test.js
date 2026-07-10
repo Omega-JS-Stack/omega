@@ -88,7 +88,7 @@ const CASES = [
 ];
 
 // NeverBounce single-check `result` parsing — the API returns STRING textcodes.
-// Regression: BEM 5.5.1–5.6.1 compared against numbers, failing every mailbox
+// Regression: @omegajs/backend 5.5.1–5.6.1 compared against numbers, failing every mailbox
 // check and silently skipping marketing sync for all signups.
 const NB_PARSE_CASES = [
   { result: 'valid', expectValid: true, expectStatus: 'valid' },

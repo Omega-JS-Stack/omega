@@ -1,10 +1,10 @@
 /**
  * Test: content/ghostii.blocksToPost()
- * Unit tests for the Ghostii-JSON → BEM-post transform.
+ * Unit tests for the Ghostii-JSON → @omegajs/backend-post transform.
  *
  * Run: npx mgr test helpers/content/ghostii-blocks
  *
- * Ghostii is unopinionated about BEM: its /write/article response is a generic
+ * Ghostii is unopinionated about @omegajs/backend: its /write/article response is a generic
  * block array ([{ name, content }], name ∈ heading-1..6/image/paragraph/blockquote/list).
  * blocksToPost() is the SSOT that turns those blocks into what admin/post wants —
  * title + header image as SEPARATE fields, body = content only.

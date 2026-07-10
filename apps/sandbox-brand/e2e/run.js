@@ -3,11 +3,11 @@
  *
  * Boots the REAL stack, nothing mocked:
  *   1. builds apps/website (esbuild bundle embedding web-manager)
- *   2. boots backend-manager's Firebase emulator suite for apps/backend
+ *   2. boots @omegajs/backend's Firebase emulator suite for apps/backend
  *      (functions, firestore, auth, database, hosting, pubsub — `npx mgr emulator`)
  *   3. serves the built website statically
  *   4. drives a real Chromium (puppeteer) through the frontend↔backend contract:
- *      signup → BEM auth onCreate creates the user doc → signout → signin →
+ *      signup → @omegajs/backend auth onCreate creates the user doc → signout → signin →
  *      session persistence across reload → subscription resolution
  *
  * This is the brand-monorepo `npm test` contract from the redesign plan; the
@@ -28,7 +28,7 @@ const EMULATOR_LOG = path.join(LOG_DIR, 'emulator.log');
 const PAGE_LOG = path.join(LOG_DIR, 'page.log');
 
 const SITE_PORT = 4600;
-// BEM only supports the default emulator ports (Manager.getApiUrl()/getFunctionsUrl()
+// @omegajs/backend only supports the default emulator ports (Manager.getApiUrl()/getFunctionsUrl()
 // hardcode them) — so the harness requires them free rather than picking random ones.
 const EMULATOR_PORTS = [9099, 5001, 8080, 5002];
 const EMULATOR_READY_TIMEOUT = 180000;
@@ -168,7 +168,7 @@ async function main() {
       await require(path.join(WEBSITE_DIR, 'build.js'))();
     });
 
-    await step('emulator ports free (BEM requires default ports)', async () => {
+    await step('emulator ports free (@omegajs/backend requires default ports)', async () => {
       for (const port of EMULATOR_PORTS) {
         if (await isPortBusy(port)) {
           throw new Error(`port ${port} is already in use — is another emulator running?`);
@@ -230,10 +230,10 @@ async function main() {
       return `uid: ${uid}`;
     });
 
-    await step('BEM auth onCreate creates the Firestore user doc', async () => {
+    await step('@omegajs/backend auth onCreate creates the Firestore user doc', async () => {
       // The frontend resolver (@omegajs/account with no generators) leaves
       // api.clientId null — it's only non-null when the account read hits the
-      // REAL doc BEM's trigger wrote (the backend generates the $uuid).
+      // REAL doc @omegajs/backend's trigger wrote (the backend generates the $uuid).
       const deadline = Date.now() + DOC_CREATE_TIMEOUT;
       let last = null;
       while (Date.now() < deadline) {

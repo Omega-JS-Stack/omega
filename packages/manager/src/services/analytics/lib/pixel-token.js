@@ -3,7 +3,7 @@
  *
  * The pixel ID is public config (`analytics.providers.{provider}.id` — it
  * ships in the frontend); the conversions/events access token is a secret
- * and lives in the brand .env under the exact name backend-manager reads.
+ * and lives in the brand .env under the exact name @omegajs/backend reads.
  * There's no practical validation API for either token, so this is a
  * presence check with where-to-get guidance — interactive runs offer a
  * paste-in that saves the token to the brand .env (the disperse service

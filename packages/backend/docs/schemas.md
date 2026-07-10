@@ -51,11 +51,11 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 
 ### ⚠️ `required` + `default` footgun
 
-BEM checks `required` against the ORIGINAL request value, before defaults apply — so `required: true` on a field with a `default` throws `Required key {field} is missing in settings` before the default is ever used. For fields that must be non-empty but have a derived default (like path-extracted IDs), use `min: 1` instead.
+@omegajs/backend checks `required` against the ORIGINAL request value, before defaults apply — so `required: true` on a field with a `default` throws `Required key {field} is missing in settings` before the default is ever used. For fields that must be non-empty but have a derived default (like path-extracted IDs), use `min: 1` instead.
 
 ## ID Generation (POST — Create)
 
-IDs are auto-generated in the **schema**, NOT in the route. Use `value` to force-generate via BEM's built-in `randomId()` (14-char nanoid, 62-char alphabet, no `-` or `_`):
+IDs are auto-generated in the **schema**, NOT in the route. Use `value` to force-generate via @omegajs/backend's built-in `randomId()` (14-char nanoid, 62-char alphabet, no `-` or `_`):
 
 ```javascript
 id: {

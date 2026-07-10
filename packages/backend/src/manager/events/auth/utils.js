@@ -36,7 +36,7 @@ async function retryWrite(assistant, tag, fn) {
  *
  * For blocking functions (before-create, before-signin):
  *   - Hook can throw HttpsError to block the operation
- *   - Hook runs AFTER BEM's core checks (disposable email, rate limiting, etc.)
+ *   - Hook runs AFTER @omegajs/backend's core checks (disposable email, rate limiting, etc.)
  *
  * For trigger functions (on-create, on-delete):
  *   - Hook errors are logged but don't block the operation
@@ -48,10 +48,10 @@ async function retryWrite(assistant, tag, fn) {
  *   functions/
  *     hooks/
  *       auth/
- *         before-create.js   — runs after BEM checks, can block signup
- *         before-signin.js   — runs after BEM signin logic, can block signin
- *         on-create.js       — runs after BEM creates user doc
- *         on-delete.js       — runs after BEM deletes user doc
+ *         before-create.js   — runs after @omegajs/backend checks, can block signup
+ *         before-signin.js   — runs after @omegajs/backend signin logic, can block signin
+ *         on-create.js       — runs after @omegajs/backend creates user doc
+ *         on-delete.js       — runs after @omegajs/backend deletes user doc
  */
 async function runAuthHook(eventName, args) {
   const { Manager, assistant } = args;
@@ -64,7 +64,7 @@ async function runAuthHook(eventName, args) {
 
   assistant.log(`${eventName}: Running consumer hook @ ${hookPath}`);
 
-  // Load and execute — passes the same args object the BEM handler received
+  // Load and execute — passes the same args object the @omegajs/backend handler received
   const hook = require(hookPath);
   await hook(args);
 

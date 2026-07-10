@@ -9,7 +9,7 @@ Web Manager is a modern JavaScript utility library for web applications with Fir
 - A singleton `Manager` instance exposing authentication, reactive DOM data binding, Firestore, storage, push notifications, error tracking (Sentry), service-worker helpers, and DOM/utility functions
 - Lazy Firebase imports to keep consumer bundles small
 - Reactive `data-wm-bind` DOM directives wired to auth + usage state
-- A `resolveSubscription()` helper unified with backend-manager's `User.resolveSubscription()` so subscription-state logic is identical across frontend and backend
+- A `resolveSubscription()` helper unified with @omegajs/backend's `User.resolveSubscription()` so subscription-state logic is identical across frontend and backend
 
 ### Consumed by the frontend Manager family
 
@@ -69,7 +69,7 @@ Whenever you make a behavioral change (new module, new method, new pattern, remo
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** WM follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / BEM / BXM / EM / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** WM follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / @omegajs/backend / BXM / EM / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 

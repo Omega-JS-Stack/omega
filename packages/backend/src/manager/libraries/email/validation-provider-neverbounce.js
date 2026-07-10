@@ -4,7 +4,7 @@ const fetch = require('wonderful-fetch');
 // as a textcode STRING ('valid', 'invalid', ...); numeric codes only appear in
 // other response modes — tolerate both so a representation change can't silently
 // fail every check again (that exact bug skipped marketing sync for all signups
-// between BEM 5.5.1 and 5.6.1).
+// between @omegajs/backend 5.5.1 and 5.6.1).
 const NUMERIC_RESULT_MAP = {
   0: 'valid',
   1: 'invalid',

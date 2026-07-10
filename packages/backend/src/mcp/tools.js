@@ -1,7 +1,7 @@
 /**
  * MCP Tool Definitions
  *
- * Each tool maps to a BEM route with method, path, and JSON Schema for inputs.
+ * Each tool maps to a @omegajs/backend route with method, path, and JSON Schema for inputs.
  * annotations.readOnlyHint / destructiveHint control Claude Desktop's read/write categorization.
  */
 module.exports = [
@@ -459,7 +459,7 @@ module.exports = [
   // --- Hooks ---
   {
     name: 'run_hook',
-    description: 'Execute a hook or BEM cron job by path. Searches: BEM internal crons (e.g. "cron/daily/blog-auto-publisher", "cron/daily/reset-usage"), consumer hooks/ directory, and consumer project root. Supports both function exports and class-based hooks.',
+    description: 'Execute a hook or @omegajs/backend cron job by path. Searches: @omegajs/backend internal crons (e.g. "cron/daily/blog-auto-publisher", "cron/daily/reset-usage"), consumer hooks/ directory, and consumer project root. Supports both function exports and class-based hooks.',
     role: 'admin',
     method: 'POST',
     path: 'admin/hook',
@@ -495,7 +495,7 @@ module.exports = [
   // --- Health Check ---
   {
     name: 'health_check',
-    description: 'Check if the BEM server is running and responding',
+    description: 'Check if the @omegajs/backend server is running and responding',
     role: 'public',
     method: 'GET',
     path: 'test/health',

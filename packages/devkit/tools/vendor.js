@@ -10,7 +10,7 @@
 //      require.resolve) AND ESM (import ... from, export ... from, dynamic
 //      import(), side-effect import) — web-manager's dist is ESM. Real host
 //      files only: symlinks are never followed and node_modules never entered
-//      (BEM's dist carries a self-test fixture with a circular self-link)
+//      (@omegajs/backend's dist carries a self-test fixture with a circular self-link)
 //   2. Copies ONLY the referenced modules (plus their transitive relative
 //      requires/imports) into <dist>/vendor/<package>/ — selective, so a host
 //      that uses just safe-install doesn't ship the test runner or inherit its
@@ -96,7 +96,7 @@ function specifierToPackageName(specifier) {
 }
 
 // Collect the .js files under dir that are host code: never follows symlinks
-// (BEM's self-test fixture ships a circular self-link inside a dist
+// (@omegajs/backend's self-test fixture ships a circular self-link inside a dist
 // node_modules — jetpack.find follows it until ENAMETOOLONG) and never
 // descends into node_modules, the vendor output, or dist/defaults (none is
 // host code to scan or rewrite — defaults are consumer templates scaffolded

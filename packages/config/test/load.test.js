@@ -179,7 +179,7 @@ test('no target: whole files merge (targets map included) — the disperse shape
 });
 
 test('backend runtime cwd (the functions/ dir) still walks up to the brand config', (t) => {
-  // BEM's Manager boots with cwd = {brand}/apps/backend/functions — the app
+  // @omegajs/backend's Manager boots with cwd = {brand}/apps/backend/functions — the app
   // root is one up, and the brand layer must still resolve from there.
   const root = makeFixture('functions-cwd', {
     'config/omega.json5': `{

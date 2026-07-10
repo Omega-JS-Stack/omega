@@ -3,7 +3,7 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 const bem_allRulesRegex = /(\/\/\/---backend-manager---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
-const bem_allRulesBackupRegex = /({{\s*?backend-manager\s*?}})/sgm;
+const bem_allRulesBackupRegex = /({{\s*?@omegajs/backend\s*?}})/sgm;
 
 class RealtimeRulesFileTest extends BaseTest {
   getName() {
@@ -35,7 +35,7 @@ class RealtimeRulesFileTest extends BaseTest {
 
     const hasTemplate = contents.match(bem_allRulesRegex) || contents.match(bem_allRulesBackupRegex);
     if (!hasTemplate) {
-      console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{backend-manager}}`), chalk.red(`to it.`));
+      console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{@omegajs/backend}}`), chalk.red(`to it.`));
       return;
     }
 

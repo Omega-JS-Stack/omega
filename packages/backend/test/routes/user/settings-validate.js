@@ -3,7 +3,7 @@
  * Tests the user validate settings endpoint
  * Requires authentication and validates settings against schema
  *
- * SKIPPED: Requires project-specific defaults.js file which BEM test environment doesn't have
+ * SKIPPED: Requires project-specific defaults.js file which @omegajs/backend test environment doesn't have
  */
 module.exports = {
   description: 'User validate settings',

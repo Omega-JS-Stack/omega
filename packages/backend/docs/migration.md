@@ -1,6 +1,6 @@
 # Migration
 
-Procedures for migrating old BEM consumer projects to the current format: environment variables (Part 1), legacy code patterns (Part 2), and routes/schemas (Part 3).
+Procedures for migrating old @omegajs/backend consumer projects to the current format: environment variables (Part 1), legacy code patterns (Part 2), and routes/schemas (Part 3).
 
 ## Part 1: Environment Variable Migration
 

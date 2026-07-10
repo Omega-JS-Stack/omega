@@ -138,11 +138,11 @@ module.exports = {
         const headerImageURL = 'https://picsum.photos/id/1/5000/3000.jpg';
 
         const response = await http.post('backend-manager/admin/post', {
-          title: 'BEM Test Create Post',
+          title: '@omegajs/backend Test Create Post',
           url: 'bem-test-create-post',
-          description: 'Test post created by BEM test suite to verify @post/ body rewriting.',
+          description: 'Test post created by @omegajs/backend test suite to verify @post/ body rewriting.',
           headerImageURL: headerImageURL,
-          body: `# BEM Test Create Post\n\nSome intro text.\n\n![Test inline image](${inlineImageURL})\n\nMore text after the image.`,
+          body: `# @omegajs/backend Test Create Post\n\nSome intro text.\n\n![Test inline image](${inlineImageURL})\n\nMore text after the image.`,
           postPath: 'guest',
         });
 
@@ -303,7 +303,7 @@ module.exports = {
             owner: state.owner,
             repo: state.repo,
             path: state.postPath,
-            message: '🧹 BEM test cleanup: delete create-post test',
+            message: '🧹 @omegajs/backend test cleanup: delete create-post test',
             sha: fileData.sha,
           });
         } catch (e) {
@@ -325,7 +325,7 @@ module.exports = {
               owner: state.owner,
               repo: state.repo,
               path: file.path,
-              message: `🧹 BEM test cleanup: delete test image ${file.name}`,
+              message: `🧹 @omegajs/backend test cleanup: delete test image ${file.name}`,
               sha: file.sha,
             });
           }
@@ -343,7 +343,7 @@ module.exports = {
           });
 
           for (const run of runs.workflow_runs) {
-            if (run.head_commit?.message?.includes('BEM test')) {
+            if (run.head_commit?.message?.includes('@omegajs/backend test')) {
               try {
                 await octokit.rest.actions.cancelWorkflowRun({
                   owner: state.owner,

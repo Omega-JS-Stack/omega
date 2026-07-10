@@ -3,8 +3,8 @@ const jetpack = require('fs-jetpack');
 const path = require('path');
 const { mergeLineBasedFiles, hasSectionMarkers, DEFAULT_SECTION_MARKER } = require('./helpers/merge-line-files');
 
-// Old BEM marker regex
-const OLD_BEM_MARKER_REGEX = /# BEM>>>([\s\S]*?)# <<<BEM\n?/g;
+// Old @omegajs/backend marker regex
+const OLD_BEM_MARKER_REGEX = /# @omegajs/backend>>>([\s\S]*?)# <<<@omegajs/backend\n?/g;
 
 class GitignoreTest extends BaseTest {
   getName() {
@@ -25,7 +25,7 @@ class GitignoreTest extends BaseTest {
       return false;
     }
 
-    // Check for old BEM markers that need to be removed
+    // Check for old @omegajs/backend markers that need to be removed
     if (OLD_BEM_MARKER_REGEX.test(existingContent)) {
       return false;
     }
@@ -108,7 +108,7 @@ class GitignoreTest extends BaseTest {
 
     let existingContent = jetpack.read(gitignorePath) || '';
 
-    // Remove old BEM markers if present
+    // Remove old @omegajs/backend markers if present
     existingContent = existingContent.replace(OLD_BEM_MARKER_REGEX, '');
 
     // Clean up any extra blank lines left behind

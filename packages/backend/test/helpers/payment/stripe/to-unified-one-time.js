@@ -10,7 +10,7 @@ const Stripe = require('../../../../src/manager/libraries/payment/processors/str
 const FIXTURE_SESSION = require('../../../fixtures/stripe/checkout-session-completed.json');
 const FIXTURE_INVOICE_FAILED = require('../../../fixtures/stripe/invoice-payment-failed.json');
 
-// Mock config matching the BEM template (new flat price structure)
+// Mock config matching the @omegajs/backend template (new flat price structure)
 const MOCK_CONFIG = {
   payment: {
     products: [

@@ -1,4 +1,4 @@
-// BEM's defaults scaffolding — applies the framework's defaults tree
+// @omegajs/backend's defaults scaffolding — applies the framework's defaults tree
 // (src/defaults/ → dist/defaults/ at runtime) to the consumer project root via
 // the shared devkit engine. Exported standalone (rather than living inside the
 // setup command) so the framework self-test can exercise the REAL file map
@@ -7,7 +7,7 @@
 const path = require('path');
 const { applyDefaults } = require('@omegajs/devkit/defaults-engine');
 
-// minimatch FILE_MAP (last-match-wins). BEM's contract:
+// minimatch FILE_MAP (last-match-wins). @omegajs/backend's contract:
 //   - everything copies on first setup only (consumer files are never clobbered)
 //   - CLAUDE.md / .gitignore / functions/.env live-sync their Default section on
 //     every setup via the marker-section merge (the Custom section is the
@@ -22,7 +22,7 @@ const FILE_MAP = {
 };
 
 /**
- * Scaffold BEM's defaults into a consumer project.
+ * Scaffold @omegajs/backend's defaults into a consumer project.
  *
  * @param {object} options
  * @param {string} options.outputDir - Consumer project root (firebaseProjectPath)

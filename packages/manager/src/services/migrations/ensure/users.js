@@ -1,6 +1,6 @@
 /**
  * Users collection migration — converges user documents to the canonical
- * backend-manager user schema.
+ * @omegajs/backend user schema.
  *
  * Fixes:
  * - Deletes orphaned user docs (no matching Firebase Auth user)
@@ -12,7 +12,7 @@
  *   against Firebase Auth's canonical creation time
  * - Backfills auth.uid/auth.email from Firebase Auth when missing
  * - Backfills consent (implicit grant at signup) for existing users
- * - Backfills all missing fields with defaults from the BEM user schema
+ * - Backfills all missing fields with defaults from the @omegajs/backend user schema
  * - Generates dynamic values for affiliate.code, api.clientId, api.privateKey
  * - Normalizes '' and old sentinels ('127.0.0.1', 'ZZ', 'Unknown') to null
  * - Migrates usage.*.period → usage.*.monthly (+ daily backfill) and deletes
@@ -48,7 +48,7 @@ function generateId(size = 7) {
 }
 
 /**
- * Default user structure from backend-manager's user schema.
+ * Default user structure from @omegajs/backend's user schema.
  * Values here are used to backfill missing fields during migration.
  *
  * Dynamic fields (affiliate.code, api.clientId, api.privateKey) use empty strings here
@@ -209,7 +209,7 @@ const DEFAULT_USER = {
 
 /**
  * Users collection schema
- * Based on backend-manager's user schema
+ * Based on @omegajs/backend's user schema
  */
 const timestampSchema = {
   type: 'object',
@@ -873,7 +873,7 @@ module.exports = async function ensureUsers(context) {
       },
 
       // Fix 13: Generate dynamic values for empty fields
-      // The BEM user schema generates these at signup: affiliate.code, api.clientId, api.privateKey
+      // The @omegajs/backend user schema generates these at signup: affiliate.code, api.clientId, api.privateKey
       (data) => {
         const updates = {};
         let hasUpdates = false;
@@ -1038,7 +1038,7 @@ module.exports = async function ensureUsers(context) {
       },
 
       // Fix 18: Delete any usage key where total == 0 (unused placeholder)
-      // BEM creates usage keys on first use — no need for zero-total placeholders.
+      // @omegajs/backend creates usage keys on first use — no need for zero-total placeholders.
       (data) => {
         if (!data.usage || typeof data.usage !== 'object') {
           return null;
@@ -1068,5 +1068,5 @@ module.exports = async function ensureUsers(context) {
   });
 };
 
-// Exported for tests — the canonical BEM default user shape the backfill converges to
+// Exported for tests — the canonical @omegajs/backend default user shape the backfill converges to
 module.exports.DEFAULT_USER = DEFAULT_USER;

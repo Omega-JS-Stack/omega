@@ -10,7 +10,7 @@ The core `Manager` class (in `src/manager/index.js`) extends EventEmitter and or
 
 ## Dual-Mode Support
 
-BEM supports two deployment modes:
+@omegajs/backend supports two deployment modes:
 - **Firebase Functions** (`projectType: 'firebase'`): Cloud Functions with Firebase triggers
 - **Custom Server** (`projectType: 'custom'`): Express server for non-Firebase deployments
 

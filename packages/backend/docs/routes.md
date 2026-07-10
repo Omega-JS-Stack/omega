@@ -1,6 +1,6 @@
 # Creating Routes, API Commands, Events, Cron Jobs
 
-Recipes for building consumer-side routes plus BEM-side API commands, event handlers, and cron jobs. See also [docs/schemas.md](schemas.md) for schema definitions, [docs/auth-hooks.md](auth-hooks.md) for auth lifecycle hooks, and [docs/common-operations.md](common-operations.md) for inside-the-handler patterns.
+Recipes for building consumer-side routes plus @omegajs/backend-side API commands, event handlers, and cron jobs. See also [docs/schemas.md](schemas.md) for schema definitions, [docs/auth-hooks.md](auth-hooks.md) for auth lifecycle hooks, and [docs/common-operations.md](common-operations.md) for inside-the-handler patterns.
 
 ## New API Command
 
@@ -36,7 +36,7 @@ module.exports = Module;
 
 ## New Route (Consumer Project)
 
-Routes live at `functions/routes/{path}/{method}.js` — BEM routes requests to the matching method file (`get.js` / `post.js` / `put.js` / `delete.js`), falling back to `index.js` if no method-specific file exists.
+Routes live at `functions/routes/{path}/{method}.js` — @omegajs/backend routes requests to the matching method file (`get.js` / `post.js` / `put.js` / `delete.js`), falling back to `index.js` if no method-specific file exists.
 
 A route exports an **async function receiving a context object** (built by the middleware — see `src/manager/helpers/middleware.js`):
 
@@ -106,7 +106,7 @@ Immutable fields (`id`, `owner`, `stats`, `metadata.created`) should NOT be edit
 ### Functions entry point (`functions/index.js`)
 
 ```javascript
-const Manager = (new (require('backend-manager'))).init(exports, {
+const Manager = (new (require('@omegajs/backend'))).init(exports, {
   setupFunctionsIdentity: false,
 });
 const { functions } = Manager.libraries;

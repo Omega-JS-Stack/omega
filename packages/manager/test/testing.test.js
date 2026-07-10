@@ -66,11 +66,11 @@ function stageBackendApp(root, { installed = '5.9.0' } = {}) {
   jetpack.write(join(appPath, 'functions', 'package.json'), {
     name: 'fixture-functions',
     private: true,
-    dependencies: { 'backend-manager': 'file:../../../../packages/backend' },
+    dependencies: { '@omegajs/backend': 'file:../../../../packages/backend' },
   });
   if (installed) {
-    jetpack.write(join(appPath, 'functions', 'node_modules', 'backend-manager', 'package.json'), {
-      name: 'backend-manager',
+    jetpack.write(join(appPath, 'functions', 'node_modules', '@omegajs/backend', 'package.json'), {
+      name: '@omegajs/backend',
       version: installed,
     });
   }
@@ -150,7 +150,7 @@ test('testing: last in SERVICE_ORDER, with the target-checks operation', () => {
 test('testing: TARGET_FRAMEWORKS maps every checkable target, mobile reserved', () => {
   assert.deepEqual(TARGET_FRAMEWORKS, {
     web: '@omegajs/web',
-    backend: 'backend-manager',
+    backend: '@omegajs/backend',
     extension: '@omegajs/extension',
     desktop: '@omegajs/desktop',
   });
@@ -181,11 +181,11 @@ test('testing: web + backend all green — exact pass set, single npm view per p
   ];
   const fetch = fakeFetch({
     [HOMEPAGE]: { status: 200 },
-    [API_URL]: { status: 200, body: { status: 'healthy', bemVersion: '5.9.0' } },
+    [API_URL]: { status: 200, body: { status: 'healthy', backendVersion: '5.9.0' } },
   });
   const exec = fakeExec({
     'npm view @omegajs/web version': '1.0.0\n',
-    'npm view backend-manager version': '5.9.0\n',
+    'npm view @omegajs/backend version': '5.9.0\n',
     [GIT_CMD]: '',
   });
 
@@ -202,7 +202,7 @@ test('testing: web + backend all green — exact pass set, single npm view per p
         'backend: package.json',
         'backend: firebase.json',
         'backend: functions/package.json',
-        'backend: backend-manager',
+        'backend: @omegajs/backend',
         'backend: API health',
         'backend: deployed backend',
         'working tree',
@@ -218,7 +218,7 @@ test('testing: web + backend all green — exact pass set, single npm view per p
   assert.deepEqual(fetch.calls, [HOMEPAGE, API_URL]);
   assert.deepEqual(exec.calls, [
     ['npm view @omegajs/web version', null],
-    ['npm view backend-manager version', null],
+    ['npm view @omegajs/backend version', null],
     [GIT_CMD, root],
   ]);
 });
@@ -304,7 +304,7 @@ test('testing: shared Firebase project → API health dims out, zero fetches', a
   const root = stageBrand();
   const apps = [stageBackendApp(root)];
   const fetch = fakeFetch({});
-  const exec = fakeExec({ 'npm view backend-manager version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig({ firebase: { shared: true }, targets: { backend: {} } }), { root, apps, fetch, exec });
 
@@ -315,8 +315,8 @@ test('testing: shared Firebase project → API health dims out, zero fetches', a
 test('testing: deployed backend older than npm latest → warned', async () => {
   const root = stageBrand();
   const apps = [stageBackendApp(root, { installed: '5.9.0' })];
-  const fetch = fakeFetch({ [API_URL]: { status: 200, body: { bemVersion: '5.0.0' } } });
-  const exec = fakeExec({ 'npm view backend-manager version': '5.9.0\n', [GIT_CMD]: '' });
+  const fetch = fakeFetch({ [API_URL]: { status: 200, body: { backendVersion: '5.0.0' } } });
+  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig({ targets: { backend: {} } }), { root, apps, fetch, exec });
 
@@ -330,7 +330,7 @@ test('testing: API returning 503 retries 3× then fails', async () => {
   const root = stageBrand();
   const apps = [stageBackendApp(root, { installed: null })];
   const fetch = fakeFetch({ [API_URL]: { status: 503 } });
-  const exec = fakeExec({ 'npm view backend-manager version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig({ targets: { backend: {} } }), { root, apps, fetch, exec });
 
@@ -345,7 +345,7 @@ test('testing: no brand.url → homepage and API health warn, zero fetches', asy
   const root = stageBrand();
   const apps = [stageWebApp(root), stageBackendApp(root)];
   const fetch = fakeFetch({});
-  const exec = fakeExec({ 'npm view backend-manager version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const config = brandConfig();
   delete config.brand.url;

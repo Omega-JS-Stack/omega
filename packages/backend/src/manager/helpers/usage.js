@@ -49,7 +49,7 @@ Usage.prototype.init = function (assistant, options) {
       return reject(new Error('Missing required {assistant} parameter'));
     }
 
-    // Add BEM to whitelist keys
+    // Add @omegajs/backend to whitelist keys
     options.whitelistKeys.push(process.env.BACKEND_MANAGER_KEY);
 
     // Set options
@@ -168,6 +168,13 @@ Usage.prototype.validate = function (name, options) {
     // Force reject (for testing/debugging)
     if (options._forceReject) {
       return _reject();
+    }
+
+    // Negative limits are unlimited (product config convention: -1)
+    if (allowed < 0) {
+      self.log(`Usage.validate(): Unlimited limit (${allowed}) for ${name}`);
+
+      return resolve(true);
     }
 
     // Check if they have a white list key
@@ -367,9 +374,9 @@ Usage.prototype.getDailyAllowance = function (name) {
     return null;
   }
 
-  // Get the monthly limit
+  // Get the monthly limit (negative limits are unlimited — no daily cap)
   const monthlyLimit = self.getLimit(name);
-  if (!monthlyLimit) {
+  if (!monthlyLimit || monthlyLimit < 0) {
     return null;
   }
 

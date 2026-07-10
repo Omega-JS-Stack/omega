@@ -1,18 +1,18 @@
 # ========== Default Values ==========
-# Backend Manager (BEM) — consumer project
+# OMEGA Backend (@omegajs/backend) — consumer project
 
-<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across UJM/BEM/BXM/EM/MAM — same sections, same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit all five together. Canonical skeleton: omega:main skill → resources/mirror-spec.md -->
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across UJM/@omegajs/backend/BXM/EM/MAM — same sections, same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit all five together. Canonical skeleton: omega:main skill → resources/mirror-spec.md -->
 
 ## Framework
 
-This project consumes **Backend Manager** (BEM) — a comprehensive framework for building modern Firebase Cloud Functions backends. BEM provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`bm_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
+This project consumes **OMEGA Backend** (@omegajs/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omegajs/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`bm_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
 **Before doing ANY work on this codebase, Claude MUST read the framework documentation — that is where the architecture, conventions, APIs, and gotchas live. Skipping these will result in solutions that conflict with framework patterns.**
 
 **Required reading:**
-- **`node_modules/backend-manager/CLAUDE.md`** — full framework reference (single comprehensive file; not yet split into per-subsystem docs)
+- **`node_modules/@omegajs/backend/CLAUDE.md`** — full framework reference (single comprehensive file; not yet split into per-subsystem docs)
 
 ## Quick start
 
@@ -20,20 +20,20 @@ This project consumes **Backend Manager** (BEM) — a comprehensive framework fo
 cd functions
 npx mgr setup             # validate config + scaffold defaults + run checks
 npx mgr emulator          # start Firebase emulators (auth/firestore/functions/database/storage)
-npx mgr test              # run framework + project test suites (project: → your tests only, mgr:/bem: → framework only)
+npx mgr test              # run framework + project test suites (project: → your tests only, mgr:/backend: → framework only)
 npx mgr test --extended   # opt into REAL external APIs (shorthand for the shared TEST_EXTENDED_MODE; default: skipped)
 npx mgr watch             # auto-reload functions on file change
 npx mgr deploy            # deploy to Firebase
 npx mgr logs:read         # read Cloud Functions logs (also: logs:tail to stream)
 npx mgr firestore:get     # read a doc from Firestore (also: firestore:set / :query / :delete)
 npx mgr auth:get          # read an Auth user (also: auth:list / :delete / :set-claims)
-npx mgr install dev       # use LOCAL backend-manager source (to test framework edits)
-npx mgr install live      # restore the published backend-manager from npm
+npx mgr install dev       # use LOCAL @omegajs/backend source (to test framework edits)
+npx mgr install live      # restore the published @omegajs/backend from npm
 ```
 
-All `npx mgr <cmd>` aliases — `npx bm <cmd>`, `npx bem <cmd>`, `npx backend-manager <cmd>` work too.
+`npx omega-backend <cmd>` works too (alias of `npx mgr <cmd>`).
 
-> Editing the BEM framework source while working here? Run `npx mgr install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/backend-manager`). Run `npx mgr install live` to switch back.
+> Editing the @omegajs/backend framework source while working here? Run `npx mgr install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omegajs/backend`). Run `npx mgr install live` to switch back.
 
 ## Where things live
 
@@ -45,13 +45,13 @@ All `npx mgr <cmd>` aliases — `npx bm <cmd>`, `npx bem <cmd>`, `npx backend-ma
 - `functions/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
 - `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Some fields managed by `npx mgr setup`.
 - `.firebaserc` — Firebase project ID alias.
-- `firestore.rules` / `database.rules.json` — security rules. BEM owns a `///---backend-manager---///` block inside each; everything outside is yours.
+- `firestore.rules` / `database.rules.json` — security rules. @omegajs/backend owns a `///---backend-manager---///` block inside each; everything outside is yours.
 
 ## Per-context imports
 
 ```js
 // functions/index.js — the entire backend bootstrap
-const Manager = require('backend-manager');
+const Manager = require('@omegajs/backend');
 Manager.init(exports, {
   projectType: 'firebase',
   // ...your config
@@ -80,12 +80,12 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically 
 
 ## Dependency resolution
 
-- **`Manager.require(name)`** resolves from BEM's module context. Consumer code (routes, schemas) can use it to access BEM's bundled dependencies without installing them directly.
-- **web-manager owns Firebase on the client side.** Frontend consumer code (UJM pages, BXM extensions, EM renderers) NEVER imports Firebase directly. BEM backend code uses `firebase-admin` directly (server-side is different).
+- **`Manager.require(name)`** resolves from @omegajs/backend's module context. Consumer code (routes, schemas) can use it to access @omegajs/backend's bundled dependencies without installing them directly.
+- **web-manager owns Firebase on the client side.** Frontend consumer code (UJM pages, BXM extensions, EM renderers) NEVER imports Firebase directly. @omegajs/backend backend code uses `firebase-admin` directly (server-side is different).
 
 ## Testing
 
-Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/` — handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)` — registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one — "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/backend-manager/docs/test-framework.md`.
+Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/` — handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)` — registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one — "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/@omegajs/backend/docs/test-framework.md`.
 
 <!-- Everything above this marker is owned by the framework and rewritten on every `npx mgr setup`. Add your project-specific notes below — they are preserved across setups. -->
 

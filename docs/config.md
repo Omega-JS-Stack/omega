@@ -53,7 +53,7 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 ```
 
 - "shared" = the file minus its `targets` key. In a standalone repo only the app layers exist.
-- **`projectDir` may be a backend's `functions/` dir** (BEM's runtime cwd): the brand
+- **`projectDir` may be a backend's `functions/` dir** (@omegajs/backend's runtime cwd): the brand
   walk-up treats the app root as one level up, so `loadConfig(functionsDir, 'backend')`
   and `loadConfig(appRoot, 'backend')` resolve identically.
 - **Target sections overlay the TOP LEVEL**: `targets.desktop.platforms` resolves to
@@ -146,7 +146,7 @@ oauth2) move to the TOP LEVEL verbatim; everything framework-specific moves unde
 | custom keys (`backend_manager`, `mcp`, …) | top level, unchanged |
 | `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | `targets.backend.<same key>` |
 
-Notes: BEM's framework-defaults layer is `templates/config/omega.json5` resolved through
+Notes: @omegajs/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
 the same loader and passed as `options.defaults`; `Manager.init()`'s
 `backendManagerConfigPath` option is gone (the loader discovers the file); boot warns on
 schema findings, `npx mgr setup` is the hard audit. The sandbox brand dogfoods the full

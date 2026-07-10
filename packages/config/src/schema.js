@@ -19,7 +19,7 @@
  *
  * SHARED_SCHEMA always applies; TARGET_SCHEMAS[target] adds that target's
  * refinements. Sections grow as each framework adopts dual-read — seed
- * entries come from EM's schema (desktop) and the sandbox brand's real BEM
+ * entries come from EM's schema (desktop) and the sandbox brand's real @omegajs/backend
  * config (backend), never from guesses.
  */
 
@@ -147,7 +147,7 @@ const SHARED_SCHEMA = [
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (BEM-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target.',
+    description: 'Product catalog (@omegajs/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target.',
   },
 
   // ── sentry ───────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ const TARGET_SCHEMAS = {
   // safelist, imagemin, workflows.
   web: [],
 
-  // Seeded from the sandbox brand's real BEM config (backend-manager-config.json).
+  // Seeded from the sandbox brand's real @omegajs/backend config (backend-manager-config.json).
   backend: [
     {
       path:        'parent',

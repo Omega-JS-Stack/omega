@@ -1,6 +1,6 @@
 # Test Framework
 
-Built-in test framework for both @omegajs/extension itself and consumer projects. Jest-like assertion syntax (`expect(actual).toBe(expected)`), four layers, BEM/EM-style output.
+Built-in test framework for both @omegajs/extension itself and consumer projects. Jest-like assertion syntax (`expect(actual).toBe(expected)`), four layers, @omegajs/backend/EM-style output.
 
 ## Running tests
 
@@ -19,7 +19,7 @@ BXM_TEST_DEBUG=1 npx mgr test         # see Chromium/SW stderr (otherwise draine
 
 In @omegajs/extension itself, `npm test` does the same.
 
-All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh on each run — same pattern as EM's `test.log` and BEM's `test.log`. Grep it after a run instead of scrolling terminal output.
+All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh on each run — same pattern as EM's `test.log` and @omegajs/backend's `test.log`. Grep it after a run instead of scrolling terminal output.
 
 ### Selecting which tests run
 
@@ -116,7 +116,7 @@ Extended mode is the opt-in for tests that hit REAL external services (Firebase 
 
 - **Skipped by default.** `npx mgr test` runs fast and offline-safe — external calls no-op in-source.
 - **Opt in** with `npx mgr test --extended` (CLI shorthand) or `TEST_EXTENDED_MODE=true npx mgr test` (env var). `TEST_EXTENDED_MODE=1` is also accepted.
-- **Shared, unprefixed name across all OMEGA frameworks.** All four OMEGA frameworks read the SAME `TEST_EXTENDED_MODE` env var (the canonical name is BEM's) — no `BXM_`-prefixed variant.
+- **Shared, unprefixed name across all OMEGA frameworks.** All four OMEGA frameworks read the SAME `TEST_EXTENDED_MODE` env var (the canonical name is @omegajs/backend's) — no `BXM_`-prefixed variant.
 - **Propagates to every spawned test environment.** The command sets `process.env.TEST_EXTENDED_MODE = 'true'`, which is visible to the in-process Node runner and inherited by Puppeteer's Chromium (background / view / boot layers) since `puppeteer.launch()` inherits `process.env`.
 - **The warning prints.** When on, the command logs `Test mode: extended (real external APIs)` plus a `⚠️` banner (teed to `logs/test.log`); when off it logs `normal (external APIs skipped)`.
 - **Tests gate on `process.env.TEST_EXTENDED_MODE`.** Guard external-service tests with `if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');` (or an early return) so they no-op in normal mode.
@@ -157,19 +157,19 @@ Consumers writing their own tests get this automatically when running through `n
 - **Framework defaults**: `<@omegajs/extension>/dist/test/suites/**/*.js`
 - **Consumer suites**: `<cwd>/test/**/*.js`
 
-**The underscore convention** (`DISCOVERY_IGNORE` in `src/test/runner.js`): `_`-prefixed FILES (`test/_init.js`, `test/page/_helper.js`) and everything under a `_`-prefixed DIRECTORY at **any depth** (`test/_fixtures/**`, `test/boot/_private/**`) are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in BEM/EM/UJM. Files load alphabetically.
+**The underscore convention** (`DISCOVERY_IGNORE` in `src/test/runner.js`): `_`-prefixed FILES (`test/_init.js`, `test/page/_helper.js`) and everything under a `_`-prefixed DIRECTORY at **any depth** (`test/_fixtures/**`, `test/boot/_private/**`) are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in @omegajs/backend/EM/UJM. Files load alphabetically.
 
 **Framework's boot suites are scoped to @omegajs/extension self-test runs only.** When a consumer runs `npx mgr test`, the framework's `dist/test/suites/boot/**` is excluded from discovery (those tests assert on @omegajs/extension's internal fixture extension). Consumers write their own boot tests under `<cwd>/test/boot/`. See [test-boot-layer.md](test-boot-layer.md).
 
 ## `test/_init.js` — pre-test lifecycle hook
 
-The runner loads an optional `test/_init.js` from **both** test roots — the framework (`<@omegajs/extension>/test/_init.js`) and the consumer project (`<cwd>/test/_init.js`) — and runs it **once, before any suite** (it is NOT itself run as a test; the `_`-prefix keeps it out of discovery). Mirrors the same hook in BEM/EM/UJM so all four frameworks share one shape.
+The runner loads an optional `test/_init.js` from **both** test roots — the framework (`<@omegajs/extension>/test/_init.js`) and the consumer project (`<cwd>/test/_init.js`) — and runs it **once, before any suite** (it is NOT itself run as a test; the `_`-prefix keeps it out of discovery). Mirrors the same hook in @omegajs/backend/EM/UJM so all four frameworks share one shape.
 
 The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ projectRoot }` and returning the hook object. It may declare:
 
 - `async setup({ projectRoot })` — runs once before the suites, e.g. to scaffold a fixture file the boot layer needs.
 
-There is **no `cleanup` hook** and **no `accounts` field** (unlike BEM — these frameworks have no auth/user system): tests clean up after themselves, so there is nothing project-level to tear down.
+There is **no `cleanup` hook** and **no `accounts` field** (unlike @omegajs/backend — these frameworks have no auth/user system): tests clean up after themselves, so there is nothing project-level to tear down.
 
 ```javascript
 // <cwd>/test/_init.js
@@ -297,7 +297,7 @@ const manifest = Manager.getManifest();
 const JSON5 = Manager.require('json5');
 ```
 
-This is the same pattern EM and BEM consumers use — assert on framework API output rather than re-implementing parsing/loading in every test.
+This is the same pattern EM and @omegajs/backend consumers use — assert on framework API output rather than re-implementing parsing/loading in every test.
 
 ## Build-layer example
 

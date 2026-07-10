@@ -519,7 +519,7 @@ function loadResolvedConfig(projectDir) {
 
 // Require — lets consumer main-process code load @omegajs/desktop's bundled dependencies at runtime
 // (e.g. `manager.require('fs-jetpack')`). Resolves from @omegajs/desktop's module context, not the
-// consumer's. Mirrors BEM's Manager.require(). For build-time (webpack) resolution,
+// consumer's. Mirrors @omegajs/backend's Manager.require(). For build-time (webpack) resolution,
 // the webpack config's resolve.modules handles this automatically.
 Manager.prototype.require = function (name) {
   return require(name);

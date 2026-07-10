@@ -12,7 +12,7 @@ const _ = require('lodash');
 // Abort if running from ~/node_modules (accidental home directory install)
 const _homeDir = os.homedir();
 if (__dirname.startsWith(path.join(_homeDir, 'node_modules'))) {
-  console.error(`\nERROR: BEM is running from ~/node_modules (home directory install).`);
+  console.error(`\nERROR: @omegajs/backend is running from ~/node_modules (home directory install).`);
   console.error(`This shadows the local project copy. Fix:`);
   console.error(`  rm -rf ~/node_modules ~/package.json ~/package-lock.json\n`);
   process.exit(1);
@@ -81,13 +81,13 @@ Main.prototype.process = async function (args) {
     return await cmd.execute();
   }
 
-  // Install local BEM
+  // Install local @omegajs/backend
   if ((self.options.i || self.options.install) && (self.options.dev || self.options.development) || self.options.local) {
     const cmd = new InstallCommand(self);
     return await cmd.execute('local');
   }
 
-  // Install live BEM
+  // Install live @omegajs/backend
   if ((self.options.i || self.options.install) && (self.options.prod || self.options.production) || self.options.live) {
     const cmd = new InstallCommand(self);
     return await cmd.execute('live');
@@ -129,7 +129,7 @@ Main.prototype.process = async function (args) {
     return await cmd.execute();
   }
 
-  // Watch (trigger hot reload when BEM source changes)
+  // Watch (trigger hot reload when @omegajs/backend source changes)
   if (self.options['watch']) {
     const cmd = new WatchCommand(self);
     return await cmd.execute();

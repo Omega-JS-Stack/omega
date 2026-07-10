@@ -133,7 +133,7 @@ function convergedNotification(id = 'notif-1') {
   };
 }
 
-/** A users doc already converged to the BEM schema (auth creation time reconciled). */
+/** A users doc already converged to the @omegajs/backend schema (auth creation time reconciled). */
 function convergedUser(id = 'uid-1') {
   const data = structuredClone(DEFAULT_USER);
   data.auth = { uid: id, email: USER_RECORD.email, temporary: false };
@@ -478,7 +478,7 @@ test('users: flat subscription.id/name become subscription.product in a pinned p
   assert.equal(result.output.users.validDocs, 1);
 });
 
-test('users: sparse doc gets the full BEM backfill with auth-reconciled metadata and consent', async () => {
+test('users: sparse doc gets the full @omegajs/backend backfill with auth-reconciled metadata and consent', async () => {
   const doc = { id: 'uid-1', createTime: '2023-01-15T12:00:00.000000Z', updateTime: '2023-02-01T00:00:00.000000Z', data: {} };
   const firestore = collectionOf([doc]);
 

@@ -2,7 +2,7 @@
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to the deep references. The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
-> **Mirrored structure:** BEM, UJM, @omegajs/extension, and @omegajs/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** @omegajs/backend, UJM, @omegajs/extension, and @omegajs/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
 ## Identity
 
@@ -39,11 +39,11 @@ OMEGA Desktop (@omegajs/desktop) is a comprehensive framework for building moder
    - `npx mgr test mgr:` — run ONLY framework tests (universal cross-framework alias for "the manager's own tests")
    - `npx mgr test desktop:build/config` — run only framework tests matching a path (`em:` aliases `framework:`, both equivalent to `mgr:`)
    - `--filter=<substring>` matches test NAMES (orthogonal to the path target)
-   - `npx mgr test --extended` (or `TEST_EXTENDED_MODE=true`) opts into tests that hit real external services (Firebase, analytics, update feeds) — off by default. `TEST_EXTENDED_MODE` is the shared, unprefixed env var across BEM/BXM/UJM/@omegajs/desktop; it propagates to every spawned test environment and prints a warning when on. See [docs/test-framework.md](docs/test-framework.md#extended-vs-normal-mode).
+   - `npx mgr test --extended` (or `TEST_EXTENDED_MODE=true`) opts into tests that hit real external services (Firebase, analytics, update feeds) — off by default. `TEST_EXTENDED_MODE` is the shared, unprefixed env var across @omegajs/backend, @omegajs/extension, UJM, and @omegajs/desktop; it propagates to every spawned test environment and prints a warning when on. See [docs/test-framework.md](docs/test-framework.md#extended-vs-normal-mode).
 
 ### For Framework Development (This Repository)
 
-> **🚫 NEVER use `npx mgr ...` from the framework repo.** `npx mgr` is for CONSUMER projects only (where the bin is linked in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call the local `bin/` directly. This applies to ALL four OMEGA frameworks (BEM/UJM/BXM/@omegajs/desktop).
+> **🚫 NEVER use `npx mgr ...` from the framework repo.** `npx mgr` is for CONSUMER projects only (where the bin is linked in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call the local `bin/` directly. This applies to ALL four OMEGA frameworks (@omegajs/backend, UJM, @omegajs/extension, @omegajs/desktop).
 
 1. `npm install`
 2. `npm start` — watch + compile `src/` → `dist/` via prepare-package
@@ -175,7 +175,7 @@ See [docs/releasing.md](docs/releasing.md) for the end-to-end flow.
 
 ## Development Workflow
 
-- **🚫 NEVER use `npx mgr ...` from the framework repo** — `npx mgr` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call `node bin/omega-desktop` directly. This applies to ALL four OMEGA frameworks (BEM/UJM/BXM/@omegajs/desktop).
+- **🚫 NEVER use `npx mgr ...` from the framework repo** — `npx mgr` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call `node bin/omega-desktop` directly. This applies to ALL four OMEGA frameworks (@omegajs/backend, UJM, @omegajs/extension, @omegajs/desktop).
 - **🚫 NEVER run `npm start`** (consumer projects) — it's the user's long-running dev process. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `runtime.log`, `test.log`) — never tail/attach to the process. Running `npx mgr test` is fine.
 - **After editing files**, verify the gulp watcher recompiled successfully. Check for webpack/sass errors in the console output. A change that breaks the build is not a completed change.
 - **Live-test UI changes via CDP.** After code changes compile, use the `chrome-devtools-electron` MCP tools (screenshots, click, evaluate JS, console logs) to verify the change works in the running app. This is the primary way to confirm UI/renderer changes — type-checking and test suites verify code correctness, not feature correctness. See [docs/cdp-debugging.md](docs/cdp-debugging.md) and `~/.claude/mcp-server/servers/chrome-devtools-electron/CLAUDE.md`.
@@ -209,7 +209,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / BEM / BXM / @omegajs/desktop / MAM — WM mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — WM mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 
@@ -249,7 +249,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/releasing.md](docs/releasing.md) — end-to-end release walkthrough
 - [docs/runner.md](docs/runner.md) — Windows EV-token signing runner
 - [docs/test-framework.md](docs/test-framework.md) — writing tests, running them, layers
-- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot` test layer: consumer end-to-end smoke + @omegajs/desktop's framework self-test from the repo via the bundled fixture (`src/test/fixtures/consumer-app/`) + `EM_TEST_BOOT_PROJECT` (@omegajs/desktop's analog of BEM/BXM/UJM `*_TEST_BOOT_PROJECT`)
+- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot` test layer: consumer end-to-end smoke + @omegajs/desktop's framework self-test from the repo via the bundled fixture (`src/test/fixtures/consumer-app/`) + `EM_TEST_BOOT_PROJECT` (@omegajs/desktop's analog of @omegajs/backend/BXM/UJM `*_TEST_BOOT_PROJECT`)
 - [docs/build-system.md](docs/build-system.md) — gulp, webpack, electron-builder pipeline
 - [docs/environment-detection.md](docs/environment-detection.md) — `isDevelopment`/`isTesting`/`getApiUrl` etc., adding new helpers
 - [docs/common-mistakes.md](docs/common-mistakes.md) — the canonical "don't do this" list

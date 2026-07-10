@@ -47,8 +47,8 @@ const { trackContentSource, contentSourceHash, resolveSources } = require('../..
 /**
  * Generate newsletter content from parent server sources.
  *
- * @param {object} Manager - BEM Manager instance
- * @param {object} assistant - BEM assistant instance
+ * @param {object} Manager - @omegajs/backend Manager instance
+ * @param {object} assistant - @omegajs/backend assistant instance
  * @param {object} settings - Campaign settings from the recurring template
  * @param {object} [opts] - Optional overrides used by the iteration test
  * @param {function} [opts.persistImage] - async (image, idx) => imagePath (URL or relative path).

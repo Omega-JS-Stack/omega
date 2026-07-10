@@ -1,17 +1,17 @@
 /**
- * Ensure BEM's custom fields exist in SendGrid with the right types.
+ * Ensure @omegajs/backend's custom fields exist in SendGrid with the right types.
  *
- * The field list comes from backend-manager's marketing SSOT (honoring each
+ * The field list comes from @omegajs/backend's marketing SSOT (honoring each
  * field's provider skip list — SendGrid has first/last name built in). A
  * type mismatch can't be patched in SendGrid, so the field is deleted and
- * recreated. Fields BEM doesn't own are never touched.
+ * recreated. Fields @omegajs/backend doesn't own are never touched.
  */
 const chalk = require('chalk').default;
-const { fieldsFor } = require('../../../lib/bem-marketing.js');
+const { fieldsFor } = require('../../../lib/backend-marketing.js');
 
 const SENDGRID_FIELDS = fieldsFor('sendgrid');
 
-// BEM type → SendGrid field_type
+// @omegajs/backend type → SendGrid field_type
 const TYPE_MAP = { text: 'Text', number: 'Number', date: 'Date' };
 
 module.exports = async function ensureCustomFields(context) {

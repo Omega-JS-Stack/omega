@@ -60,7 +60,7 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 1. **Testing** — `process.env.BXM_TEST_MODE === 'true'`, `globalThis.BXM_TEST_MODE === true`, or a build baked with `config.bxm.environment === 'testing'` (set by the harness before any consumer JS runs). A test run is a test run regardless of any other signal.
 2. **Production / Development (runtime)** — `chrome.runtime.getManifest().update_url`: present → production (packed / store-installed), absent → development (unpacked). This is the authoritative runtime signal in an extension context. In build-time Node, `chrome` is undefined, so it falls through.
 3. **Build-time + config signals** — `BXM_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development; `config.bxm.environment` (`'development'` / `'production'`) override.
-4. **Default** — development. @omegajs/extension's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `BXM_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast BEM/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
+4. **Default** — development. @omegajs/extension's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `BXM_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast @omegajs/backend/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
 
 ## Adding a new helper
 

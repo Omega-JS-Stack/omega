@@ -48,7 +48,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     return assistant.respond('Your data request is still being processed. Please check back later.', { code: 400 });
   }
 
-  // Build query list: BEM defaults + project-specific queries from config
+  // Build query list: @omegajs/backend defaults + project-specific queries from config
   const defaultQueries = [
     { path: 'users/{uid}', redact: ['api.privateKey'] },
     { collection: 'data-requests', where: [['owner', '==', '{uid}']] },

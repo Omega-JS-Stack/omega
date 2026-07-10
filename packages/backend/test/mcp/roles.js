@@ -2,7 +2,7 @@
  * Test: MCP role-based tool scoping
  * Tests that admin/user/public roles see the correct tools via the MCP protocol endpoint
  *
- * Run: npx mgr test bem:mcp/roles
+ * Run: npx mgr test backend:mcp/roles
  */
 const fetch = require('wonderful-fetch');
 

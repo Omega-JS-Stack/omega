@@ -6,9 +6,9 @@ This document covers the full payment system: pipeline architecture, subscriptio
 
 The payment system follows a linear pipeline: **Intent → Webhook → On-Write → Transition**.
 
-1. **Intent** (`POST /payments/intent`): Client requests a payment session. BEM validates the product, generates an order ID (`XXXX-XXXX-XXXX`), and delegates to the processor module (e.g., Stripe creates a Checkout Session). Saves to `payments-intents/{orderId}`.
+1. **Intent** (`POST /payments/intent`): Client requests a payment session. @omegajs/backend validates the product, generates an order ID (`XXXX-XXXX-XXXX`), and delegates to the processor module (e.g., Stripe creates a Checkout Session). Saves to `payments-intents/{orderId}`.
 
-2. **Webhook** (`POST /payments/webhook?processor=X&key=Y`): Processor sends event data. BEM parses and categorizes the event (`subscription` or `one-time`), extracts the UID, and saves to `payments-webhooks/{eventId}` with `status: 'pending'`.
+2. **Webhook** (`POST /payments/webhook?processor=X&key=Y`): Processor sends event data. @omegajs/backend parses and categorizes the event (`subscription` or `one-time`), extracts the UID, and saves to `payments-webhooks/{eventId}` with `status: 'pending'`.
 
 3. **On-Write** (Firestore trigger on `payments-webhooks/{eventId}`): Fetches the latest resource from the processor API (not stale webhook data), transforms it into a unified object, detects state transitions, dispatches handlers, tracks analytics, and writes to `users/{uid}.subscription` (subscriptions) and `payments-orders/{orderId}`.
 
@@ -70,7 +70,7 @@ subscription: {
   },
   payment: {
     processor: null,               // 'stripe' | 'paypal' | etc.
-    orderId: null,                 // BEM order ID (e.g., '1234-5678-9012')
+    orderId: null,                 // @omegajs/backend order ID (e.g., '1234-5678-9012')
     resourceId: null,              // provider subscription ID (e.g., 'sub_xxx')
     frequency: null,               // 'monthly' | 'annually' | 'weekly' | 'daily'
     price: 0,                      // resolved from config (number, e.g., 4.99)
@@ -104,7 +104,7 @@ user.subscription.status === 'suspended'
 `User.resolveSubscription(account)` is a static method on the User helper that derives calculated subscription fields from raw account data. It returns only fields that require derivation logic — raw data (product.id, status, trial, cancellation) lives on the account object directly.
 
 ```javascript
-const User = require('backend-manager/src/manager/helpers/user');
+const User = require('@omegajs/backend/src/manager/helpers/user');
 
 const resolved = User.resolveSubscription(account);
 // Returns: { plan, active, trialing, cancelling }
@@ -134,7 +134,7 @@ if (user.subscription.status === 'active' && user.subscription.product.id !== 'b
 
 ## Transition Handlers
 
-When a webhook changes a subscription or processes a one-time payment, BEM detects the state transition and dispatches to a handler file. Handlers are fire-and-forget (non-blocking) — they run after the transition is detected but before or during the Firestore writes. Handler failures never block webhook processing.
+When a webhook changes a subscription or processes a one-time payment, @omegajs/backend detects the state transition and dispatches to a handler file. Handlers are fire-and-forget (non-blocking) — they run after the transition is detected but before or during the Firestore writes. Handler failures never block webhook processing.
 
 Handlers are skipped during tests unless `TEST_EXTENDED_MODE` is set.
 

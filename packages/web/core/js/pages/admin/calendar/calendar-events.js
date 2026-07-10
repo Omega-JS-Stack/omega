@@ -1,6 +1,6 @@
 /**
  * Calendar Events (Campaign Editor)
- * Campaign CRUD via FormManager + BEM API, modal management,
+ * Campaign CRUD via FormManager + @omegajs/backend API, modal management,
  * type toggling (email/push), and results viewer.
  */
 
@@ -636,7 +636,7 @@ export default class CalendarEvents {
   }
 
   // ============================================
-  // BEM API Calls
+  // @omegajs/backend API Calls
   // ============================================
   async _createCampaign(payload) {
     const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;

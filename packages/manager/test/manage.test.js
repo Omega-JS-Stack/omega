@@ -146,7 +146,7 @@ test('loadBrand: declared target beats naming; unconventional dirs map via their
   const root = stageBrand();
 
   // apps/api declares targets.backend in functions/config/omega.json5 — the
-  // BEM layout — and "api" matches no naming convention
+  // @omegajs/backend layout — and "api" matches no naming convention
   const functionsConfig = path.join(root, 'apps', 'api', 'functions', 'config');
   fs.mkdirSync(functionsConfig, { recursive: true });
   fs.writeFileSync(path.join(functionsConfig, 'omega.json5'), `{ targets: { backend: {} } }`);

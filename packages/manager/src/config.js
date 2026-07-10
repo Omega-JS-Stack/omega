@@ -45,7 +45,7 @@ const TARGET_APP_DIRS = Object.fromEntries(
 // parked, no framework to check).
 const TARGET_FRAMEWORKS = {
   web: '@omegajs/web',
-  backend: 'backend-manager',
+  backend: '@omegajs/backend',
   extension: '@omegajs/extension',
   desktop: '@omegajs/desktop',
 };
@@ -105,7 +105,7 @@ const DEFAULTS = {
   // account + property selection/creation flow and land both ids here
   // (comment-preserving writeback). Meta/TikTok pixel IDs are public config;
   // their access tokens live in the brand .env (META_ACCESS_TOKEN /
-  // TIKTOK_ACCESS_TOKEN — the names backend-manager reads).
+  // TIKTOK_ACCESS_TOKEN — the names @omegajs/backend reads).
   analytics: {
     providers: {
       google: {
@@ -181,7 +181,7 @@ const DEFAULTS = {
   // cache. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
   // (+ BACKEND_MANAGER_WEBHOOK_KEY for the webhook operations).
   // omega-manager also carried a newsletter.content generator blob here —
-  // it's BEM newsletter-generator data, not service config; it rides the
+  // it's @omegajs/backend newsletter-generator data, not service config; it rides the
   // config-hierarchy dispersal story.
   marketing: {
     campaigns: {
@@ -648,16 +648,16 @@ const OPERATIONS = {
     { name: 'domain-auth', ensure: true },     // Domain authentication (DKIM CNAMEs via Cloudflare, one-pass validate)
     { name: 'sender-identity', ensure: true }, // Verified sender for Single Sends (offers@{contact domain})
     { name: 'list', ensure: true },            // The brand's marketing list (id written back to omega.json5)
-    { name: 'custom-fields', ensure: true },   // BEM custom fields (backend-manager's marketing SSOT)
-    { name: 'segments', ensure: true },        // BEM segments (query_dsl diffed; __temp_ orphans swept)
-    { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent BEM forwarder (min-diff PATCH)
+    { name: 'custom-fields', ensure: true },   // @omegajs/backend custom fields (@omegajs/backend's marketing SSOT)
+    { name: 'segments', ensure: true },        // @omegajs/backend segments (query_dsl diffed; __temp_ orphans swept)
+    { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent @omegajs/backend forwarder (min-diff PATCH)
   ],
 
   beehiiv: [
     { name: 'publication', ensure: true },   // Publication access (config/state id, auto-match by name; creation is manual)
-    { name: 'custom-fields', ensure: true }, // BEM custom fields (backend-manager's marketing SSOT, diffed by display)
-    { name: 'segments', ensure: true },      // BEM segments verified (no create API — instructions when missing)
-    { name: 'webhook', ensure: true },       // Publication webhook → parent BEM forwarder (min-diff PATCH)
+    { name: 'custom-fields', ensure: true }, // @omegajs/backend custom fields (@omegajs/backend's marketing SSOT, diffed by display)
+    { name: 'segments', ensure: true },      // @omegajs/backend segments verified (no create API — instructions when missing)
+    { name: 'webhook', ensure: true },       // Publication webhook → parent @omegajs/backend forwarder (min-diff PATCH)
   ],
 
   payment: [
@@ -728,7 +728,7 @@ const OPERATIONS = {
 
   migrations: [
     { name: 'notifications', ensure: true }, // uid→owner + metadata/context/attribution + validate schema
-    { name: 'users', ensure: true },         // plan→subscription + BEM-schema backfill + orphan cleanup + validate
+    { name: 'users', ensure: true },         // plan→subscription + @omegajs/backend-schema backfill + orphan cleanup + validate
   ],
 
   bookmark: [

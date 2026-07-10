@@ -1,14 +1,14 @@
 /**
- * Golden-master gate: @omegajs/account must reproduce backend-manager's LIVE
+ * Golden-master gate: @omegajs/account must reproduce @omegajs/backend's LIVE
  * user.js output byte-for-byte before any framework adopts it.
  *
  * Method:
- * - requires BEM's actual src/manager/helpers/user.js from packages/backend
- *   (a live comparison, not a snapshot — if BEM's schema changes, this fails)
+ * - requires @omegajs/backend's actual src/manager/helpers/user.js from packages/backend
+ *   (a live comparison, not a snapshot — if @omegajs/backend's schema changes, this fails)
  * - freezes time (node:test mock timers, Date API) so both sides compute
  *   identical $now/$nowUNIX values
  * - $randomId is deterministic on both sides (mock Manager / injected generator)
- * - $uuid and $apiKey are module-internal in BEM (uuid v4 / uid-generator, not
+ * - $uuid and $apiKey are module-internal in @omegajs/backend (uuid v4 / uid-generator, not
  *   injectable) — those two fields are format-asserted, then replaced with
  *   sentinels on both sides before the byte comparison
  * - deepStrictEqual for diffs + JSON.stringify equality for key-order parity
@@ -30,13 +30,13 @@ const RANDOM_ID = 'gm-rand8';
 const mockManager = {
   Utilities: () => ({
     randomId: (options) => {
-      assert.deepStrictEqual(options, { size: 8 }, 'BEM should request an 8-char randomId');
+      assert.deepStrictEqual(options, { size: 8 }, '@omegajs/backend should request an 8-char randomId');
       return RANDOM_ID;
     },
   }),
 };
 
-// The account side injects sentinels directly; the BEM side generates real
+// The account side injects sentinels directly; the @omegajs/backend side generates real
 // values that get format-checked and replaced by the same sentinels.
 const SENTINEL_GENERATORS = {
   uuid: () => '<uuid>',
@@ -48,11 +48,11 @@ function normalizeBem(properties, fixture) {
   // Only generated values need normalizing — fixture-supplied api values pass
   // through both engines untouched and stay byte-comparable as-is.
   if (typeof fixture?.api?.clientId !== 'string') {
-    assert.match(properties.api.clientId, UUID_RE, 'BEM api.clientId should be a v4 uuid');
+    assert.match(properties.api.clientId, UUID_RE, '@omegajs/backend api.clientId should be a v4 uuid');
     properties.api.clientId = '<uuid>';
   }
   if (typeof fixture?.api?.privateKey !== 'string') {
-    assert.match(properties.api.privateKey, API_KEY_RE, 'BEM api.privateKey should be a uid-generator token');
+    assert.match(properties.api.privateKey, API_KEY_RE, '@omegajs/backend api.privateKey should be a uid-generator token');
     properties.api.privateKey = '<apiKey>';
   }
   return properties;
@@ -183,7 +183,7 @@ test('golden master: no settings at all', (t) => {
   assert.strictEqual(JSON.stringify(ours), JSON.stringify(bem));
 });
 
-// User-instance fallback: BEM's resolveSubscription accepts { properties: {...} }
+// User-instance fallback: @omegajs/backend's resolveSubscription accepts { properties: {...} }
 test('golden master: resolveSubscription accepts a User-like wrapper', (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: FIXED_NOW_MS });
 

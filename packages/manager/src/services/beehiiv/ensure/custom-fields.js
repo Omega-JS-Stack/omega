@@ -1,20 +1,20 @@
 /**
- * Ensure BEM's custom fields exist on the Beehiiv publication with the
+ * Ensure @omegajs/backend's custom fields exist on the Beehiiv publication with the
  * right kinds.
  *
- * The field list comes from backend-manager's marketing SSOT (honoring each
+ * The field list comes from @omegajs/backend's marketing SSOT (honoring each
  * field's provider skip list — Beehiiv needs first/last name as custom
  * fields, but tracks country and UTM source natively). Beehiiv matches
  * subscriber values by display name, so fields are diffed by `display`. A
  * kind mismatch can't be patched — the field is deleted and recreated.
- * Fields BEM doesn't own are never touched.
+ * Fields @omegajs/backend doesn't own are never touched.
  */
 const chalk = require('chalk').default;
-const { fieldsFor } = require('../../../lib/bem-marketing.js');
+const { fieldsFor } = require('../../../lib/backend-marketing.js');
 
 const BEEHIIV_FIELDS = fieldsFor('beehiiv');
 
-// BEM type → Beehiiv kind
+// @omegajs/backend type → Beehiiv kind
 const KIND_MAP = { text: 'string', number: 'integer', date: 'datetime' };
 
 module.exports = async function ensureCustomFields(context) {

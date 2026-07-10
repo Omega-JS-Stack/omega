@@ -21,7 +21,7 @@ class SkipError extends Error {
 }
 
 /**
- * BEM Integration Test Runner
+ * @omegajs/backend Integration Test Runner
  * Supports standalone tests and test suites with sequential tests and shared state
  */
 class TestRunner {
@@ -45,6 +45,7 @@ class TestRunner {
       passed: 0,
       failed: 0,
       skipped: 0,
+      aborted: false, // pre-flight abort (config/health/accounts) — must exit non-zero
       tests: [],
       startTime: null,
       endTime: null,
@@ -55,10 +56,10 @@ class TestRunner {
    * Main run method
    */
   async run() {
-    // Abort if BEM is running from the user's home directory (e.g., accidental ~/node_modules install)
+    // Abort if @omegajs/backend is running from the user's home directory (e.g., accidental ~/node_modules install)
     const homeDir = os.homedir();
     if (__dirname.startsWith(path.join(homeDir, 'node_modules'))) {
-      console.error(chalk.red('\n  ERROR: BEM is running from ~/node_modules (home directory install).'));
+      console.error(chalk.red('\n  ERROR: @omegajs/backend is running from ~/node_modules (home directory install).'));
       console.error(chalk.red('  This is likely an accidental global install that shadows local project copies.'));
       console.error(chalk.red(`  Fix: rm -rf ${path.join(homeDir, 'node_modules')} ${path.join(homeDir, 'package.json')} ${path.join(homeDir, 'package-lock.json')}`));
       console.error(chalk.red(`  Running from: ${__dirname}\n`));
@@ -70,7 +71,7 @@ class TestRunner {
 
     this.results.startTime = Date.now();
 
-    console.log(chalk.bold('\n  BEM Integration Tests\n'));
+    console.log(chalk.bold('\n  @omegajs/backend Integration Tests\n'));
 
     // Warn if TEST_EXTENDED_MODE is enabled
     if (process.env.TEST_EXTENDED_MODE) {
@@ -81,6 +82,7 @@ class TestRunner {
 
     // Validate configuration
     if (!this.validateConfig()) {
+      this.results.aborted = true;
       return this.results;
     }
 
@@ -93,24 +95,26 @@ class TestRunner {
 
     const healthy = await this.healthCheck(healthHttp);
     if (!healthy) {
+      this.results.aborted = true;
       return this.results;
     }
 
     // Setup accounts
     const accountsReady = await this.setupAccounts();
     if (!accountsReady) {
+      this.results.aborted = true;
       return this.results;
     }
 
     // Discover and run tests
-    // BEM tests are in the top-level test/ directory of the package
-    const bemTestsDir = path.resolve(__dirname, '../../test');
+    // @omegajs/backend tests are in the top-level test/ directory of the package
+    const frameworkTestsDir = path.resolve(__dirname, '../../test');
     const projectTestsDir = path.join(this.options.projectDir, 'test');
 
-    // Run BEM default tests
-    if (jetpack.exists(bemTestsDir)) {
-      console.log(chalk.bold('  BEM Core Tests'));
-      await this.runTestsInDir(bemTestsDir, 'bem');
+    // Run @omegajs/backend default tests
+    if (jetpack.exists(frameworkTestsDir)) {
+      console.log(chalk.bold('  @omegajs/backend Core Tests'));
+      await this.runTestsInDir(frameworkTestsDir, 'backend');
     }
 
     // Run project-specific tests
@@ -214,8 +218,8 @@ class TestRunner {
   /**
    * Verify the running emulator belongs to this project. Tries the Firebase
    * Emulator Hub (localhost:4400) first — it always knows the project ID
-   * regardless of BEM version. Falls back to the health endpoint's projectId
-   * field (added in BEM 5.3.3+). Returns true (= mismatch, abort) if the
+   * regardless of @omegajs/backend version. Falls back to the health endpoint's projectId
+   * field (added in @omegajs/backend 5.3.3+). Returns true (= mismatch, abort) if the
    * project IDs differ.
    */
   async checkProjectMismatch(healthData) {
@@ -243,7 +247,7 @@ class TestRunner {
       // Hub unreachable — fall back to health endpoint
     }
 
-    // Fall back to the health endpoint's projectId (BEM 5.3.3+)
+    // Fall back to the health endpoint's projectId (@omegajs/backend 5.3.3+)
     if (!emulatorProjectId) {
       emulatorProjectId = healthData?.projectId;
     }
@@ -261,7 +265,7 @@ class TestRunner {
    * Setup test accounts - deletes existing test users and recreates them fresh
    */
   async setupAccounts() {
-    // Load the optional test/_init.js hooks from BOTH test roots (BEM core +
+    // Load the optional test/_init.js hooks from BOTH test roots (@omegajs/backend core +
     // consumer project): extra `accounts` to create and `setup()` to seed fixtures.
     const initHooks = this.loadInitHooks();
 
@@ -299,7 +303,7 @@ class TestRunner {
     // Fetch account privateKeys (built-in + project-defined).
     this.accounts = await testAccounts.fetchPrivateKeys(this.options.admin, this.options.domain, this.config, initHooks.accounts);
 
-    // Run custom setup hooks (BEM core first, then consumer). Runs AFTER the
+    // Run custom setup hooks (@omegajs/backend core first, then consumer). Runs AFTER the
     // standard test accounts exist and AFTER the clean slate, so they can seed
     // fixtures (brands, etc.) and reference the created accounts.
     for (const setup of initHooks.setups) {
@@ -414,7 +418,7 @@ class TestRunner {
 
   /**
    * Load and merge the `test/_init.js` lifecycle hooks from BOTH test roots —
-   * BEM core (`<bem>/test/_init.js`) and the consumer project
+   * @omegajs/backend core (`<backend>/test/_init.js`) and the consumer project
    * (`<projectDir>/test/_init.js`). Same contract for both, so framework and
    * consumer authors write the identical file shape. Each exports a function
    * (see loadInit) returning:
@@ -428,15 +432,15 @@ class TestRunner {
    * every run (deleteTestUsers → flushEmulatorFirestore) and each test cleans up
    * after itself, so there is nothing project-level to tear down.
    *
-   * Returns the merged extra `accounts` map (BEM core then consumer; consumer
-   * wins on key collision) and the ordered `setups` runners (BEM core first).
+   * Returns the merged extra `accounts` map (@omegajs/backend core then consumer; consumer
+   * wins on key collision) and the ordered `setups` runners (@omegajs/backend core first).
    */
   loadInitHooks() {
-    const bemTestsDir = path.resolve(__dirname, '../../test');
+    const frameworkTestsDir = path.resolve(__dirname, '../../test');
     const projectTestsDir = path.join(this.options.projectDir, 'test');
 
     const hooks = [
-      this.loadInit(bemTestsDir, 'BEM core'),
+      this.loadInit(frameworkTestsDir, '@omegajs/backend core'),
       this.loadInit(projectTestsDir, 'project'),
     ];
 
@@ -502,7 +506,7 @@ class TestRunner {
   /**
    * Filter tests based on CLI paths
    * Supports source prefixes (standardized across all OMEGA frameworks):
-   *   mgr:path/ / bem:path/  → framework tests ('mgr:' is the universal alias)
+   *   mgr:path/ / backend:path/  → framework tests ('mgr:' is the universal alias)
    *   project:path/          → project tests
    *   no prefix              → both sources, matched by path
    */
@@ -515,13 +519,13 @@ class TestRunner {
       const relativePath = this.getRelativeTestPath(testFile, source);
 
       for (const filterPath of this.options.testPaths) {
-        // Check for source prefix (mgr:/bem: → framework, project: → project)
-        const prefixMatch = filterPath.match(/^(mgr|bem|project):(.*)$/);
+        // Check for source prefix (mgr:/backend: → framework, project: → project)
+        const prefixMatch = filterPath.match(/^(mgr|backend|project):(.*)$/);
 
         if (prefixMatch) {
           const [, rawPrefix, pathPart] = prefixMatch;
-          // 'mgr' is the universal framework alias → normalize to this framework's source id ('bem').
-          const prefix = rawPrefix === 'mgr' ? 'bem' : rawPrefix;
+          // 'mgr' is the universal framework alias → normalize to this framework's source id ('backend').
+          const prefix = rawPrefix === 'mgr' ? 'backend' : rawPrefix;
 
           // Skip if source doesn't match prefix
           if (prefix !== source) {
@@ -550,7 +554,7 @@ class TestRunner {
    * Get relative test path for display
    */
   getRelativeTestPath(testFile, source) {
-    if (source === 'bem') {
+    if (source === 'backend') {
       return path.relative(path.resolve(__dirname, '../../test'), testFile);
     }
     return path.relative(path.join(this.options.projectDir, 'test'), testFile);
@@ -926,7 +930,7 @@ class TestRunner {
       pubsub,
       skip,
       admin: this.config.admin,
-      // Real BEM Manager + assistant, booted by run-tests.js with BEM_TEST_RUNNER=1.
+      // Real @omegajs/backend Manager + assistant, booted by run-tests.js with BEM_TEST_RUNNER=1.
       // Tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
       // like production code — no stubs.
       Manager: this.config.Manager,

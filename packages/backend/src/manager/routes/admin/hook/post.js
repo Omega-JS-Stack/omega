@@ -2,8 +2,8 @@
  * POST /admin/hook - Run a hook or cron job manually
  *
  * Resolves the hook from multiple locations:
- *   1. BEM internal crons (e.g. path="cron/daily/blog-auto-publisher")
- *   2. BEM internal functions/core hooks
+ *   1. @omegajs/backend internal crons (e.g. path="cron/daily/blog-auto-publisher")
+ *   2. @omegajs/backend internal functions/core hooks
  *   3. Consumer project root
  *   4. Consumer hooks/ directory
  *
@@ -69,9 +69,9 @@ function loadHook(assistant, hookPath) {
   const path = require('path');
 
   const searchPaths = [
-    // BEM internal crons + events (e.g. "cron/daily/blog-auto-publisher")
+    // @omegajs/backend internal crons + events (e.g. "cron/daily/blog-auto-publisher")
     path.join(Manager.rootDirectory, 'events', hookPath),
-    // BEM internal functions/core
+    // @omegajs/backend internal functions/core
     path.join(Manager.rootDirectory, '..', '..', 'functions', 'core', hookPath),
     // Consumer project root
     path.join(Manager.cwd, hookPath),

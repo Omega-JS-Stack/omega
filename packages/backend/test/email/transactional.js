@@ -19,7 +19,7 @@ module.exports = {
 
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Empty To',
+          subject: '@omegajs/backend Test Email - Empty To',
           to: [],
           copy: false,
         });
@@ -35,7 +35,7 @@ module.exports = {
 
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Bad Object',
+          subject: '@omegajs/backend Test Email - Bad Object',
           to: [{ name: 'No Email' }],
           copy: false,
         });
@@ -51,12 +51,12 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Default Template',
+          subject: '@omegajs/backend Test Email - Default Template',
           to: [{ email: `_test-receiver@${config.domain}` }],
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Default Template',
+              subject: '@omegajs/backend Test Email - Default Template',
             },
             content: {
               message: 'Testing that default template is used when not specified.',
@@ -77,7 +77,7 @@ module.exports = {
 
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Bad UID',
+          subject: '@omegajs/backend Test Email - Bad UID',
           to: 'nonexistent_uid_12345',
           copy: false,
         });
@@ -99,7 +99,7 @@ module.exports = {
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Fallback Subject',
+              subject: '@omegajs/backend Test Email - Fallback Subject',
             },
             content: {
               message: 'Testing subject fallback from data.email.subject.',
@@ -121,12 +121,12 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - String Email',
+          subject: '@omegajs/backend Test Email - String Email',
           to: `_test-receiver@${config.domain}`,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - String Email',
+              subject: '@omegajs/backend Test Email - String Email',
             },
             content: {
               message: 'Testing string email format.',
@@ -146,12 +146,12 @@ module.exports = {
 
       async run({ http, assert, accounts }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - UID Recipient',
+          subject: '@omegajs/backend Test Email - UID Recipient',
           to: accounts.admin.uid,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - UID Recipient',
+              subject: '@omegajs/backend Test Email - UID Recipient',
             },
             content: {
               message: 'Testing UID resolution.',
@@ -171,7 +171,7 @@ module.exports = {
 
       async run({ http, assert, accounts, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Mixed Recipients',
+          subject: '@omegajs/backend Test Email - Mixed Recipients',
           to: [
             `_test-receiver@${config.domain}`,
             { email: `_test-receiver-2@${config.domain}`, name: 'Receiver 2' },
@@ -180,7 +180,7 @@ module.exports = {
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Mixed Recipients',
+              subject: '@omegajs/backend Test Email - Mixed Recipients',
             },
             content: {
               message: 'Testing mixed recipient formats.',
@@ -200,12 +200,12 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Object Recipient',
+          subject: '@omegajs/backend Test Email - Object Recipient',
           to: { email: `_test-receiver@${config.domain}`, name: 'Named Recipient' },
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Object Recipient',
+              subject: '@omegajs/backend Test Email - Object Recipient',
             },
             content: {
               message: 'Testing single object recipient with name.',
@@ -225,14 +225,14 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - CC/BCC',
+          subject: '@omegajs/backend Test Email - CC/BCC',
           to: `_test-receiver@${config.domain}`,
           cc: `_test-cc@${config.domain}`,
           bcc: { email: `_test-bcc@${config.domain}`, name: 'BCC Receiver' },
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - CC/BCC',
+              subject: '@omegajs/backend Test Email - CC/BCC',
             },
             content: {
               message: 'Testing cc and bcc recipients.',
@@ -256,12 +256,12 @@ module.exports = {
         const email = `_test-dedup@${config.domain}`;
 
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Dedup To',
+          subject: '@omegajs/backend Test Email - Dedup To',
           to: [email, email],
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Dedup To',
+              subject: '@omegajs/backend Test Email - Dedup To',
             },
             content: {
               message: 'Testing deduplication of same email in to.',
@@ -284,13 +284,13 @@ module.exports = {
         const email = `_test-dedup-cc@${config.domain}`;
 
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Dedup CC',
+          subject: '@omegajs/backend Test Email - Dedup CC',
           to: email,
           cc: email,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Dedup CC',
+              subject: '@omegajs/backend Test Email - Dedup CC',
             },
             content: {
               message: 'Testing cross-list dedup (to removes from cc).',
@@ -311,12 +311,12 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Case Dedup',
+          subject: '@omegajs/backend Test Email - Case Dedup',
           to: [`_TEST-DEDUP@${config.domain}`, `_test-dedup@${config.domain}`],
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Case Dedup',
+              subject: '@omegajs/backend Test Email - Case Dedup',
             },
             content: {
               message: 'Testing case-insensitive deduplication.',
@@ -339,12 +339,12 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - No Copy',
+          subject: '@omegajs/backend Test Email - No Copy',
           to: `_test-receiver@${config.domain}`,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - No Copy',
+              subject: '@omegajs/backend Test Email - No Copy',
             },
             content: {
               message: 'Testing that copy:false produces no cc/bcc.',
@@ -366,7 +366,7 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - HTML Override',
+          subject: '@omegajs/backend Test Email - HTML Override',
           to: `_test-receiver@${config.domain}`,
           html: '<p>This is raw HTML content.</p>',
           copy: false,
@@ -385,12 +385,12 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - SVG to PNG',
+          subject: '@omegajs/backend Test Email - SVG to PNG',
           to: `_test-receiver@${config.domain}`,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - SVG to PNG',
+              subject: '@omegajs/backend Test Email - SVG to PNG',
             },
             content: {
               message: 'Testing that SVG images are converted to PNG for email.',
@@ -416,13 +416,13 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Sender Orders',
+          subject: '@omegajs/backend Test Email - Sender Orders',
           to: `_test-receiver@${config.domain}`,
           sender: 'orders',
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Sender Orders',
+              subject: '@omegajs/backend Test Email - Sender Orders',
             },
             content: {
               message: 'Testing sender resolution for orders.',
@@ -446,13 +446,13 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Sender Security',
+          subject: '@omegajs/backend Test Email - Sender Security',
           to: `_test-receiver@${config.domain}`,
           sender: 'security',
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Sender Security',
+              subject: '@omegajs/backend Test Email - Sender Security',
             },
             content: {
               message: 'Testing that security sender resolves correctly.',
@@ -477,14 +477,14 @@ module.exports = {
         const customFrom = { email: `custom@${config.domain}`, name: 'Custom Sender' };
 
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - From Override',
+          subject: '@omegajs/backend Test Email - From Override',
           to: `_test-receiver@${config.domain}`,
           sender: 'orders',
           from: customFrom,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - From Override',
+              subject: '@omegajs/backend Test Email - From Override',
             },
             content: {
               message: 'Testing that explicit from overrides sender.',
@@ -506,13 +506,13 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - Unknown Sender',
+          subject: '@omegajs/backend Test Email - Unknown Sender',
           to: `_test-receiver@${config.domain}`,
           sender: 'nonexistent',
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - Unknown Sender',
+              subject: '@omegajs/backend Test Email - Unknown Sender',
             },
             content: {
               message: 'Testing that unknown sender falls back to brand defaults.',
@@ -537,13 +537,13 @@ module.exports = {
         const sendAtDate = new Date(Date.now() + (60 * 60 * 1000)).toISOString();
 
         const response = await http.post('backend-manager/admin/email', {
-          subject: 'BEM Test Email - ISO SendAt',
+          subject: '@omegajs/backend Test Email - ISO SendAt',
           to: `_test-receiver@${config.domain}`,
           sendAt: sendAtDate,
           copy: false,
           data: {
             email: {
-              subject: 'BEM Test Email - ISO SendAt',
+              subject: '@omegajs/backend Test Email - ISO SendAt',
             },
             content: {
               message: 'Testing ISO string sendAt.',

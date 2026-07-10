@@ -105,7 +105,7 @@ Defaults: `utm_source=brand.id`, `utm_medium=email`, `utm_campaign=name`, `utm_c
 
 ## Segments SSOT
 
-`SEGMENTS` dictionary in `constants.js` — 22 segment definitions. OMEGA creates them in SendGrid, BEM resolves keys to provider IDs at runtime via `resolveSegmentIds()` (cached).
+`SEGMENTS` dictionary in `constants.js` — 22 segment definitions. OMEGA creates them in SendGrid, @omegajs/backend resolves keys to provider IDs at runtime via `resolveSegmentIds()` (cached).
 
 | Category | Segments |
 |----------|----------|

@@ -1,4 +1,4 @@
-// Runtime mode helpers (BEM-pattern), shared across all three context Managers
+// Runtime mode helpers (@omegajs/backend-pattern), shared across all three context Managers
 // (main / renderer / preload) and the build-time Manager.
 //
 // Three MUTUALLY EXCLUSIVE environments — exactly one is true:
@@ -121,7 +121,7 @@ function getVersion() {
 }
 
 // Mix the helpers into a Manager constructor's prototype + the constructor itself
-// (so `Manager.isTesting()` works statically too, matching BEM's pattern). getEnvironment()
+// (so `Manager.isTesting()` works statically too, matching @omegajs/backend's pattern). getEnvironment()
 // is attached here too so all four entry points share one resolver — the URL helpers in
 // url-helpers.js depend on this.getEnvironment() existing.
 function attachTo(Manager) {

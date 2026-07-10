@@ -3,7 +3,7 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 const bem_allRulesRegex = /(\/\/\/---backend-manager---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
-const bem_allRulesBackupRegex = /({{\s*?backend-manager\s*?}})/sgm;
+const bem_allRulesBackupRegex = /({{\s*?@omegajs/backend\s*?}})/sgm;
 
 class FirestoreRulesFileTest extends BaseTest {
   getName() {
@@ -39,18 +39,18 @@ class FirestoreRulesFileTest extends BaseTest {
 
     const hasTemplate = contents.match(bem_allRulesRegex) || contents.match(bem_allRulesBackupRegex);
     if (!hasTemplate) {
-      console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{backend-manager}}`), chalk.red(`to it.`));
+      console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{@omegajs/backend}}`), chalk.red(`to it.`));
       return;
     }
 
-    // Always replace rules to ensure they're in sync with BEM template
+    // Always replace rules to ensure they're in sync with @omegajs/backend template
     const originalContents = contents;
     contents = contents.replace(bem_allRulesBackupRegex, self.default.firestoreRulesCore);
     contents = contents.replace(bem_allRulesRegex, self.default.firestoreRulesCore);
 
     if (contents !== originalContents) {
       jetpack.write(path, contents);
-      console.log(chalk.yellow(`Updated BEM rules in ${name} file`));
+      console.log(chalk.yellow(`Updated @omegajs/backend rules in ${name} file`));
     }
   }
 }

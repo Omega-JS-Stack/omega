@@ -17,23 +17,23 @@ class InstallCommand extends BaseCommand {
   }
 
   async installLocal() {
-    await this.uninstallPkg('backend-manager');
-    await this.installPkg(`npm install ${os.homedir()}/Developer/Repositories/ITW-Creative-Works/backend-manager`);
+    await this.uninstallPkg('@omegajs/backend');
+    await this.installPkg(`npm install ${os.homedir()}/Developer/Repositories/Omega/omega/packages/backend`);
   }
 
   async installLive() {
     // Check and update peer dependencies before installing
     await this.updatePeerDependencies();
 
-    await this.uninstallPkg('backend-manager');
-    await this.installPkg('backend-manager');
+    await this.uninstallPkg('@omegajs/backend');
+    await this.installPkg('@omegajs/backend');
   }
 
   async updatePeerDependencies() {
-    // Fetch latest backend-manager package info from npm
-    const latestBem = await this.getPackageInfo('backend-manager');
+    // Fetch latest @omegajs/backend package info from npm
+    const latestBem = await this.getPackageInfo('@omegajs/backend');
     if (!latestBem || !latestBem.peerDependencies) {
-      this.logWarning('Could not fetch backend-manager peer dependencies, proceeding anyway...');
+      this.logWarning('Could not fetch @omegajs/backend peer dependencies, proceeding anyway...');
       return;
     }
 
@@ -77,7 +77,7 @@ class InstallCommand extends BaseCommand {
     }
 
     // Log and update each dependency
-    this.log(chalk.yellow('\nUpdating peer dependencies for backend-manager...'));
+    this.log(chalk.yellow('\nUpdating peer dependencies for @omegajs/backend...'));
     for (const dep of outdatedDeps) {
       const majorWarning = dep.isMajor ? chalk.red(' (major update)') : '';
       this.log(`  ${chalk.bold(dep.name)}: ${dep.installed} → ${dep.required}${majorWarning}`);

@@ -41,7 +41,7 @@ function getPastExpires(years = 1) {
 /**
  * Static test accounts - always created with fixed properties
  * Used for testing access control levels
- * Both BEM and consuming projects rely on these
+ * Both @omegajs/backend and consuming projects rely on these
  *
  * Structure: { id, uid, email, properties }
  * - id: Account identifier
@@ -583,7 +583,7 @@ const TEST_ACCOUNTS = {
 /**
  * Get all test account definitions with resolved emails and dynamic product IDs
  * @param {string} domain - Domain for email addresses (e.g., 'itwcreativeworks.com')
- * @param {object} [config] - BEM config (used to resolve first paid product)
+ * @param {object} [config] - @omegajs/backend config (used to resolve first paid product)
  * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js,
  *   keyed by id, each `{ id, uid, email, properties }`. Merged after the built-in
  *   accounts; a project account may override a built-in one by reusing its key.
@@ -619,7 +619,7 @@ function getAccountDefinitions(domain, config, extraAccounts) {
  * Fetch privateKeys for test accounts from Firestore
  * @param {object} admin - Firebase admin instance
  * @param {string} domain - Domain for email addresses (e.g., 'itwcreativeworks.com')
- * @param {object} [config] - BEM config (used to resolve first paid product)
+ * @param {object} [config] - @omegajs/backend config (used to resolve first paid product)
  * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
  * @returns {Promise<object>} Account credentials with privateKeys
  */
@@ -934,7 +934,7 @@ async function _deleteAccountsIndividually(admin, allAccounts, results) {
  * Assumes deleteTestUsers() was called first to ensure clean state
  * @param {object} admin - Firebase admin instance
  * @param {string} domain - Domain for email addresses (e.g., 'itwcreativeworks.com')
- * @param {object} [config] - BEM config (used to resolve first paid product)
+ * @param {object} [config] - @omegajs/backend config (used to resolve first paid product)
  * @param {object} [extraAccounts] - Project-defined accounts from test/_init.js
  * @returns {Promise<object>} Result with created/failed counts
  */

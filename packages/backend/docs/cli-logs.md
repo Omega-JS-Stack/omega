@@ -41,7 +41,7 @@ Both commands save output to `functions/production.log` (overwritten on each run
 
 The `--fn` flag uses the **deployed Cloud Function name**, not the route path.
 
-**BEM built-in functions (always deployed):**
+**@omegajs/backend built-in functions (always deployed):**
 
 | Function name | Type | Description |
 |---------------|------|-------------|

@@ -33,7 +33,7 @@ const SUBSCRIPTION_FIELD_PATHS = [
  * @returns {'synced'|'planned'|'updated'}
  */
 async function ensureOwnerPlan({ db, ownerUid, plan, dryRun }) {
-  // Subscription shape matches the BEM user schema
+  // Subscription shape matches the @omegajs/backend user schema
   const desired = {
     product: { id: plan.id, name: plan.name },
     status: 'active',

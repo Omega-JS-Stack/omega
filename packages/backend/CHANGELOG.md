@@ -14,10 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
-# [Unreleased]
+# [6.0.0] - 2026-07-10
 
 ### BREAKING
-- **Config is now `functions/config/omega.json5` — `backend-manager-config.json` is no longer read anywhere.** BEM loads config through `@omegajs/config` (vendored; no new install for consumers). One-time migration per consumer:
+- **Package renamed `backend-manager` → `@omegajs/backend`** (6.0.0 continues the 5.x line). Bins are now **`omega-backend`** + the universal **`mgr`** — the `bm`, `bem`, and `backend-manager` aliases are gone. Display identity is **OMEGA Backend**; the MCP server registers as `omega-backend`.
+- **Framework test-source prefix is `backend:`** (was `bem:`) — `npx mgr test backend:routes/`; the universal `mgr:` alias and `project:` are unchanged. The runner's source id and the boot path (`backend:boot`) follow.
+- **Audit IDs renamed `BEM-xx` → `BKD-xx`** in `docs/audit.md` (matches EXT-xx / DSK-xx).
+- **Health endpoints return `backendVersion`** (was `bemVersion`) — `/test/health` route + legacy action; @omegajs/manager's api-check flipped in the same change.
+- **Deliberately NOT renamed (deployed/consumer wire format):** the `/backend-manager` URL route prefix + hosting-rewrite source, `bm_*` Cloud Function names, the `///---backend-manager---///` rules-file markers, `BACKEND_MANAGER_*` env keys + the `backend_manager` config key, the internal `BEM_TEST_CONFIG` env var, Stripe idempotency prefixes (`bem-*`), and test-data markers (`+bem`, `bem-test`). These ride the Phase-5 harmonization pass with the other frameworks' legacy acronyms.
+- **Config is now `functions/config/omega.json5` — `backend-manager-config.json` is no longer read anywhere.** The framework loads config through `@omegajs/config` (vendored; no new install for consumers). One-time migration per consumer:
   1. Create `functions/config/omega.json5` from `functions/backend-manager-config.json` (JSON5 — comments allowed).
   2. Shared sections stay at the top level, unchanged spelling: `brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2` (plus custom keys like `backend_manager`, `mcp`).
   3. Move the backend-specific sections under `targets: { backend: { ... } }`: `parent`, `github`, `marketing`, `blog`, `reviews`, `dataRequest`.
@@ -27,11 +32,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`Manager.init()` option `backendManagerConfigPath` removed** — the config path is discovered by the loader (`config/omega.json5` under the cwd, `functions/config/omega.json5` from a project root); there is nothing to point at anymore.
 - **Boot now warns on schema findings** — `Manager.init()` validates the resolved config against the shared OMEGA schema (`@omegajs/config`) and `console.warn`s findings; `npx mgr setup` (the audit) fails hard on unloadable configs and missing template keys, same as before.
 
+### Added
+- **The `test` AI provider reads directives from path-based messages** (folded from upstream backend-manager v5.12.0) — routes idiomatically pass `message: { path, settings }`, so the scripted-directive source falls back to the message's `settings` values (flattened raw, keeping directive JSON parseable). Consumer routes written in the standard prompt-template style are scriptable in tests without restructuring their AI calls. New coverage in `test/helpers/ai-test-provider.js`.
+
 ### Changed
-- **Defaults scaffolding now runs through the shared devkit defaults engine** (`src/utils/scaffold-defaults.js` — same engine as EM/BXM), and the defaults tree reached structural parity with the other frameworks: `.gitignore` and `functions/.env` moved from `templates/` into `src/defaults/` (as `_.gitignore` / `functions/_.env`) and are created on first setup + live-merged on every setup via the marker-section protocol, alongside the existing CLAUDE.md merge. The `env-file` / `gitignore` setup checks now validate against the defaults-tree templates and keep their legacy-migration fix paths (old `# BEM>>>` markers, `functions/.gitignore` removal, no-marker files). GitHub workflow templates were deliberately NOT added — no BEM consumer ships one.
-- **`merge-line-files` is now the devkit canonical copy** — BEM's custom-key promotion (a key the framework newly adopts into its Default section is promoted UP from the consumer's Custom section with their value, instead of being duplicated empty) was absorbed into `@omegajs/devkit/merge-line-files` and BEM's local implementation became a shim. One refinement over BEM's old copy: a key present in BOTH sections keeps its Custom copy (dropping it would silently flip dotenv's effective value).
+- **Defaults scaffolding now runs through the shared devkit defaults engine** (`src/utils/scaffold-defaults.js` — same engine as @omegajs/desktop and @omegajs/extension), and the defaults tree reached structural parity with the other frameworks: `.gitignore` and `functions/.env` moved from `templates/` into `src/defaults/` (as `_.gitignore` / `functions/_.env`) and are created on first setup + live-merged on every setup via the marker-section protocol, alongside the existing CLAUDE.md merge. The `env-file` / `gitignore` setup checks now validate against the defaults-tree templates and keep their legacy-migration fix paths (old `# BEM>>>` markers, `functions/.gitignore` removal, no-marker files). GitHub workflow templates were deliberately NOT added — no backend consumer ships one.
+- **`merge-line-files` is now the devkit canonical copy** — the framework's custom-key promotion (a key the framework newly adopts into its Default section is promoted UP from the consumer's Custom section with their value, instead of being duplicated empty) was absorbed into `@omegajs/devkit/merge-line-files` and the local implementation became a shim. One refinement over the old copy: a key present in BOTH sections keeps its Custom copy (dropping it would silently flip dotenv's effective value).
 - `npx mgr setup` scaffolds `functions/config/omega.json5` (from `templates/config/omega.json5`) instead of `backend-manager-config.json`; the config setup test compares the consumer's RESOLVED config against the template resolved through the same loader, so brand-monorepo consumers with brand-level shared sections pass correctly.
 - `project-id-consistency` reads the projectId from the resolved config (a brand-level `firebaseConfig` counts) and fixes mismatches by writing an app-level override to `functions/config/omega.json5`.
+
+### Fixed
+- **Negative usage limits (`-1`) are now actually unlimited** (folded from upstream backend-manager v5.12.0) — `usage.validate()` had no negative-limit handling, so the daily-cap math (`ceil(-1/daysInMonth)`) produced a 0/day cap that 429'd EVERY request from users on unlimited plans. `validate()` resolves immediately for negative limits and `getDailyAllowance()` returns no cap for them; 0/missing limits still reject. New suite: `test/helpers/usage-limits.js`.
+- **`linkFixtureDeps` creates the scoped link's parent dir** (`node_modules/@omegajs`) before `symlinkSync` — a scoped framework name failed the symlink silently (warn-and-continue), leaving the emulator's function workers unable to resolve the framework. Same fix as @omegajs/desktop's boot runner.
+- **Pre-flight aborts now exit non-zero.** A failed config validation, health check, or account setup returned zero-test results with `failed === 0`, so `run-tests.js` exited 0 — a dead server produced a GREEN suite (caught when the rename's boot canary "passed" while `bm_api` was 500ing). The runner marks those paths `aborted` and the exit condition treats an aborted run as failure.
+- **README test locations corrected** — project tests live in `functions/test/` (the runner's actual `projectTestsDir`), not `functions/test/bem/`.
+
+### Removed
+- Legacy `repository`/`bugs`/`homepage` package fields, the README badge header + legacy repo links, and the dev-install path into the standalone repo (now the monorepo package). License ISC → MIT.
 
 # [5.11.7] - 2026-07-03
 

@@ -36,7 +36,7 @@ test('custom section is preserved verbatim (env values normalized to quotes)', (
   assert.match(merged, /MY_SECRET="raw value"/);
 });
 
-test('custom key newly adopted by the framework is promoted UP into default (BEM behavior)', () => {
+test('custom key newly adopted by the framework is promoted UP into default (@omegajs/backend behavior)', () => {
   const existing = `${DEFAULT_MARKER}\n${CUSTOM_MARKER}\nGH_TOKEN="moved"\n`;
   const incoming = `${DEFAULT_MARKER}\nGH_TOKEN=""\n${CUSTOM_MARKER}\n`;
   const merged = mergeLineBasedFiles(existing, incoming, '.env');

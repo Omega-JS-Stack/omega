@@ -41,7 +41,7 @@ class BaseCommand {
   }
 
   /**
-   * Resolve a path for a human-readable log file. BEM-owned logs (dev.log,
+   * Resolve a path for a human-readable log file. @omegajs/backend-owned logs (dev.log,
    * emulator.log, test.log, production.log) live in `functions/` alongside
    * firebase-tools' own *-debug.log files so all log output is grep-able from
    * one place. Reset sentinels and other internal-only artifacts use
@@ -57,7 +57,7 @@ class BaseCommand {
   }
 
   /**
-   * Sweep stale BEM-owned logs out of `functions/`. Catches `.log` files
+   * Sweep stale @omegajs/backend-owned logs out of `functions/`. Catches `.log` files
    * from previous runs so each emulator/serve/test boot starts with a clean
    * slate. Also catches stale `.reset` sentinels in `.temp/` that a crashed
    * process may have left behind.
@@ -294,7 +294,7 @@ class BaseCommand {
       return null;
     }
 
-    // Check for Backend Manager webhook key
+    // Check for OMEGA Backend webhook key
     if (!process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
       this.log(chalk.gray('  (Stripe webhook forwarding disabled - BACKEND_MANAGER_WEBHOOK_KEY not set in .env)\n'));
       return null;

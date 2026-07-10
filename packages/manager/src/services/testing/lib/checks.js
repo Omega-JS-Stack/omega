@@ -355,7 +355,7 @@ async function checkApiHealth(recorder, app, ctx) {
   }
 
   const framework = TARGET_FRAMEWORKS[app.target];
-  const deployed = data?.bemVersion;
+  const deployed = data?.backendVersion;
   if (!deployed) return;
 
   const deployedName = `${app.name}: deployed backend`;

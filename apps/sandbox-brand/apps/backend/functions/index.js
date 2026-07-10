@@ -1,7 +1,7 @@
 /*
   Initialize
 */
-const Manager = (new (require('backend-manager'))).init(exports, {
+const Manager = (new (require('@omegajs/backend'))).init(exports, {
 });
 const { functions } = Manager.libraries;
 

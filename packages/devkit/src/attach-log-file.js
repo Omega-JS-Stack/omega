@@ -1,6 +1,6 @@
 // attachLogFile(filePath) — duplicate process.stdout + process.stderr writes to a log file.
 //
-// Inspired by BEM's per-command log pattern. Lets devs (and Claude) `tail -f` a log file to
+// Inspired by @omegajs/backend's per-command log pattern. Lets devs (and Claude) `tail -f` a log file to
 // see every line of output a process produces — test runner output, child process
 // stdout/stderr, console.log calls, the works.
 //
@@ -41,7 +41,7 @@ function createTee() {
     if (activeStream && activePath === abs) return activeStream;
     if (activeStream) detach();
 
-    // Truncate fresh on each invocation — same as BEM's `flags: 'w'`. Devs running multiple
+    // Truncate fresh on each invocation — same as @omegajs/backend's `flags: 'w'`. Devs running multiple
     // sessions back to back don't want stale lines from the previous run mixed in.
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     const stream = fs.createWriteStream(abs, { flags: 'w' });

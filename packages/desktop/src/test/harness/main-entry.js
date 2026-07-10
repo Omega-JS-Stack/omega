@@ -9,7 +9,7 @@
 //   { event: 'skip',    name, reason }
 //   { event: 'end',     passed, failed, skipped }
 //
-// The parent runner reads stdout, renders the BEM-style output, and the harness
+// The parent runner reads stdout, renders the @omegajs/backend-style output, and the harness
 // exits 0 on success / 1 on any failure.
 
 const path = require('path');

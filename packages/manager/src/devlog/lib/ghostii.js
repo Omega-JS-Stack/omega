@@ -1,7 +1,7 @@
 /**
- * Ghostii API client — mirror of BEM's Ghostii client
- * (backend-manager/src/manager/libraries/content/ghostii.js). The SSOT for
- * the request shape is BEM; keep this in sync when it changes.
+ * Ghostii API client — mirror of @omegajs/backend's Ghostii client
+ * (@omegajs/backend src/manager/libraries/content/ghostii.js). The SSOT for
+ * the request shape is @omegajs/backend; keep this in sync when it changes.
  *
  * Raw Cloud Functions URL (not api.ghostii.ai) to get the 5-min function
  * timeout instead of Firebase Hosting's hard 60s proxy timeout.
@@ -83,7 +83,7 @@ async function writeArticle({ brandConfig, description, links = [], sourceConten
 
 /**
  * Transform Ghostii's JSON block array into a clean post shape.
- * Mirror of BEM's blocksToPost(): title ← first heading-1, headerImageUrl ←
+ * Mirror of @omegajs/backend's blocksToPost(): title ← first heading-1, headerImageUrl ←
  * first image block, body ← every remaining block joined as markdown (no
  * title embedded).
  *

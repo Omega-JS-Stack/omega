@@ -5,7 +5,7 @@
  * Run: npx mgr test helpers/slugify
  *
  * slugify is the SSOT used by:
- *   - BEM admin/post (legacy + modern) for URL + image filenames
+ *   - @omegajs/backend admin/post (legacy + modern) for URL + image filenames
  *   - Sponsorship platform validator.buildFormatted()
  *
  * Contract:

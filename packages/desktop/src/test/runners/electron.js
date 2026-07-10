@@ -1,5 +1,5 @@
 // Electron-runner — spawns electron with the main-process harness, parses JSON-line stream,
-// renders BEM-style output to console. Returns aggregate counts.
+// renders @omegajs/backend-style output to console. Returns aggregate counts.
 
 const path = require('path');
 const { spawn } = require('child_process');

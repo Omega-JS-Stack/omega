@@ -5,29 +5,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/package-json/v/itw-creative-works/backend-manager.svg">
-  <br>
-  <img src="https://img.shields.io/librariesio/release/npm/backend-manager.svg">
-  <img src="https://img.shields.io/bundlephobia/min/backend-manager.svg">
-  <img src="https://img.shields.io/codeclimate/maintainability-percentage/itw-creative-works/backend-manager.svg">
-  <img src="https://img.shields.io/npm/dm/backend-manager.svg">
-  <img src="https://img.shields.io/node/v/backend-manager.svg">
-  <img src="https://img.shields.io/website/https/itwcreativeworks.com.svg">
-  <img src="https://img.shields.io/github/license/itw-creative-works/backend-manager.svg">
-  <img src="https://img.shields.io/github/contributors/itw-creative-works/backend-manager.svg">
-  <img src="https://img.shields.io/github/last-commit/itw-creative-works/backend-manager.svg">
-  <br>
-  <br>
-  <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/backend-manager">NPM Module</a> | <a href="https://github.com/itw-creative-works/backend-manager">GitHub Repo</a>
-  <br>
-  <br>
-  <strong>Backend Manager (BEM)</strong> is an NPM module for Firebase developers that instantly implements powerful backend features including authentication, rate limiting, analytics, and more.
+  <strong>OMEGA Backend</strong> — all-in-one development framework for Firebase Cloud Functions backends. Sister project to
+  <a href="../desktop/">@omegajs/desktop</a>,
+  <a href="../extension/">@omegajs/extension</a>, and
+  <a href="https://github.com/itw-creative-works/ultimate-jekyll-manager">Ultimate Jekyll Manager</a>.
 </p>
 
 ## Installation
 
 ```bash
-npm install backend-manager
+npm install @omegajs/backend
 ```
 
 **Requirements:**
@@ -41,7 +28,7 @@ npm install backend-manager
 Create `functions/index.js`:
 
 ```javascript
-const Manager = (new (require('backend-manager'))).init(exports, {
+const Manager = (new (require('@omegajs/backend'))).init(exports, {
   setupFunctionsIdentity: true,
 });
 const { functions } = Manager.libraries;
@@ -95,7 +82,7 @@ npx mgr setup
 ## Initialization Options
 
 ```javascript
-const Manager = (new (require('backend-manager'))).init(exports, options);
+const Manager = (new (require('@omegajs/backend'))).init(exports, options);
 ```
 
 | Option | Default | Description |
@@ -300,7 +287,7 @@ Manager.Middleware(req, res).run('routeName', {
 Intercept and modify `bm_api` requests before/after processing:
 
 ```javascript
-const Manager = (new (require('backend-manager'))).init(exports, {});
+const Manager = (new (require('@omegajs/backend'))).init(exports, {});
 
 Manager.handlers.bm_api = function (mod, position) {
   const assistant = mod.assistant;
@@ -459,7 +446,7 @@ GDPR/CASL-compliant consent capture and cross-provider unsubscribe sync.
 - **Account-page toggle** — `/account` notifications section lets logged-in users opt in/out, hits both SendGrid + Beehiiv
 - **HMAC unsubscribe links** — email-footer one-click flow continues to work; unsubscribe removes the contact from ALL providers (not just the SendGrid ASM group), re-subscribe re-adds the contact
 - **Provider webhook receivers** — `POST /marketing/webhook?provider=sendgrid|beehiiv&key=X` catches unsubscribe / spam / bounce events from SendGrid and Beehiiv, writes the user doc + syncs to the OTHER provider
-- **Parent forwarder** — single public webhook endpoint (`/marketing/webhook/forward`) on the parent BEM fans out to every brand's child BEM so each one updates its own Firestore
+- **Parent forwarder** — single public webhook endpoint (`/marketing/webhook/forward`) on the parent @omegajs/backend fans out to every brand's child @omegajs/backend so each one updates its own Firestore
 - **Library-level consent gate** — `email.add()` and `email.sync()` skip users whose `consent.marketing.status === 'revoked'` (covers every call site: payment syncs, admin re-syncs, newsletter form); admin contact DELETE mirrors `revoked` back to the user doc so removals stick
 
 See [docs/consent.md](docs/consent.md) for the full architecture, source enum reference, migration script template, and provider configuration steps.
@@ -743,7 +730,7 @@ storage.set('nested.path', { data: true }).write();
 
 ## Authentication
 
-BEM supports multiple authentication methods (checked in order):
+@omegajs/backend supports multiple authentication methods (checked in order):
 
 1. **Bearer Token (JWT)**
    ```
@@ -757,7 +744,7 @@ BEM supports multiple authentication methods (checked in order):
    { authenticationToken: 'user-private-key' }
    ```
 
-3. **Backend Manager Key** (Admin access)
+3. **OMEGA Backend Key** (Admin access)
    ```javascript
    { backendManagerKey: 'your-backend-manager-key' }
    ```
@@ -784,39 +771,39 @@ const user = await assistant.authenticate();
 
 ## CLI Commands
 
-BEM includes a CLI for development and deployment:
+@omegajs/backend includes a CLI for development and deployment:
 
 ```bash
 # Install globally or use npx
-npm install -g backend-manager
+npm install -g @omegajs/backend
 # or
-npx backend-manager <command>
+npx @omegajs/backend <command>
 ```
 
 | Command | Description |
 |---------|-------------|
-| `bem setup` | Run Firebase project setup and validation |
-| `bem serve` | Start local Firebase emulator |
-| `bem deploy` | Deploy functions to Firebase |
-| `bem test [paths...]` | Run integration tests |
-| `bem emulator` | Start Firebase emulator (keep-alive mode) |
-| `bem stripe` | Start Stripe CLI webhook forwarding to local server |
-| `bem version`, `bem v` | Show BEM version |
-| `bem clear` | Clear cache and temp files |
-| `bem install`, `bem i` | Install BEM (local or production) |
-| `bem clean:npm` | Clean and reinstall npm modules |
-| `bem firestore:indexes:get` | Get Firestore indexes |
-| `bem cwd` | Show current working directory |
-| `bem firestore:get <path>` | Read a Firestore document |
-| `bem firestore:set <path> '<json>'` | Write/merge a Firestore document |
-| `bem firestore:query <collection>` | Query a Firestore collection |
-| `bem firestore:delete <path>` | Delete a Firestore document |
-| `bem auth:get <uid-or-email>` | Get an Auth user by UID or email |
-| `bem auth:list` | List Auth users |
-| `bem auth:delete <uid-or-email>` | Delete an Auth user |
-| `bem auth:set-claims <uid-or-email> '<json>'` | Set custom claims on an Auth user |
-| `bem logs:read` | Fetch Cloud Function logs from Google Cloud Logging |
-| `bem logs:tail` | Stream live Cloud Function logs |
+| `mgr setup` | Run Firebase project setup and validation |
+| `mgr serve` | Start local Firebase emulator |
+| `mgr deploy` | Deploy functions to Firebase |
+| `mgr test [paths...]` | Run integration tests |
+| `mgr emulator` | Start Firebase emulator (keep-alive mode) |
+| `mgr stripe` | Start Stripe CLI webhook forwarding to local server |
+| `mgr version`, `bem v` | Show @omegajs/backend version |
+| `mgr clear` | Clear cache and temp files |
+| `mgr install`, `bem i` | Install @omegajs/backend (local or production) |
+| `mgr clean:npm` | Clean and reinstall npm modules |
+| `mgr firestore:indexes:get` | Get Firestore indexes |
+| `mgr cwd` | Show current working directory |
+| `mgr firestore:get <path>` | Read a Firestore document |
+| `mgr firestore:set <path> '<json>'` | Write/merge a Firestore document |
+| `mgr firestore:query <collection>` | Query a Firestore collection |
+| `mgr firestore:delete <path>` | Delete a Firestore document |
+| `mgr auth:get <uid-or-email>` | Get an Auth user by UID or email |
+| `mgr auth:list` | List Auth users |
+| `mgr auth:delete <uid-or-email>` | Delete an Auth user |
+| `mgr auth:set-claims <uid-or-email> '<json>'` | Set custom claims on an Auth user |
+| `mgr logs:read` | Fetch Cloud Function logs from Google Cloud Logging |
+| `mgr logs:tail` | Stream live Cloud Function logs |
 
 All Firestore and Auth commands support `--emulator` to target the local emulator, `--force` to skip confirmation, and `--raw` for compact JSON output.
 
@@ -833,7 +820,7 @@ Set these in your `functions/.env` file:
 
 ## Response Headers
 
-BEM attaches metadata to responses:
+@omegajs/backend attaches metadata to responses:
 
 ```
 bm-properties: {"code":200,"tag":"functionName/executionId","usage":{...},"schema":{...}}
@@ -841,7 +828,7 @@ bm-properties: {"code":200,"tag":"functionName/executionId","usage":{...},"schem
 
 ## Testing
 
-BEM includes an integration test framework that runs against the Firebase emulator.
+@omegajs/backend includes an integration test framework that runs against the Firebase emulator.
 
 ### Running Tests
 
@@ -856,7 +843,7 @@ npx mgr test
 
 ### Extended Mode (real APIs)
 
-Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across BEM/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:
+Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omegajs/backend/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:
 
 ```bash
 # Terminal 1 — start once, no flag needed
@@ -873,16 +860,16 @@ See [docs/test-framework.md](docs/test-framework.md#extended-mode-test_extended_
 ### Filtering Tests
 
 ```bash
-npx mgr test rules/             # Run rules tests (both BEM and project)
-npx mgr test bem:rules/         # Only BEM's rules tests
+npx mgr test rules/             # Run rules tests (both @omegajs/backend and project)
+npx mgr test backend:rules/         # Only @omegajs/backend's rules tests
 npx mgr test project:rules/     # Only project's rules tests
 npx mgr test user/ admin/       # Multiple paths
 ```
 
 ### Log Files
 
-BEM CLI commands automatically save output to log files in the project's `functions/` directory (alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place):
-- **`functions/dev.log`** — Output from `npx mgr serve` (BEM's local dev server)
+@omegajs/backend CLI commands automatically save output to log files in the project's `functions/` directory (alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place):
+- **`functions/dev.log`** — Output from `npx mgr serve` (@omegajs/backend's local dev server)
 - **`functions/emulator.log`** — Full emulator + Cloud Functions output (`npx mgr emulator`)
 - **`functions/test.log`** — Test runner output (`npx mgr test`, when running against an existing emulator)
 - **`functions/production.log`** — Production Cloud Function logs (`npx mgr logs:read` or `npx mgr logs:tail`)
@@ -891,10 +878,10 @@ Logs are overwritten on each run and gitignored via `*.log`. Use them to debug f
 
 ### Test Locations
 
-- **BEM core tests:** `test/`
-- **Project tests:** `functions/test/bem/`
+- **@omegajs/backend core tests:** `test/`
+- **Project tests:** `functions/test/`
 
-Use `bem:` or `project:` prefix to filter by source.
+Use `backend:` or `project:` prefix to filter by source.
 
 ### Writing Tests
 
@@ -967,7 +954,7 @@ See `CLAUDE.md` for complete test API documentation.
 
 ## Subscription System
 
-BEM includes a built-in payment/subscription system with Stripe and PayPal integration.
+@omegajs/backend includes a built-in payment/subscription system with Stripe and PayPal integration.
 
 ### Subscription Statuses
 
@@ -1077,7 +1064,7 @@ user.subscription.status === 'suspended'
 Static method on the `User` helper that derives calculated subscription fields. Returns only fields that require derivation logic — raw data lives on the account object directly.
 
 ```javascript
-const User = require('backend-manager/src/manager/helpers/user');
+const User = require('@omegajs/backend/src/manager/helpers/user');
 
 const resolved = User.resolveSubscription(account);
 // Returns: { plan, active, trialing, cancelling }
@@ -1094,7 +1081,7 @@ The same function exists as `auth.resolveSubscription(account)` in [web-manager]
 
 ## Final Words
 
-If you are still having difficulty, we would love for you to post a question to [the Backend Manager issues page](https://github.com/itw-creative-works/backend-manager/issues). It is much easier to answer questions that include your code and relevant files! So if you can provide them, we'd be extremely grateful (and more likely to help you find the answer!)
+If you are still having difficulty, open an issue in the OMEGA monorepo. It is much easier to answer questions that include your code and relevant files! So if you can provide them, we'd be extremely grateful (and more likely to help you find the answer!)
 
 ## Projects Using this Library
 

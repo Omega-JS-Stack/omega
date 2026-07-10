@@ -19,7 +19,7 @@
  *    The fixture's content shape MUST match the template's `schema` export.
  *
  * 2. AI PIPELINE MODE (set TEST_EXTENDED_MODE=1)
- *    Pulls real sources from the parent BEM server, runs them through the
+ *    Pulls real sources from the parent @omegajs/backend server, runs them through the
  *    structure → SVG → MJML pipeline, and writes a preview HTML. Same code
  *    path the daily pre-generation cron uses. Costs money (AI tokens). Use
  *    this when you want to evaluate prompt quality against real sources.

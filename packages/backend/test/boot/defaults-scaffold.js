@@ -1,12 +1,12 @@
 /**
- * Defaults scaffold — BEM's framework self-test layer.
+ * Defaults scaffold — @omegajs/backend's framework self-test layer.
  *
  * Runs ONLY during framework self-test (like emulator-boots.js). Exercises the
  * REAL scaffolding path — dist/utils/scaffold-defaults.js (the devkit defaults
- * engine + BEM's actual FILE_MAP) against dist/defaults/ — into temp dirs:
+ * engine + @omegajs/backend's actual FILE_MAP) against dist/defaults/ — into temp dirs:
  * fresh scaffold, marker-merge preservation, custom-key promotion, idempotency.
  *
- * This is BEM's equivalent of EM/BXM's defaults-scaffold build suites.
+ * This is @omegajs/backend's equivalent of EM/BXM's defaults-scaffold build suites.
  */
 
 const os = require('os');
@@ -25,7 +25,7 @@ function makeTmp() {
 }
 
 module.exports = {
-  description: 'Defaults scaffold — devkit engine + real BEM file map',
+  description: 'Defaults scaffold — devkit engine + real @omegajs/backend file map',
   type: 'group',
   timeout: 30000,
 

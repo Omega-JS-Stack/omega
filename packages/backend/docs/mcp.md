@@ -1,6 +1,6 @@
 # Model Context Protocol (MCP)
 
-BEM includes a built-in MCP server that exposes BEM routes as tools for Claude Chat, Claude Code, Claude Desktop, and other MCP clients. The MCP layer is a thin wrapper over the existing BEM API — every tool maps to a route, and authentication goes through the same middleware pipeline.
+@omegajs/backend includes a built-in MCP server that exposes @omegajs/backend routes as tools for Claude Chat, Claude Code, Claude Desktop, and other MCP clients. The MCP layer is a thin wrapper over the existing @omegajs/backend API — every tool maps to a route, and authentication goes through the same middleware pipeline.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ Every tool has a `role` that controls who can see and call it:
 | `user` | Authenticated users + admins | 2 | `get_user`, `get_subscription` |
 | `public` | Everyone (after OAuth) | 1 | `health_check` |
 
-Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying BEM route still rejects.
+Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying @omegajs/backend route still rejects.
 
 ## Available Tools (25)
 
@@ -77,7 +77,7 @@ Consumer tools can set all the same annotations — they're passed through autom
    - Otherwise → redirects to consumer's website (`/token?redirect_uri=...&state=...&mcp=true`)
 6. User signs in on their familiar site, gets a Firebase ID token
 7. Consumer's `/token` page redirects back with `code={idToken}&state={state}`
-8. Client exchanges code: `POST /backend-manager/mcp/token` → BEM verifies ID token, returns `api.privateKey` as `access_token`
+8. Client exchanges code: `POST /backend-manager/mcp/token` → @omegajs/backend verifies ID token, returns `api.privateKey` as `access_token`
 9. Client uses the API key for all future MCP requests as `Authorization: Bearer {key}`
 
 The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `config/omega.json5`.
@@ -147,7 +147,7 @@ module.exports = [
 - Every tool needs `name`, `description`, and either `path` (route delegation) or `handler` (direct execution)
 - `role` defaults to `admin` if not specified
 - Handler-based tools only work on the HTTP transport (they return an error on stdio)
-- Handler-based tools bypass BEM route middleware — they execute directly with the Manager context
+- Handler-based tools bypass @omegajs/backend route middleware — they execute directly with the Manager context
 - All MCP-standard fields are passed through: `annotations`, `outputSchema`, `inputSchema`
 
 ## HTTPS Local Development
@@ -184,7 +184,7 @@ Add to `.claude/settings.json`:
 ```json
 {
   "mcpServers": {
-    "backend-manager": {
+    "@omegajs/backend": {
       "command": "npx",
       "args": ["bm", "mcp"],
       "cwd": "/path/to/consumer-project"
@@ -209,9 +209,9 @@ Add to `.claude/settings.json`:
 
 ## Adding New Tools
 
-### Built-in tools (in BEM itself)
+### Built-in tools (in @omegajs/backend itself)
 
-Add a tool definition to `src/mcp/tools.js` with `name`, `description`, `role`, `method`, `path`, `annotations`, and `inputSchema`. The tool automatically maps to the corresponding BEM route via the HTTP client.
+Add a tool definition to `src/mcp/tools.js` with `name`, `description`, `role`, `method`, `path`, `annotations`, and `inputSchema`. The tool automatically maps to the corresponding @omegajs/backend route via the HTTP client.
 
 ### Consumer tools (in a consumer project)
 

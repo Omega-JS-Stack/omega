@@ -66,7 +66,7 @@ class SetupCommand extends BaseCommand {
     let cwd = jetpack.cwd();
 
     // OMEGA-style banner. Replaces the old `---- RUNNING SETUP ---- ` line.
-    ui.banner(`Backend Manager ${chalk.dim(`v${self.default.version}`)}`);
+    ui.banner(`OMEGA Backend ${chalk.dim(`v${self.default.version}`)}`);
 
     // Fresh summary collector for this run (the test runner records into it and
     // prints it on a hard failure; we print it here on success).
@@ -98,10 +98,10 @@ class SetupCommand extends BaseCommand {
     this.copyDefaults();
     this.loadFiles();
 
-    // Clean up leftover trigger files + stale log files from older BEM versions
+    // Clean up leftover trigger files + stale log files from older @omegajs/backend versions
     this.cleanupGeneratedArtifacts();
 
-    // Load the rules files (reads from BEM's own templates/, not consumer files)
+    // Load the rules files (reads from @omegajs/backend's own templates/, not consumer files)
     this.getRulesFile();
     self.default.rulesVersionRegex = new RegExp(`///---version=${self.default.version}---///`);
 
@@ -121,13 +121,13 @@ class SetupCommand extends BaseCommand {
     ui.section('Checks');
     await this.runTests();
 
-    // Warn if using local backend-manager
-    const bemDep = self.package.dependencies?.['backend-manager']
-      || self.package.devDependencies?.['backend-manager']
+    // Warn if using local @omegajs/backend
+    const bemDep = self.package.dependencies?.['@omegajs/backend']
+      || self.package.devDependencies?.['@omegajs/backend']
       || '';
     if (bemDep.includes('file:')) {
       ui.section('Notices');
-      ui.status('warn', `Using the local ${chalk.bold('backend-manager')} source (file: dependency)`, { level: 2 });
+      ui.status('warn', `Using the local ${chalk.bold('@omegajs/backend')} source (file: dependency)`, { level: 2 });
     }
 
     // Fetch stats
@@ -141,7 +141,7 @@ class SetupCommand extends BaseCommand {
     // Notify parent if exists
     if (process.send) {
       process.send({
-        sender: 'backend-manager',
+        sender: '@omegajs/backend',
         command: 'setup:complete',
         payload: {
           passed: self.testCount + self.warnCount === self.testTotal,
@@ -170,7 +170,7 @@ class SetupCommand extends BaseCommand {
     const defaultsDir = path.resolve(`${__dirname}/../../defaults`);
 
     if (!jetpack.exists(defaultsDir)) {
-      // Defaults dir is optional — older BEM versions didn't have one. If missing, skip silently.
+      // Defaults dir is optional — older @omegajs/backend versions didn't have one. If missing, skip silently.
       ui.note('No defaults to scaffold', 2);
       return;
     }
@@ -294,13 +294,13 @@ class SetupCommand extends BaseCommand {
   cleanupGeneratedArtifacts() {
     const self = this.main;
 
-    // Remove the BEM reload-trigger file (transient artifact from `npx mgr watch`)
-    const triggerFile = `${self.firebaseProjectPath}/functions/bem-reload-trigger.js`;
+    // Remove the @omegajs/backend reload-trigger file (transient artifact from `npx mgr watch`)
+    const triggerFile = `${self.firebaseProjectPath}/functions/omega-reload-trigger.js`;
     if (jetpack.exists(triggerFile)) {
       jetpack.remove(triggerFile);
     }
 
-    // Sweep stale firebase-tools debug logs + leftover BEM logs from older
+    // Sweep stale firebase-tools debug logs + leftover @omegajs/backend logs from older
     // versions (pre-5.2.2 they lived in functions/; now in .temp/). Shared
     // implementation in base-command.js so emulator/serve boot also runs it.
     this.sweepStaleLogs();

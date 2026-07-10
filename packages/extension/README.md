@@ -174,4 +174,4 @@ In-depth docs for every subsystem live in [docs/](docs/). See [CLAUDE.md](CLAUDE
 
 - [@omegajs/desktop](../desktop/) — same patterns, but for Electron desktop apps
 - [Ultimate Jekyll Manager (UJM)](https://github.com/itw-creative-works/ultimate-jekyll-manager) — Jekyll static-site framework
-- [Backend Manager (BEM)](https://github.com/itw-creative-works/backend-manager) — Firebase Functions backend framework
+- [Backend Manager (@omegajs/backend)](https://github.com/itw-creative-works/backend-manager) — Firebase Functions backend framework

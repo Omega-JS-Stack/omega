@@ -110,7 +110,7 @@ export default function () {
       const provider = $submitButton?.getAttribute('data-provider');
 
       // Capture consent BEFORE any Firebase call. On signup pages the checkbox state
-      // must survive any post-auth redirect so BEM's /user/signup can write it to the doc.
+      // must survive any post-auth redirect so @omegajs/backend's /user/signup can write it to the doc.
       // Read from FormManager-collected data on signup; ignored on signin (no checkboxes there).
       if (action === 'signup') {
         captureSignupConsent(data);
@@ -217,7 +217,7 @@ export default function () {
   }
 
   // Read the consent checkboxes and stash to storage. Survives the post-signup redirect
-  // the same way attribution does. BEM's /user/signup route picks it up via sendUserSignupMetadata.
+  // the same way attribution does. @omegajs/backend's /user/signup route picks it up via sendUserSignupMetadata.
   function captureSignupConsent(data) {
     const legalLabel = document.querySelector('label[for="consent-legal"]')?.innerText?.trim() || null;
     const marketingLabel = document.querySelector('label[for="consent-marketing"]')?.innerText?.trim() || null;
@@ -370,7 +370,7 @@ export default function () {
       }
 
       // Handle specific OAuth errors. Check blocking-function rejections FIRST —
-      // those carry a custom message from BEM (rate limit, disposable email, etc.)
+      // those carry a custom message from @omegajs/backend (rate limit, disposable email, etc.)
       // that the user actually needs to see, hidden behind a generic Firebase code.
       const blockingMessage = extractBlockingFunctionMessage(error);
       if (blockingMessage) {
@@ -569,8 +569,8 @@ export default function () {
         }
       }
 
-      // Blocking-function rejections from BEM (rate limit, disposable email, etc.)
-      // — surface the BEM-side message instead of the opaque auth/internal-error.
+      // Blocking-function rejections from @omegajs/backend (rate limit, disposable email, etc.)
+      // — surface the @omegajs/backend-side message instead of the opaque auth/internal-error.
       const blockingMessage = extractBlockingFunctionMessage(error);
       if (blockingMessage) {
         throw new Error(blockingMessage);
@@ -607,8 +607,8 @@ export default function () {
       // Show success message
       formManager.showSuccess('Successfully signed in!');
     } catch (error) {
-      // Blocking-function rejections from BEM's before-signin (rate limit, etc.)
-      // — surface the BEM-side message instead of the opaque auth/internal-error.
+      // Blocking-function rejections from @omegajs/backend's before-signin (rate limit, etc.)
+      // — surface the @omegajs/backend-side message instead of the opaque auth/internal-error.
       const blockingMessage = extractBlockingFunctionMessage(error);
       if (blockingMessage) {
         throw new Error(blockingMessage);
@@ -798,7 +798,7 @@ export default function () {
         webManager.sentry().captureException(new Error('OAuth provider sign-in error', { cause: error }));
       }
 
-      // Handle specific errors. Blocking-function rejections from BEM carry a
+      // Handle specific errors. Blocking-function rejections from @omegajs/backend carry a
       // custom message (rate limit, disposable email, etc.) that the user needs
       // to see — check those FIRST before generic Firebase codes.
       const blockingMessage = extractBlockingFunctionMessage(error);
@@ -906,7 +906,7 @@ export default function () {
 
   // Extract the readable message from a Firebase Auth blocking-function error.
   //
-  // When a BEM blocking function (before-create / before-signin) throws
+  // When a @omegajs/backend blocking function (before-create / before-signin) throws
   // HttpsError('resource-exhausted', 'Too many signups...'), Firebase surfaces
   // it as `auth/internal-error` (sometimes also `auth/error-code:-47`) and
   // stashes the actual server response on `error.customData.serverResponse`.
@@ -923,7 +923,7 @@ export default function () {
   // Returns just the inner message string, or null if nothing useful was found.
   function extractBlockingFunctionMessage(error) {
     // Diagnostic: dump the full shape of every error that lands here so we can
-    // see exactly what Firebase delivers when BEM's beforeCreate throws. The
+    // see exactly what Firebase delivers when @omegajs/backend's beforeCreate throws. The
     // 503 path (Identity Toolkit returns 503 with code -47, no BLOCKING_FUNCTION
     // wrapper) needs different handling than the 400 path.
     console.warn('[Auth] extractBlockingFunctionMessage: error shape', {
@@ -938,9 +938,9 @@ export default function () {
 
     // The OAuth redirect path (signInWithIdp → 503) delivers the rejection as
     // `auth/error-code:-47` with NO `customData.serverResponse` blob — Firebase
-    // strips the BEM-side message before it reaches the client. The code is
+    // strips the @omegajs/backend-side message before it reaches the client. The code is
     // 1:1 with "blocking-function rejected this signup," so surface a generic-
-    // but-helpful message that covers all three BEM beforeCreate reasons
+    // but-helpful message that covers all three @omegajs/backend beforeCreate reasons
     // (rate limit, disposable email, custom hook reject).
     if (error?.code === 'auth/error-code:-47') {
       return 'Account creation is temporarily restricted. This can happen if you\'ve recently created too many accounts, or your email is on our blocked list. Please try again later or contact support.';

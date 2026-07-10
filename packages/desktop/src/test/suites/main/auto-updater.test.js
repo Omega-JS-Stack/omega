@@ -752,7 +752,7 @@ module.exports = {
       },
     },
 
-    // ─── Mode helpers (BEM-pattern: isDevelopment / isProduction / isTesting) ────
+    // ─── Mode helpers (@omegajs/backend-pattern: isDevelopment / isProduction / isTesting) ────
 
     {
       name: 'manager.isTesting() returns true under EM_TEST_MODE (set by test runner)',

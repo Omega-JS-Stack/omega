@@ -3,7 +3,7 @@
  * the OMEGA user/account schema (shared with web-manager, so a doc resolved
  * here is byte-identical to one resolved on the frontend).
  *
- * BEM's contribution is injecting the real value generators for the
+ * @omegajs/backend's contribution is injecting the real value generators for the
  * '$uuid'/'$randomId'/'$apiKey' schema tokens — the frontend injects none and
  * those fields resolve to null (real values always come from the backend).
  * API unchanged:

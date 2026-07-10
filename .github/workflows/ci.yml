@@ -17,7 +17,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      # BEM's suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
+      # @omegajs/backend's suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -32,7 +32,7 @@ jobs:
       - name: manager suite (service-runner contract + brand loading + external-service reconciliation suites + e2e manage over fixture brands)
         run: npm test --workspace=packages/manager
 
-      - name: account suite (incl. golden master vs live BEM user.js)
+      - name: account suite (incl. golden master vs live @omegajs/backend user.js)
         run: npm test --workspace=packages/account
 
       - name: config suite
@@ -63,7 +63,7 @@ jobs:
         run: npm test --workspace=packages/backend
 
   sandbox:
-    name: Sandbox brand (BEM corpus + cross-stack e2e)
+    name: Sandbox brand (@omegajs/backend corpus + cross-stack e2e)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,18 +83,18 @@ jobs:
         run: npm ci
 
       # functions/ is a standalone install (not a workspace) — it owns its own lockfile,
-      # with backend-manager linked via file: to packages/backend
+      # with @omegajs/backend linked via file: to packages/backend
       - name: Sandbox backend deps
         working-directory: apps/sandbox-brand/apps/backend/functions
         run: npm ci
 
-      # Full BEM corpus (routes/events/rules/email/mcp) against the fresh consumer
+      # Full @omegajs/backend corpus (routes/events/rules/email/mcp) against the fresh consumer
       - name: Sandbox backend corpus
         working-directory: apps/sandbox-brand
         run: npm run test:backend
 
       # Real stack, real browser: emulator + built website (web-manager bundle) +
-      # puppeteer signup → BEM onCreate → signin → session persistence → subscription
+      # puppeteer signup → @omegajs/backend onCreate → signin → session persistence → subscription
       - name: Cross-stack e2e
         working-directory: apps/sandbox-brand
         run: npm test

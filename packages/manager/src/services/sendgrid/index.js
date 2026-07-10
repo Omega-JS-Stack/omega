@@ -1,9 +1,9 @@
 /**
  * SendGrid service — the brand's email-marketing infrastructure: domain
  * authentication (DKIM/SPF CNAMEs written via Cloudflare), a verified sender
- * for Single Sends, the brand's marketing list, BEM's custom fields and
- * segments (from backend-manager's SSOT), and the account-global Event
- * Webhook pointed at the parent BEM's forwarder.
+ * for Single Sends, the brand's marketing list, @omegajs/backend's custom fields and
+ * segments (from @omegajs/backend's SSOT), and the account-global Event
+ * Webhook pointed at the parent @omegajs/backend's forwarder.
  *
  * Runs after cloudflare (the zone must exist for the DKIM records). The
  * whole service reconciles one SendGrid account per brand-or-company — the

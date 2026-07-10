@@ -1,10 +1,10 @@
-// BEM self-test fixture config — omega.json5 shape: shared sections top-level,
+// @omegajs/backend self-test fixture config — omega.json5 shape: shared sections top-level,
 // targets.backend presence = backend enabled. backend_manager holds the
 // fixture's admin keys (test-only values, injected into env by the runner).
 {
   brand: {
-    id: 'backend-manager',
-    name: 'BEM Fixture',
+    id: '@omegajs/backend',
+    name: '@omegajs/backend Fixture',
     url: 'https://example.com',
     contact: {
       email: 'fixture@example.com',
@@ -17,9 +17,9 @@
   },
   firebaseConfig: {
     apiKey: 'fixture-api-key',
-    authDomain: 'demo-backend-manager.firebaseapp.com',
-    projectId: 'demo-backend-manager',
-    storageBucket: 'demo-backend-manager.appspot.com',
+    authDomain: 'demo-omega-backend.firebaseapp.com',
+    projectId: 'demo-omega-backend',
+    storageBucket: 'demo-omega-backend.appspot.com',
     messagingSenderId: '000000000000',
     appId: '1:000000000000:web:0000000000000000000000',
     measurementId: 'G-0000000000',

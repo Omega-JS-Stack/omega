@@ -16,7 +16,7 @@ If you're writing `const mockX = {...}` to satisfy a function under test, STOP a
 Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment — and even then, stub the *smallest possible seam*, never a whole `Manager`/`assistant`:
 
 1. **A side effect that would destroy the test run itself.** If invoking the real method would kill or corrupt the harness — e.g. a process-exit, an `app.quit()`, a destructive filesystem wipe, a recursive re-invocation of the test/build command — you may stub *that one call* to a no-op, assert the surrounding logic, then restore it. You are not faking behavior; you are preventing the harness from terminating mid-assertion.
-2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* BEM backends (parent → child brand servers). Only **one** BEM emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.js`.)
+2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omegajs/backend backends (parent → child brand servers). Only **one** @omegajs/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.js`.)
 
 **Rules for both exceptions:** stub the narrowest seam (one method / one module), restore it immediately, and add a comment stating *why the real thing can't run here*. If you can run it for real, you must.
 
@@ -27,10 +27,10 @@ A feature is not done when it works — it's done when every surface it exposes 
 | Coverage | Where | Proves |
 |---|---|---|
 | **Logic** | `test/routes/` / `test/events/` | The handler does the right thing — exercised against the real emulator (real Manager, `assistant`, Firestore) |
-| **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS BEM's end-to-end |
+| **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS @omegajs/backend's end-to-end |
 | **Rules** | `test/rules/` suites | Firestore security rules permit/deny exactly as intended (required whenever rules change) |
 
-BEM has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
+@omegajs/backend has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
 
 **Skipping a surface is the exception, not the default.** Skip ONLY when the feature genuinely doesn't expose that surface (a pure helper has no route; a route that touches no Firestore docs needs no rules test). Convenience is never a reason: "the handler test already covers it" does NOT excuse the route round-trip — handler tests prove the logic, round-trips prove the wiring (a route can be unregistered or mis-gated while every handler test stays green). When in doubt, write the test.
 
@@ -49,7 +49,7 @@ npx mgr test
 
 ### Self-test from the framework repo (bundled fixture)
 
-`npx mgr test` run **from the backend-manager repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `bm_api` → health returns 200). Mirrors BXM's `BXM_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `BEM_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx mgr install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
+`npx mgr test` run **from the @omegajs/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `bm_api` → health returns 200). Mirrors BXM's `BXM_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `BEM_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx mgr install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
 
 ### Filtering tests
 
@@ -62,8 +62,8 @@ npx mgr test email/transactional
 # Run all tests in a directory
 npx mgr test routes/marketing
 
-# Run only BEM framework tests (from node_modules/backend-manager/test/)
-npx mgr test bem:email/templates
+# Run only @omegajs/backend framework tests (from node_modules/@omegajs/backend/test/)
+npx mgr test backend:email/templates
 
 # Run only consumer project tests (from the project's own test/)
 npx mgr test project:routes/custom
@@ -72,15 +72,15 @@ npx mgr test project:routes/custom
 npx mgr test --extended routes/marketing/push-send
 ```
 
-The filter matches against the test file path. `bem:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, both are searched.
+The filter matches against the test file path. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, both are searched.
 
 ## Project mismatch detection
 
 The test runner's health check verifies that the running emulator belongs to the **same project** as the test suite. If you leave project A's emulator running and run `npx mgr test` from project B, the hosting rewrites won't match and tests fail with mysterious 404s.
 
 Detection uses two sources (tried in order):
-1. **Firebase Emulator Hub** (`localhost:4400/emulators`) — always returns the emulator's `projectId`, regardless of BEM version.
-2. **Health endpoint** (`/test/health`) — returns `projectId` from `Manager.config.firebaseConfig.projectId` (BEM 5.3.3+).
+1. **Firebase Emulator Hub** (`localhost:4400/emulators`) — always returns the emulator's `projectId`, regardless of @omegajs/backend version.
+2. **Health endpoint** (`/test/health`) — returns `projectId` from `Manager.config.firebaseConfig.projectId` (@omegajs/backend 5.3.3+).
 
 On mismatch the runner aborts immediately:
 ```
@@ -90,7 +90,7 @@ On mismatch the runner aborts immediately:
 
 ## Cross-project API calls (single-emulator limitation)
 
-Some routes fan out to **other BEM backends** — e.g. a sponsorship submission on `itw-creative-works` publishes a guest post to `ultimate-jekyll`'s `POST /admin/post`. Only **one** Firebase emulator can run locally at a time, so these cross-project calls **always hit the live deployed target**, even in test/dev mode.
+Some routes fan out to **other @omegajs/backend backends** — e.g. a sponsorship submission on `itw-creative-works` publishes a guest post to `ultimate-jekyll`'s `POST /admin/post`. Only **one** Firebase emulator can run locally at a time, so these cross-project calls **always hit the live deployed target**, even in test/dev mode.
 
 This means:
 - The target backend must be **deployed** with up-to-date code for extended tests to pass.
@@ -130,7 +130,7 @@ The rule: **never put cleanup at the END of a test file or suite for the purpose
 
 ## `test/_init.js` — pre-test lifecycle hook
 
-The runner loads an optional `test/_init.js` from **both** test roots — BEM core (`<bem>/test/_init.js`) and the consumer project (`<projectDir>/test/_init.js`) — and runs it before any test (it is NOT itself run as a test). Same contract for both roots, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare** — `_init.js` only declares accounts and reseeds fixtures.
+The runner loads an optional `test/_init.js` from **both** test roots — @omegajs/backend core (`<backend>/test/_init.js`) and the consumer project (`<projectDir>/test/_init.js`) — and runs it before any test (it is NOT itself run as a test). Same contract for both roots, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare** — `_init.js` only declares accounts and reseeds fixtures.
 
 The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ config, Manager }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
 
@@ -161,11 +161,11 @@ module.exports = ({ config }) => ({
 
 ## Extended Mode (`TEST_EXTENDED_MODE`)
 
-`TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across BEM/BXM/UJM/EM. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx mgr test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx mgr test`. Either form works; the flag is just sugar over the env var.
+`TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across @omegajs/backend/BXM/UJM/EM. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx mgr test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx mgr test`. Either form works; the flag is just sugar over the env var.
 
 Several routes/handlers skip external API calls (SendGrid, Beehiiv, Stripe webhooks, dispute handlers, marketing libraries) when `process.env.TEST_EXTENDED_MODE` is unset, so unit tests don't fire real emails or webhook side effects. Set the flag (or pass `--extended`) to opt **in** to those side effects for a full end-to-end run.
 
-**BEM propagates the mode to BOTH spawned environments — the distinctive BEM detail.** The mode reaches (1) the **test-runner subprocess** (spawned with `{ ...process.env }`, so `TEST_EXTENDED_MODE` carries through) AND (2) the **running emulator's function workers** (via the `.temp/test-mode.json` shared state file written pre-flight by `src/test/utils/test-mode-file.js`, allowlisted in `SYNCED_ENV_KEYS`). That's why a single `--extended` on the test command flips both the runner's in-source gates and the live emulator without restarting it.
+**@omegajs/backend propagates the mode to BOTH spawned environments — the distinctive @omegajs/backend detail.** The mode reaches (1) the **test-runner subprocess** (spawned with `{ ...process.env }`, so `TEST_EXTENDED_MODE` carries through) AND (2) the **running emulator's function workers** (via the `.temp/test-mode.json` shared state file written pre-flight by `src/test/utils/test-mode-file.js`, allowlisted in `SYNCED_ENV_KEYS`). That's why a single `--extended` on the test command flips both the runner's in-source gates and the live emulator without restarting it.
 
 The marketing library gates at the SSOT level: `Marketing.add()`, `Marketing.sync()`, and `Marketing.remove()` each short-circuit with `if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) return {}` before touching any provider. Callers (auth `onDelete`, webhook processors, contact-delete route) inherit the gate for free — do NOT rely on a per-caller guard for provider safety; add the gate to the library method itself when introducing a new provider-touching method.
 
@@ -218,18 +218,18 @@ Test runs tee output to `functions/test.log` (own-emulator runs go to `functions
 ## Filtering Tests
 
 ```bash
-npx mgr test rules/             # Run rules tests (both BEM and project)
-npx mgr test bem:rules/         # Only BEM's rules tests
+npx mgr test rules/             # Run rules tests (both @omegajs/backend and project)
+npx mgr test backend:rules/         # Only @omegajs/backend's rules tests
 npx mgr test project:rules/     # Only project's rules tests
 npx mgr test user/ admin/       # Multiple paths
 ```
 
 ## Test Locations
 
-- **BEM core tests:** `test/` (in the framework repo)
+- **@omegajs/backend core tests:** `test/` (in the framework repo)
 - **Project tests:** the consumer project's repo-root `test/` directory (NOT inside `functions/`)
 
-Use `bem:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.js`, `.../manual-validation.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx mgr test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
+Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.js`, `.../manual-validation.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx mgr test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
 
 **The underscore convention:** `_`-prefixed files and directories at any depth under `test/` are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`, `test/routes/_shared-utils.js`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in EM/BXM/UJM.
 
@@ -295,14 +295,14 @@ module.exports = {
 | `state` | Shared state (suites only) |
 | `waitFor` | Polling helper `waitFor(condition, timeout, interval)` |
 | `config` | Test configuration |
-| `Manager` | Real booted BEM Manager (+ `Manager.Assistant()` etc.) |
+| `Manager` | Real booted @omegajs/backend Manager (+ `Manager.Assistant()` etc.) |
 
 ## HTTP Routing
 
 The `http` client sends requests directly to the hosting emulator (`http://localhost:5002`) with no magic prefix. The route string you pass becomes the URL path as-is — the hosting emulator's `firebase.json` rewrites handle routing to the correct Cloud Function.
 
 ```javascript
-// BEM built-in routes — go through bm_api via firebase.json rewrite
+// @omegajs/backend built-in routes — go through bm_api via firebase.json rewrite
 http.post('backend-manager/payments/intent', { ... })
 http.as('admin').get('backend-manager/admin/stats')
 http.as('none').post('backend-manager/marketing/webhook?provider=sendgrid&key=...', [...])
@@ -313,7 +313,7 @@ http.get('sender-accounts', { projectId: 'abc' })
 http.as('none').post('webhooks', { event: 'reply', campaignId: '...' })
 ```
 
-BEM routes live under `/backend-manager/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
+@omegajs/backend routes live under `/backend-manager/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
 
 ## Assert Methods
 
@@ -468,7 +468,7 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 | File | Purpose |
 |------|---------|
 | `src/test/runner.js` | Test runner |
-| `test/` | BEM core tests |
+| `test/` | @omegajs/backend core tests |
 | `src/test/utils/assertions.js` | Assert helpers |
 | `src/test/utils/http-client.js` | HTTP client |
 | `src/test/utils/firestore-rules-client.js` | Rules testing client (`asAccount` / `expectSuccess` / `expectFailure`) |

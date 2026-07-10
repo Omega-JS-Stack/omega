@@ -105,7 +105,7 @@ module.exports = {
 
         assert.isSuccess(signupResponse, `user:sign-up should succeed: ${JSON.stringify(signupResponse, null, 2)}`);
 
-        // BEM API returns { data: { signedUp: true } }, http-client wraps in { data: response }
+        // @omegajs/backend API returns { data: { signedUp: true } }, http-client wraps in { data: response }
         const signedUp = signupResponse.data?.data?.signedUp || signupResponse.data?.signedUp;
         assert.ok(signedUp === true, `Should return signedUp: true (got: ${JSON.stringify(signupResponse.data)})`);
       },

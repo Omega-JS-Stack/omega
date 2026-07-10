@@ -2,7 +2,7 @@
 
 How to drive a browser you can CONTROL — see a consuming site live, screenshot it, click, type, read console logs, inspect network requests — for agents (Claude via MCP/CDP) and humans. WM has no dev server of its own; it runs INSIDE consumers (UJM sites, BXM extensions, EM renderers), so browser verification means driving a consumer.
 
-> Mirrored across the five sister frameworks (UJM / BEM / BXM / EM / WM) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / EM / WM) — same core section, framework-flavored. Edit all five together.
 
 ## The browser: your Claude session owns one
 

@@ -99,7 +99,7 @@ When `npx mgr test` runs from the @omegajs/desktop repo (the cwd's `package.json
 - **`isFrameworkSelfTest`** (in [src/test/runner.js](../src/test/runner.js)) — test discovery includes the framework's own `boot/**` suites. For a real consumer this flag is false and framework `boot/**` suites are **excluded** (they target @omegajs/desktop's fixture, not the consumer's app), so they never run in a consumer's `npx mgr test`.
 - **`EM_TEST_BOOT_PROJECT`** — [src/commands/test.js](../src/commands/test.js) points the boot runner at the bundled fixture under `src/test/fixtures/consumer-app/` instead of the cwd.
 
-The gate decides *whether* the framework boot suite runs; the env var decides *which project* gets booted. (BEM's `BEM_TEST_BOOT_PROJECT`, BXM's `BXM_TEST_BOOT_PROJECT`, and UJM's `UJ_TEST_BOOT_PROJECT` are the exact analogs.)
+The gate decides *whether* the framework boot suite runs; the env var decides *which project* gets booted. (@omegajs/backend's `BEM_TEST_BOOT_PROJECT`, BXM's `BXM_TEST_BOOT_PROJECT`, and UJM's `UJ_TEST_BOOT_PROJECT` are the exact analogs.)
 
 ### The bundled fixture
 

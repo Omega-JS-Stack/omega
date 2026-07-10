@@ -1,14 +1,14 @@
 {
-  "name": "bem-fixture-functions",
+  "name": "backend-fixture-functions",
   "version": "0.0.1",
-  "description": "BEM self-test fixture Cloud Functions (emulator-only, demo project)",
+  "description": "@omegajs/backend self-test fixture Cloud Functions (emulator-only, demo project)",
   "private": true,
   "engines": {
     "node": "22"
   },
   "main": "index.js",
   "dependencies": {
-    "backend-manager": "file:../../../../..",
+    "@omegajs/backend": "file:../../../../..",
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^7.2.5"
   }

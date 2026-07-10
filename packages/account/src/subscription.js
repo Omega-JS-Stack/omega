@@ -1,5 +1,5 @@
 /**
- * resolveSubscription — extracted verbatim from backend-manager's User.resolveSubscription
+ * resolveSubscription — extracted verbatim from @omegajs/backend's User.resolveSubscription
  * (the superset: web-manager's drifted copy lacked `everPaid`).
  *
  * Resolves calculated subscription fields that require derivation logic.

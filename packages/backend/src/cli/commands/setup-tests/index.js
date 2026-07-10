@@ -14,7 +14,7 @@ const GcloudCliTest = require('./gcloud-cli');
 const FunctionsPackageTest = require('./functions-package');
 const FirebaseAdminTest = require('./firebase-admin');
 const FirebaseFunctionsTest = require('./firebase-functions');
-const BackendManagerTest = require('./backend-manager');
+const OmegaBackendTest = require('./omega-backend');
 const NpmProjectScriptsTest = require('./npm-project-scripts');
 const RootPackageJsonTest = require('./root-package-json');
 const OmegaConfigTest = require('./omega-config');
@@ -61,7 +61,7 @@ function getTests(context) {
     new FunctionsPackageTest(context),
     new FirebaseAdminTest(context),
     new FirebaseFunctionsTest(context),
-    new BackendManagerTest(context),
+    new OmegaBackendTest(context),
     new NpmProjectScriptsTest(context),
     new RootPackageJsonTest(context),
     new OmegaConfigTest(context),

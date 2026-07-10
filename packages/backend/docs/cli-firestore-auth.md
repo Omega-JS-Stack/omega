@@ -1,6 +1,6 @@
 # CLI: Firestore & Auth Commands
 
-Quick commands for reading/writing Firestore and managing Auth users directly from the terminal. Works in any BEM consumer project (requires `functions/service-account.json` for production, or `--emulator` for local).
+Quick commands for reading/writing Firestore and managing Auth users directly from the terminal. Works in any @omegajs/backend consumer project (requires `functions/service-account.json` for production, or `--emulator` for local).
 
 **IMPORTANT: All CLI commands (`npx mgr ...`) MUST be run from the consumer project's `functions/` subdirectory** (e.g., `cd /path/to/my-project/functions && npx mgr ...`). The `mgr` binary lives in `functions/node_modules/.bin/` — running from the project root or any other directory will fail.
 

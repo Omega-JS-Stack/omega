@@ -1,6 +1,6 @@
 // TEST_EXTENDED_MODE warning — SSOT for consistent messaging.
 //
-// The headline + shape live in @omegajs/devkit (mirrored across BEM/BXM/UJM); these
+// The headline + shape live in @omegajs/devkit (mirrored across @omegajs/backend/BXM/UJM); these
 // detail lines describe @omegajs/desktop's blast radius. Used by the test command (printed to
 // console + teed to logs/test.log).
 const { makeExtendedModeWarning } = require('@omegajs/devkit/test/extended-mode-warning');

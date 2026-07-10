@@ -2,7 +2,7 @@
  * Test: MCP OAuth authorize + token endpoints
  * Tests admin auto-approve, manual form fallback, token exchange
  *
- * Run: npx mgr test bem:mcp/oauth
+ * Run: npx mgr test backend:mcp/oauth
  */
 const fetch = require('wonderful-fetch');
 

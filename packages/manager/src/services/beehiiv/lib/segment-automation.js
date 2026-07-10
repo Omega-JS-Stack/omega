@@ -11,7 +11,7 @@
  * shared by the verify output in ensure/segments.js.
  */
 const chalk = require('chalk').default;
-const { BEM_FIELDS_MAP } = require('../../../lib/bem-marketing.js');
+const { BACKEND_FIELDS_MAP } = require('../../../lib/backend-marketing.js');
 
 // Operator → human-readable phrasing for the dashboard instructions
 const OP_DISPLAY = {
@@ -36,13 +36,13 @@ function formatCondition(condition) {
     return `${OP_DISPLAY[condition.op] || condition.op} ${condition.value}`;
   }
 
-  const fieldDef = BEM_FIELDS_MAP[condition.field];
+  const fieldDef = BACKEND_FIELDS_MAP[condition.field];
   const fieldName = fieldDef?.display || condition.field;
   return `${fieldName} ${OP_DISPLAY[condition.op] || condition.op} "${condition.value}"`;
 }
 
 /**
- * Map a BEM operator to the Beehiiv dropdown text.
+ * Map a @omegajs/backend operator to the Beehiiv dropdown text.
  */
 function beehiivOperator(op) {
   switch (op) {
@@ -67,7 +67,7 @@ function beehiivOperator(op) {
  * exact dashboard steps).
  *
  * @param {AutomationClient} client - Connected automation client
- * @param {Object} segment - BEM segment ({ name, display, conditions, logic })
+ * @param {Object} segment - @omegajs/backend segment ({ name, display, conditions, logic })
  */
 async function automateCreateSegment(client, segment) {
   const log = (msg) => console.log(`        ${chalk.dim(msg)}`);
@@ -401,7 +401,7 @@ async function automateCreateSegment(client, segment) {
       await client.wait({ delay: 1500 });
 
       // 5d: Open "Select a Custom Field" dropdown → select the field by display name
-      const fieldDef = BEM_FIELDS_MAP[condition.field];
+      const fieldDef = BACKEND_FIELDS_MAP[condition.field];
       const fieldDisplay = fieldDef?.display || condition.field;
       log(`Selecting "${fieldDisplay}"...`);
 

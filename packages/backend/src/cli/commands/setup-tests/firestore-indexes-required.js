@@ -6,7 +6,7 @@ const requiredIndexes = require('./helpers/required-indexes');
 
 class FirestoreIndexesRequiredTest extends BaseTest {
   getName() {
-    return 'firestore indexes have required BEM indexes';
+    return 'firestore indexes have required @omegajs/backend indexes';
   }
 
   async run() {

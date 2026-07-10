@@ -1,16 +1,16 @@
 /**
- * Ensure BEM's segments exist in SendGrid with the right query_dsl.
+ * Ensure @omegajs/backend's segments exist in SendGrid with the right query_dsl.
  *
- * The segment list comes from backend-manager's marketing SSOT; each one's
+ * The segment list comes from @omegajs/backend's marketing SSOT; each one's
  * query_dsl is rebuilt from its conditions and compared against the live
  * segment (the list endpoint omits query_dsl, so present segments cost one
  * detail read each). Stale segments are PATCHed in place, falling back to
  * delete + recreate when SendGrid rejects the PATCH. Orphaned `__temp_`
- * segments (leaked by BEM's brand-scoped campaign sends on crash) are swept.
- * Segments BEM doesn't own are never touched.
+ * segments (leaked by @omegajs/backend's brand-scoped campaign sends on crash) are swept.
+ * Segments @omegajs/backend doesn't own are never touched.
  */
 const chalk = require('chalk').default;
-const { segmentsFor } = require('../../../lib/bem-marketing.js');
+const { segmentsFor } = require('../../../lib/backend-marketing.js');
 const { buildQueryDsl } = require('../lib/segment-query.js');
 
 const SENDGRID_SEGMENTS = segmentsFor('sendgrid');

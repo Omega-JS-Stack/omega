@@ -27,11 +27,11 @@ class ServeCommand extends BaseCommand {
       throw new Error('Port conflicts could not be resolved');
     }
 
-    // Wipe stale firebase-tools debug logs + any leftover BEM logs from older
+    // Wipe stale firebase-tools debug logs + any leftover @omegajs/backend logs from older
     // versions. Keeps the project tree clean across runs.
     this.sweepStaleLogs();
 
-    // Start BEM watcher in background
+    // Start @omegajs/backend watcher in background
     const watcher = new WatchCommand(self);
     watcher.startBackground();
 

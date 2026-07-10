@@ -2,7 +2,7 @@
  * Test: MCP utility functions
  * Tests resolveAuthInfo, filterToolsByRole, loadConsumerTools, buildToolMap
  *
- * Run: npx mgr test bem:mcp/utils
+ * Run: npx mgr test backend:mcp/utils
  */
 const path = require('path');
 

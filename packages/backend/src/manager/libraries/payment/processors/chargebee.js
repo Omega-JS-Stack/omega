@@ -277,7 +277,7 @@ const Chargebee = {
    *
    * @param {object} rawSubscription - Raw Chargebee subscription object
    * @param {object} options
-   * @param {object} options.config - BEM config (must contain products array)
+   * @param {object} options.config - @omegajs/backend config (must contain products array)
    * @param {string} options.eventName - Name of the webhook event
    * @param {string} options.eventId - ID of the webhook event
    * @returns {object} Unified subscription object

@@ -23,7 +23,7 @@ const BEM_PACKAGE = require('../../package.json');
 function Manager() {
   const self = this;
 
-  // BEM library version
+  // @omegajs/backend library version
   self.version = BEM_PACKAGE.version;
 
   // Constants
@@ -53,7 +53,7 @@ Manager.prototype.init = function (exporter, options) {
   const self = this;
 
   // Auto-detect test-runner context. The test runner sets BEM_TEST_RUNNER=1
-  // before invoking anything that loads BEM. When detected, init() runs the
+  // before invoking anything that loads @omegajs/backend. When detected, init() runs the
   // library-loading + project-config-setup pieces normally, but skips wiring
   // Firebase Cloud Functions handlers and the custom-server boot (neither
   // works outside an actual Functions runtime). The runner has already called
@@ -151,7 +151,7 @@ Manager.prototype.init = function (exporter, options) {
     // Boot warns on schema findings, audit (mgr setup) throws — the two-mode
     // contract from @omegajs/config. Secrets in the file already threw above.
     if (errors.length) {
-      console.warn(`[backend-manager] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+      console.warn(`[@omegajs/backend] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
     }
   } else {
     self.config = configDefaults;
@@ -208,7 +208,7 @@ Manager.prototype.init = function (exporter, options) {
     ) {
       return 'development';
     } else {
-      // Default: production. BEM's deployed RUNTIME can legitimately lack a dev signal — a
+      // Default: production. @omegajs/backend's deployed RUNTIME can legitimately lack a dev signal — a
       // live Cloud Function has no FUNCTIONS_EMULATOR and often no ENVIRONMENT var, so
       // "no signal" IS the normal production state. Defaulting to development here would make
       // every deployed function skip real side effects (emails/analytics/webhooks).
@@ -277,8 +277,8 @@ Manager.prototype.init = function (exporter, options) {
       : self.config.brand?.url || '';
   };
 
-  // Resolve the parent BEM's website URL (the parent's brand domain, NO `api.` subdomain).
-  // - If config.parent === 'self', THIS BEM is the parent — returns this brand's own URL.
+  // Resolve the parent @omegajs/backend's website URL (the parent's brand domain, NO `api.` subdomain).
+  // - If config.parent === 'self', THIS @omegajs/backend is the parent — returns this brand's own URL.
   // - If config.parent is a URL, returns it as-is.
   // - Returns '' if neither is configured.
   // Use getParentApiUrl() for the API URL (with `api.` subdomain inserted).
@@ -290,7 +290,7 @@ Manager.prototype.init = function (exporter, options) {
     return parent || '';
   };
 
-  // Resolve the parent BEM's API URL (`https://api.{parent-host}`).
+  // Resolve the parent @omegajs/backend's API URL (`https://api.{parent-host}`).
   // ALWAYS returns the live production URL — even when THIS brand is running
   // in dev/test mode. The parent's API is a real remote server (no localhost
   // equivalent), so dev-mode does NOT redirect to localhost the way getApiUrl()
@@ -300,7 +300,7 @@ Manager.prototype.init = function (exporter, options) {
     return base ? `https://api.${base}` : '';
   };
 
-  // Returns true when this BEM IS the parent (config.parent === 'self').
+  // Returns true when this @omegajs/backend IS the parent (config.parent === 'self').
   // Gates parent-only routes like /marketing/webhook/forward.
   self.isParent = function() {
     return self.config.parent === 'self';
@@ -323,7 +323,7 @@ Manager.prototype.init = function (exporter, options) {
   // Set environment
   process.env.ENVIRONMENT = process.env.ENVIRONMENT || self.getEnvironment();
 
-  // Set BEM env variables
+  // Set @omegajs/backend env variables
   process.env.BEM_FUNCTIONS_URL = self.project.functionsUrl;
   process.env.BEM_API_URL = self.project.apiUrl;
   process.env.BEM_WEBSITE_URL = self.project.websiteUrl;
@@ -647,10 +647,10 @@ Manager.prototype.Middleware = function () {
   return new self.libraries.Middleware(self, ...arguments);
 };
 
-Manager.prototype.BemRouter = function (req, res) {
+Manager.prototype.BackendRouter = function (req, res) {
   const self = this;
-  self.libraries.BemRouter = self.libraries.BemRouter || require('./helpers/bem-router.js');
-  return new self.libraries.BemRouter(self, req, res);
+  self.libraries.BackendRouter = self.libraries.BackendRouter || require('./helpers/backend-router.js');
+  return new self.libraries.BackendRouter(self, req, res);
 };
 
 Manager.prototype.EventMiddleware = function (payload) {
@@ -923,7 +923,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
   exporter.bm_api =
   fn({memory: '256MB', timeoutSeconds: 60 * 5})
   .https.onRequest(async (req, res) => {
-    const route = self.BemRouter(req, res).resolve();
+    const route = self.BackendRouter(req, res).resolve();
 
     // MCP endpoint — bypass middleware, handle protocol directly
     const mcpRoutePath = resolveMcpRoutePath(route.routePath);
@@ -1320,7 +1320,7 @@ function resolveProjectPackage(dir) {
  * Check if a routePath is an MCP-related route and normalize it.
  * Handles /backend-manager/mcp/* paths and /.well-known/oauth-* discovery.
  *
- * @param {string} routePath - Resolved route path from BemRouter
+ * @param {string} routePath - Resolved route path from BackendRouter
  * @returns {string|null} - Normalized MCP route path, or null if not MCP
  */
 function resolveMcpRoutePath(routePath) {

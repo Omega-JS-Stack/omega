@@ -1,10 +1,10 @@
 /**
  * Ghostii article engine — shared helpers for AI article generation + publishing.
  *
- * Ghostii (api.ghostii.ai) is UNOPINIONATED about BEM. It returns a generic,
+ * Ghostii (api.ghostii.ai) is UNOPINIONATED about @omegajs/backend. It returns a generic,
  * structured article: a `json` block array ([{ name, content }]) plus `title`,
  * `description`, `headerImageUrl`, `categories`, `keywords`. It is NOT shaped to
- * BEM's post format — BEM is responsible for transforming Ghostii's output into
+ * @omegajs/backend's post format — @omegajs/backend is responsible for transforming Ghostii's output into
  * what its `admin/post` route expects.
  *
  * `blocksToPost()` is that transform: it digests the JSON blocks and pulls out
@@ -35,7 +35,7 @@ const powertools = require('node-powertools');
  * @returns {Promise<object>} Ghostii's generic article response:
  *   { title, description, body, json, headerImageUrl, images, categories, keywords, links, outline }
  *   where `json` is the structured block array ([{ name, content }]) that
- *   blocksToPost() consumes to build BEM's post shape.
+ *   blocksToPost() consumes to build @omegajs/backend's post shape.
  */
 async function writeArticle({ brand, description, links, sourceContent, overrides }) {
   const o = overrides || {};
@@ -81,10 +81,10 @@ async function writeArticle({ brand, description, links, sourceContent, override
 }
 
 /**
- * Transform Ghostii's generic JSON block array into BEM's post shape.
+ * Transform Ghostii's generic JSON block array into @omegajs/backend's post shape.
  *
  * Ghostii returns `json: [{ name, content }]` where name ∈ heading-1..6, image,
- * paragraph, blockquote, list. BEM's admin/post wants the title + header image as
+ * paragraph, blockquote, list. @omegajs/backend's admin/post wants the title + header image as
  * SEPARATE fields and a body that is ONLY the content below them. So we extract:
  *   - title       ← first heading-1 block (markdown `#` stripped)
  *   - headerImageUrl ← first image block's URL
@@ -119,7 +119,7 @@ function blocksToPost(json) {
 /**
  * Publish a Ghostii article to the brand's website repo via the admin/post route.
  *
- * @param {object} assistant - BEM assistant instance
+ * @param {object} assistant - @omegajs/backend assistant instance
  * @param {object} args
  * @param {object} args.brand - Public brand config ({ brand: { url, ... }, github: { user, repo } })
  * @param {object} args.article - The article from writeArticle(). When it carries a
@@ -133,7 +133,7 @@ function blocksToPost(json) {
 async function publishArticle(assistant, { brand, article, id, author, postPath, source }) {
   const apiUrl = assistant.Manager.getApiUrl();
 
-  // Transform Ghostii's generic JSON into BEM's post shape (title + header image
+  // Transform Ghostii's generic JSON into @omegajs/backend's post shape (title + header image
   // as separate fields, body = content only). Fall back to the legacy flat fields
   // for older Ghostii responses that don't include `json`.
   const post = blocksToPost(article.json);

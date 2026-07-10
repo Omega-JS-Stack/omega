@@ -73,7 +73,7 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 2. **Config override** — `config.em.environment` (`'development'` / `'testing'` / `'production'`), the consumer's explicit choice. It beats the auto-detected `app.isPackaged` below.
 3. **Production / Development (runtime)** — Electron `app.isPackaged`: packaged → production, unpackaged → development. This is the authoritative runtime signal in the main process. In renderer / preload / plain Node, `app` is unavailable, so it falls through.
 4. **Build-time signals** — `EM_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development.
-5. **Default** — production. @omegajs/desktop's deployed *runtime* can reach here without a dev signal (a packaged binary whose `app.isPackaged` didn't resolve is still a shipped app), so production is the safe assumption. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. BEM defaults to production for the same reason as @omegajs/desktop.)
+5. **Default** — production. @omegajs/desktop's deployed *runtime* can reach here without a dev signal (a packaged binary whose `app.isPackaged` didn't resolve is still a shipped app), so production is the safe assumption. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. @omegajs/backend defaults to production for the same reason as @omegajs/desktop.)
 
 ## Adding a new helper
 

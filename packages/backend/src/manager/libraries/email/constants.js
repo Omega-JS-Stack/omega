@@ -10,13 +10,13 @@
 // Group shortcut map — SendGrid ASM group IDs
 // Rename these in SendGrid dashboard to match the comments
 const GROUPS = {
-  'orders': 16223,         // BEM - Order Updates
-  'hello': 35092,          // BEM - Onboarding
-  'account': 25927,        // BEM - Account
-  'marketing': 25928,      // BEM - Marketing & Promotions
-  'security': 35093,       // BEM - Security
-  'newsletter': 28096,     // BEM - Newsletter
-  'internal': 35094,       // BEM - Internal Alerts
+  'orders': 16223,         // @omegajs/backend - Order Updates
+  'hello': 35092,          // @omegajs/backend - Onboarding
+  'account': 25927,        // @omegajs/backend - Account
+  'marketing': 25928,      // @omegajs/backend - Marketing & Promotions
+  'security': 35093,       // @omegajs/backend - Security
+  'newsletter': 28096,     // @omegajs/backend - Newsletter
+  'internal': 35094,       // @omegajs/backend - Internal Alerts
 };
 
 // Semantic sender categories — pass `sender: 'orders'` to auto-resolve from address, display name, and ASM group
@@ -271,7 +271,7 @@ function errorWithCode(message, code) {
 // To add a new tracked marketing field:
 //   1. Add an entry here (key, display, source, path, type)
 //   2. Run OMEGA: npm start -- --service=sendgrid,beehiiv --brand=X
-//   3. BEM resolves field IDs at runtime — no provider code changes needed
+//   3. @omegajs/backend resolves field IDs at runtime — no provider code changes needed
 //   4. If 'resolved' source, ensure resolveFieldValues() computes it
 //
 // Flags:
@@ -310,7 +310,7 @@ const FIELDS = {
 // Master segment dictionary — SSOT for all marketing segments.
 //
 // Segments are created in each provider by OMEGA (like custom fields).
-// BEM references them by key. Provider-specific IDs are resolved at runtime.
+// @omegajs/backend references them by key. Provider-specific IDs are resolved at runtime.
 //
 // Condition types:
 //   'field'      — custom field condition (uses FIELDS above)

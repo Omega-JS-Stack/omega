@@ -26,14 +26,14 @@
   },
 
   // GA4 analytics. Measurement ID lives in config (not secret); the API secret
-  // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (matches BEM convention) so
+  // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omegajs/backend convention) so
   // it's not committed. Webpack's DefinePlugin bakes the secret into packaged
   // builds at build time so production apps don't need .env at runtime.
   // client_id / user_id are uuidv5(deviceId/firebaseUid, projectId-namespace)
   // so the same human gets unified events across desktop + web + backend.
   analytics: {
     // Presence-driven: set `providers.google.id` to `G-XXXXXXXXXX` to enable analytics.
-    // Empty string = analytics disabled (matches BEM convention — no redundant enabled flag).
+    // Empty string = analytics disabled (matches @omegajs/backend convention — no redundant enabled flag).
     providers: {
       google: {
         id: '',                               // 'G-XXXXXXXXXX' Measurement ID
@@ -41,7 +41,7 @@
     },
   },
 
-  // Payment — BEM-shaped so the same product catalog can be referenced from backend
+  // Payment — @omegajs/backend-shaped so the same product catalog can be referenced from backend
   // + desktop. The schema enforces publishableKey shape when set; everything else is
   // freeform so apps can extend per their needs without @omegajs/desktop caring. Leave empty until
   // you're ready to wire payments.
@@ -53,7 +53,7 @@
     products: [],
   },
 
-  // Firebase web SDK config. Flat shape — same key names BEM/BXM/web-manager all use.
+  // Firebase web SDK config. Flat shape — same key names @omegajs/backend/BXM/web-manager all use.
   // Copy directly from Firebase Console → Project Settings → SDK setup (Config option).
   // Empty {} disables Firebase Auth in the renderer (web-manager-bridge logs a warn).
   firebaseConfig: {

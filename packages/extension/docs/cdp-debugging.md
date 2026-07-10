@@ -2,7 +2,7 @@
 
 How to drive a browser you can CONTROL — see the extension live, screenshot it, click, type, read console logs, inspect network requests — for agents (Claude via MCP/CDP) and humans. For @omegajs/extension this is THE dev surface: the extension only exists inside a running browser.
 
-> Mirrored across the five sister frameworks (UJM / BEM / @omegajs/extension / EM / WM) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omegajs/backend / @omegajs/extension / EM / WM) — same core section, framework-flavored. Edit all five together.
 
 ## The browser: your Claude session owns one
 

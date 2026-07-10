@@ -1,6 +1,6 @@
 # Logging
 
-BEM CLI commands automatically save all output to log files while still streaming to the console. **BEM's logs live in `<projectDir>/functions/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit beside firebase-tools' own `*-debug.log` files and everything can be grepped from one directory.
+@omegajs/backend CLI commands automatically save all output to log files while still streaming to the console. **@omegajs/backend's logs live in `<projectDir>/functions/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit beside firebase-tools' own `*-debug.log` files and everything can be grepped from one directory.
 
 ## Log files
 
@@ -8,7 +8,7 @@ All in `<projectDir>/functions/`:
 
 | File | Source | Lifetime |
 |---|---|---|
-| `dev.log` | `npx mgr serve` — BEM's local dev server (Firebase serve) | Overwritten each run |
+| `dev.log` | `npx mgr serve` — @omegajs/backend's local dev server (Firebase serve) | Overwritten each run |
 | `deploy.log` | `npx mgr deploy` — Firebase deployment output (function uploads, hosting deploys, errors) | Overwritten each run |
 | `emulator.log` | `npx mgr emulator` — full emulator output (Firebase emulator + Cloud Functions logs); also `npx mgr test` when it starts its own emulator | Overwritten each run |
 | `test.log` | `npx mgr test` runner output when running against an already-running emulator | Overwritten each run |

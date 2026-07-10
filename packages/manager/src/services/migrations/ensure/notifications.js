@@ -1,6 +1,6 @@
 /**
  * Notifications collection migration — converges push-subscription docs to
- * the canonical backend-manager/web-manager shape.
+ * the canonical @omegajs/backend + web-manager shape.
  *
  * Fixes:
  * - Renames `uid` field to `owner` and deletes `uid`

@@ -98,7 +98,7 @@ function collectProjectLinks(commits, projectMap) {
 function buildBrief({ brandConfig, days }) {
   const { brand, devlog } = brandConfig;
   // Voice: the newsletter generator's instructions blob when the brand's
-  // omega.json5 carries one (it's BEM data, not manager config — presence is
+  // omega.json5 carries one (it's @omegajs/backend data, not manager config — presence is
   // genuinely uncertain), else the brand description.
   const voice = brandConfig.marketing?.newsletter?.content?.[0]?.instructions
     || brand.description

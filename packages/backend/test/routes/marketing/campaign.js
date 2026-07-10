@@ -20,13 +20,13 @@ module.exports = {
 
       async run({ http, assert, state }) {
         const response = await http.post('backend-manager/marketing/campaign', {
-          name: 'BEM Test Campaign',
+          name: '@omegajs/backend Test Campaign',
           subject: 'Test Marketing Email',
           template: 'card',
           data: {
             content: {
               title: 'Test Marketing Email',
-              message: 'This is a **test marketing email** sent from the BEM test suite.\n\nIf you received this, the SendGrid Single Send pipeline is working correctly.',
+              message: 'This is a **test marketing email** sent from the @omegajs/backend test suite.\n\nIf you received this, the SendGrid Single Send pipeline is working correctly.',
               button: { text: 'Visit Dashboard →', url: '{brand.url}' },
             },
           },

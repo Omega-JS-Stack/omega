@@ -4,7 +4,7 @@ const jetpack = require('fs-jetpack');
  * Shared cron job runner
  *
  * Discovers and executes all .js job files from:
- * 1. BEM core jobs directory
+ * 1. @omegajs/backend core jobs directory
  * 2. Custom project hooks directory
  *
  * @param {string} name - Cron schedule name (e.g., 'daily', 'frequent')
@@ -20,7 +20,7 @@ module.exports = async function run(name, { Manager, assistant, context }) {
   // Log
   assistant.log('Starting...');
 
-  // Load BEM jobs
+  // Load @omegajs/backend jobs
   await loadAndExecuteJobs(name, `${__dirname}/${name}`, Manager, context);
 
   // Load custom jobs

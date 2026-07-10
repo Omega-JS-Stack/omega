@@ -334,13 +334,13 @@ const bridge = {
     });
 
     if (!res.ok) {
-      throw new Error(`backend-manager responded with ${res.status}`);
+      throw new Error(`@omegajs/backend responded with ${res.status}`);
     }
 
     const data = await res.json();
     const token = data?.response?.token;
     if (!token) {
-      throw new Error('backend-manager response missing token.');
+      throw new Error('@omegajs/backend response missing token.');
     }
     return token;
   },

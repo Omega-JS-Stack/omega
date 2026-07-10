@@ -22,7 +22,7 @@
     "@omegajs/config": "*",
     "@omegajs/devkit": "*",
     "ag-psd": "^31.0.2",
-    "backend-manager": "*",
+    "@omegajs/backend": "*",
     "canvas": "^3.2.3",
     "chalk": "^5.6.2",
     "dotenv": "^17.4.2",

@@ -37,7 +37,7 @@ function getConsumerTools(cwd) {
  * @param {IncomingMessage} req
  * @param {ServerResponse} res
  * @param {object} options
- * @param {object} options.Manager - BEM Manager instance
+ * @param {object} options.Manager - @omegajs/backend Manager instance
  * @param {string} options.routePath - Resolved route path (e.g. "mcp", "mcp/authorize")
  */
 async function handleMcpRoute(req, res, options) {
@@ -129,7 +129,7 @@ function handleAuthorize(req, res, options, baseUrl) {
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Backend Manager — Authorize MCP</title>
+  <title>OMEGA Backend — Authorize MCP</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -147,11 +147,11 @@ function handleAuthorize(req, res, options, baseUrl) {
 <body>
   <div class="card">
     <h1>Authorize MCP Connection</h1>
-    <p>Enter your Backend Manager key to allow Claude to connect.</p>
+    <p>Enter your OMEGA Backend key to allow Claude to connect.</p>
     <form method="POST">
       <input type="hidden" name="redirect_uri" value="${escapeHtml(redirect_uri || '')}">
       <input type="hidden" name="state" value="${escapeHtml(state || '')}">
-      <label for="key">Backend Manager Key</label>
+      <label for="key">OMEGA Backend Key</label>
       <input type="password" id="key" name="key" placeholder="Enter your key" required autofocus>
       <button type="submit">Allow</button>
     </form>
@@ -383,7 +383,7 @@ async function handleMcpProtocol(req, res, options) {
   // Create MCP server
   const server = new Server(
     {
-      name: 'backend-manager',
+      name: '@omegajs/backend',
       version: packageJSON.version,
     },
     {

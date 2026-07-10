@@ -11,7 +11,7 @@ const PayPal = require('../../../../src/manager/libraries/payment/processors/pay
 const FIXTURE_ORDER_APPROVED = require('../../../fixtures/paypal/order-approved.json');
 const FIXTURE_ORDER_COMPLETED = require('../../../fixtures/paypal/order-completed.json');
 
-// Mock config matching the BEM template (new flat price structure)
+// Mock config matching the @omegajs/backend template (new flat price structure)
 const MOCK_CONFIG = {
   payment: {
     products: [

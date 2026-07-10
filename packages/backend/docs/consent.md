@@ -2,7 +2,7 @@
 
 Captures, stores, and synchronizes user consent for legal terms (ToS + Privacy) and marketing communications across SendGrid + Beehiiv. Designed for GDPR / CASL / CAN-SPAM compliance with full audit metadata.
 
-This doc covers the **server-side** (BEM) part of the system. The matching frontend pieces live in [ultimate-jekyll-manager](https://github.com/itw-creative-works/ultimate-jekyll-manager) and [web-manager](https://github.com/itw-creative-works/web-manager).
+This doc covers the **server-side** (@omegajs/backend) part of the system. The matching frontend pieces live in [ultimate-jekyll-manager](https://github.com/itw-creative-works/ultimate-jekyll-manager) and [web-manager](https://github.com/itw-creative-works/web-manager).
 
 ## Why this exists
 
@@ -32,7 +32,7 @@ consent: {
 **Field semantics:**
 
 - `status` — single-source-of-truth boolean state, expressed as a string enum so future states (`'pending'`, `'expired'`) don't break the schema.
-- `grantedAt` / `revokedAt` — full audit metadata for the **most recent** transition of each kind. Both ALWAYS present on the doc; nulls live at the leaves (e.g. `grantedAt: { timestamp: null, ... }`), never at the object boundary. Matches BEM's `subscription.expires` / `payment.startDate` conventions.
+- `grantedAt` / `revokedAt` — full audit metadata for the **most recent** transition of each kind. Both ALWAYS present on the doc; nulls live at the leaves (e.g. `grantedAt: { timestamp: null, ... }`), never at the object boundary. Matches @omegajs/backend's `subscription.expires` / `payment.startDate` conventions.
 - `legal` only has `grantedAt` (no `revokedAt`) because revoking legal consent = deleting the account.
 - `text` records the **exact wording** the user agreed to. Critical for audit defense if a marketing label is challenged later.
 
@@ -162,14 +162,14 @@ After removing the contact from all providers, the route mirrors `consent.market
 
 [src/manager/routes/marketing/webhook/forward/post.js](../src/manager/routes/marketing/webhook/forward/post.js)
 
-SendGrid and Beehiiv only let you configure a small number of webhook URLs (often one per account). With many brands sharing the same SendGrid account, we can't point the webhook at every brand's BEM directly. Instead:
+SendGrid and Beehiiv only let you configure a small number of webhook URLs (often one per account). With many brands sharing the same SendGrid account, we can't point the webhook at every brand's @omegajs/backend directly. Instead:
 
 ```
 SendGrid → POST https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=sendgrid&key=X
 Beehiiv  → POST https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=beehiiv&key=X
 ```
 
-The **parent BEM** (the one whose `config/omega.json5` has `parent: 'self'` under `targets.backend`) exposes the forwarder route. Every other BEM has the route but it returns 404 (gated on `Manager.config.parent === 'self'`).
+The **parent @omegajs/backend** (the one whose `config/omega.json5` has `parent: 'self'` under `targets.backend`) exposes the forwarder route. Every other @omegajs/backend has the route but it returns 404 (gated on `Manager.config.parent === 'self'`).
 
 The parent forwarder:
 
@@ -190,7 +190,7 @@ Each brand has its own Firebase project, so its `users` collection is separate. 
 
 ### Why self IS in the fan-out
 
-The parent BEM has its own brand (e.g. `itw-creative-works`) with its own users. By fanning out via HTTP to itself like any other child, the parent's brand processes its users the same way as siblings — no special-case inline path.
+The parent @omegajs/backend has its own brand (e.g. `itw-creative-works`) with its own users. By fanning out via HTTP to itself like any other child, the parent's brand processes its users the same way as siblings — no special-case inline path.
 
 ### Shared-publication scenario (Beehiiv devbeans)
 
@@ -277,7 +277,7 @@ Every other brand:
 - `Manager.getParentApiUrl()` — returns the parent's API URL (`https://api.{host}`). **Always live** — does NOT redirect to localhost in dev mode, because you can't run two Firebase emulators simultaneously. The parent's API is always the production URL regardless of which environment THIS brand is in.
 - `Manager.isParent()` — boolean, true when `config.parent === 'self'`.
 
-Only the BEM where `Manager.isParent()` returns true exposes `/marketing/webhook/forward`. Everywhere else, the route is invisible (404).
+Only the @omegajs/backend where `Manager.isParent()` returns true exposes `/marketing/webhook/forward`. Everywhere else, the route is invisible (404).
 
 ## Legacy user migration
 
@@ -320,7 +320,7 @@ After the migration: optionally run a re-opt-in drip campaign to legally recover
 
 ## Test coverage
 
-**BEM tests:**
+**@omegajs/backend tests:**
 
 - [test/helpers/user.js](../test/helpers/user.js) — 31 tests covering the canonical schema, defaults, granted/revoked states, round-tripping
 - [test/routes/user/signup.js](../test/routes/user/signup.js) — 3 tests for signup-time consent capture (granted both, marketing declined, missing payload)
@@ -336,7 +336,7 @@ Run with `npx mgr test` (full suite) or `npx mgr test routes/marketing/webhook` 
 
 ### Live-provider tests (extended mode only)
 
-Most BEM tests are self-contained against the local emulator. The marketing-consent system has one test that's an exception — [test/marketing/consent-lifecycle.js](../test/marketing/consent-lifecycle.js) — which makes real API calls to SendGrid + Beehiiv to verify the full round-trip works end-to-end.
+Most @omegajs/backend tests are self-contained against the local emulator. The marketing-consent system has one test that's an exception — [test/marketing/consent-lifecycle.js](../test/marketing/consent-lifecycle.js) — which makes real API calls to SendGrid + Beehiiv to verify the full round-trip works end-to-end.
 
 The validation pipeline (`src/manager/libraries/email/validation.js`) blocks all `_test.*` emails from reaching providers via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`. The two `_test.allow_*` sentinels (`_test.allow_consent-granted` and `_test.allow_consent-declined`) used by the lifecycle test bypass that gate intentionally, and the test cleans up after itself (phase-3 removes the granted contact via `Manager.Email().remove()`).
 

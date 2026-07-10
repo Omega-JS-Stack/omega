@@ -6,13 +6,13 @@ const Npm = require('npm-api');
 const helpers = require('./helpers');
 const { safeInstall } = require('../../utils/safe-install');
 
-class BackendManagerTest extends BaseTest {
+class OmegaBackendTest extends BaseTest {
   getName() {
-    return 'using updated backend-manager';
+    return 'using updated @omegajs/backend';
   }
 
   async run() {
-    const pkg = 'backend-manager';
+    const pkg = '@omegajs/backend';
     const latest = await this.getPkgVersion(pkg);
     const mine = this.context.package.dependencies[pkg];
 
@@ -29,9 +29,9 @@ class BackendManagerTest extends BaseTest {
   }
 
   async fix() {
-    await this.installPkg('backend-manager');
+    await this.installPkg('@omegajs/backend');
 
-    console.log(chalk.green(`Process has exited since a new version of backend-manager was installed. Run ${chalk.bold('npx bm setup')} again.`));
+    console.log(chalk.green(`Process has exited since a new version of @omegajs/backend was installed. Run ${chalk.bold('npx bm setup')} again.`));
     process.exit(0);
   }
 
@@ -77,4 +77,4 @@ class BackendManagerTest extends BaseTest {
   }
 }
 
-module.exports = BackendManagerTest;
+module.exports = OmegaBackendTest;

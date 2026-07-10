@@ -25,7 +25,7 @@
 
 ## Payment Configuration
 
-Payment config shape mirrors OMEGA (the SSOT) — same key names used in BEM, UJM, and EM:
+Payment config shape mirrors OMEGA (the SSOT) — same key names used in @omegajs/backend, UJM, and EM:
 - `processors`: Stripe, PayPal, Chargebee, Coinbase (publishable keys / client IDs)
 - `products`: Array of `{ id, name, type, limits: { feature: N }, prices, trial, paypal, stripe, chargebee }` — used to resolve usage limits on the frontend AND drive checkout flows
 
