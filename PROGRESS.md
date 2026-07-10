@@ -2,23 +2,33 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- (idle — next queue item starts on Ian's "continue")
+- cp70: core-changes graduation + N1 upstream re-sync sweep (spec: [plans/omega-core-changes-inbox.md](plans/omega-core-changes-inbox.md), DECIDED 10/10)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Phase 5 template + **the OMEGA brand dogfood** (Ian 2026-07-10): onboard a brand around omega itself with ALL targets — web + backend + desktop + extension — and make everything work locally (`omega dev --local` is live as of 69)
-2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
+1. N2 Great Rename — `@omegajs/*` → `@omega.js/*`; `omega`+`omg` bins on every framework (`mgr` kept, context-aware dispatch); `window.webManager` → `window.omega`
+2. N3 wire/env harmonization — route prefix `/omega`, functions `omega_*`, runtime-config key `omega`, env `OMEGA_*`
+3. N4 migrated-code architecture sweep (DRY/SSOT review of packages/*) + zod route schemas (data shapes + route semantics preserved)
+4. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
+5. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
+6. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002)
+7. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`)
+8. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - electron-manager@1.12.1/1.13.0 publish — 1.12.0 on npm breaks fresh installs; the LEGACY repo now carries both commits (the other agent's merge), so Ian publishes straight from it — the monorepo pre-rename tag (`pre-desktop-rename`, cp66) is just backup
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
-- @omegajs npm org claim (gates publishes ONLY — local work proceeds); GitHub remote creation + first push (ci.yml verification pending)
-- PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in @omegajs/web). MAM parked entirely.
+- npm PUBLISHES still gated (orgs are claimed — see standing rules — but versions not finalized; zero publishes until Ian says go)
+- PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in the web package). MAM parked entirely.
 
 ## 📏 Standing rules
+- **Continuous mode (Ian 2026-07-10)**: keep iterating/building/testing autonomously, checkpoint after checkpoint — stop ONLY for serious errors or decisions that are genuinely Ian's. (Replaces one-checkpoint-per-"continue".)
+- **Orgs claimed + locked (Ian 2026-07-10)**: npm org `omega.js` and GH org `Omega-JS-Stack` are Ian's — names are final. GH org is empty; full control granted to create repos/push/try things. npm publishes REMAIN gated (versions not finalized).
+- **Data-shape preservation (Ian 2026-07-10)**: existing Firestore shapes (`users/{uid}`, payment orders, …) + backend route semantics are presumed good. Any breaking change that would require migrating existing data needs Ian's explicit OK — flag with a migration plan, don't build.
+- Core-changes spec: [plans/omega-core-changes-inbox.md](plans/omega-core-changes-inbox.md) (DECIDED 10/10, 2026-07-10) is binding alongside the master plan; classy/CMS/admin arcs build systems/extensibility first — visuals are the easy part (Ian).
 - Existing repos (omega-manager, all framework + consumer repos) are READ-ONLY — all work happens in this monorepo; old-name releases publish FROM the monorepo copies.
 - Live checks NEVER touch real ITW repos/resources — not even read-only probes; sandbox/fixture resources only, creds scrubbed (`env -u`).
 - No backwards compat (Ian 2026-07-06: dual-read cancelled) — implement + document the new way only.
-- Rhythm: one checkpoint per "continue" — survey (read-only) → design (de-ITW, non-interactive, .env creds, dry-run) → implement → tests → sandbox/fixture proof → docs → commit.
+- Checkpoint discipline (structure unchanged): survey (read-only) → design (de-ITW, non-interactive, .env creds, dry-run) → implement → tests → sandbox/fixture proof → docs → commit.
 - Git: explicit `git -C` always (post-incident rule: a checkpoint-5 commit briefly landed in omega-manager via a stray cwd — reverted, nothing pushed); commit-and-continue is standing for THIS repo; `Co-Authored-By: Claude Fable 5` trailer.
 - De-ITW'ing hardcoded company values into config = standard scope; best-implementation-wins normalization is licensed (pick the better behavior, don't keep both quirks).
 - npu, never raw npm install/npx. Secrets never in omega.json5 — .env / .omega/secrets only (@omegajs/config hard-fails on secret-shaped keys).
@@ -54,4 +64,4 @@
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 2:50 AM (checkpoint 69)*
+*Last updated: 2026-07-10 12:25 PM (checkpoint 70 in flight — continuous mode)*
