@@ -1,6 +1,6 @@
 # OMEGA Core Changes — Ideas Inbox
 
-> **Status: TRIAGE DRAFT — under discussion.** Ian's raw dump (verbatim, bottom half) + organized triage (top half). Nothing is queued until decisions land in [omega-redesign-master-plan.md](omega-redesign-master-plan.md) (amendments) and [PROGRESS.md](../PROGRESS.md) (queue).
+> **Status: DECIDED 9/10 (2026-07-10) — only D4 (apps/ vs targets/) open.** Ian's raw dump (verbatim, bottom half) + organized triage (top half). Graduates into [omega-redesign-master-plan.md](omega-redesign-master-plan.md) amendments + the [PROGRESS.md](../PROGRESS.md) queue on Ian's next "continue".
 
 ---
 
@@ -31,22 +31,25 @@
 
 - **C1. Template + onboarding product polish** — the shipfa.st-grade first-run: scaffold + walk the user through exactly which API keys, env vars, and cloud settings to set up; template repo lives in the new GH org.
 - **C2. Blueprint/pricing rethink** — pricing/plans read from omega.json5 (`payment.products`) at build; kill the pricing-frontmatter dispersal entirely; slim theme-layout frontmatter (theme logic moves into templates; frontmatter reserved for consumers); KEEP: 3-layer default/theme/consumer JS+CSS hierarchy (you like it, it stays), legal append/addendum pattern, zero-config default pages (D8 for the mechanism).
-- **C3. Classy full redesign** — ground-up rebuild: modern, clean, light/dark, kickass typography, polished UX; freedom to rip apart, no compat. After C2 so it's built once on the new shape; the omega dogfood site becomes the showcase.
+- **C3. Classy full redesign** — ground-up rebuild: modern, clean, light/dark, kickass typography, polished UX; freedom to rip apart, no compat. After C2 so it's built once on the new shape; the omega dogfood site becomes the showcase. **Designed cross-target from day one (D10)** — core omega css/js consumable by desktop/extension too, brand layers on top.
 - **C4. Cross-target sharing** — analytics integration module, fontawesome, theme sharing across web/desktop/extension ("brand theme once, all three targets" is the acceptance test); revisit `@omega.js/themes` once C3 stabilizes.
 
-### D. Decisions needed (Ian) — with recommendations
+### D. Decisions — Ian's calls (2026-07-10; D4 still open)
 
-1. **Scope `@omega.js`** — confirm (fallback if some tool chokes on the dot: `@omega-js`). GH org `Omega-JS-Stack` confirmed?
-2. **Bins** — `omega` + `omg` on every framework, `mgr` kept, context-aware dispatch: ok?
-3. **`window.webManager` →** recommend **`window.omega`**.
-4. **`apps/` vs `targets/`** — recommend KEEP `apps/`: apps are INSTANCES of target types (a brand can have `website` + `website-docs`, both `targets.web`); config `targets` names the type, the folder names the instance.
-5. **New wire names** — propose: route prefix **`/omega`**, function names **`omega_*`**, runtime-config key **`omega`**, env prefix **`OMEGA_*`**.
-6. **Zod for route schemas** — recommend YES (universally known, typed, composable; path- and plan-conditional shaping preserved via schema-builder functions). Account schema engine STAYS (golden-mastered, proven); revisit later.
-7. **Pricing from config** — YES per your note.
-8. **Default pages mechanism** — recommend keep virtual templates (zero files in consumer = zero clutter) + add **`omega eject <page>`** to materialize any default page as a real consumer file when wanted — your "import stub" instinct as an opt-in instead of the default.
-9. **Config stays local/git SSOT** — recommend NO Firebase config store; "manage from anywhere" arrives later via the git-backed CMS (L3); avoids the runtime-fetch latency you flagged (pricing page) and config split-brain.
-10. **Classy redesign timing** — recommend: dogfood scaffolds on current classy first (proves plumbing), then C2 → C3 land and the dogfood site re-skins into the showcase.
-11. **Assets layout** — brand-root `assets/` SSOT, per-target derived outputs (manager dispersal): ok?
+1. ✅ **Scope = `@omega.js`**; GH org `Omega-JS-Stack` (from the dump). Zero npm publishes still standing — versions not finalized.
+2. ✅ **Bins**: every framework ships `omega` + `omg` (docs flip to `npx omega`), `mgr` kept as supported alias; context-aware dispatch so the bin resolves the framework owning the cwd's app in brand monorepos.
+3. ✅ **`window.webManager` → `window.omega`**.
+4. ⏳ **OPEN — `apps/` vs `targets/`.** Ian: "couldn't we also achieve this if it was named targets?" Answer: mechanically yes (glob + discovery rename, cheap right now) — but then the word `targets` means TWO different things: in config, `targets.web` names a TYPE from a fixed vocabulary of five; on disk, `targets/website-docs/` would name an INSTANCE with an arbitrary name. The visual match is a false friend (`targets/website/`'s config section is `targets.web`, NOT `targets.website`). `apps/` keeps one meaning per word — "apps are instances of targets" — and matches the layout every monorepo consumer already knows (Turborepo/Nx/npm-docs `apps/*`). Recommendation stands: **`apps/`**. Ian's call pending.
+5. ✅ **Wire names**: route prefix `/omega`, function names `omega_*`, runtime-config key `omega`, env prefix `OMEGA_*`.
+6. ✅ **Zod for route schemas** (path- and plan-conditional shaping via schema-builder functions); account schema engine stays as-is (golden-mastered).
+7. ✅ **Pricing/plans read from omega.json5** (`payment.products`); the pricing-frontmatter dispersal dies.
+8. ✅ **Default pages stay virtual — NO eject command** (Ian: "we dont need a command for this"): taking over a page = create the same-URL file in the consumer; the existing override mechanism is the whole story. Docs point at the default-page sources for copy-paste.
+9. ✅ **No Firebase config store — git stays the config SSOT — BUT designed for two future clients** (standing design principle):
+   - a **hosted company omega** — the company instance running on a server, not a laptop;
+   - a **layperson CMS** — no files on a hard drive: website editor + config editor served from the site's `/admin`.
+   Both ride the SAME plumbing rather than a second store: all reads through `@omega.js/config` loadConfig (single choke point), all writes through the comment-preserving writeback editor (cp59), storage = git commits, rebuild = CI/server on push. Nothing in the architecture may assume a human with a local checkout.
+10. ✅ **Classy redesign timing**: dogfood scaffolds on current classy → blueprint/pricing rethink (C2) → redesign (C3). **Merged requirement (Ian): the redesigned theme system is CROSS-TARGET from day one** — core omega css/js shared by web/desktop/extension, brand-specific layers on top; universal `theme.id` in shared config (already there — stays); consumer themes must be SUPER easy to make, and default pages (/account, /signin, …) automatically match the theme's look. (This absorbs C4's theme bullet.)
+11. ✅ **Assets root-first**: brand-root `assets/` = SSOT (logos, icons, og images, fonts); manager derives per-target outputs into each app; app-local assets only for genuinely app-specific extras. Principle: shared-by-default at root, local only when truly local.
 
 ### E. LATER (post-dogfood backlog, roughly ordered)
 
