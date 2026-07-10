@@ -13,6 +13,7 @@
 - **Single brand OR company-of-brands** — designed in from day one (COMPANY → BRAND → APPS; one engine, two modes). Onboarding wizard exists (`onboard` cp58 + service flows cp60, tested against fixtures) — but the real-world proof + the cloud-setup walkthrough (API keys, env vars, Google Cloud consoles) is the queued template work (C1). Honest status: architecture yes, first-run product polish not yet.
 - **Config: what we decided** — one shape everywhere: `config/omega.json5` at brand root (shared values) + `apps/<app>/config/omega.json5` (target section + any-key overrides). Cascade: `framework defaults ← company ← brand shared ← brand targets.<type> ← app shared ← app targets.<type>` — exactly your defaults > company > brand > target want. Company config lives in the company workspace (your omega-manager instance). **Assets**: brand-root `assets/` as SSOT, manager disperses/derives per target — confirm during dogfood (D11).
 - **Shared JS lib across targets** — `@omega.js/client` IS that lib (already the runtime singleton in web/desktop/extension). Theme sharing across targets = C4.
+- **Per-target config values (sentry, analytics, …)** — ✅ confirmed exists (your `# more` question): the cascade overlays `targets.<type>` onto the shared namespace at both the brand and app layers — "a per-surface sentry.dsn or analytics id is just `targets.<type>.sentry.dsn`" ([packages/config/src/load.js](../packages/config/src/load.js)).
 - **Token signin for manual testing** — exists (web auth signin-with-token); N6 formalizes it into personas.
 - **Tests today** — framework suites are real (devkit 120, manager 564, web 52, client 77, extension 93, desktop 758, backend corpus ~1,252 + cross-stack signup/signin/subscription e2e in CI). Your gaps are real gaps: lifecycle flows (cancel/refund/export/delete), persona accounts, consumer-authorable brand tests → N6.
 - **Sandbox brand vs dogfood for global e2e** — both: sandbox = CI-grade harness (already boots emulator + built site together and waits); dogfood adds desktop+extension to the matrix. Harness only tests targets present in the brand (app discovery drives it).
@@ -53,6 +54,8 @@
 10. ✅ **Classy redesign timing**: dogfood scaffolds on current classy → blueprint/pricing rethink (C2) → redesign (C3). **Merged requirement (Ian): the redesigned theme system is CROSS-TARGET from day one** — core omega css/js shared by web/desktop/extension, brand-specific layers on top; universal `theme.id` in shared config (already there — stays); consumer themes must be SUPER easy to make, and default pages (/account, /signin, …) automatically match the theme's look. (This absorbs C4's theme bullet.)
 11. ✅ **Assets root-first**: brand-root `assets/` = SSOT (logos, icons, og images, fonts); manager derives per-target outputs into each app; app-local assets only for genuinely app-specific extras. Principle: shared-by-default at root, local only when truly local. **Addendum (Ian 2026-07-10):** the assets are SCAFFOLDED at onboarding (placeholders/templates at brand root) and stay MANAGED by the omega system — the manager's assets service re-derives per-target outputs idempotently on every run, not a one-time copy.
 
+12. ✅ **Provider-discriminated config keys** (added post-decide — Ian 2026-07-10, `# more`): keys that name a ROLE with a `provider` discriminator instead of provider-named top-levels — e.g. `firebaseConfig` becomes `<role>: { provider: 'firebase', … }` — so a consumer could someday switch (supabase etc.) without a config-shape break. NO alternative providers actually built now; shape-only future-proofing. Exact key names land in N4's config review (cheap pre-dogfood, expensive after brands migrate).
+
 ### E. LATER (post-dogfood backlog, roughly ordered)
 
 - **L1. /admin + /dashboard overhaul** — admin = manage the business (firestore data, subscriber counts, revenue; plan editing = admin edits config → git → CI redeploy for now; a real-time remote-config layer only if genuinely needed later); dashboard = kickass layout shell, minimal default content (every app differs).
@@ -65,6 +68,7 @@
 - **L8. Workspace setup service** — emails, filters, aliases, pfp, signatures.
 - **L9. Per-consumer migration guides** — Phase 4 material (pinned with it).
 - **L10. Monetization** — shipfa.st-style "launch a business" positioning; possibly private distribution instead of public npm → publishes stay gated (already standing); decide before first publish, no architectural blocker either way.
+- **L11. Churn retention / cancel-flow save offers** (Ian 2026-07-10, `# more`) — cancelling during a free trial warns "your trial will be cancelled"; cancel attempts get a stay-and-continue offer (e.g. 50% off next month, coupon-backed). Lands with L2's payment review + C3's account/billing UI.
 
 ---
 
@@ -197,3 +201,16 @@ Basically, we want ALL OF THE BS PARTS OF A SAAS PLATFORM TO BE HABDLED BY OMEGA
 * maybe if we generate html fo rht enewsletter that is already using beehiiv classes/styles, we can actually use html blocks? we could just generate each block? idk?
 * BEM call to get current usage so it can always be displayed (like on studymonkey)
 * setup workspace + filters, aliases, emails, pfp, signatures, etc
+
+
+# more
+> (triaged 2026-07-10 → per-target answer in A, provider keys = D12, churn retention = L11)
+
+better churn retention
+* popup if cancelling during free trial (trial will be canceld)
+* stay and continue for 50% off your next month
+
+options
+* maybe have options for providers for things in case the consuemr wants to switch?
+  * instaed of things lie firebaseConfig being toplevel, maybe have "something".provider = 'firebase'? "something" is the name for whatever firebase is (alternatives would be supabase, etc, but we would nto support that yet at all, just leaving the otpion open for later?)
+  * also did we make it so tht we can have different config values per target like sentry, analytics, etc? i think we did but just checking.

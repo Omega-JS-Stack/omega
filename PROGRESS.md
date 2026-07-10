@@ -5,7 +5,7 @@
 - N3 wire/env harmonization (cp72) — route prefix `/omega`, functions `omega_*`, runtime-config key `omega`, env `OMEGA_*`; CI runs 2–3 verifying in background
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. N4 migrated-code architecture sweep (DRY/SSOT review of packages/*) + zod route schemas (data shapes + route semantics preserved)
+1. N4 migrated-code architecture sweep (DRY/SSOT review of packages/*) + zod route schemas (data shapes + route semantics preserved) + provider-discriminated config keys (D12)
 2. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
 3. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
 4. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002)
@@ -23,7 +23,7 @@
 - **Orgs claimed + locked (Ian 2026-07-10)**: npm org `omega.js` and GH org `Omega-JS-Stack` are Ian's — names are final. GH org is empty; full control granted to create repos/push/try things. npm publishes REMAIN gated (versions not finalized).
 - **Data-shape preservation (Ian 2026-07-10)**: existing Firestore shapes (`users/{uid}`, payment orders, …) + backend route semantics are presumed good. Any breaking change that would require migrating existing data needs Ian's explicit OK — flag with a migration plan, don't build.
 - Core-changes spec: [plans/omega-core-changes-inbox.md](plans/omega-core-changes-inbox.md) (DECIDED 10/10, 2026-07-10) is binding alongside the master plan; classy/CMS/admin arcs build systems/extensibility first — visuals are the easy part (Ian).
-- Existing repos (omega-manager, all framework + consumer repos) are READ-ONLY — all work happens in this monorepo; old-name releases publish FROM the monorepo copies.
+- Existing repos (omega-manager, all framework + consumer repos) are READ-ONLY — all work happens in this monorepo; old-name releases publish from the LEGACY repos (monorepo pre-rename tags are backup).
 - Live checks NEVER touch real ITW repos/resources — not even read-only probes; sandbox/fixture resources only, creds scrubbed (`env -u`).
 - No backwards compat (Ian 2026-07-06: dual-read cancelled) — implement + document the new way only.
 - Checkpoint discipline (structure unchanged): survey (read-only) → design (de-ITW, non-interactive, .env creds, dry-run) → implement → tests → sandbox/fixture proof → docs → commit.
@@ -41,7 +41,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 71 Great Rename — `@omega.js` scope everywhere (650 files; lockfiles regenerated, dists re-vendored, regex gates escaped); universal `omega`/`omg`/`mgr` dispatcher bins (devkit 1.2.0, hoist-winner-proof, bootstrap fallback, live cross-dispatch proof); `window.omega` identifier sweep (127 files; migrate-codemod collision caught + repaired by fixture tests); docs flip to `npx omega`; 10 suites + pack-smoke ×4 green (this commit) → CHANGELOG
+- [x] 71 Great Rename — `@omega.js` scope everywhere (650 files; lockfiles regenerated, dists re-vendored, regex gates escaped); universal `omega`/`omg`/`mgr` dispatcher bins (devkit 1.2.0, hoist-winner-proof, bootstrap fallback, live cross-dispatch proof); `window.webManager` → `window.omega` sweep (127 files; migrate-codemod collision caught + repaired by fixture tests); docs flip to `npx omega`; 10 suites + pack-smoke ×4 green (this commit) → CHANGELOG
 - [x] 70 core-changes graduation + N1 re-sync + first real CI — inbox DECIDED 10/10 binding, queue = N1–N7 + dogfood, continuous mode ON; repo live at github.com/Omega-JS-Stack/omega; sweep verdict: monorepo is a superset of ALL legacy repos (one gap: 9 UJM redirect shortlinks → web 0.2.1); desktop webpack `global` fix (2.0.2) + CI env fixes (firebase-tools, puppeteer) (this commit) → CHANGELOG
 - [x] 69 local-linking DX (plan §8) — devkit/local + concurrent root `npm start` + `omega dev --local` + `mgr i local` ×3 (desktop/extension were broken since their renames); vendor fix: published runtime deps (client) never vendored; live proofs + 7 suites + pack-smoke ×4 (this commit) → CHANGELOG + docs/local-dev.md
 - [x] 68 @omega.js/client cutover (local) — FINAL Phase-3 rename, every package @omega.js-named: 5.0.0, v4.3.5–4.3.6 folded, module-field finding resolved, 5 suites + e2e + pack-smoke green (cc01c38) → CHANGELOG
