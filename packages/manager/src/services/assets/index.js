@@ -1,27 +1,37 @@
 /**
  * Assets service — the brand's derived visual collateral generated from
- * its logo sources, entirely local (no external API): wordmark/combomark
- * SVGs from the brandmark + brand.font, color/black SVG variants + PNG
- * size ladders, macOS/Windows app icons, social profile icons, and the
- * web favicon set.
+ * its logo sources: wordmark/combomark SVGs from the brandmark +
+ * brand.font, color/black SVG variants + PNG size ladders, PSD templates
+ * (seeded from the company root, logo/text layers refreshed, PNGs
+ * exported), macOS/Windows app icons, social profile icons, and the web
+ * favicon set.
  *
- * Sources are committed brand collateral at `assets/logo/*.svg` in the
- * brand repo (omega-manager read `.brands/{id}/assets/`); derived files
- * land in the gitignored `.omega/assets/` (omega-manager's
- * `.output/{id}/assets/`). Every operation is mtime-diffed — only missing
- * or stale outputs regenerate — which replaces omega-manager's
- * `--onboarding` gate on the write operations (it regenerated blindly, so
- * running every time was too expensive; it also had no dry-run guard).
+ * Sources are committed brand collateral at `assets/logo/*.svg` and
+ * `assets/templates/*.psd` in the brand repo (omega-manager read
+ * `.brands/{id}/assets/`); derived files land in the gitignored
+ * `.omega/assets/` (omega-manager's `.output/{id}/assets/`). Every
+ * operation is mtime-diffed — only missing or stale outputs regenerate —
+ * which replaces omega-manager's `--onboarding` gate on the write
+ * operations (it regenerated blindly, so running every time was too
+ * expensive; it also had no dry-run guard).
  *
- * Not ported here: the MrLogo AI brandmark generation (needs the company's
- * MrLogo admin token; a missing brandmark is a clean skip with guidance)
- * and the PSD template operations (templates / social-images / store-images
- * — need ag-psd + node-canvas and the company's binary PSD templates). Both
- * wait on those company binaries/tokens — queued with the extension port.
+ * The brandmark is the root of every derived asset. When it's missing,
+ * interactive runs offer the AI generation flow (lib/brandmark-api.js —
+ * configured via `assets.brandmark`, de-ITW'd from omega-manager's
+ * hardcoded MrLogo constants); otherwise the service skips with
+ * guidance. Not ported: omega-manager's social-images/store-images
+ * write operations — dead code whose template-name lists never matched
+ * TEMPLATE_CONFIG keys (they could never generate anything); their
+ * intended outputs are the templates operation's og-image and
+ * store/chrome exports.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
+const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { input, isInteractive } = require('@omegajs/devkit/prompt');
+const { withSpinner } = require('@omegajs/devkit/flows');
+const { resolveBrandmarkSpec, resolveLogoApiToken, generateBrandmark } = require('./lib/brandmark-api.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -35,9 +45,25 @@ module.exports.run = createServiceRunner({
     const logoDir = join(context.brandRoot, 'assets', 'logo');
     const brandmarkPath = join(logoDir, 'brandmark.svg');
 
-    // The brandmark is the root of every derived asset
+    // The brandmark is the root of every derived asset — offer the AI
+    // generation flow before giving up on a brand that has none yet
     if (!jetpack.exists(brandmarkPath)) {
-      return { skip: true, reason: 'no assets/logo/brandmark.svg in the brand repo (add the brand\'s logo source — the AI logo-generation flow is parked: it needs the company MrLogo admin token)' };
+      const spec = resolveBrandmarkSpec(context.brandConfig);
+
+      if (spec && isInteractive() && !context.options?.dryRun) {
+        try {
+          const direction = (await input({ message: 'Logo prompt (press Enter to skip):', default: '' })).trim();
+          const token = await resolveLogoApiToken(spec, context.brandRoot);
+          await withSpinner('Generating brandmark via the logo API', () =>
+            generateBrandmark({ spec, brandConfig: context.brandConfig, brandmarkPath, direction, token }));
+        } catch (error) {
+          console.log(`    ${chalk.yellow('⚠')} Brandmark generation failed${chalk.dim(`: ${error.message}`)}`);
+        }
+      }
+
+      if (!jetpack.exists(brandmarkPath)) {
+        return { skip: true, reason: 'no assets/logo/brandmark.svg in the brand repo (add the brand\'s logo source, or configure assets.brandmark for the AI generation flow)' };
+      }
     }
 
     return {

@@ -1,0 +1,201 @@
+// ============================================
+// Custom Popup Component Override
+// ============================================
+
+// Import the default popup component styles first
+@use 'components/popup' as *;
+
+// ============================================
+// Omega Popup Styles
+// ============================================
+
+html, body {
+  width: 360px;
+  min-width: 360px;
+  height: 500px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bs-dark);
+}
+
+.omega-popup {
+  width: 100%;
+  height: 100%;
+  background: var(--bs-dark);
+  color: var(--bs-light);
+}
+
+.omega-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  flex-shrink: 0;
+}
+
+.omega-search {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+  font-size: 13px !important;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  &:focus {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    box-shadow: none !important;
+  }
+}
+
+.omega-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+
+  &.connected {
+    background: #4caf50;
+    box-shadow: 0 0 4px #4caf50;
+  }
+}
+
+.omega-results {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+  }
+}
+
+// Group headers
+.omega-brand-header {
+  padding: 8px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #a0a0ff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bs-dark);
+
+  &:not(:first-child) {
+    margin-top: 12px;
+  }
+}
+
+.omega-category-header {
+  padding: 4px 12px 2px;
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+// Separators
+.omega-separator {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 10px 12px;
+}
+
+// Result items
+.omega-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 12px 5px 20px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--bs-light);
+  border-left: 3px solid transparent;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--bs-light);
+    text-decoration: none;
+  }
+
+  &.selected {
+    background: rgba(102, 126, 234, 0.15);
+    border-left-color: #667eea;
+    color: var(--bs-light);
+    text-decoration: none;
+  }
+}
+
+.omega-item-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: #333;
+  flex-shrink: 0;
+}
+
+.omega-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.omega-item-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.omega-item-path {
+  font-size: 10px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+// Match highlighting
+.omega-highlight {
+  color: #ffd54f;
+  font-weight: 600;
+}
+
+// Hints bar
+.omega-hints {
+  flex-shrink: 0;
+  font-size: 10px;
+  background: var(--bs-dark);
+
+  kbd {
+    display: inline-block;
+    padding: 0 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 10px;
+    color: #777;
+  }
+}
+
+// Empty state
+.omega-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.omega-empty-icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+}

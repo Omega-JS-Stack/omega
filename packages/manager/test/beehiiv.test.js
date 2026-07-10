@@ -3,15 +3,21 @@
  * fake. Proves skip semantics, the converged zero-mutation no-op,
  * publication resolution (config/state verify, auto-match by name, the
  * manual-creation warn — publications have no create API), SSOT-driven
- * custom-field reconciliation diffed by display, the verify-only segments
- * operation (Beehiiv has no segment-create API — it can never mutate), the
+ * custom-field reconciliation diffed by display, the segments operation
+ * (Beehiiv has no segment-create API — the API side never mutates; the
+ * interactive extension-automation path is driven end-to-end over a fake
+ * TTY + a REAL ws client standing in for the extension, with the
+ * post-automation re-verify pinned to what the API reports), the
  * min-diff webhook patch, and the dry-run zero-mutation guarantee.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const net = require('node:net');
+const WebSocket = require('ws');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { fieldsFor, segmentsFor } = require('../src/lib/bem-marketing.js');
+const { openTtyPrompt } = require('./lib/interactive.js');
 const service = require('../src/services/beehiiv/index.js');
 
 // Tests must never see real credentials from the shell environment
@@ -260,6 +266,128 @@ test('beehiiv: missing segments warn with instructions and NEVER mutate', async 
   assert.deepEqual(api.mutations(), []);
 });
 
+/** Ephemeral port for the automation server (parallel-safe). */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.listen(0, () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+    srv.on('error', reject);
+  });
+}
+
+/**
+ * A fake extension: retries until the AutomationClient's server is up,
+ * then answers every OMEGA_AUTOMATE with a success whose value satisfies
+ * all the automation's clicked/typed gates. Records the command stream.
+ */
+function startFakeExtension(port) {
+  const commands = [];
+  let ws = null;
+  let stopped = false;
+
+  const tryConnect = () => {
+    if (stopped) return;
+    ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    ws.on('error', () => setTimeout(tryConnect, 25));
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data.toString());
+      commands.push(msg);
+      ws.send(JSON.stringify({
+        type: 'OMEGA_AUTOMATE_RESULT',
+        id: msg.id,
+        success: true,
+        result: { value: { clicked: true, typed: true, focused: true } },
+      }));
+    });
+  };
+  tryConnect();
+
+  return { commands, stop: () => { stopped = true; ws?.terminate(); } };
+}
+
+test('beehiiv: interactive Skip choice leaves the segments warned', async () => {
+  const list = convergedResponses().getSegments;
+  const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) });
+
+  const tty = openTtyPrompt();
+  try {
+    const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+    await tty.answer('Create missing segments?', '[B[B\r'); // ↓↓ to "Skip"
+    const result = await running;
+
+    assert.equal(result.status, 'warned');
+    assert.deepEqual(result.output.segments.missing, [BEEHIIV_SEGMENTS[0].name]);
+    assert.deepEqual(api.mutations(), []);
+  } finally {
+    tty.close();
+  }
+});
+
+test('beehiiv: extension automation creates the missing segment and the re-verify confirms it', async () => {
+  const full = convergedResponses().getSegments;
+  let segmentsCalls = 0;
+  const api = fakeBeehiiv({
+    ...convergedResponses(),
+    // First list: one missing. After the automation "created" it in the
+    // dashboard, Beehiiv reports the full set.
+    getSegments: () => (segmentsCalls++ === 0 ? full.slice(1) : full),
+  });
+
+  const port = await freePort();
+  process.env.OMEGA_EXTENSION_PORT = String(port);
+  const ext = startFakeExtension(port);
+
+  const tty = openTtyPrompt();
+  try {
+    const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+    await tty.answer('Create missing segments?', '\r');   // default: Automate via extension
+    await tty.answer('Open browser now?', 'n\r');         // dashboard already open — decline
+    const result = await running;
+
+    assert.equal(result.status, 'success');
+    assert.deepEqual(result.output.segments.missing, []);
+    assert.deepEqual(result.output.segments.created, [BEEHIIV_SEGMENTS[0].name]);
+
+    // The automation drove the real protocol: navigation to the segment
+    // builder, the trusted-typed name, and the save click
+    assert.equal(ext.commands[0].command, 'navigate');
+    assert.equal(ext.commands[0].params.url, 'https://app.beehiiv.com/segments/new');
+    const typed = ext.commands.find((c) => c.command === 'type');
+    assert.equal(typed.params.text, BEEHIIV_SEGMENTS[0].name);
+    assert.ok(ext.commands.some((c) => c.command === 'evaluate' && c.params.expression.includes('save segment')));
+
+    // Still zero Beehiiv API writes — creation happened in the browser
+    assert.deepEqual(api.mutations(), []);
+  } finally {
+    tty.close();
+    ext.stop();
+    delete process.env.OMEGA_EXTENSION_PORT;
+  }
+});
+
+test('beehiiv: manual choice re-verifies — still-missing segments stay warned', async () => {
+  const list = convergedResponses().getSegments;
+  const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) }); // never created
+
+  const tty = openTtyPrompt();
+  try {
+    const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
+    await tty.answer('Create missing segments?', '[B\r'); // ↓ to "Open dashboard (manual)"
+    await tty.answer('Open browser now?', 'n\r');
+    const result = await running;
+
+    assert.equal(result.status, 'warned');
+    assert.deepEqual(result.output.segments.missing, [BEEHIIV_SEGMENTS[0].name]);
+    assert.equal(result.output.segments.created, undefined);
+    assert.equal(api.callsTo('getSegments').length, 2); // verified again after the manual window
+  } finally {
+    tty.close();
+  }
+});
+
 // ─── webhook ─────────────────────────────────────────────────────────────────
 
 test('beehiiv: webhook drift is patched with the minimum diff (matched by managed description)', async () => {
@@ -334,7 +462,6 @@ test('beehiiv: dry-run on a fully drifted brand performs zero mutations', async 
 // ─── Interactive create-publication flow (browser open + poll) ────────────────
 
 const { setBrowserOpener } = require('@omegajs/devkit/flows');
-const { openTtyPrompt } = require('./lib/interactive.js');
 
 test('publication: interactive run opens the create page and polls until the new publication auto-matches', async () => {
   const api = fakeBeehiiv(convergedResponses());

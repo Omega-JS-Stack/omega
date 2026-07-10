@@ -154,9 +154,9 @@ function convergedUser(id = 'uid-1') {
 
 // ─── Registry / sentinel / lib units ─────────────────────────────────────────
 
-test('migrations: registered after account, before testing, with notifications then users', () => {
+test('migrations: registered after account, before bookmark, with notifications then users', () => {
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('account') + 1], 'migrations');
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('migrations') + 1], 'testing');
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('migrations') + 1], 'bookmark');
   assert.deepEqual(OPERATIONS.migrations.map((o) => o.name), ['notifications', 'users']);
 });
 

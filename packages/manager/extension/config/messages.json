@@ -1,0 +1,18 @@
+{
+  appName: {
+    message: 'Omega Manager',
+    description: 'The name of the extension.',
+  },
+  appNameShort: {
+    message: 'Omega',
+    description: 'The short name of the extension.',
+  },
+  appDescription: {
+    message: 'Brand management bookmarks, automation, and more.',
+    description: 'The description of the extension.',
+  },
+  btnTooltip: {
+    message: 'Omega Manager',
+    description: 'Tooltip for the button.',
+  },
+}

@@ -21,7 +21,9 @@
   "dependencies": {
     "@omegajs/config": "*",
     "@omegajs/devkit": "*",
+    "ag-psd": "^31.0.2",
     "backend-manager": "*",
+    "canvas": "^3.2.3",
     "chalk": "^5.6.2",
     "dotenv": "^17.4.2",
     "fs-jetpack": "^5.1.0",
@@ -31,6 +33,7 @@
     "psl": "^1.15.0",
     "sharp": "^0.35.3",
     "stripe": "^22.3.0",
+    "ws": "^8.21.0",
     "yargs": "^18.0.0"
   },
   "engines": {

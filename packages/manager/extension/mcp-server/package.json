@@ -1,0 +1,11 @@
+{
+  "name": "omega-extension-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Omega Manager browser extension automation",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.18.0"
+  }
+}

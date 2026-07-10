@@ -1,0 +1,28 @@
+<div class="omega-popup d-flex flex-column">
+  <!-- Header with search -->
+  <div class="omega-header px-3 py-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-semibold text-white small">Omega Manager</span>
+      <span class="omega-status-dot" id="status-dot" title="Disconnected"></span>
+    </div>
+    <input
+      type="text"
+      class="form-control form-control-sm omega-search"
+      id="search-input"
+      placeholder="Search bookmarks... (e.g. bink cloud)"
+      autofocus
+    >
+  </div>
+
+  <!-- Results -->
+  <div class="omega-results flex-grow-1 overflow-auto" id="results">
+    <div class="text-center text-muted p-4">Loading...</div>
+  </div>
+
+  <!-- Keyboard hints -->
+  <div class="omega-hints d-flex gap-3 px-2 py-1 border-top border-dark">
+    <small class="text-muted"><kbd>&uarr;</kbd><kbd>&darr;</kbd> Navigate</small>
+    <small class="text-muted"><kbd>Enter</kbd> Open</small>
+    <small class="text-muted"><kbd>Esc</kbd> Clear</small>
+  </div>
+</div>

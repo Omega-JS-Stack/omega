@@ -95,9 +95,10 @@ function stageFont(root) {
 
 // ─── Registry / defaults pins ────────────────────────────────────────────────
 
-test('assets: registered after server with the five ported operations', () => {
+test('assets: registered after server with the six operations in dependency order', () => {
   assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('server') + 1], 'assets');
-  assert.deepEqual(OPERATIONS.assets.map((o) => o.name), ['logo-gen', 'process', 'icons', 'social-icons', 'favicons']);
+  // templates before icons — icons prefers the composited icon.png it makes
+  assert.deepEqual(OPERATIONS.assets.map((o) => o.name), ['logo-gen', 'process', 'templates', 'icons', 'social-icons', 'favicons']);
 });
 
 test('assets: defaults are enabled-only', () => {
@@ -337,4 +338,294 @@ test('svg-to-black: fills, strokes, style values, and defs all go black', () => 
   // none is a deliberate absence, not a color
   assert.ok(black.includes('fill="none" stroke="none"'));
   assert.ok(!black.includes('ff0000') && !black.includes('00ff00'));
+});
+
+// ─── PSD templates (seed from the company + layer replacement + exports) ─────
+
+const { readPsd, writePsdBuffer, initializeCanvas } = require('ag-psd');
+const { createCanvas } = require('canvas');
+const { TEMPLATE_CONFIG } = require('../src/services/assets/lib/assets-config.js');
+
+initializeCanvas(createCanvas);
+
+function filledCanvas(w, h, color) {
+  const c = createCanvas(w, h);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, w, h);
+  return c;
+}
+
+/** A fixture PSD in the template layer convention (Main/Logo/Logo + optional text layers). */
+function fixturePsd(width, height, { textLayers = [] } = {}) {
+  return writePsdBuffer({
+    width,
+    height,
+    children: [
+      { name: 'Background', canvas: filledCanvas(width, height, '#ffffff'), left: 0, top: 0 },
+      {
+        name: 'Main',
+        children: [
+          {
+            name: 'Logo',
+            children: [
+              { name: 'Logo', canvas: filledCanvas(200, 200, '#00ff00'), left: 100, top: 100 },
+            ],
+          },
+          ...(textLayers.length > 0 ? [{
+            name: 'Text',
+            children: textLayers.map((name, i) => ({
+              name,
+              canvas: filledCanvas(300, 60, '#0000ff'),
+              left: 50,
+              top: 400 + i * 80,
+              text: { text: 'PLACEHOLDER', style: { fontSize: 48 } },
+            })),
+          }] : []),
+        ],
+      },
+    ],
+  });
+}
+
+/** A company root with templates + the marker stamped into the brand. */
+function stageCompany(brandRoot, templates) {
+  const companyRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-assets-company-'));
+  fs.mkdirSync(path.join(companyRoot, 'config'));
+  fs.writeFileSync(path.join(companyRoot, 'config', 'omega.json5'), '{ brands: { roots: ["./brands"] } }');
+  fs.mkdirSync(path.join(companyRoot, 'assets', 'templates'), { recursive: true });
+  for (const [name, buffer] of Object.entries(templates)) {
+    fs.writeFileSync(path.join(companyRoot, 'assets', 'templates', `${name}.psd`), buffer);
+  }
+  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+  return companyRoot;
+}
+
+function readBrandPsd(root, name) {
+  return readPsd(fs.readFileSync(path.join(root, 'assets', 'templates', `${name}.psd`)));
+}
+
+test('templates: seeded from the company, logo layer re-rastered, PNG exported, icons consume the composite', async () => {
+  const root = stageBrand();
+  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+
+  const result = await runService(root, brandConfig());
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.templates.seeded, 1);
+  assert.equal(result.output.templates.processed, 1);
+  assert.equal(result.output.templates.missing.length, Object.keys(TEMPLATE_CONFIG).length - 1);
+
+  // The seeded PSD is now brand collateral with the brandmark in its logo layer
+  const psd = readBrandPsd(root, 'app-macos-icon');
+  const logo = psd.children.find((l) => l.name === 'Main')
+    .children.find((l) => l.name === 'Logo').children[0];
+  const logoSize = Math.floor(0.575 * 1024);
+  assert.equal(logo.canvas.width, logoSize);
+  assert.equal(logo.canvas.height, logoSize);
+  // Centered inside the configured bounds — not the fixture's 100,100
+  assert.ok(logo.left > 79 && logo.top > 90, `logo at ${logo.left},${logo.top}`);
+  // The re-raster carries the brandmark's red, not the fixture's green
+  const px = logo.canvas.getContext('2d').getImageData(logoSize / 2, logoSize / 2, 1, 1).data;
+  assert.ok(px[0] > 200 && px[1] < 100, `center pixel rgb(${px[0]},${px[1]},${px[2]})`);
+
+  // The export composite exists at template dimensions
+  const iconPng = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
+  assert.ok(fs.existsSync(iconPng));
+  const sharp = require('sharp');
+  const meta = await sharp(iconPng).metadata();
+  assert.equal(meta.width, 1024);
+  assert.equal(meta.height, 1024);
+
+  // The icons op ran AFTER templates and used the composited icon.png
+  // (its .icns must be newer than the composite it derives from)
+  const icns = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.icns');
+  assert.ok(fs.statSync(icns).mtimeMs >= fs.statSync(iconPng).mtimeMs);
+});
+
+test('templates: text layers take brandConfig values and overflow shrinks the font', async () => {
+  const root = stageBrand();
+  stageCompany(root, {
+    'social-og-image': fixturePsd(1200, 630, { textLayers: ['Brand Name', 'Brand Tagline'] }),
+  });
+
+  const config = brandConfig();
+  config.brand.tagline = 'A very long fixture tagline that cannot possibly fit inside seventy percent of the canvas width without shrinking quite a lot first';
+
+  const result = await runService(root, config);
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.templates.processed, 1);
+
+  const psd = readBrandPsd(root, 'social-og-image');
+  const textFolder = psd.children.find((l) => l.name === 'Main').children.find((l) => l.name === 'Text');
+  const nameLayer = textFolder.children.find((l) => l.name === 'Brand Name');
+  const taglineLayer = textFolder.children.find((l) => l.name === 'Brand Tagline');
+
+  assert.equal(nameLayer.text.text, 'AB');
+  assert.equal(taglineLayer.text.text, config.brand.tagline);
+  // 'AB' fits at 48pt; the long tagline had to shrink
+  assert.equal(nameLayer.text.style.fontSize, 48);
+  assert.ok(taglineLayer.text.style.fontSize < 48, `tagline still ${taglineLayer.text.style.fontSize}pt`);
+
+  const meta = await require('sharp')(path.join(root, '.omega', 'assets', 'social', 'og-image.png')).metadata();
+  assert.equal(meta.width, 1200);
+  assert.equal(meta.height, 630);
+});
+
+test('templates: converged rerun is zero-work; a touched PSD reprocesses', async () => {
+  const root = stageBrand();
+  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+  await runService(root, brandConfig());
+
+  const psdPath = path.join(root, 'assets', 'templates', 'app-macos-icon.psd');
+  const pngPath = path.join(root, '.omega', 'assets', 'app', 'macos', 'icon.png');
+  const before = [fs.statSync(psdPath).mtimeMs, fs.statSync(pngPath).mtimeMs];
+
+  const rerun = await runService(root, brandConfig());
+  assert.equal(rerun.output.templates.processed, 0);
+  assert.equal(rerun.output.templates.seeded, 0);
+  assert.equal(rerun.output.templates.fresh, 1);
+  assert.deepEqual([fs.statSync(psdPath).mtimeMs, fs.statSync(pngPath).mtimeMs], before);
+
+  // A manual Photoshop edit (mtime bump) → the logo refresh + export rerun
+  const future = new Date(Date.now() + 5000);
+  fs.utimesSync(psdPath, future, future);
+  const touched = await runService(root, brandConfig());
+  assert.equal(touched.output.templates.processed, 1);
+  assert.ok(fs.statSync(pngPath).mtimeMs > before[1]);
+});
+
+test('templates: dry-run plans the seed + process and writes nothing', async () => {
+  const root = stageBrand();
+  stageCompany(root, { 'app-macos-icon': fixturePsd(1024, 1024) });
+
+  const result = await runService(root, brandConfig(), { options: { dryRun: true } });
+  assert.equal(result.status, 'success');
+  assert.deepEqual(result.output.templates.planned, ['app-macos-icon (seed + process)']);
+  assert.ok(!fs.existsSync(path.join(root, 'assets', 'templates')));
+  assert.deepEqual(derivedFiles(root), []);
+});
+
+test('templates: no PSDs anywhere is a quiet note, never a warn', async () => {
+  const root = stageBrand(); // no company marker, no brand templates
+  const result = await runService(root, brandConfig());
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.templates.missing.length, Object.keys(TEMPLATE_CONFIG).length);
+  assert.equal(result.output.templates.processed, 0);
+});
+
+// ─── AI brandmark generation (logo API) ──────────────────────────────────────
+
+const http = require('node:http');
+const { openTtyPrompt } = require('./lib/interactive.js');
+
+const GENERATED_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1d3557"/></svg>';
+
+/** A local logo API: POST /logos → mono SVG URL; GET /mono.svg → the SVG. */
+function startLogoApi() {
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      requests.push({ method: req.method, url: req.url, authorization: req.headers.authorization, body: body ? JSON.parse(body) : null });
+      if (req.method === 'POST' && req.url === '/logos') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ iteration: { files: { monoSvg: { url: `http://127.0.0.1:${server.address().port}/mono.svg` } } } }));
+      } else if (req.url === '/mono.svg') {
+        res.end(GENERATED_SVG);
+      } else {
+        res.statusCode = 404;
+        res.end('not found');
+      }
+    });
+  });
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve({ server, requests, url: `http://127.0.0.1:${server.address().port}/logos` }));
+  });
+}
+
+test('brandmark: interactive generation via the logo API roots the whole derived set', async () => {
+  const api = await startLogoApi();
+  const root = stageBrand({ brandmark: false });
+  const config = brandConfig({ assets: { brandmark: { apiUrl: api.url } } });
+  config.brand.description = 'A fixture brand';
+
+  process.env.LOGO_API_ID_TOKEN = 'test-token-123';
+  const tty = openTtyPrompt();
+  try {
+    const running = runService(root, config);
+    await tty.answer('Logo prompt', 'geometric fox\r');
+    const result = await running;
+
+    assert.equal(result.status, 'success');
+
+    // The generated SVG landed as committed brand collateral
+    assert.equal(fs.readFileSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), 'utf8'), GENERATED_SVG);
+
+    // The request carried the token + the brand identity + the typed direction
+    const post = api.requests.find((r) => r.method === 'POST');
+    assert.equal(post.authorization, 'Bearer test-token-123');
+    assert.equal(post.body.brandName, 'AB');
+    assert.equal(post.body.mode, 'brandmark');
+    assert.equal(post.body.description, 'A fixture brand. geometric fox');
+    assert.deepEqual(post.body.colors, ['#000000']);
+
+    // And the rest of the service derived from it in the same run
+    const colorSvg = fs.readFileSync(path.join(root, '.omega', 'assets', 'logo', 'brandmark', 'color-x.svg'), 'utf8');
+    assert.equal(colorSvg, GENERATED_SVG);
+  } finally {
+    tty.close();
+    delete process.env.LOGO_API_ID_TOKEN;
+    api.server.close();
+  }
+});
+
+test('brandmark: no resolvable token warns and the service skips with guidance — no API call', async () => {
+  const api = await startLogoApi();
+  const root = stageBrand({ brandmark: false });
+  // Spec without providerBrand/adminEmail and no LOGO_API_ID_TOKEN → nothing to mint with
+  const config = brandConfig({ assets: { brandmark: { apiUrl: api.url } } });
+
+  delete process.env.LOGO_API_ID_TOKEN;
+  const tty = openTtyPrompt();
+  try {
+    const running = runService(root, config);
+    await tty.answer('Logo prompt', '\r');
+    const result = await running;
+
+    assert.equal(result.status, 'skipped');
+    assert.match(result.reason, /brandmark\.svg/);
+    assert.equal(api.requests.length, 0);
+    assert.ok(!fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg')));
+  } finally {
+    tty.close();
+    api.server.close();
+  }
+});
+
+test('brandmark: non-interactive and dry runs never attempt generation', async () => {
+  const api = await startLogoApi();
+  process.env.LOGO_API_ID_TOKEN = 'test-token-123';
+  try {
+    // Headless: even with a token + spec, the skip guidance is the answer
+    const headless = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url } } }));
+    assert.equal(headless.status, 'skipped');
+    assert.match(headless.reason, /assets\.brandmark/);
+
+    // Dry run: interactive TTY, still no generation attempt
+    const tty = openTtyPrompt();
+    try {
+      const dry = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url } } }), { options: { dryRun: true } });
+      assert.equal(dry.status, 'skipped');
+    } finally {
+      tty.close();
+    }
+
+    assert.equal(api.requests.length, 0);
+  } finally {
+    delete process.env.LOGO_API_ID_TOKEN;
+    api.server.close();
+  }
 });

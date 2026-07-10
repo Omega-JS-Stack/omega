@@ -2,7 +2,7 @@
  * Generate the platform app-icon files — macOS `.icns` and Windows
  * `.ico` — into `.omega/assets/app/{platform}/`. The source is the
  * composited `icon.png` in that directory when present (produced by the
- * PSD templates operation when it ports), else the brandmark SVG.
+ * templates operation, which runs just before), else the brandmark SVG.
  * mtime-diffed against the chosen source.
  */
 const { join } = require('node:path');

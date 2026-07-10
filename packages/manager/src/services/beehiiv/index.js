@@ -1,10 +1,10 @@
 /**
  * Beehiiv service — the brand's newsletter publication: access verified (or
  * auto-matched by name), BEM's custom fields provisioned, BEM's segments
- * verified (Beehiiv has no segment-create API — missing ones get readable
- * instructions; the browser automation omega-manager drove through the
- * Chrome extension rides the extension port), and the publication
- * webhook pointed at the parent BEM's forwarder.
+ * ensured (Beehiiv has no segment-create API — missing ones get readable
+ * instructions, and interactive runs offer to create them by driving the
+ * dashboard UI through the companion Chrome extension), and the
+ * publication webhook pointed at the parent BEM's forwarder.
  *
  * Publications are created manually in the dashboard (no API) — the service
  * prints the exact values to copy when none matches.

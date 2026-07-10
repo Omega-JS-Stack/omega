@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="omega" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#ffd966"/>
+      <stop offset="100%" stop-color="#f4b942"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- Omega Symbol (Ω) - classic horseshoe arch with feet -->
+  <g fill="url(#omega)">
+    <path d="
+      M 262 720
+      L 262 650
+      L 345 650
+      C 270 560 238 460 238 385
+      C 238 230 350 140 512 140
+      C 674 140 786 230 786 385
+      C 786 460 754 560 679 650
+      L 762 650
+      L 762 720
+      L 555 720
+      L 555 650
+      L 625 650
+      C 685 565 710 485 710 385
+      C 710 270 628 205 512 205
+      C 396 205 314 270 314 385
+      C 314 485 339 565 399 650
+      L 469 650
+      L 469 720
+      Z
+    "/>
+  </g>
+
+  <!-- Four-Point Star inside the arch -->
+  <path d="
+    M 512 290
+    C 512 290 528 350 545 370
+    C 562 390 620 405 620 405
+    C 620 405 562 420 545 440
+    C 528 460 512 520 512 520
+    C 512 520 496 460 479 440
+    C 462 420 404 405 404 405
+    C 404 405 462 390 479 370
+    C 496 350 512 290 512 290 Z
+  " fill="#b8a9e8"/>
+</svg>

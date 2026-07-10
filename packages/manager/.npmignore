@@ -1,0 +1,4 @@
+# The companion Chrome extension is a standalone BXM consumer project —
+# developed and loaded unpacked from the repo, never shipped in the npm
+# package (it has its own deps + build; see extension/README.md).
+extension/

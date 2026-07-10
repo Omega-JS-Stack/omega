@@ -5,26 +5,20 @@
  * user choices (no .brands/ mirror), durable derived data lives in
  * .omega/state.json, and per-run transients in .omega/runs/{ts}.json.
  *
- * Services port over from omega-manager in stages. The full provisioning
- * order there is:
+ * omega-manager's full provisioning order is ported — every service in
  *
  *   github → cloudflare → domain → firebase → recaptcha → analytics →
  *   search-console → adsense → sendgrid → beehiiv → payment → slapform →
  *   chatsy → replyify → server → assets → certificates → seo → disperse →
  *   update → account → migrations → bookmark → testing
  *
- * Everything but `bookmark` is ported: the local trio that makes a brand
- * monorepo itself work — workspace (structure/config health), update
- * (install + build every app), testing (per-app local + live health
- * checks) — the external
- * provisioning services github, cloudflare, domain, firebase, recaptcha,
- * analytics, search-console, adsense, sendgrid, beehiiv, payment, slapform,
- * chatsy, replyify, server, assets, certificates, seo, account, and
- * migrations (--migration-gated Firestore data migrations), plus disperse
- * (the remnant: signing artifacts + composed app .env files — the config
- * dispersal itself dissolved into the omega.json5 hierarchy). Onboarding is
- * the `onboard` wizard and company mode rides runCompany; `bookmark` stays
- * parked with the extension port.
+ * now runs here, plus the workspace service (brand structure/config
+ * health) the monorepo world added. disperse is the remnant of its old
+ * self (signing artifacts + composed app .env files — the config
+ * dispersal dissolved into the omega.json5 hierarchy), and bookmark +
+ * the beehiiv segment automation talk to the companion Chrome extension
+ * in extension/ (the last piece, ported with it). Onboarding is the
+ * `onboard` wizard and company mode rides runCompany.
  */
 
 // =============================================================================
@@ -550,6 +544,7 @@ const SERVICE_ORDER = [
   'update',          // installs deps + builds every app
   'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
   'migrations',      // Firestore data migrations — only with --migration, after the deployed backend is current
+  'bookmark',        // brand bookmarks → the companion Chrome extension (interactive sessions only)
   'testing',         // health checks after everything else ran
 ];
 
@@ -677,7 +672,8 @@ const OPERATIONS = {
   assets: [
     { name: 'logo-gen', ensure: true },     // Wordmark + combomark from brandmark + brand.font (missing-only)
     { name: 'process', write: true },       // Color/black SVG variants + PNG size ladders per logo source
-    { name: 'icons', write: true },         // macOS .icns + Windows .ico app icons
+    { name: 'templates', write: true },     // Brand PSDs seeded from the company + logo/text layers refreshed + PNG exports
+    { name: 'icons', write: true },         // macOS .icns + Windows .ico app icons (composited icon.png when the templates op made one)
     { name: 'social-icons', write: true },  // Brandmark-on-white social profile icons
     { name: 'favicons', write: true },      // Web favicon set + site.webmanifest
   ],
@@ -709,6 +705,10 @@ const OPERATIONS = {
   migrations: [
     { name: 'notifications', ensure: true }, // uid→owner + metadata/context/attribution + validate schema
     { name: 'users', ensure: true },         // plan→subscription + BEM-schema backfill + orphan cleanup + validate
+  ],
+
+  bookmark: [
+    { name: 'sync', ensure: true },       // Push brand console/dashboard bookmarks to the companion Chrome extension
   ],
 
   testing: [
