@@ -8,7 +8,7 @@
  * scope instead of a render context.
  */
 import path from 'node:path';
-import templateKit from '@omegajs/template-kit';
+import templateKit from '@omega.js/template-kit';
 import { SPIKE } from './paths.mjs';
 import { getCollection, getCollectionNames } from './collections.mjs';
 

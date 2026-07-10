@@ -2,11 +2,11 @@
 
 ## Context
 
-Building @omegajs/desktop (@omegajs/desktop) — multi-platform Electron release framework. Currently testing on a consumer project end-to-end. Mac signing/notarizing/publishing works. Linux works. **Windows EV-token signing is the only blocker.**
+Building @omega.js/desktop (@omega.js/desktop) — multi-platform Electron release framework. Currently testing on a consumer project end-to-end. Mac signing/notarizing/publishing works. Linux works. **Windows EV-token signing is the only blocker.**
 
 ## Latest state
 
-- **@omegajs/desktop**: v1.2.15 published (npm + GH). v1.2.16 staged locally (just `.env.example` doc — never pushed yet).
+- **@omega.js/desktop**: v1.2.15 published (npm + GH). v1.2.16 staged locally (just `.env.example` doc — never pushed yet).
 - **Consumer current version**: `1.0.4`. Latest workflow run failed at the sign step.
 - **Self-hosted runner**: registered with consumer's GH org, service installed at `C:\actions-runners\actions-runner-<org>`, configured to run as the local user account (per install log).
 - **EV cert**: stored in `CurrentUser\My`, valid through 2027.
@@ -73,11 +73,11 @@ cd C:\actions-runners\actions-runner-<org>
 set WIN_EV_TOKEN_PATH=<thumbprint>
 set WIN_CSC_KEY_PASSWORD=<token-pin>
 set SIGNTOOL_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe
-npx mgr sign-windows --in <dir-with-unsigned-exe> --out <output-dir>
+npx omega sign-windows --in <dir-with-unsigned-exe> --out <output-dir>
 ```
 
 If that fails the same way, you've reproduced the issue locally — iterate
-without CI. Once it succeeds locally as the service user, push the @omegajs/desktop fix and
+without CI. Once it succeeds locally as the service user, push the @omega.js/desktop fix and
 trigger a real release run as the final verification.
 
 To reproduce the **service-context** specifically (vs. interactive shell), use
@@ -93,7 +93,7 @@ sc qc <full-service-name>
 ```
 (Find the service name with `sc query state= all | findstr actions.runner`)
 
-Look for `SERVICE_START_NAME`. If it's `LocalSystem` or `NETWORK SERVICE`, @omegajs/desktop didn't apply the creds (despite saying it did) → bug to fix. If it's `.\<user>`, identity is right; problem is elsewhere.
+Look for `SERVICE_START_NAME`. If it's `LocalSystem` or `NETWORK SERVICE`, @omega.js/desktop didn't apply the creds (despite saying it did) → bug to fix. If it's `.\<user>`, identity is right; problem is elsewhere.
 
 **Test 2 — does signtool work interactively for the user**:
 ```cmd
@@ -122,20 +122,20 @@ Logs at `C:\actions-runners\actions-runner-<org>\_diag\Runner_*.log` and `Worker
 
 ## Useful paths
 
-- @omegajs/desktop source on Windows: `C:\Users\<user>\Documents\GitHub\ITW-Creative-Works\@omegajs/desktop`
+- @omega.js/desktop source on Windows: `C:\Users\<user>\Documents\GitHub\ITW-Creative-Works\@omega.js/desktop`
 - Runner installs: `C:\actions-runners\actions-runner-<org>\`
 - Runner diag logs: `C:\actions-runners\actions-runner-<org>\_diag\Runner_*.log`
-- `.env` on Windows @omegajs/desktop: should have `GH_TOKEN`, `EM_RUNNER_ORGS`, `WIN_RUNNER_LOGON_ACCOUNT`, `WIN_RUNNER_LOGON_PASSWORD`
+- `.env` on Windows @omega.js/desktop: should have `GH_TOKEN`, `EM_RUNNER_ORGS`, `WIN_RUNNER_LOGON_ACCOUNT`, `WIN_RUNNER_LOGON_PASSWORD`
 - `.env` on consumer project: should have everything for push-secrets (mac signing creds + windows EV creds)
 
-## @omegajs/desktop commands reference
+## @omega.js/desktop commands reference
 
-- `npx mgr runner install` — register + install service
-- `npx mgr runner status` — see service state
-- `npx mgr runner uninstall` — full teardown
-- `npx mgr runner set-credentials` — interactive prompt to save logon creds (DPAPI-encrypted)
-- `npx mgr sign-windows --in <dir> --out <dir>` — manually sign artifacts (used by workflow)
-- `npx mgr push-secrets` — push `.env` Default section keys to GH Actions secrets
+- `npx omega runner install` — register + install service
+- `npx omega runner status` — see service state
+- `npx omega runner uninstall` — full teardown
+- `npx omega runner set-credentials` — interactive prompt to save logon creds (DPAPI-encrypted)
+- `npx omega sign-windows --in <dir> --out <dir>` — manually sign artifacts (used by workflow)
+- `npx omega push-secrets` — push `.env` Default section keys to GH Actions secrets
 
 ## Pending TODOs (low priority)
 

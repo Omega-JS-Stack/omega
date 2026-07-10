@@ -8,7 +8,7 @@
  * the same SSOT the build uses, so the lists can't drift.
  */
 const { Liquid } = require('liquidjs');
-const { registerLiquid } = require('@omegajs/template-kit');
+const { registerLiquid } = require('@omega.js/template-kit');
 
 // Jekyll-only tags with no LiquidJS/engine equivalent — hard findings
 const JEKYLL_ONLY_TAGS = {

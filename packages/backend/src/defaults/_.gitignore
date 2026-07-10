@@ -44,7 +44,7 @@ node_modules/
 # dotenv environment variables file
 .env*
 
-# @omegajs/backend specific
+# @omega.js/backend specific
 .runtimeconfig.json
 service-account*.json
 omega-reload-trigger.js

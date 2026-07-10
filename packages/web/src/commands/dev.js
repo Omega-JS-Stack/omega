@@ -8,14 +8,14 @@
  *
  * `omega dev --port=4000` overrides the default port.
  *
- * `omega dev --local` first links every @omegajs framework the brand uses to
+ * `omega dev --local` first links every @omega.js framework the brand uses to
  * the local Omega monorepo (file: installs, idempotent) and starts the
  * monorepo's src→dist watch, then runs the normal dev loop (master plan §8).
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { buildAssets } = require('../assets.js');
 const { configureOmega } = require('../engine.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -103,15 +103,15 @@ module.exports = async function (options) {
 };
 
 /**
- * `--local` prelude: file:-install every @omegajs framework used anywhere in
+ * `--local` prelude: file:-install every @omega.js framework used anywhere in
  * this brand (all apps, walked up from cwd) from the local Omega monorepo,
  * then start the monorepo's src→dist watch as a session-scoped child.
  */
 async function linkBrandToMonorepo() {
-  const local = require('@omegajs/devkit/local');
+  const local = require('@omega.js/devkit/local');
   const monorepoRoot = local.resolveMonorepoRoot();
   const brandRoot = local.findBrandRoot(process.cwd());
-  logger.log(`Local mode: linking @omegajs packages from ${monorepoRoot}`);
+  logger.log(`Local mode: linking @omega.js packages from ${monorepoRoot}`);
 
   for (const appDir of local.discoverApps(brandRoot)) {
     await local.linkLocalPackages({ dir: appDir, monorepoRoot, logger });

@@ -4,7 +4,7 @@
  * .omega/asset-manifest.json for the dev config and post-build tooling.
  */
 const path = require('node:path');
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { resolveClientEntry } = require('../paths.js');

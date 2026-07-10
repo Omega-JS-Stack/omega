@@ -5,20 +5,20 @@
 The library exports a singleton `Manager` instance. Import it directly from any file — it's always the same initialized instance:
 
 ```javascript
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Same instance everywhere — config, auth, firestore, all ready
-webManager.auth().listen((state) => { ... });
-webManager.utilities().escapeHTML(untrustedText);
-webManager.config.environment; // 'development' or 'production'
+omega.auth().listen((state) => { ... });
+omega.utilities().escapeHTML(untrustedText);
+omega.config.environment; // 'development' or 'production'
 ```
 
-**Do NOT create new instances** (`new Manager()`). @omegajs/web, @omegajs/extension, and @omegajs/desktop initialize the singleton — every import gets that same object. Do NOT pass `webManager` through function params or store it in module-level variables — just import it.
+**Do NOT create new instances** (`new Manager()`). @omega.js/web, @omega.js/extension, and @omega.js/desktop initialize the singleton — every import gets that same object. Do NOT pass `omega` through function params or store it in module-level variables — just import it.
 
 ## Directory Structure
 
 ```
-@omegajs/client/
+@omega.js/client/
 ├── src/                       # Source code (ES6+)
 │   ├── index.js               # Manager class, initialization, Firebase setup
 │   └── modules/               # Feature modules
@@ -55,5 +55,5 @@ Manager (index.js)
 
 `initialize(config)` boots Firebase only when a usable web SDK config resolves:
 
-- `_resolveFirebaseConfig()` checks the flat `firebaseConfig` blob first (canonical shape — @omegajs/backend/@omegajs/extension/@omegajs/desktop), then the nested `firebase.app.config` (UJM yaml shape). A blob only counts when **at least one value is non-empty** — framework config merges (e.g. UJM's Jekyll chain) inject all-empty-string blobs into Firebase-less sites, and those resolve to `null` (no init, no URL derivation).
+- `_resolveFirebaseConfig()` checks the flat `firebaseConfig` blob first (canonical shape — @omega.js/backend/@omega.js/extension/@omega.js/desktop), then the nested `firebase.app.config` (UJM yaml shape). A blob only counts when **at least one value is non-empty** — framework config merges (e.g. UJM's Jekyll chain) inject all-empty-string blobs into Firebase-less sites, and those resolve to `null` (no init, no URL derivation).
 - Initialization additionally requires a **non-empty `apiKey`** — the SDK cannot boot without one (it crashes the page with `auth/invalid-api-key`). Configs carrying only `projectId`/`authDomain` still resolve so `getFunctionsUrl()`/`getApiUrl()` can derive URLs, but Firebase itself stays uninitialized and the console logs `[Firebase] Skipped: config has no apiKey ...` (same idiom as `[Analytics] Skipped:`).

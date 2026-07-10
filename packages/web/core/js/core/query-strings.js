@@ -1,9 +1,9 @@
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Query Strings Module
 export default function () {
   // Process query strings when DOM is ready
-  webManager.dom().ready().then(() => {
+  omega.dom().ready().then(() => {
     processQueryStrings();
   });
 
@@ -12,7 +12,7 @@ export default function () {
     const urlParams = new URLSearchParams(window.location.search);
 
     // Get current attribution data
-    const attribution = webManager.storage().get('attribution', {});
+    const attribution = omega.storage().get('attribution', {});
 
     // Process affiliate/referral parameters
     processAffiliateParams(urlParams, attribution);
@@ -22,7 +22,7 @@ export default function () {
 
     // Save updated attribution if anything changed
     if (Object.keys(attribution).length > 0) {
-      webManager.storage().set('attribution', attribution);
+      omega.storage().set('attribution', attribution);
     }
   }
 

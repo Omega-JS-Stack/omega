@@ -6,14 +6,14 @@ import { state, buildBindingsState, resolveProcessor, FREQUENCIES, getAvailableF
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from './modules/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let formManager = null;
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
     await initializeCheckout();
     return resolve();
   });
@@ -21,7 +21,7 @@ export default () => {
 
 // Update UI via bindings (single source of truth)
 function updateUI() {
-  webManager.bindings().update(buildBindingsState());
+  omega.bindings().update(buildBindingsState());
 }
 
 // Show fatal error and hide checkout content
@@ -32,7 +32,7 @@ function showError(message) {
 
 // Create/reset abandoned cart tracker in Firestore (fire-and-forget)
 function trackAbandonedCart(product, state) {
-  const user = webManager.auth().getUser();
+  const user = omega.auth().getUser();
   if (!user) {
     return;
   }
@@ -42,7 +42,7 @@ function trackAbandonedCart(product, state) {
   const nowISO = new Date().toISOString();
   const FIRST_REMINDER_DELAY = 900; // 15 minutes
 
-  webManager.firestore().doc(`payments-carts/${uid}`).set({
+  omega.firestore().doc(`payments-carts/${uid}`).set({
     id: uid,
     owner: uid,
     status: 'pending',
@@ -72,7 +72,7 @@ async function initializeCheckout() {
       throw new Error('Product ID is missing from URL.');
     }
 
-    // Read payment config from _config.yml (available instantly via webManager.config)
+    // Read payment config from _config.yml (available instantly via omega.config)
     state.processors = getProcessors();
 
     // Find product
@@ -83,7 +83,7 @@ async function initializeCheckout() {
     state.product = product;
 
     // Wait for auth state to settle before any authorized calls
-    await new Promise((resolve) => webManager.auth().listen({ once: true }, resolve));
+    await new Promise((resolve) => omega.auth().listen({ once: true }, resolve));
 
     // Fire-and-forget server warmup
     warmupServer();
@@ -91,7 +91,7 @@ async function initializeCheckout() {
     // Parallel fetch: trial eligibility + reCAPTCHA
     const [trialResult, recaptchaResult] = await Promise.allSettled([
       fetchTrialEligibility(),
-      initializeRecaptcha(webManager.config?.recaptcha?.['site-key']),
+      initializeRecaptcha(omega.config?.recaptcha?.['site-key']),
     ]);
 
     /* @dev-only:start */
@@ -119,7 +119,7 @@ async function initializeCheckout() {
     let trialEligible = trialResult.status === 'fulfilled' ? trialResult.value : false;
 
     // Dev override for trial
-    if (_dev_trialEligible && webManager.isDevelopment()) {
+    if (_dev_trialEligible && omega.isDevelopment()) {
       trialEligible = _dev_trialEligible === 'true';
     }
 
@@ -247,7 +247,7 @@ function setupForm() {
   if ($helpButton) {
     $helpButton.addEventListener('click', (e) => {
       e.preventDefault();
-      webManager._chatsy?.open();
+      omega._chatsy?.open();
     });
   }
 

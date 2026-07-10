@@ -4,13 +4,13 @@
 
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupNewsletterForm();
     setupSearch();
@@ -114,7 +114,7 @@ function performSearch(query, $blogPosts, $searchResults) {
   if (matchCount === 0) {
     $searchResults.innerHTML = '<p class="text-muted">No posts found matching your search.</p>';
   } else {
-    $searchResults.innerHTML = `<p class="text-muted">Found ${matchCount} post${matchCount !== 1 ? 's' : ''} matching "${webManager.utilities().escapeHTML(query)}"</p>`;
+    $searchResults.innerHTML = `<p class="text-muted">Found ${matchCount} post${matchCount !== 1 ? 's' : ''} matching "${omega.utilities().escapeHTML(query)}"</p>`;
   }
 
   $searchResults.classList.remove('d-none');

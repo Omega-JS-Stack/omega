@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let formManager = null;
 
@@ -41,7 +41,7 @@ function setupDeleteAccountForm() {
     }
 
     // Send delete request to server
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/user`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user`, {
       method: 'DELETE',
       timeout: 30000,
       response: 'json',
@@ -62,7 +62,7 @@ function setupDeleteAccountForm() {
     formManager.showSuccess('Your account has been successfully deleted. You will now be signed out.');
 
     // Sign out the user
-    await webManager.auth().signOut();
+    await omega.auth().signOut();
 
     // Redirect to home page
     setTimeout(() => {

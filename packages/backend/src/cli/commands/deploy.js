@@ -25,7 +25,7 @@ class DeployCommand extends BaseCommand {
 
     // public/ is generated, never tracked — `firebase deploy` (no --only) includes
     // hosting and fails without the folder. The blessed flow runs setup first
-    // (authoritative overwrite); this covers a bare `npx mgr deploy`.
+    // (authoritative overwrite); this covers a bare `npx omega deploy`.
     ensurePublicFiles(self.firebaseProjectPath);
 
     try {
@@ -53,7 +53,7 @@ class DeployCommand extends BaseCommand {
    *
    * Firebase CLI used to set this automatically but stopped around the Node 10
    * runtime transition. Without it, HTTP requests get a 403 at the IAM level
-   * before @omegajs/backend's application-level auth (backendManagerKey) can run.
+   * before @omega.js/backend's application-level auth (backendManagerKey) can run.
    *
    * Dynamically discovers all deployed functions via gcloud and fixes any
    * HTTP-triggered function missing the allUsers invoker binding.

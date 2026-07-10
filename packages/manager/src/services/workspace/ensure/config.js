@@ -7,10 +7,10 @@
  */
 const chalk = require('chalk').default;
 
-const { loadConfig, hasOmegaConfig } = require('@omegajs/config');
+const { loadConfig, hasOmegaConfig } = require('@omega.js/config');
 
 module.exports = async ({ brand, apps }) => {
-  // Brand config failed to LOAD (thrown by @omegajs/config — secrets, parse, targets array)
+  // Brand config failed to LOAD (thrown by @omega.js/config — secrets, parse, targets array)
   if (brand.configError) {
     console.log(`      ${chalk.red('✗')} ${brand.configError}`);
     return { status: 'error', error: brand.configError };

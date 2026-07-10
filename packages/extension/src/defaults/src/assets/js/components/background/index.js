@@ -3,7 +3,7 @@
 // ============================================
 
 // Import OMEGA Extension
-import Manager from '@omegajs/extension/background';
+import Manager from '@omega.js/extension/background';
 
 // Create instance
 const manager = new Manager();
@@ -15,7 +15,7 @@ const serviceWorker = self;
 manager.initialize()
 .then(() => {
   // Shortcuts
-  const { extension, logger, webManager } = manager;
+  const { extension, logger, omega } = manager;
 
   // Add your project-specific background logic here
   // ...

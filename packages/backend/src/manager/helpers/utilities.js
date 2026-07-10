@@ -471,7 +471,7 @@ Utilities.prototype.get = function (docPath, options) {
 /**
  * Convert a string into a URL-safe slug.
  * Strips all non-alphanumeric characters, collapses runs of hyphens, lowercases.
- * Canonical slug builder — share this between @omegajs/backend admin/post and any consumer
+ * Canonical slug builder — share this between @omega.js/backend admin/post and any consumer
  * that needs to predict the resulting URL (e.g. sponsorship platform).
  *
  * @param {string} input - The string to slugify

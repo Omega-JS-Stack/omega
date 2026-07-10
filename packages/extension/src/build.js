@@ -100,13 +100,13 @@ Manager.getManifest = function () {
 }
 Manager.prototype.getManifest = Manager.getManifest;
 
-// getConfig: the consumer's RESOLVED config/omega.json5 via @omegajs/config —
+// getConfig: the consumer's RESOLVED config/omega.json5 via @omega.js/config —
 // shared sections at the top level, targets.extension overlaid onto them (brand
 // walk-up applies in brand monorepos). Secrets never live in the file; the loader
 // hard-fails on secret-shaped keys.
 let warnedConfigSchema = false;
 Manager.getConfig = function () {
-  const { hasOmegaConfig, loadConfig, formatErrors } = require('@omegajs/config');
+  const { hasOmegaConfig, loadConfig, formatErrors } = require('@omega.js/config');
 
   // No config at all (fresh dir, non-consumer cwd) → empty shape; callers
   // optional-chain and the defaults task scaffolds the real file on setup.
@@ -120,7 +120,7 @@ Manager.getConfig = function () {
   // Warn ONCE per process — gulp tasks each call getConfig() at require time.
   if (errors.length && !warnedConfigSchema) {
     warnedConfigSchema = true;
-    console.warn(`[@omegajs/extension] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+    console.warn(`[@omega.js/extension] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
   }
 
   return config;

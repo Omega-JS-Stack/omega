@@ -1,6 +1,6 @@
 // Runtime-side logger.
 //
-// Same per-name `new LoggerLite('foo')` API the rest of @omegajs/desktop has always used. Adds a
+// Same per-name `new LoggerLite('foo')` API the rest of @omega.js/desktop has always used. Adds a
 // file transport when running inside Electron (main process) so consumers can read
 // runtime logs from disk without remoting into the running app.
 //

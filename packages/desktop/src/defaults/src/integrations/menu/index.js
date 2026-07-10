@@ -1,12 +1,12 @@
-// Application menu definition. Called by @omegajs/desktop during boot.
+// Application menu definition. Called by @omega.js/desktop during boot.
 //
-// `manager`  — the running @omegajs/desktop Manager.
+// `manager`  — the running @omega.js/desktop Manager.
 // `menu`     — builder API + id-path API (find/update/remove/insertAfter/etc.).
 // `defaults` — the platform-aware default template (an array you can mutate manually if needed).
 //
-// This file is OPTIONAL — delete it and @omegajs/desktop still ships a working application menu.
+// This file is OPTIONAL — delete it and @omega.js/desktop still ships a working application menu.
 //
-// @omegajs/desktop ships a default menu template with stable id paths. Highlights:
+// @omega.js/desktop ships a default menu template with stable id paths. Highlights:
 //   main/about, main/check-for-updates, main/preferences (hidden), main/services,
 //     main/hide, main/relaunch, main/quit                                          (mac)
 //   file/close (mac), file/preferences, file/relaunch, file/quit                   (win/linux)

@@ -1,9 +1,9 @@
 /**
  * index.js — the `omega migrate` orchestrator: one call converts a UJM
- * consumer to @omegajs/web.
+ * consumer to @omega.js/web.
  *
  *   1. Config: _config.yml + ultimate-jekyll-manager.json → config/omega.json5
- *      (validated through the real @omegajs/config loader after writing).
+ *      (validated through the real @omega.js/config loader after writing).
  *   2. Codemod: the rule table over src/** templates (rules.js).
  *   3. Lint: the liquid-lint scanner over the (rewritten) templates.
  *   4. Hygiene: legacy files removed (Gemfile, lockfile, the old configs).
@@ -12,7 +12,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadConfig } = require('@omegajs/config');
+const { loadConfig } = require('@omega.js/config');
 const { convertConfig, readLegacyConfigs, serializeOmega } = require('./config-convert.js');
 const { runCodemod, collectTemplateFiles } = require('./codemod.js');
 const { lintText } = require('./lint.js');

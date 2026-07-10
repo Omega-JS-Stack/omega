@@ -12,7 +12,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { generateCorpus } = require('@omegajs/bakeoff-shared');
+const { generateCorpus } = require('@omega.js/bakeoff-shared');
 const { buildAssets, purgeCss } = require('./assets-pipeline.js');
 
 const SPIKE = path.resolve(__dirname, '..');

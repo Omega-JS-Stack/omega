@@ -6,15 +6,15 @@
 
 <p align="center">
   <strong>OMEGA Backend</strong> — all-in-one development framework for Firebase Cloud Functions backends. Sister project to
-  <a href="../desktop/">@omegajs/desktop</a>,
-  <a href="../extension/">@omegajs/extension</a>, and
+  <a href="../desktop/">@omega.js/desktop</a>,
+  <a href="../extension/">@omega.js/extension</a>, and
   <a href="https://github.com/itw-creative-works/ultimate-jekyll-manager">Ultimate Jekyll Manager</a>.
 </p>
 
 ## Installation
 
 ```bash
-npm install @omegajs/backend
+npm install @omega.js/backend
 ```
 
 **Requirements:**
@@ -28,7 +28,7 @@ npm install @omegajs/backend
 Create `functions/index.js`:
 
 ```javascript
-const Manager = (new (require('@omegajs/backend'))).init(exports, {
+const Manager = (new (require('@omega.js/backend'))).init(exports, {
   setupFunctionsIdentity: true,
 });
 const { functions } = Manager.libraries;
@@ -76,13 +76,13 @@ module.exports = function (assistant) {
 Run the setup command:
 
 ```bash
-npx mgr setup
+npx omega setup
 ```
 
 ## Initialization Options
 
 ```javascript
-const Manager = (new (require('@omegajs/backend'))).init(exports, options);
+const Manager = (new (require('@omega.js/backend'))).init(exports, options);
 ```
 
 | Option | Default | Description |
@@ -105,7 +105,7 @@ const Manager = (new (require('@omegajs/backend'))).init(exports, options);
 
 ## Configuration File
 
-Create `config/omega.json5` in your functions directory (`npx mgr setup` scaffolds it from the template). Shared sections (`brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
+Create `config/omega.json5` in your functions directory (`npx omega setup` scaffolds it from the template). Shared sections (`brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
 
 ```json5
 {
@@ -287,7 +287,7 @@ Manager.Middleware(req, res).run('routeName', {
 Intercept and modify `bm_api` requests before/after processing:
 
 ```javascript
-const Manager = (new (require('@omegajs/backend'))).init(exports, {});
+const Manager = (new (require('@omega.js/backend'))).init(exports, {});
 
 Manager.handlers.bm_api = function (mod, position) {
   const assistant = mod.assistant;
@@ -446,7 +446,7 @@ GDPR/CASL-compliant consent capture and cross-provider unsubscribe sync.
 - **Account-page toggle** — `/account` notifications section lets logged-in users opt in/out, hits both SendGrid + Beehiiv
 - **HMAC unsubscribe links** — email-footer one-click flow continues to work; unsubscribe removes the contact from ALL providers (not just the SendGrid ASM group), re-subscribe re-adds the contact
 - **Provider webhook receivers** — `POST /marketing/webhook?provider=sendgrid|beehiiv&key=X` catches unsubscribe / spam / bounce events from SendGrid and Beehiiv, writes the user doc + syncs to the OTHER provider
-- **Parent forwarder** — single public webhook endpoint (`/marketing/webhook/forward`) on the parent @omegajs/backend fans out to every brand's child @omegajs/backend so each one updates its own Firestore
+- **Parent forwarder** — single public webhook endpoint (`/marketing/webhook/forward`) on the parent @omega.js/backend fans out to every brand's child @omega.js/backend so each one updates its own Firestore
 - **Library-level consent gate** — `email.add()` and `email.sync()` skip users whose `consent.marketing.status === 'revoked'` (covers every call site: payment syncs, admin re-syncs, newsletter form); admin contact DELETE mirrors `revoked` back to the user doc so removals stick
 
 See [docs/consent.md](docs/consent.md) for the full architecture, source enum reference, migration script template, and provider configuration steps.
@@ -730,7 +730,7 @@ storage.set('nested.path', { data: true }).write();
 
 ## Authentication
 
-@omegajs/backend supports multiple authentication methods (checked in order):
+@omega.js/backend supports multiple authentication methods (checked in order):
 
 1. **Bearer Token (JWT)**
    ```
@@ -771,13 +771,13 @@ const user = await assistant.authenticate();
 
 ## CLI Commands
 
-@omegajs/backend includes a CLI for development and deployment:
+@omega.js/backend includes a CLI for development and deployment:
 
 ```bash
 # Install globally or use npx
-npm install -g @omegajs/backend
+npm install -g @omega.js/backend
 # or
-npx @omegajs/backend <command>
+npx @omega.js/backend <command>
 ```
 
 | Command | Description |
@@ -788,9 +788,9 @@ npx @omegajs/backend <command>
 | `mgr test [paths...]` | Run integration tests |
 | `mgr emulator` | Start Firebase emulator (keep-alive mode) |
 | `mgr stripe` | Start Stripe CLI webhook forwarding to local server |
-| `mgr version`, `mgr v` | Show @omegajs/backend version |
+| `mgr version`, `mgr v` | Show @omega.js/backend version |
 | `mgr clear` | Clear cache and temp files |
-| `mgr install`, `mgr i` | Install @omegajs/backend (local — links every `@omegajs/*` dep from the Omega monorepo — or production) |
+| `mgr install`, `mgr i` | Install @omega.js/backend (local — links every `@omega.js/*` dep from the Omega monorepo — or production) |
 | `mgr clean:npm` | Clean and reinstall npm modules |
 | `mgr firestore:indexes:get` | Get Firestore indexes |
 | `mgr cwd` | Show current working directory |
@@ -820,7 +820,7 @@ Set these in your `functions/.env` file:
 
 ## Response Headers
 
-@omegajs/backend attaches metadata to responses:
+@omega.js/backend attaches metadata to responses:
 
 ```
 bm-properties: {"code":200,"tag":"functionName/executionId","usage":{...},"schema":{...}}
@@ -828,31 +828,31 @@ bm-properties: {"code":200,"tag":"functionName/executionId","usage":{...},"schem
 
 ## Testing
 
-@omegajs/backend includes an integration test framework that runs against the Firebase emulator.
+@omega.js/backend includes an integration test framework that runs against the Firebase emulator.
 
 ### Running Tests
 
 ```bash
 # Option 1: Two terminals (recommended for development)
-npx mgr emulator  # Terminal 1 - keeps emulator running
-npx mgr test      # Terminal 2 - runs tests
+npx omega emulator  # Terminal 1 - keeps emulator running
+npx omega test      # Terminal 2 - runs tests
 
 # Option 2: Single command (auto-starts emulator, shuts down after)
-npx mgr test
+npx omega test
 ```
 
 ### Extended Mode (real APIs)
 
-Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omegajs/backend/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:
+Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:
 
 ```bash
 # Terminal 1 — start once, no flag needed
-npx mgr emulator
+npx omega emulator
 
 # Terminal 2 — toggle freely between runs
-npx mgr test --extended ...                 # extended mode (--extended sets TEST_EXTENDED_MODE)
-TEST_EXTENDED_MODE=true npx mgr test ...    # identical — the env-var form
-npx mgr test ...                            # normal mode (next run flips back)
+npx omega test --extended ...                 # extended mode (--extended sets TEST_EXTENDED_MODE)
+TEST_EXTENDED_MODE=true npx omega test ...    # identical — the env-var form
+npx omega test ...                            # normal mode (next run flips back)
 ```
 
 See [docs/test-framework.md](docs/test-framework.md#extended-mode-test_extended_mode) for the full mechanism.
@@ -860,25 +860,25 @@ See [docs/test-framework.md](docs/test-framework.md#extended-mode-test_extended_
 ### Filtering Tests
 
 ```bash
-npx mgr test rules/             # Run rules tests (both @omegajs/backend and project)
-npx mgr test backend:rules/         # Only @omegajs/backend's rules tests
-npx mgr test project:rules/     # Only project's rules tests
-npx mgr test user/ admin/       # Multiple paths
+npx omega test rules/             # Run rules tests (both @omega.js/backend and project)
+npx omega test backend:rules/         # Only @omega.js/backend's rules tests
+npx omega test project:rules/     # Only project's rules tests
+npx omega test user/ admin/       # Multiple paths
 ```
 
 ### Log Files
 
-@omegajs/backend CLI commands automatically save output to log files in the project's `functions/` directory (alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place):
-- **`functions/dev.log`** — Output from `npx mgr serve` (@omegajs/backend's local dev server)
-- **`functions/emulator.log`** — Full emulator + Cloud Functions output (`npx mgr emulator`)
-- **`functions/test.log`** — Test runner output (`npx mgr test`, when running against an existing emulator)
-- **`functions/production.log`** — Production Cloud Function logs (`npx mgr logs:read` or `npx mgr logs:tail`)
+@omega.js/backend CLI commands automatically save output to log files in the project's `functions/` directory (alongside firebase-tools' own `*-debug.log` files so everything is grep-able from one place):
+- **`functions/dev.log`** — Output from `npx omega serve` (@omega.js/backend's local dev server)
+- **`functions/emulator.log`** — Full emulator + Cloud Functions output (`npx omega emulator`)
+- **`functions/test.log`** — Test runner output (`npx omega test`, when running against an existing emulator)
+- **`functions/production.log`** — Production Cloud Function logs (`npx omega logs:read` or `npx omega logs:tail`)
 
 Logs are overwritten on each run and gitignored via `*.log`. Use them to debug failing tests or review function output. Transient internal artifacts (reset sentinels, watch trigger, `test-mode.json`) live separately in `<projectDir>/.temp/`.
 
 ### Test Locations
 
-- **@omegajs/backend core tests:** `test/`
+- **@omega.js/backend core tests:** `test/`
 - **Project tests:** `functions/test/`
 
 Use `backend:` or `project:` prefix to filter by source.
@@ -954,7 +954,7 @@ See `CLAUDE.md` for complete test API documentation.
 
 ## Subscription System
 
-@omegajs/backend includes a built-in payment/subscription system with Stripe and PayPal integration.
+@omega.js/backend includes a built-in payment/subscription system with Stripe and PayPal integration.
 
 ### Subscription Statuses
 
@@ -1064,7 +1064,7 @@ user.subscription.status === 'suspended'
 Static method on the `User` helper that derives calculated subscription fields. Returns only fields that require derivation logic — raw data lives on the account object directly.
 
 ```javascript
-const User = require('@omegajs/backend/src/manager/helpers/user');
+const User = require('@omega.js/backend/src/manager/helpers/user');
 
 const resolved = User.resolveSubscription(account);
 // Returns: { plan, active, trialing, cancelling }
@@ -1077,7 +1077,7 @@ const resolved = User.resolveSubscription(account);
 | `trialing` | `boolean` | In active trial (status `'active'` + claimed + unexpired) |
 | `cancelling` | `boolean` | Cancellation pending (status `'active'` + `cancellation.pending`) |
 
-The same function exists as `auth.resolveSubscription(account)` in [@omegajs/client](../client/) with identical logic and return shape.
+The same function exists as `auth.resolveSubscription(account)` in [@omega.js/client](../client/) with identical logic and return shape.
 
 ## Final Words
 

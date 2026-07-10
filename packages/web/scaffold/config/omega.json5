@@ -1,6 +1,6 @@
 {
   // OMEGA config — one file, one shape, every project type.
-  // Docs: node_modules/@omegajs/web/README.md + docs/config.md in the Omega repo.
+  // Docs: node_modules/@omega.js/web/README.md + docs/config.md in the Omega repo.
   // Secrets NEVER live here — they go in .env (the validator hard-fails on
   // secret-shaped keys).
   brand: {

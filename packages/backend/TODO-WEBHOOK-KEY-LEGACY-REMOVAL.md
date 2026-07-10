@@ -12,4 +12,4 @@ Once every brand's provider URLs (Stripe / PayPal / Chargebee / Chargeblast / Co
 
 ## How to verify it's safe
 
-Grep production logs (`npx mgr logs:read --fn bm_api --grep "payments/webhook" --limit 1000`) and confirm zero `401 Invalid key` hits over a meaningful window. If there are any, those are providers still on the old URL — re-register them via OMEGA before dropping the fallback.
+Grep production logs (`npx omega logs:read --fn bm_api --grep "payments/webhook" --limit 1000`) and confirm zero `401 Invalid key` hits over a meaningful window. If there are any, those are providers still on the old URL — re-register them via OMEGA before dropping the fallback.

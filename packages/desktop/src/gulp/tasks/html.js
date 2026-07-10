@@ -47,7 +47,7 @@ module.exports = function htmlTask(done) {
   const templatePath = path.join(packageRoot, 'dist', 'config', 'page-template.html');
 
   if (!jetpack.exists(templatePath)) {
-    logger.warn(`No @omegajs/desktop page template at ${templatePath}. Falling back to raw view copy.`);
+    logger.warn(`No @omega.js/desktop page template at ${templatePath}. Falling back to raw view copy.`);
     files.forEach((src) => {
       const rel = path.relative(viewsDir, src);
       const dest = path.join(projectRoot, 'dist', 'views', rel);

@@ -47,14 +47,14 @@ async function generateBuildJs(outputDir) {
     // Get git info
     const gitInfo = getGitInfo();
 
-    // Build config object matching @omegajs/client's expected structure
+    // Build config object matching @omega.js/client's expected structure
     const buildConfig = {
       timestamp: new Date().toISOString(),
       repo: gitInfo,
       environment: Manager.getEnvironment(),
       packages: {
         [package.name]: package.version,
-        '@omegajs/client': getPackageVersion('@omegajs/client'),
+        '@omega.js/client': getPackageVersion('@omega.js/client'),
       },
       config: {
         // Core metadata
@@ -99,7 +99,7 @@ async function generateBuildJs(outputDir) {
         serviceWorker: { enabled: false, config: {} },
 
         // Analytics. The Measurement Protocol API secret comes from .env
-        // (GOOGLE_ANALYTICS_SECRET — matches @omegajs/backend/EM convention; secrets never live
+        // (GOOGLE_ANALYTICS_SECRET — matches @omega.js/backend/EM convention; secrets never live
         // in omega.json5) and is baked into the snapshot here at build time.
         analytics: {
           google: config.analytics?.providers?.google?.id || '',

@@ -2,7 +2,7 @@
 // Minimal mutable state -- everything else is derived by buildBindingsState()
 
 import { calculatePrices } from './pricing.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // All supported billing frequencies
 export const FREQUENCIES = ['daily', 'weekly', 'monthly', 'annually'];
@@ -59,7 +59,7 @@ export function getAvailableFrequencies(product) {
 // Returns a fresh object every time -- no mutation of shared references
 export function buildBindingsState() {
   const product = state.product;
-  const user = webManager.auth().getUser();
+  const user = omega.auth().getUser();
   const prices = calculatePrices(state);
 
   const isSubscription = product?.type === 'subscription';

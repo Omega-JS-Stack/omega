@@ -95,8 +95,8 @@ class Manager {
       // Set platform and runtime on HTML element
       this._setHtmlDataAttributes();
 
-      // Initialize Firebase if a config blob is present (presence-driven — matches @omegajs/backend
-      // convention). Reads flat `firebaseConfig` (the @omegajs/backend/extension/desktop canonical
+      // Initialize Firebase if a config blob is present (presence-driven — matches @omega.js/backend
+      // convention). Reads flat `firebaseConfig` (the @omega.js/backend/extension/desktop canonical
       // shape) and falls back to nested `firebase.app.config` (UJM's current `_config.yml` shape).
       // Once UJM migrates to the flat shape this fallback can be dropped.
       // Initialize Firebase only when the resolved config can actually boot the
@@ -398,7 +398,7 @@ class Manager {
   }
 
   // Resolve the Firebase web SDK config blob. Flat `firebaseConfig` first (canonical
-  // shape — @omegajs/backend/extension/desktop), then nested `firebase.app.config` (UJM legacy yaml shape).
+  // shape — @omega.js/backend/extension/desktop), then nested `firebase.app.config` (UJM legacy yaml shape).
   // A blob only counts when at least one value is non-empty — framework config merges
   // (e.g. UJM's Jekyll chain) inject all-empty-string blobs into Firebase-less sites,
   // and those must resolve to null (no init, no URL derivation).
@@ -531,8 +531,8 @@ class Manager {
       || this.config.environment;
 
     if (env === 'development') {
-      // @omegajs/backend's `mgr serve` exposes the local API over HTTPS (mkcert proxy on 5002,
-      // since @omegajs/backend 5.7.0) — plain http:// cannot connect to it.
+      // @omega.js/backend's `mgr serve` exposes the local API over HTTPS (mkcert proxy on 5002,
+      // since @omega.js/backend 5.7.0) — plain http:// cannot connect to it.
       return 'https://localhost:5002';
     }
 

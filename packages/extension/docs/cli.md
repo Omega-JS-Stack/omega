@@ -1,6 +1,6 @@
 # CLI
 
-`npx mgr <command>` — aliases `xm`, `ext`, `mgr`, `@omegajs/extension`.
+`npx omega <command>` — aliases `xm`, `ext`, `mgr`, `@omega.js/extension`.
 
 ## Commands
 
@@ -10,7 +10,7 @@
 | `clean` | `-c`, `--clean` | Remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | `-i`, `i`, `--install` | Install peer deps (gulp, etc.) |
 | `test` | `-t`, `--test` | Run framework + project test suites. Positional target scopes by source + path (`project:` / `mgr:` / bare path); `--filter` matches test names; `--extended` enables real-external-API tests. See [test-framework.md](test-framework.md). |
-| `version` | `-v`, `--version` | Print @omegajs/extension, Node, peer-dep versions |
+| `version` | `-v`, `--version` | Print @omega.js/extension, Node, peer-dep versions |
 
 ## Entry point
 
@@ -29,7 +29,7 @@
      <name>:  ['-x', '--<name>'],
    },
    ```
-3. Optionally add to `projectScripts` in [package.json](../package.json) so consumers get a wrapper npm script on `npx mgr setup`.
+3. Optionally add to `projectScripts` in [package.json](../package.json) so consumers get a wrapper npm script on `npx omega setup`.
 4. Document under this page.
 
 ## Command options
@@ -40,7 +40,7 @@ Yargs parses `--foo bar` and `--foo=bar` into `options.foo`. Positional args go 
 // src/commands/test.js
 module.exports = async function (options) {
   const layer    = options.layer    || 'all';
-  const target   = (options._ && options._[1]) || null; // positional: `npx mgr test <target>`
+  const target   = (options._ && options._[1]) || null; // positional: `npx omega test <target>`
   const filter   = options.filter   || null;
   const reporter = options.reporter || 'pretty';
   // ...
@@ -56,7 +56,7 @@ Commands read BXM-prefixed env vars for behavior switches (one exception: `TEST_
 | `BXM_BUILD_MODE=true` | gulp tasks | Production build mode |
 | `BXM_IS_PUBLISH=true` | gulp/package | Also publish to extension stores after packaging |
 | `BXM_LOG_FILE` | gulp + test runners | Override the stdout/stderr tee path, or `false` to disable (see [logging.md](logging.md)) |
-| `BXM_TEST_MODE=true` | test runners | Powers `Manager.isTesting()` (auto-set by `npx mgr test`) |
+| `BXM_TEST_MODE=true` | test runners | Powers `Manager.isTesting()` (auto-set by `npx omega test`) |
 | `TEST_EXTENDED_MODE=true` | test runners | Run tests that hit REAL external services (`--extended` is the CLI shorthand; see [test-framework.md](test-framework.md)) |
 | `BXM_TEST_BOOT_PROJECT` | test/boot | Override project root for boot tests |
 | `BXM_TEST_BOOT_DIR` | test/boot | Override extension dir directly |
@@ -66,5 +66,5 @@ Commands read BXM-prefixed env vars for behavior switches (one exception: `TEST_
 ## See also
 
 - [build-system.md](build-system.md) — `gulp` is what most CLI commands ultimately invoke
-- [test-framework.md](test-framework.md) — `npx mgr test` command surface
-- [defaults.md](defaults.md) — `npx mgr setup` invokes the defaults task
+- [test-framework.md](test-framework.md) — `npx omega test` command surface
+- [defaults.md](defaults.md) — `npx omega setup` invokes the defaults task

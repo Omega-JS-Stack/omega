@@ -1,11 +1,11 @@
 /**
- * Ensure the Firebase Admin SDK service account exists with the roles @omegajs/backend
+ * Ensure the Firebase Admin SDK service account exists with the roles @omega.js/backend
  * needs, and its key is downloaded.
  *
  * Google shows service account keys ONCE at creation — they can't be
  * re-downloaded. The key's source of truth is the brand's gitignored
  * .omega/secrets/service-account.json; it's copied into the backend app's
- * functions/ dir (where @omegajs/backend expects it) whenever missing there.
+ * functions/ dir (where @omega.js/backend expects it) whenever missing there.
  *
  * The IAM role grant diffs the policy first (omega-manager PUT the policy on
  * every run) — a converged account is a zero-mutation no-op.
@@ -61,7 +61,7 @@ module.exports = async function ensureServiceAccount(context) {
   const { firebaseApi: api, brandConfig, brandRoot, apps = [], projectId, options = {} } = context;
   const brandName = brandConfig.brand?.name || context.brandId;
 
-  // Source of truth + the backend copy @omegajs/backend reads
+  // Source of truth + the backend copy @omega.js/backend reads
   const sourceKeyPath = join(brandRoot, '.omega', 'secrets', 'service-account.json');
   const backendApp = apps.find((app) => app.target === 'backend');
   const destKeyPath = backendApp ? join(backendApp.path, 'functions', 'service-account.json') : null;

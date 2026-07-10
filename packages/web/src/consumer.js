@@ -1,6 +1,6 @@
 /**
  * Consumer-project resolution for CLI commands: the standard directory
- * layout of an @omegajs/web consumer, and the omega.json5 → site-data
+ * layout of an @omega.js/web consumer, and the omega.json5 → site-data
  * pipeline (loadConfig + toSiteGlobal).
  *
  * Consumer layout (scaffolded by `omega setup`):
@@ -11,7 +11,7 @@
  *   config/omega.json5
  */
 const path = require('node:path');
-const { loadConfig, toSiteGlobal, formatErrors } = require('@omegajs/config');
+const { loadConfig, toSiteGlobal, formatErrors } = require('@omega.js/config');
 
 /**
  * The standard consumer directories, rooted at `cwd`.

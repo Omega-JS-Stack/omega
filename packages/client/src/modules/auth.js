@@ -1,9 +1,9 @@
-// The account schema + subscription derivation live in @omegajs/account — the
-// single source of truth shared with @omegajs/backend, so a doc resolved here is
+// The account schema + subscription derivation live in @omega.js/account — the
+// single source of truth shared with @omega.js/backend, so a doc resolved here is
 // byte-identical to one resolved by the backend. No generators are injected:
 // $uuid/$randomId/$apiKey fields resolve to null (real values always come from
 // the backend-written doc).
-import { resolveAccount, resolveSubscription } from '@omegajs/account';
+import { resolveAccount, resolveSubscription } from '@omega.js/account';
 
 class Auth {
   constructor(manager) {
@@ -165,7 +165,7 @@ class Auth {
   }
 
   // Resolves calculated subscription fields that require derivation logic
-  // (shared @omegajs/account implementation — same math as the backend).
+  // (shared @omega.js/account implementation — same math as the backend).
   // Returns: { plan, active, trialing, cancelling, everPaid }
   // Falls back to the stored auth state when no account is passed.
   resolveSubscription(account) {
@@ -176,7 +176,7 @@ class Auth {
   // Returns: { credits: { monthly: 5, limit: 100 }, ... }
   //
   // The product catalog lives at `config.payment.products` (OMEGA canonical
-  // shape — matches @omegajs/backend, UJM, and @omegajs/desktop). Each product entry has `{ id, limits: {...} }`.
+  // shape — matches @omega.js/backend, UJM, and @omega.js/desktop). Each product entry has `{ id, limits: {...} }`.
   _resolveUsage(state) {
     const accountUsage = state.account?.usage || {};
     const productId    = state.resolved?.plan || 'basic';

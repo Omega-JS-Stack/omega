@@ -1,12 +1,12 @@
 /**
- * `omega migrate` — convert a UJM (Jekyll) consumer to @omegajs/web in place:
+ * `omega migrate` — convert a UJM (Jekyll) consumer to @omega.js/web in place:
  * legacy configs → config/omega.json5, the codemod rule table over src/**
  * templates, the liquid-lint scan, and legacy-file removal (Gemfile & co).
  *
  * `omega migrate --check` runs the full pipeline in memory and prints the
  * report without writing anything — the pre-flight for Phase-4 site waves.
  */
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { runMigration } = require('../migrate/index.js');
 
 const logger = new Logger('omega:migrate');

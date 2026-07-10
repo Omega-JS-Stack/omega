@@ -8,7 +8,7 @@
  * The chosen id lands in omega.json5 (comment-preserving writeback).
  */
 const chalk = require('chalk').default;
-const { input } = require('@omegajs/devkit/prompt');
+const { input } = require('@omega.js/devkit/prompt');
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
 
 const PROJECT_QUOTA = 30;

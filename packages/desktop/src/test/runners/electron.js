@@ -1,5 +1,5 @@
 // Electron-runner — spawns electron with the main-process harness, parses JSON-line stream,
-// renders @omegajs/backend-style output to console. Returns aggregate counts.
+// renders @omega.js/backend-style output to console. Returns aggregate counts.
 
 const path = require('path');
 const { spawn } = require('child_process');
@@ -61,7 +61,7 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
         if (line.startsWith('__EM_TEST__')) {
           handleEvent(JSON.parse(line.slice('__EM_TEST__'.length)));
         } else if (line.trim().length > 0) {
-          // Pass-through other electron stdout (logger lines from @omegajs/desktop init, etc.)
+          // Pass-through other electron stdout (logger lines from @omega.js/desktop init, etc.)
           // Indent so they don't disrupt the layout.
           process.stdout.write(chalk.gray(`      ${line}\n`));
         }

@@ -1,5 +1,5 @@
 // Settings window renderer entry.
-const Manager = require('@omegajs/desktop/renderer');
+const Manager = require('@omega.js/desktop/renderer');
 
 const manager = new Manager();
 

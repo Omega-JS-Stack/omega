@@ -1,21 +1,21 @@
 /**
- * @omegajs/account — the single source of truth for the OMEGA user/account schema.
+ * @omega.js/account — the single source of truth for the OMEGA user/account schema.
  *
- * Today the account shape lives in two drifted places: @omegajs/backend's
+ * Today the account shape lives in two drifted places: @omega.js/backend's
  * src/manager/helpers/user.js (canonical — schema engine + tokens) and
- * @omegajs/client's DEFAULT_ACCOUNT in modules/auth.js (hand-rolled deep-merge,
+ * @omega.js/client's DEFAULT_ACCOUNT in modules/auth.js (hand-rolled deep-merge,
  * missing flags/activity/personal branches and `everPaid`). This package
- * unifies them; each framework becomes a thin wrapper (@omegajs/backend keeps its
- * `new User(Manager, settings).properties` API, @omegajs/client keeps
+ * unifies them; each framework becomes a thin wrapper (@omega.js/backend keeps its
+ * `new User(Manager, settings).properties` API, @omega.js/client keeps
  * `resolveAccount(rawData, firebaseUser)`).
  *
  * resolveAccount(data, options):
  *   options.generators — { uuid, randomId, apiKey } value generators for the
- *     '$uuid'/'$randomId'/'$apiKey' schema tokens. @omegajs/backend injects real ones
+ *     '$uuid'/'$randomId'/'$apiKey' schema tokens. @omega.js/backend injects real ones
  *     (uuid v4, Utilities().randomId, uid-generator); the frontend passes none
  *     and the fields resolve to null (real values always come from the backend).
  *   options.user — optional auth-user overlay ({ uid, email }): fills
- *     account.auth identity when the doc doesn't carry it (@omegajs/client's
+ *     account.auth identity when the doc doesn't carry it (@omega.js/client's
  *     resolveAccount(rawData, firebaseUser) semantic).
  */
 const USER_SCHEMA = require('./schema.js');
@@ -25,7 +25,7 @@ const resolveSubscription = require('./subscription.js');
 function resolveAccount(data, options) {
   options = options || {};
 
-  // Time context — byte-identical to @omegajs/backend's node-powertools timestamps:
+  // Time context — byte-identical to @omega.js/backend's node-powertools timestamps:
   // powertools.timestamp(d, { output: 'string' }) === d.toISOString(),
   // powertools.timestamp(d, { output: 'unix' }) === floor(ms / 1000).
   const now = new Date();

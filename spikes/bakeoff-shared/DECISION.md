@@ -1,4 +1,4 @@
-# A2 Decision Memo — @omegajs/web builds on **Eleventy 3**
+# A2 Decision Memo — @omega.js/web builds on **Eleventy 3**
 
 Date: 2026-07-06 · Phase 2 Task 2.4 · Scores + raw data: [RESULTS.md](RESULTS.md)
 
@@ -6,8 +6,8 @@ Date: 2026-07-06 · Phase 2 Task 2.4 · Scores + raw data: [RESULTS.md](RESULTS.
 
 **Eleventy 4.70 vs Astro 3.55 (weighted, 1–5). Margin 1.15.** The decision
 rule ("margin < 0.5 → Eleventy by default") never had to fire — Eleventy wins
-on the merits. Phase B (B1–B5) builds `@omegajs/web` on **Eleventy 3 +
-LiquidJS + @omegajs/template-kit**, promoting the `spikes/bakeoff-eleventy`
+on the merits. Phase B (B1–B5) builds `@omega.js/web` on **Eleventy 3 +
+LiquidJS + @omega.js/template-kit**, promoting the `spikes/bakeoff-eleventy`
 engine core.
 
 ## Why Eleventy — the three deciding facts
@@ -77,7 +77,7 @@ Proven on real files this checkpoint; every rule is mechanical:
 | 7 | `page.canonical.url` → `{{ site.url }}{{ page.url }}` | recipe schema |
 | 8 | Jekyll per-collection `defaults:` → engine-level collection config | recipe layout/permalink assignment (B3 design) |
 
-Plus engine conventions locked for @omegajs/web (winner-independent, already
+Plus engine conventions locked for @omega.js/web (winner-independent, already
 implemented in the spike): UTC date filters (CI parity), deterministic post
 sort (date desc, slug tie-break), page-scoped frontmatter Liquid (page-ref
 values render per-page, copy-on-write — never into shared layout data), team
@@ -90,6 +90,6 @@ dirs only — a missing root cost +1.05 s/corpus in LiquidJS probes).
 - **Keep** `spikes/bakeoff-astro` in-tree as a reference implementation (it
   proved the layered-theme model is engine-portable; its README holds the
   Astro-specific findings if the decision is ever revisited).
-- **Carry forward regardless of engine**: @omegajs/template-kit,
-  @omegajs/config, bakeoff-shared's asset pipeline + fixtures, the
+- **Carry forward regardless of engine**: @omega.js/template-kit,
+  @omega.js/config, bakeoff-shared's asset pipeline + fixtures, the
   default-pages-with-suppression model, and the codemod rules above.

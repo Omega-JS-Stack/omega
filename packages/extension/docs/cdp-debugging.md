@@ -1,8 +1,8 @@
 # CDP Debugging (driving a live browser)
 
-How to drive a browser you can CONTROL — see the extension live, screenshot it, click, type, read console logs, inspect network requests — for agents (Claude via MCP/CDP) and humans. For @omegajs/extension this is THE dev surface: the extension only exists inside a running browser.
+How to drive a browser you can CONTROL — see the extension live, screenshot it, click, type, read console logs, inspect network requests — for agents (Claude via MCP/CDP) and humans. For @omega.js/extension this is THE dev surface: the extension only exists inside a running browser.
 
-> Mirrored across the five sister frameworks (UJM / @omegajs/backend / @omegajs/extension / EM / @omegajs/client) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omega.js/backend / @omega.js/extension / EM / @omega.js/client) — same core section, framework-flavored. Edit all five together.
 
 ## The browser: your Claude session owns one
 
@@ -19,9 +19,9 @@ Humans: the agent's Chrome window is visible — you can watch it drive. Full re
 
 ## Electron apps are the exception (attach, don't launch)
 
-An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx mgr cdp`. See EM's `docs/cdp-debugging.md`.
+An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx omega cdp`. See EM's `docs/cdp-debugging.md`.
 
-## @omegajs/extension specifics: testing the extension (`chrome-devtools-extension` upstream)
+## @omega.js/extension specifics: testing the extension (`chrome-devtools-extension` upstream)
 
 The plain `chrome-devtools` browser has NO extension in it — and `--load-extension` is silently ignored by branded stable Chrome (removed ~v137; verified on 149). The fix is the dedicated **`chrome-devtools-extension` MCP upstream**: the same per-session isolated model, but it launches **Chrome for Testing** (which still honors `--load-extension` — verified on CfT 150) with your unpacked extension pre-loaded into the ephemeral profile.
 

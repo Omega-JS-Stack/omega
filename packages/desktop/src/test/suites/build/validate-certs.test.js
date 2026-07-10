@@ -1,5 +1,5 @@
 // Build-layer tests for commands/validate-certs.js — provisioning profile parsing logic.
-// The full validate flow (Keychain query, env vars) is exercised via real `npx mgr setup` runs.
+// The full validate flow (Keychain query, env vars) is exercised via real `npx omega setup` runs.
 
 const path = require('path');
 const fs   = require('fs');

@@ -1,5 +1,5 @@
 /**
- * @omegajs/backend segment conditions → SendGrid query_dsl (the SQL-like segment query
+ * @omega.js/backend segment conditions → SendGrid query_dsl (the SQL-like segment query
  * language). Pure functions, ported behavior-for-behavior from omega-manager
  * — the generated SQL is compared against live segments for staleness, so
  * any change here re-syncs every segment on the next run.
@@ -7,7 +7,7 @@
 const { BACKEND_FIELDS_MAP } = require('../../../lib/backend-marketing.js');
 
 /**
- * Convert a @omegajs/backend field condition to a WHERE clause fragment. Custom fields
+ * Convert a @omega.js/backend field condition to a WHERE clause fragment. Custom fields
  * are referenced by name (double-quoted) in query_dsl, not by internal ID.
  */
 function fieldConditionToWhere(condition) {
@@ -59,7 +59,7 @@ function conditionToWhere(condition) {
 }
 
 /**
- * Build a complete query_dsl from @omegajs/backend segment conditions. Engagement
+ * Build a complete query_dsl from @omega.js/backend segment conditions. Engagement
  * conditions need event_data (JOIN or subqueries); field/contact conditions
  * query contact_data directly.
  */

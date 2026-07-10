@@ -5,8 +5,8 @@
 // settings live under targets.backend — key presence under `targets` means
 // "this project supports this target".
 //
-// This file doubles as @omegajs/backend's framework-defaults layer: the Manager
-// resolves it through @omegajs/config and merges the consumer's own
+// This file doubles as @omega.js/backend's framework-defaults layer: the Manager
+// resolves it through @omega.js/config and merges the consumer's own
 // functions/config/omega.json5 on top. Secrets NEVER live here — they go in
 // functions/.env (the loader hard-fails on secret-shaped keys).
 {
@@ -156,7 +156,7 @@
   // also appear here as a backend-only override (e.g. a per-surface sentry.dsn).
   targets: {
     backend: {
-      // 'self' = this @omegajs/backend is the parent (newsletter-sources provider);
+      // 'self' = this @omega.js/backend is the parent (newsletter-sources provider);
       // a URL = external parent (e.g. 'https://api.itwcreativeworks.com') —
       // used by the newsletter generator to pull sources; '' = no parent
       parent: '',
@@ -261,7 +261,7 @@
       },
       dataRequest: {
         // Additional queries to include in GDPR data exports
-        // @omegajs/backend always exports: users, auth record, data-requests, payments-intents, payments-orders
+        // @omega.js/backend always exports: users, auth record, data-requests, payments-intents, payments-orders
         // Single doc: { path: 'collection/{uid}', redact: ['field.to.redact'] }
         // Collection query: { collection: 'my-data', where: [['ownerField', '==', '{uid}']] }
         queries: [],

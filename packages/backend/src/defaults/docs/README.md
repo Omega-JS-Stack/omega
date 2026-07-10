@@ -14,4 +14,4 @@ Examples of good `docs/*.md` topics:
 
 ## See also
 
-`node_modules/@omegajs/backend/CLAUDE.md` is the framework's own overview.
+`node_modules/@omega.js/backend/CLAUDE.md` is the framework's own overview.

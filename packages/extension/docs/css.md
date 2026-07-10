@@ -4,7 +4,7 @@ SCSS-based, theme-pluggable, with a load-path system that lets consumer SCSS ref
 
 ## Main entry
 
-[src/assets/css/@omegajs/extension.scss](../src/assets/css/@omegajs/extension.scss) is the framework's CSS entry point. Consumers `@use` it to get framework defaults + utilities + theme.
+[src/assets/css/@omega.js/extension.scss](../src/assets/css/@omega.js/extension.scss) is the framework's CSS entry point. Consumers `@use` it to get framework defaults + utilities + theme.
 
 ## Core modules
 
@@ -16,7 +16,7 @@ SCSS-based, theme-pluggable, with a load-path system that lets consumer SCSS ref
 
 ## Per-component styles
 
-Each component can have framework defaults in `src/assets/css/components/<name>/index.scss`. These define the FRAMEWORK'S default look — e.g. `src/assets/css/components/popup/index.scss` defines popup-specific layout that ALL @omegajs/extension extensions inherit unless they override.
+Each component can have framework defaults in `src/assets/css/components/<name>/index.scss`. These define the FRAMEWORK'S default look — e.g. `src/assets/css/components/popup/index.scss` defines popup-specific layout that ALL @omega.js/extension extensions inherit unless they override.
 
 Consumer extensions add their OWN per-component overrides in `src/assets/css/components/<name>/index.scss` (in the consumer project, not the framework).
 
@@ -24,15 +24,15 @@ Consumer extensions add their OWN per-component overrides in `src/assets/css/com
 
 The SCSS load path is set up by [src/gulp/tasks/sass.js](../src/gulp/tasks/sass.js) with this search order:
 
-1. **Framework CSS** — `node_modules/@omegajs/extension/dist/assets/css`
-2. **Active theme** — `node_modules/@omegajs/extension/dist/assets/themes/<theme-id>`
+1. **Framework CSS** — `node_modules/@omega.js/extension/dist/assets/css`
+2. **Active theme** — `node_modules/@omega.js/extension/dist/assets/themes/<theme-id>`
 3. **Project dist** — `<consumer>/dist/assets/css`
 4. **node_modules** — for npm-installed SCSS packages
 
 So this just works in a consumer's `src/assets/css/main.scss`:
 
 ```scss
-// 1. Resolves to @omegajs/extension's main entry — sets up Bootstrap, utilities, etc.
+// 1. Resolves to @omega.js/extension's main entry — sets up Bootstrap, utilities, etc.
 @use 'omega-extension' as * with (
   $primary: #5B47FB,
 );
@@ -40,7 +40,7 @@ So this just works in a consumer's `src/assets/css/main.scss`:
 // 2. Resolves to the active theme's _theme.scss
 @use 'theme' as *;
 
-// 3. Resolves to @omegajs/extension's bundled popup defaults
+// 3. Resolves to @omega.js/extension's bundled popup defaults
 @use 'components/popup' as *;
 
 // 4. Resolves to npm-installed CSS package
@@ -72,17 +72,17 @@ Themes vendor their own SCSS under `src/assets/themes/<theme-id>/`. The load pat
 }
 ```
 
-After adding, run `npm run prepare` in @omegajs/extension (or `npm start` in the consumer) and the new utility is available framework-wide.
+After adding, run `npm run prepare` in @omega.js/extension (or `npm start` in the consumer) and the new utility is available framework-wide.
 
 ## Why this load-path system
 
 Without it, every consumer SCSS file would need:
 
 ```scss
-@use '../../../../node_modules/@omegajs/extension/dist/assets/css/@omegajs/extension' as *;
+@use '../../../../node_modules/@omega.js/extension/dist/assets/css/@omega.js/extension' as *;
 ```
 
-Brittle, ugly, breaks with hoisted/non-hoisted npm installs. The load-path lets `@use 'omega-extension'` work regardless of where @omegajs/extension is installed. Same pattern UJM uses for Jekyll themes.
+Brittle, ugly, breaks with hoisted/non-hoisted npm installs. The load-path lets `@use 'omega-extension'` work regardless of where @omega.js/extension is installed. Same pattern UJM uses for Jekyll themes.
 
 ## See also
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * @omegajs/backend MCP Server (Stdio Transport)
+ * @omega.js/backend MCP Server (Stdio Transport)
  *
  * Exposes OMEGA Backend routes as MCP tools so Claude (or any MCP client)
- * can interact with a running @omegajs/backend instance — local or production.
+ * can interact with a running @omega.js/backend instance — local or production.
  *
  * Usage:
  *   npx bm mcp                       # admin (uses BACKEND_MANAGER_KEY)
@@ -12,7 +12,7 @@
  *   npx bm mcp                       # public-only (no key, no token)
  *
  * Environment variables:
- *   BEM_URL              - @omegajs/backend server URL (default: http://localhost:5002)
+ *   BEM_URL              - @omega.js/backend server URL (default: http://localhost:5002)
  *   BACKEND_MANAGER_KEY  - Admin API key for authentication
  */
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
@@ -26,7 +26,7 @@ const packageJSON = require('../../package.json');
 /**
  * Start the MCP server
  * @param {object} options
- * @param {string} options.baseUrl - @omegajs/backend server URL
+ * @param {string} options.baseUrl - @omega.js/backend server URL
  * @param {string} options.backendManagerKey - Admin API key
  * @param {string} options.userToken - User API key (for user-level connections)
  * @param {string} options.cwd - Consumer project functions directory (for consumer tool discovery)
@@ -47,7 +47,7 @@ async function startServer(options) {
   const authInfo = resolveAuthInfo(token);
 
   if (authInfo.role === 'public') {
-    console.error('[@omegajs/backend MCP] No key or token set. Only public tools will be available.');
+    console.error('[@omega.js/backend MCP] No key or token set. Only public tools will be available.');
   }
 
   // Build client with appropriate auth
@@ -138,18 +138,18 @@ async function startServer(options) {
   await server.connect(transport);
 
   // Log to stderr (stdout is reserved for MCP protocol)
-  console.error(`[@omegajs/backend MCP] Server running — connected to ${baseUrl}`);
-  console.error(`[@omegajs/backend MCP] Role: ${authInfo.role} | ${visibleTools.length}/${allTools.length} tools available`);
+  console.error(`[@omega.js/backend MCP] Server running — connected to ${baseUrl}`);
+  console.error(`[@omega.js/backend MCP] Role: ${authInfo.role} | ${visibleTools.length}/${allTools.length} tools available`);
 
   if (consumerTools.length > 0) {
-    console.error(`[@omegajs/backend MCP] ${consumerTools.length} consumer tool(s) loaded`);
+    console.error(`[@omega.js/backend MCP] ${consumerTools.length} consumer tool(s) loaded`);
   }
 }
 
 // Allow direct execution or require
 if (require.main === module) {
   startServer().catch((error) => {
-    console.error('[@omegajs/backend MCP] Fatal error:', error);
+    console.error('[@omega.js/backend MCP] Fatal error:', error);
     process.exit(1);
   });
 }

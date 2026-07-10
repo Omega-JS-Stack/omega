@@ -56,4 +56,4 @@ what if in web-manager we put a special thing like
     const searchParams = new URLSearchParams(window.location.search);
     const queryEnv = searchParams.get('_dev_loudLogs');
 
-and this will set a property of webManager to true that enables copious logs
+and this will set a property of omega to true that enables copious logs

@@ -28,7 +28,7 @@ The build pipeline wires these together — `views/<component>/index.html` autom
 
 ## Manifest wiring per component
 
-`src/manifest.json` (JSON5, merged with @omegajs/extension's default manifest at build — see [build-system.md](build-system.md)) registers each component with the browser:
+`src/manifest.json` (JSON5, merged with @omega.js/extension's default manifest at build — see [build-system.md](build-system.md)) registers each component with the browser:
 
 | Component | Manifest field |
 |---|---|
@@ -57,7 +57,7 @@ See [auth.md](auth.md) for the detailed sign-in / sign-out / context-load flows.
 
 ## Adding a new component type to the framework
 
-This is rare — only needed if you're adding a brand new context kind to @omegajs/extension (e.g. devtools panel). For most consumer needs, "add a new page" means creating a new entry under `src/views/pages/<name>/` (one component, many pages).
+This is rare — only needed if you're adding a brand new context kind to @omega.js/extension (e.g. devtools panel). For most consumer needs, "add a new page" means creating a new entry under `src/views/pages/<name>/` (one component, many pages).
 
 If you DO need to add a new top-level component type:
 

@@ -9,7 +9,7 @@
  * override. Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
-const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
+const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
 
 module.exports = async function ensureStripeRadar(context) {
   const { brandConfig, stripeApi: api, serviceData, options = {} } = context;

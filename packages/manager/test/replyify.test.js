@@ -395,7 +395,7 @@ test('replyify: dry run on a fully drifted brand performs zero mutations', async
 
 // ─── Interactive setup flow (config-landing) ─────────────────────────────────
 
-const { setBrowserOpener: setOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener: setOpener } = require('@omega.js/devkit/flows');
 const { makeBrandRoot: makeRoot, readConfigSource: readSource } = require('./lib/config-fixture.js');
 const { openTtyPrompt: openTty } = require('./lib/interactive.js');
 

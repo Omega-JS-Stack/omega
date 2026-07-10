@@ -3,7 +3,7 @@
  *
  * Single Sends require a registered sender (not an inline from address);
  * each brand gets one: offers@{contact-email domain} with the brand's name.
- * It auto-verifies because domain-auth runs first. @omegajs/backend resolves the sender
+ * It auto-verifies because domain-auth runs first. @omega.js/backend resolves the sender
  * id at runtime by from_email, so nothing lands in state.
  *
  * CAN-SPAM requires a physical mailing address — brand.address in

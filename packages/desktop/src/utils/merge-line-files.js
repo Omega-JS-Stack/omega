@@ -1,5 +1,5 @@
 // Shared devkit module — vendored into dist/vendor/devkit at prepare time by the
 // preparePackage `after` hook. This shim keeps the framework's internal require
-// paths stable while the implementation lives in @omegajs/devkit (@omegajs/desktop's copy was
+// paths stable while the implementation lives in @omega.js/devkit (@omega.js/desktop's copy was
 // the canonical seed — quote normalization + order-safe key substitution).
-module.exports = require('@omegajs/devkit/merge-line-files');
+module.exports = require('@omega.js/devkit/merge-line-files');

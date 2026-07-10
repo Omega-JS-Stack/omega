@@ -2,7 +2,7 @@
  * Test: content/ghostii.writeArticle() pass-through
  * Verifies that writeArticle() correctly applies overrides and includes sourceContent.
  *
- * Run: npx mgr test helpers/content/ghostii-write-article
+ * Run: npx omega test helpers/content/ghostii-write-article
  *
  * These tests intercept the outgoing HTTP request to verify the API body shape
  * without calling the real Ghostii API. The `wonderful-fetch` call is replaced

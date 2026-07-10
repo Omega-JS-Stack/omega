@@ -14,7 +14,7 @@ const { mkdtempSync, mkdirSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { getBaselineKnowledge } = require('../src/services/chatsy/lib/baseline-knowledge.js');
 const service = require('../src/services/chatsy/index.js');

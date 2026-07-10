@@ -1,22 +1,22 @@
 # Restart Manager
 
-@omegajs/desktop apps don't restart themselves after a crash — they delegate to **Restart Manager** (RM), a hidden guardian app that sits outside the host app's process tree, so it can wait, observe, and re-launch cleanly through edge cases that are impossible to handle from inside your own dying process (crashed-then-relaunch, post-update install, hidden-mode rehydrate, etc.).
+@omega.js/desktop apps don't restart themselves after a crash — they delegate to **Restart Manager** (RM), a hidden guardian app that sits outside the host app's process tree, so it can wait, observe, and re-launch cleanly through edge cases that are impossible to handle from inside your own dying process (crashed-then-relaunch, post-update install, hidden-mode rehydrate, etc.).
 
-**Protocol v2 rewrite** — the legacy `restart-manager://message?command=register&payload=<json>` deep-link handshake is GONE (it was fire-and-forget with no ack, and RM polled process NAMES). RM now serves a loopback HTTP protocol and monitors exact PIDs. The RM app itself is an @omegajs/desktop consumer at `restart-manager/restart-manager-desktop` and is the serving side of everything below.
+**Protocol v2 rewrite** — the legacy `restart-manager://message?command=register&payload=<json>` deep-link handshake is GONE (it was fire-and-forget with no ack, and RM polled process NAMES). RM now serves a loopback HTTP protocol and monitors exact PIDs. The RM app itself is an @omega.js/desktop consumer at `restart-manager/restart-manager-desktop` and is the serving side of everything below.
 
 ## Protocol v1 — the SSOT
 
 The contract ships IN THIS FRAMEWORK as `lib/restart-manager/protocol.js`, exported for the RM app via the sanctioned deep require:
 
 ```js
-require('@omegajs/desktop/lib/restart-manager/protocol')
+require('@omega.js/desktop/lib/restart-manager/protocol')
 ```
 
 Both sides import the same file — contract constants are never copied between repos. Bump `PROTOCOL_VERSION` (currently 1) on any breaking change.
 
 ### The shared root
 
-Neutral ground, deliberately NOT any app's userData (@omegajs/desktop's dev/test userData suffixing never moves it): `resolveSharedRoot(appDataPath, env)` → `env.EM_RM_ROOT || <appData>/restart-manager/`.
+Neutral ground, deliberately NOT any app's userData (@omega.js/desktop's dev/test userData suffixing never moves it): `resolveSharedRoot(appDataPath, env)` → `env.EM_RM_ROOT || <appData>/restart-manager/`.
 
 ```
 <appData>/restart-manager/
@@ -29,10 +29,10 @@ Neutral ground, deliberately NOT any app's userData (@omegajs/desktop's dev/test
 │                       Restart Manager\Restart Manager.exe (getInstalledAppPath resolves all
 │                       three) — NSIS is what lets RM self-update via electron-updater.
 └── install.lock      ← advisory lock ({ pid, hostAppId, acquiredAt }, stale after 10 min) so two
-                        @omegajs/desktop apps can't run installers concurrently
+                        @omega.js/desktop apps can't run installers concurrently
 ```
 
-`EM_RM_ROOT` is the cross-repo test/dev isolation seam. In @omegajs/desktop's own test mode the lib roots at `<userData>/restart-manager` (the ` (Testing)` dir, wiped per run) — tests never touch the real root.
+`EM_RM_ROOT` is the cross-repo test/dev isolation seam. In @omega.js/desktop's own test mode the lib roots at `<userData>/restart-manager` (the ` (Testing)` dir, wiped per run) — tests never touch the real root.
 
 ### HTTP endpoints (RM serves; 127.0.0.1 bind + peer check; no bearer — same-user threat model)
 
@@ -56,7 +56,7 @@ There is deliberately no quit endpoint — RM updates itself (below); nothing ex
 
 `ensureInstalled()` short-circuits on `app/<platform entry>` existing — repeat boots cost one stat, zero network. When missing:
 
-1. Fetch the release feed `https://github.com/<owner>/<repo>/releases/latest/download/<latest-mac.yml | latest.yml | latest-linux.yml>` (js-yaml). Default feed: **`restart-manager/update-server`** — RM publishes through @omegajs/desktop's standard release pipeline, so the feed files + versioned artifacts are the normal ones.
+1. Fetch the release feed `https://github.com/<owner>/<repo>/releases/latest/download/<latest-mac.yml | latest.yml | latest-linux.yml>` (js-yaml). Default feed: **`restart-manager/update-server`** — RM publishes through @omega.js/desktop's standard release pipeline, so the feed files + versioned artifacts are the normal ones.
 2. Pick the artifact — mac: `-<arch>-mac.zip` → `-universal-mac.zip` → `-mac.zip` (RM ships universal); win: the NSIS setup `.exe`; linux: the `.AppImage`. Artifact URLs are `releases/latest/download/<encodeURIComponent(name)>`.
 3. Download (atomic `.part` + rename, 5-hop redirect follow) → install per platform (mac/linux extract into `app.tmp/` then swap into `app/`; win runs the installer).
 
@@ -66,13 +66,13 @@ There is deliberately no quit endpoint — RM updates itself (below); nothing ex
 | **windows** | NSIS one-click run with `/S` → `%LOCALAPPDATA%\Programs\Restart Manager\` | Silent. No installer window, no admin, per-user — and NSIS is what makes RM self-updatable by electron-updater. |
 | **linux** | AppImage → `app/Restart-Manager.AppImage` + chmod 755 | Silent. No .deb, no sudo. (AppImage needs FUSE; failure surfaces as a spawn-poll timeout in the log.) |
 
-Failures set a 1-hour install cooldown (no download storms); the advisory `install.lock` serializes concurrent installers across @omegajs/desktop apps.
+Failures set a 1-hour install cooldown (no download storms); the advisory `install.lock` serializes concurrent installers across @omega.js/desktop apps.
 
-## Updates — RM updates ITSELF (@omegajs/desktop's standard autoUpdater)
+## Updates — RM updates ITSELF (@omega.js/desktop's standard autoUpdater)
 
-This lib only ever **installs** RM when missing. Once running, RM keeps itself fresh exactly like every other @omegajs/desktop app — `autoUpdate.enabled: true`, standard electron-updater flow (NSIS on win, zip-in-place on mac, AppImage on linux), applying on the user-idle install policy with the 30d force gate. No bespoke update logic anywhere.
+This lib only ever **installs** RM when missing. Once running, RM keeps itself fresh exactly like every other @omega.js/desktop app — `autoUpdate.enabled: true`, standard electron-updater flow (NSIS on win, zip-in-place on mac, AppImage on linux), applying on the user-idle install policy with the 30d force gate. No bespoke update logic anywhere.
 
-The update relaunch is safe by construction: RM's registrations are **storage-persisted** (its boot prune keeps live-pid entries), watched apps' 60s heartbeats reconnect through the freshly written runtime.json, and @omegajs/desktop's single-instance lock quits any duplicate spawned during the handover window.
+The update relaunch is safe by construction: RM's registrations are **storage-persisted** (its boot prune keeps live-pid entries), watched apps' 60s heartbeats reconnect through the freshly written runtime.json, and @omega.js/desktop's single-instance lock quits any duplicate spawned during the handover window.
 
 ## Bail conditions
 
@@ -123,16 +123,16 @@ You can `app.relaunch() + app.quit()` from inside the app and it works for the c
 
 ```bash
 # 1. Run RM from source (writes the REAL shared root on purpose)
-cd restart-manager-desktop && npx mgr install dev && npm start
+cd restart-manager-desktop && npx omega install dev && npm start
 cat ~/Library/Application\ Support/restart-manager/runtime.json
 
-# 2. Any @omegajs/desktop consumer registers against it
+# 2. Any @omega.js/desktop consumer registers against it
 EM_RESTART_MANAGER_DEV=1 npm start          # registers ~3s after ready (dev delay)
 curl 127.0.0.1:<port>/v1/apps               # the consumer listed, status alive
 
 # 3. Graceful quit → the entry disappears (≤1s flush), NO relaunch
 # 4. kill -9 <pid> → RM relaunches it within ~2 ticks (~20s)
-# 5. open "restart-manager://app/show" → RM's dashboard (@omegajs/desktop built-in route)
+# 5. open "restart-manager://app/show" → RM's dashboard (@omega.js/desktop built-in route)
 ```
 
 Terminal-smoke gotcha: a leaked `ELECTRON_RUN_AS_NODE=1` makes any packaged Electron binary exit instantly as plain node — `env -u ELECTRON_RUN_AS_NODE <binary>` first.

@@ -1,9 +1,9 @@
 /**
- * Schema resolution engine — extracted verbatim from @omegajs/backend's
+ * Schema resolution engine — extracted verbatim from @omega.js/backend's
  * src/manager/helpers/user.js, with ONE change: the '$uuid'/'$randomId'/'$apiKey'
  * value generators are injected via ctx.generators instead of being required
- * in-module. Hosts that can generate them (@omegajs/backend, Node) inject real generators;
- * hosts that can't (@omegajs/client, browser) pass none and the fields resolve to
+ * in-module. Hosts that can generate them (@omega.js/backend, Node) inject real generators;
+ * hosts that can't (@omega.js/client, browser) pass none and the fields resolve to
  * null — the doc's real values always come from the backend.
  *
  * The engine is environment-agnostic: no dependencies, no Node APIs.

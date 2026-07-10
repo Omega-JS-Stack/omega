@@ -25,8 +25,8 @@ module.exports = {
       async run({ http, assert }) {
         const response = await http.command('admin:send-notification', {
           notification: {
-            title: '@omegajs/backend Test Notification',
-            body: 'Testing from @omegajs/backend test suite',
+            title: '@omega.js/backend Test Notification',
+            body: 'Testing from @omega.js/backend test suite',
             clickAction: 'https://example.com/test',
           },
         });
@@ -133,7 +133,7 @@ module.exports = {
       async run({ http, assert, config }) {
         const response = await http.command('admin:send-notification', {
           notification: {
-            title: '@omegajs/backend Test Notification',
+            title: '@omega.js/backend Test Notification',
             body: `Test sent at ${new Date().toISOString()}`,
             clickAction: `https://${config.domain}/?test-notification=true`,
           },

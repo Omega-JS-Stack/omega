@@ -1,7 +1,7 @@
 // Validate code-signing prerequisites (certs, profiles, env vars).
 //
-// Runs as part of `npx mgr setup` (non-fatal — warns and continues so scaffolding
-// finishes even if certs aren't ready yet) and standalone via `npx mgr validate-certs`.
+// Runs as part of `npx omega setup` (non-fatal — warns and continues so scaffolding
+// finishes even if certs aren't ready yet) and standalone via `npx omega validate-certs`.
 //
 // Exit codes:
 //   0  all checks passed

@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Liquid } from 'liquidjs';
 import MarkdownIt from 'markdown-it';
-import templateKit from '@omegajs/template-kit';
-import frontmatterLiquid from '@omegajs/web/frontmatter-liquid';
+import templateKit from '@omega.js/template-kit';
+import frontmatterLiquid from '@omega.js/web/frontmatter-liquid';
 import { SPIKE, consumerDir, layerDirs } from './paths.mjs';
 import { getCollection, getCollectionNames } from './collections.mjs';
 

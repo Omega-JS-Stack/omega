@@ -1,6 +1,6 @@
 # Logging
 
-@omegajs/backend CLI commands automatically save all output to log files while still streaming to the console. **@omegajs/backend's logs live in `<projectDir>/functions/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit beside firebase-tools' own `*-debug.log` files and everything can be grepped from one directory.
+@omega.js/backend CLI commands automatically save all output to log files while still streaming to the console. **@omega.js/backend's logs live in `<projectDir>/functions/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit beside firebase-tools' own `*-debug.log` files and everything can be grepped from one directory.
 
 ## Log files
 
@@ -8,11 +8,11 @@ All in `<projectDir>/functions/`:
 
 | File | Source | Lifetime |
 |---|---|---|
-| `dev.log` | `npx mgr serve` — @omegajs/backend's local dev server (Firebase serve) | Overwritten each run |
-| `deploy.log` | `npx mgr deploy` — Firebase deployment output (function uploads, hosting deploys, errors) | Overwritten each run |
-| `emulator.log` | `npx mgr emulator` — full emulator output (Firebase emulator + Cloud Functions logs); also `npx mgr test` when it starts its own emulator | Overwritten each run |
-| `test.log` | `npx mgr test` runner output when running against an already-running emulator | Overwritten each run |
-| `production.log` | `npx mgr logs:read` / `npx mgr logs:tail` — production Cloud Function logs from Google Cloud Logging (raw JSON for `read`, streaming text for `tail`) | Overwritten each run |
+| `dev.log` | `npx omega serve` — @omega.js/backend's local dev server (Firebase serve) | Overwritten each run |
+| `deploy.log` | `npx omega deploy` — Firebase deployment output (function uploads, hosting deploys, errors) | Overwritten each run |
+| `emulator.log` | `npx omega emulator` — full emulator output (Firebase emulator + Cloud Functions logs); also `npx omega test` when it starts its own emulator | Overwritten each run |
+| `test.log` | `npx omega test` runner output when running against an already-running emulator | Overwritten each run |
+| `production.log` | `npx omega logs:read` / `npx omega logs:tail` — production Cloud Function logs from Google Cloud Logging (raw JSON for `read`, streaming text for `tail`) | Overwritten each run |
 
 The `dev`/`test` names match EM/BXM/UJM for cross-framework parity.
 
@@ -37,11 +37,11 @@ Used by `deploy.js`. The `serve`/`emulator`/`test` commands use inline stream ma
 
 ## What gets captured
 
-When `npx mgr test` starts its own emulator, logs go to `emulator.log` (it delegates to the emulator command). When running against an already-running emulator, logs go to `test.log`.
+When `npx omega test` starts its own emulator, logs go to `emulator.log` (it delegates to the emulator command). When running against an already-running emulator, logs go to `test.log`.
 
 All files are gitignored via `*.log`. Reset sentinels (`*.log.reset`), the watch trigger file, and `test-mode.json` live separately in `<projectDir>/.temp/` — they're transient internal signals with no debugging value.
 
 ## See also
 
-- [cli-logs.md](cli-logs.md) — `npx mgr logs:read` / `logs:tail` flag reference (the commands that feed `production.log`)
+- [cli-logs.md](cli-logs.md) — `npx omega logs:read` / `logs:tail` flag reference (the commands that feed `production.log`)
 - [test-framework.md](test-framework.md) — the test runner that feeds `test.log` / `emulator.log`

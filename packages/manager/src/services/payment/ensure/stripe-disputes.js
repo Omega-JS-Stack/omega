@@ -7,7 +7,7 @@
  * confirmed (`disputesConfirmed` in state). Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
-const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
+const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
 
 module.exports = async function ensureStripeDisputes(context) {
   const { stripeApi: api, serviceData, options = {} } = context;

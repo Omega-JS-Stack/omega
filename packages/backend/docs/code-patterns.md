@@ -56,10 +56,10 @@ admin.firestore().collection('users').doc('abc123')
 
 ```javascript
 // CORRECT
-require(`${functionsDir}/node_modules/@omegajs/backend`)
+require(`${functionsDir}/node_modules/@omega.js/backend`)
 
 // INCORRECT
-require(functionsDir + '/node_modules/@omegajs/backend')
+require(functionsDir + '/node_modules/@omega.js/backend')
 ```
 
 ## Prefer fs-jetpack

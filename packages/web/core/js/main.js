@@ -7,22 +7,22 @@ import serviceWorkerModule from '__main_assets__/js/core/service-worker.js';
 import appearanceModule from '__main_assets__/js/core/appearance.js';
 import completeModule from '__main_assets__/js/core/complete.js';
 
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Ultimate Jekyll Manager Module
 export default async function ({ manager, options } = {}) {
   // Add Manager to global scope for easy access in modules
-  // Removed because @omegajs/client is singleton and can be imported directly in modules, so no need to attach it to window
+  // Removed because @omega.js/client is singleton and can be imported directly in modules, so no need to attach it to window
   // window.Manager = manager;
 
-  // Initialize the UJ library on webManager for programmatic access to UJ features
-  // This allows other modules to call webManager.uj().showExitPopup(), etc.
+  // Initialize the UJ library on omega for programmatic access to UJ features
+  // This allows other modules to call omega.uj().showExitPopup(), etc.
   const ujLibrary = {};
-  webManager.uj = function() {
+  omega.uj = function() {
     return ujLibrary;
   };
   // Also expose the internal object for modules to register their functions
-  webManager._ujLibrary = ujLibrary;
+  omega._ujLibrary = ujLibrary;
 
   // Log
   console.log('Global module loaded successfully (assets/js/ultimate-jekyll-manager.js)');
@@ -49,7 +49,7 @@ export default async function ({ manager, options } = {}) {
 
   // Add conditional modules if enabled
   for (const module of conditionalModules) {
-    const moduleConfig = webManager.config[module.configKey];
+    const moduleConfig = omega.config[module.configKey];
     if (moduleConfig?.enabled) {
       modulePromises.push(
         module.load()

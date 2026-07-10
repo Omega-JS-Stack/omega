@@ -11,7 +11,7 @@
  *   env   — per-app .env composition (secrets hard-fail in omega.json5 by
  *           design): brand-level env values, per-surface analytics stream
  *           secrets, and app-relative signing paths land in each app's
- *           gitignored .env so the app's own tooling (builds, `npx mgr
+ *           gitignored .env so the app's own tooling (builds, `npx omega
  *           push-secrets`) works without the manager in front.
  *
  * De-ITW'd from omega-manager: the company-wide .output/_shared/ cert tree

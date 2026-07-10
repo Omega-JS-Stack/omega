@@ -17,7 +17,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      # @omegajs/backend's suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
+      # @omega.js/backend's suite boots the Firebase emulators (firestore/database/pubsub need a JRE)
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -37,7 +37,7 @@ jobs:
       - name: manager suite (service-runner contract + brand loading + external-service reconciliation suites + e2e manage over fixture brands)
         run: npm test --workspace=packages/manager
 
-      - name: account suite (incl. golden master vs live @omegajs/backend user.js)
+      - name: account suite (incl. golden master vs live @omega.js/backend user.js)
         run: npm test --workspace=packages/account
 
       - name: config suite
@@ -68,7 +68,7 @@ jobs:
         run: npm test --workspace=packages/backend
 
   sandbox:
-    name: Sandbox brand (@omegajs/backend corpus + cross-stack e2e)
+    name: Sandbox brand (@omega.js/backend corpus + cross-stack e2e)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,18 +98,18 @@ jobs:
         run: npx puppeteer browsers install chrome
 
       # functions/ is a standalone install (not a workspace) — it owns its own lockfile,
-      # with @omegajs/backend linked via file: to packages/backend
+      # with @omega.js/backend linked via file: to packages/backend
       - name: Sandbox backend deps
         working-directory: apps/sandbox-brand/apps/backend/functions
         run: npm ci
 
-      # Full @omegajs/backend corpus (routes/events/rules/email/mcp) against the fresh consumer
+      # Full @omega.js/backend corpus (routes/events/rules/email/mcp) against the fresh consumer
       - name: Sandbox backend corpus
         working-directory: apps/sandbox-brand
         run: npm run test:backend
 
-      # Real stack, real browser: emulator + built website (@omegajs/client bundle) +
-      # puppeteer signup → @omegajs/backend onCreate → signin → session persistence → subscription
+      # Real stack, real browser: emulator + built website (@omega.js/client bundle) +
+      # puppeteer signup → @omega.js/backend onCreate → signin → session persistence → subscription
       - name: Cross-stack e2e
         working-directory: apps/sandbox-brand
         run: npm test
@@ -130,11 +130,11 @@ jobs:
 
       # Catches phantom-dependency/hoisting bugs: each package must install and load
       # from its packed tarball in a bare consumer, exactly like a real npm install.
-      # Also the self-containment gate for @omegajs vendoring: shipped dist must
-      # contain zero raw requires OR imports of the PRIVATE @omegajs packages
+      # Also the self-containment gate for @omega.js vendoring: shipped dist must
+      # contain zero raw requires OR imports of the PRIVATE @omega.js packages
       # (devkit/config/account — the vendor after-hook rewrites them to relative
-      # paths; see packages/devkit/tools/vendor.js). Published @omegajs runtime
-      # deps (e.g. @omegajs/client) legitimately stay as package requires — the
+      # paths; see packages/devkit/tools/vendor.js). Published @omega.js runtime
+      # deps (e.g. @omega.js/client) legitimately stay as package requires — the
       # scratch install maps them to their local tarballs via overrides until
       # they exist on npm.
       - name: Pack and scratch-install each package
@@ -151,14 +151,14 @@ jobs:
               && if [ "$pkg" != "client" ]; then node -e "
                 const fs = require('fs');
                 const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-                p.overrides = { '@omegajs/client': 'file:/tmp/$client_tarball' };
+                p.overrides = { '@omega.js/client': 'file:/tmp/$client_tarball' };
                 fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
               "; fi \
               && npm install --no-audit --no-fund "/tmp/$tarball")
             (cd "$scratch" && node -e "require.resolve('$name'); console.log('$name: resolves OK')")
-            if grep -rE "(require(\.resolve)?\(|from |import\(|import )['\"]@omegajs/(devkit|config|account)" "$scratch/node_modules/$name/dist"; then
-              echo "FAIL: $name ships raw private @omegajs references — vendoring did not run/rewrite"
+            if grep -rE "(require(\.resolve)?\(|from |import\(|import )['\"]@omega\.js/(devkit|config|account)" "$scratch/node_modules/$name/dist"; then
+              echo "FAIL: $name ships raw private @omega.js references — vendoring did not run/rewrite"
               exit 1
             fi
-            echo "$name: shipped dist is self-contained (no raw private @omegajs references)"
+            echo "$name: shipped dist is self-contained (no raw private @omega.js references)"
           done

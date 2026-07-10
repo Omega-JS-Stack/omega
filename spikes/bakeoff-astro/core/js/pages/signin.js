@@ -1,6 +1,6 @@
 /**
  * Core signin page module — 3-layer page-module slice, core layer.
- * Boots the real web-manager (@omegajs/client, aliased by the esbuild config)
+ * Boots the real web-manager (@omega.js/client, aliased by the esbuild config)
  * and binds the FormManager-style auth form.
  */
 const WebManager = require('web-manager');

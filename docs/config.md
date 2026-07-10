@@ -1,6 +1,6 @@
 # omega.json5 — the single OMEGA config
 
-One config file, identical shape, for every OMEGA project type. Owned by `@omegajs/config`
+One config file, identical shape, for every OMEGA project type. Owned by `@omega.js/config`
 (`packages/config`); frameworks vendor it at prepare time and read **only** this format —
 there is no dual-read of legacy files. Legacy brands migrate by converting their old config
 once (mapping tables below) and deleting the old file.
@@ -21,7 +21,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 ```json5
 {
   // SHARED sections — identical spelling in every project type.
-  // (`SHARED_SECTIONS` in @omegajs/config is the authoritative list.)
+  // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
   brand:          { id, name, url, description, tagline, contact: { email }, address: {…}, images: {…} },
   firebaseConfig: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId },
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
@@ -34,7 +34,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // (replaces the legacy brand-config targets ARRAY). `extension: {}` means
   // enabled-with-defaults. Unknown keys are validation errors.
   targets: {
-    web:       { /* @omegajs/web settings — defined in Phase 2 */ },
+    web:       { /* @omega.js/web settings — defined in Phase 2 */ },
     backend:   { parent, github, reviews, marketing, blog, dataRequest },
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
                  releases, downloads, remoteConfig, restartManager },
@@ -53,7 +53,7 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 ```
 
 - "shared" = the file minus its `targets` key. In a standalone repo only the app layers exist.
-- **`projectDir` may be a backend's `functions/` dir** (@omegajs/backend's runtime cwd): the brand
+- **`projectDir` may be a backend's `functions/` dir** (@omega.js/backend's runtime cwd): the brand
   walk-up treats the app root as one level up, so `loadConfig(functionsDir, 'backend')`
   and `loadConfig(appRoot, 'backend')` resolve identically.
 - **Target sections overlay the TOP LEVEL**: `targets.desktop.platforms` resolves to
@@ -85,8 +85,8 @@ slug) and `brand.name` are the only universally required fields.
 
 ## Consumer access
 
-Each framework exposes the vendored loader — desktop: `require('@omegajs/desktop/config')`,
-extension: `require('@omegajs/extension/config')` → `{ loadConfig, validateConfig, … }`.
+Each framework exposes the vendored loader — desktop: `require('@omega.js/desktop/config')`,
+extension: `require('@omega.js/extension/config')` → `{ loadConfig, validateConfig, … }`.
 Consumer workflows use this instead of raw JSON5 reads so brand-monorepo resolution
 always applies.
 
@@ -146,10 +146,10 @@ oauth2) move to the TOP LEVEL verbatim; everything framework-specific moves unde
 | custom keys (`backend_manager`, `mcp`, …) | top level, unchanged |
 | `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | `targets.backend.<same key>` |
 
-Notes: @omegajs/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
+Notes: @omega.js/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
 the same loader and passed as `options.defaults`; `Manager.init()`'s
 `backendManagerConfigPath` option is gone (the loader discovers the file); boot warns on
-schema findings, `npx mgr setup` is the hard audit. The sandbox brand dogfoods the full
+schema findings, `npx omega setup` is the hard audit. The sandbox brand dogfoods the full
 hierarchy: shared sections live in `apps/sandbox-brand/config/omega.json5` (brand level),
 the backend app file carries only `targets.backend`.
 
@@ -219,5 +219,5 @@ const {
   writeConfigValues,   // (projectDir, edits, { dryRun }?) → { path, changed, applied }
   deepMerge,           // agnostic layer merge
   TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS,
-} = require('@omegajs/config');
+} = require('@omega.js/config');
 ```

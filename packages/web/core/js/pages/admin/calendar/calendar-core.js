@@ -7,7 +7,7 @@
  * IMPORTANT: All dates/times in this module are UTC.
  * No local time APIs (getHours, getDate, etc.) are used anywhere.
  */
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // View modes
 export const VIEW_MODES = ['day', 'week', 'month', 'year', 'list'];
@@ -564,7 +564,7 @@ export default class CalendarCore {
   async _loadRecurringTemplates() {
     try {
       const { collection, query, where, getDocs, onSnapshot } = await import('firebase/firestore');
-      const db = webManager.firebaseFirestore;
+      const db = omega.firebaseFirestore;
       const colRef = collection(db, 'marketing-campaigns');
 
       const recurringDocs = await getDocs(query(
@@ -617,7 +617,7 @@ export default class CalendarCore {
 
     try {
       const { collection, query, where, orderBy, onSnapshot } = await import('firebase/firestore');
-      const db = webManager.firebaseFirestore;
+      const db = omega.firebaseFirestore;
 
       const rangeQuery = query(
         collection(db, 'marketing-campaigns'),

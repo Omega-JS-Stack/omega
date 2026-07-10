@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+# [6.1.0] - 2026-07-10
+
+- Added
+  - `omega` and `omg` bins — the context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest app's framework (walking up from cwd, incl. `functions/`) runs, so the arbitrary bin hoist-winner in a brand monorepo is always correct; no app context falls back to this framework's CLI (bootstrap case). `mgr` now dispatches the same way; `omega-backend` runs this CLI directly. Root `cli.js` (`@omega.js/backend/cli`, in `files`) exposes `run()` for cross-framework dispatch.
+- Changed
+  - Package renamed `@omegajs/backend` → `@omega.js/backend` (npm scope `omega.js`; nothing was ever published under `@omegajs`). Docs now say `npx omega …`.
+
 # [6.0.1] - 2026-07-10
 
 - Changed

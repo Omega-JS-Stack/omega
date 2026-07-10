@@ -1,15 +1,15 @@
 # Auth Hooks (Consumer Project)
 
-Auth hooks let consumer projects inject custom logic into @omegajs/backend's auth event lifecycle. @omegajs/backend runs its core handler first, then looks for a matching hook at `hooks/auth/{event-name}.js`.
+Auth hooks let consumer projects inject custom logic into @omega.js/backend's auth event lifecycle. @omega.js/backend runs its core handler first, then looks for a matching hook at `hooks/auth/{event-name}.js`.
 
 | Hook | File | Behavior |
 |------|------|----------|
-| `before-create` | `hooks/auth/before-create.js` | Runs after @omegajs/backend's disposable email + rate limit checks. **Can throw `HttpsError` to block signup.** |
-| `before-signin` | `hooks/auth/before-signin.js` | Runs after @omegajs/backend's activity update. **Can throw `HttpsError` to block sign-in.** |
-| `on-create` | `hooks/auth/on-create.js` | Runs after @omegajs/backend creates the user doc. **Non-blocking** — errors are caught and logged. |
-| `on-delete` | `hooks/auth/on-delete.js` | Runs after @omegajs/backend deletes the user doc. **Non-blocking** — errors are caught and logged. |
+| `before-create` | `hooks/auth/before-create.js` | Runs after @omega.js/backend's disposable email + rate limit checks. **Can throw `HttpsError` to block signup.** |
+| `before-signin` | `hooks/auth/before-signin.js` | Runs after @omega.js/backend's activity update. **Can throw `HttpsError` to block sign-in.** |
+| `on-create` | `hooks/auth/on-create.js` | Runs after @omega.js/backend creates the user doc. **Non-blocking** — errors are caught and logged. |
+| `on-delete` | `hooks/auth/on-delete.js` | Runs after @omega.js/backend deletes the user doc. **Non-blocking** — errors are caught and logged. |
 
-Hook signature (same as @omegajs/backend's internal handlers):
+Hook signature (same as @omega.js/backend's internal handlers):
 
 ```javascript
 module.exports = async ({ Manager, assistant, user, context, libraries }) => {

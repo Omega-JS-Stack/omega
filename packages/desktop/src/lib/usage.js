@@ -1,5 +1,5 @@
 // Usage tracking — opens (= launchCount) + hours-of-use accumulation.
-// Sister of legacy @omegajs/desktop's Usage library, but without the
+// Sister of legacy @omega.js/desktop's Usage library, but without the
 // electron-store-cwd hack (uses our manager.storage instead).
 //
 // Persisted shape (storage.usage):

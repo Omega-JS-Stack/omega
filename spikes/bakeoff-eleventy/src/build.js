@@ -1,5 +1,5 @@
 /**
- * Bench-harness build: corpus (generate if absent) → @omegajs/web buildSite
+ * Bench-harness build: corpus (generate if absent) → @omega.js/web buildSite
  * (assets → Eleventy → PurgeCSS), with per-phase timings printed for the
  * bench harness. The engine was promoted to packages/web in B1 — this file
  * is only the corpus-consumer wiring.
@@ -11,8 +11,8 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { generateCorpus } = require('@omegajs/bakeoff-shared');
-const { buildSite } = require('@omegajs/web');
+const { generateCorpus } = require('@omega.js/bakeoff-shared');
+const { buildSite } = require('@omega.js/web');
 
 const SPIKE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(SPIKE, '..', '..');

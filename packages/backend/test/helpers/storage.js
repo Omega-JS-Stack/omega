@@ -2,7 +2,7 @@
  * Test: Manager.storage()
  * Unit tests for the lowdb-backed local JSON storage wrapper
  *
- * Run: npx mgr test helpers/storage
+ * Run: npx omega test helpers/storage
  *
  * Covers:
  * - get/set/write operations

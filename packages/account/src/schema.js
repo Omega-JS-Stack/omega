@@ -1,8 +1,8 @@
 /**
  * USER_SCHEMA — the canonical OMEGA user/account schema (pure data, no logic).
  *
- * Extracted verbatim from @omegajs/backend's src/manager/helpers/user.js, which is
- * the authoritative shape (@omegajs/client's DEFAULT_ACCOUNT had drifted from it).
+ * Extracted verbatim from @omega.js/backend's src/manager/helpers/user.js, which is
+ * the authoritative shape (@omega.js/client's DEFAULT_ACCOUNT had drifted from it).
  *
  * Each leaf field is { type, default, nullable }
  * Special keys:

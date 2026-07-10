@@ -1,19 +1,19 @@
 # Manager Classes
 
-Each component context has its own Manager class — a one-line import + `initialize()` bootstrap that wires up `extension` (the cross-browser API wrapper), `logger`, `webManager` (Firebase auth), `messenger`, and cross-context helpers.
+Each component context has its own Manager class — a one-line import + `initialize()` bootstrap that wires up `extension` (the cross-browser API wrapper), `logger`, `omega` (Firebase auth), `messenger`, and cross-context helpers.
 
 ## Import paths
 
 | Context | Import | Source |
 |---|---|---|
-| Build-time (Node) | `require('@omegajs/extension/build')` | [src/build.js](../src/build.js) |
-| Background SW | `require('@omegajs/extension/background')` | [src/background.js](../src/background.js) |
-| Popup | `require('@omegajs/extension/popup')` | [src/popup.js](../src/popup.js) |
-| Options | `require('@omegajs/extension/options')` | [src/options.js](../src/options.js) |
-| Sidepanel | `require('@omegajs/extension/sidepanel')` | [src/sidepanel.js](../src/sidepanel.js) |
-| Pages (custom) | `require('@omegajs/extension/page')` | [src/page.js](../src/page.js) |
-| Content script | `require('@omegajs/extension/content')` | [src/content.js](../src/content.js) |
-| Offscreen | `require('@omegajs/extension/offscreen')` | [src/offscreen.js](../src/offscreen.js) |
+| Build-time (Node) | `require('@omega.js/extension/build')` | [src/build.js](../src/build.js) |
+| Background SW | `require('@omega.js/extension/background')` | [src/background.js](../src/background.js) |
+| Popup | `require('@omega.js/extension/popup')` | [src/popup.js](../src/popup.js) |
+| Options | `require('@omega.js/extension/options')` | [src/options.js](../src/options.js) |
+| Sidepanel | `require('@omega.js/extension/sidepanel')` | [src/sidepanel.js](../src/sidepanel.js) |
+| Pages (custom) | `require('@omega.js/extension/page')` | [src/page.js](../src/page.js) |
+| Content script | `require('@omega.js/extension/content')` | [src/content.js](../src/content.js) |
+| Offscreen | `require('@omega.js/extension/offscreen')` | [src/offscreen.js](../src/offscreen.js) |
 
 ## One-line bootstrap
 
@@ -21,7 +21,7 @@ Every consumer-side context entry is the same shape:
 
 ```js
 // src/assets/js/components/popup/index.js
-import Manager from '@omegajs/extension/popup';
+import Manager from '@omega.js/extension/popup';
 
 const manager = new Manager();
 await manager.initialize();
@@ -29,31 +29,31 @@ await manager.initialize();
 // Manager now exposes:
 //   manager.extension   — cross-browser chrome.*/browser.* API wrapper (see docs/extension.md)
 //   manager.logger      — LoggerLite('popup') with timestamped output
-//   manager.webManager  — Web Manager (Firebase, auth, analytics, bindings)
+//   manager.omega  — Web Manager (Firebase, auth, analytics, bindings)
 //   manager.messenger   — wired automatically; chrome.runtime.onMessage listener installed
 //   manager.isDevelopment() / isProduction() / isTesting() / getVersion()  (cross-context helpers)
 ```
 
-The contexts that include `@omegajs/client` (popup / options / sidepanel / page) also run the auth sync handshake automatically — see [auth.md](auth.md).
+The contexts that include `@omega.js/client` (popup / options / sidepanel / page) also run the auth sync handshake automatically — see [auth.md](auth.md).
 
 ## Build-time Manager
 
-`@omegajs/extension/build` is the build-time Manager — used in gulp tasks, CLI commands, and tests. Different surface from the runtime Managers:
+`@omega.js/extension/build` is the build-time Manager — used in gulp tasks, CLI commands, and tests. Different surface from the runtime Managers:
 
 ```js
-const Manager = require('@omegajs/extension/build');
+const Manager = require('@omega.js/extension/build');
 
-Manager.getConfig();         // → RESOLVED config/omega.json5 (targets.extension overlaid; via @omegajs/config)
+Manager.getConfig();         // → RESOLVED config/omega.json5 (targets.extension overlaid; via @omega.js/config)
 Manager.getManifest();       // → parsed src/manifest.json (JSON5)
 Manager.getPackage('project');   // → cwd's package.json
-Manager.getPackage('main');      // → @omegajs/extension's own package.json
+Manager.getPackage('main');      // → @omega.js/extension's own package.json
 Manager.getRootPath('project');  // → process.cwd()
-Manager.getRootPath('main');     // → path to @omegajs/extension's dist
+Manager.getRootPath('main');     // → path to @omega.js/extension's dist
 Manager.getEnvironment();    // → 'production' if BXM_BUILD_MODE=true else 'development'
 Manager.getLiveReloadPort(); // → 35729 by default
 Manager.isBuildMode();       // → boolean
 Manager.actLikeProduction(); // → buildMode || UJ_AUDIT_FORCE
-Manager.require(name);       // → borrow any of @omegajs/extension's bundled deps (json5, fs-jetpack, etc.)
+Manager.require(name);       // → borrow any of @omega.js/extension's bundled deps (json5, fs-jetpack, etc.)
 Manager.logger(name);        // → new logger('name') instance
 Manager.reportBuildError(e); // → notifly + log
 ```
@@ -67,8 +67,8 @@ Each Manager's `initialize()`:
 1. **Read configuration** — from `window.BXM_BUILD_JSON?.config` (injected by webpack at build time)
 2. **Wire `extension`** — singleton from [src/lib/extension.js](../src/lib/extension.js), normalized chrome.*/browser.* API
 3. **Construct `logger`** — `new LoggerLite('<context>')` from [src/lib/logger-lite.js](../src/lib/logger-lite.js)
-4. **Initialize `webManager`** (popup/options/sidepanel/page only) — `webManager.initialize(config)`
-5. **Set up auth listener** — `webManager.auth().listen((state) => { /* ... */ })`
+4. **Initialize `omega`** (popup/options/sidepanel/page only) — `omega.initialize(config)`
+5. **Set up auth listener** — `omega.auth().listen((state) => { /* ... */ })`
 6. **Sync with background** — call `syncWithBackground(this)` from [src/lib/auth-helpers.js](../src/lib/auth-helpers.js); see [auth.md](auth.md)
 7. **Install broadcast / sign-out / event listeners** — handles signin-from-other-context, signout propagation
 8. **Return the manager instance**

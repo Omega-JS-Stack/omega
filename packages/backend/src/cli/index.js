@@ -12,7 +12,7 @@ const _ = require('lodash');
 // Abort if running from ~/node_modules (accidental home directory install)
 const _homeDir = os.homedir();
 if (__dirname.startsWith(path.join(_homeDir, 'node_modules'))) {
-  console.error(`\nERROR: @omegajs/backend is running from ~/node_modules (home directory install).`);
+  console.error(`\nERROR: @omega.js/backend is running from ~/node_modules (home directory install).`);
   console.error(`This shadows the local project copy. Fix:`);
   console.error(`  rm -rf ~/node_modules ~/package.json ~/package-lock.json\n`);
   process.exit(1);
@@ -81,13 +81,13 @@ Main.prototype.process = async function (args) {
     return await cmd.execute();
   }
 
-  // Install local @omegajs/backend
+  // Install local @omega.js/backend
   if ((self.options.i || self.options.install) && (self.options.dev || self.options.development) || self.options.local) {
     const cmd = new InstallCommand(self);
     return await cmd.execute('local');
   }
 
-  // Install live @omegajs/backend
+  // Install live @omega.js/backend
   if ((self.options.i || self.options.install) && (self.options.prod || self.options.production) || self.options.live) {
     const cmd = new InstallCommand(self);
     return await cmd.execute('live');
@@ -129,7 +129,7 @@ Main.prototype.process = async function (args) {
     return await cmd.execute();
   }
 
-  // Watch (trigger hot reload when @omegajs/backend source changes)
+  // Watch (trigger hot reload when @omega.js/backend source changes)
   if (self.options['watch']) {
     const cmd = new WatchCommand(self);
     return await cmd.execute();
@@ -256,7 +256,7 @@ Main.prototype.test = async function(name, fn, fix, args) {
 // with no reason (which surfaced as an ugly `UnhandledPromiseRejection: undefined`).
 Main.prototype.haltSetup = function() {
   if (this.setupSummary) {
-    this.setupSummary.print({ hint: `Fix the above, then run ${require('chalk').default.bold('npx mgr setup')} again.` });
+    this.setupSummary.print({ hint: `Fix the above, then run ${require('chalk').default.bold('npx omega setup')} again.` });
   }
 
   process.exit(1);

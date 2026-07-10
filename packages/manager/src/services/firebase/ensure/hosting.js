@@ -21,8 +21,8 @@
  * required records are printed instead and the operation warns.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { pollWithSpinner } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { pollWithSpinner } = require('@omega.js/devkit/flows');
 
 module.exports = async function ensureHosting(context) {
   const { firebaseApi: api, cloudflareApi, brandConfig, projectId, domain, apexDomain, isSubdomainProject, options = {} } = context;

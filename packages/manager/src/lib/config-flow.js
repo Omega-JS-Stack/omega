@@ -12,8 +12,8 @@
  * gate ("Disable" writes `<section>: false` so the service stops asking).
  */
 const chalk = require('chalk').default;
-const { input, select, isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowser } = require('@omegajs/devkit/flows');
+const { input, select, isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('./config-write.js');
 
 const CREATE_NEW = '__CREATE_NEW__';

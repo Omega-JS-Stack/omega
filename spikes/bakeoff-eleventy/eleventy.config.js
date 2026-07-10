@@ -2,7 +2,7 @@
  * Eleventy CLI config — used by `npm run dev` (serve/watch) over the corpus.
  * Production builds go through src/build.js (which runs the asset pipeline
  * first); this config reads the manifest that build left behind. The engine
- * itself is @omegajs/web (promoted from this spike in B1).
+ * itself is @omega.js/web (promoted from this spike in B1).
  *
  * Dev-mode notes:
  * - layouts default to the symlink FARM (watchable); virtual templates capture
@@ -12,7 +12,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { configureOmega, PATHS } = require('@omegajs/web');
+const { configureOmega, PATHS } = require('@omega.js/web');
 
 const SPIKE = __dirname;
 const ROOT = path.resolve(SPIKE, '..', '..');

@@ -6,13 +6,13 @@
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupForm();
     setupRatingButtons();
@@ -77,7 +77,7 @@ function setupForm() {
   formManager.on('submit', async ({ data }) => {
     trackFeedbackSubmit(data.rating);
 
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/user/feedback`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user/feedback`, {
       method: 'POST',
       response: 'json',
       timeout: 30000,
@@ -101,7 +101,7 @@ function setupForm() {
   });
 
   // Wait for auth state before enabling the form
-  webManager.auth().listen({ once: true }, () => {
+  omega.auth().listen({ once: true }, () => {
     formManager.ready();
   });
 }
@@ -120,7 +120,7 @@ function showReviewModal(reviewURL, data) {
   // Extract site name for display
   try {
     const siteName = new URL(fullURL).hostname.replace('www.', '');
-    $link.innerHTML = `${getPrerenderedIcon('arrow-up-right-from-square', 'me-2')} Post your review on ${webManager.utilities().escapeHTML(siteName)}`;
+    $link.innerHTML = `${getPrerenderedIcon('arrow-up-right-from-square', 'me-2')} Post your review on ${omega.utilities().escapeHTML(siteName)}`;
   } catch (e) {
     // Use default text
   }
@@ -136,7 +136,7 @@ function showReviewModal(reviewURL, data) {
   const $copyBtn = document.getElementById('review-modal-copy');
   if ($copyBtn && $feedbackTextarea) {
     $copyBtn.addEventListener('click', () => {
-      webManager.utilities().clipboardCopy($feedbackTextarea.value);
+      omega.utilities().clipboardCopy($feedbackTextarea.value);
       $copyBtn.innerHTML = `${getPrerenderedIcon('check', 'me-1')} Copied!`;
       setTimeout(() => {
         $copyBtn.innerHTML = `${getPrerenderedIcon('copy', 'me-1')} Copy`;

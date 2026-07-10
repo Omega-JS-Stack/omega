@@ -116,7 +116,7 @@ async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, confi
       owner, repo,
       tag_name: tag,
       name: tag,
-      body: `Draft release auto-created by @omegajs/desktop for partial-platform run. Will be filled in by subsequent runs and published once all platforms have built.`,
+      body: `Draft release auto-created by @omega.js/desktop for partial-platform run. Will be filled in by subsequent runs and published once all platforms have built.`,
       draft: true,
       prerelease: false,
     });
@@ -192,7 +192,7 @@ async function uploadSignedWindows({ octokit, owner, repo, tag, signedDir, confi
     const { data } = await octokit.rest.repos.createRelease({
       owner: downloadsOwner, repo: downloadsRepo,
       tag_name: downloadsTag, name: downloadsTag,
-      body: `Latest installers (auto-mirrored by @omegajs/desktop).`,
+      body: `Latest installers (auto-mirrored by @omega.js/desktop).`,
       draft: false, prerelease: false,
     });
     installerId = data.id;

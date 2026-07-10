@@ -1,13 +1,13 @@
 // Tray — file-based tray definition.
 //
-// @omegajs/desktop looks for the consumer's `src/integrations/tray/index.js` and calls it with a builder API:
+// @omega.js/desktop looks for the consumer's `src/integrations/tray/index.js` and calls it with a builder API:
 //
 //   // src/integrations/tray/index.js
 //   module.exports = ({ manager, tray }) => {
 //     tray.icon('src/assets/icons/tray-Template.png');
 //     tray.tooltip('MyApp');
 //
-//     // Start from @omegajs/desktop's default template:
+//     // Start from @omega.js/desktop's default template:
 //     tray.useDefaults();
 //
 //     // ...or build from scratch:
@@ -25,7 +25,7 @@
 // Builder API (during definition):
 //   tray.icon(path) / tray.tooltip(text)
 //   tray.item(descriptor) / tray.separator() / tray.submenu(label, items)
-//   tray.useDefaults()        — populate with @omegajs/desktop's default template
+//   tray.useDefaults()        — populate with @omega.js/desktop's default template
 //   tray.clear()              — start over
 //
 // Id-path API (during definition AND at runtime via `manager.tray.*`):
@@ -156,7 +156,7 @@ const tray = {
 
   // Resolve the runtime tray icon path. Reads from `<projectRoot>/dist/config/icons/<platform>/`
   // which is populated by `gulp/build-config` using its 3-tier waterfall (consumer config →
-  // consumer convention → @omegajs/desktop bundled). So at runtime we just consume what build-config
+  // consumer convention → @omega.js/desktop bundled). So at runtime we just consume what build-config
   // already resolved — no need to re-walk the chain (and `__dirname` is unreliable inside
   // webpack-bundled main.bundle.js anyway).
   //

@@ -1,7 +1,7 @@
 {
-  "name": "@omegajs/bakeoff-eleventy",
+  "name": "@omega.js/bakeoff-eleventy",
   "version": "1.0.0",
-  "description": "Bench harness for the winning bake-off candidate — builds the shared corpus through @omegajs/web (the engine core promoted from this spike in Phase B1); cold benches + watch-mode incremental probes",
+  "description": "Bench harness for the winning bake-off candidate — builds the shared corpus through @omega.js/web (the engine core promoted from this spike in Phase B1); cold benches + watch-mode incremental probes",
   "private": true,
   "main": "./eleventy.config.js",
   "scripts": {
@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@11ty/eleventy": "^3.1.6",
-    "@omegajs/bakeoff-shared": "*",
-    "@omegajs/web": "*"
+    "@omega.js/bakeoff-shared": "*",
+    "@omega.js/web": "*"
   },
   "engines": {
     "node": ">=22"

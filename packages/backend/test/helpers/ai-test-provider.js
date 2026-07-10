@@ -199,7 +199,7 @@ module.exports = {
       },
     },
 
-    // ─── Path-based messages (@omegajs/backend prompt-template style) ───
+    // ─── Path-based messages (@omega.js/backend prompt-template style) ───
 
     {
       name: 'reply-directive-from-path-based-message-settings',

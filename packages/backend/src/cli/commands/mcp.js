@@ -13,7 +13,7 @@ class McpCommand extends BaseCommand {
       require('dotenv').config({ path: envPath, quiet: true });
     }
 
-    // Resolve the @omegajs/backend server URL
+    // Resolve the @omega.js/backend server URL
     const baseUrl = self.argv.url
       || process.env.BEM_URL
       || 'http://localhost:5002';

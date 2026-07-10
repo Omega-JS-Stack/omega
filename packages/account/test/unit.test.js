@@ -1,7 +1,7 @@
 /**
- * Unit tests for @omegajs/account — engine semantics, generator injection,
+ * Unit tests for @omega.js/account — engine semantics, generator injection,
  * the frontend auth-user overlay, and resolveSubscription derivations.
- * (Byte-parity with @omegajs/backend's live user.js is covered by golden-master.test.js.)
+ * (Byte-parity with @omega.js/backend's live user.js is covered by golden-master.test.js.)
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

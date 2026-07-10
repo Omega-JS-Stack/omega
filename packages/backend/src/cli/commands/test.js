@@ -20,12 +20,12 @@ class TestCommand extends BaseCommand {
     // env var opts into REAL external services (default skipped). Set this
     // BEFORE the captureSyncedEnv/writeTestMode pre-flight below so the flag
     // flows into the emulator's test-mode.json too — making
-    // `npx mgr test --extended` equivalent to `TEST_EXTENDED_MODE=true npx mgr test`.
+    // `npx omega test --extended` equivalent to `TEST_EXTENDED_MODE=true npx omega test`.
     if (argv.extended) {
       process.env.TEST_EXTENDED_MODE = 'true';
     }
 
-    // Framework self-test: when `npx mgr test` is run from the @omegajs/backend repo
+    // Framework self-test: when `npx omega test` is run from the @omega.js/backend repo
     // (no firebase.json in cwd), boot the bundled fixture project under
     // src/test/fixtures/firebase-project. Mirrors BXM/UJM *_TEST_BOOT_PROJECT.
     const isSelfTest = this.setupSelfTest();
@@ -132,7 +132,7 @@ class TestCommand extends BaseCommand {
 
     // Load config/omega.json5 (resolved — the loader walks up to the brand
     // layer from the functions dir in a brand monorepo)
-    const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+    const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
     if (!hasOmegaConfig(functionsDir)) {
       this.logError('Error: Missing config/omega.json5');
       return null;
@@ -195,11 +195,11 @@ class TestCommand extends BaseCommand {
   /**
    * Framework self-test detection + fixture wiring.
    *
-   * When `npx mgr test` runs from a directory that is NOT a Firebase project
-   * (no firebase.json) AND is the @omegajs/backend repo (or BEM_TEST_BOOT_PROJECT
+   * When `npx omega test` runs from a directory that is NOT a Firebase project
+   * (no firebase.json) AND is the @omega.js/backend repo (or BEM_TEST_BOOT_PROJECT
    * is set), point the run at the bundled fixture project and link the local
    * framework + firebase deps into it so the emulator's function workers resolve
-   * them. This is @omegajs/backend's equivalent of BXM's BXM_TEST_BOOT_PROJECT / UJM's
+   * them. This is @omega.js/backend's equivalent of BXM's BXM_TEST_BOOT_PROJECT / UJM's
    * UJ_TEST_BOOT_PROJECT. Returns true if self-test wiring was applied.
    */
   setupSelfTest() {
@@ -210,11 +210,11 @@ class TestCommand extends BaseCommand {
       return false;
     }
 
-    // Self-test if BEM_TEST_BOOT_PROJECT is set, or cwd is the @omegajs/backend repo.
+    // Self-test if BEM_TEST_BOOT_PROJECT is set, or cwd is the @omega.js/backend repo.
     let isSelfTest = !!process.env.BEM_TEST_BOOT_PROJECT;
     if (!isSelfTest) {
       try {
-        isSelfTest = require(path.join(process.cwd(), 'package.json')).name === '@omegajs/backend';
+        isSelfTest = require(path.join(process.cwd(), 'package.json')).name === '@omega.js/backend';
       } catch (_) { /* no package.json — not a self-test */ }
     }
     if (!isSelfTest) {
@@ -233,7 +233,7 @@ class TestCommand extends BaseCommand {
     // the fixture config so loadProjectConfig finds them — no committed .env
     // needed (single source = the fixture config).
     try {
-      const cfg = require('@omegajs/config').loadConfig(fixture, 'backend').config;
+      const cfg = require('@omega.js/config').loadConfig(fixture, 'backend').config;
       process.env.BACKEND_MANAGER_KEY = process.env.BACKEND_MANAGER_KEY || cfg.backend_manager?.key;
       process.env.BACKEND_MANAGER_WEBHOOK_KEY = process.env.BACKEND_MANAGER_WEBHOOK_KEY || cfg.backend_manager?.webhookKey;
     } catch (_) { /* fixture config unreadable — let the normal key check report it */ }
@@ -251,7 +251,7 @@ class TestCommand extends BaseCommand {
 
   /**
    * Write a throwaway service-account.json into the fixture so firebase-admin's
-   * `cert()` can parse it. @omegajs/backend's manager uses the cert path when
+   * `cert()` can parse it. @omega.js/backend's manager uses the cert path when
    * GOOGLE_APPLICATION_CREDENTIALS is unset (as in the functions emulator). The
    * key is a freshly-generated RSA key — emulator-only, never authenticates
    * against Google (the project is a `demo-` project), so it is generated at
@@ -288,9 +288,9 @@ class TestCommand extends BaseCommand {
   /**
    * Symlink the local framework + firebase deps into the fixture's
    * functions/node_modules so the emulator's function workers can resolve them.
-   * Mirrors what `npx mgr install dev` does in a real consumer, but for the
+   * Mirrors what `npx omega install dev` does in a real consumer, but for the
    * fixture and without an npm install (firebase-admin/firebase-functions come
-   * from @omegajs/backend's own node_modules; @omegajs/backend points at the repo root).
+   * from @omega.js/backend's own node_modules; @omega.js/backend points at the repo root).
    */
   linkFixtureDeps(fixture) {
     const fnNodeModules = path.join(fixture, 'functions', 'node_modules');
@@ -298,7 +298,7 @@ class TestCommand extends BaseCommand {
 
     const frameworkRoot = path.resolve(__dirname, '..', '..', '..'); // src/cli/commands -> repo root
     const links = {
-      '@omegajs/backend': frameworkRoot,
+      '@omega.js/backend': frameworkRoot,
       'firebase-admin': path.join(frameworkRoot, 'node_modules', 'firebase-admin'),
       'firebase-functions': path.join(frameworkRoot, 'node_modules', 'firebase-functions'),
     };
@@ -308,7 +308,7 @@ class TestCommand extends BaseCommand {
       try { fs.rmSync(linkPath, { recursive: true, force: true }); } catch (_) { /* nothing to remove */ }
       try {
         // The link's PARENT, not just node_modules — a scoped name like
-        // @omegajs/backend needs its node_modules/@omegajs dir to exist first
+        // @omega.js/backend needs its node_modules/@omega.js dir to exist first
         fs.mkdirSync(path.dirname(linkPath), { recursive: true });
         fs.symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
       } catch (e) {
@@ -352,8 +352,8 @@ class TestCommand extends BaseCommand {
    * own perspective — avoids the sparse-file problem caused by external truncation).
    *
    * Waits up to 2s for the sentinel to be consumed. If it's still there after 2s
-   * the emulator isn't watching (probably running an older @omegajs/backend or started outside
-   * `npx mgr emulator`); we delete the sentinel and proceed — tests still run, the
+   * the emulator isn't watching (probably running an older @omega.js/backend or started outside
+   * `npx omega emulator`); we delete the sentinel and proceed — tests still run, the
    * log just won't be reset for this run.
    */
   async requestEmulatorLogReset(projectDir) {
@@ -389,8 +389,8 @@ class TestCommand extends BaseCommand {
 
     // Ask the running emulator process to roll emulator.log so this test run gets a
     // clean slate. We touch a sentinel file the emulator polls for (every ~500ms) and
-    // wait briefly for it to be consumed. If the emulator isn't watching (older @omegajs/backend
-    // version, or not started via `npx mgr emulator`), we time out silently — the log
+    // wait briefly for it to be consumed. If the emulator isn't watching (older @omega.js/backend
+    // version, or not started via `npx omega emulator`), we time out silently — the log
     // just won't be fresh, tests still run normally.
     await this.requestEmulatorLogReset(projectDir);
 

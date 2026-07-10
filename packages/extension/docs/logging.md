@@ -1,6 +1,6 @@
 # Logging
 
-@omegajs/extension tees every line of CLI/pipeline output to log files in the consumer project root, so you can `tail -f` or `grep` a run instead of scrolling terminal scrollback. Runtime extension logs live in the browser's own consoles (service-worker console, popup/options DevTools) — this doc covers the file logs @omegajs/extension itself writes.
+@omega.js/extension tees every line of CLI/pipeline output to log files in the consumer project root, so you can `tail -f` or `grep` a run instead of scrolling terminal scrollback. Runtime extension logs live in the browser's own consoles (service-worker console, popup/options DevTools) — this doc covers the file logs @omega.js/extension itself writes.
 
 ## Log files
 
@@ -10,7 +10,7 @@ All in `<projectRoot>/logs/`:
 |---|---|---|
 | `dev.log` | Gulp pipeline output on `npm start` | Truncated each run |
 | `build.log` | Gulp pipeline output on `npm run build` (`BXM_BUILD_MODE=true`) | Truncated each run |
-| `test.log` | `npx mgr test` runner output (suite names, pass/fail states, timings) | Truncated each run |
+| `test.log` | `npx omega test` runner output (suite names, pass/fail states, timings) | Truncated each run |
 
 `dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `BXM_BUILD_MODE`, so they never both fill up in one run.
 

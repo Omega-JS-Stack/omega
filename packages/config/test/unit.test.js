@@ -1,5 +1,5 @@
 /**
- * Unit tests for @omegajs/config — merge semantics, secret-shaped-key
+ * Unit tests for @omega.js/config — merge semantics, secret-shaped-key
  * detection, and schema validation (shared + per-target refinements).
  * (File discovery + the full resolution chain are covered by load.test.js.)
  */

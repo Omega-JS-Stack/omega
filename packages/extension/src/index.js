@@ -1,5 +1,5 @@
 // // Libraries
-// const WebManager = require('@omegajs/client');
+// const WebManager = require('@omega.js/client');
 
 // // Class
 // function Manager() {
@@ -9,7 +9,7 @@
 //   self.extension = null;
 //   self.messenger = null;
 //   self.logger = null;
-//   self.webManager = null;
+//   self.omega = null;
 
 //   // Return
 //   return self;
@@ -25,13 +25,13 @@
 //   self.extension = require('./lib/extension');
 //   self.messenger = null;
 //   self.logger = new (require('./lib/logger-lite'))('popup');
-//   self.webManager = new WebManager();
+//   self.omega = new WebManager();
 
 //   // Initialize
-//   self.webManager.init(configuration, callback);
+//   self.omega.init(configuration, callback);
 
 //   // Return
-//   return self.webManager;
+//   return self.omega;
 // };
 
 // Manager.prototype.library = function (name) {

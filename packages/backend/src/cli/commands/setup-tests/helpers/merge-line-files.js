@@ -1,7 +1,7 @@
 /**
  * SSOT shim for line-based file merging (.env / .gitignore / CLAUDE.md).
  *
- * The real merge logic lives in @omegajs/devkit/merge-line-files (reached through
+ * The real merge logic lives in @omega.js/devkit/merge-line-files (reached through
  * the `src/utils/merge-line-files.js` shim so vendoring rewrites one path) — a
  * key-based merge that keeps each KEY under its template header and
  * promotes/migrates keys between the Default/Custom sections correctly. This file

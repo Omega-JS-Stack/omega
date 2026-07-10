@@ -13,8 +13,8 @@
  * identically to a normal run.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowserAndPoll } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 
 // Throwaway token for the secret-validity probe — never a real assessment
 const PROBE_TOKEN = 'omega-manager-secret-validation-probe';

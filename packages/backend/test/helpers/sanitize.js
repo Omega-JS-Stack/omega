@@ -2,7 +2,7 @@
  * Test: helpers/utilities.sanitize()
  * Unit tests for HTML sanitization and trimming across all data types
  *
- * Run: npx mgr test helpers/sanitize
+ * Run: npx omega test helpers/sanitize
  *
  * Covers:
  * - Pure schema fields (sanitized by default, opt-out with sanitize: false)

@@ -13,7 +13,7 @@ const DEFAULTS = {
 
 // Resolve runtime config + decide whether sentry should boot.
 // Presence-driven: a non-empty `dsn` enables sentry. No separate `enabled` flag —
-// matches @omegajs/backend convention (a config block's credentials are its enable signal).
+// matches @omega.js/backend convention (a config block's credentials are its enable signal).
 // Returns { shouldEnable, options, reason } where options is the resolved sentry-init opts.
 function resolveConfig(manager) {
   const cfg = (manager && manager.config && manager.config.sentry) || {};
@@ -45,7 +45,7 @@ function resolveConfig(manager) {
   return { shouldEnable: true, options: opts, reason: null };
 }
 
-// Normalize a @omegajs/client / firebase user object into the minimal shape Sentry wants.
+// Normalize a @omega.js/client / firebase user object into the minimal shape Sentry wants.
 // Only the safe fields — never email if `sentry.scrubEmail` is true (default false).
 function normalizeUser(user, opts = {}) {
   if (!user) return null;

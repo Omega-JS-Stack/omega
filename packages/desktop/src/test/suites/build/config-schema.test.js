@@ -1,5 +1,5 @@
 // Validates the framework default config (src/defaults/config/omega.json5) parses as
-// JSON5 and — RESOLVED for the desktop target via @omegajs/config — has all the keys
+// JSON5 and — RESOLVED for the desktop target via @omega.js/config — has all the keys
 // the framework code reads.
 //
 // This is a SUITE (sequential, shared state) — the raw file is loaded once by the first
@@ -8,7 +8,7 @@
 const path = require('path');
 const fs = require('fs');
 const JSON5 = require('json5');
-const { loadConfig } = require('@omegajs/config');
+const { loadConfig } = require('@omega.js/config');
 
 const Manager = require('../../../build.js');
 const root = Manager.getRootPath('main');
@@ -105,7 +105,7 @@ module.exports = {
     {
       name: 'has NO `windows` block — windows are created from main.js (lazy)',
       run: (ctx) => {
-        // @omegajs/desktop no longer auto-creates windows. The `windows` config block is optional —
+        // @omega.js/desktop no longer auto-creates windows. The `windows` config block is optional —
         // consumer adds it only when overriding defaults persistently. Default config
         // ships without one.
         ctx.expect(ctx.state.cfg.windows).toBeFalsy();

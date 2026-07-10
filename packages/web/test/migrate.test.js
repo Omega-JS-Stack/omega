@@ -5,7 +5,7 @@
  * guards), SEMANTIC proofs (the rewrites render identically / correctly
  * through the real LiquidJS + template-kit adapter — the same path the
  * engine uses), and the end-to-end migration of a synthetic UJM consumer in
- * a temp dir (config conversion validated through the real @omegajs/config
+ * a temp dir (config conversion validated through the real @omega.js/config
  * loader, legacy files removed, check mode writes nothing). Plus the runtime
  * composition the migration relies on: firebaseConfig/payment/analytics at
  * their omega.json5 homes render into the chrome's composed spots.
@@ -16,8 +16,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const { Liquid } = require('liquidjs');
-const { registerLiquid } = require('@omegajs/template-kit');
-const { loadConfig } = require('@omegajs/config');
+const { registerLiquid } = require('@omega.js/template-kit');
+const { loadConfig } = require('@omega.js/config');
 const { applyRules } = require('../src/migrate/codemod.js');
 const { convertConfig, serializeOmega } = require('../src/migrate/config-convert.js');
 const { lintText } = require('../src/migrate/lint.js');

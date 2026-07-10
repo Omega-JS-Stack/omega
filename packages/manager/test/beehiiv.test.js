@@ -29,7 +29,7 @@ const BRAND_NAME = 'Fixture Brand';
 const PUB_ID = 'pub_fixture123';
 const WEBHOOK_KEY = 'fixture-webhook-key';
 const WEBHOOK_URL = `https://api.${DOMAIN}/backend-manager/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`;
-const WEBHOOK_DESCRIPTION = '@omegajs/backend consent pipeline (managed by OMEGA — do not edit manually)';
+const WEBHOOK_DESCRIPTION = '@omega.js/backend consent pipeline (managed by OMEGA — do not edit manually)';
 const EVENT_TYPES = ['subscription.unsubscribed', 'subscription.deleted', 'subscription.paused'];
 
 const BEEHIIV_FIELDS = fieldsFor('beehiiv');
@@ -461,7 +461,7 @@ test('beehiiv: dry-run on a fully drifted brand performs zero mutations', async 
 
 // ─── Interactive create-publication flow (browser open + poll) ────────────────
 
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 
 test('publication: interactive run opens the create page and polls until the new publication auto-matches', async () => {
   const api = fakeBeehiiv(convergedResponses());

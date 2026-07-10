@@ -1,6 +1,6 @@
 {
-  "name": "@omegajs/desktop",
-  "version": "2.0.2",
+  "name": "@omega.js/desktop",
+  "version": "2.1.0",
   "description": "OMEGA desktop framework — build, test, and package Electron apps for macOS, Windows, and Linux",
   "main": "dist/index.js",
   "exports": {
@@ -29,11 +29,14 @@
     "./lib/templating": "./dist/lib/templating.js",
     "./lib/tray": "./dist/lib/tray.js",
     "./lib/client-bridge": "./dist/lib/client-bridge.js",
-    "./lib/window-manager": "./dist/lib/window-manager.js"
+    "./lib/window-manager": "./dist/lib/window-manager.js",
+    "./cli": "./dist/cli-run.js"
   },
   "bin": {
-    "omega-desktop": "bin/omega-desktop",
-    "mgr": "bin/omega-desktop"
+    "omega": "./bin/omega",
+    "omg": "./bin/omg",
+    "mgr": "./bin/omega",
+    "omega-desktop": "./bin/omega-desktop"
   },
   "files": [
     "bin/",
@@ -48,7 +51,7 @@
     "type": "copy",
     "replace": {},
     "hooks": {
-      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
     }
   },
   "scripts": {
@@ -59,16 +62,16 @@
     "test": "node ./bin/omega-desktop test"
   },
   "projectScripts": {
-    "start": "npx mgr clean && npx mgr setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omegajs/desktop/dist/gulp/main.js",
-    "build": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- build",
-    "package": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- packageBuild",
-    "package:quick": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- packageQuick",
+    "start": "npx omega clean && npx omega setup && npm run gulp --",
+    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omega.js/desktop/dist/gulp/main.js",
+    "build": "npx omega clean && npx omega setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- build",
+    "package": "npx omega clean && npx omega setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- packageBuild",
+    "package:quick": "npx omega clean && npx omega setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- packageQuick",
     "publish": "npx cross-env EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish",
-    "release": "npx mgr release",
-    "release:local": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish",
-    "postinstall": "node node_modules/@omegajs/desktop/scripts/sync-nvmrc.js",
-    "test": "npx mgr test",
+    "release": "npx omega release",
+    "release:local": "npx omega clean && npx omega setup && npx cross-env EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish",
+    "postinstall": "node node_modules/@omega.js/desktop/scripts/sync-nvmrc.js",
+    "test": "npx omega test",
     "electron": "electron ."
   },
   "engines": {
@@ -95,8 +98,8 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
-    "@omegajs/config": "*",
-    "@omegajs/devkit": "*",
+    "@omega.js/config": "*",
+    "@omega.js/devkit": "*",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "firebase-admin": "^13.9.0",
@@ -129,7 +132,7 @@
     "plist": "^4.0.0",
     "sass": "^1.99.0",
     "uuid": "^14.0.0",
-    "@omegajs/client": "^5.0.0",
+    "@omega.js/client": "^5.0.0",
     "webpack": "^5.106.2",
     "wonderful-fetch": "^2.0.5",
     "wonderful-version": "^1.3.2",

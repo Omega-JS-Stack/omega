@@ -1,12 +1,12 @@
 // Libraries
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupBillingToggle();
     setupPlanButtons();
@@ -148,7 +148,7 @@ function handlePlanSelection(button) {
   const billingType = document.querySelector(`${config.selectors.billingRadios}:checked`)?.dataset.billing || 'monthly';
 
   if (!planId) {
-    webManager.sentry().captureException(new Error('Plan ID missing from button'));
+    omega.sentry().captureException(new Error('Plan ID missing from button'));
     return;
   }
 
@@ -321,8 +321,8 @@ function setupPromoCountdown() {
 
 // Update buttons based on the user's current active plan
 function setupCurrentPlanIndicator() {
-  webManager.auth().listen({ once: true }, (state) => {
-    const resolved = webManager.auth().resolveSubscription(state.account);
+  omega.auth().listen({ once: true }, (state) => {
+    const resolved = omega.auth().resolveSubscription(state.account);
 
     if (!resolved.active) {
       return;

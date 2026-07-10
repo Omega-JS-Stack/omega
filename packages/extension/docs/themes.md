@@ -1,6 +1,6 @@
 # Themes
 
-@omegajs/extension ships two themes plus a template for new ones. Themes vendor their own SCSS + JS + Bootstrap-compatible variable system.
+@omega.js/extension ships two themes plus a template for new ones. Themes vendor their own SCSS + JS + Bootstrap-compatible variable system.
 
 ## Available themes
 
@@ -68,7 +68,7 @@ Consumer views can use `{{ theme.appearance }}` in their HTML to apply per-page 
 
 ## Why not Tailwind?
 
-Themes are SCSS-first because @omegajs/extension's roots are Bootstrap-based and most @omegajs/extension consumers already use Bootstrap-style class names (`.btn`, `.card`, `.modal`). Tailwind requires a build step (PostCSS + content scanning) that would complicate the lean gulp pipeline. If a future theme wants Tailwind, drop it under `src/assets/themes/tailwind/` and wire its own build hook.
+Themes are SCSS-first because @omega.js/extension's roots are Bootstrap-based and most @omega.js/extension consumers already use Bootstrap-style class names (`.btn`, `.card`, `.modal`). Tailwind requires a build step (PostCSS + content scanning) that would complicate the lean gulp pipeline. If a future theme wants Tailwind, drop it under `src/assets/themes/tailwind/` and wire its own build hook.
 
 ## See also
 

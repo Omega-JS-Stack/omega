@@ -2,7 +2,7 @@
  * POST /marketing/webhook/forward?provider=sendgrid|beehiiv&key=<BACKEND_MANAGER_WEBHOOK_KEY>
  *
  * Parent-only forwarder. SendGrid and Beehiiv send webhooks to this single URL
- * on the parent @omegajs/backend. The parent reads its `brands` collection and re-POSTs the
+ * on the parent @omega.js/backend. The parent reads its `brands` collection and re-POSTs the
  * raw body to every child's /marketing/webhook?provider=X. Each child then
  * processes the event against its own Firestore and providers.
  *
@@ -19,7 +19,7 @@
  *   - Child receivers live at `/backend-manager/marketing/webhook` on that host.
  *
  * Self-inclusion:
- *   - The parent's own brand IS included in the fan-out. The parent @omegajs/backend has
+ *   - The parent's own brand IS included in the fan-out. The parent @omega.js/backend has
  *     its own user base (e.g. itwcreativeworks.com users) and needs the same
  *     consent updates as any other brand. Self-fan-out goes via HTTP like
  *     every other child — no special inline path.
@@ -38,7 +38,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   const { admin } = libraries;
   const query = assistant.request.query;
 
-  // Gate: only the parent @omegajs/backend exposes this route. Any brand whose config.parent
+  // Gate: only the parent @omega.js/backend exposes this route. Any brand whose config.parent
   // points to a URL (the normal case) returns 404 — pretend the route doesn't exist.
   if (!Manager.isParent()) {
     return assistant.respond('Not found', { code: 404 });
@@ -135,7 +135,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
 };
 
 /**
- * POST the raw body to one child @omegajs/backend's /marketing/webhook receiver.
+ * POST the raw body to one child @omega.js/backend's /marketing/webhook receiver.
  * Returns { ok: true } on success, { ok: false, error } on failure.
  */
 async function forwardToChild({ assistant, brandId, brandUrl, provider, key, body }) {

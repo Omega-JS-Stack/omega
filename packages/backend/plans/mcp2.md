@@ -45,7 +45,7 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated sees only `pu
 
 4. User lands on their familiar website sign-in page.
    Signs in with Google / email+password / whatever.
-   After sign-in, page gets Firebase ID token via webManager.auth().getIdToken()
+   After sign-in, page gets Firebase ID token via omega.auth().getIdToken()
 
 5. Consumer's /token page redirects to CLAUDE_CALLBACK:
    CLAUDE_CALLBACK?code=FIREBASE_ID_TOKEN&state=STATE
@@ -209,7 +209,7 @@ In `call()`:
 
 The UJM `/token` page needs to support the MCP OAuth redirect flow:
 - Detect `redirect_uri` and `state` query params
-- After sign-in, get Firebase ID token via `webManager.auth().getIdToken()`
+- After sign-in, get Firebase ID token via `omega.auth().getIdToken()`
 - Redirect to `redirect_uri?code={idToken}&state={state}`
 
 This is a small addition to the existing `/token` page layout. Files:
@@ -237,11 +237,11 @@ This is a small addition to the existing `/token` page layout. Files:
 
 ## Verification
 
-1. **Existing admin flow**: `npx mgr mcp` with `BACKEND_MANAGER_KEY` → all 19 tools listed, all callable
-2. **User flow (stdio)**: `npx mgr mcp --token <api-key>` → only user+public tools listed
-3. **Public flow**: `npx mgr mcp` (no key, no token) → only public tools listed
+1. **Existing admin flow**: `npx omega mcp` with `BACKEND_MANAGER_KEY` → all 19 tools listed, all callable
+2. **User flow (stdio)**: `npx omega mcp --token <api-key>` → only user+public tools listed
+3. **Public flow**: `npx omega mcp` (no key, no token) → only public tools listed
 4. **Consumer tools**: Create `functions/mcp.js` in a consumer project → tools appear in listing
 5. **HTTP OAuth flow**: Connect from Claude Code/Desktop → redirected to consumer site → sign in → redirected back → user tools available
 6. **Token exchange**: POST to `/mcp/token` with Firebase ID token → returns API key as access_token
 7. **Role enforcement**: User calling an admin tool by name → unknown tool error (tool not in filtered list)
-8. **Run `npx mgr test`** to verify no regressions
+8. **Run `npx omega test`** to verify no regressions

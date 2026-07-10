@@ -1,5 +1,5 @@
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Global variables
 let launchTimeout;
@@ -14,9 +14,9 @@ let $spinner;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    // Set webManager
+    // Set omega
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupPage();
 

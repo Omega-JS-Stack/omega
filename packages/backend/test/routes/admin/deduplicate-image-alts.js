@@ -2,7 +2,7 @@
  * Test: routes/admin/post/deduplicate-image-alts
  * Unit tests for the alt-text dedup helper used by the admin/post route.
  *
- * Run: npx mgr test routes/admin/deduplicate-image-alts
+ * Run: npx omega test routes/admin/deduplicate-image-alts
  *
  * Contract:
  *   - Header images are never modified.

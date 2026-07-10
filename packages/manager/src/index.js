@@ -1,5 +1,5 @@
 /**
- * @omegajs/manager — the OMEGA orchestration engine for brand monorepos.
+ * @omega.js/manager — the OMEGA orchestration engine for brand monorepos.
  * Public surface: the manage runner, the service-runner factory (services
  * and tests build on it), brand/state loading, and the registry.
  */

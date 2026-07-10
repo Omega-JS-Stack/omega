@@ -14,7 +14,7 @@ const { test } = require('node:test');
 
 const Main = require('../src/cli.js');
 const { scaffoldDefaults, FILE_MAP, NODE_VERSION } = require('../src/scaffold.js');
-const { loadConfig } = require('@omegajs/config');
+const { loadConfig } = require('@omega.js/config');
 
 const PKG = path.resolve(__dirname, '..');
 const quiet = { log() {}, warn() {}, error() {} };

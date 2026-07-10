@@ -1,6 +1,6 @@
 /**
  * FROZEN B1 snapshot of the bake-off asset pipeline (theme.scss entry,
- * flat manifest) — vendored when @omegajs/web moved to the B2 layer-root
+ * flat manifest) — vendored when @omega.js/web moved to the B2 layer-root
  * conventions. This spike is a retained reference; its pipeline stays as
  * measured. Original: 3-layer page-module JS via esbuild
  * (content-hashed, manifest-mapped), layered sass (`omega:` scheme importer
@@ -13,7 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const sass = require('sass');
-const { collectLayered } = require('@omegajs/web/layers');
+const { collectLayered } = require('@omega.js/web/layers');
 
 /**
  * Build page-module JS + theme CSS, returning the asset manifest.
@@ -21,7 +21,7 @@ const { collectLayered } = require('@omegajs/web/layers');
  * @param {string[]} options.jsLayers - ordered js layer dirs (site → theme(s) → core), each containing pages/
  * @param {string[]} options.cssLayers - ordered css layer dirs (active theme → classy → core)
  * @param {string} options.outDir - the site output dir (_site)
- * @param {string} options.clientEntry - path to @omegajs/client's entry (aliased as `web-manager`)
+ * @param {string} options.clientEntry - path to @omega.js/client's entry (aliased as `web-manager`)
  * @returns {Promise<{ js: object, css: object }>}
  */
 async function buildAssets(options) {

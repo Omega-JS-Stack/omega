@@ -16,7 +16,7 @@ If you're writing `const mockX = {...}` to satisfy a function under test, STOP a
 Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment — and even then, stub the *smallest possible seam*, never a whole `Manager`/`assistant`:
 
 1. **A side effect that would destroy the test run itself.** If invoking the real method would kill or corrupt the harness — e.g. a process-exit, an `app.quit()`, a destructive filesystem wipe, a recursive re-invocation of the test/build command — you may stub *that one call* to a no-op, assert the surrounding logic, then restore it. You are not faking behavior; you are preventing the harness from terminating mid-assertion.
-2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omegajs/backend backends (parent → child brand servers). Only **one** @omegajs/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.js`.)
+2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omega.js/backend backends (parent → child brand servers). Only **one** @omega.js/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.js`.)
 
 **Rules for both exceptions:** stub the narrowest seam (one method / one module), restore it immediately, and add a comment stating *why the real thing can't run here*. If you can run it for real, you must.
 
@@ -27,29 +27,29 @@ A feature is not done when it works — it's done when every surface it exposes 
 | Coverage | Where | Proves |
 |---|---|---|
 | **Logic** | `test/routes/` / `test/events/` | The handler does the right thing — exercised against the real emulator (real Manager, `assistant`, Firestore) |
-| **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS @omegajs/backend's end-to-end |
+| **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS @omega.js/backend's end-to-end |
 | **Rules** | `test/rules/` suites | Firestore security rules permit/deny exactly as intended (required whenever rules change) |
 
-@omegajs/backend has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
+@omega.js/backend has no UI layer — a feature's UI coverage lives in the consuming frontend (UJM/BXM/EM), which has its own mirrored coverage convention. External-API paths are covered for real via [Extended Mode](#extended-mode-test_extended_mode), never mocked.
 
 **Skipping a surface is the exception, not the default.** Skip ONLY when the feature genuinely doesn't expose that surface (a pure helper has no route; a route that touches no Firestore docs needs no rules test). Convenience is never a reason: "the handler test already covers it" does NOT excuse the route round-trip — handler tests prove the logic, round-trips prove the wiring (a route can be unregistered or mis-gated while every handler test stays green). When in doubt, write the test.
 
 ## Running Tests
 
-**Where to run:** `npx mgr test` runs from a **Firebase project directory** — a consumer project's root or its `functions/` dir (the runner resolves the project from `cwd`, stripping a trailing `/functions`). A single `npx mgr test` **auto-launches the emulator** (Option 2 below) — you don't need to start one first.
+**Where to run:** `npx omega test` runs from a **Firebase project directory** — a consumer project's root or its `functions/` dir (the runner resolves the project from `cwd`, stripping a trailing `/functions`). A single `npx omega test` **auto-launches the emulator** (Option 2 below) — you don't need to start one first.
 
 ```bash
 # Option 1: Two terminals
-npx mgr emulator  # Terminal 1 - keeps emulator running
-npx mgr test      # Terminal 2 - runs tests
+npx omega emulator  # Terminal 1 - keeps emulator running
+npx omega test      # Terminal 2 - runs tests
 
 # Option 2: Single command (auto-starts emulator) — the usual way
-npx mgr test
+npx omega test
 ```
 
 ### Self-test from the framework repo (bundled fixture)
 
-`npx mgr test` run **from the @omegajs/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `bm_api` → health returns 200). Mirrors BXM's `BXM_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `BEM_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx mgr install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
+`npx omega test` run **from the @omega.js/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `bm_api` → health returns 200). Mirrors BXM's `BXM_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `BEM_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx omega install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
 
 ### Filtering tests
 
@@ -57,40 +57,40 @@ Pass a path (relative to `test/`) as a positional argument to run specific tests
 
 ```bash
 # Run a single test file
-npx mgr test email/transactional
+npx omega test email/transactional
 
 # Run all tests in a directory
-npx mgr test routes/marketing
+npx omega test routes/marketing
 
-# Run only @omegajs/backend framework tests (from node_modules/@omegajs/backend/test/)
-npx mgr test backend:email/templates
+# Run only @omega.js/backend framework tests (from node_modules/@omega.js/backend/test/)
+npx omega test backend:email/templates
 
 # Run only consumer project tests (from the project's own test/)
-npx mgr test project:routes/custom
+npx omega test project:routes/custom
 
 # Combine with extended mode for tests that hit real APIs (--extended sets the shared TEST_EXTENDED_MODE)
-npx mgr test --extended routes/marketing/push-send
+npx omega test --extended routes/marketing/push-send
 ```
 
 The filter matches against the test file path. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, both are searched.
 
 ## Project mismatch detection
 
-The test runner's health check verifies that the running emulator belongs to the **same project** as the test suite. If you leave project A's emulator running and run `npx mgr test` from project B, the hosting rewrites won't match and tests fail with mysterious 404s.
+The test runner's health check verifies that the running emulator belongs to the **same project** as the test suite. If you leave project A's emulator running and run `npx omega test` from project B, the hosting rewrites won't match and tests fail with mysterious 404s.
 
 Detection uses two sources (tried in order):
-1. **Firebase Emulator Hub** (`localhost:4400/emulators`) — always returns the emulator's `projectId`, regardless of @omegajs/backend version.
-2. **Health endpoint** (`/test/health`) — returns `projectId` from `Manager.config.firebaseConfig.projectId` (@omegajs/backend 5.3.3+).
+1. **Firebase Emulator Hub** (`localhost:4400/emulators`) — always returns the emulator's `projectId`, regardless of @omega.js/backend version.
+2. **Health endpoint** (`/test/health`) — returns `projectId` from `Manager.config.firebaseConfig.projectId` (@omega.js/backend 5.3.3+).
 
 On mismatch the runner aborts immediately:
 ```
 ✗ Project mismatch: the running emulator belongs to "project-a" but this project is "project-b".
-  Stop the other emulator first, then run: npx mgr emulator
+  Stop the other emulator first, then run: npx omega emulator
 ```
 
 ## Cross-project API calls (single-emulator limitation)
 
-Some routes fan out to **other @omegajs/backend backends** — e.g. a sponsorship submission on `itw-creative-works` publishes a guest post to `ultimate-jekyll`'s `POST /admin/post`. Only **one** Firebase emulator can run locally at a time, so these cross-project calls **always hit the live deployed target**, even in test/dev mode.
+Some routes fan out to **other @omega.js/backend backends** — e.g. a sponsorship submission on `itw-creative-works` publishes a guest post to `ultimate-jekyll`'s `POST /admin/post`. Only **one** Firebase emulator can run locally at a time, so these cross-project calls **always hit the live deployed target**, even in test/dev mode.
 
 This means:
 - The target backend must be **deployed** with up-to-date code for extended tests to pass.
@@ -130,7 +130,7 @@ The rule: **never put cleanup at the END of a test file or suite for the purpose
 
 ## `test/_init.js` — pre-test lifecycle hook
 
-The runner loads an optional `test/_init.js` from **both** test roots — @omegajs/backend core (`<backend>/test/_init.js`) and the consumer project (`<projectDir>/test/_init.js`) — and runs it before any test (it is NOT itself run as a test). Same contract for both roots, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare** — `_init.js` only declares accounts and reseeds fixtures.
+The runner loads an optional `test/_init.js` from **both** test roots — @omega.js/backend core (`<backend>/test/_init.js`) and the consumer project (`<projectDir>/test/_init.js`) — and runs it before any test (it is NOT itself run as a test). Same contract for both roots, so framework and consumer authors write the identical file. Because the entire emulator Firestore is flushed each run, there are **no collection lists to declare** — `_init.js` only declares accounts and reseeds fixtures.
 
 The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ config, Manager }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
 
@@ -161,11 +161,11 @@ module.exports = ({ config }) => ({
 
 ## Extended Mode (`TEST_EXTENDED_MODE`)
 
-`TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across @omegajs/backend/BXM/UJM/EM. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx mgr test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx mgr test`. Either form works; the flag is just sugar over the env var.
+`TEST_EXTENDED_MODE` is the **shared, unprefixed** extended-mode switch standardized across @omega.js/backend/BXM/UJM/EM. It opts **in** to REAL external services (default: skipped). The CLI shorthand `--extended` sets it for you, so `npx omega test --extended` is equivalent to `TEST_EXTENDED_MODE=true npx omega test`. Either form works; the flag is just sugar over the env var.
 
 Several routes/handlers skip external API calls (SendGrid, Beehiiv, Stripe webhooks, dispute handlers, marketing libraries) when `process.env.TEST_EXTENDED_MODE` is unset, so unit tests don't fire real emails or webhook side effects. Set the flag (or pass `--extended`) to opt **in** to those side effects for a full end-to-end run.
 
-**@omegajs/backend propagates the mode to BOTH spawned environments — the distinctive @omegajs/backend detail.** The mode reaches (1) the **test-runner subprocess** (spawned with `{ ...process.env }`, so `TEST_EXTENDED_MODE` carries through) AND (2) the **running emulator's function workers** (via the `.temp/test-mode.json` shared state file written pre-flight by `src/test/utils/test-mode-file.js`, allowlisted in `SYNCED_ENV_KEYS`). That's why a single `--extended` on the test command flips both the runner's in-source gates and the live emulator without restarting it.
+**@omega.js/backend propagates the mode to BOTH spawned environments — the distinctive @omega.js/backend detail.** The mode reaches (1) the **test-runner subprocess** (spawned with `{ ...process.env }`, so `TEST_EXTENDED_MODE` carries through) AND (2) the **running emulator's function workers** (via the `.temp/test-mode.json` shared state file written pre-flight by `src/test/utils/test-mode-file.js`, allowlisted in `SYNCED_ENV_KEYS`). That's why a single `--extended` on the test command flips both the runner's in-source gates and the live emulator without restarting it.
 
 The marketing library gates at the SSOT level: `Marketing.add()`, `Marketing.sync()`, and `Marketing.remove()` each short-circuit with `if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) return {}` before touching any provider. Callers (auth `onDelete`, webhook processors, contact-delete route) inherit the gate for free — do NOT rely on a per-caller guard for provider safety; add the gate to the library method itself when introducing a new provider-touching method.
 
@@ -173,13 +173,13 @@ The marketing library gates at the SSOT level: `Marketing.add()`, `Marketing.syn
 
 ```bash
 # Terminal 1 — start once, leave running. NO flag needed.
-npx mgr emulator
+npx omega emulator
 
 # Terminal 2 — toggle freely between runs:
-npx mgr test --extended ...                 # runs in extended mode (--extended sets TEST_EXTENDED_MODE)
-TEST_EXTENDED_MODE=true npx mgr test ...    # identical — the env-var form
-npx mgr test ...                            # runs in normal mode
-npx mgr test --extended ...                 # back to extended
+npx omega test --extended ...                 # runs in extended mode (--extended sets TEST_EXTENDED_MODE)
+TEST_EXTENDED_MODE=true npx omega test ...    # identical — the env-var form
+npx omega test ...                            # runs in normal mode
+npx omega test --extended ...                 # back to extended
 ```
 
 The emulator log shows each flip, e.g.:
@@ -194,21 +194,21 @@ The test command also confirms the mode in its own output (`Test mode: extended 
 
 **Allowlist.** Only env vars listed in `SYNCED_ENV_KEYS` (`src/test/utils/test-mode-file.js`) flow through. Today: `TEST_EXTENDED_MODE`. Add a key there to make a new env var live-syncable across terminals. The allowlist exists to prevent accidentally syncing process-specific vars (`FIRESTORE_EMULATOR_HOST`) or sensitive ones (API keys).
 
-**Preferred flow: set the flag on the test command.** Every `npx mgr test` invocation overwrites the shared state file with whatever flags it was called with, and the emulator follows live. This is the recommended pattern — start the emulator once with no flag, leave it running, control the mode from your test invocations.
+**Preferred flow: set the flag on the test command.** Every `npx omega test` invocation overwrites the shared state file with whatever flags it was called with, and the emulator follows live. This is the recommended pattern — start the emulator once with no flag, leave it running, control the mode from your test invocations.
 
 ```bash
 # Recommended
-npx mgr emulator                                # boots in normal mode
-npx mgr test --extended ...                      # flips emulator to extended (or: TEST_EXTENDED_MODE=true npx mgr test ...)
-npx mgr test ...                                 # flips emulator back to normal
+npx omega emulator                                # boots in normal mode
+npx omega test --extended ...                      # flips emulator to extended (or: TEST_EXTENDED_MODE=true npx omega test ...)
+npx omega test ...                                 # flips emulator back to normal
 ```
 
-**Also supported: set the flag on the emulator command.** This still works as a boot default — the emulator command writes the file with whatever it was started with, so the very first test run (before any `npx mgr test` overrides it) sees that mode. Useful if you want to inspect the emulator in a particular mode before firing any tests, or if you script the emulator boot from CI. Just know that the next test command overrides whatever you set here.
+**Also supported: set the flag on the emulator command.** This still works as a boot default — the emulator command writes the file with whatever it was started with, so the very first test run (before any `npx omega test` overrides it) sees that mode. Useful if you want to inspect the emulator in a particular mode before firing any tests, or if you script the emulator boot from CI. Just know that the next test command overrides whatever you set here.
 
 ```bash
 # Also works (boot default — overridden by next test command)
-TEST_EXTENDED_MODE=true npx mgr emulator        # boots in extended mode
-npx mgr test ...                                 # ← this still flips it back to normal
+TEST_EXTENDED_MODE=true npx omega emulator        # boots in extended mode
+npx omega test ...                                 # ← this still flips it back to normal
 ```
 
 ## Log Files
@@ -218,18 +218,18 @@ Test runs tee output to `functions/test.log` (own-emulator runs go to `functions
 ## Filtering Tests
 
 ```bash
-npx mgr test rules/             # Run rules tests (both @omegajs/backend and project)
-npx mgr test backend:rules/         # Only @omegajs/backend's rules tests
-npx mgr test project:rules/     # Only project's rules tests
-npx mgr test user/ admin/       # Multiple paths
+npx omega test rules/             # Run rules tests (both @omega.js/backend and project)
+npx omega test backend:rules/         # Only @omega.js/backend's rules tests
+npx omega test project:rules/     # Only project's rules tests
+npx omega test user/ admin/       # Multiple paths
 ```
 
 ## Test Locations
 
-- **@omegajs/backend core tests:** `test/` (in the framework repo)
+- **@omega.js/backend core tests:** `test/` (in the framework repo)
 - **Project tests:** the consumer project's repo-root `test/` directory (NOT inside `functions/`)
 
-Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.js`, `.../manual-validation.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx mgr test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
+Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.js`, `.../manual-validation.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx omega test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
 
 **The underscore convention:** `_`-prefixed files and directories at any depth under `test/` are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`, `test/routes/_shared-utils.js`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in EM/BXM/UJM.
 
@@ -295,14 +295,14 @@ module.exports = {
 | `state` | Shared state (suites only) |
 | `waitFor` | Polling helper `waitFor(condition, timeout, interval)` |
 | `config` | Test configuration |
-| `Manager` | Real booted @omegajs/backend Manager (+ `Manager.Assistant()` etc.) |
+| `Manager` | Real booted @omega.js/backend Manager (+ `Manager.Assistant()` etc.) |
 
 ## HTTP Routing
 
 The `http` client sends requests directly to the hosting emulator (`http://localhost:5002`) with no magic prefix. The route string you pass becomes the URL path as-is — the hosting emulator's `firebase.json` rewrites handle routing to the correct Cloud Function.
 
 ```javascript
-// @omegajs/backend built-in routes — go through bm_api via firebase.json rewrite
+// @omega.js/backend built-in routes — go through bm_api via firebase.json rewrite
 http.post('backend-manager/payments/intent', { ... })
 http.as('admin').get('backend-manager/admin/stats')
 http.as('none').post('backend-manager/marketing/webhook?provider=sendgrid&key=...', [...])
@@ -313,7 +313,7 @@ http.get('sender-accounts', { projectId: 'abc' })
 http.as('none').post('webhooks', { event: 'reply', campaignId: '...' })
 ```
 
-@omegajs/backend routes live under `/backend-manager/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
+@omega.js/backend routes live under `/backend-manager/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
 
 ## Assert Methods
 
@@ -468,7 +468,7 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 | File | Purpose |
 |------|---------|
 | `src/test/runner.js` | Test runner |
-| `test/` | @omegajs/backend core tests |
+| `test/` | @omega.js/backend core tests |
 | `src/test/utils/assertions.js` | Assert helpers |
 | `src/test/utils/http-client.js` | HTTP client |
 | `src/test/utils/firestore-rules-client.js` | Rules testing client (`asAccount` / `expectSuccess` / `expectFailure`) |

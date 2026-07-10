@@ -12,7 +12,7 @@
  */
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 const FORM_ID = 'marketing-emails-form';
 const TOGGLE_ID = 'marketing-emails';
@@ -36,7 +36,7 @@ export function init() {
   formManager.on('submit', async ({ data }) => {
     const action = data.enabled ? 'subscribe' : 'unsubscribe';
 
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/marketing/email-preferences`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/marketing/email-preferences`, {
       method: 'POST',
       timeout: 60000,
       response: 'json',
@@ -103,8 +103,8 @@ function updatePushUI() {
     return;
   }
 
-  const notifications = webManager.notifications();
-  const stored = webManager.storage().get('notifications', {});
+  const notifications = omega.notifications();
+  const stored = omega.storage().get('notifications', {});
   const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
 
   let state;
@@ -140,7 +140,7 @@ async function initPushNotifications() {
     return;
   }
 
-  const notifications = webManager.notifications();
+  const notifications = omega.notifications();
 
   // Full sync: validates permission + token + Firestore, then updates localStorage
   await notifications.syncSubscription();

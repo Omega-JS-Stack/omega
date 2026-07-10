@@ -20,7 +20,7 @@
  * check → error, any warning → warned.
  *
  * omega-manager deltas: build.json check stays behind (a UJM artifact —
- * @omegajs/web has no build manifest); the stash check stays behind (nothing
+ * @omega.js/web has no build manifest); the stash check stays behind (nothing
  * stashes in the new update service); GitHub Actions is repo-level (one repo
  * per brand, not one per target).
  */

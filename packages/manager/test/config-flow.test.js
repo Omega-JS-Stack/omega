@@ -10,9 +10,9 @@
 
 const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { setPromptStreams } = require('@omegajs/devkit/prompt');
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
-const { makeStreams } = require('@omegajs/devkit/test/prompt-streams');
+const { setPromptStreams } = require('@omega.js/devkit/prompt');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
+const { makeStreams } = require('@omega.js/devkit/test/prompt-streams');
 const JSON5 = require('json5');
 const { resolveConfigValue, sortChoicesForBrand, setAtPath } = require('../src/lib/config-flow.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');

@@ -29,8 +29,8 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { input, isInteractive } = require('@omegajs/devkit/prompt');
-const { withSpinner } = require('@omegajs/devkit/flows');
+const { input, isInteractive } = require('@omega.js/devkit/prompt');
+const { withSpinner } = require('@omega.js/devkit/flows');
 const { resolveBrandmarkSpec, resolveLogoApiToken, generateBrandmark } = require('./lib/brandmark-api.js');
 
 module.exports.run = createServiceRunner({

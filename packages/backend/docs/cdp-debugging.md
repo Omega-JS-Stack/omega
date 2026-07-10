@@ -2,7 +2,7 @@
 
 How to drive a browser you can CONTROL — see the frontend live, screenshot it, click, type, read console logs, inspect network requests against your routes — for agents (Claude via MCP/CDP) and humans.
 
-> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / EM / @omegajs/client) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omega.js/backend / BXM / EM / @omega.js/client) — same core section, framework-flavored. Edit all five together.
 
 ## The browser: your Claude session owns one
 
@@ -19,11 +19,11 @@ Humans: the agent's Chrome window is visible — you can watch it drive. Full re
 
 ## Electron apps are the exception (attach, don't launch)
 
-An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx mgr cdp`. See EM's `docs/cdp-debugging.md`.
+An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx omega cdp`. See EM's `docs/cdp-debugging.md`.
 
-## @omegajs/backend specifics
+## @omega.js/backend specifics
 
 - **The UJM dev site URL is `https://localhost:4000` — NEVER the LAN IP** (`https://192.168.x.x:...`). Port 4000 by default, increments (4001, …) when multiple sites run; the exact port is in `.temp/_config_browsersync.yml` at the root of the WEBSITE project (the UJM consumer — e.g. `<brand>-website/.temp/_config_browsersync.yml`, NOT this backend repo).
 - The network tab is the payoff: `list_network_requests` shows every call the frontend makes to your routes — method, status, and payloads — while you click through the real UI.
 - **Auth'd flows**: the profile is ephemeral, so log in through the real UI at the start of the session (test creds) — then exercise the authenticated routes.
-- Backend-side observation stays where it always was: `npx mgr logs` (gcloud logs) and the emulator suite; this doc only covers the browser half of the loop.
+- Backend-side observation stays where it always was: `npx omega logs` (gcloud logs) and the emulator suite; this doc only covers the browser half of the loop.

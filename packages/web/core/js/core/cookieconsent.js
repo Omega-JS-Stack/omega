@@ -1,16 +1,16 @@
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Cookie Consent Module
 export default function () {
 
   // Check if user has already consented
-  const hasConsented = webManager.storage().get('cookies.consent.accepted') === true;
+  const hasConsented = omega.storage().get('cookies.consent.accepted') === true;
 
   // Get configuration (already normalized with defaults)
-  const config = webManager.config.cookieConsent.config;
+  const config = omega.config.cookieConsent.config;
 
   // Wait for DOM to be ready
-  webManager.dom().ready().then(() => {
+  omega.dom().ready().then(() => {
     if (hasConsented) {
       // Show minimized button if already consented
       createMinimizedButton(config);
@@ -245,7 +245,7 @@ export default function () {
       button.remove();
 
       // Clear consent to show banner again
-      webManager.storage().remove('cookies.consent');
+      omega.storage().remove('cookies.consent');
 
       // Recreate cookie banner
       createCookieBanner(config);
@@ -263,8 +263,8 @@ export default function () {
   function acceptCookies(banner) {
     const timestamp = new Date().toISOString();
 
-    // Store consent using webManager storage
-    webManager.storage().set('cookies.consent', {
+    // Store consent using omega storage
+    omega.storage().set('cookies.consent', {
       accepted: true,
       timestamp: timestamp,
       version: config.version || '1.0'
@@ -287,8 +287,8 @@ export default function () {
   function denyCookies(banner) {
     const timestamp = new Date().toISOString();
 
-    // Store denial using webManager storage
-    webManager.storage().set('cookies.consent', {
+    // Store denial using omega storage
+    omega.storage().set('cookies.consent', {
       accepted: false,
       timestamp: timestamp,
       version: config.version || '1.0'

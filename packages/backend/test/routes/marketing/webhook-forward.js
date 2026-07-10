@@ -10,7 +10,7 @@
  * which exercise the forwarder logic against a mock admin + mock fetch — no emulator
  * round-trip required.
  *
- * This file only verifies the GATE: on a non-parent @omegajs/backend, the route is invisible.
+ * This file only verifies the GATE: on a non-parent @omega.js/backend, the route is invisible.
  */
 module.exports = {
   description: 'Marketing webhook forwarder gating (parent-only)',

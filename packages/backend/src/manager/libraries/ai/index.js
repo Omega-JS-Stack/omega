@@ -65,7 +65,7 @@ AI.prototype.request = async function (options) {
 
   // Normalize unified options shape into what each provider expects.
   // Callers can pass either `messages: [{ role, content }]` (standard SDK style)
-  // or @omegajs/backend's legacy `prompt.content` / `message.content`.
+  // or @omega.js/backend's legacy `prompt.content` / `message.content`.
   const normalized = normalizeOptions(options || {});
 
   const client = self._getProvider(provider, normalized.apiKey);

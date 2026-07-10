@@ -1,6 +1,6 @@
 /**
  * Ensure the Meta Pixel is configured with a Conversions API access token
- * (META_ACCESS_TOKEN in the brand .env — the name @omegajs/backend reads).
+ * (META_ACCESS_TOKEN in the brand .env — the name @omega.js/backend reads).
  */
 const { ensurePixelToken } = require('../lib/pixel-token.js');
 

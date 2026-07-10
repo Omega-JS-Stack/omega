@@ -49,7 +49,7 @@ HTML views go through a two-step `{{ }}` token replacement during the `gulp/html
 - `<script>` for the component's `.bundle.js`
 - Cache-busting query params via `{{ cacheBust }}`
 
-Consumers don't author this — @omegajs/extension owns it. If you need to customize per-view, override directly in `src/views/<component>/index.html` (@omegajs/extension detects when a view provides its own full `<html>` and skips wrapping).
+Consumers don't author this — @omega.js/extension owns it. If you need to customize per-view, override directly in `src/views/<component>/index.html` (@omega.js/extension detects when a view provides its own full `<html>` and skips wrapping).
 
 ## Customizing page vars
 

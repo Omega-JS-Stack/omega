@@ -1,6 +1,6 @@
 /**
  * Ensure the account-global SendGrid Event Webhook points at the parent
- * @omegajs/backend's forwarder with the consent-pipeline events enabled.
+ * @omega.js/backend's forwarder with the consent-pipeline events enabled.
  *
  * SendGrid supports ONE Event Webhook per account, so it always targets the
  * parent brand (`parent` in omega.json5 — 'self' when this brand IS the
@@ -12,7 +12,7 @@
  */
 const chalk = require('chalk').default;
 
-// The consent-pipeline events @omegajs/backend must receive
+// The consent-pipeline events @omega.js/backend must receive
 const DESIRED_TOGGLES = {
   bounce: true,
   dropped: true,

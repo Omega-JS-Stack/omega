@@ -2,7 +2,7 @@
 import { state, buildBindingsState } from './modules/state.js';
 import { trackPurchaseIfNeeded } from './modules/tracking.js';
 import { triggerCelebration } from './modules/celebration.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 /* Test URL
   https://localhost:3000/payment/confirmation?orderId=ORD-TRIAL-123&productId=pro&productName=Pro%20Plan&amount=0&currency=USD&frequency=annually&paymentMethod=stripe&trial=true&track=true
@@ -11,7 +11,7 @@ import webManager from '@omegajs/client';
 // Module export
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
     await initializeConfirmation();
     return resolve();
   });
@@ -19,7 +19,7 @@ export default () => {
 
 // Update UI via bindings (single source of truth)
 function updateUI() {
-  webManager.bindings().update(buildBindingsState());
+  omega.bindings().update(buildBindingsState());
 }
 
 // Initialize confirmation page
@@ -39,7 +39,7 @@ async function initializeConfirmation() {
   // Subscribe to push notifications on CTA click (requires user gesture)
   document.querySelectorAll('.btn').forEach(($btn) => {
     $btn.addEventListener('click', () => {
-      webManager.notifications().subscribe().catch((e) => {
+      omega.notifications().subscribe().catch((e) => {
         console.warn('[Confirmation] Notification subscribe failed:', e.message);
       });
     }, { once: true });

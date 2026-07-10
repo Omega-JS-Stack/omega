@@ -8,11 +8,11 @@ const { safeInstall } = require('../../utils/safe-install');
 
 class OmegaBackendTest extends BaseTest {
   getName() {
-    return 'using updated @omegajs/backend';
+    return 'using updated @omega.js/backend';
   }
 
   async run() {
-    const pkg = '@omegajs/backend';
+    const pkg = '@omega.js/backend';
     const latest = await this.getPkgVersion(pkg);
     const mine = this.context.package.dependencies[pkg];
 
@@ -29,9 +29,9 @@ class OmegaBackendTest extends BaseTest {
   }
 
   async fix() {
-    await this.installPkg('@omegajs/backend');
+    await this.installPkg('@omega.js/backend');
 
-    console.log(chalk.green(`Process has exited since a new version of @omegajs/backend was installed. Run ${chalk.bold('npx bm setup')} again.`));
+    console.log(chalk.green(`Process has exited since a new version of @omega.js/backend was installed. Run ${chalk.bold('npx bm setup')} again.`));
     process.exit(0);
   }
 

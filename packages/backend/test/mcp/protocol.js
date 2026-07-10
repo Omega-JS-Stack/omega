@@ -2,7 +2,7 @@
  * Test: MCP protocol endpoint — happy path, sad path, edge cases
  * Tests the Streamable HTTP transport at POST /backend-manager/mcp
  *
- * Run: npx mgr test backend:mcp/protocol
+ * Run: npx omega test backend:mcp/protocol
  */
 const fetch = require('wonderful-fetch');
 

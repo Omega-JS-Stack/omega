@@ -2,7 +2,7 @@
  * render.mjs — the per-page render orchestration every route shares:
  * frontmatter Liquid → layout dispatch → `resolved` deep-merge → body render.
  */
-import templateKitConfig from '@omegajs/config/site-global';
+import templateKitConfig from '@omega.js/config/site-global';
 import { activeThemeId, loadSiteData, loadAssetManifest } from './paths.mjs';
 import { contentEngine, renderBody } from './liquid.mjs';
 import { resolveLayoutModule } from './layouts.mjs';

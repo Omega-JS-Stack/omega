@@ -1,4 +1,4 @@
-// `npx mgr logs` — show / tail / locate the consumer app's runtime log file.
+// `npx omega logs` — show / tail / locate the consumer app's runtime log file.
 //
 // Resolves to the same file the runtime logger writes to:
 //   - Dev (running from a project directory): <projectRoot>/logs/runtime.log

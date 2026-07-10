@@ -13,7 +13,7 @@ Cross-platform code signing reference. Covers macOS (sign + notarize), Windows (
 ```
 <your-app>/
   build/
-    entitlements.mac.plist             # universal — already in @omegajs/desktop defaults
+    entitlements.mac.plist             # universal — already in @omega.js/desktop defaults
     icon.icns / icon.ico / icon.png    # per-brand
     certs/                             # gitignored
       developer-id-application.p12     # universal across team
@@ -68,12 +68,12 @@ APPLE_API_ISSUER=00000000-0000-...      # UUID from App Store Connect
 APPLE_TEAM_ID=XXXXXXXXXX
 ```
 
-> **Empty values are safe.** The `.env` template ships these as `CSC_LINK=""` placeholders; @omegajs/desktop deletes empty/whitespace signing vars after loading `.env` (`src/utils/sanitize-signing-env.js`) so they read as *unset*. Without the guard, app-builder-lib only null-checks — `importCertificate('')` resolves `''` to the project root and the build dies with `"<projectRoot> not a file"`. With no `CSC_LINK` at all, electron-builder falls back to Keychain identity auto-discovery (so local `package:quick` builds still sign when an identity is installed).
+> **Empty values are safe.** The `.env` template ships these as `CSC_LINK=""` placeholders; @omega.js/desktop deletes empty/whitespace signing vars after loading `.env` (`src/utils/sanitize-signing-env.js`) so they read as *unset*. Without the guard, app-builder-lib only null-checks — `importCertificate('')` resolves `''` to the project root and the build dies with `"<projectRoot> not a file"`. With no `CSC_LINK` at all, electron-builder falls back to Keychain identity auto-discovery (so local `package:quick` builds still sign when an identity is installed).
 
 ### 4. Verify
 
 ```bash
-npx mgr validate-certs
+npx omega validate-certs
 ```
 
 This checks:
@@ -88,7 +88,7 @@ This checks:
 npm run release   # signs + notarizes + publishes
 ```
 
-@omegajs/desktop's built-in notarize is wired as electron-builder's `afterSign` hook (via `gulp/build-config`) and calls `@electron/notarize` with the API key creds. Consumers can extend it with an optional `hooks/notarize/post.js` for post-notarization work.
+@omega.js/desktop's built-in notarize is wired as electron-builder's `afterSign` hook (via `gulp/build-config`) and calls `@electron/notarize` with the API key creds. Consumers can extend it with an optional `hooks/notarize/post.js` for post-notarization work.
 
 ## Windows setup
 
@@ -106,7 +106,7 @@ Buy an EV code-signing cert from Sectigo, DigiCert, SSL.com, etc. Get a physical
    ```
 4. The `windows-sign` job in `.github/workflows/build.yml` will route signing to that runner.
 
-`npx mgr sign-windows` is the strategy-aware command that drives `signtool` (or the cloud provider CLI).
+`npx omega sign-windows` is the strategy-aware command that drives `signtool` (or the cloud provider CLI).
 
 ### Cloud signing (future migration)
 
@@ -128,17 +128,17 @@ If no signing runner is available, CI uploads the unsigned `.exe` and a develope
 
 ## Pushing secrets to GitHub Actions
 
-@omegajs/desktop ships a command that reads your local `.env` and pushes everything to the repo's GitHub Actions secrets, encrypted with the repo's libsodium public key. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
+@omega.js/desktop ships a command that reads your local `.env` and pushes everything to the repo's GitHub Actions secrets, encrypted with the repo's libsodium public key. For env vars whose value is a path to a local file (`.p12`, `.p8`, etc.), the secret value pushed is the **base64-encoded file contents** — the workflow decodes back to a temp file at job start.
 
 ```bash
 # Make sure .env has GH_TOKEN (a PAT with `repo` scope) plus all your signing creds
-npx mgr push-secrets
+npx omega push-secrets
 
 # Push only specific keys
-npx mgr push-secrets --only=CSC_LINK,CSC_KEY_PASSWORD
+npx omega push-secrets --only=CSC_LINK,CSC_KEY_PASSWORD
 
 # Push everything including empty values (default skips empties)
-npx mgr push-secrets --skip-empty=false
+npx omega push-secrets --skip-empty=false
 ```
 
 Behavior:
@@ -200,7 +200,7 @@ The workflow base64-decodes secrets into temp files inside `config/certs/` at jo
 - Confirm `APPLE_API_ISSUER` is the issuer UUID from App Store Connect → Users and Access → Keys.
 
 ### "Hardened runtime requires entitlements"
-- @omegajs/desktop generates `dist/config/entitlements.mac.plist` from defaults + your overrides at build time.
+- @omega.js/desktop generates `dist/config/entitlements.mac.plist` from defaults + your overrides at build time.
 - Defaults cover Electron's needs (allow-jit, network client/server, library validation off, etc.).
 - To override or add: set the `entitlements.mac` block in `config/omega.json5`. Setting a key to `null` removes a default.
   ```json5
@@ -219,10 +219,10 @@ The workflow base64-decodes secrets into temp files inside `config/certs/` at jo
 
 ## What lives in `build/`
 
-`build/` in a consumer project holds **only** code-signing certificate files. Everything else (entitlements, icons, electron-builder config) is generated by @omegajs/desktop into `dist/config/` at build time.
+`build/` in a consumer project holds **only** code-signing certificate files. Everything else (entitlements, icons, electron-builder config) is generated by @omega.js/desktop into `dist/config/` at build time.
 
 - **`config/certs/`** — `.p12`, `.p8`, `.cer`, `.mobileprovision` files. Per-developer / per-CI-runner. **Never commit** — `.gitignore` blocks them.
-- **Nothing else.** `entitlements.mac.plist` is generated. App icons + DMG background + tray icons resolve from `config/icons/` (consumer override) → @omegajs/desktop's bundled defaults. `electron-builder.yml` is generated.
+- **Nothing else.** `entitlements.mac.plist` is generated. App icons + DMG background + tray icons resolve from `config/icons/` (consumer override) → @omega.js/desktop's bundled defaults. `electron-builder.yml` is generated.
 
 The only file you usually create yourself in `build/` is the cert files in `config/certs/`. See [`config/certs/README.md`](../src/defaults/config/certs/README.md) for the full inventory.
 

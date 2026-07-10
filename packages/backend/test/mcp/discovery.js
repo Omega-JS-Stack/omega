@@ -2,7 +2,7 @@
  * Test: MCP OAuth discovery endpoints
  * Tests .well-known/oauth-authorization-server and .well-known/oauth-protected-resource
  *
- * Run: npx mgr test backend:mcp/discovery
+ * Run: npx omega test backend:mcp/discovery
  */
 const fetch = require('wonderful-fetch');
 

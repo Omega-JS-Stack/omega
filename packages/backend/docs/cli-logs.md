@@ -2,26 +2,26 @@
 
 Fetch or stream Cloud Function logs from Google Cloud Logging. Requires `gcloud` CLI installed and authenticated. Auto-resolves the project ID from `service-account.json`, `.firebaserc`, or `GCLOUD_PROJECT`.
 
-> All `npx mgr ...` commands must be run from the consumer project's `functions/` subdirectory. See [docs/cli-firestore-auth.md](cli-firestore-auth.md) for the explanation.
+> All `npx omega ...` commands must be run from the consumer project's `functions/` subdirectory. See [docs/cli-firestore-auth.md](cli-firestore-auth.md) for the explanation.
 
 ## Commands
 
 ```bash
-npx mgr logs:read                                     # Read last 1h of logs (default: 300 entries, newest first)
-npx mgr logs:read --fn bm_api                         # Filter by function name
-npx mgr logs:read --fn bm_api --severity ERROR        # Filter by severity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-npx mgr logs:read --since 2d --limit 100              # Custom time range and limit
-npx mgr logs:read --search "72.134.242.25"            # Search textPayload for a string (IP, email, error, etc.)
-npx mgr logs:read --fn bm_authBeforeCreate --search "ian@example.com" --since 7d  # Combined filters
-npx mgr logs:read --order asc                         # Oldest first (default: desc/newest first)
-npx mgr logs:read --filter 'jsonPayload.level="error"'  # Raw gcloud filter passthrough
-npx mgr logs:tail                                     # Stream live logs
-npx mgr logs:tail --fn bm_paymentsWebhookOnWrite      # Stream filtered live logs
+npx omega logs:read                                     # Read last 1h of logs (default: 300 entries, newest first)
+npx omega logs:read --fn bm_api                         # Filter by function name
+npx omega logs:read --fn bm_api --severity ERROR        # Filter by severity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+npx omega logs:read --since 2d --limit 100              # Custom time range and limit
+npx omega logs:read --search "72.134.242.25"            # Search textPayload for a string (IP, email, error, etc.)
+npx omega logs:read --fn bm_authBeforeCreate --search "ian@example.com" --since 7d  # Combined filters
+npx omega logs:read --order asc                         # Oldest first (default: desc/newest first)
+npx omega logs:read --filter 'jsonPayload.level="error"'  # Raw gcloud filter passthrough
+npx omega logs:tail                                     # Stream live logs
+npx omega logs:tail --fn bm_paymentsWebhookOnWrite      # Stream filtered live logs
 ```
 
 Both commands save output to `functions/production.log` (overwritten on each run). `logs:read` saves raw JSON; `logs:tail` streams text.
 
-**Cloud Logs vs Local Logs:** These commands query **production** Google Cloud Logging. For **local/dev** logs, read `functions/dev.log` (from `npx mgr serve`) or `functions/emulator.log` (from `npx mgr test`) directly — they are plain text files, not gcloud.
+**Cloud Logs vs Local Logs:** These commands query **production** Google Cloud Logging. For **local/dev** logs, read `functions/dev.log` (from `npx omega serve`) or `functions/emulator.log` (from `npx omega test`) directly — they are plain text files, not gcloud.
 
 ## Flags
 
@@ -41,7 +41,7 @@ Both commands save output to `functions/production.log` (overwritten on each run
 
 The `--fn` flag uses the **deployed Cloud Function name**, not the route path.
 
-**@omegajs/backend built-in functions (always deployed):**
+**@omega.js/backend built-in functions (always deployed):**
 
 | Function name | Type | Description |
 |---------------|------|-------------|

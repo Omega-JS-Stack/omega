@@ -1,11 +1,11 @@
 # Model Context Protocol (MCP)
 
-@omegajs/backend includes a built-in MCP server that exposes @omegajs/backend routes as tools for Claude Chat, Claude Code, Claude Desktop, and other MCP clients. The MCP layer is a thin wrapper over the existing @omegajs/backend API — every tool maps to a route, and authentication goes through the same middleware pipeline.
+@omega.js/backend includes a built-in MCP server that exposes @omega.js/backend routes as tools for Claude Chat, Claude Code, Claude Desktop, and other MCP clients. The MCP layer is a thin wrapper over the existing @omega.js/backend API — every tool maps to a route, and authentication goes through the same middleware pipeline.
 
 ## Architecture
 
 Two transport modes:
-- **Stdio** (local): `npx mgr mcp` — for Claude Code / Claude Desktop
+- **Stdio** (local): `npx omega mcp` — for Claude Code / Claude Desktop
 - **Streamable HTTP** (remote): `POST /backend-manager/mcp` — for Claude Chat / Claude Desktop custom connectors (stateless, Firebase Functions compatible)
 
 ## Roles
@@ -18,7 +18,7 @@ Every tool has a `role` that controls who can see and call it:
 | `user` | Authenticated users + admins | 2 | `get_user`, `get_subscription` |
 | `public` | Everyone (after OAuth) | 1 | `health_check` |
 
-Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying @omegajs/backend route still rejects.
+Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying @omega.js/backend route still rejects.
 
 ## Available Tools (25)
 
@@ -77,7 +77,7 @@ Consumer tools can set all the same annotations — they're passed through autom
    - Otherwise → redirects to consumer's website (`/token?redirect_uri=...&state=...&mcp=true`)
 6. User signs in on their familiar site, gets a Firebase ID token
 7. Consumer's `/token` page redirects back with `code={idToken}&state={state}`
-8. Client exchanges code: `POST /backend-manager/mcp/token` → @omegajs/backend verifies ID token, returns `api.privateKey` as `access_token`
+8. Client exchanges code: `POST /backend-manager/mcp/token` → @omega.js/backend verifies ID token, returns `api.privateKey` as `access_token`
 9. Client uses the API key for all future MCP requests as `Authorization: Bearer {key}`
 
 The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `config/omega.json5`.
@@ -85,13 +85,13 @@ The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves 
 ### Admin (Stdio)
 
 ```bash
-npx mgr mcp    # Reads BACKEND_MANAGER_KEY from functions/.env — sees all 25 tools
+npx omega mcp    # Reads BACKEND_MANAGER_KEY from functions/.env — sees all 25 tools
 ```
 
 ### User (Stdio)
 
 ```bash
-npx mgr mcp --token <api-key>    # User-level — sees 3 tools (2 user + 1 public)
+npx omega mcp --token <api-key>    # User-level — sees 3 tools (2 user + 1 public)
 ```
 
 ## Consumer MCP Tools
@@ -147,12 +147,12 @@ module.exports = [
 - Every tool needs `name`, `description`, and either `path` (route delegation) or `handler` (direct execution)
 - `role` defaults to `admin` if not specified
 - Handler-based tools only work on the HTTP transport (they return an error on stdio)
-- Handler-based tools bypass @omegajs/backend route middleware — they execute directly with the Manager context
+- Handler-based tools bypass @omega.js/backend route middleware — they execute directly with the Manager context
 - All MCP-standard fields are passed through: `annotations`, `outputSchema`, `inputSchema`
 
 ## HTTPS Local Development
 
-`npx mgr serve` starts an HTTPS proxy on port 5002 (firebase serve runs internally on 5443). This enables Claude Desktop to connect locally since it requires HTTPS.
+`npx omega serve` starts an HTTPS proxy on port 5002 (firebase serve runs internally on 5443). This enables Claude Desktop to connect locally since it requires HTTPS.
 
 - Certificates are auto-generated via mkcert into `.temp/certs/`
 - `getApiUrl()` returns `https://localhost:5002` when the HTTPS proxy is active
@@ -161,7 +161,7 @@ module.exports = [
 
 ## Hosting Rewrites
 
-The `npx mgr setup` command automatically adds required Firebase Hosting rewrites for MCP OAuth:
+The `npx omega setup` command automatically adds required Firebase Hosting rewrites for MCP OAuth:
 
 ```json
 {
@@ -184,7 +184,7 @@ Add to `.claude/settings.json`:
 ```json
 {
   "mcpServers": {
-    "@omegajs/backend": {
+    "@omega.js/backend": {
       "command": "npx",
       "args": ["bm", "mcp"],
       "cwd": "/path/to/consumer-project"
@@ -209,9 +209,9 @@ Add to `.claude/settings.json`:
 
 ## Adding New Tools
 
-### Built-in tools (in @omegajs/backend itself)
+### Built-in tools (in @omega.js/backend itself)
 
-Add a tool definition to `src/mcp/tools.js` with `name`, `description`, `role`, `method`, `path`, `annotations`, and `inputSchema`. The tool automatically maps to the corresponding @omegajs/backend route via the HTTP client.
+Add a tool definition to `src/mcp/tools.js` with `name`, `description`, `role`, `method`, `path`, `annotations`, and `inputSchema`. The tool automatically maps to the corresponding @omega.js/backend route via the HTTP client.
 
 ### Consumer tools (in a consumer project)
 

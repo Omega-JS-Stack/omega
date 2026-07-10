@@ -11,8 +11,8 @@
  * manual fix converges on rerun.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { pollWithSpinner } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { pollWithSpinner } = require('@omega.js/devkit/flows');
 
 const SUBDOMAIN = 'emailauth';
 

@@ -12,8 +12,8 @@
  * State: { zoneId } — later operations in THIS run read it via getZoneId.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowserAndPoll, pollWithSpinner } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowserAndPoll, pollWithSpinner } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
 const { API_PROVIDERS, REGISTRAR_NAMESERVER_URLS } = require('../../domain/lib/registrars.js');
 

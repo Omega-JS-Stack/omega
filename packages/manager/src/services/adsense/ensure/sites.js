@@ -9,8 +9,8 @@
  * appears); non-READY → warned with what Google is waiting on.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowserAndPoll } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 
 // AdSense site approval states → run status + operator guidance
 const STATES = {

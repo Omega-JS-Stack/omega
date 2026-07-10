@@ -50,20 +50,20 @@ if (isDevelopment() || isTesting()) { /* localhost URL, console logging, etc. */
 ## URL helpers
 
 ```javascript
-Manager.getApiUrl()  // this brand's API URL — the SSOT for calling the @omegajs/backend API
+Manager.getApiUrl()  // this brand's API URL — the SSOT for calling the @omega.js/backend API
 ```
 
 **`Manager.getApiUrl()` is the one and only way to get the API URL.** It resolves to the **local** hosting emulator (`http://localhost:5002`) in development OR testing, and to production (`https://api.{domain}`) otherwise. Always call `getApiUrl()` directly — do NOT read the cached `Manager.project.apiUrl` property (it's a boot-time snapshot kept only for internal env-var export; the getter is the SSOT and always fresh). Build full endpoints by appending the path: `` `${Manager.getApiUrl()}/backend-manager/admin/post` ``.
 
-Resolving local in test mode is required because tests hit the local emulator — without it, internal @omegajs/backend→@omegajs/backend calls (and tests calling `getApiUrl()`) would leak to the live production server. Pass an explicit `env` arg (`getApiUrl('production')`) only to force a specific environment regardless of the current one — rarely needed, and mainly used by tests to pin a specific environment's mapping.
+Resolving local in test mode is required because tests hit the local emulator — without it, internal @omega.js/backend→@omega.js/backend calls (and tests calling `getApiUrl()`) would leak to the live production server. Pass an explicit `env` arg (`getApiUrl('production')`) only to force a specific environment regardless of the current one — rarely needed, and mainly used by tests to pin a specific environment's mapping.
 
 > `getFunctionsUrl()` (raw Cloud Functions URL) exists for the ONE internal case that must name a specific deployed function by its raw address (`assistant.tryUrl()`). Application/route code should never need it — use `getApiUrl()`.
 
-**Exception — parent helpers stay live:** `Manager.getParentApiUrl()` / `getParentUrl()` ALWAYS return the live production URL, even in dev/test. The parent @omegajs/backend is a real remote server with no localhost equivalent, so cross-brand parent calls are never redirected to localhost.
+**Exception — parent helpers stay live:** `Manager.getParentApiUrl()` / `getParentUrl()` ALWAYS return the live production URL, even in dev/test. The parent @omega.js/backend is a real remote server with no localhost equivalent, so cross-brand parent calls are never redirected to localhost.
 
 ## Where they live
 
-Source: [src/manager/index.js](../src/manager/index.js). @omegajs/backend has a single Manager (no multi-context mixin like EM/UJM/BXM), so `getEnvironment()` + `is*()` + the URL helpers live directly on the Manager. The `assistant` exposes the same methods and forwards each to its Manager (`assistant.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
+Source: [src/manager/index.js](../src/manager/index.js). @omega.js/backend has a single Manager (no multi-context mixin like EM/UJM/BXM), so `getEnvironment()` + `is*()` + the URL helpers live directly on the Manager. The `assistant` exposes the same methods and forwards each to its Manager (`assistant.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
 
 ## How detection works
 
@@ -72,7 +72,7 @@ Source: [src/manager/index.js](../src/manager/index.js). @omegajs/backend has a 
 1. **Testing** — `process.env.BEM_TESTING === 'true'` (set by the test runner / emulator). A test run is a test run regardless of any other signal.
 2. **Production** — `process.env.ENVIRONMENT === 'production'`.
 3. **Development** — `process.env.ENVIRONMENT === 'development'`, or `FUNCTIONS_EMULATOR` is set, or `TERM_PROGRAM` is `Apple_Terminal` / `vscode` (running locally).
-4. **Default** — production. @omegajs/backend's deployed *runtime* can legitimately lack a dev signal (a live Cloud Function has no `FUNCTIONS_EMULATOR`), so "no signal" IS the normal production state. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. EM defaults to production for the same reason as @omegajs/backend.)
+4. **Default** — production. @omega.js/backend's deployed *runtime* can legitimately lack a dev signal (a live Cloud Function has no `FUNCTIONS_EMULATOR`), so "no signal" IS the normal production state. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. EM defaults to production for the same reason as @omega.js/backend.)
 
 ## Adding a new helper
 

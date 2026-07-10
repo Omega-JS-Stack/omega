@@ -1,10 +1,10 @@
 // Web Manager Bridge — main-process Firebase Auth, source of truth for renderers.
 //
-// This is @omegajs/desktop's analogue of BXM's background-service-worker auth role. The pattern:
+// This is @omega.js/desktop's analogue of BXM's background-service-worker auth role. The pattern:
 //
 //   1. Main runs its own Firebase Auth instance and is the source of truth.
 //   2. When a deep-link auth/token arrives, main calls signInWithCustomToken with that token,
-//      then BROADCASTS the token to all renderer windows so their @omegajs/client Firebase
+//      then BROADCASTS the token to all renderer windows so their @omega.js/client Firebase
 //      instances can sign in with the SAME token.
 //   3. On every renderer load, the renderer asks main "I'm at UID X (or null)" via the
 //      desktop:auth:sync-request IPC. Main compares with its own UID and either does nothing,
@@ -13,7 +13,7 @@
 //   4. Sign-out: any renderer can request sign-out via desktop:auth:sign-out. Main signs out
 //      its own Firebase + broadcasts desktop:auth:sign-out to all renderers.
 //
-// Firebase is BUNDLED by webpack from @omegajs/desktop's module context (@omegajs/client owns it in @omegajs/desktop's
+// Firebase is BUNDLED by webpack from @omega.js/desktop's module context (@omega.js/client owns it in @omega.js/desktop's
 // tree). If loading fails, the bridge stays in no-op mode and logs the reason.
 
 const LoggerLite = require('./logger-lite.js');
@@ -69,10 +69,10 @@ const bridge = {
     bridge._initialized = true;
   },
 
-  // Load firebase. Returns true on success. BUNDLED by webpack from @omegajs/desktop's module context
-  // (@omegajs/client owns firebase in @omegajs/desktop's tree) — same treatment as json5 in main.js. It was
+  // Load firebase. Returns true on success. BUNDLED by webpack from @omega.js/desktop's module context
+  // (@omega.js/client owns firebase in @omega.js/desktop's tree) — same treatment as json5 in main.js. It was
   // previously a webpackIgnore'd runtime import(), which resolves relative to the CONSUMER's
-  // main.bundle.js: that walk never reaches @omegajs/desktop's node_modules when @omegajs/desktop is symlinked
+  // main.bundle.js: that walk never reaches @omega.js/desktop's node_modules when @omega.js/desktop is symlinked
   // (`mgr install dev`) and depends on npm hoisting when installed — every dev app silently
   // ran the bridge in no-op mode. Interop guards handle both namespace shapes (json5 precedent).
   async _tryLoadFirebase() {
@@ -136,7 +136,7 @@ const bridge = {
       return u ? bridge._snapshotUser(u) : null;
     });
 
-    // Renderer pushes its @omegajs/client account resolution (auth().listen() settled:
+    // Renderer pushes its @omega.js/client account resolution (auth().listen() settled:
     // Firestore account fetched, subscription resolved). Main can't run Firestore,
     // so this is how main-side plan gates learn the REAL plan — BXM's "browser
     // contexts resolve, authority caches" split. UID-guarded: a stale push from a
@@ -177,7 +177,7 @@ const bridge = {
       bridge._resolvedRoles = null;
     }
 
-    // Notify any main-side subscribers (consumer code that called manager.webManager.onAuthChange).
+    // Notify any main-side subscribers (consumer code that called manager.omega.onAuthChange).
     const snap = user ? bridge._snapshotUser(user) : null;
     bridge._stateSubs.forEach((fn) => {
       try { fn(snap); } catch (e) { logger.error('onAuthChange subscriber threw:', e); }
@@ -279,7 +279,7 @@ const bridge = {
 
   // The renderer-resolved subscription ({ plan, active, trialing, cancelling }) or null
   // while no renderer has resolved yet. THE main-side plan source — consumer plan gates
-  // read this (@omegajs/client's resolveSubscription output, pushed via desktop:auth:account-resolved).
+  // read this (@omega.js/client's resolveSubscription output, pushed via desktop:auth:account-resolved).
   getResolvedPlan() {
     return bridge._resolvedPlan;
   },
@@ -334,13 +334,13 @@ const bridge = {
     });
 
     if (!res.ok) {
-      throw new Error(`@omegajs/backend responded with ${res.status}`);
+      throw new Error(`@omega.js/backend responded with ${res.status}`);
     }
 
     const data = await res.json();
     const token = data?.response?.token;
     if (!token) {
-      throw new Error('@omegajs/backend response missing token.');
+      throw new Error('@omega.js/backend response missing token.');
     }
     return token;
   },

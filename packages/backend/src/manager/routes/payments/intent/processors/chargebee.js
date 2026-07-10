@@ -8,7 +8,7 @@ module.exports = {
    *
    * @param {object} options
    * @param {string} options.uid - User's UID
-   * @param {string} options.orderId - @omegajs/backend order ID (XXXX-XXXX-XXXX)
+   * @param {string} options.orderId - @omega.js/backend order ID (XXXX-XXXX-XXXX)
    * @param {object} options.product - Full product object from config
    * @param {string} options.productId - Product ID from config (e.g., 'premium')
    * @param {string} options.frequency - 'monthly' or 'annually' (subscriptions only)

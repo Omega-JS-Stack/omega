@@ -42,7 +42,7 @@ const HARD_BOUNCE_CLASSIFICATIONS = new Set([
 /**
  * Parse the raw webhook request into a normalized array of events.
  * SendGrid sends an array of events as the body. Some HTTP clients (including
- * @omegajs/backend's own test client) JSON-encode arrays as objects with numeric keys —
+ * @omega.js/backend's own test client) JSON-encode arrays as objects with numeric keys —
  * we tolerate both shapes plus the rare single-event object form.
  */
 function parseWebhook(req) {

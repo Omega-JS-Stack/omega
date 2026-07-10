@@ -5,7 +5,7 @@
  * keystrokes go in, rendered output comes out, no mocks anywhere.
  *
  * Used by devkit's own prompt/flows tests and by consumers testing code
- * built on @omegajs/devkit/prompt (e.g. the manager's onboarding flows).
+ * built on @omega.js/devkit/prompt (e.g. the manager's onboarding flows).
  */
 const { PassThrough } = require('node:stream');
 

@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // State
 let currentCollection = '';
@@ -22,9 +22,9 @@ const MAX_DISPLAY_COLUMNS = 4;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
-    webManager.auth().listen({ once: true }, async (state) => {
+    omega.auth().listen({ once: true }, async (state) => {
       if (!state.user) {
         return;
       }
@@ -134,7 +134,7 @@ function initRefresh() {
 // ============================================
 async function loadCollectionCounts() {
   const { collection, getCountFromServer } = await import('firebase/firestore');
-  const db = webManager.firebaseFirestore;
+  const db = omega.firebaseFirestore;
 
   const $links = document.querySelectorAll('#collection-links [data-collection]');
   const promises = [];
@@ -205,7 +205,7 @@ async function browseCollection(collectionName) {
 // Load Documents
 // ============================================
 async function loadDocuments() {
-  const firestore = webManager.firestore();
+  const firestore = omega.firestore();
   let ref = firestore.collection(currentCollection).limit(PAGE_SIZE);
 
   if (lastDoc) {
@@ -287,7 +287,7 @@ function renderDocuments() {
   if ($thead) {
     $thead.innerHTML = '<th>Document ID</th>';
     columns.forEach((col) => {
-      $thead.innerHTML += `<th>${webManager.utilities().escapeHTML(col)}</th>`;
+      $thead.innerHTML += `<th>${omega.utilities().escapeHTML(col)}</th>`;
     });
     $thead.innerHTML += '<th style="width: 40px;"></th>';
   }
@@ -299,15 +299,15 @@ function renderDocuments() {
       const $row = document.createElement('tr');
       $row.style.cursor = 'pointer';
 
-      let cells = `<td class="font-monospace small text-truncate" style="max-width: 200px;" title="${webManager.utilities().escapeHTML(doc.id)}">${webManager.utilities().escapeHTML(doc.id)}</td>`;
+      let cells = `<td class="font-monospace small text-truncate" style="max-width: 200px;" title="${omega.utilities().escapeHTML(doc.id)}">${omega.utilities().escapeHTML(doc.id)}</td>`;
 
       columns.forEach((col) => {
         const value = getNestedValue(doc.data, col);
-        cells += `<td class="small text-truncate" style="max-width: 180px;" title="${webManager.utilities().escapeHTML(value ?? '')}">${renderCellValue(value)}</td>`;
+        cells += `<td class="small text-truncate" style="max-width: 180px;" title="${omega.utilities().escapeHTML(value ?? '')}">${renderCellValue(value)}</td>`;
       });
 
       cells += `<td>
-        <button class="btn btn-sm btn-link p-0 btn-view-doc" data-doc-id="${webManager.utilities().escapeHTML(doc.id)}">
+        <button class="btn btn-sm btn-link p-0 btn-view-doc" data-doc-id="${omega.utilities().escapeHTML(doc.id)}">
           ${getPrerenderedIcon('file', 'fa-sm')}
         </button>
       </td>`;
@@ -408,24 +408,24 @@ function renderCellValue(value) {
   if (typeof value === 'number') {
     // Check if it looks like a UNIX timestamp (reasonable range)
     if (value > 1000000000 && value < 10000000000) {
-      return `<span title="${webManager.utilities().escapeHTML(value)}">${webManager.utilities().escapeHTML(new Date(value * 1000).toLocaleDateString())}</span>`;
+      return `<span title="${omega.utilities().escapeHTML(value)}">${omega.utilities().escapeHTML(new Date(value * 1000).toLocaleDateString())}</span>`;
     }
-    return webManager.utilities().escapeHTML(value.toLocaleString());
+    return omega.utilities().escapeHTML(value.toLocaleString());
   }
 
   if (typeof value === 'object') {
     if (value.toDate && typeof value.toDate === 'function') {
-      return webManager.utilities().escapeHTML(value.toDate().toLocaleDateString());
+      return omega.utilities().escapeHTML(value.toDate().toLocaleDateString());
     }
     return `<span class="text-muted">{...}</span>`;
   }
 
   const str = String(value);
   if (str.length > 40) {
-    return webManager.utilities().escapeHTML(str.substring(0, 40) + '...');
+    return omega.utilities().escapeHTML(str.substring(0, 40) + '...');
   }
 
-  return webManager.utilities().escapeHTML(str);
+  return omega.utilities().escapeHTML(str);
 }
 
 // ============================================
@@ -509,7 +509,7 @@ async function saveDocument() {
   }
 
   try {
-    const firestore = webManager.firestore();
+    const firestore = omega.firestore();
     await firestore.doc(currentDocPath).set(parsedData, { merge: true });
 
     // Update the local document cache
@@ -571,7 +571,7 @@ async function runQuery(data) {
   if ($clearQuery) $clearQuery.classList.remove('d-none');
 
   try {
-    const firestore = webManager.firestore();
+    const firestore = omega.firestore();
     const snapshot = await firestore.collection(currentCollection)
       .where(field, operator, value)
       .limit(PAGE_SIZE)

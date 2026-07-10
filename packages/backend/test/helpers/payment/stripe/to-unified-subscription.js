@@ -11,7 +11,7 @@ const FIXTURE_ACTIVE = require('../../../fixtures/stripe/subscription-active.jso
 const FIXTURE_CANCELED = require('../../../fixtures/stripe/subscription-canceled.json');
 const FIXTURE_TRIALING = require('../../../fixtures/stripe/subscription-trialing.json');
 
-// Mock config matching the @omegajs/backend template (new flat price structure)
+// Mock config matching the @omega.js/backend template (new flat price structure)
 const MOCK_CONFIG = {
   payment: {
     products: [

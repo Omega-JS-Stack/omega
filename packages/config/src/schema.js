@@ -19,7 +19,7 @@
  *
  * SHARED_SCHEMA always applies; TARGET_SCHEMAS[target] adds that target's
  * refinements. Sections grow as each framework adopts dual-read — seed
- * entries come from EM's schema (desktop) and the sandbox brand's real @omegajs/backend
+ * entries come from EM's schema (desktop) and the sandbox brand's real @omega.js/backend
  * config (backend), never from guesses.
  */
 
@@ -147,7 +147,7 @@ const SHARED_SCHEMA = [
     path:        'payment.products',
     type:        'array',
     required:    false,
-    description: 'Product catalog (@omegajs/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target.',
+    description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target.',
   },
 
   // ── sentry ───────────────────────────────────────────────────────────────
@@ -194,11 +194,11 @@ const SHARED_SCHEMA = [
 // Per-target refinements — validated against the RESOLVED config (the target
 // section's keys land at the top level).
 const TARGET_SCHEMAS = {
-  // Filled in Phase 2 with @omegajs/web's design: distribute, purgecss
+  // Filled in Phase 2 with @omega.js/web's design: distribute, purgecss
   // safelist, imagemin, workflows.
   web: [],
 
-  // Seeded from the sandbox brand's real @omegajs/backend config (backend-manager-config.json).
+  // Seeded from the sandbox brand's real @omega.js/backend config (backend-manager-config.json).
   backend: [
     {
       path:        'parent',

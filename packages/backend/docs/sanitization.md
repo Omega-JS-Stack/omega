@@ -1,6 +1,6 @@
 # Sanitization (XSS Prevention)
 
-@omegajs/backend middleware always **trims** whitespace on incoming string fields (via `utilities.trim()`). HTML sanitization is **opt-in** — it's not run by default because it mangles legitimate input like URL query strings (`&` → `&amp;`) and Markdown.
+@omega.js/backend middleware always **trims** whitespace on incoming string fields (via `utilities.trim()`). HTML sanitization is **opt-in** — it's not run by default because it mangles legitimate input like URL query strings (`&` → `&amp;`) and Markdown.
 
 The expectation is that you sanitize at the **HTML-insertion site** (in the template, in the email body, etc.) — not at the request boundary.
 

@@ -3,7 +3,7 @@
  * Handles lazy loading of ad units (verts) when scrolled into view.
  * Configuration is passed via data attributes on the script tag itself.
  */
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Get search params to check for debug mode
 const searchParams = new URLSearchParams(window.location.search);
@@ -39,7 +39,7 @@ const protectFromAdSenseOverrides = ($el, $vertUnit, resolvedSize) => {
 };
 
 // Main initialization
-webManager.dom().ready().then(() => {
+omega.dom().ready().then(() => {
   // Get the current script element to extract configuration
   const $currentScript = document.currentScript;
   if (!$currentScript) {
@@ -73,7 +73,7 @@ const loadAdSenseScript = (config) => {
   }
 
   // Load the AdSense script dynamically
-  return webManager.dom().loadScript({
+  return omega.dom().loadScript({
     src: `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${config.client}`,
     async: true,
     crossorigin: 'anonymous',
@@ -184,7 +184,7 @@ const createCustomAd = ($vertUnit, config) => {
 
   // Build base URL for the ad content
   // Use local server if debug=true OR if we're in development mode AND on promo-server
-  const baseURL = (qsDebug || (webManager.isDevelopment() && webManager.config.brand.id === 'promo-server'))
+  const baseURL = (qsDebug || (omega.isDevelopment() && omega.config.brand.id === 'promo-server'))
     ? `${window.location.protocol}//${window.location.host}/verts/main`
     : 'https://promo-server.itwcreativeworks.com/verts/main';
 
@@ -217,8 +217,8 @@ const createCustomAd = ($vertUnit, config) => {
   $vertUnit.appendChild($iframe);
 
   // Retrigger bindings to apply plan visibility
-  webManager.auth().listen({ once: true }, async () => {
-    webManager.bindings().update();
+  omega.auth().listen({ once: true }, async () => {
+    omega.bindings().update();
   });
 
   // Log success
@@ -347,8 +347,8 @@ const createAdUnit = (config, $currentScript) => {
       monitorAdFillStatus($vertUnit, config);
 
       // Retrigger bindings to apply plan visibility
-      webManager.auth().listen({ once: true }, async () => {
-        webManager.bindings().update();
+      omega.auth().listen({ once: true }, async () => {
+        omega.bindings().update();
       });
 
       // Log success

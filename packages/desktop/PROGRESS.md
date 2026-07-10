@@ -13,9 +13,9 @@ Living checklist of what's done, what's in progress, and what's deferred. Update
 
 ## Conventions established
 
-- **Every feature pass writes its tests AND its docs in the same pass.** Real impl + test suite + `docs/<topic>.md` (or update if it exists) + both `npm test` (EM) and `npx mgr test` (somiibo) green before the pass is done. No "tests later," no "docs later." Update PROGRESS.md last. CLAUDE.md / README.md only need touching when a convention or top-level surface changes — feature-level details belong in `docs/<topic>.md`.
-- **CLI alias** — canonical command is `npx mgr`. `em` and `electron-manager` are also bound.
-- **Config format** — `config/omega.json5` (the single OMEGA config, JSON5), resolved via the vendored `@omegajs/config`: shared sections top-level, desktop settings under `targets.desktop` (overlaid onto the top level at load). The legacy `config/electron-manager.json` is no longer read — migration table in the monorepo's `docs/config.md`.
+- **Every feature pass writes its tests AND its docs in the same pass.** Real impl + test suite + `docs/<topic>.md` (or update if it exists) + both `npm test` (EM) and `npx omega test` (somiibo) green before the pass is done. No "tests later," no "docs later." Update PROGRESS.md last. CLAUDE.md / README.md only need touching when a convention or top-level surface changes — feature-level details belong in `docs/<topic>.md`.
+- **CLI alias** — canonical command is `npx omega`. `em` and `electron-manager` are also bound.
+- **Config format** — `config/omega.json5` (the single OMEGA config, JSON5), resolved via the vendored `@omega.js/config`: shared sections top-level, desktop settings under `targets.desktop` (overlaid onto the top level at load). The legacy `config/electron-manager.json` is no longer read — migration table in the monorepo's `docs/config.md`.
 - **One-line bootstrap** — `new (require('electron-manager/main'))().initialize()` auto-loads + resolves config from `config/omega.json5`. Pass a resolved object to override, pass a string project-dir path to resolve a different project.
 - **Lib module shape** — every `src/lib/<name>.js` exports a singleton object with at minimum `initialize(manager)`. Stub modules accept the call as a no-op + log; real impls fill in.
 - **Per-process imports** — `electron-manager/main`, `/renderer`, `/preload`, `/build`, `/lib/<name>`.
@@ -37,7 +37,7 @@ Top-level keys (v1.0.0):
 - `windows` — **named-window registry** (`main`, `settings`, `about`, ...). Each entry: view, width, height, show, hideOnClose, minWidth, minHeight, title, backgroundColor, persistBounds, skipTaskbar.
 - `signing.windows` — strategy (self-hosted | cloud | local), cloud.{provider, options}.
 - `deepLinks` — schemes[], routes{}.
-- `sentry.dsn`, `firebaseConfig`, `webManager`.
+- `sentry.dsn`, `firebaseConfig`, `omega`.
 - `em` — environment, cacheBreaker, liveReloadPort.
 
 ## Pass status
@@ -76,7 +76,7 @@ Top-level keys (v1.0.0):
 
 ### ✅ 2026-07-03 — `mgr cdp --port` flag (cross-env quote-mangling escape hatch)
 
-- [x] `commands/cdp.js`: every cdp subcommand accepts `--port <n>` (sets `EM_CDP_PORT` before dispatch — client.js reads the env). Motivation: restart-manager's `debug:show` npm script pinned its port via `npx cross-env EM_CDP_PORT=9223 npx mgr cdp eval … "window.em.ipc.invoke('rm:window:show')"` and cross-env STRIPPED the single quotes inside the expression → `SyntaxError: missing ) after argument list` on Ian's first live run. Root-caused by argv bisection (`["window.em.ipc.invoke(rm:window:show)"]` after the cross-env hop).
+- [x] `commands/cdp.js`: every cdp subcommand accepts `--port <n>` (sets `EM_CDP_PORT` before dispatch — client.js reads the env). Motivation: restart-manager's `debug:show` npm script pinned its port via `npx cross-env EM_CDP_PORT=9223 npx omega cdp eval … "window.em.ipc.invoke('rm:window:show')"` and cross-env STRIPPED the single quotes inside the expression → `SyntaxError: missing ) after argument list` on Ian's first live run. Root-caused by argv bisection (`["window.em.ipc.invoke(rm:window:show)"]` after the cross-env hop).
 - [x] Verified live against a running consumer (Somiibo, CDP :9222): quoted eval survives with `--port`; the verbatim RM expression reaches the IPC layer. docs/cdp-debugging.md documents the flag + a "use `--port`, never cross-env" warning; CHANGELOG Unreleased. Uncommitted — ship with the next EM release.
 
 ### ✅ 2026-07-02 — electron-store bundled into the consumer main bundle (packaged-storage fix)
@@ -91,7 +91,7 @@ Top-level keys (v1.0.0):
 ### ✅ 2026-07-02 — `--extended` boolean-declaration fix + consumer-template docs
 
 - [x] bin: bare `yargs(...).parseSync()` let `mgr test --extended some/target` swallow the target as the flag's VALUE (target lost + extended silently off); now declares `.boolean(['extended'])` — mirrors BEM's cli fix; same fix in BXM + UJM in the same pass. Verified: parse proof + real run shows `target="..." +extended`; `build/cli` suite 3 passing.
-- [x] `src/defaults/CLAUDE.md`: added the `npx mgr test --extended` line (1.9.0 changelog claimed it existed; it didn't) — `npm run prepare` synced dist. Dropped dead `EM_TEST_SKIP_INTEGRATION` from `.env.example`. SHIPPED as v1.9.2 (npm + GH release, 2026-07-02) — also carried the CDP doc rewrite.
+- [x] `src/defaults/CLAUDE.md`: added the `npx omega test --extended` line (1.9.0 changelog claimed it existed; it didn't) — `npm run prepare` synced dist. Dropped dead `EM_TEST_SKIP_INTEGRATION` from `.env.example`. SHIPPED as v1.9.2 (npm + GH release, 2026-07-02) — also carried the CDP doc rewrite.
 
 ### ✅ 2026-07-01 — CDP doc harmonization (docs only)
 
@@ -114,7 +114,7 @@ Top-level keys (v1.0.0):
 - [x] `src/gulp/main.js` + tasks (`defaults`, `distribute`, `webpack`, `sass`, `html`, `serve`, `package`, `release`, `audit`)
 - [x] `src/defaults/` — full consumer scaffold (config JSON5, electron-builder.yml, hooks/notarize.js, .github/workflows/build.yml, src/main.js, src/preload.js, three view HTMLs, three renderer entries, main.scss)
 - [x] CLI verified: `version`, `validate-certs`, unknown command (exit 1)
-- [x] End-to-end verified in somiibo-desktop: `npm i ../../ITW-Creative-Works/electron-manager` → `npx mgr setup` copies defaults + injects projectScripts + sets `private: true` + sets `main: 'src/main.js'`
+- [x] End-to-end verified in somiibo-desktop: `npm i ../../ITW-Creative-Works/electron-manager` → `npx omega setup` copies defaults + injects projectScripts + sets `private: true` + sets `main: 'src/main.js'`
 
 ### ✅ Pass 2.0 — Window opens (DONE, smoke-tested)
 
@@ -171,7 +171,7 @@ Top-level keys (v1.0.0):
   - **Array form**: `module.exports = [ {name, run}, ... ]` — implicit group.
 - [x] Three layers: `build` (plain Node, fast), `main` (spawn Electron — Pass 2.3b), `renderer` (hidden BrowserWindow — Pass 2.3c). 2.3a ships build; main/renderer tests are SKIPped with reason.
 - [x] Auto-discovery: globs `<framework>/dist/test/suites/**/*.js` (default suite) **and** `<consumer-cwd>/test/**/*.js` (consumer suite, BEM convention). Excludes dirs starting with `_`. Both run together so consumers free-ride on framework regression coverage.
-- [x] CLI: `npx mgr test`, `npx mgr test --layer build|main|renderer`, `npx mgr test --filter <name>`. Exit code 1 on any failure.
+- [x] CLI: `npx omega test`, `npx omega test --layer build|main|renderer`, `npx omega test --filter <name>`. Exit code 1 on any failure.
 - [x] Public API: `const { expect } = require('electron-manager/test')`. Custom `expect()` with the Jest-compatible subset we need: `toBe`, `toEqual`, `toBeTruthy`, `toBeFalsy`, `toBeDefined`, `toBeUndefined`, `toBeNull`, `toContain`, `toHaveProperty`, `toMatch`, `toBeInstanceOf`, `toBeGreaterThan`, `toBeLessThan`, `toThrow`, plus `.not` chain.
 - [x] **Context (`ctx`)** passed to every `run`/`cleanup`: `expect`, `state` (shared across suite tests), `skip(reason)`, `layer`. Layer-specific helpers (`ctx.manager`, `ctx.page`) added later by main/renderer harnesses.
 - [x] First suites (build layer, **27 tests, all green**, ~30ms):
@@ -179,7 +179,7 @@ Top-level keys (v1.0.0):
   - `exports.test.js` — group of 3 tests on package exports + lib module shapes.
   - `cli.test.js` — group of 3 tests on CLI structure.
   - `config-schema.test.js` — **suite** of 11 tests on default config (parses raw once, reuses via `state.cfg` — demonstrates shared state).
-- [x] Tests green in **both** EM repo (`npm test`) and somiibo-desktop (`npx mgr test`) — proves auto-discovery + dual-context execution.
+- [x] Tests green in **both** EM repo (`npm test`) and somiibo-desktop (`npx omega test`) — proves auto-discovery + dual-context execution.
 - [x] **API URL helpers on runtime Manager** (mirror web-manager): `manager.isDevelopment()`, `manager.getEnvironment()`, `manager.getApiUrl()`, `manager.getFunctionsUrl()`. Dev hits `localhost:5002` / `localhost:5001` (Firebase emulators); prod derives from `firebaseConfig.authDomain` / `firebaseConfig.projectId`. Drives the "tests hit the real dev backend" pattern.
 
 ### ✅ Pass 2.3b — Main-process test harness (DONE, 57 tests green at end of pass)
@@ -194,20 +194,20 @@ Top-level keys (v1.0.0):
   - `storage.test.js` (8 tests, suite) — set/get round-trip, default fallback, has, delete, dot-notation, onChange firing, clear, getPath.
   - `window-manager.test.js` (7 tests, suite) — initialize ran, list empty, get null, createNamed registers, dedup, hide/show, close removes from registry.
   - `boot-sequence.test.js` (15 tests, group) — every lib's `_initialized` flag is true post-boot + config loaded + getEnvironment.
-- [x] **Verified in both EM (`npm test`) and somiibo (`npx mgr test`)**: 27 build + 30 main = **57 passing**. Same tests, same results, both contexts.
+- [x] **Verified in both EM (`npm test`) and somiibo (`npx omega test`)**: 27 build + 30 main = **57 passing**. Same tests, same results, both contexts.
 
 ### ✅ Pass 2.3c — Renderer test harness (DONE, 323 passing)
 
 - [x] Hidden BrowserWindow loaded by the harness; preload exposes a `__emTest` IPC channel back to main. Mirrors production `window.em` surface (ipc, storage, logger, autoUpdater).
 - [x] Suite files run *inside* the renderer; results posted via `__emTest:result` to main, which forwards `__EM_TEST__`-prefixed JSON lines on stdout. Test functions serialized via `Function.prototype.toString()` + regex body extraction, reconstructed inside the renderer via `new Function('ctx', body)` (no closure access — only `ctx` and page globals).
 - [x] First renderer suite (`renderer/window-em-surface.test.js`) — 9 tests covering `window.em.*` surface + storage proxy round-trip.
-- [x] Combined main + renderer layers into a single Electron boot per `npx mgr test` invocation.
+- [x] Combined main + renderer layers into a single Electron boot per `npx omega test` invocation.
 
 ### ✅ Pass 2.3d — CI integration (DONE)
 
 - [x] `.github/workflows/build.yml` adds a `test` job (ubuntu-latest, xvfb-run) before `build` via `needs: test`.
 - [x] `--reporter json` emits a final `{"event":"summary",...}` line for machine-readable output.
-- [x] `--integration` flag (or `EM_TEST_INTEGRATION=1`) opts into integration suites; default is skip so `npx mgr test` is fast + green offline. CI sets `EM_TEST_INTEGRATION: '0'` to enforce skip.
+- [x] `--integration` flag (or `EM_TEST_INTEGRATION=1`) opts into integration suites; default is skip so `npx omega test` is fast + green offline. CI sets `EM_TEST_INTEGRATION: '0'` to enforce skip.
 
 ### ✅ Pass 2.4 — Real ipc (DONE, 71 tests green)
 
@@ -217,7 +217,7 @@ Top-level keys (v1.0.0):
 - [x] **Validation** — duplicate `handle()` throws; `handle()` rejects empty/non-string channel and non-function handler; `invoke` on a missing channel rejects with a clear message; handler errors propagate through `invoke`.
 - [x] **`ipc.test.js`** (14 tests, suite) — covers initialization, storage handler registration, handle/invoke roundtrip, duplicate-handle rejection, unhandle, missing-channel error, error propagation, listener subscribe/unsubscribe, multi-listener, safe broadcast with zero windows, safe send with destroyed/null webContents, end-to-end storage broadcast through ipc, and input validation.
 - [x] **Test discovery is now sorted alphabetically** — fixes a flaky harness exit when the window-manager close test ran first and crashed the harness pipe before later suites could run.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **71 tests passing** (27 build + 44 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **71 tests passing** (27 build + 44 main).
 
 ### ✅ Pass 2.5 — Real tray (DONE, 84 tests green)
 
@@ -227,7 +227,7 @@ Top-level keys (v1.0.0):
 - [x] **Default scaffold** — `src/defaults/src/tray/index.js` ships a minimal Open + Quit example so consumers have a working tray on day one.
 - [x] **Default config** — `tray`/`menu`/`contextMenu` blocks now `{ enabled, definition }` only; `tray.items` array removed. `config-schema.test.js` updated to match.
 - [x] **`tray.test.js`** (14 tests, suite) — initialize, no-definition behavior, `define()` runs the builder, `define()` validation + replacement semantics, `addItem` append, `clearItems`, `setIcon`/`setTooltip`, dynamic label evaluation, click error wrapping, separator resolution, submenu recursion, `refresh()` safe with no icon, builder-fn argument shape.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **84 tests passing** (27 build + 57 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **84 tests passing** (27 build + 57 main).
 
 ### ✅ Pass 2.6 — Real menu (DONE, 98 tests green)
 
@@ -248,7 +248,7 @@ Top-level keys (v1.0.0):
 - [x] **Default scaffold** — `src/defaults/src/context-menu/index.js` ships the same baseline as the built-in default but exposed for consumers to edit.
 - [x] **`context-menu.test.js`** (14 tests, suite) — initialize, no-file fallback, default fn coverage (editable / selection / link / empty), `define()` semantics + validation, `menu.separator()` / `menu.submenu()`, definition-fn argument shape, dynamic label resolution, click error wrapping, attach idempotency.
 - [x] **Window close test fixed** — was timing-flaky because it polled with a 50ms `setTimeout`; now waits for the actual `'closed'` event. Reliable across machines under any CPU load.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **113 tests passing** (27 build + 86 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **113 tests passing** (27 build + 86 main).
 
 ### ✅ Pass 2.8 — Window bounds persistence (DONE, 122 tests green)
 
@@ -257,7 +257,7 @@ Top-level keys (v1.0.0):
 - [x] **Off-screen clamping** — `_clampToDisplays` requires ≥100×50px overlap with a real display's `workArea`. If saved coordinates fail (monitor unplugged, resolution dropped), position is dropped but size kept (Electron centers on primary display).
 - [x] **Per-window opt-out** — `config.windows.<name>.persistBounds: false` skips both the listener wiring (no auto-save) and the restore lookup (no auto-load). Default is on.
 - [x] **`window-bounds.test.js`** (9 tests, suite) — `_loadBounds` null/round-trip/malformed-rejection, `_clampToDisplays` off-screen vs on-screen, `createNamed` restoration, `_saveBoundsNow` write, close flushes, full opt-out behavior under `persistBounds: false`.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **122 tests passing** (27 build + 95 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **122 tests passing** (27 build + 95 main).
 
 ### ✅ Pass 2.9 — Real startup + tray-only zero-bounce launch (DONE, 138 tests green)
 
@@ -268,7 +268,7 @@ Top-level keys (v1.0.0):
 - [x] **`gulp/tasks/build-config.js`** — new task (auto-loaded). Materializes `dist/electron-builder.yml` from the consumer's `electron-builder.yml`, injecting `mac.extendInfo.LSUIElement: true` when `startup.mode === 'tray-only'`. Hand-written YAML editor (preserves comments, idempotent, merges into existing `extendInfo` if present, appends a complete `mac:` block if absent). `gulp/package` now points electron-builder at the materialized config.
 - [x] **`startup.test.js`** (10 tests) — initialize ran, `getMode` defaults/validation/fallback, `isLaunchHidden`/`isTrayOnly` truth tables, `applyEarly` safe in all modes, `setOpenAtLogin` / `isOpenAtLogin`.
 - [x] **`build-config.test.js`** (6 tests, build layer) — task module shape, fresh-injection (no extendInfo present), merge-into-existing extendInfo, key-update (not duplication), idempotency, mac-block-creation when no `mac:` exists.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **138 tests passing** (33 build + 105 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **138 tests passing** (33 build + 105 main).
 - [x] **Production zero-bounce path validated** — gulp build-config injects `LSUIElement` correctly; manual end-to-end (`electron-builder` packaging somiibo as tray-only and confirming no dock bounce) deferred to CI integration in Pass 2.3d.
 
 ### ✅ Pass 2.10 — Real app-state (DONE, 149 tests green)
@@ -278,7 +278,7 @@ Top-level keys (v1.0.0):
 - [x] **Version change detection** — `wasUpgraded()` is true only if THIS launch's version differs from the previous launch's version (not derived from any historical `previousVersion` field). `getPreviousVersion()` preserves the historical value across no-change launches so consumers can show "upgraded from X" UI even on the second launch after the upgrade.
 - [x] **Public API** — `isFirstLaunch()`, `getLaunchCount()`, `getInstalledAt()`, `getLastLaunchAt()`, `getLastQuitAt()` (live storage read so consumers can poll), `recoveredFromCrash()`, `getVersion()`, `getPreviousVersion()`, `wasUpgraded()`, `launchedAtLogin()` (via `app.getLoginItemSettings().wasOpenedAtLogin`), `launchedFromDeepLink()` + `setLaunchedFromDeepLink(bool)` (hook for `lib/deep-link` to call when it parses a cold-start payload), `reset()` (test helper / consumer "reset to factory" command).
 - [x] **`app-state.test.js`** (11 tests, suite) — initialize ran, first-launch flag, second-launch increments, crash detection, graceful-quit clears sentinel, version upgrade vs no-change semantics, `previousVersion` preserved across no-change boots, `launchedFromDeepLink` getter/setter, `launchedAtLogin` returns boolean, `getLastQuitAt` reads live storage, `reset()` wipes state.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **149 tests passing** (33 build + 116 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **149 tests passing** (33 build + 116 main).
 
 ### ✅ Pass 2.11 — Real deep-link + protocol (DONE, 170 tests green)
 
@@ -289,7 +289,7 @@ Top-level keys (v1.0.0):
   - **Pattern matching**: exact (`auth/token`), named params (`user/profile/:id`), wildcard (`*`).
   - **Resolution order**: consumer concrete handlers → built-in concrete handlers → wildcard catch-all (only if no concrete matched). `ctx.handled = true` short-circuits the cascade.
   - **Built-in routes** (registered by EM, overridable by consumer):
-    - `auth/token` → calls `manager.webManager.handleAuthToken(query.token)` (Pass 2.12 wires this).
+    - `auth/token` → calls `manager.omega.handleAuthToken(query.token)` (Pass 2.12 wires this).
     - `app/show` → `manager.windows.show(query.window || 'main')`.
     - `app/quit` → `app.quit()`.
   - **Auto-focus on warm-start**: `second-instance` handler restores + focuses the existing main window before dispatching.
@@ -298,14 +298,14 @@ Top-level keys (v1.0.0):
 - [x] **`deep-link.test.js`** (20 tests, suite) — initialize, built-in registration, URL parsing (flat / nested / malformed), pattern matching (exact / param / wildcard / mismatched), `on()` validation + unsubscribe, dispatch firing the right ctx, multi-handler ordering, consumer-before-builtin priority, `ctx.handled` suppression, wildcard fallback semantics, built-in `app/show` + `auth/token` integration, argv extraction, error isolation between handlers.
 - [x] **`docs/deep-link.md`** written — covers config, cross-platform behavior table, pattern syntax, handler signature, built-in routes + override pattern, resolution order, common usage patterns, single-instance flow, `appState` linkage.
 - [x] **CLAUDE.md** + **README.md** updated to reflect protocol + deep-link as real.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **170 tests passing** (33 build + 137 main).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **170 tests passing** (33 build + 137 main).
 
 ### ✅ Pass 2.12 — Real web-manager-bridge (DONE, 183 passing + 4 integration skipped clean)
 
 - [x] **`lib/web-manager-bridge.js`** — full impl. Main runs its own Firebase Auth instance (app name `em-auth`) and is source of truth. Mirrors BXM's background/foreground pattern.
-- [x] **Auth flow**: deep-link `auth/token` → `webManager.handleAuthToken(token)` → `signInWithCustomToken` against main's Firebase → broadcasts `em:auth:sign-in-with-token` to all renderers → renderers each call `webManager.auth().signInWithCustomToken(token)` against their own (web-manager-managed) Firebase.
+- [x] **Auth flow**: deep-link `auth/token` → `omega.handleAuthToken(token)` → `signInWithCustomToken` against main's Firebase → broadcasts `em:auth:sign-in-with-token` to all renderers → renderers each call `omega.auth().signInWithCustomToken(token)` against their own (web-manager-managed) Firebase.
 - [x] **Sync flow**: every renderer load sends `em:auth:sync-request` with current UID. Main compares: same UID → no sync; main signed-out + renderer signed-in → tells renderer to sign out; main signed-in + renderer different/null → main fetches fresh custom token from `${apiUrl}/backend-manager` (command `user:create-custom-token`) and returns it for the renderer to sign in with.
-- [x] **Sign-out flow**: any process can call `manager.webManager.signOut()` → main signs out + broadcasts `em:auth:sign-out` → all renderers sign out.
+- [x] **Sign-out flow**: any process can call `manager.omega.signOut()` → main signs out + broadcasts `em:auth:sign-out` → all renderers sign out.
 - [x] **Lazy firebase**: dynamic `await import('firebase/app')` and `firebase/auth`. Resolves from cwd / EM root / default require chain. If firebase isn't installed, bridge runs as no-op with clear warning. Consumers without auth pay zero cost.
 - [x] **No token persistence**: tokens expire in 1 hour; never stored. Firebase IndexedDB persistence handles session restoration. Matches BXM exactly.
 - [x] **User snapshot stripping** — only `{uid, email, displayName, photoURL, emailVerified}` cross IPC. Sensitive fields (stsTokenManager, providerData, etc.) never leave main.
@@ -316,11 +316,11 @@ Top-level keys (v1.0.0):
 - [x] **`web-manager-bridge.integration.test.js`** (4 tests, suite, gated on `EM_TEST_FIREBASE_ADMIN_KEY` or `GOOGLE_APPLICATION_CREDENTIALS`) — firebase loaded check, mint custom token via firebase-admin + sign in via bridge + verify state, sign-out clears state, onAuthChange fires on state change. Skips cleanly with clear reason when creds absent.
 - [x] **`docs/web-manager-bridge.md`** written — covers architecture diagram, auth flow / sync flow / sign-out flow, public API for both main and renderer, config requirements, lazy-firebase explanation, common patterns (refresh tray on auth change, gate deep-link on auth, sign-out button), full IPC channel table, testing instructions.
 - [x] **CLAUDE.md** + **README.md** updated. **PROGRESS.md** updated.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both at **183 passing + 4 integration skipped** (33 build + 150 main + 4 skip-with-reason). Integration runs clean once creds are wired up locally.
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both at **183 passing + 4 integration skipped** (33 build + 150 main + 4 skip-with-reason). Integration runs clean once creds are wired up locally.
 
 ### ✅ Pass 2.13 — env-merge convention + signing scaffold (DONE, 191 passing + 4 integration skipped)
 
-- [x] **`.env` merge convention adopted** — matches BXM/UJM. Files use `# ========== Default Values ==========` and `# ========== Custom Values ==========` markers. On `npx mgr setup`, the Default section is replaced with the framework's current keys; existing values are preserved in their original section; user-added keys in Default that aren't in the new framework defaults migrate to Custom (so cleanups don't lose user data). `.gitignore` follows the same convention (line-based instead of key-based).
+- [x] **`.env` merge convention adopted** — matches BXM/UJM. Files use `# ========== Default Values ==========` and `# ========== Custom Values ==========` markers. On `npx omega setup`, the Default section is replaced with the framework's current keys; existing values are preserved in their original section; user-added keys in Default that aren't in the new framework defaults migrate to Custom (so cleanups don't lose user data). `.gitignore` follows the same convention (line-based instead of key-based).
 - [x] **`src/utils/merge-line-files.js`** — new utility. `mergeLineBasedFiles(existingContent, newContent, fileName)`. Used by `commands/setup.js` for `.env` and `.gitignore`. Lives outside `lib/` because it's a pure utility, not a feature module (lib/ modules require `initialize(manager)`).
 - [x] **`commands/setup.js` updated** — `copyDefaults()` now merges `.env` + `.gitignore` instead of skipping them when they exist. Other files keep the existing skip-if-exists behavior.
 - [x] **`.env.example` (EM root) + `_.env` (consumer scaffold) updated** with new keys: `GH_TOKEN` (was `GITHUB_TOKEN`), `BACKEND_MANAGER_KEY`, plus full Apple notarization key set (`APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` — preferred over legacy Apple ID + app-specific password).
@@ -333,7 +333,7 @@ Top-level keys (v1.0.0):
 - [x] **`docs/signing.md`** written — full reference: Apple Developer setup, App Store Connect API key vs legacy Apple ID flow, cert file inventory (universal vs per-brand), env-var-to-file mapping table, Windows EV/cloud/local strategy, CI secret rotation, troubleshooting.
 - [x] **`merge-line-files.test.js`** (8 tests, build layer) — value preservation, custom section preservation, new keys added to Default, user keys migrated to Custom, gitignore line-based handling, gitignore migration, idempotency, comment preservation.
 - [x] **CLAUDE.md** + **README.md** updated with `docs/signing.md` link.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both green at **191 passing + 4 integration skipped clean** (41 build + 150 main + 4 skip-with-reason).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both green at **191 passing + 4 integration skipped clean** (41 build + 150 main + 4 skip-with-reason).
 
 ### ✅ Pass 2.14 — Cert validation + GH Actions secret push (DONE, 205 passing + 4 integration skipped)
 
@@ -346,7 +346,7 @@ Top-level keys (v1.0.0):
   - On macOS, queries Keychain via `security find-identity -v -p codesigning` for the Developer ID Application identity
   - Returns `{ ok, issues }`. `--strict` flag exits non-zero on errors. Default behavior is warn-only so `setup` can call it non-fatally.
 - [x] **Auto-runs at end of `setup`** — non-fatal warning pass so user knows what's missing before they release. Skip with `options.validateCerts = false` if calling programmatically.
-- [x] **New `commands/push-secrets.js`** (`npx mgr push-secrets` / `npx mgr secrets`) — reads `.env` Default section, encrypts via libsodium (`crypto_box_seal`), pushes via Octokit `createOrUpdateRepoSecret`. Auto-detects paths-to-files (relative/absolute, plus a heuristic on cert/key extensions) and base64-encodes file contents instead of pushing the path string. Custom section is never touched. Filtering via `--only=KEY1,KEY2` and `--skip-empty=false`.
+- [x] **New `commands/push-secrets.js`** (`npx omega push-secrets` / `npx omega secrets`) — reads `.env` Default section, encrypts via libsodium (`crypto_box_seal`), pushes via Octokit `createOrUpdateRepoSecret`. Auto-detects paths-to-files (relative/absolute, plus a heuristic on cert/key extensions) and base64-encodes file contents instead of pushing the path string. Custom section is never touched. Filtering via `--only=KEY1,KEY2` and `--skip-empty=false`.
 - [x] **`discoverRepo()`** parses owner/repo from `package.json` `repository.url` (string OR object form) or falls back to `git config --get remote.origin.url`. SSH and HTTPS URLs both supported.
 - [x] **`cli.js`** updated with `push-secrets` alias (`secrets`).
 - [x] **devDeps added**: `libsodium-wrappers`, `@octokit/rest`, `plist`.
@@ -354,7 +354,7 @@ Top-level keys (v1.0.0):
 - [x] **`push-secrets.test.js`** (10 tests, build layer) — `parseEnv` Default vs Custom split, quote stripping, comment skipping; `resolveSecretValue` string-as-is, empty pass-through, file → base64, missing-file → string-as-is, relative paths resolved against projectRoot; `discoverRepo` HTTPS + SSH URL parsing.
 - [x] **`docs/signing.md` updated** with full `push-secrets` walkthrough + CI decode-back-to-file pattern.
 - [x] **CLAUDE.md** CLI table updated. **PROGRESS.md** updated.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both at **205 passing + 4 integration skipped clean** (55 build + 150 main + 4 skip-with-reason).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both at **205 passing + 4 integration skipped clean** (55 build + 150 main + 4 skip-with-reason).
 
 ### ✅ Pass 2.15 — env value double-quote normalization (DONE, 212 passing + 4 integration skipped)
 
@@ -363,8 +363,8 @@ Top-level keys (v1.0.0):
 - [x] **Default templates** (`.env.example` at EM root + `_.env` consumer scaffold) updated to ship in `KEY=""` form so the convention is visible from day one.
 - [x] **Custom section is also normalized** — the user's secrets get the same quoting treatment so the file's style is consistent throughout. Behavior is idempotent.
 - [x] **`merge-line-files.test.js`** expanded from 8 → 15 tests. Covers: existing tests updated to assert the quoted form (e.g. `GH_TOKEN="ghp_secret123"`), 7 new direct `normalizeEnvLine` tests for raw → quoted, already-quoted pass-through, single → double canonicalization, empty stays bare, escape handling, comment + blank preservation, leading-whitespace preservation.
-- [x] **Two pre-existing test brittlenesses fixed** — `tray.test.js` and `context-menu.test.js` both had hard-coded "no consumer file" assertions that broke once somiibo ran `npx mgr setup` and got the default `src/tray/index.js` + `src/context-menu/index.js` scaffolds. Tests now read the actual file presence and adapt expectations.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both at **212 passing + 4 integration skipped clean**. (62 build + 150 main + 4 skip-with-reason).
+- [x] **Two pre-existing test brittlenesses fixed** — `tray.test.js` and `context-menu.test.js` both had hard-coded "no consumer file" assertions that broke once somiibo ran `npx omega setup` and got the default `src/tray/index.js` + `src/context-menu/index.js` scaffolds. Tests now read the actual file presence and adapt expectations.
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both at **212 passing + 4 integration skipped clean**. (62 build + 150 main + 4 skip-with-reason).
 
 ### ✅ Pass 2.16 — Real release pipeline (DONE, 222 passing + 4 integration skipped)
 
@@ -382,7 +382,7 @@ Top-level keys (v1.0.0):
 - [x] **`docs/signing.md`** updated to drop legacy Apple ID path.
 - [x] **CLAUDE.md** + **README.md** updated with `docs/releasing.md` link, sign-windows marked real.
 - [x] **`release-pipeline.test.js`** (10 tests, build layer) — module-load shape verification (package, release, build-config, sign-windows are all functions), sign-windows error paths (missing input dir, unknown cloud provider, missing provider, unknown strategy), notarize hook skip-on-non-darwin and skip-on-missing-env behaviors. Real signing/notarization is too external for unit tests; verified manually via `npm run release` against real certs.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both at **222 passing + 4 integration skipped clean** (72 build + 150 main + 4 skip-with-reason).
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both at **222 passing + 4 integration skipped clean** (72 build + 150 main + 4 skip-with-reason).
 - [x] **End-to-end smoke**: deferred to consumer-side `npm run release` against real certs (somiibo has them wired). The pipeline is ready; running it against real Apple Developer creds is the consumer's call.
 
 ### ✅ Pass 2.17 — Dependency upgrade pass (DONE, 222 passing + 4 integration skipped)
@@ -395,7 +395,7 @@ Top-level keys (v1.0.0):
   - `electron` and `electron-builder` already on latest (41.3.0 / 26.8.1)
 - [x] **Stripped final legacy notarization references** in `src/defaults/build/certs/README.md` — replaced `APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD` row with the API-key trio.
 - [x] **`npm outdated` is now empty** — everything on latest.
-- [x] **Verified**: `npm test` (EM) and `npx mgr test` (somiibo) both at **222 passing + 4 integration skipped clean**. Storage round-trip + dot-notation + onChange tests confirm electron-store v11 compatibility.
+- [x] **Verified**: `npm test` (EM) and `npx omega test` (somiibo) both at **222 passing + 4 integration skipped clean**. Storage round-trip + dot-notation + onChange tests confirm electron-store v11 compatibility.
 
 ### ✅ Pass 2.18 — End-to-end release validation (DONE, two real GH releases shipped)
 
@@ -405,7 +405,7 @@ Validated the full sign + notarize + publish pipeline against real Apple Develop
 
 - [x] **electron-builder 26 schema break** — `win.signingHashAlgorithms` was deprecated; moved into `win.signtoolOptions.signingHashAlgorithms` in `src/defaults/electron-builder.yml`. Without this, `electron-builder` exits 1 on config validation before any signing happens.
 - [x] **Double sign+notarize** — `gulp.publish` was `series(packageBuild, release)` which ran the entire sign+notarize cycle twice (~18 min, 4 notarizations). Changed to `series(build, release)`. Now one pass, ~10 min, 2 notarizations. `packageBuild` still exists for `npm run build` (no-publish local builds).
-- [x] **Dev webpack overwriting prod build** — consumer's `npm run release` was `npm run build && npm run publish`, but `publish` re-ran webpack without `EM_BUILD_MODE=true`, leaving a dev-mode bundle in `dist/` before electron-builder packaged it. Changed `projectScripts.release` to a single gulp invocation: `npx mgr clean && npx mgr setup && EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish`. Also set `projectScripts.publish` to include `EM_BUILD_MODE=true` so a standalone `npm run publish` from a clean tree also produces prod artifacts.
+- [x] **Dev webpack overwriting prod build** — consumer's `npm run release` was `npm run build && npm run publish`, but `publish` re-ran webpack without `EM_BUILD_MODE=true`, leaving a dev-mode bundle in `dist/` before electron-builder packaged it. Changed `projectScripts.release` to a single gulp invocation: `npx omega clean && npx omega setup && EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish`. Also set `projectScripts.publish` to include `EM_BUILD_MODE=true` so a standalone `npm run publish` from a clean tree also produces prod artifacts.
 
 **Two real GH releases published end-to-end:**
 
@@ -461,16 +461,16 @@ downloads: {
 
 Built the self-installing Windows code-signing runner. **Not smoke-tested on actual Windows yet** — that's deferred to when Ian's at the Windows box. All Mac-side surface (CLI dispatch, error paths, watcher daemon source code, docs) is in place.
 
-**New `npx mgr runner` subcommand surface:**
+**New `npx omega runner` subcommand surface:**
 
 ```bash
-npx mgr runner install              # idempotent setup on Windows; downloads actions/runner, registers vs every admin org, installs watcher service. Tears down any prior install first, so re-running is safe.
-npx mgr runner register-org <org>   # manual single-org registration
-npx mgr runner start                # start services
-npx mgr runner stop                 # stop services
-npx mgr runner status               # health + registered orgs + service state
-npx mgr runner uninstall            # full removal
-npx mgr runner self-update          # force npm i -g electron-manager@latest
+npx omega runner install              # idempotent setup on Windows; downloads actions/runner, registers vs every admin org, installs watcher service. Tears down any prior install first, so re-running is safe.
+npx omega runner register-org <org>   # manual single-org registration
+npx omega runner start                # start services
+npx omega runner stop                 # stop services
+npx omega runner status               # health + registered orgs + service state
+npx omega runner uninstall            # full removal
+npx omega runner self-update          # force npm i -g electron-manager@latest
 ```
 
 **Files:**
@@ -480,7 +480,7 @@ npx mgr runner self-update          # force npm i -g electron-manager@latest
 - `src/utils/github.js` — used by both runner.js and watcher (the watcher embeds its own copy of the API call to be self-contained).
 - `package.json` — `node-windows` in `optionalDependencies` so Mac installs don't fail.
 
-**Auto-onboarding new orgs:** zero Windows interaction. The watcher detects admin access to any new GH org within 60s and auto-registers. So onboarding a new app under a brand-new org is purely a Mac-side `npx mgr setup` step.
+**Auto-onboarding new orgs:** zero Windows interaction. The watcher detects admin access to any new GH org within 60s and auto-registers. So onboarding a new app under a brand-new org is purely a Mac-side `npx omega setup` step.
 
 **Docs:** `docs/runner.md` — full install walkthrough, GH_TOKEN scope requirements (`admin:org` needed for full automation), troubleshooting, architecture diagram.
 
@@ -726,7 +726,7 @@ Built for Somiibo's "icons on every button / stop reinventing tooltips" batch �
 
 ### ✅ Pass 2.28 — web-manager-bridge public `getIdToken()` (DONE, uncommitted)
 
-Built for Somiibo's premium proxy provisioning (consumer main code calling an authenticated BEM route). New public `manager.webManager.getIdToken()` — fresh Firebase ID token for the signed-in user (async; null when signed out / Firebase absent), so consumers never reach into the bridge's private `_firebaseAuth`. Unit test in the bridge main suite (null when signed out); documented in docs/web-manager-bridge.md § Public API; CHANGELOG 1.10.0 `Added (web-manager-bridge)`.
+Built for Somiibo's premium proxy provisioning (consumer main code calling an authenticated BEM route). New public `manager.omega.getIdToken()` — fresh Firebase ID token for the signed-in user (async; null when signed out / Firebase absent), so consumers never reach into the bridge's private `_firebaseAuth`. Unit test in the bridge main suite (null when signed out); documented in docs/web-manager-bridge.md § Public API; CHANGELOG 1.10.0 `Added (web-manager-bridge)`.
 
 ### ✅ Pass 2.4+ — Feature implementations (all DONE — see individual passes for details)
 

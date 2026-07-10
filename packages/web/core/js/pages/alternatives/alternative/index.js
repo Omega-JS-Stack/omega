@@ -3,13 +3,13 @@
  */
 
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     // Resolve after initialization
     return resolve();

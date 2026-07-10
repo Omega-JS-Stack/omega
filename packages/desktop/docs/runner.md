@@ -1,6 +1,6 @@
 # Windows Code-Signing Runner
 
-@omegajs/desktop ships a self-installing Windows runner so you can EV-token sign every consumer app from a single Windows box, with zero per-org setup after the initial install.
+@omega.js/desktop ships a self-installing Windows runner so you can EV-token sign every consumer app from a single Windows box, with zero per-org setup after the initial install.
 
 ## Why a runner?
 
@@ -20,18 +20,18 @@ Hand this section to a fresh Claude session on the Windows box. It's the linear 
 - Visual Studio Build Tools 2022 with the "Desktop development with C++" workload (provides `signtool.exe`) — `winget install Microsoft.VisualStudio.2022.BuildTools` then in the Installer enable that workload
 - A GitHub Personal Access Token (classic) with `repo`, `workflow`, `admin:org` scopes (https://github.com/settings/tokens). The runner-registration-token API requires `admin:org`; `manage_runners:org` alone is insufficient.
 
-**Step 1 — Install @omegajs/desktop globally:**
+**Step 1 — Install @omega.js/desktop globally:**
 ```powershell
-npm install -g @omegajs/desktop
-npx mgr version
+npm install -g @omega.js/desktop
+npx omega version
 ```
-Should print `@omegajs/desktop@1.0.0` (or newer).
+Should print `@omega.js/desktop@1.0.0` (or newer).
 
 **Step 2 — Smoke-test signtool against your EV token (no GitHub, no runner — just signing):**
 ```powershell
 $env:WIN_EV_TOKEN_PATH = "C:\path\to\your-token-or-cert.cer"
 $env:WIN_CSC_KEY_PASSWORD = "<your token password>"
-npx mgr sign-windows --smoke
+npx omega sign-windows --smoke
 ```
 Copies `where.exe` to a temp location, signs it, verifies it, prints PASS/FAIL. If this fails, fix it before continuing — the runner just calls the same `signtool` underneath.
 
@@ -40,15 +40,15 @@ If smoke passes you've proven: drivers see the token, signtool finds the cert, y
 **Step 3 — Install the runner:**
 ```powershell
 $env:GH_TOKEN = "ghp_xxx_with_admin_org_scope"
-npx mgr runner install
-npx mgr runner status
+npx omega runner install
+npx omega runner status
 ```
 `status` should show the watcher service running and at least one org registered.
 
 **Step 4 — Trigger a real signing job from the consumer side (do this on your Mac, not Windows):**
 ```bash
 # On your Mac, in a consumer project (e.g. deployment-playground-desktop)
-npx mgr publish
+npx omega publish
 ```
 This kicks the GH Actions matrix. The Windows job builds unsigned, uploads `windows-unsigned`, and the `windows-sign` job dispatches to your runner box. Watch the run in the GH Actions UI.
 
@@ -61,7 +61,7 @@ type .gh-runners\watcher\watcher.log
 eventvwr.msc   # Windows Logs → Application → filter source: actions-runner-svc
 
 # Force a fresh smoke test
-npx mgr sign-windows --smoke
+npx omega sign-windows --smoke
 ```
 
 If you hit any specific signtool error, jump to the "Debugging signtool errors" section below.
@@ -77,9 +77,9 @@ If you hit any specific signtool error, jump to the "Debugging signtool errors" 
 
 ```powershell
 # Run on the Windows box. Idempotent — safe to re-run if anything's weird.
-npm install -g @omegajs/desktop
+npm install -g @omega.js/desktop
 $env:GH_TOKEN = "ghp_xxx_token_with_admin_org_scope"
-npx mgr runner install
+npx omega runner install
 ```
 
 `install`:
@@ -88,7 +88,7 @@ npx mgr runner install
 3. Registers a runner with labels `[self-hosted, windows, ev-token]` against each org.
 4. Installs the `em-runner-watcher` Windows service that:
    - Polls GitHub every 60s for new orgs you've gained admin access to → auto-registers a runner there.
-   - Self-updates @omegajs/desktop via `npm i -g @omegajs/desktop@latest` on every tick (so the runner box always has the freshest CLI).
+   - Self-updates @omega.js/desktop via `npm i -g @omega.js/desktop@latest` on every tick (so the runner box always has the freshest CLI).
 5. Starts the service. Auto-starts on boot.
 
 Done. You never touch the Windows box again unless you replace the EV token or migrate hardware.
@@ -101,27 +101,27 @@ For full automation (auto-registering against new orgs without prompting), the t
 - `workflow`
 - `admin:org` (full)
 
-**Why not `manage_runners:org`?** GitHub's UI lists it as a minimum-privilege scope under `admin:org`, but the actual REST endpoint @omegajs/desktop uses (`POST /orgs/{org}/actions/runners/registration-token`) explicitly requires `admin:org` (full) per their docs. `manage_runners:org` alone returns 403. Fine-grained tokens with "Self-hosted runners: write" do work but must be issued per-org, defeating auto-discovery.
+**Why not `manage_runners:org`?** GitHub's UI lists it as a minimum-privilege scope under `admin:org`, but the actual REST endpoint @omega.js/desktop uses (`POST /orgs/{org}/actions/runners/registration-token`) explicitly requires `admin:org` (full) per their docs. `manage_runners:org` alone returns 403. Fine-grained tokens with "Self-hosted runners: write" do work but must be issued per-org, defeating auto-discovery.
 
 If your token only has `repo` scope, runner registration will fail per-org with a clear message telling you to broaden the scope.
 
 ## Day-to-day on Windows
 
 ```powershell
-npx mgr runner status         # show service state, registered orgs, last poll
-npx mgr runner start          # start services if stopped
-npx mgr runner stop           # stop services
-npx mgr runner monitor        # tail the live signing event log (see below)
-npx mgr runner self-update    # force an immediate npm i -g @omegajs/desktop@latest
-npx mgr runner uninstall      # full removal: deregister from every org, delete services
+npx omega runner status         # show service state, registered orgs, last poll
+npx omega runner start          # start services if stopped
+npx omega runner stop           # stop services
+npx omega runner monitor        # tail the live signing event log (see below)
+npx omega runner self-update    # force an immediate npm i -g @omega.js/desktop@latest
+npx omega runner uninstall      # full removal: deregister from every org, delete services
 ```
 
 ## Live signing monitor
 
-`npx mgr runner monitor` pretty-prints a structured signing event log in real time so you can watch jobs flow through the signer without remoting into the GH Actions UI. Run it in a separate PowerShell / Windows Terminal tab on the signing box while a release is in flight.
+`npx omega runner monitor` pretty-prints a structured signing event log in real time so you can watch jobs flow through the signer without remoting into the GH Actions UI. Run it in a separate PowerShell / Windows Terminal tab on the signing box while a release is in flight.
 
 ```powershell
-npx mgr runner monitor
+npx omega runner monitor
 ```
 
 ```
@@ -144,8 +144,8 @@ Events captured per job:
 The event log is a JSONL file at `<runner-home>/em-signing.log` on CI (resolved from `EM_RUNNER_HOME` / `RUNNER_TOOLSDIRECTORY` / `RUNNER_WORKSPACE`), or `logs/signing.log` in local dev. Override with `EM_SIGN_LOG=<path>`. Monitor flags:
 
 ```powershell
-npx mgr runner monitor --follow-only      # only show NEW events (skip replay of pre-existing log)
-npx mgr runner monitor --file <path>      # watch a specific log file
+npx omega runner monitor --follow-only      # only show NEW events (skip replay of pre-existing log)
+npx omega runner monitor --file <path>      # watch a specific log file
 ```
 
 The log persists across job runs and is the system of record for signing — so even after the GH Actions UI rolls off (90 days), you have a local trail.
@@ -159,7 +159,7 @@ You can run signing **without doing a full release**. Three modes:
 ```powershell
 $env:WIN_EV_TOKEN_PATH = "C:\path\to\token.cer"     # or your .pfx for testing
 $env:WIN_CSC_KEY_PASSWORD = "<token password>"
-npx mgr sign-windows --smoke
+npx omega sign-windows --smoke
 ```
 
 Copies `%WINDIR%\System32\where.exe` to a temp dir, runs the full `signtool sign` + `signtool verify` flow against it, prints PASS/FAIL with diagnosis. Cleans up after itself. **This is the first thing to run if anything's broken.**
@@ -167,7 +167,7 @@ Copies `%WINDIR%\System32\where.exe` to a temp dir, runs the full `signtool sign
 ### Sign a single binary you already have
 
 ```powershell
-npx mgr sign-windows --target "C:\path\to\some-installer.exe"
+npx omega sign-windows --target "C:\path\to\some-installer.exe"
 ```
 
 Useful when CI gives you an unsigned `.exe` artifact and you want to test signing it locally before debugging the runner.
@@ -175,7 +175,7 @@ Useful when CI gives you an unsigned `.exe` artifact and you want to test signin
 ### Verify a signed binary's signature
 
 ```powershell
-npx mgr sign-windows --target "C:\path\to\some-installer.exe" --verify-only
+npx omega sign-windows --target "C:\path\to\some-installer.exe" --verify-only
 ```
 
 Reports whether the file is signed, by whom, and prints the cert chain. Doesn't sign.
@@ -183,7 +183,7 @@ Reports whether the file is signed, by whom, and prints the cert chain. Doesn't 
 ### Sign every artifact in `./release/`
 
 ```powershell
-npx mgr sign-windows --in release/ --out release/signed/
+npx omega sign-windows --in release/ --out release/signed/
 ```
 
 Standard mode. Used by the GH Actions workflow.
@@ -200,22 +200,22 @@ Standard mode. Used by the GH Actions workflow.
 
 ## Adding a new org
 
-**Zero Windows interaction.** Just create or get added as admin to a new GH org. Within ~60s the watcher polls, sees the new org, and auto-registers a runner against it. Your next `npx mgr setup` on a consumer in that org finds the runner waiting.
+**Zero Windows interaction.** Just create or get added as admin to a new GH org. Within ~60s the watcher polls, sees the new org, and auto-registers a runner against it. Your next `npx omega setup` on a consumer in that org finds the runner waiting.
 
 You can also force-register manually:
 ```powershell
-npx mgr runner register-org <org-name>
+npx omega runner register-org <org-name>
 ```
 
 ## EV USB token requirements
 
-These are *physical* / *driver-level* prerequisites @omegajs/desktop can't automate:
+These are *physical* / *driver-level* prerequisites @omega.js/desktop can't automate:
 
 1. EV USB token plugged in to the Windows box.
 2. SafeNet (or vendor-equivalent) drivers installed.
 3. Token unlocked once after every boot — there's typically a tray icon prompting for the password the first time `signtool` accesses the token. **For unattended signing, configure SafeNet client to cache the token password** (driver-specific; see SafeNet docs).
 
-@omegajs/desktop's `validate-certs` command will warn if it detects a missing token / driver, but can't install drivers for you.
+@omega.js/desktop's `validate-certs` command will warn if it detects a missing token / driver, but can't install drivers for you.
 
 ## Architecture: Mac side ↔ Windows side
 
@@ -223,7 +223,7 @@ These are *physical* / *driver-level* prerequisites @omegajs/desktop can't autom
 ┌──────────────────────────────────┐         ┌────────────────────────────────────┐
 │  YOUR MAC (developer)            │         │  WINDOWS BOX (signing runner)      │
 │                                  │         │                                    │
-│  npx mgr setup                   │         │  npx mgr runner install            │
+│  npx omega setup                   │         │  npx omega runner install            │
 │  (per consumer project)          │         │  (idempotent; re-run anytime)      │
 │                                  │         │                                    │
 │  • detects org                   │         │  • downloads actions/runner        │
@@ -244,13 +244,13 @@ These are *physical* / *driver-level* prerequisites @omegajs/desktop can't autom
 
 ## Continuing this work in a new chat (start cold from Windows)
 
-Open this repo's `docs/runner.md` in your new chat and ask the assistant to "continue the @omegajs/desktop Pass 2.20 Windows runner work — see PROGRESS.md and docs/runner.md." Hand it the output of:
+Open this repo's `docs/runner.md` in your new chat and ask the assistant to "continue the @omega.js/desktop Pass 2.20 Windows runner work — see PROGRESS.md and docs/runner.md." Hand it the output of:
 
 ```powershell
-npx mgr runner status                   # service health
+npx omega runner status                   # service health
 type <framework-clone>\.gh-runners\watcher\watcher.log  # last 50 lines of watcher log
 $env:GH_TOKEN = "ghp_..."               # confirm scope: settings/tokens shows admin:org checked
-npx mgr sign-windows --smoke            # smoke test
+npx omega sign-windows --smoke            # smoke test
 ```
 
 That's enough to give a fresh assistant the full state needed to continue.
@@ -261,7 +261,7 @@ That's enough to give a fresh assistant the full state needed to continue.
 - EV token isn't plugged in, or SafeNet client doesn't see it.
 - Open SafeNet Authentication Client (tray icon) → confirm token shows up.
 - If the token is there but signtool still can't see it, run `certutil -store -user My` and confirm the cert is listed under your user store.
-- Try `npx mgr sign-windows --smoke` to isolate.
+- Try `npx omega sign-windows --smoke` to isolate.
 
 ### "SignTool Error: An error occurred while attempting to sign: ..."
 Followed by a more specific message. The most common ones:
@@ -285,10 +285,10 @@ Your `GH_TOKEN` lacks `admin:org` scope for that org. Re-issue the token at <htt
 2. Common cause: working directory `<framework-clone>\.gh-runners\actions-runner-<org>` isn't writable by the service account. Either fix permissions or change the service's "Log On" user.
 
 ### Watcher service appears installed but isn't ticking
-Check `<framework-clone>\.gh-runners\watcher\watcher.log`. If it stops after a `tick: error GH API …`, your `GH_TOKEN` rotated or got revoked. Update `.env` with the new token, then run `npx mgr runner install` — it's idempotent and re-bakes the new token into the watcher service.
+Check `<framework-clone>\.gh-runners\watcher\watcher.log`. If it stops after a `tick: error GH API …`, your `GH_TOKEN` rotated or got revoked. Update `.env` with the new token, then run `npx omega runner install` — it's idempotent and re-bakes the new token into the watcher service.
 
 ### After Windows update, signtool can't find the token
-The SafeNet driver sometimes detaches after major OS updates. Open SafeNet Authentication Client tray app → check token shows up → run `npx mgr runner status` to confirm services are healthy. Then `npx mgr sign-windows --smoke` to validate end-to-end.
+The SafeNet driver sometimes detaches after major OS updates. Open SafeNet Authentication Client tray app → check token shows up → run `npx omega runner status` to confirm services are healthy. Then `npx omega sign-windows --smoke` to validate end-to-end.
 
 ## Useful files / paths to check
 
@@ -303,4 +303,4 @@ The SafeNet driver sometimes detaches after major OS updates. Open SafeNet Authe
 
 ## Pinning + upgrades
 
-@omegajs/desktop pins the `actions/runner` version it downloads (look at `ACTIONS_RUNNER_VERSION` in `src/commands/runner.js`). To upgrade the runner binary itself, bump that constant in @omegajs/desktop, ship a new release, and the watcher's self-update will pull the new @omegajs/desktop. Then re-run `npx mgr runner install` on the Windows box — it tears down the old install and lays down the new actions/runner version cleanly.
+@omega.js/desktop pins the `actions/runner` version it downloads (look at `ACTIONS_RUNNER_VERSION` in `src/commands/runner.js`). To upgrade the runner binary itself, bump that constant in @omega.js/desktop, ship a new release, and the watcher's self-update will pull the new @omega.js/desktop. Then re-run `npx omega runner install` on the Windows box — it tears down the old install and lays down the new actions/runner version cleanly.

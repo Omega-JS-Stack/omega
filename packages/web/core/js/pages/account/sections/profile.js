@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let formManager = null;
 
@@ -132,8 +132,8 @@ async function updateUserProfile(data) {
   console.log('Profile update data:', data);
 
   // Get current user and update Firestore
-  const user = webManager.auth().getUser();
-  const firestore = webManager.firestore();
+  const user = omega.auth().getUser();
+  const firestore = omega.firestore();
   const userDocRef = firestore.doc(`users/${user.uid}`);
 
   // Use merge to only update specified fields
@@ -152,8 +152,8 @@ async function handleCopyUid() {
   }
 
   try {
-    // Use webManager's clipboard utility
-    await webManager.utilities().clipboardCopy($uidInput);
+    // Use omega's clipboard utility
+    await omega.utilities().clipboardCopy($uidInput);
 
     // Update button text temporarily
     const $text = $copyBtn.querySelector('.button-text');

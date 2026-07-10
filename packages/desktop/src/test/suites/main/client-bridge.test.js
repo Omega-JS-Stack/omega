@@ -8,13 +8,13 @@ module.exports = {
   layer: 'main',
   description: 'client-bridge (main, unit)',
   cleanup: async (ctx) => {
-    await ctx.manager.webManager._resetForTests();
+    await ctx.manager.omega._resetForTests();
   },
   tests: [
     {
       name: 'initialize ran during boot',
       run: (ctx) => {
-        ctx.expect(ctx.manager.webManager._initialized).toBe(true);
+        ctx.expect(ctx.manager.omega._initialized).toBe(true);
       },
     },
     {
@@ -30,7 +30,7 @@ module.exports = {
       run: (ctx) => {
         // The harness boots without auth; either firebase isn't loaded (no firebaseConfig
         // in default config) or it is and there's no user. Either way, currentUser is null.
-        ctx.expect(ctx.manager.webManager.getCurrentUser()).toBeNull();
+        ctx.expect(ctx.manager.omega.getCurrentUser()).toBeNull();
       },
     },
     {
@@ -38,17 +38,17 @@ module.exports = {
       run: async (ctx) => {
         // Same no-auth harness as getCurrentUser above — signed-in token
         // round-trips are the integration suite's domain.
-        ctx.expect(await ctx.manager.webManager.getIdToken()).toBeNull();
+        ctx.expect(await ctx.manager.omega.getIdToken()).toBeNull();
       },
     },
     {
       name: 'handleAuthToken returns no-op result when firebase not loaded',
       run: async (ctx) => {
         // Default config has empty firebaseConfig → firebase fails to init → _firebaseAuth=null.
-        if (ctx.manager.webManager._firebaseAuth) {
+        if (ctx.manager.omega._firebaseAuth) {
           ctx.skip('firebase did load (firebaseConfig was set) — covered by integration tests');
         }
-        const r = await ctx.manager.webManager.handleAuthToken('whatever');
+        const r = await ctx.manager.omega.handleAuthToken('whatever');
         ctx.expect(r.success).toBe(false);
         ctx.expect(r.reason).toBe('firebase-not-loaded');
       },
@@ -57,14 +57,14 @@ module.exports = {
       name: 'handleAuthToken with empty token returns no-token failure',
       run: async (ctx) => {
         // Stub _firebaseAuth so we hit the "no token" branch instead of "firebase-not-loaded."
-        const origAuth = ctx.manager.webManager._firebaseAuth;
-        ctx.manager.webManager._firebaseAuth = { currentUser: null }; // truthy so we pass the firebase check
+        const origAuth = ctx.manager.omega._firebaseAuth;
+        ctx.manager.omega._firebaseAuth = { currentUser: null }; // truthy so we pass the firebase check
         try {
-          const r = await ctx.manager.webManager.handleAuthToken('');
+          const r = await ctx.manager.omega.handleAuthToken('');
           ctx.expect(r.success).toBe(false);
           ctx.expect(r.reason).toBe('no-token');
         } finally {
-          ctx.manager.webManager._firebaseAuth = origAuth;
+          ctx.manager.omega._firebaseAuth = origAuth;
         }
       },
     },
@@ -72,41 +72,41 @@ module.exports = {
       name: 'sync-request: same UID → no sync needed',
       run: async (ctx) => {
         // Stub the auth so we control bgUid.
-        const origAuth = ctx.manager.webManager._firebaseAuth;
-        ctx.manager.webManager._firebaseAuth = { currentUser: { uid: 'abc' } };
+        const origAuth = ctx.manager.omega._firebaseAuth;
+        ctx.manager.omega._firebaseAuth = { currentUser: { uid: 'abc' } };
         try {
           const result = await ctx.manager.ipc.invoke('desktop:auth:sync-request', { contextUid: 'abc' });
           ctx.expect(result.needsSync).toBe(false);
         } finally {
-          ctx.manager.webManager._firebaseAuth = origAuth;
+          ctx.manager.omega._firebaseAuth = origAuth;
         }
       },
     },
     {
       name: 'sync-request: main signed out, renderer signed in → tells renderer to sign out',
       run: async (ctx) => {
-        const origAuth = ctx.manager.webManager._firebaseAuth;
-        ctx.manager.webManager._firebaseAuth = { currentUser: null };
+        const origAuth = ctx.manager.omega._firebaseAuth;
+        ctx.manager.omega._firebaseAuth = { currentUser: null };
         try {
           const result = await ctx.manager.ipc.invoke('desktop:auth:sync-request', { contextUid: 'someone' });
           ctx.expect(result.needsSync).toBe(true);
           ctx.expect(result.signOut).toBe(true);
         } finally {
-          ctx.manager.webManager._firebaseAuth = origAuth;
+          ctx.manager.omega._firebaseAuth = origAuth;
         }
       },
     },
     {
       name: 'sync-request: firebase not loaded → no sync',
       run: async (ctx) => {
-        const origAuth = ctx.manager.webManager._firebaseAuth;
-        ctx.manager.webManager._firebaseAuth = null;
+        const origAuth = ctx.manager.omega._firebaseAuth;
+        ctx.manager.omega._firebaseAuth = null;
         try {
           const result = await ctx.manager.ipc.invoke('desktop:auth:sync-request', { contextUid: null });
           ctx.expect(result.needsSync).toBe(false);
           ctx.expect(result.reason).toBe('firebase-not-loaded');
         } finally {
-          ctx.manager.webManager._firebaseAuth = origAuth;
+          ctx.manager.omega._firebaseAuth = origAuth;
         }
       },
     },
@@ -128,16 +128,16 @@ module.exports = {
       name: 'onAuthChange returns an unsubscribe fn',
       run: (ctx) => {
         const fn = () => {};
-        const off = ctx.manager.webManager.onAuthChange(fn);
-        ctx.expect(ctx.manager.webManager._stateSubs.has(fn)).toBe(true);
+        const off = ctx.manager.omega.onAuthChange(fn);
+        ctx.expect(ctx.manager.omega._stateSubs.has(fn)).toBe(true);
         off();
-        ctx.expect(ctx.manager.webManager._stateSubs.has(fn)).toBe(false);
+        ctx.expect(ctx.manager.omega._stateSubs.has(fn)).toBe(false);
       },
     },
     {
       name: '_snapshotUser returns the public user shape (no token)',
       run: (ctx) => {
-        const snap = ctx.manager.webManager._snapshotUser({
+        const snap = ctx.manager.omega._snapshotUser({
           uid: 'u1',
           email: 'a@b.com',
           displayName: 'Bob',
@@ -162,8 +162,8 @@ module.exports = {
         // We've already tested the deep-link side in deep-link.test.js. Here we verify
         // the integration is actually live: dispatching the route triggers our spy.
         let received = null;
-        const orig = ctx.manager.webManager.handleAuthToken;
-        ctx.manager.webManager.handleAuthToken = async (token) => {
+        const orig = ctx.manager.omega.handleAuthToken;
+        ctx.manager.omega.handleAuthToken = async (token) => {
           received = token;
           return { success: true };
         };
@@ -173,7 +173,7 @@ module.exports = {
           await new Promise((r) => setImmediate(r));
           ctx.expect(received).toBe('BRIDGE-TEST-TOKEN');
         } finally {
-          ctx.manager.webManager.handleAuthToken = orig;
+          ctx.manager.omega.handleAuthToken = orig;
         }
       },
     },

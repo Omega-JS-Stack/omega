@@ -26,7 +26,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const yaml = require('js-yaml');
 const JSON5 = require('json5');
-const { findSecretKeys } = require('@omegajs/config');
+const { findSecretKeys } = require('@omega.js/config');
 
 // _config.yml sections that were Jekyll/UJM machinery — gone with Jekyll
 const DROPPED_JEKYLL_KEYS = [
@@ -85,13 +85,15 @@ function convertConfig({ jekyll, ujm }) {
   if (!isEmpty(theme)) omega.theme = theme;
 
   // ---- web_manager: extract the shared sections, keep the client blob
-  const webManager = take('web_manager') || {};
-  const firebaseConfig = webManager.firebase && webManager.firebase.app && webManager.firebase.app.config;
+  // (legacyWebManager = the LEGACY config blob being migrated — the identifier
+  // deliberately keeps the old product name; `omega` is the OUTPUT object.)
+  const legacyWebManager = take('web_manager') || {};
+  const firebaseConfig = legacyWebManager.firebase && legacyWebManager.firebase.app && legacyWebManager.firebase.app.config;
   if (!isEmpty(firebaseConfig)) {
     omega.firebaseConfig = firebaseConfig;
-    delete webManager.firebase.app.config;
-    if (isEmpty(webManager.firebase.app)) delete webManager.firebase.app;
-    if (isEmpty(webManager.firebase)) delete webManager.firebase;
+    delete legacyWebManager.firebase.app.config;
+    if (isEmpty(legacyWebManager.firebase.app)) delete legacyWebManager.firebase.app;
+    if (isEmpty(legacyWebManager.firebase)) delete legacyWebManager.firebase;
   }
 
   // ---- analytics: flat scalars → providers shape
@@ -106,9 +108,9 @@ function convertConfig({ jekyll, ujm }) {
     if (!isEmpty(providers)) omega.analytics = { providers };
   }
 
-  if (!isEmpty(webManager.payment)) {
-    omega.payment = webManager.payment;
-    delete webManager.payment;
+  if (!isEmpty(legacyWebManager.payment)) {
+    omega.payment = legacyWebManager.payment;
+    delete legacyWebManager.payment;
 
     // Legacy "disabled" idiom: credential keys set to `false` (somiibo ships
     // `stripe.publishableKey: false`). The schema types them as strings —
@@ -129,7 +131,7 @@ function convertConfig({ jekyll, ujm }) {
   // ---- web-scoped sections from _config.yml
   for (const key of WEB_SECTION_ORDER) {
     if (key === 'web_manager') {
-      if (!isEmpty(webManager)) web.web_manager = webManager;
+      if (!isEmpty(legacyWebManager)) web.web_manager = legacyWebManager;
       continue;
     }
     const value = take(key);

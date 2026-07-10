@@ -196,28 +196,28 @@ module.exports = {
       },
     },
     {
-      name: 'built-in auth/token calls webManager.handleAuthToken when available',
+      name: 'built-in auth/token calls omega.handleAuthToken when available',
       run: (ctx) => {
         let receivedToken = null;
-        const origHandler = ctx.manager.webManager.handleAuthToken;
-        ctx.manager.webManager.handleAuthToken = (token) => { receivedToken = token; };
+        const origHandler = ctx.manager.omega.handleAuthToken;
+        ctx.manager.omega.handleAuthToken = (token) => { receivedToken = token; };
 
         try {
           ctx.manager.deepLink.dispatch('myapp://auth/token?authToken=abc123');
           ctx.expect(receivedToken).toBe('abc123');
         } finally {
-          ctx.manager.webManager.handleAuthToken = origHandler;
+          ctx.manager.omega.handleAuthToken = origHandler;
         }
       },
     },
     {
       // MODERN shape only: ?authToken= (what the website's token page sends).
-      // Legacy-app formats (?token=, ?payload=) are UJM's concern — @omegajs/desktop ignores them.
+      // Legacy-app formats (?token=, ?payload=) are UJM's concern — @omega.js/desktop ignores them.
       name: 'built-in auth/token reads ONLY ?authToken= (legacy ?token=/?payload= ignored)',
       run: (ctx) => {
         let called = false;
-        const origHandler = ctx.manager.webManager.handleAuthToken;
-        ctx.manager.webManager.handleAuthToken = () => { called = true; };
+        const origHandler = ctx.manager.omega.handleAuthToken;
+        ctx.manager.omega.handleAuthToken = () => { called = true; };
 
         try {
           ctx.manager.deepLink.dispatch('myapp://auth/token?token=legacy1');
@@ -225,7 +225,7 @@ module.exports = {
           ctx.manager.deepLink.dispatch(`myapp://auth/token?payload=${payload}`);
           ctx.expect(called).toBe(false);
         } finally {
-          ctx.manager.webManager.handleAuthToken = origHandler;
+          ctx.manager.omega.handleAuthToken = origHandler;
         }
       },
     },

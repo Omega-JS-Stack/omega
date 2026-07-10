@@ -1,7 +1,7 @@
 // Test runner — discovers + runs suites, reports OMEGA-Extension-style.
 //
 // The runner CORE (discovery, suite/group/standalone execution, filtering, skip
-// semantics, init hooks, reporting) is the shared @omegajs/devkit runner-core,
+// semantics, init hooks, reporting) is the shared @omega.js/devkit runner-core,
 // vendored into dist/vendor/devkit at prepare time. This file is the extension framework's config:
 // title, target alias, and the framework-specific layer glue.
 //
@@ -17,11 +17,11 @@
 const path = require('path');
 const chalk = require('chalk').default;
 
-const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omegajs/devkit/test/runner-core');
+const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omega.js/devkit/test/runner-core');
 
 const runner = createRunner({
   title: 'OMEGA Extension Tests',
-  packageName: '@omegajs/extension',
+  packageName: '@omega.js/extension',
   targetAlias: 'extension',
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),

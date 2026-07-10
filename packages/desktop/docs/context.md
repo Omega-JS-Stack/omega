@@ -1,6 +1,6 @@
 # Context
 
-Runtime info block. Mirrors @omegajs/backend's `assistant.request.{geolocation,client}` shape so @omegajs/desktop apps + sister projects (@omegajs/backend, UJM, @omegajs/client) all reference the same property paths when reading user info.
+Runtime info block. Mirrors @omega.js/backend's `assistant.request.{geolocation,client}` shape so @omega.js/desktop apps + sister projects (@omega.js/backend, UJM, @omega.js/client) all reference the same property paths when reading user info.
 
 Populated asynchronously during `manager.initialize()`.
 
@@ -19,7 +19,7 @@ manager.context.client = {
   locale:    'en-US',            // app.getLocale()
   platform:  'darwin',           // os.platform()
   arch:      'arm64',            // os.arch()
-  mobile:    false,              // always false on @omegajs/desktop (desktop framework)
+  mobile:    false,              // always false on @omega.js/desktop (desktop framework)
 };
 
 manager.context.session = {
@@ -66,14 +66,14 @@ const snap = await window.em.context.get();
 console.log(snap.session.deviceId);
 ```
 
-## Why the @omegajs/backend shape
+## Why the @omega.js/backend shape
 
-Sister projects (@omegajs/backend, @omegajs/client, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. @omegajs/desktop matches the leaf names so consumer code can write logic that works across all four runtimes:
+Sister projects (@omega.js/backend, @omega.js/client, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. @omega.js/desktop matches the leaf names so consumer code can write logic that works across all four runtimes:
 
 ```js
 const country = manager.context.geolocation.country
-             || assistant.request.geolocation.country  // @omegajs/backend
-             || webManager.context.geolocation.country;
+             || assistant.request.geolocation.country  // @omega.js/backend
+             || omega.context.geolocation.country;
 ```
 
 ## Tests

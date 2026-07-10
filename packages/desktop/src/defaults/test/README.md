@@ -1,6 +1,6 @@
 # Project tests
 
-Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx mgr test`.
+Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx omega test`.
 
 ## Layers
 
@@ -21,7 +21,7 @@ Every feature ships with tests at every layer it has a surface in — logic (`bu
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('@omegajs/desktop/test/assert');
+const assert = require('@omega.js/desktop/test/assert');
 
 module.exports = {
   'my feature does the thing': async () => {
@@ -33,4 +33,4 @@ module.exports = {
 
 ## See also
 
-`node_modules/@omegajs/desktop/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omega.js/desktop/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).

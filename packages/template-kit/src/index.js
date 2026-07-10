@@ -1,5 +1,5 @@
 /**
- * index.js — @omegajs/template-kit public surface.
+ * index.js — @omega.js/template-kit public surface.
  *
  * The uj_* template filters/tags from jekyll-uj-powertools as plain,
  * engine-neutral JS, plus the Jekyll-compat filter pack and the LiquidJS

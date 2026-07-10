@@ -1,6 +1,6 @@
 /**
  * Ensure the publication's webhook delivers subscription events to the
- * parent @omegajs/backend's forwarder.
+ * parent @omega.js/backend's forwarder.
  *
  * Publications can be shared across sibling brands, so the webhook always
  * points at the parent (`parent` in omega.json5, 'self' for the parent
@@ -11,7 +11,7 @@
  */
 const chalk = require('chalk').default;
 
-// Subscription events @omegajs/backend's consent pipeline consumes (they flip
+// Subscription events @omega.js/backend's consent pipeline consumes (they flip
 // consent.marketing.status to 'revoked' and propagate the unsub to SendGrid)
 const DESIRED_EVENT_TYPES = [
   'subscription.unsubscribed',
@@ -19,7 +19,7 @@ const DESIRED_EVENT_TYPES = [
   'subscription.paused',
 ];
 
-const WEBHOOK_DESCRIPTION = '@omegajs/backend consent pipeline (managed by OMEGA — do not edit manually)';
+const WEBHOOK_DESCRIPTION = '@omega.js/backend consent pipeline (managed by OMEGA — do not edit manually)';
 
 module.exports = async function ensureWebhook(context) {
   const { beehiivApi: api, brandConfig, domain, serviceData, options = {} } = context;

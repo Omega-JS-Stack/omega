@@ -23,7 +23,7 @@ const chalk = require('chalk').default;
 // payload. The runner reads it from disk once at module-load time. Resolved through
 // devkit (NOT ../assert.js, which is now a CommonJS re-export shim — its source would
 // leave a bare `module.exports = require(...)` in the browser context).
-const ASSERT_SRC = fs.readFileSync(require.resolve('@omegajs/devkit/test/assert'), 'utf8');
+const ASSERT_SRC = fs.readFileSync(require.resolve('@omega.js/devkit/test/assert'), 'utf8');
 
 async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, projectRoot, frameworkDistRoot }) {
   let puppeteer;

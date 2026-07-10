@@ -4,7 +4,7 @@
  * source type detection, Firestore tracking, hash determinism, and the
  * unified pick/fallback resolution.
  *
- * Run: npx mgr test helpers/content/blog-auto-publisher
+ * Run: npx omega test helpers/content/blog-auto-publisher
  *
  * Pure-function tests for exported utilities (contentSourceHash, isURL). Feed
  * processing and Firestore tracking tests run against the real emulator.

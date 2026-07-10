@@ -4,7 +4,7 @@
 // Default functionality for the sidepanel view
 
 // Import OMEGA Extension
-import Manager from '@omegajs/extension/sidepanel';
+import Manager from '@omega.js/extension/sidepanel';
 
 // Create instance
 const manager = new Manager();
@@ -13,7 +13,7 @@ const manager = new Manager();
 manager.initialize()
 .then(() => {
   // Shortcuts
-  const { extension, messenger, logger, webManager } = manager;
+  const { extension, messenger, logger, omega } = manager;
 
   // Add your sidepanel-specific JavaScript here
   logger.log('Sidepanel initialized!');

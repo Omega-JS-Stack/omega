@@ -471,7 +471,7 @@ const autoUpdater = {
     return { label, enabled };
   },
 
-  // Reflect updater state into the @omegajs/desktop Check-for-Updates item. The item lives under
+  // Reflect updater state into the @omega.js/desktop Check-for-Updates item. The item lives under
   // `main/check-for-updates` on macOS (App menu) and `help/check-for-updates` on win/linux —
   // we just patch whichever one exists. Consumer can remove either via
   // manager.menu.remove('main/check-for-updates') in their integrations/menu/index.js.

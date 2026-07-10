@@ -1,7 +1,7 @@
 // This file is required by /token page to generate custom auth tokens for extensions/apps
 // Also handles MCP OAuth flow: user signs in → Firebase ID token sent back to Claude as auth code
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default function () {
@@ -25,13 +25,13 @@ export default function () {
   const isMcp = url.searchParams.get('mcp') === 'true';
 
   // Handle DOM ready
-  webManager.dom().ready()
+  omega.dom().ready()
   .then(async () => {
     // Log
     console.log('[Token] Initialized.', isMcp ? 'MCP OAuth flow' : 'Standard flow', 'authReturnUrl:', authReturnUrl);
 
     // Validate redirect URLs
-    if (authReturnUrl && !webManager.isValidRedirectUrl(authReturnUrl)) {
+    if (authReturnUrl && !omega.isValidRedirectUrl(authReturnUrl)) {
       showError('Invalid redirect URL');
       return;
     }
@@ -42,7 +42,7 @@ export default function () {
     }
 
     // Wait for auth to be ready and get user
-    webManager.auth().listen({ once: true }, async (state) => {
+    omega.auth().listen({ once: true }, async (state) => {
       const user = state.user;
 
       // Should not happen since page requires auth, but just in case
@@ -56,7 +56,7 @@ export default function () {
         if (isMcp && mcpRedirectUri) {
           updateStatus('Completing MCP authorization...');
 
-          const idToken = await webManager.auth().getIdToken(true);
+          const idToken = await omega.auth().getIdToken(true);
           const returnUrl = new URL(mcpRedirectUri);
           returnUrl.searchParams.set('code', idToken);
 
@@ -70,14 +70,14 @@ export default function () {
           updateStatus('Redirecting to Claude...');
 
           setTimeout(() => {
-            updateStatus('If you were not redirected, <a href="' + webManager.utilities().escapeHTML(redirectUrl) + '">click here to try again</a>.', true);
+            updateStatus('If you were not redirected, <a href="' + omega.utilities().escapeHTML(redirectUrl) + '">click here to try again</a>.', true);
           }, 3000);
 
           window.location.href = redirectUrl;
           return;
         }
 
-        // Standard flow: generate custom token via @omegajs/backend API
+        // Standard flow: generate custom token via @omega.js/backend API
         updateStatus('Generating secure token...');
         const token = await generateCustomToken();
 
@@ -100,7 +100,7 @@ export default function () {
 
           // Show retry button after a delay in case the redirect was cancelled (e.g. custom protocol dialog)
           setTimeout(() => {
-            updateStatus('If you were not redirected, <a href="' + webManager.utilities().escapeHTML(redirectUrl) + '">click here to try again</a>.', true);
+            updateStatus('If you were not redirected, <a href="' + omega.utilities().escapeHTML(redirectUrl) + '">click here to try again</a>.', true);
           }, 3000);
 
           window.location.href = redirectUrl;
@@ -119,9 +119,9 @@ export default function () {
     });
   });
 
-  // Generate custom token via @omegajs/backend API
+  // Generate custom token via @omega.js/backend API
   async function generateCustomToken() {
-    const serverApiURL = `${webManager.getApiUrl()}/backend-manager/user/token`;
+    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/token`;
 
     const response = await authorizedFetch(serverApiURL, {
       method: 'POST',

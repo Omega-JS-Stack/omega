@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let paymentConfig = null;
 let cancelFormManager = null;
@@ -70,13 +70,13 @@ export function onShow() {
 /* @dev-only:end */
 
 function updateUI(account) {
-  webManager.bindings().update(buildBillingState(account));
+  omega.bindings().update(buildBillingState(account));
   updateUsageInfo(account);
 }
 
 function buildBillingState(account) {
   const subscription = account?.subscription || {};
-  const resolved = webManager.auth().resolveSubscription(account);
+  const resolved = omega.auth().resolveSubscription(account);
   const rawStatus = subscription.status;
   const isPaid = subscription.product?.id !== 'basic' && !!subscription.product?.id;
   const displayName = getDisplayName(subscription);
@@ -187,7 +187,7 @@ async function openBillingPortal() {
     if ($manageBtn) $manageBtn.disabled = true;
     if ($btnText) $btnText.textContent = 'Opening...';
 
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/payments/portal`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/portal`, {
       method: 'POST',
       timeout: 15000,
       response: 'json',
@@ -203,7 +203,7 @@ async function openBillingPortal() {
     }
   } catch (error) {
     console.error('Failed to open billing portal:', error);
-    webManager.utilities().showNotification(error.message || 'Failed to open billing portal. Please try again later.', 'danger');
+    omega.utilities().showNotification(error.message || 'Failed to open billing portal. Please try again later.', 'danger');
   } finally {
     if ($manageBtn) $manageBtn.disabled = false;
     if ($btnText) $btnText.textContent = originalText;
@@ -235,14 +235,14 @@ function setupCancellationForm() {
 
     // Capture state BEFORE the API call — the auth listener may update currentAccount
     // with Firestore data (cancellation.pending=true) before we reach the post-cancel code
-    const resolvedBeforeCancel = webManager.auth().resolveSubscription(currentAccount);
+    const resolvedBeforeCancel = omega.auth().resolveSubscription(currentAccount);
     const isTrialCancel = resolvedBeforeCancel.trialing;
 
     console.log('[Billing] Cancelling:', { plan: resolvedBeforeCancel.plan, isTrialCancel });
 
     trackBilling('cancel_submit');
 
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/payments/cancel`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/cancel`, {
       method: 'POST',
       timeout: 30000,
       response: 'json',
@@ -320,8 +320,8 @@ function populateCancelReasons() {
 
   $container.innerHTML = shuffled.map((reason, i) => `
     <div class="form-check mb-2">
-      <input class="form-check-input" type="radio" name="cancel_reason" id="cancel-reason-${i}" value="${webManager.utilities().escapeHTML(reason)}">
-      <label class="form-check-label" for="cancel-reason-${i}">${webManager.utilities().escapeHTML(reason)}</label>
+      <input class="form-check-input" type="radio" name="cancel_reason" id="cancel-reason-${i}" value="${omega.utilities().escapeHTML(reason)}">
+      <label class="form-check-label" for="cancel-reason-${i}">${omega.utilities().escapeHTML(reason)}</label>
     </div>
   `).join('');
 }
@@ -337,7 +337,7 @@ function updateUsageInfo(account) {
   }
 
   // Use the effective plan for usage limits (basic if cancelled/suspended)
-  const resolved = webManager.auth().resolveSubscription(account);
+  const resolved = omega.auth().resolveSubscription(account);
   const product = paymentConfig?.products?.find(p => p.id === resolved.plan);
   const limits = product?.limits || {};
 
@@ -375,8 +375,8 @@ function updateUsageInfo(account) {
     $container.innerHTML += `
       <div class="mb-3">
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <small class="text-muted fw-semibold">${webManager.utilities().escapeHTML(metricName)}</small>
-          <small class="text-muted">${webManager.utilities().escapeHTML(formattedUsed)} / ${webManager.utilities().escapeHTML(formattedLimit)}</small>
+          <small class="text-muted fw-semibold">${omega.utilities().escapeHTML(metricName)}</small>
+          <small class="text-muted">${omega.utilities().escapeHTML(formattedUsed)} / ${omega.utilities().escapeHTML(formattedLimit)}</small>
         </div>
         <div class="progress" style="height: 20px;">
           <div class="progress-bar ${progressClass}" role="progressbar"

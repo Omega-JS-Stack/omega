@@ -1,4 +1,4 @@
-// Optional consumer extension hook — called AFTER @omegajs/desktop's built-in macOS
+// Optional consumer extension hook — called AFTER @omega.js/desktop's built-in macOS
 // notarization has already run. No-op by default.
 //
 // Use this for: custom stapling, archiving the notarized .app, notifications, uploading the
@@ -6,7 +6,7 @@
 //
 // Receives the full electron-builder afterSign context.
 //
-// IMPORTANT: This file is NOT the notarization entrypoint. @omegajs/desktop's electron-builder integration
+// IMPORTANT: This file is NOT the notarization entrypoint. @omega.js/desktop's electron-builder integration
 // uses its own internal notarize hook as the afterSign entrypoint, then calls into this file
 // as a final step. You can never accidentally break notarization by editing this — at worst,
 // a thrown error here fails the build loudly.

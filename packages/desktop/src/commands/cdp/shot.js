@@ -1,4 +1,4 @@
-// `npx mgr cdp shot <target-match> <out.png>` — per-renderer screenshot: what
+// `npx omega cdp shot <target-match> <out.png>` — per-renderer screenshot: what
 // ONE webContents painted (its own surface).
 //
 // This is NOT the composited window (BrowserWindow document + WebContentsViews
@@ -12,7 +12,7 @@ const client = require('./client');
 module.exports = async function (options) {
   const [, , matcher, outPath] = options._;
   if (!matcher || !outPath) {
-    throw new Error('Usage: npx mgr cdp shot <target-match> <out.png>');
+    throw new Error('Usage: npx omega cdp shot <target-match> <out.png>');
   }
 
   await client.screenshot(String(matcher), String(outPath));

@@ -98,7 +98,7 @@ URL citations live in the returned `output` (message content) as `annotations` o
 
 Directives form a sequence consumed across loop turns (call N executes directive N-1, indexed by assistant turns after the last user turn). Directive values must not contain `]]` internally (a trailing JSON `]` is fine).
 
-The directive source is resolved in order: the last `messages[]` user turn → `message.content` → **`message.settings` values** (flattened raw). That last fallback makes path-based routes (`message: { path, settings }` — the idiomatic @omegajs/backend prompt-template style) scriptable as-is: embed the directive in whatever request field gets interpolated into the template (e.g. a chat's `message`, a quiz's `topic`).
+The directive source is resolved in order: the last `messages[]` user turn → `message.content` → **`message.settings` values** (flattened raw). That last fallback makes path-based routes (`message: { path, settings }` — the idiomatic @omega.js/backend prompt-template style) scriptable as-is: embed the directive in whatever request field gets interpolated into the template (e.g. a chat's `message`, a quiz's `topic`).
 
 | Directive | Behavior |
 |---|---|

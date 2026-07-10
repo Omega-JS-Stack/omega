@@ -1,15 +1,15 @@
 // Integration tests for client-bridge — actually hits Firebase.
 //
 // Skipped automatically unless EM_TEST_FIREBASE_ADMIN_KEY (or GOOGLE_APPLICATION_CREDENTIALS)
-// points to a Firebase service-account JSON file. This keeps `npx mgr test` fast & green
+// points to a Firebase service-account JSON file. This keeps `npx omega test` fast & green
 // offline / on machines without backend creds.
 //
 // To run:
-//   1. Install firebase-admin: `npm i -D firebase-admin` (already in @omegajs/desktop's devDeps)
+//   1. Install firebase-admin: `npm i -D firebase-admin` (already in @omega.js/desktop's devDeps)
 //   2. Drop a service-account JSON in a safe place
 //   3. Set EM_TEST_FIREBASE_ADMIN_KEY=/path/to/file.json (or use GOOGLE_APPLICATION_CREDENTIALS)
 //   4. Optionally EM_TEST_USER_UID=your-test-uid (defaults to 'em-test-user')
-//   5. `npx mgr test`
+//   5. `npx omega test`
 
 const fs = require('fs');
 
@@ -18,8 +18,8 @@ const ADMIN_KEY = process.env.EM_TEST_FIREBASE_ADMIN_KEY
                 || null;
 const USER_UID = process.env.EM_TEST_USER_UID || 'em-test-user';
 // These hit REAL Firebase, so they're gated behind extended mode (the cross-framework
-// `TEST_EXTENDED_MODE` opt-in). `npx mgr test --extended` (or TEST_EXTENDED_MODE=true) runs
-// them; default is skip so `npx mgr test` stays fast + offline-safe.
+// `TEST_EXTENDED_MODE` opt-in). `npx omega test --extended` (or TEST_EXTENDED_MODE=true) runs
+// them; default is skip so `npx omega test` stays fast + offline-safe.
 const EXTENDED_OPTED_IN = process.env.TEST_EXTENDED_MODE === 'true'
                        || process.env.TEST_EXTENDED_MODE === '1';
 
@@ -44,23 +44,23 @@ module.exports = {
   skip: skipReason || false,
   cleanup: async (ctx) => {
     try {
-      await ctx.manager.webManager.signOut();
+      await ctx.manager.omega.signOut();
     } catch (e) { /* ignore */ }
   },
   tests: [
     {
       name: 'firebase loaded (firebaseConfig present in test config)',
       run: (ctx) => {
-        if (!ctx.manager.webManager._firebaseAuth) {
+        if (!ctx.manager.omega._firebaseAuth) {
           ctx.skip('firebaseConfig not set in default config — set one in src/defaults/config/omega.json5 to run');
         }
-        ctx.expect(ctx.manager.webManager._firebaseAuth).toBeTruthy();
+        ctx.expect(ctx.manager.omega._firebaseAuth).toBeTruthy();
       },
     },
     {
       name: 'admin can mint a custom token, bridge can sign in with it',
       run: async (ctx) => {
-        if (!ctx.manager.webManager._firebaseAuth) {
+        if (!ctx.manager.omega._firebaseAuth) {
           ctx.skip('firebase not loaded');
         }
 
@@ -76,7 +76,7 @@ module.exports = {
         ctx.expect(typeof token).toBe('string');
 
         // Hand it to the bridge.
-        const result = await ctx.manager.webManager.handleAuthToken(token);
+        const result = await ctx.manager.omega.handleAuthToken(token);
 
         if (!result.success) {
           ctx.skip(`signInWithCustomToken failed: ${result.error || 'unknown'} — likely a project mismatch (firebaseConfig.projectId vs service-account project)`);
@@ -84,25 +84,25 @@ module.exports = {
         ctx.expect(result.user.uid).toBe(USER_UID);
 
         // Bridge state should reflect the signed-in user.
-        const current = ctx.manager.webManager.getCurrentUser();
+        const current = ctx.manager.omega.getCurrentUser();
         ctx.expect(current?.uid).toBe(USER_UID);
       },
     },
     {
       name: 'sign-out clears the current user and broadcasts',
       run: async (ctx) => {
-        if (!ctx.manager.webManager.getCurrentUser()) {
+        if (!ctx.manager.omega.getCurrentUser()) {
           ctx.skip('not signed in (previous test may have skipped)');
         }
-        const r = await ctx.manager.webManager.signOut();
+        const r = await ctx.manager.omega.signOut();
         ctx.expect(r.success).toBe(true);
-        ctx.expect(ctx.manager.webManager.getCurrentUser()).toBeNull();
+        ctx.expect(ctx.manager.omega.getCurrentUser()).toBeNull();
       },
     },
     {
       name: 'onAuthChange fires when state changes',
       run: async (ctx) => {
-        if (!ctx.manager.webManager._firebaseAuth) {
+        if (!ctx.manager.omega._firebaseAuth) {
           ctx.skip('firebase not loaded');
         }
 
@@ -114,11 +114,11 @@ module.exports = {
         }
 
         const calls = [];
-        const off = ctx.manager.webManager.onAuthChange((snap) => calls.push(snap));
+        const off = ctx.manager.omega.onAuthChange((snap) => calls.push(snap));
 
         try {
           const token = await admin.auth().createCustomToken(USER_UID);
-          await ctx.manager.webManager.handleAuthToken(token);
+          await ctx.manager.omega.handleAuthToken(token);
 
           // Give onAuthStateChanged a tick to fire.
           await new Promise((r) => setTimeout(r, 200));

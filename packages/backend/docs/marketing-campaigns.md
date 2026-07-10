@@ -105,7 +105,7 @@ Defaults: `utm_source=brand.id`, `utm_medium=email`, `utm_campaign=name`, `utm_c
 
 ## Segments SSOT
 
-`SEGMENTS` dictionary in `constants.js` — 22 segment definitions. OMEGA creates them in SendGrid, @omegajs/backend resolves keys to provider IDs at runtime via `resolveSegmentIds()` (cached).
+`SEGMENTS` dictionary in `constants.js` — 22 segment definitions. OMEGA creates them in SendGrid, @omega.js/backend resolves keys to provider IDs at runtime via `resolveSegmentIds()` (cached).
 
 | Category | Segments |
 |----------|----------|
@@ -334,7 +334,7 @@ Requires `GH_TOKEN` env var (org-scoped, write access to `newsletter-assets`). W
 
 ## Seed Campaigns
 
-Created by `npx mgr setup` (idempotent, enforced fields checked every run):
+Created by `npx omega setup` (idempotent, enforced fields checked every run):
 
 | ID | Type | Description |
 |----|------|-------------|

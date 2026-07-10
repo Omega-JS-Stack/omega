@@ -3,7 +3,7 @@
 // ============================================
 
 // Import OMEGA Extension
-import Manager from '@omegajs/extension/content';
+import Manager from '@omega.js/extension/content';
 
 // Create instance
 const manager = new Manager();

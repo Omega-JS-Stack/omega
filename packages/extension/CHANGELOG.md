@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 # [Unreleased]
 
 ### BREAKING
-- **Config flips HARD to `config/omega.json5`** — the single OMEGA config, loaded via the vendored `@omegajs/config`. `config/browser-extension-manager.json` is no longer read anywhere. Migration (one-time, per consumer):
+- **Config flips HARD to `config/omega.json5`** — the single OMEGA config, loaded via the vendored `@omega.js/config`. `config/browser-extension-manager.json` is no longer read anywhere. Migration (one-time, per consumer):
   1. Create `config/omega.json5` next to the old file.
   2. Shared sections move over UNCHANGED at the top level: `brand`, `firebaseConfig`, `analytics`, `sentry`, `theme` (custom top-level keys like `liveReloadPort` also carry over unchanged).
   3. Add `targets: { extension: {} }` — key presence marks the extension target enabled; extension-specific settings (and per-surface overrides of any shared key) go inside it.
@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`Manager.getConfig()` semantics** — returns the resolved config (target section overlaid onto the top level; brand walk-up in monorepos). Missing config now returns `{}` instead of throwing; schema findings warn once per process.
 
 ### Added
-- **`browser-extension-manager/config` export** — the vendored `@omegajs/config` loader (`loadConfig`, `validateConfig`, …) for consumer workflows, so brand-monorepo resolution always applies instead of raw JSON5 reads.
+- **`@omega.js/extension/config` export** — the vendored `@omega.js/config` loader (`loadConfig`, `validateConfig`, …) for consumer workflows, so brand-monorepo resolution always applies instead of raw JSON5 reads.
 
 ### Changed
 - **The defaults scaffold (`bxm setup` / `gulp defaults`) now runs through the shared devkit defaults engine** (vendored into `dist/vendor/devkit/defaults-engine.js`) — the gulp task owns only its `FILE_MAP` and the `[ site.x ]` token pass; `_.` renames, `.gitkeep`/`.DS_Store` handling, and write-only-if-changed are engine built-ins. The marker-section merge (.env/.gitignore/CLAUDE.md) is now the canonical devkit implementation, which additionally normalizes `.env` values to double-quoted form (`KEY=raw` → `KEY="raw"`) and substitutes preserved values order-safely. `.nvmrc` template tokens normalized to the `{{ versions.node }}` standard (rendered output unchanged).
@@ -37,6 +37,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - **`bxm setup` config merge no longer drops consumer-only keys.** The defaults merge started from the framework template and only walked template keys, so any consumer key absent from the template (e.g. `liveReloadPort`, or anything under `targets.extension`) was silently deleted on every setup. Consumer-only keys now survive at every nesting level.
+
+## [2.1.0] - 2026-07-10
+
+- Added
+  - `omega` and `omg` bins — the context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest app's framework (walking up from cwd, incl. a backend's `functions/`) runs, so the arbitrary bin hoist-winner in a brand monorepo is always correct; no app context falls back to this framework's CLI (bootstrap case). `mgr` now dispatches the same way; `omega-extension` runs this CLI directly. New `./cli` export exposes `run()` for cross-framework dispatch.
+- Changed
+  - Package renamed `@omegajs/extension` → `@omega.js/extension` (npm scope `omega.js`; nothing was ever published under `@omegajs`). Docs now say `npx omega …`.
+  - Consumer scaffold + docs: the client global identifier is `omega` (was `webManager`).
 
 ## [2.0.1] - 2026-07-10
 

@@ -5,7 +5,7 @@ const { watch, series } = require('gulp');
 const jetpack = require('fs-jetpack');
 const path = require('path');
 const { template } = require('node-powertools');
-const { applyDefaults } = require('@omegajs/devkit/defaults-engine');
+const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
 // Load package
 const package = Manager.getPackage('main');

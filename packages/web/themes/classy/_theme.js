@@ -1,7 +1,7 @@
 // Import the theme entry point
 // __main_assets__ is a webpack alias that resolves to UJM's dist/assets
 import bootstrap from '__main_assets__/themes/bootstrap/js/index.umd.js';
-import { ready as domReady } from '@omegajs/client/modules/dom.js';
+import { ready as domReady } from '@omega.js/client/modules/dom.js';
 
 // Make Bootstrap available globally
 window.bootstrap = bootstrap;

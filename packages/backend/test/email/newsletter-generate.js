@@ -19,7 +19,7 @@
  *    The fixture's content shape MUST match the template's `schema` export.
  *
  * 2. AI PIPELINE MODE (set TEST_EXTENDED_MODE=1)
- *    Pulls real sources from the parent @omegajs/backend server, runs them through the
+ *    Pulls real sources from the parent @omega.js/backend server, runs them through the
  *    structure → SVG → MJML pipeline, and writes a preview HTML. Same code
  *    path the daily pre-generation cron uses. Costs money (AI tokens). Use
  *    this when you want to evaluate prompt quality against real sources.
@@ -27,9 +27,9 @@
  * Output (both modes): <projectRoot>/.temp/newsletter/run-<timestamp>/  (one level above functions/)
  *
  * Run from somiibo-backend/functions:
- *   npx mgr test project:marketing/newsletter-generate.js                   # fixture (fast, free)
- *   NEWSLETTER_FIXTURE=editorial   npx mgr test project:marketing/newsletter-generate.js
- *   TEST_EXTENDED_MODE=1           npx mgr test project:marketing/newsletter-generate.js  # AI pipeline
+ *   npx omega test project:marketing/newsletter-generate.js                   # fixture (fast, free)
+ *   NEWSLETTER_FIXTURE=editorial   npx omega test project:marketing/newsletter-generate.js
+ *   TEST_EXTENDED_MODE=1           npx omega test project:marketing/newsletter-generate.js  # AI pipeline
  *
  * --- Env vars (most apply to AI mode only) ---
  *   NEWSLETTER_FIXTURE=<name>          Load and render a specific fixture (fixture mode).
@@ -141,7 +141,7 @@ module.exports = {
     //   3. newsletterConfig.template           (use the fixture for the active brand's template)
     //   4. 'clean'                              (universal fallback)
     //
-    // This means a fresh `npx mgr test` against any consumer project picks the
+    // This means a fresh `npx omega test` against any consumer project picks the
     // brand's configured template, renders the matching fixture, and produces
     // a deterministic preview HTML — no AI, no money spent.
     //

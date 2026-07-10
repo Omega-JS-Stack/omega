@@ -1,6 +1,6 @@
 // This file is required by /signin, /signup, and /reset pages since the logic is mostly the same
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default function () {
@@ -14,7 +14,7 @@ export default function () {
   // wakeupServer();
 
   // Handle DOM ready
-  webManager.dom().ready()
+  omega.dom().ready()
   .then(async () => {
     // Log
     console.log('[Auth] Initialized. useAuthPopup:', useAuthPopup);
@@ -110,7 +110,7 @@ export default function () {
       const provider = $submitButton?.getAttribute('data-provider');
 
       // Capture consent BEFORE any Firebase call. On signup pages the checkbox state
-      // must survive any post-auth redirect so @omegajs/backend's /user/signup can write it to the doc.
+      // must survive any post-auth redirect so @omega.js/backend's /user/signup can write it to the doc.
       // Read from FormManager-collected data on signup; ignored on signin (no checkboxes there).
       if (action === 'signup') {
         captureSignupConsent(data);
@@ -146,7 +146,7 @@ export default function () {
       // Best-effort. If delete fails (network/token issue), the page-load consent guard
       // is the backstop — the orphan account will be signed out on every future visit.
       console.error('[Auth] Failed to delete accidental account:', e);
-      webManager.sentry().captureException(new Error('Failed to reverse accidental signup', { cause: e }));
+      omega.sentry().captureException(new Error('Failed to reverse accidental signup', { cause: e }));
     }
 
     try {
@@ -217,12 +217,12 @@ export default function () {
   }
 
   // Read the consent checkboxes and stash to storage. Survives the post-signup redirect
-  // the same way attribution does. @omegajs/backend's /user/signup route picks it up via sendUserSignupMetadata.
+  // the same way attribution does. @omega.js/backend's /user/signup route picks it up via sendUserSignupMetadata.
   function captureSignupConsent(data) {
     const legalLabel = document.querySelector('label[for="consent-legal"]')?.innerText?.trim() || null;
     const marketingLabel = document.querySelector('label[for="consent-marketing"]')?.innerText?.trim() || null;
 
-    webManager.storage().set('consent', {
+    omega.storage().set('consent', {
       legal: {
         granted: data?.consentLegal === true || data?.consentLegal === 'on',
         text: legalLabel,
@@ -353,7 +353,7 @@ export default function () {
       // state listener won't fire (no real Firebase login happened).
       if (simulateRedirect) {
         const authReturnUrl = url.searchParams.get('authReturnUrl');
-        const redirectTo = authReturnUrl && webManager.isValidRedirectUrl(authReturnUrl)
+        const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
           ? authReturnUrl
           : '/dashboard';
         console.log('[Auth] Simulated redirect to:', redirectTo);
@@ -366,11 +366,11 @@ export default function () {
     } catch (error) {
       // Only capture unexpected errors to Sentry
       if (!isUserError(error.code)) {
-        webManager.sentry().captureException(new Error('Error handling redirect result', { cause: error }));
+        omega.sentry().captureException(new Error('Error handling redirect result', { cause: error }));
       }
 
       // Handle specific OAuth errors. Check blocking-function rejections FIRST —
-      // those carry a custom message from @omegajs/backend (rate limit, disposable email, etc.)
+      // those carry a custom message from @omega.js/backend (rate limit, disposable email, etc.)
       // that the user actually needs to see, hidden behind a generic Firebase code.
       const blockingMessage = extractBlockingFunctionMessage(error);
       if (blockingMessage) {
@@ -410,21 +410,21 @@ export default function () {
       trackLogin('custom-token', userCredential.user);
 
       const authReturnUrl = url.searchParams.get('authReturnUrl');
-      const redirectTo = authReturnUrl && webManager.isValidRedirectUrl(authReturnUrl)
+      const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
         ? authReturnUrl
         : '/dashboard';
 
       window.location.href = redirectTo;
       return true;
     } catch (error) {
-      webManager.sentry().captureException(new Error('Custom token sign-in error', { cause: error }));
+      omega.sentry().captureException(new Error('Custom token sign-in error', { cause: error }));
       console.error('[Auth] Custom token sign-in failed:', error);
 
       const url = new URL(window.location.href);
       url.searchParams.delete('authCustomToken');
       window.history.replaceState({}, document.title, url.toString());
 
-      webManager.utilities().showNotification(
+      omega.utilities().showNotification(
         `Custom token sign-in failed: ${error.message || 'Invalid or expired token'}`,
         { type: 'danger', timeout: 8000 }
       );
@@ -444,8 +444,8 @@ export default function () {
       // Log
       console.log('[Auth] Signing out user due to authSignout=true parameter');
 
-      // Sign out the user using webManager
-      await webManager.auth().signOut();
+      // Sign out the user using omega
+      await omega.auth().signOut();
 
       // Remove the authSignout parameter from URL to prevent sign-out loop
       url.searchParams.delete('authSignout');
@@ -457,7 +457,7 @@ export default function () {
 
   function checkSubdomainAuth() {
     // Get the allowSubdomainAuth config value (defaults to true if not set)
-    const allowSubdomainAuth = webManager.config.auth?.config?.allowSubdomainAuth ?? true;
+    const allowSubdomainAuth = omega.config.auth?.config?.allowSubdomainAuth ?? true;
 
     // Check if current hostname is a subdomain
     const hostname = window.location.hostname;
@@ -569,8 +569,8 @@ export default function () {
         }
       }
 
-      // Blocking-function rejections from @omegajs/backend (rate limit, disposable email, etc.)
-      // — surface the @omegajs/backend-side message instead of the opaque auth/internal-error.
+      // Blocking-function rejections from @omega.js/backend (rate limit, disposable email, etc.)
+      // — surface the @omega.js/backend-side message instead of the opaque auth/internal-error.
       const blockingMessage = extractBlockingFunctionMessage(error);
       if (blockingMessage) {
         throw new Error(blockingMessage);
@@ -607,8 +607,8 @@ export default function () {
       // Show success message
       formManager.showSuccess('Successfully signed in!');
     } catch (error) {
-      // Blocking-function rejections from @omegajs/backend's before-signin (rate limit, etc.)
-      // — surface the @omegajs/backend-side message instead of the opaque auth/internal-error.
+      // Blocking-function rejections from @omega.js/backend's before-signin (rate limit, etc.)
+      // — surface the @omega.js/backend-side message instead of the opaque auth/internal-error.
       const blockingMessage = extractBlockingFunctionMessage(error);
       if (blockingMessage) {
         throw new Error(blockingMessage);
@@ -713,8 +713,8 @@ export default function () {
       /* @dev-only:start */
       {
         // // Add device_id and device_name for private IP addresses (required by Firebase)
-        // const deviceId = webManager.storage().get('devDeviceId') || crypto.randomUUID();
-        // webManager.storage().set('devDeviceId', deviceId);
+        // const deviceId = omega.storage().get('devDeviceId') || crypto.randomUUID();
+        // omega.storage().set('devDeviceId', deviceId);
 
         // provider.setCustomParameters({
         //   device_id: deviceId,
@@ -723,7 +723,7 @@ export default function () {
 
         // Show warning in dev mode when using redirect
         if (!useAuthPopup) {
-          webManager.utilities().showNotification(
+          omega.utilities().showNotification(
             'OAuth redirect may fail in development. Use localhost:4000 or add ?authPopup=true to the URL',
             {
               type: 'warning',
@@ -795,10 +795,10 @@ export default function () {
     } catch (error) {
       // Only capture unexpected errors to Sentry
       if (!isUserError(error.code)) {
-        webManager.sentry().captureException(new Error('OAuth provider sign-in error', { cause: error }));
+        omega.sentry().captureException(new Error('OAuth provider sign-in error', { cause: error }));
       }
 
-      // Handle specific errors. Blocking-function rejections from @omegajs/backend carry a
+      // Handle specific errors. Blocking-function rejections from @omega.js/backend carry a
       // custom message (rate limit, disposable email, etc.) that the user needs
       // to see — check those FIRST before generic Firebase codes.
       const blockingMessage = extractBlockingFunctionMessage(error);
@@ -906,7 +906,7 @@ export default function () {
 
   // Extract the readable message from a Firebase Auth blocking-function error.
   //
-  // When a @omegajs/backend blocking function (before-create / before-signin) throws
+  // When a @omega.js/backend blocking function (before-create / before-signin) throws
   // HttpsError('resource-exhausted', 'Too many signups...'), Firebase surfaces
   // it as `auth/internal-error` (sometimes also `auth/error-code:-47`) and
   // stashes the actual server response on `error.customData.serverResponse`.
@@ -923,7 +923,7 @@ export default function () {
   // Returns just the inner message string, or null if nothing useful was found.
   function extractBlockingFunctionMessage(error) {
     // Diagnostic: dump the full shape of every error that lands here so we can
-    // see exactly what Firebase delivers when @omegajs/backend's beforeCreate throws. The
+    // see exactly what Firebase delivers when @omega.js/backend's beforeCreate throws. The
     // 503 path (Identity Toolkit returns 503 with code -47, no BLOCKING_FUNCTION
     // wrapper) needs different handling than the 400 path.
     console.warn('[Auth] extractBlockingFunctionMessage: error shape', {
@@ -938,9 +938,9 @@ export default function () {
 
     // The OAuth redirect path (signInWithIdp → 503) delivers the rejection as
     // `auth/error-code:-47` with NO `customData.serverResponse` blob — Firebase
-    // strips the @omegajs/backend-side message before it reaches the client. The code is
+    // strips the @omega.js/backend-side message before it reaches the client. The code is
     // 1:1 with "blocking-function rejected this signup," so surface a generic-
-    // but-helpful message that covers all three @omegajs/backend beforeCreate reasons
+    // but-helpful message that covers all three @omega.js/backend beforeCreate reasons
     // (rate limit, disposable email, custom hook reject).
     if (error?.code === 'auth/error-code:-47') {
       return 'Account creation is temporarily restricted. This can happen if you\'ve recently created too many accounts, or your email is on our blocked list. Please try again later or contact support.';
@@ -1050,7 +1050,7 @@ export default function () {
 
   // Wakeup server to prevent cold start on signup API call
   function wakeupServer() {
-    const serverApiURL = `${webManager.getApiUrl()}/backend-manager/user/signup?wakeup=true`;
+    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/signup?wakeup=true`;
 
     fetch(serverApiURL, { method: 'POST' })
       .then(() => console.log('[Auth] Server wakeup sent'))

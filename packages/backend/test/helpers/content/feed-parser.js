@@ -2,7 +2,7 @@
  * Test: content/feed-parser
  * Unit tests for the RSS 2.0, Atom 1.0, and JSON Feed parser + article content extractor.
  *
- * Run: npx mgr test helpers/content/feed-parser
+ * Run: npx omega test helpers/content/feed-parser
  *
  * Pure function tests (parseFeed, stripHtml, extractElement) — required
  * directly and called with plain inputs. NOT a mock.

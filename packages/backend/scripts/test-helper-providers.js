@@ -5,7 +5,7 @@
  *
  * Lets the live-test checklist verify SendGrid + Beehiiv state without
  * clicking around in dashboards. Reuses the same provider helpers that
- * @omegajs/backend uses in production (findContact / removeContact).
+ * @omega.js/backend uses in production (findContact / removeContact).
  *
  * Usage (run from a consumer project's functions/ dir):
  *
@@ -73,20 +73,20 @@ if (!process.env.BEEHIIV_API_KEY) {
 
 // --- bootstrap Manager so providers can read Manager.config.marketing.* ---
 // The providers require '../../../index.js' which is the Manager singleton.
-// We need to load @omegajs/backend from the consumer's node_modules (not the @omegajs/backend repo's own src)
+// We need to load @omega.js/backend from the consumer's node_modules (not the @omega.js/backend repo's own src)
 // so it picks up the consumer's config + service account.
 let Manager;
 try {
-  const BackendManager = require(path.join(cwd, 'node_modules', '@omegajs/backend'));
+  const BackendManager = require(path.join(cwd, 'node_modules', '@omega.js/backend'));
   Manager = (new BackendManager()).init({}, { setupFunctionsLegacy: false, log: false });
 } catch (e) {
   console.error('✗ Failed to bootstrap Manager from consumer node_modules:', e.message);
   process.exit(2);
 }
 
-// --- load providers via the @omegajs/backend Manager.libraries surface (preferred) or direct path ---
-const sendgridProviderPath = path.join(cwd, 'node_modules', '@omegajs/backend', 'src', 'manager', 'libraries', 'email', 'providers', 'sendgrid.js');
-const beehiivProviderPath = path.join(cwd, 'node_modules', '@omegajs/backend', 'src', 'manager', 'libraries', 'email', 'providers', 'beehiiv.js');
+// --- load providers via the @omega.js/backend Manager.libraries surface (preferred) or direct path ---
+const sendgridProviderPath = path.join(cwd, 'node_modules', '@omega.js/backend', 'src', 'manager', 'libraries', 'email', 'providers', 'sendgrid.js');
+const beehiivProviderPath = path.join(cwd, 'node_modules', '@omega.js/backend', 'src', 'manager', 'libraries', 'email', 'providers', 'beehiiv.js');
 
 const sendgrid = require(sendgridProviderPath);
 const beehiiv = require(beehiivProviderPath);

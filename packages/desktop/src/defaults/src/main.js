@@ -1,16 +1,16 @@
 // Main-process entry. Config is auto-loaded from config/omega.json5 (resolved for the desktop target).
-const Manager = require('@omegajs/desktop/main');
+const Manager = require('@omega.js/desktop/main');
 
 const manager = new Manager();
 
 manager.initialize()
   .then(() => {
-    const { logger, ipc, storage, windows, tray, menu, contextMenu, deepLink, autoUpdater, webManager, appState, sentry, startup } = manager;
+    const { logger, ipc, storage, windows, tray, menu, contextMenu, deepLink, autoUpdater, omega, appState, sentry, startup } = manager;
 
     // ─────────────────────────────────────────────────────────────────────────────
     // 1. Create the main window
     // ─────────────────────────────────────────────────────────────────────────────
-    // Always create `main` — @omegajs/desktop uses its presence in the registry to surface UI when
+    // Always create `main` — @omega.js/desktop uses its presence in the registry to surface UI when
     // the user double-clicks the dock icon (macOS) or relaunches the app (win/linux).
     // In hidden launches (agent / menubar apps with `startup.mode = 'hidden'`, or auto-
     // launch at login), pass `show: false` so the window is registered but invisible:

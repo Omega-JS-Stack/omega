@@ -6,9 +6,9 @@
 
 <p align="center">
   <strong>OMEGA Client</strong> — the shared frontend runtime (auth, data binding, storage, push notifications, error tracking) embedded by
-  <a href="../web/">@omegajs/web</a>,
-  <a href="../desktop/">@omegajs/desktop</a>, and
-  <a href="../extension/">@omegajs/extension</a>.
+  <a href="../web/">@omega.js/web</a>,
+  <a href="../desktop/">@omega.js/desktop</a>, and
+  <a href="../extension/">@omega.js/extension</a>.
 </p>
 
 ## Table of Contents
@@ -37,7 +37,7 @@
 
 ## Installation
 ```shell
-npm install @omegajs/client
+npm install @omega.js/client
 ```
 
 ## Requirements
@@ -49,7 +49,7 @@ npm install @omegajs/client
 ## Quick Start
 
 ```javascript
-import Manager from '@omegajs/client';
+import Manager from '@omega.js/client';
 
 // Initialize with your configuration
 await Manager.initialize({
@@ -217,7 +217,7 @@ await Manager.initialize({
 The Manager is a singleton that provides access to all modules:
 
 ```javascript
-import Manager from '@omegajs/client';
+import Manager from '@omega.js/client';
 
 // Module getters
 Manager.storage();        // Storage API
@@ -666,7 +666,7 @@ try {
 ### DOM Utilities
 
 ```javascript
-import { loadScript, ready } from '@omegajs/client/modules/dom';
+import { loadScript, ready } from '@omega.js/client/modules/dom';
 // Or: const { loadScript, ready } = Manager.dom();
 
 // Wait for DOM ready
@@ -716,7 +716,7 @@ import {
   isMobile,
   getDevice,
   getContext
-} from '@omegajs/client/modules/utilities';
+} from '@omega.js/client/modules/utilities';
 // Or: const utils = Manager.utilities();
 
 // Copy to clipboard
@@ -796,29 +796,29 @@ Import individual modules to reduce bundle size:
 
 ```javascript
 // Storage only
-import Storage from '@omegajs/client/modules/storage';
+import Storage from '@omega.js/client/modules/storage';
 const storage = new Storage();
 
 // Utilities only
-import { clipboardCopy, escapeHTML } from '@omegajs/client/modules/utilities';
+import { clipboardCopy, escapeHTML } from '@omega.js/client/modules/utilities';
 
 // DOM utilities only
-import { loadScript, ready } from '@omegajs/client/modules/dom';
+import { loadScript, ready } from '@omega.js/client/modules/dom';
 
 // Full manager (default)
-import Manager from '@omegajs/client';
+import Manager from '@omega.js/client';
 ```
 
 **Available Modules**:
-- `@omegajs/client/modules/storage` - Storage class
-- `@omegajs/client/modules/utilities` - Utility functions
-- `@omegajs/client/modules/dom` - DOM utilities
-- `@omegajs/client/modules/auth` - Auth class (requires Manager)
-- `@omegajs/client/modules/bindings` - Bindings class (requires Manager)
-- `@omegajs/client/modules/firestore` - Firestore class (requires Manager)
-- `@omegajs/client/modules/notifications` - Notifications class (requires Manager)
-- `@omegajs/client/modules/service-worker` - ServiceWorker class (requires Manager)
-- `@omegajs/client/modules/sentry` - Sentry class (requires Manager)
+- `@omega.js/client/modules/storage` - Storage class
+- `@omega.js/client/modules/utilities` - Utility functions
+- `@omega.js/client/modules/dom` - DOM utilities
+- `@omega.js/client/modules/auth` - Auth class (requires Manager)
+- `@omega.js/client/modules/bindings` - Bindings class (requires Manager)
+- `@omega.js/client/modules/firestore` - Firestore class (requires Manager)
+- `@omega.js/client/modules/notifications` - Notifications class (requires Manager)
+- `@omega.js/client/modules/service-worker` - ServiceWorker class (requires Manager)
+- `@omega.js/client/modules/sentry` - Sentry class (requires Manager)
 
 ## Browser Support
 

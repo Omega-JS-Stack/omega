@@ -1,6 +1,6 @@
 {
-  "name": "@omegajs/backend",
-  "version": "6.0.1",
+  "name": "@omega.js/backend",
+  "version": "6.1.0",
   "description": "OMEGA backend framework — build, test, and deploy Firebase Cloud Functions backends",
   "main": "dist/manager/index.js",
   "files": [
@@ -10,11 +10,14 @@
     "src/",
     "templates/",
     "test/",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "cli.js"
   ],
   "bin": {
-    "omega-backend": "./bin/omega-backend",
-    "mgr": "./bin/omega-backend"
+    "omega": "./bin/omega",
+    "omg": "./bin/omg",
+    "mgr": "./bin/omega",
+    "omega-backend": "./bin/omega-backend"
   },
   "scripts": {
     "start": "npm run prepare:watch",
@@ -27,11 +30,11 @@
     "node": "22"
   },
   "projectScripts": {
-    "start": "npx mgr setup && npx mgr serve",
-    "deploy": "npx mgr setup && npx mgr deploy",
-    "emulator": "npx mgr setup && npx mgr emulator",
-    "test": "npx mgr setup && npx mgr test",
-    "setup": "npx mgr setup"
+    "start": "npx omega setup && npx omega serve",
+    "deploy": "npx omega setup && npx omega deploy",
+    "emulator": "npx omega setup && npx omega emulator",
+    "test": "npx omega setup && npx omega test",
+    "setup": "npx omega setup"
   },
   "keywords": [
     "omega",
@@ -54,7 +57,7 @@
     "type": "copy",
     "hooks": {
       "before": "node scripts/update-disposable-domains.js",
-      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
     }
   },
   "dependencies": {
@@ -108,9 +111,9 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
-    "@omegajs/account": "*",
-    "@omegajs/config": "*",
-    "@omegajs/devkit": "*",
+    "@omega.js/account": "*",
+    "@omega.js/config": "*",
+    "@omega.js/devkit": "*",
     "prepare-package": "^2.1.0"
   },
   "peerDependencies": {

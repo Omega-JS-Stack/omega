@@ -26,14 +26,14 @@
   },
 
   // GA4 analytics. Measurement ID lives in config (not secret); the API secret
-  // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omegajs/backend convention) so
+  // lives in `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omega.js/backend convention) so
   // it's not committed. Webpack's DefinePlugin bakes the secret into packaged
   // builds at build time so production apps don't need .env at runtime.
   // client_id / user_id are uuidv5(deviceId/firebaseUid, projectId-namespace)
   // so the same human gets unified events across desktop + web + backend.
   analytics: {
     // Presence-driven: set `providers.google.id` to `G-XXXXXXXXXX` to enable analytics.
-    // Empty string = analytics disabled (matches @omegajs/backend convention — no redundant enabled flag).
+    // Empty string = analytics disabled (matches @omega.js/backend convention — no redundant enabled flag).
     providers: {
       google: {
         id: '',                               // 'G-XXXXXXXXXX' Measurement ID
@@ -41,9 +41,9 @@
     },
   },
 
-  // Payment — @omegajs/backend-shaped so the same product catalog can be referenced from backend
+  // Payment — @omega.js/backend-shaped so the same product catalog can be referenced from backend
   // + desktop. The schema enforces publishableKey shape when set; everything else is
-  // freeform so apps can extend per their needs without @omegajs/desktop caring. Leave empty until
+  // freeform so apps can extend per their needs without @omega.js/desktop caring. Leave empty until
   // you're ready to wire payments.
   payment: {
     processors: {
@@ -53,7 +53,7 @@
     products: [],
   },
 
-  // Firebase web SDK config. Flat shape — same key names @omegajs/backend/BXM/@omegajs/client all use.
+  // Firebase web SDK config. Flat shape — same key names @omega.js/backend/BXM/@omega.js/client all use.
   // Copy directly from Firebase Console → Project Settings → SDK setup (Config option).
   // Empty {} disables Firebase Auth in the renderer (client-bridge logs a warn).
   firebaseConfig: {
@@ -80,12 +80,12 @@
   // monorepo the brand-level omega.json5 lists every enabled target.
   targets: {
     desktop: {
-      // App-level metadata — universal cross-platform fields. @omegajs/desktop auto-derives sensible
+      // App-level metadata — universal cross-platform fields. @omega.js/desktop auto-derives sensible
       // defaults: `appId` ← `com.itwcreativeworks.<brand.id>`, `productName` ← `brand.name`,
       // `copyright` ← `© <year>, ITW Creative Works`. Override any of these explicitly only
       // if you must.
       //
-      // `category` is a generic high-level category — @omegajs/desktop maps it to per-platform values
+      // `category` is a generic high-level category — @omega.js/desktop maps it to per-platform values
       // (mac uses Apple's UTI strings, linux uses freedesktop categories). Allowed values:
       //   productivity (default) | developer-tools | utilities | media | social | network
       // Override the per-platform mapping in `platforms.<plat>.category` if you need
@@ -106,12 +106,12 @@
         //   config/icons/windows/<slot>.png      — Windows override
         //   config/icons/linux/<slot>.png        — Linux override (otherwise falls back to global → windows)
         // Slots: icon, tray (mac+win+linux); dmg (mac-only).
-        // Native size only — @omegajs/desktop downscales @1x variants from your @2x source automatically.
-        // macOS tray must be 32×32; @omegajs/desktop renames the dist output to trayTemplate.png for the
+        // Native size only — @omega.js/desktop downscales @1x variants from your @2x source automatically.
+        // macOS tray must be 32×32; @omega.js/desktop renames the dist output to trayTemplate.png for the
         // OS dark-mode auto-inversion magic.
       },
       // Per-platform install/distribution config. The keys here map directly to the same
-      // electron-builder concepts (`mac.target`, `win.target`, `linux.target`) but @omegajs/desktop owns
+      // electron-builder concepts (`mac.target`, `win.target`, `linux.target`) but @omega.js/desktop owns
       // the actual target list (dmg+zip on mac, nsis on win, deb+AppImage on linux) so
       // auto-update keeps working — see docs/installer-options.md for why. Each block
       // exposes only the knobs that exist for that platform — no cross-platform analog
@@ -119,11 +119,11 @@
       platforms: {
         mac: {
           arch: ['universal'],   // universal binary (x64 + arm64 lipo'd) — one .dmg/.zip for both
-          // Entitlements override map. @omegajs/desktop ships sensible defaults (allow-jit,
+          // Entitlements override map. @omega.js/desktop ships sensible defaults (allow-jit,
           // allow-unsigned-executable-memory, disable-library-validation, network.client/server,
           // files.user-selected.read-write, allow-dyld-environment-variables). To override:
           //   - Set a key to a value to add/replace it (boolean, string, or array per Apple's plist spec)
-          //   - Set a key to `null` to remove it from @omegajs/desktop's defaults
+          //   - Set a key to `null` to remove it from @omega.js/desktop's defaults
           // Output: dist/config/entitlements.mac.plist (auto-wired into electron-builder.yml).
           // Example: { 'com.apple.security.network.server': false, 'com.apple.security.device.audio-input': true }
           entitlements: {},
@@ -183,7 +183,7 @@
         maxAgeMs:       2592000000,   // 30d — once an update has been pending this long, force install
       },
       // Tray, menu, and context-menu are defined in JS files (full power, no DSL).
-      // @omegajs/desktop looks for them at the conventional paths:
+      // @omega.js/desktop looks for them at the conventional paths:
       //   src/integrations/tray/index.js
       //   src/integrations/menu/index.js
       //   src/integrations/context-menu/index.js
@@ -198,7 +198,7 @@
       //            zero dock bounce, no dock icon, not in Cmd+Tab. Tray + notifications
       //            + networking still work. Your main.js skips windows.create() at boot
       //            and surfaces UI later (typically from a tray click). When you do call
-      //            windows.create('main'), @omegajs/desktop auto-runs app.dock.show() so the dock icon
+      //            windows.create('main'), @omega.js/desktop auto-runs app.dock.show() so the dock icon
       //            appears alongside the window.
       //
       // `openAtLogin` controls auto-launch on OS login:
@@ -215,7 +215,7 @@
           mode:    'hidden',
         },
       },
-      // No `windows` block needed — @omegajs/desktop no longer auto-creates windows. Your main.js
+      // No `windows` block needed — @omega.js/desktop no longer auto-creates windows. Your main.js
       // calls `manager.windows.create('main', { width: 1280, height: 800, ... })` when
       // you want UI to surface. Defaults baked in:
       //   main      → { width: 1024, height: 720, hideOnClose: true,  view: 'main' }
@@ -231,7 +231,7 @@
         owner:   null,              // null = use app repo owner
         repo:    'update-server',
       },
-      // Downloads — fixed-name mirror release. After every successful release, @omegajs/desktop re-uploads the
+      // Downloads — fixed-name mirror release. After every successful release, @omega.js/desktop re-uploads the
       // versioned artifacts (MyApp-1.0.1.dmg) to a stable tag with stable names (MyApp-mac-arm64.dmg).
       // Marketing site links to https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>
       // and that link never changes across versions.
@@ -242,7 +242,7 @@
         tag:     'installer',
       },
       // Deep links: scheme is automatically `<brand.id>://...`. Built-in routes:
-      //   auth/token  → @omegajs/client auth token handoff
+      //   auth/token  → @omega.js/client auth token handoff
       //   app/show    → manager.windows.show(query.window || 'main')
       //   app/quit    → app.quit()
       // Add custom routes at runtime: manager.deepLink.on('my-route', (ctx) => {...}) in main.
@@ -258,11 +258,11 @@
         // url: 'https://brand.example/data/resources/main.json',   // default uses brand.url
       },
       // Restart Manager — external guardian app that relaunches this app if it
-      // crashes. @omegajs/desktop talks to it over a localhost HTTP protocol (docs/restart-manager.md):
+      // crashes. @omega.js/desktop talks to it over a localhost HTTP protocol (docs/restart-manager.md):
       // auto-registers ~15s after launch, heartbeats every 60s, deregisters on clean
       // quit, and silently installs RM when missing (mac zip / win silent NSIS /
       // linux AppImage — no installer UI, no admin; RM then keeps itself updated via
-      // its own standard @omegajs/desktop auto-updater). Set false to disable entirely. In dev
+      // its own standard @omega.js/desktop auto-updater). Set false to disable entirely. In dev
       // mode it's skipped unless EM_RESTART_MANAGER_DEV=1.
       restartManager: {
         enabled: true,

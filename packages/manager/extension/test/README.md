@@ -1,6 +1,6 @@
 # Project tests
 
-Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx mgr test`.
+Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx omega test`.
 
 ## Layers
 
@@ -17,7 +17,7 @@ Match the framework's four layers — Browser Extension Manager's test runner di
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('@omegajs/extension/test/assert');
+const assert = require('@omega.js/extension/test/assert');
 
 module.exports = {
   'my feature does the thing': async () => {
@@ -29,4 +29,4 @@ module.exports = {
 
 ## See also
 
-`node_modules/@omegajs/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omega.js/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).

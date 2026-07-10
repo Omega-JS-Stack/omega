@@ -1,5 +1,5 @@
 // Preload Manager singleton.
-// Consumer entry: `new (require('@omegajs/desktop/preload'))().initialize()`.
+// Consumer entry: `new (require('@omega.js/desktop/preload'))().initialize()`.
 // Wires contextBridge so renderer code can call `window.em.ipc.invoke(...)` without nodeIntegration.
 
 const LoggerLite = require('./lib/logger-lite.js');
@@ -66,7 +66,7 @@ Manager.prototype.initialize = async function () {
       },
     },
     // FontAwesome — resolve a bundled icon to its inline-SVG string (or null).
-    // Renderer code rarely needs this directly: @omegajs/desktop's renderer bootstrap
+    // Renderer code rarely needs this directly: @omega.js/desktop's renderer bootstrap
     // auto-renders `<i class="fa-solid fa-*">` elements (see src/renderer.js).
     fontawesome: {
       get: (name, style) => ipcRenderer.invoke('desktop:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
@@ -172,7 +172,7 @@ Manager.prototype.initialize = async function () {
     media.addEventListener('change', apply);
   } catch (e) { /* DOM not available (test mode) — skip */ }
 
-  self.logger.log('@omegajs/desktop (preload) initialized.');
+  self.logger.log('@omega.js/desktop (preload) initialized.');
 
   return self;
 };

@@ -11,7 +11,7 @@ const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warnin
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { ensurePublicFiles } = require('../utils/public-files');
 
-// Used by both `npx mgr emulator` and `npx mgr test` auto-start path.
+// Used by both `npx omega emulator` and `npx omega test` auto-start path.
 // Note: `emulators:start` enables the UI by default (controlled by firebase.json's
 // `emulators.ui.enabled`), so no `--ui` flag here — that flag only exists on `:exec`.
 const EMULATOR_FLAGS = '--only functions,firestore,auth,database,hosting,pubsub';
@@ -24,11 +24,11 @@ class EmulatorCommand extends BaseCommand {
     // Boot-time: seed the shared state file with whatever this emulator was
     // started with. Two flows are supported:
     //   - Recommended: start emulator without the flag, set TEST_EXTENDED_MODE
-    //     on `npx mgr test` instead. The test command writes the file; the
+    //     on `npx omega test` instead. The test command writes the file; the
     //     emulator's function workers watch it and flip live.
     //   - Also supported: start emulator with TEST_EXTENDED_MODE=true. We
     //     write the file here as a boot default. Useful for inspecting the
-    //     emulator before any tests fire. Note: the next `npx mgr test`
+    //     emulator before any tests fire. Note: the next `npx omega test`
     //     overwrites the file regardless of how the emulator booted.
     {
       const projectDir = this.main.firebaseProjectPath;
@@ -40,11 +40,11 @@ class EmulatorCommand extends BaseCommand {
     if (process.env.TEST_EXTENDED_MODE) {
       this.log(chalk.yellow.bold(`\n  ${EXTENDED_MODE_WARNING[0]}`));
       EXTENDED_MODE_WARNING.slice(1).forEach((line) => this.log(chalk.yellow(`  ${line}`)));
-      this.log(chalk.gray(`  (Tip: you can also flip mode per-run by setting TEST_EXTENDED_MODE on \`npx mgr test\`.)`));
+      this.log(chalk.gray(`  (Tip: you can also flip mode per-run by setting TEST_EXTENDED_MODE on \`npx omega test\`.)`));
       this.log('');
     }
 
-    // Start @omegajs/backend watcher in background
+    // Start @omega.js/backend watcher in background
     const watcher = new WatchCommand(this.main);
     watcher.startBackground();
 
@@ -119,7 +119,7 @@ class EmulatorCommand extends BaseCommand {
       throw new Error('Port conflicts could not be resolved');
     }
 
-    // Wipe stale firebase-tools debug logs + any leftover @omegajs/backend logs from older versions.
+    // Wipe stale firebase-tools debug logs + any leftover @omega.js/backend logs from older versions.
     this.sweepStaleLogs();
 
     // Set up log file + reset-sentinel watcher.
@@ -302,8 +302,8 @@ class EmulatorCommand extends BaseCommand {
    * Boot emulators and run a single command against them. Sends SIGTERM to the emulator
    * when the command exits (or this process is interrupted) and waits for clean shutdown.
    *
-   * Used by `npx mgr emulator` for the keep-alive flow (command is a no-op sleep).
-   * `npx mgr test`'s auto-start path uses startEmulators() directly so it can tee the
+   * Used by `npx omega emulator` for the keep-alive flow (command is a no-op sleep).
+   * `npx omega test`'s auto-start path uses startEmulators() directly so it can tee the
    * test command's output to its own log (test.log) separate from emulator.log.
    *
    * @param {string} command - shell command to run while emulators are up

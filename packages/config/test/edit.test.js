@@ -1,5 +1,5 @@
 /**
- * Writeback tests for @omegajs/config — comment-preserving omega.json5
+ * Writeback tests for @omega.js/config — comment-preserving omega.json5
  * edits. Pins the surgical guarantee (every byte outside the edited spans
  * survives: comments, blank lines, key order, quote style), replace vs
  * insert (leaf, whole missing branch, empty/single-line/comment-only

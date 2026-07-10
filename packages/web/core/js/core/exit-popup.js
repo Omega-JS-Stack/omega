@@ -1,18 +1,18 @@
 // Libraries
 import merge from 'lodash/merge.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Exit Popup Module
 export default function () {
 
   // Get config
-  const config = webManager.config.exitPopup.config;
+  const config = omega.config.exitPopup.config;
 
   // Storage key for tracking last shown time
   const STORAGE_KEY = 'exitPopup.timestamp';
 
   // Check if we should show the popup based on timeout
-  const lastShown = webManager.storage().get(STORAGE_KEY, 0);
+  const lastShown = omega.storage().get(STORAGE_KEY, 0);
   const now = Date.now();
   const timeSinceLastShown = now - lastShown;
 
@@ -20,15 +20,15 @@ export default function () {
   let shouldShow = timeSinceLastShown >= config.timeout;
 
   // Wait for DOM to be ready
-  webManager.dom().ready().then(() => {
+  omega.dom().ready().then(() => {
     // Setup exit intent detection without needing the element yet
     setupExitIntentDetection();
   });
 
   // Register showExitPopup on the UJ library for programmatic access
-  // Usage: webManager.uj().showExitPopup()
+  // Usage: omega.uj().showExitPopup()
 
-  webManager._ujLibrary.showExitPopup = showExitPopup;
+  omega._ujLibrary.showExitPopup = showExitPopup;
 
   function updateModalContent($modal, effectiveConfig) {
     // Update title
@@ -184,12 +184,12 @@ export default function () {
     shouldShow = false;
 
     // Store timestamp in storage
-    webManager.storage().set(STORAGE_KEY, Date.now());
+    omega.storage().set(STORAGE_KEY, Date.now());
 
     // Find the modal element only when needed
     const $modalElement = document.getElementById('modal-exit-popup');
     if (!$modalElement) {
-      webManager.sentry().captureException(new Error('Exit popup modal element not found'));
+      omega.sentry().captureException(new Error('Exit popup modal element not found'));
       return;
     }
 
@@ -198,7 +198,7 @@ export default function () {
 
     // Check if Bootstrap is available
     if (!window.bootstrap || !window.bootstrap.Modal) {
-      webManager.sentry().captureException(new Error('Bootstrap Modal not available for exit popup'));
+      omega.sentry().captureException(new Error('Bootstrap Modal not available for exit popup'));
       return;
     }
 
@@ -207,7 +207,7 @@ export default function () {
     try {
       modal = new window.bootstrap.Modal($modalElement);
     } catch (error) {
-      webManager.sentry().captureException(new Error('Error initializing Bootstrap modal for exit popup', { cause: error }));
+      omega.sentry().captureException(new Error('Error initializing Bootstrap modal for exit popup', { cause: error }));
       return;
     }
 
@@ -244,7 +244,7 @@ export default function () {
         trackExitPopupDismissed();
       }, { once: true });
     } catch (error) {
-      webManager.sentry().captureException(new Error('Error showing exit popup', { cause: error }));
+      omega.sentry().captureException(new Error('Error showing exit popup', { cause: error }));
     }
   }
 

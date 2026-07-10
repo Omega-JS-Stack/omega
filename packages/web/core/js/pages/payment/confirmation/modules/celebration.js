@@ -1,10 +1,10 @@
 // Celebration animation for confirmation page
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Trigger confetti celebration
 export async function triggerCelebration() {
   try {
-    await webManager.dom().loadScript({
+    await omega.dom().loadScript({
       src: 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js'
     });
 

@@ -1,6 +1,6 @@
 // Libraries
 const path = require('path');
-const { createCliRouter } = require('@omegajs/devkit/cli-router');
+const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
 // Load .env file from current working directory (project root)
 require('dotenv').config({ path: path.join(process.cwd(), '.env') });

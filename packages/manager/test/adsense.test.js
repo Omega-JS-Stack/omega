@@ -8,7 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const service = require('../src/services/adsense/index.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');

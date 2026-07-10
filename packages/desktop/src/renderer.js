@@ -1,10 +1,10 @@
 // Renderer-process Manager singleton.
-// Consumer entry (per view): `new (require('@omegajs/desktop/renderer'))().initialize()`.
-// Reads window.EM_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps @omegajs/client + auth.
+// Consumer entry (per view): `new (require('@omega.js/desktop/renderer'))().initialize()`.
+// Reads window.EM_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps @omega.js/client + auth.
 //
 // Auth bridge:
 //   - On init, asks main "I'm at UID X (or null), are we in sync?" via desktop:auth:sync-request.
-//     If main returns a custom token, this renderer calls webManager.auth().signInWithCustomToken(token).
+//     If main returns a custom token, this renderer calls omega.auth().signInWithCustomToken(token).
 //     If main says "sign out," this renderer signs out.
 //   - Listens for desktop:auth:sign-in-with-token broadcasts (fired when ANY renderer or main signs in)
 //     and signs in with the provided token.
@@ -19,7 +19,7 @@ function Manager() {
 
   self.config = null;
   self.logger = new LoggerLite('renderer');
-  self.webManager = null;
+  self.omega = null;
 
   // Bridges exposed by preload contextBridge (window.em.*)
   self.ipc     = (typeof window !== 'undefined' && window.em?.ipc)     || null;
@@ -37,17 +37,17 @@ Manager.prototype.initialize = async function (overrides) {
   const buildJson = (typeof EM_BUILD_JSON !== 'undefined' && EM_BUILD_JSON) || {};
   self.config = Object.assign({}, buildJson.config || {}, overrides || {});
 
-  self.logger.log('Initializing @omegajs/desktop (renderer)...');
+  self.logger.log('Initializing @omega.js/desktop (renderer)...');
 
-  // Boot @omegajs/client so Firebase Auth is available in this renderer.
+  // Boot @omega.js/client so Firebase Auth is available in this renderer.
   try {
-    const wmMod = require('@omegajs/client');
-    self.webManager = wmMod.default || wmMod;
-    if (self.webManager?.initialize) {
-      await self.webManager.initialize(self.config);
+    const wmMod = require('@omega.js/client');
+    self.omega = wmMod.default || wmMod;
+    if (self.omega?.initialize) {
+      await self.omega.initialize(self.config);
     }
   } catch (e) {
-    self.logger.warn('@omegajs/client not available — auth bridge running in no-op mode.', e?.message);
+    self.logger.warn('@omega.js/client not available — auth bridge running in no-op mode.', e?.message);
   }
 
   // Wire the auth bridge: sync with main, listen for broadcasts.
@@ -62,7 +62,7 @@ Manager.prototype.initialize = async function (overrides) {
   self._wireFontAwesome();
   self._wireTooltips();
 
-  self.logger.log('@omegajs/desktop (renderer) initialized.');
+  self.logger.log('@omega.js/desktop (renderer) initialized.');
 
   return self;
 };
@@ -160,7 +160,7 @@ Manager.prototype._wireFontAwesome = function () {
   };
 
   // Observe + initial scan. Deferred until the document exists — when this
-  // runs from a preload (the @omegajs/desktop test harness does), documentElement isn't
+  // runs from a preload (the @omega.js/desktop test harness does), documentElement isn't
   // built yet.
   const start = () => {
     new MutationObserver((mutations) => {
@@ -184,12 +184,12 @@ Manager.prototype._wireFontAwesome = function () {
 };
 
 // Public alias — minimal surfaces that skip the full initialize() (no
-// @omegajs/client / auth bridge) can still enable the FontAwesome auto-render:
-//   new (require('@omegajs/desktop/renderer'))().enableFontAwesome();
+// @omega.js/client / auth bridge) can still enable the FontAwesome auto-render:
+//   new (require('@omega.js/desktop/renderer'))().enableFontAwesome();
 Manager.prototype.enableFontAwesome = Manager.prototype._wireFontAwesome;
 
 // Bootstrap tooltips — auto-initialize every `[data-bs-toggle="tooltip"]`
-// element (Bootstrap's JS + Popper ship inside @omegajs/desktop as a prebuilt bundle —
+// element (Bootstrap's JS + Popper ship inside @omega.js/desktop as a prebuilt bundle —
 // assets/themes/bootstrap/js/bootstrap.bundle.js; consumers add ZERO setup).
 // Live-managed via MutationObserver:
 //   - elements inserted later get their tooltip on arrival
@@ -212,7 +212,7 @@ Manager.prototype._wireTooltips = function () {
 
   // Everything — including the require — is deferred until the document
   // exists: the Bootstrap bundle reads document.documentElement at import
-  // time, which is null when this runs from a preload (the @omegajs/desktop test harness
+  // time, which is null when this runs from a preload (the @omega.js/desktop test harness
   // does) before the DOM is built.
   const start = () => {
     let Tooltip;
@@ -308,13 +308,13 @@ Manager.prototype._wireTooltips = function () {
   }
 };
 
-// Bridge between renderer's @omegajs/client and main's client-bridge.
+// Bridge between renderer's @omega.js/client and main's client-bridge.
 // Mirrors BXM's foreground sync logic.
 Manager.prototype._wireAuthBridge = async function () {
   const self = this;
   if (!self.ipc) return;
 
-  const auth = self.webManager?.auth?.();
+  const auth = self.omega?.auth?.();
   const getCurrentUid = () => {
     try { return auth?.user?.()?.uid || null; }
     catch (e) { return null; }
@@ -342,9 +342,9 @@ Manager.prototype._wireAuthBridge = async function () {
     }
   });
 
-  // Run @omegajs/client's FULL auth cycle (UJM/BXM parity): listen() waits for auth to
+  // Run @omega.js/client's FULL auth cycle (UJM/BXM parity): listen() waits for auth to
   // settle, fetches the Firestore account, resolves the subscription, and auto-populates
-  // the data-wm-bind bindings — so any @omegajs/desktop app can write UJM-style reactive HTML
+  // the data-wm-bind bindings — so any @omega.js/desktop app can write UJM-style reactive HTML
   // (`@show auth.user`, `@text auth.account.plan.id`, ...). Persistent listener: fires
   // again on every subsequent sign-in/out (broadcast tokens included).
   //

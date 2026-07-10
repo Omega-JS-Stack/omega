@@ -2,10 +2,10 @@
  * Test: helpers/utilities.slugify()
  * Unit tests for the canonical URL slug builder.
  *
- * Run: npx mgr test helpers/slugify
+ * Run: npx omega test helpers/slugify
  *
  * slugify is the SSOT used by:
- *   - @omegajs/backend admin/post (legacy + modern) for URL + image filenames
+ *   - @omega.js/backend admin/post (legacy + modern) for URL + image filenames
  *   - Sponsorship platform validator.buildFormatted()
  *
  * Contract:

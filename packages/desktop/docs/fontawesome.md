@@ -1,6 +1,6 @@
 # FontAwesome
 
-@omegajs/desktop ships the **Font Awesome Pro icon library** (solid + brands, SVG) inside the
+@omega.js/desktop ships the **Font Awesome Pro icon library** (solid + brands, SVG) inside the
 framework — every consumer gets the full icon set with **zero setup**, fully
 offline, no icon font, no CDN.
 
@@ -17,9 +17,9 @@ renderer bootstrap. No `initialize()` options, no imports.
 ## How it works
 
 - **Assets** — `assets/icons/font-awesome/{solid,brands}/*.svg` ship inside the
-  @omegajs/desktop package (Font Awesome Pro 7.x — 4,700+ solid, 600+ brand icons, including
+  @omega.js/desktop package (Font Awesome Pro 7.x — 4,700+ solid, 600+ brand icons, including
   the classic alias filenames like `search.svg` → `magnifying-glass`). They ride
-  into packaged apps automatically (@omegajs/desktop's `dist/` lives in the consumer's asar).
+  into packaged apps automatically (@omega.js/desktop's `dist/` lives in the consumer's asar).
 - **Main lib** (`lib/fontawesome.js`) — `manager.fontawesome.get(name, style)`
   resolves an icon to its SVG string (`null` for unknown names — never throws).
   Lookups are slug-sanitized (the IPC channel can never read outside the icon
@@ -41,11 +41,11 @@ renderer bootstrap. No `initialize()` options, no imports.
 ## Minimal surfaces
 
 The auto-render is wired by `initialize()`. A renderer that deliberately skips
-the full init (no @omegajs/client / auth — e.g. a lightweight popover overlay) can
+the full init (no @omega.js/client / auth — e.g. a lightweight popover overlay) can
 enable JUST the icon pipeline:
 
 ```js
-new (require('@omegajs/desktop/renderer'))().enableFontAwesome();
+new (require('@omega.js/desktop/renderer'))().enableFontAwesome();
 ```
 
 ## Notes

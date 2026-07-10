@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { consumerPaths } = require('../consumer.js');
 
 const logger = new Logger('omega:test');

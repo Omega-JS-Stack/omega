@@ -195,7 +195,7 @@ module.exports = {
       },
     },
     {
-      // Unsubscribe links are NOT rendered by @omegajs/backend — both Beehiiv and SendGrid
+      // Unsubscribe links are NOT rendered by @omega.js/backend — both Beehiiv and SendGrid
       // auto-append a CAN-SPAM-compliant unsubscribe footer to every email they
       // send (with a working URL tied to the subscriber). Rendering our own
       // ${brandUrl}/unsubscribe would create a dead second link.

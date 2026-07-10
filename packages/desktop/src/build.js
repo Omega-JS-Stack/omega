@@ -112,9 +112,9 @@ Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 
 // getEnvironment() is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
 // (alongside isDevelopment/isProduction/isTesting — the natural environment-helper family).
-// It's mixed into ALL FOUR @omegajs/desktop Manager entry points (main / renderer / preload / build) via
+// It's mixed into ALL FOUR @omega.js/desktop Manager entry points (main / renderer / preload / build) via
 // the mode-helpers attachTo() call at the bottom of each, so every context resolves the
-// environment identically. (@omegajs/desktop has four separate Manager constructors that share code only
+// environment identically. (@omega.js/desktop has four separate Manager constructors that share code only
 // through these mixins — unlike UJM/BXM, where one build.js Manager serves every context.)
 
 Manager.getMode = function () {
@@ -128,16 +128,16 @@ Manager.getMode = function () {
 Manager.prototype.getMode = Manager.getMode;
 
 // Config — the consumer's config/omega.json5 resolved for the desktop target via
-// @omegajs/config: shared sections (brand, firebaseConfig, analytics, payment, sentry,
+// @omega.js/config: shared sections (brand, firebaseConfig, analytics, payment, sentry,
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
-// config merges underneath the app's. Then @omegajs/desktop's derived defaults:
+// config merges underneath the app's. Then @omega.js/desktop's derived defaults:
 //   app.appId       ← `com.itwcreativeworks.${brand.id}` if not set
 //   app.productName ← brand.name if not set
 // These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo' }` is
 // enough; appId/productName flow through automatically.
 Manager.getConfig = function () {
-  const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+  const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
   // No config at all (fresh dir, non-consumer cwd) → seeded empty shape below; the
   // schema validation in audit/boot reports what's actually missing.

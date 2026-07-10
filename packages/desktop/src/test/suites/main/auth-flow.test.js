@@ -1,7 +1,7 @@
 // Main-process tests for lib/auth-flow.js — the openAuthFlow() sign-in round trip.
 // The dev loopback listener is REAL (http server on 127.0.0.1, real GETs simulate the
 // browser's redirect back); only the pieces that would leave the machine are stubbed
-// (shell.openExternal, webManager.handleAuthToken, windows.get's show/focus surface).
+// (shell.openExternal, omega.handleAuthToken, windows.get's show/focus surface).
 
 const http = require('http');
 
@@ -25,10 +25,10 @@ function stubExternals(ctx) {
   const tokens = [];
   const shown = [];
   const origOpen = electron.shell.openExternal;
-  const origHandle = ctx.manager.webManager.handleAuthToken;
+  const origHandle = ctx.manager.omega.handleAuthToken;
   const origShow = ctx.manager.windows.show;
   electron.shell.openExternal = async (url) => { opened.push(url); };
-  ctx.manager.webManager.handleAuthToken = (t) => { tokens.push(t); };
+  ctx.manager.omega.handleAuthToken = (t) => { tokens.push(t); };
   ctx.manager.windows.show = (name) => { shown.push(name); };
   return {
     opened,
@@ -36,7 +36,7 @@ function stubExternals(ctx) {
     shown,
     restore() {
       electron.shell.openExternal = origOpen;
-      ctx.manager.webManager.handleAuthToken = origHandle;
+      ctx.manager.omega.handleAuthToken = origHandle;
       ctx.manager.windows.show = origShow;
       ctx.manager.authFlow.cancel();
     },

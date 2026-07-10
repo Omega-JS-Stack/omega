@@ -1,6 +1,6 @@
 # Stripe Webhook Forwarding
 
-@omegajs/backend auto-starts Stripe CLI webhook forwarding when running `npx mgr serve` or `npx mgr emulator`. This forwards Stripe test webhooks to the local server so the full payment pipeline works end-to-end during development.
+@omega.js/backend auto-starts Stripe CLI webhook forwarding when running `npx omega serve` or `npx omega emulator`. This forwards Stripe test webhooks to the local server so the full payment pipeline works end-to-end during development.
 
 **Requirements:**
 - `STRIPE_SECRET_KEY` set in `functions/.env`
@@ -10,7 +10,7 @@
 **Standalone usage:**
 
 ```bash
-npx mgr stripe
+npx omega stripe
 ```
 
 If any prerequisite is missing, webhook forwarding is silently skipped with an info message.

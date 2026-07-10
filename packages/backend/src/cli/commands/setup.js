@@ -5,7 +5,7 @@ const path = require('path');
 const JSON5 = require('json5');
 const fetch = require('wonderful-fetch');
 // Namespaced: this class has its own loadConfig() method (CLI flags), which is unrelated
-const omegaConfig = require('@omegajs/config');
+const omegaConfig = require('@omega.js/config');
 
 // Regex patterns (used by getRulesFile)
 const bem_allRulesRegex = /(\/\/\/---backend-manager---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
@@ -78,14 +78,14 @@ class SetupCommand extends BaseCommand {
     // Check if package exists
     if (!hasContent(self.package)) {
       ui.status('fail', `Missing ${chalk.bold('functions/package.json')}`);
-      ui.note(`Run ${chalk.bold('npx mgr setup')} from inside the ${chalk.bold('functions')} folder of a Firebase project.`);
+      ui.note(`Run ${chalk.bold('npx omega setup')} from inside the ${chalk.bold('functions')} folder of a Firebase project.`);
       process.exit(1);
     }
 
     // Check if we're running from the functions folder
     if (!cwd.endsWith('functions') && !cwd.endsWith('functions/')) {
       ui.status('fail', `Wrong directory`);
-      ui.note(`Run ${chalk.bold('npx mgr setup')} from the ${chalk.bold('functions')} folder. Try ${chalk.bold('cd functions')} first.`);
+      ui.note(`Run ${chalk.bold('npx omega setup')} from the ${chalk.bold('functions')} folder. Try ${chalk.bold('cd functions')} first.`);
       process.exit(1);
     }
 
@@ -98,10 +98,10 @@ class SetupCommand extends BaseCommand {
     this.copyDefaults();
     this.loadFiles();
 
-    // Clean up leftover trigger files + stale log files from older @omegajs/backend versions
+    // Clean up leftover trigger files + stale log files from older @omega.js/backend versions
     this.cleanupGeneratedArtifacts();
 
-    // Load the rules files (reads from @omegajs/backend's own templates/, not consumer files)
+    // Load the rules files (reads from @omega.js/backend's own templates/, not consumer files)
     this.getRulesFile();
     self.default.rulesVersionRegex = new RegExp(`///---version=${self.default.version}---///`);
 
@@ -121,13 +121,13 @@ class SetupCommand extends BaseCommand {
     ui.section('Checks');
     await this.runTests();
 
-    // Warn if using local @omegajs/backend
-    const bemDep = self.package.dependencies?.['@omegajs/backend']
-      || self.package.devDependencies?.['@omegajs/backend']
+    // Warn if using local @omega.js/backend
+    const bemDep = self.package.dependencies?.['@omega.js/backend']
+      || self.package.devDependencies?.['@omega.js/backend']
       || '';
     if (bemDep.includes('file:')) {
       ui.section('Notices');
-      ui.status('warn', `Using the local ${chalk.bold('@omegajs/backend')} source (file: dependency)`, { level: 2 });
+      ui.status('warn', `Using the local ${chalk.bold('@omega.js/backend')} source (file: dependency)`, { level: 2 });
     }
 
     // Fetch stats
@@ -141,7 +141,7 @@ class SetupCommand extends BaseCommand {
     // Notify parent if exists
     if (process.send) {
       process.send({
-        sender: '@omegajs/backend',
+        sender: '@omega.js/backend',
         command: 'setup:complete',
         payload: {
           passed: self.testCount + self.warnCount === self.testTotal,
@@ -170,7 +170,7 @@ class SetupCommand extends BaseCommand {
     const defaultsDir = path.resolve(`${__dirname}/../../defaults`);
 
     if (!jetpack.exists(defaultsDir)) {
-      // Defaults dir is optional — older @omegajs/backend versions didn't have one. If missing, skip silently.
+      // Defaults dir is optional — older @omega.js/backend versions didn't have one. If missing, skip silently.
       ui.note('No defaults to scaffold', 2);
       return;
     }
@@ -205,7 +205,7 @@ class SetupCommand extends BaseCommand {
     self.firebaseRC = loadJSON(`${self.firebaseProjectPath}/.firebaserc`);
     self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/functions/remoteconfig.template.json`);
     self.projectPackage = loadJSON(`${self.firebaseProjectPath}/package.json`);
-    // Resolved through @omegajs/config WITHOUT the framework-defaults layer —
+    // Resolved through @omega.js/config WITHOUT the framework-defaults layer —
     // the omega-config setup test compares these keys against the template, so
     // defaults here would make every key look present. Throws on secrets/parse
     // errors (setup IS the audit — hard failures are correct here).
@@ -294,13 +294,13 @@ class SetupCommand extends BaseCommand {
   cleanupGeneratedArtifacts() {
     const self = this.main;
 
-    // Remove the @omegajs/backend reload-trigger file (transient artifact from `npx mgr watch`)
+    // Remove the @omega.js/backend reload-trigger file (transient artifact from `npx omega watch`)
     const triggerFile = `${self.firebaseProjectPath}/functions/omega-reload-trigger.js`;
     if (jetpack.exists(triggerFile)) {
       jetpack.remove(triggerFile);
     }
 
-    // Sweep stale firebase-tools debug logs + leftover @omegajs/backend logs from older
+    // Sweep stale firebase-tools debug logs + leftover @omega.js/backend logs from older
     // versions (pre-5.2.2 they lived in functions/; now in .temp/). Shared
     // implementation in base-command.js so emulator/serve boot also runs it.
     this.sweepStaleLogs();

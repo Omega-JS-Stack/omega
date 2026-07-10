@@ -1,4 +1,4 @@
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Lazy Loading Module
 export default function () {
@@ -6,7 +6,7 @@ export default function () {
   const TRANSPARENT_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
   // Configuration
-  const config = webManager.config.lazyLoading.config;
+  const config = omega.config.lazyLoading.config;
 
   // Track loaded elements to avoid reprocessing
   const loadedElements = new WeakSet();
@@ -17,12 +17,12 @@ export default function () {
   // Helper function to add cache buster to URLs
   function addCacheBuster(url) {
     const urlObj = new URL(url, window.location.href);
-    urlObj.searchParams.set('cb', webManager.config.buildTime);
+    urlObj.searchParams.set('cb', omega.config.buildTime);
     return urlObj.toString();
   }
 
   // Wait for DOM to be ready
-  webManager.dom().ready().then(() => {
+  omega.dom().ready().then(() => {
     initLazyLoading();
   });
 
@@ -327,7 +327,7 @@ export default function () {
         parent: element,
       };
 
-      webManager.dom().loadScript(scriptOptions)
+      omega.dom().loadScript(scriptOptions)
         .then(() => {
           markAsLoaded(element);
         })

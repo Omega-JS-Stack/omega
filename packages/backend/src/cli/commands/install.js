@@ -1,6 +1,6 @@
 const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
-const local = require('@omegajs/devkit/local');
+const local = require('@omega.js/devkit/local');
 const powertools = require('node-powertools');
 const Npm = require('npm-api');
 const jetpack = require('fs-jetpack');
@@ -17,7 +17,7 @@ class InstallCommand extends BaseCommand {
   }
 
   async installLocal() {
-    // Link every declared @omegajs dependency (functions/package.json for
+    // Link every declared @omega.js dependency (functions/package.json for
     // backend projects) to the local Omega monorepo — idempotent.
     const actions = await local.linkLocalPackages({
       dir: this.firebaseProjectPath,
@@ -26,7 +26,7 @@ class InstallCommand extends BaseCommand {
     });
 
     if (actions.length === 0) {
-      this.logWarning('No @omegajs dependencies declared in this project — nothing to link');
+      this.logWarning('No @omega.js dependencies declared in this project — nothing to link');
     }
   }
 
@@ -34,15 +34,15 @@ class InstallCommand extends BaseCommand {
     // Check and update peer dependencies before installing
     await this.updatePeerDependencies();
 
-    await this.uninstallPkg('@omegajs/backend');
-    await this.installPkg('@omegajs/backend');
+    await this.uninstallPkg('@omega.js/backend');
+    await this.installPkg('@omega.js/backend');
   }
 
   async updatePeerDependencies() {
-    // Fetch latest @omegajs/backend package info from npm
-    const latestBem = await this.getPackageInfo('@omegajs/backend');
+    // Fetch latest @omega.js/backend package info from npm
+    const latestBem = await this.getPackageInfo('@omega.js/backend');
     if (!latestBem || !latestBem.peerDependencies) {
-      this.logWarning('Could not fetch @omegajs/backend peer dependencies, proceeding anyway...');
+      this.logWarning('Could not fetch @omega.js/backend peer dependencies, proceeding anyway...');
       return;
     }
 
@@ -86,7 +86,7 @@ class InstallCommand extends BaseCommand {
     }
 
     // Log and update each dependency
-    this.log(chalk.yellow('\nUpdating peer dependencies for @omegajs/backend...'));
+    this.log(chalk.yellow('\nUpdating peer dependencies for @omega.js/backend...'));
     for (const dep of outdatedDeps) {
       const majorWarning = dep.isMajor ? chalk.red(' (major update)') : '';
       this.log(`  ${chalk.bold(dep.name)}: ${dep.installed} → ${dep.required}${majorWarning}`);

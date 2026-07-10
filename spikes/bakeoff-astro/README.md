@@ -5,9 +5,9 @@
 proved the layered-theme model is engine-portable and holds the Astro-specific
 findings if the decision is ever revisited. Since B1 it imports the
 SSG-agnostic pieces (frontmatter Liquid, consumer scan, layered resolution)
-and the mini-site/ports-site test fixtures from `@omegajs/web`; since B2 the
+and the mini-site/ports-site test fixtures from `@omega.js/web`; since B2 the
 asset pipeline is a FROZEN B1 snapshot vendored at
-[src/assets-pipeline.js](src/assets-pipeline.js) (@omegajs/web moved to
+[src/assets-pipeline.js](src/assets-pipeline.js) (@omega.js/web moved to
 layer-root conventions; this reference stays as measured).
 
 The A1 slice built on Astro against the shared corpus
@@ -51,7 +51,7 @@ npm test        # 13 tests against the shared mini-site fixture (real astro buil
   (`injectRoute`) that simply doesn't inject when the consumer owns the URL.
 - **Assets** — the SHARED SSG-agnostic pipeline
   ([bakeoff-shared/src/assets.js](../bakeoff-shared/src/assets.js)): esbuild
-  page modules (real `@omegajs/client` via the `web-manager` alias), `omega:`
+  page modules (real `@omega.js/client` via the `web-manager` alias), `omega:`
   scheme sass, PurgeCSS. Built into a staging dir and copied after Astro runs
   (astro build clears its outDir).
 

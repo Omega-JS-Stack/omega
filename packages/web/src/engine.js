@@ -1,5 +1,5 @@
 /**
- * The Eleventy engine core of @omegajs/web: layered themes (virtual templates
+ * The Eleventy engine core of @omega.js/web: layered themes (virtual templates
  * / symlink farm), template-kit registration on Eleventy's own LiquidJS
  * instance, frontmatter Liquid rendering, the `resolved` data alias
  * (page.resolved equivalent — native data cascade), Jekyll conventions (dated
@@ -10,8 +10,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const markdownIt = require('markdown-it');
-const { registerLiquid } = require('@omegajs/template-kit/register-liquid');
-const { toSiteGlobal } = require('@omegajs/config/site-global');
+const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
+const { toSiteGlobal } = require('@omega.js/config/site-global');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered } = require('./layers.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
@@ -328,7 +328,7 @@ function configureOmega(eleventyConfig, options) {
   }
 
   // ---- Globals. site.uj carries UJM-runtime site values the core includes
-  // read (cache_breaker in the @omegajs/client Configuration, date.year in the
+  // read (cache_breaker in the @omega.js/client Configuration, date.year in the
   // copyright meta, placeholder.src in lazy-loaded imgs).
   site.uj = {
     cache_breaker: 0,

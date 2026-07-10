@@ -942,7 +942,7 @@ test('payment: dry-run on a fully drifted account — zero mutations on all thre
 // ─── Interactive processor credential entry (config-landing flow) ────────────
 
 const { processorSetupFlow } = require('../src/services/payment/lib/processor-setup.js');
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { readFileSync } = require('node:fs');
 const { join: joinPath } = require('node:path');
 

@@ -1,6 +1,6 @@
 # Project tests
 
-Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx mgr test`.
+Drop your project test suites here. The framework auto-runs them alongside its own when you run `npx omega test`.
 
 ## Layers
 
@@ -17,13 +17,13 @@ Match the framework's four layers — OMEGA Extension's test runner discovers fi
 
 Every feature ships with tests at every layer it has a surface in — logic (`build`/`background`), UI (`view`), end-to-end (`boot`). Skip a layer only when the feature genuinely has no surface there; "the logic test covers it" does not excuse the UI test.
 
-Tests that hit REAL external services (Firebase, push, network) are skipped by default — gate them on `process.env.TEST_EXTENDED_MODE` (`if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');`) and run them with `npx mgr test --extended` (or `TEST_EXTENDED_MODE=true`). `TEST_EXTENDED_MODE` is the shared, unprefixed name across @omegajs/backend/BXM/UJM/EM. Never mock the external service — skip it in-source.
+Tests that hit REAL external services (Firebase, push, network) are skipped by default — gate them on `process.env.TEST_EXTENDED_MODE` (`if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');`) and run them with `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`). `TEST_EXTENDED_MODE` is the shared, unprefixed name across @omega.js/backend/BXM/UJM/EM. Never mock the external service — skip it in-source.
 
 ## Quick example
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('@omegajs/extension/test/assert');
+const assert = require('@omega.js/extension/test/assert');
 
 module.exports = {
   'my feature does the thing': async () => {
@@ -35,4 +35,4 @@ module.exports = {
 
 ## See also
 
-`node_modules/@omegajs/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omega.js/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).

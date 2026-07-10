@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Initialize section
 export function init() {
@@ -56,9 +56,9 @@ function setupButtons() {
       const text = $target.tagName === 'PRE' ? $target.textContent : $target.value;
 
       navigator.clipboard.writeText(text).then(() => {
-        webManager.utilities().showNotification('Copied!', 'success');
+        omega.utilities().showNotification('Copied!', 'success');
       }).catch(() => {
-        webManager.utilities().showNotification('Failed to copy', 'danger');
+        omega.utilities().showNotification('Failed to copy', 'danger');
       });
     });
   });
@@ -66,7 +66,7 @@ function setupButtons() {
 
 // Setup MCP integration URLs
 function setupMcp() {
-  const apiUrl = webManager.getApiUrl();
+  const apiUrl = omega.getApiUrl();
   const mcpUrl = `${apiUrl}/mcp`;
   const $mcpCard = document.getElementById('mcp-card');
   const brandName = ($mcpCard?.dataset?.brandId || 'backend').toLowerCase().replace(/\s+/g, '-');
@@ -165,7 +165,7 @@ function setupResetApiKeyForm() {
       throw new Error('API key reset cancelled.');
     }
 
-    const serverApiURL = `${webManager.getApiUrl()}/backend-manager/user/api-keys`;
+    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/api-keys`;
 
     const response = await authorizedFetch(serverApiURL, {
       method: 'POST',
@@ -196,12 +196,12 @@ async function handleCopyInput(inputId, $btn) {
   const $input = document.getElementById(inputId);
 
   if (!$input || !$input.value || $input.value === 'Loading...') {
-    webManager.utilities().showNotification('Nothing to copy', 'warning');
+    omega.utilities().showNotification('Nothing to copy', 'warning');
     return;
   }
 
   try {
-    await webManager.utilities().clipboardCopy($input);
+    await omega.utilities().clipboardCopy($input);
 
     const $text = $btn.querySelector('.button-text');
     if ($text) {
@@ -216,10 +216,10 @@ async function handleCopyInput(inputId, $btn) {
         $btn.classList.add('btn-outline-adaptive');
       }, 2000);
     } else {
-      webManager.utilities().showNotification('Copied!', 'success');
+      omega.utilities().showNotification('Copied!', 'success');
     }
   } catch (err) {
     console.error('Failed to copy:', err);
-    webManager.utilities().showNotification('Failed to copy', 'danger');
+    omega.utilities().showNotification('Failed to copy', 'danger');
   }
 }

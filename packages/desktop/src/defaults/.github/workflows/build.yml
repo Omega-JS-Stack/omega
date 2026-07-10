@@ -89,7 +89,7 @@ jobs:
           sudo apt-get install -y xvfb libgtk-3-0 libnss3 libxss1 libasound2t64 libgbm1 || sudo apt-get install -y xvfb libgtk-3-0 libnss3 libxss1 libasound2 libgbm1
       - run: sfw npm ci
       - name: Run framework + project test suites
-        run: xvfb-run --auto-servernum -- npx mgr test --reporter json
+        run: xvfb-run --auto-servernum -- npx omega test --reporter json
         env:
           # Skip extended suites that hit real external services (live backend creds, real
           # network). Set TEST_EXTENDED_MODE: 'true' on a separate workflow to run them.
@@ -131,12 +131,12 @@ jobs:
 
       - if: matrix.os == 'windows-latest'
         shell: cmd
-        run: npx mgr setup
+        run: npx omega setup
       - if: matrix.os != 'windows-latest'
-        run: npx mgr setup
+        run: npx omega setup
 
       # macOS — decode signing assets from secrets, then sign + notarize + publish.
-      # `npx mgr push-secrets` uploads .p12 / .p8 files as base64-encoded secrets;
+      # `npx omega push-secrets` uploads .p12 / .p8 files as base64-encoded secrets;
       # the workflow decodes them back to disk for electron-builder + notarytool to read.
       - if: matrix.os == 'macos-latest'
         run: |
@@ -165,9 +165,9 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           # (a) Config check — explicit `enabled: false` opts out; missing/true opts in.
-          # `@omegajs/desktop/config` is the vendored @omegajs/config loader — resolves
+          # `@omega.js/desktop/config` is the vendored @omega.js/config loader — resolves
           # config/omega.json5 for the desktop target (brand-monorepo aware).
-          if node -e 'const c = require("@omegajs/desktop/config").loadConfig(process.cwd(), "desktop").config; process.exit(c.platforms?.linux?.snap?.enabled === false ? 1 : 0);'; then
+          if node -e 'const c = require("@omega.js/desktop/config").loadConfig(process.cwd(), "desktop").config; process.exit(c.platforms?.linux?.snap?.enabled === false ? 1 : 0);'; then
             CONFIG_OK=1
           else
             CONFIG_OK=0
@@ -231,7 +231,7 @@ jobs:
       - run: sfw npm ci
       - id: resolve
         run: |
-          STRATEGY=$(node -e "const c=require('@omegajs/desktop/config').loadConfig(process.cwd(),'desktop').config;console.log(c.platforms?.win?.signing?.strategy || 'self-hosted');")
+          STRATEGY=$(node -e "const c=require('@omega.js/desktop/config').loadConfig(process.cwd(),'desktop').config;console.log(c.platforms?.win?.signing?.strategy || 'self-hosted');")
           echo "strategy=$STRATEGY" >> "$GITHUB_OUTPUT"
           echo "Resolved Windows signing strategy: $STRATEGY"
 
@@ -241,7 +241,7 @@ jobs:
     # Strategy comes from config platforms.win.signing.strategy (read by windows-strategy job).
     #   self-hosted (default) — runs on a self-hosted runner with EV USB token attached
     #   cloud                 — runs on hosted windows-latest, calls cloud signing provider
-    #   local                 — skip this job; sign locally via `npx mgr sign-windows`
+    #   local                 — skip this job; sign locally via `npx omega sign-windows`
     if: needs.setup.outputs.windows == 'true' && needs.windows-strategy.outputs.strategy != 'local'
     runs-on: ${{ needs.windows-strategy.outputs.strategy == 'cloud' && fromJSON('["windows-latest"]') || fromJSON('["self-hosted","windows","ev-token"]') }}
     # Use cmd.exe (not PowerShell) on Windows. Self-hosted runners often have PowerShell
@@ -254,7 +254,7 @@ jobs:
     env:
       # Self-hosted EV USB token signing — these tell signtool which cert to use and
       # how to authenticate to the SafeNet driver. Set in the consumer's .env and
-      # pushed to GH Actions secrets via `npx mgr push-secrets`.
+      # pushed to GH Actions secrets via `npx omega push-secrets`.
       WIN_EV_TOKEN_PATH:                ${{ secrets.WIN_EV_TOKEN_PATH }}
       WIN_CSC_KEY_PASSWORD:             ${{ secrets.WIN_CSC_KEY_PASSWORD }}
       SIGNTOOL_PATH:                    ${{ secrets.SIGNTOOL_PATH }}
@@ -279,11 +279,11 @@ jobs:
         with:
           name: windows-unsigned
           path: release
-      - run: npx mgr sign-windows --in release --out release/signed
+      - run: npx omega sign-windows --in release --out release/signed
       # Upload the SIGNED Windows assets to the existing update-server release (created
       # by mac/linux's electron-builder publish step). Then mirror to download-server's
       # installer tag with stable filenames.
-      - run: npx mgr finalize-release --signed-dir release/signed
+      - run: npx omega finalize-release --signed-dir release/signed
 
   finalize:
     name: Finalize release
@@ -307,6 +307,6 @@ jobs:
       # the release as a draft, so subsequent runs can fill in the missing platform
       # assets before electron-updater starts seeing the version.
       - if: needs.setup.outputs.mac == 'true' && needs.setup.outputs.linux == 'true' && needs.setup.outputs.windows == 'true'
-        run: npx mgr finalize-release --publish
+        run: npx omega finalize-release --publish
       - if: needs.setup.outputs.mac != 'true' || needs.setup.outputs.linux != 'true' || needs.setup.outputs.windows != 'true'
         run: echo "Partial-platform run (mac=${{ needs.setup.outputs.mac }} linux=${{ needs.setup.outputs.linux }} windows=${{ needs.setup.outputs.windows }}) — leaving release as draft. Run with --platforms all to publish."

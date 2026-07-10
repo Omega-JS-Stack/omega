@@ -6,9 +6,9 @@
 // — the workflow then decodes back to a temp file at job start.
 //
 // Usage:
-//   npx mgr push-secrets                       # push all keys from .env Default section
-//   npx mgr push-secrets --only=GH_TOKEN,CSC_LINK
-//   npx mgr push-secrets --skip-empty=false    # also push empty values (not recommended)
+//   npx omega push-secrets                       # push all keys from .env Default section
+//   npx omega push-secrets --only=GH_TOKEN,CSC_LINK
+//   npx omega push-secrets --skip-empty=false    # also push empty values (not recommended)
 
 const path = require('path');
 const fs = require('fs');

@@ -1,7 +1,7 @@
 // Build-layer tests for src/utils/attach-log-file.js — tee process.stdout/stderr to a file
 // with ANSI stripping. Each test attaches, writes, detaches, then inspects the file.
 //
-// CRITICAL: these tests run INSIDE a live `npx mgr test` process whose own output is being
+// CRITICAL: these tests run INSIDE a live `npx omega test` process whose own output is being
 // teed to logs/test.log by the singleton. So they must NOT touch the singleton — exercising
 // attach()/detach() on it would detach the live tee mid-run and truncate logs/test.log. Each
 // test uses its OWN `createTee()` instance, which stacks under the live singleton tee and

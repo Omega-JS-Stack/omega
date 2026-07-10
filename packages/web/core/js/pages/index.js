@@ -3,13 +3,13 @@
  */
 
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     // Bootstrap tabs handle all the tab switching automatically via data-bs-toggle="tab"
     // We just need to pause videos when switching tabs for better UX

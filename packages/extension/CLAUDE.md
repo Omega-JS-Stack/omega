@@ -1,12 +1,12 @@
-# OMEGA Extension (@omegajs/extension)
+# OMEGA Extension (@omega.js/extension)
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to deep references. The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
-> **Mirrored structure:** @omegajs/backend, UJM, @omegajs/extension, and @omegajs/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** @omega.js/backend, UJM, @omega.js/extension, and @omega.js/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
 ## Identity
 
-OMEGA Extension (@omegajs/extension) is a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave). Sister project to @omegajs/desktop and Ultimate Jekyll Manager (UJM). Provides one-line-import bootstrap per extension context, a component-based architecture, a multi-browser build/release pipeline, auto-translation across 16 languages, cross-context auth synchronization, and a built-in four-layer test framework.
+OMEGA Extension (@omega.js/extension) is a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave). Sister project to @omega.js/desktop and Ultimate Jekyll Manager (UJM). Provides one-line-import bootstrap per extension context, a component-based architecture, a multi-browser build/release pipeline, auto-translation across 16 languages, cross-context auth synchronization, and a built-in four-layer test framework.
 
 ## Recommended skills
 
@@ -15,39 +15,39 @@ OMEGA Extension (@omegajs/extension) is a comprehensive framework for building m
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omegajs/extension ships `@omegajs/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omegajs/client as much as with @omegajs/extension.
+**@omega.js/extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/extension.
 
 **Required reading:**
-- **`node_modules/@omegajs/client/CLAUDE.md`** — top-level overview + index
-- **`node_modules/@omegajs/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omega.js/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start
 
 ### For Consuming Projects
 
-1. `npm install @omegajs/extension --save-dev`
-2. `npx mgr setup` — scaffolds the project (copies `src/defaults/` into the project: `src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.)
+1. `npm install @omega.js/extension --save-dev`
+2. `npx omega setup` — scaffolds the project (copies `src/defaults/` into the project: `src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.)
 3. `npm start` — dev (gulp → webpack → serve with live reload)
 4. `npm run build` — production build (compiles `dist/`, packages per-browser into `packaged/<browser>/raw/` + `.zip`)
 5. `BXM_IS_PUBLISH=true npm run build` — also uploads to Chrome / Firefox / Edge stores (see [docs/publishing.md](docs/publishing.md))
-6. `npx mgr test` — runs framework + project test suites
-   - `npx mgr test build/config` — bare path: run tests matching a path in BOTH sources
-   - `npx mgr test project:` — run ONLY consumer project tests (`project:<path>` to narrow)
-   - `npx mgr test mgr:` — run ONLY framework tests (`mgr:` is the universal cross-framework alias; `extension:` / `framework:` are equivalent)
-   - `npx mgr test extension:build/config` — run only framework tests matching a path
+6. `npx omega test` — runs framework + project test suites
+   - `npx omega test build/config` — bare path: run tests matching a path in BOTH sources
+   - `npx omega test project:` — run ONLY consumer project tests (`project:<path>` to narrow)
+   - `npx omega test mgr:` — run ONLY framework tests (`mgr:` is the universal cross-framework alias; `extension:` / `framework:` are equivalent)
+   - `npx omega test extension:build/config` — run only framework tests matching a path
    - The positional target selects which test FILES run (by source + path); `--filter=<substring>` is orthogonal — it matches test NAMES within them
    - Output is teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh each run — `cat logs/test.log` instead of scrolling scrollback
-   - Extended mode (off by default): `npx mgr test --extended` or `TEST_EXTENDED_MODE=true npx mgr test` opts into tests that hit REAL external services (Firebase via @omegajs/client, push, network). `TEST_EXTENDED_MODE` is the shared, unprefixed name across all OMEGA frameworks; it propagates to every spawned test environment
+   - Extended mode (off by default): `npx omega test --extended` or `TEST_EXTENDED_MODE=true npx omega test` opts into tests that hit REAL external services (Firebase via @omega.js/client, push, network). `TEST_EXTENDED_MODE` is the shared, unprefixed name across all OMEGA frameworks; it propagates to every spawned test environment
 
 To load the unpacked extension in Chrome: point chrome://extensions → "Load unpacked" at `packaged/chromium/raw/`.
 
 ### For Framework Development (This Repository)
 
-> **🚫 NEVER use `npx mgr ...` from the framework repo.** `npx mgr` is for CONSUMER projects only (where the bin is linked in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call the local `bin/` directly. This applies to ALL four OMEGA frameworks.
+> **🚫 NEVER use `npx omega ...` from the framework repo.** `npx omega` is for CONSUMER projects only (where the bin is linked in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call the local `bin/` directly. This applies to ALL four OMEGA frameworks.
 
 1. `npm install`
 2. `npm start` — watch + compile `src/` → `dist/` via prepare-package
-3. Test in the **designated test consumer** — `../powertools-browser-extension` is @omegajs/extension's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From inside it, run `npx mgr install dev` to swap @omegajs/extension to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omegajs/extension`). Reverse with `npx mgr install live`.
+3. Test in the **designated test consumer** — `../powertools-browser-extension` is @omega.js/extension's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From inside it, run `npx omega install dev` to swap @omega.js/extension to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/extension`). Reverse with `npx omega install live`.
 4. `npm test` — runs the framework's own suites
 
 ## Architecture
@@ -58,11 +58,11 @@ Each extension context has its own one-line bootstrap. Eight contexts total — 
 
 ```js
 // src/assets/js/components/popup/index.js
-import Manager from '@omegajs/extension/popup';
+import Manager from '@omega.js/extension/popup';
 await new Manager().initialize();
 
 // src/assets/js/components/background.js  (service worker)
-import Manager from '@omegajs/extension/background';
+import Manager from '@omega.js/extension/background';
 await new Manager().initialize();
 
 // Same shape for options / sidepanel / content / page / offscreen
@@ -71,7 +71,7 @@ await new Manager().initialize();
 After `initialize()`, the Manager exposes:
 - `manager.extension` — cross-browser `chrome.*` / `browser.*` / `window.*` API wrapper ([docs/extension.md](docs/extension.md))
 - `manager.logger` — timestamped per-context logger
-- `manager.webManager` — Web Manager singleton (Firebase, auth, analytics, reactive bindings)
+- `manager.omega` — Web Manager singleton (Firebase, auth, analytics, reactive bindings)
 - `manager.messenger` — `chrome.runtime.onMessage` listener wired automatically
 - `manager.isDevelopment() / isProduction() / isTesting() / getVersion()` — cross-context helpers ([docs/environment-detection.md](docs/environment-detection.md))
 
@@ -120,17 +120,17 @@ See [docs/build-system.md](docs/build-system.md).
 
 - `BXM_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
 - `BXM_IS_PUBLISH=true` — also publish to Chrome / Firefox / Edge stores after packaging
-- `BXM_TEST_MODE=true` — running inside @omegajs/extension's test framework. Powers `Manager.isTesting()`.
+- `BXM_TEST_MODE=true` — running inside @omega.js/extension's test framework. Powers `Manager.isTesting()`.
 - `BXM_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task
 - `BXM_LOG_FILE` — override the gulp stdout/stderr tee path, or `false` to disable it
 
 ### Themes
 
-Two themes ship with @omegajs/extension: `bootstrap` (pure Bootstrap 5.3+) and `classy` (Bootstrap + custom design system). Plus `_template/` for new themes. Activate via `config.theme.id`; appearance via `config.theme.appearance` ('dark' / 'light'). Variables overridable from consumer SCSS via `@use 'omega-extension' as * with ($primary: …)`. See [docs/themes.md](docs/themes.md).
+Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and `classy` (Bootstrap + custom design system). Plus `_template/` for new themes. Activate via `config.theme.id`; appearance via `config.theme.appearance` ('dark' / 'light'). Variables overridable from consumer SCSS via `@use 'omega-extension' as * with ($primary: …)`. See [docs/themes.md](docs/themes.md).
 
 ### Defaults system
 
-`src/defaults/` is the starter template — copied to consumer projects on `npx mgr setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. See [docs/defaults.md](docs/defaults.md).
+`src/defaults/` is the starter template — copied to consumer projects on `npx omega setup`. File behavior (overwrite/skip/template/rename) is controlled by `FILE_MAP` in [gulp/tasks/defaults.js](src/gulp/tasks/defaults.js). Most consumer files default to `overwrite: false` so user code is never clobbered. See [docs/defaults.md](docs/defaults.md).
 
 ### Auto-translation
 
@@ -158,8 +158,8 @@ The three environment checks are mutually exclusive. Gate side effects on the IN
 
 ### Test framework
 
-`npx mgr test` discovers + runs:
-- `<@omegajs/extension>/dist/test/suites/**/*.js` — framework defaults
+`npx omega test` discovers + runs:
+- `<@omega.js/extension>/dist/test/suites/**/*.js` — framework defaults
 - `<cwd>/test/**/*.js` — consumer suites
 
 Four layers:
@@ -168,9 +168,9 @@ Four layers:
 - **view** — Chromium tab loading harness `popup.html` / `options.html` / `sidepanel.html`. DOM bindings, Manager surface, popup ↔ background messaging.
 - **boot** — real headless Chromium loading the **consumer's** `packaged/<browser>/raw/` as an unpacked extension. End-to-end: does the real packaged extension boot?
 
-Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omegajs/desktop and @omegajs/backend. CSP-safe ([docs/test-framework.md](docs/test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
+Test files export `{ type, layer, description, tests, cleanup }` with `run` (build/background/view) or `inspect` (boot). Same `ctx.expect` / `state` / `skip` API as @omega.js/desktop and @omega.js/backend. CSP-safe ([docs/test-framework.md](docs/test-framework.md)) — test bodies are inlined as literal async-function expressions at runner build-time, not eval'd inside the SW.
 
-**NEVER mock — test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a `mockManager`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx mgr test --extended` or `TEST_EXTENDED_MODE=true`) — normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/test-framework.md](docs/test-framework.md).
+**NEVER mock — test against the real harness.** Every layer gives you the real runtime (real MV3 SW, real Chromium tab + DOM, real packaged extension), so never hand-roll a `mockManager`, fake `chrome`/`browser`, or stubbed context. Only pure functions (zero I/O) are called directly. Real external APIs (Firebase, etc.) are GATED behind extended mode (`npx omega test --extended` or `TEST_EXTENDED_MODE=true`) — normal mode skips them in-source via `ctx.skip(process.env.TEST_EXTENDED_MODE)`, NOT mocked; extended-mode tests must clean up anything they create externally. See [docs/test-framework.md](docs/test-framework.md).
 
 See [docs/test-framework.md](docs/test-framework.md) and [docs/test-boot-layer.md](docs/test-boot-layer.md).
 
@@ -180,7 +180,7 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 ## CLI
 
-`npx mgr <command>` (aliases `xm`, `ext`, `mgr`, `@omegajs/extension`):
+`npx omega <command>` (aliases `xm`, `ext`, `mgr`, `@omega.js/extension`):
 
 | Command | Description |
 |---|---|
@@ -194,21 +194,21 @@ See [docs/cli.md](docs/cli.md).
 
 ## Dependency Resolution
 
-- **Consumer code can `require()` any @omegajs/extension dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `@omegajs/client`, or any other @omegajs/extension transitive dep. If a dep doesn't resolve, the fix is in @omegajs/extension's webpack config — not the consumer's `package.json`.
-- **@omegajs/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `import webManager from '@omegajs/client'` → `webManager.auth()`, `webManager.firestore()`. Same rule in EM and UJM.
-- **`Manager.require(name)`** resolves from @omegajs/extension's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
+- **Consumer code can `require()` any @omega.js/extension dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `@omega.js/client`, or any other @omega.js/extension transitive dep. If a dep doesn't resolve, the fix is in @omega.js/extension's webpack config — not the consumer's `package.json`.
+- **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `import omega from '@omega.js/client'` → `omega.auth()`, `omega.firestore()`. Same rule in EM and UJM.
+- **`Manager.require(name)`** resolves from @omega.js/extension's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
 
 ## Development Workflow
 
-- **🚫 NEVER use `npx mgr ...` from the framework repo** — `npx mgr` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call `node bin/omega-extension` directly. This applies to ALL four OMEGA frameworks.
-- **🚫 NEVER run `npm start`** (consumer projects) — it's the user's long-running dev watcher. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `build.log`, `test.log`) — never tail/attach to the process. Running `npx mgr test` is fine.
-- **Where the output logs live:** the gulp pipeline tees all stdout/stderr to `<projectRoot>/logs/dev.log` (on `npm start`) or `logs/build.log` (on `npm run build`), truncated fresh each run, ANSI-stripped. `cat logs/dev.log` (or `grep` it) instead of scrolling scrollback. `npx mgr test` writes `logs/test.log`. See [docs/build-system.md](docs/build-system.md#log-files).
+- **🚫 NEVER use `npx omega ...` from the framework repo** — `npx omega` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call `node bin/omega-extension` directly. This applies to ALL four OMEGA frameworks.
+- **🚫 NEVER run `npm start`** (consumer projects) — it's the user's long-running dev watcher. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `build.log`, `test.log`) — never tail/attach to the process. Running `npx omega test` is fine.
+- **Where the output logs live:** the gulp pipeline tees all stdout/stderr to `<projectRoot>/logs/dev.log` (on `npm start`) or `logs/build.log` (on `npm run build`), truncated fresh each run, ANSI-stripped. `cat logs/dev.log` (or `grep` it) instead of scrolling scrollback. `npx omega test` writes `logs/test.log`. See [docs/build-system.md](docs/build-system.md#log-files).
 - **After editing files**, verify the gulp watcher recompiled successfully. Check for webpack/sass errors in the console output. A change that breaks the build is not a completed change.
 - **Live-test the extension via CDP.** Use the `chrome-devtools-extension` MCP upstream — it launches a per-session Chrome for Testing with the unpacked extension pre-loaded (`BXM_EXTENSION_PATH="$(pwd)/packaged/chromium/raw" claude`, then `router__enable_upstream`; stable Chrome ignores `--load-extension`). Plain web pages (no extension needed): the regular `chrome-devtools` MCP tools — your session auto-launches its own private Chrome on the first tool call. This is the primary way to confirm UI changes — type-checking and test suites verify code correctness, not feature correctness. See [docs/cdp-debugging.md](docs/cdp-debugging.md) + `~/.claude/mcp-server/servers/chrome-devtools-extension/CLAUDE.md`.
 
 ## Supply-Chain Security
 
-All `npm install` calls in CLI commands (`npx mgr i`, `npx mgr setup`) route through the `safeInstall()` helper (`src/lib/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm install`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
+All `npm install` calls in CLI commands (`npx omega i`, `npx omega setup`) route through the `safeInstall()` helper (`src/lib/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm install`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
 
 ## File Conventions
 
@@ -219,8 +219,8 @@ All `npm install` calls in CLI commands (`npx mgr i`, `npx mgr setup`) route thr
 - Prefer **`fs-jetpack`** over `fs-extra`.
 - **No backwards compatibility** unless explicitly requested.
 - **No paranoid `?.`** — see [the defensive-coding rule](https://anthropic.com/claude-code) (also enforced in `~/.claude/skills/js:patterns`). Framework internals deref directly; `?.` is for genuinely-uncertain values (user config sub-fields, `chrome.*` APIs that may be absent, regex matches, caught exceptions).
-- **Browser-context modules are ES-module.** Webpack compiles them. Don't try to `require()` them from Node — they reference `window`, `document`, `chrome` at module-load time. Build-layer tests should target `lib/*.js` (Node-safe) or use @omegajs/extension's public Manager API (`require('@omegajs/extension/build').getConfig()`).
-- **Consumer pattern: use the public Manager API in tests.** Don't `require('json5')` or other transitive @omegajs/extension deps directly from consumer test files — they're not in the consumer's `package.json` and resolution is fragile. Use `Manager.getConfig()` / `Manager.getManifest()` / `Manager.require('json5')`.
+- **Browser-context modules are ES-module.** Webpack compiles them. Don't try to `require()` them from Node — they reference `window`, `document`, `chrome` at module-load time. Build-layer tests should target `lib/*.js` (Node-safe) or use @omega.js/extension's public Manager API (`require('@omega.js/extension/build').getConfig()`).
+- **Consumer pattern: use the public Manager API in tests.** Don't `require('json5')` or other transitive @omega.js/extension deps directly from consumer test files — they're not in the consumer's `package.json` and resolution is fragile. Use `Manager.getConfig()` / `Manager.getManifest()` / `Manager.require('json5')`.
 
 ## Doc-update parity
 
@@ -233,7 +233,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — @omegajs/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omega.js/backend / @omega.js/extension / @omega.js/desktop / MAM — @omega.js/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 

@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Fixture: locked by default. @omegajs/backend routes use the Admin SDK (which bypasses
+    // Fixture: locked by default. @omega.js/backend routes use the Admin SDK (which bypasses
     // rules), so the boot smoke never needs permissive rules.
     match /{document=**} {
       allow read, write: if false;

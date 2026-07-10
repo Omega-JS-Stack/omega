@@ -1,6 +1,6 @@
 // Menu — file-based application menu definition.
 //
-// @omegajs/desktop looks for the consumer's `src/integrations/menu/index.js` and calls it with a builder API:
+// @omega.js/desktop looks for the consumer's `src/integrations/menu/index.js` and calls it with a builder API:
 //
 //   // src/integrations/menu/index.js
 //   module.exports = ({ manager, menu, defaults }) => {
@@ -163,7 +163,7 @@ const menu = {
 
   // Default template — platform-aware. macOS gets the standard app menu prepended.
   // Every item carries a stable path-id so consumers can target it. The set of items
-  // is informed by the legacy @omegajs/desktop template (preferences, relaunch,
+  // is informed by the legacy @omega.js/desktop template (preferences, relaunch,
   // dev tools nested under view/developer, top-level development menu).
   _defaultTemplate() {
     const m = menu._manager;
@@ -173,7 +173,7 @@ const menu = {
     const brandName    = m.config.brand.name;
     const isDev        = m.isDevelopment();
 
-    // @omegajs/desktop's built-in "Check for Updates..." item. Click defaults to invoking auto-updater
+    // @omega.js/desktop's built-in "Check for Updates..." item. Click defaults to invoking auto-updater
     // check; auto-updater hook updates label/enabled dynamically based on status.
     // ID is platform-dependent because the item lives under the App menu on macOS but the
     // Help menu on win/linux — same FUNCTION, different LOCATION → different id-path.
@@ -378,7 +378,7 @@ const menu = {
             id: 'development/test-error',
             label: 'Throw test error',
             click: () => {
-              setTimeout(() => { throw new Error('@omegajs/desktop test error (development menu)'); }, 0);
+              setTimeout(() => { throw new Error('@omega.js/desktop test error (development menu)'); }, 0);
             },
           },
         ],

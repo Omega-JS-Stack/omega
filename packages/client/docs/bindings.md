@@ -1,6 +1,6 @@
 # Bindings (`data-wm-bind`)
 
-The `data-wm-bind` attribute declaratively binds DOM elements to state data (auth, plan, roles, usage, custom state) managed by `webManager.bindings()`. **Always prefer wm-bindings over manual JS class toggling** for anything based on user/auth state — if an element's visibility or content depends on the user object, use `data-wm-bind` in HTML, not `classList.toggle('d-none', ...)` or `.hidden` from JS.
+The `data-wm-bind` attribute declaratively binds DOM elements to state data (auth, plan, roles, usage, custom state) managed by `omega.bindings()`. **Always prefer wm-bindings over manual JS class toggling** for anything based on user/auth state — if an element's visibility or content depends on the user object, use `data-wm-bind` in HTML, not `classList.toggle('d-none', ...)` or `.hidden` from JS.
 
 ## HTML Syntax
 
@@ -73,7 +73,7 @@ No logic operators (`&&`, `||`) in conditions — keep conditions simple. Right-
 
 ## Available State Paths
 
-### Auth paths (automatically populated by @omegajs/client)
+### Auth paths (automatically populated by @omega.js/client)
 
 ```
 auth.user                        # Firebase user object (truthy = signed in)
@@ -87,7 +87,7 @@ auth.account.roles.admin         # Boolean
 auth.account.roles.betaTester    # Boolean
 ```
 
-### Usage paths (auto-populated by @omegajs/client + authorized-fetch)
+### Usage paths (auto-populated by @omega.js/client + authorized-fetch)
 
 ```
 usage.{feature}.monthly              # Current monthly usage count
@@ -101,13 +101,13 @@ Seeded on auth settle from `account.usage` + the site's payment plan config. Ref
 
 ### Custom state (set via JS)
 
-Any custom paths set via `webManager.bindings().update(stateObject)`.
+Any custom paths set via `omega.bindings().update(stateObject)`.
 
 ## JavaScript API
 
 ```javascript
 // Update bindings with state data
-webManager.bindings().update({
+omega.bindings().update({
   checkout: {
     product: { name: 'Pro Plan' },
     error: { show: false, message: '' },
@@ -115,10 +115,10 @@ webManager.bindings().update({
 });
 
 // Get current binding context
-const context = webManager.bindings().getContext();
+const context = omega.bindings().getContext();
 
 // Clear all bindings
-webManager.bindings().clear();
+omega.bindings().clear();
 ```
 
 ## Skeleton Loaders
@@ -150,12 +150,12 @@ When bindings fire in phases, skeletons resolve independently per root key:
 
 ```javascript
 // Phase 1: Global auth bindings fire
-webManager.bindings().update({ auth: { user: {...} } });
+omega.bindings().update({ auth: { user: {...} } });
 // → Only elements bound to 'auth.*' resolve their skeletons
 // → Elements bound to 'checkout.*' keep their skeletons
 
 // Phase 2: After API fetches complete
-webManager.bindings().update({ checkout: { pricing: {...} } });
+omega.bindings().update({ checkout: { pricing: {...} } });
 // → Now elements bound to 'checkout.*' resolve their skeletons
 ```
 
@@ -177,7 +177,7 @@ For composite text (e.g., "$0.00 due today"), do NOT mix static text with a bind
 
 ```javascript
 // CORRECT: compose the text in JS, bind as single value
-webManager.bindings().update({
+omega.bindings().update({
   checkout: {
     totalDueText: `${formatCurrency(prices.total)} due today`,
   },
@@ -198,7 +198,7 @@ webManager.bindings().update({
 
 - Uses the `hidden` attribute for show/hide (`[hidden] { display: none !important; }`)
 - Queries `[data-wm-bind]` on each `update()` call — handles dynamic elements
-- Auth bindings are auto-populated when `webManager.auth().listen()` fires
+- Auth bindings are auto-populated when `omega.auth().listen()` fires
 - When `updatedKeys` is `null` (e.g., from `clear()`), ALL bindings fire
 
 ### Root Key Update Filtering
@@ -207,7 +207,7 @@ webManager.bindings().update({
 
 ```javascript
 // This update ONLY triggers bindings whose expression starts with 'checkout'
-webManager.bindings().update({
+omega.bindings().update({
   checkout: { pricing: { total: 9.99 } },
 });
 // Fires: @text checkout.pricing.total, @show checkout.active

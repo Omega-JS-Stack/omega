@@ -35,7 +35,7 @@ const PNG_WIDTH = 800; // 2x display width of 400px container
  * @param {object} args.brand - { name, color: { primary, secondary, ... } }
  * @param {object} args.newsletterConfig - marketing.newsletter.content
  * @param {object} args.ai - AI instance
- * @param {object} args.assistant - @omegajs/backend assistant
+ * @param {object} args.assistant - @omega.js/backend assistant
  * @returns {Promise<{svg: string, png: Buffer, fallback: boolean}>}
  */
 async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, assistant }) {

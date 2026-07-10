@@ -24,7 +24,7 @@ const { TARGET_FRAMEWORKS } = require('../../../config.js');
 const MAX_RETRIES = 3;
 const MAX_FILES_SHOWN = 10;
 
-// Mirrors @omegajs/backend: getApiUrl() serves from the `api.` subdomain and
+// Mirrors @omega.js/backend: getApiUrl() serves from the `api.` subdomain and
 // mounts its routes under /backend-manager (packages/backend route prefix)
 const API_SUBDOMAIN = 'api';
 const API_HEALTH_PATH = '/backend-manager/test/health';

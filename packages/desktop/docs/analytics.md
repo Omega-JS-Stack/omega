@@ -1,6 +1,6 @@
 # Analytics
 
-GA4 Measurement Protocol with cross-platform identity. The same human gets unified events across desktop (@omegajs/desktop), web (UJM/@omegajs/client), and backend (@omegajs/backend) — provided all four reference the same Firebase project ID.
+GA4 Measurement Protocol with cross-platform identity. The same human gets unified events across desktop (@omega.js/desktop), web (UJM/@omega.js/client), and backend (@omega.js/backend) — provided all four reference the same Firebase project ID.
 
 ## How identity works
 
@@ -9,11 +9,11 @@ Every event ships with two GA4 fields:
 - **`client_id`** — uniquely identifies a *device install*. Stable per-install, anonymous.
 - **`user_id`** — uniquely identifies a *human*. Set when the user is signed in via Firebase Auth.
 
-@omegajs/desktop derives both via `uuidv5(input, namespace)` where:
+@omega.js/desktop derives both via `uuidv5(input, namespace)` where:
 
-- `namespace = uuidv5(firebaseConfig.projectId, uuidv5.URL)` — same projectId in @omegajs/backend/UJM/@omegajs/client → same namespace everywhere.
+- `namespace = uuidv5(firebaseConfig.projectId, uuidv5.URL)` — same projectId in @omega.js/backend/UJM/@omega.js/client → same namespace everywhere.
 - `client_id = uuidv5(deviceId, namespace)` — `deviceId` is the first non-internal MAC from `os.networkInterfaces()`, falling back to a persisted `crypto.randomUUID()`.
-- `user_id = uuidv5(firebaseUid, namespace)` — set automatically when `webManager.onAuthChange` fires with a uid; cleared on logout.
+- `user_id = uuidv5(firebaseUid, namespace)` — set automatically when `omega.onAuthChange` fires with a uid; cleared on logout.
 
 Why this matters: the same Firebase user signing into the desktop app, the web app, and triggering backend events produces **identical `user_id` values** in every Measurement Protocol call. GA4 stitches the events into one user journey across all surfaces.
 
@@ -30,7 +30,7 @@ analytics: {
 }
 ```
 
-The API secret is read from `process.env.GOOGLE_ANALYTICS_SECRET` — never committed. Mirrors @omegajs/backend's convention.
+The API secret is read from `process.env.GOOGLE_ANALYTICS_SECRET` — never committed. Mirrors @omega.js/backend's convention.
 
 ### Local dev
 
@@ -72,8 +72,8 @@ The renderer surface is fire-and-forget IPC (`ipcRenderer.send`) for events; onl
 | Event | When | Notes |
 |---|---|---|
 | `app_launch` | At end of `analytics.initialize()` (main process) | Fires once per launch |
-| `login` | On `webManager.onAuthChange({uid: ...})` transition from null → uid | `params.method = providerId` |
-| `logout` | On `webManager.onAuthChange({uid: null})` after a previous uid | — |
+| `login` | On `omega.onAuthChange({uid: ...})` transition from null → uid | `params.method = providerId` |
+| `logout` | On `omega.onAuthChange({uid: null})` after a previous uid | — |
 
 ## Queueing
 
@@ -91,7 +91,7 @@ In all three cases, `event()` is a silent no-op (no throws, no warns past init).
 
 ## Event-name normalization
 
-GA4 enforces `[A-Za-z0-9_]` only, max 40 chars, no leading/trailing underscores. @omegajs/desktop normalizes:
+GA4 enforces `[A-Za-z0-9_]` only, max 40 chars, no leading/trailing underscores. @omega.js/desktop normalizes:
 
 - `'Hello World!'` → `'Hello_World'`
 - `'__trim__'` → `'trim'`

@@ -15,6 +15,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Security` in case of vulnerabilities.
 
 ---
+## [2.1.0] - 2026-07-10
+
+- Added
+  - `omega` and `omg` bins — the context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest app's framework (walking up from cwd, incl. a backend's `functions/`) runs, so the arbitrary bin hoist-winner in a brand monorepo is always correct; no app context falls back to this framework's CLI (bootstrap case). `mgr` now dispatches the same way; `omega-desktop` runs this CLI directly. New `./cli` export exposes `run()` for cross-framework dispatch.
+- Changed
+  - Package renamed `@omegajs/desktop` → `@omega.js/desktop` (npm scope `omega.js`; nothing was ever published under `@omegajs`). Docs now say `npx omega …`.
+  - Renderer global renamed: `self.webManager` → `self.omega` (the `@omega.js/client` singleton).
+
+---
 ## [2.0.2] - 2026-07-10
 
 - Fixed

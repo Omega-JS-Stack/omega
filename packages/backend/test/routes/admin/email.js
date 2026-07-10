@@ -67,13 +67,13 @@ module.exports = {
 
       async run({ http, assert, config }) {
         const response = await http.post('backend-manager/admin/email', {
-          subject: '@omegajs/backend Test Email - Status Sent',
+          subject: '@omega.js/backend Test Email - Status Sent',
           to: [{ email: `_test-receiver@${config.domain}`, name: 'Test Receiver' }],
           copy: false,
           data: {
             email: {
-              subject: '@omegajs/backend Test Email - Status Sent',
-              body: 'This is a test email from @omegajs/backend tests (status: sent).',
+              subject: '@omega.js/backend Test Email - Status Sent',
+              body: 'This is a test email from @omega.js/backend tests (status: sent).',
             },
           },
         });
@@ -93,13 +93,13 @@ module.exports = {
         const sendAt = Math.floor(Date.now() / 1000) + (72 * 60 * 60);
 
         const response = await http.post('backend-manager/admin/email', {
-          subject: '@omegajs/backend Test Email - Status Queued',
+          subject: '@omega.js/backend Test Email - Status Queued',
           to: [{ email: `_test-receiver@${config.domain}`, name: 'Test Receiver' }],
           copy: false,
           sendAt: sendAt,
           data: {
             email: {
-              subject: '@omegajs/backend Test Email - Status Queued',
+              subject: '@omega.js/backend Test Email - Status Queued',
               body: 'This is a test email scheduled for later (status: queued).',
             },
           },

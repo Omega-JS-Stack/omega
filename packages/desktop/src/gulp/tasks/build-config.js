@@ -1,10 +1,10 @@
-// Generate dist/electron-builder.yml entirely from @omegajs/desktop defaults + the consumer's
+// Generate dist/electron-builder.yml entirely from @omega.js/desktop defaults + the consumer's
 // config/omega.json5. The consumer NEVER ships an electron-builder.yml.
 //
 // Why:
 //   - Single source of truth: consumer config (omega.json5) drives everything.
 //   - Stops consumers from drifting into electron-builder-config-fork-of-our-defaults hell.
-//   - Lets @omegajs/desktop evolve packaging defaults centrally (e.g. switch from NSIS to MSIX someday)
+//   - Lets @omega.js/desktop evolve packaging defaults centrally (e.g. switch from NSIS to MSIX someday)
 //     without per-consumer migrations.
 //
 // Consumer overrides:
@@ -32,7 +32,7 @@ module.exports = function buildConfig(done) {
 
     // 1. Generate entitlements.mac.plist into dist/config/. Consumer overrides live at
     // `platforms.mac.entitlements` (an object map of plist key → value, with `null` to
-    // remove an @omegajs/desktop default). Top-level `entitlements.mac` is no longer read.
+    // remove an @omega.js/desktop default). Top-level `entitlements.mac` is no longer read.
     const entitlementsPath = writeMacEntitlements(distRoot, config.platforms?.mac?.entitlements);
     logger.log(`wrote ${entitlementsPath}`);
 
@@ -41,7 +41,7 @@ module.exports = function buildConfig(done) {
     const icons = await resolveAndCopy({ config, projectRoot, distRoot, emDefaultsRoot });
     logger.log(`resolved icons: mac=${Object.keys(icons.macos).length}, win=${Object.keys(icons.windows).length}, linux=${Object.keys(icons.linux).length}`);
 
-    // Build the full config object from @omegajs/desktop defaults + consumer overrides.
+    // Build the full config object from @omega.js/desktop defaults + consumer overrides.
     let builderConfig = baseConfig(config, { entitlementsPath, icons, distRoot, projectRoot });
 
     // Mode-dependent injections. LSUIElement=true in Info.plist → on macOS the
@@ -84,8 +84,8 @@ module.exports = function buildConfig(done) {
       }
     }
 
-    // Inject afterSign → @omegajs/desktop's built-in notarize hook.
-    builderConfig.afterSign = require.resolve('@omegajs/desktop/hooks/notarize');
+    // Inject afterSign → @omega.js/desktop's built-in notarize hook.
+    builderConfig.afterSign = require.resolve('@omega.js/desktop/hooks/notarize');
     logger.log(`afterSign → ${builderConfig.afterSign}`);
 
     // Apply consumer overrides last so they win.
@@ -102,7 +102,7 @@ module.exports = function buildConfig(done) {
 };
 
 // Generic-category → per-platform mapping. Consumer sets `app.category` to one of these
-// keys; @omegajs/desktop emits the corresponding mac UTI string and Linux freedesktop category.
+// keys; @omega.js/desktop emits the corresponding mac UTI string and Linux freedesktop category.
 //
 // macOS: https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html#//apple_ref/doc/uid/TP40009250-SW8
 // Linux: https://specifications.freedesktop.org/menu-spec/latest/apa.html
@@ -127,9 +127,9 @@ function expandYear(str) {
   return str.replace(/\{YEAR\}/g, String(new Date().getFullYear()));
 }
 
-// @omegajs/desktop's canonical electron-builder config. Driven by the consumer's omega.json5
+// @omega.js/desktop's canonical electron-builder config. Driven by the consumer's omega.json5
 // where it makes sense (appId, productName, copyright, category, languages, platform archs,
-// installer flags); everything else (target list, file globs, signing) is @omegajs/desktop's opinionated
+// installer flags); everything else (target list, file globs, signing) is @omega.js/desktop's opinionated
 // default.
 //
 // Optional `extras` argument carries resolved icon paths + entitlements path from the

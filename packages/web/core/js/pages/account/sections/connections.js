@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let oauth2Config = null;
 let accountData = null;
@@ -16,7 +16,7 @@ const supportedProviders = ['google', 'discord', 'github', 'twitter', 'facebook'
 
 // Get API URL helper
 function getApiUrl() {
-  return `${webManager.getApiUrl()}/backend-manager/user/oauth2`;
+  return `${omega.getApiUrl()}/backend-manager/user/oauth2`;
 }
 
 // Initialize connections section
@@ -113,8 +113,8 @@ function displayConnections() {
             &#9888;
           </div>
           <div>
-            <h6 class="mb-0">${webManager.utilities().escapeHTML(providerName)}</h6>
-            <small class="text-warning d-block">Unsupported connection: "${webManager.utilities().escapeHTML(providerId)}". Update Ultimate Jekyll Manager to enable this provider.</small>
+            <h6 class="mb-0">${omega.utilities().escapeHTML(providerName)}</h6>
+            <small class="text-warning d-block">Unsupported connection: "${omega.utilities().escapeHTML(providerId)}". Update Ultimate Jekyll Manager to enable this provider.</small>
           </div>
         </div>
         <div class="text-start text-sm-end flex-shrink-0">

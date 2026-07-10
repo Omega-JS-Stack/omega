@@ -11,7 +11,7 @@
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { scaffoldDefaults, NODE_VERSION } = require('../scaffold.js');
 
 const logger = new Logger('omega:setup');

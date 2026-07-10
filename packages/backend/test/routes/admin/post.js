@@ -21,14 +21,14 @@ function generatePostContent(body) {
   const frontmatter = `layout: blueprint/blog/post
 
 meta:
-  title: @omegajs/backend Test Post
-  description: This is a test post created by @omegajs/backend test suite.
+  title: @omega.js/backend Test Post
+  description: This is a test post created by @omega.js/backend test suite.
   og:image: ''
 
 post:
-  title: @omegajs/backend Test Post
+  title: @omega.js/backend Test Post
   id: ${TEST_POST_ID}
-  description: This is a test post created by @omegajs/backend test suite.
+  description: This is a test post created by @omega.js/backend test suite.
   author: guest
   tags: []
   categories: []`;
@@ -82,7 +82,7 @@ module.exports = {
       async run({ http, assert, config }) {
         const response = await http.put('backend-manager/admin/post', {
           url: `https://${config.domain}/blog/nonexistent-test-post-12345`,
-          body: 'This is test content from @omegajs/backend test suite.',
+          body: 'This is test content from @omega.js/backend test suite.',
         });
 
         assert.isError(response, 404, 'Non-existent post should return 404');
@@ -141,7 +141,7 @@ module.exports = {
         state.postSlug = TEST_POST_SLUG;
 
         // Create the post content
-        const originalBody = 'This is the original content of the test post.\n\nIt will be edited by the @omegajs/backend test suite.';
+        const originalBody = 'This is the original content of the test post.\n\nIt will be edited by the @omega.js/backend test suite.';
         state.originalBody = originalBody;
         const content = generatePostContent(originalBody);
 
@@ -163,7 +163,7 @@ module.exports = {
           owner: state.owner,
           repo: state.repo,
           path: state.postPath,
-          message: `🧪 @omegajs/backend test: create test post for edit-post test`,
+          message: `🧪 @omega.js/backend test: create test post for edit-post test`,
           content: Buffer.from(content).toString('base64'),
           sha: existingSha, // Include SHA if file exists
         }).catch(e => e);
@@ -220,7 +220,7 @@ module.exports = {
           return; // Previous tests didn't run
         }
 
-        const newBody = 'This content was EDITED by the @omegajs/backend test suite.\n\nThe edit was successful!';
+        const newBody = 'This content was EDITED by the @omega.js/backend test suite.\n\nThe edit was successful!';
         state.editedBody = newBody;
 
         const response = await http.put('backend-manager/admin/post', {
@@ -267,11 +267,11 @@ module.exports = {
 
           const decoded = Buffer.from(fileData.content, 'base64').toString();
 
-          return decoded.includes('EDITED by the @omegajs/backend test suite') ? decoded : false;
+          return decoded.includes('EDITED by the @omega.js/backend test suite') ? decoded : false;
         }, 60000, 3000);
 
         assert.ok(
-          content.includes('EDITED by the @omegajs/backend test suite'),
+          content.includes('EDITED by the @omega.js/backend test suite'),
           'Post content should contain the edited text'
         );
       },
@@ -334,7 +334,7 @@ module.exports = {
             owner: state.owner,
             repo: state.repo,
             path: state.postPath,
-            message: `🧹 @omegajs/backend test cleanup: delete test post`,
+            message: `🧹 @omega.js/backend test cleanup: delete test post`,
             sha: fileData.sha,
           });
         } catch (e) {
@@ -351,7 +351,7 @@ module.exports = {
           });
 
           for (const run of runs.workflow_runs) {
-            if (run.head_commit?.message?.includes('@omegajs/backend test')) {
+            if (run.head_commit?.message?.includes('@omega.js/backend test')) {
               try {
                 await octokit.rest.actions.cancelWorkflowRun({
                   owner: state.owner,

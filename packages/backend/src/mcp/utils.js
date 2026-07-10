@@ -55,18 +55,18 @@ function loadConsumerTools(cwd) {
     const consumerTools = require(mcpPath);
 
     if (!Array.isArray(consumerTools)) {
-      console.error(`[@omegajs/backend MCP] Consumer mcp.js must export an array, got ${typeof consumerTools}`);
+      console.error(`[@omega.js/backend MCP] Consumer mcp.js must export an array, got ${typeof consumerTools}`);
       return [];
     }
 
     for (const tool of consumerTools) {
       if (!tool.name || !tool.description) {
-        console.error(`[@omegajs/backend MCP] Consumer tool missing name or description:`, tool);
+        console.error(`[@omega.js/backend MCP] Consumer tool missing name or description:`, tool);
         return [];
       }
 
       if (!tool.path && !tool.handler) {
-        console.error(`[@omegajs/backend MCP] Consumer tool "${tool.name}" must have a path or handler`);
+        console.error(`[@omega.js/backend MCP] Consumer tool "${tool.name}" must have a path or handler`);
         return [];
       }
 
@@ -76,7 +76,7 @@ function loadConsumerTools(cwd) {
 
     return consumerTools;
   } catch (error) {
-    console.error(`[@omegajs/backend MCP] Failed to load consumer tools from ${mcpPath}:`, error.message);
+    console.error(`[@omega.js/backend MCP] Failed to load consumer tools from ${mcpPath}:`, error.message);
     return [];
   }
 }

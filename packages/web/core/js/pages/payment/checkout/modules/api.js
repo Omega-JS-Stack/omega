@@ -2,12 +2,12 @@
 import fetch from 'wonderful-fetch';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getRecaptchaToken } from './recaptcha.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Check trial eligibility via backend endpoint
 export async function fetchTrialEligibility() {
   try {
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/payments/trial-eligibility`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/trial-eligibility`, {
       method: 'GET',
       response: 'json',
     });
@@ -22,7 +22,7 @@ export async function fetchTrialEligibility() {
 
 // Validate a discount code via backend
 export async function validateDiscountCode(code) {
-  const response = await fetch(`${webManager.getApiUrl()}/backend-manager/payments/discount`, {
+  const response = await fetch(`${omega.getApiUrl()}/backend-manager/payments/discount`, {
     response: 'json',
     query: { code },
   });
@@ -32,7 +32,7 @@ export async function validateDiscountCode(code) {
 
 // Fire-and-forget server warmup
 export function warmupServer() {
-  fetch(`${webManager.getApiUrl()}/backend-manager/payments/intent`, {
+  fetch(`${omega.getApiUrl()}/backend-manager/payments/intent`, {
     method: 'GET',
     query: { wakeup: 'true' },
   }).catch(() => {});
@@ -57,7 +57,7 @@ export async function createPaymentIntent({ state, processor, formData }) {
     productId: state.product.id,
     frequency: state.frequency,
     trial: state.trialEligible,
-    attribution: webManager.storage().get('attribution', {}),
+    attribution: omega.storage().get('attribution', {}),
     verification: {
       'g-recaptcha-response': recaptchaToken || '',
     },
@@ -75,7 +75,7 @@ export async function createPaymentIntent({ state, processor, formData }) {
   console.log('Sending payment intent:', { processor, productId: state.product.id, payload });
 
   // POST to backend (authorized — attaches Firebase ID token)
-  const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/payments/intent`, {
+  const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/intent`, {
     method: 'POST',
     response: 'json',
     tries: 1,

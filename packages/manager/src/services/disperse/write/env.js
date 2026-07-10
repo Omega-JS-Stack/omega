@@ -18,7 +18,7 @@
  *
  * Write semantics honor the frameworks' .env merge convention: keys already
  * in the file are updated in place wherever they live; new keys land in the
- * "Default Values" section (npx mgr push-secrets only pushes that section);
+ * "Default Values" section (npx omega push-secrets only pushes that section);
  * everything else — comments, blanks, the Custom section — is preserved
  * verbatim. A missing .env is created with the two section markers. Values
  * normalize to double-quoted form with newlines escaped as \n (dotenv
@@ -179,7 +179,7 @@ function updateEnvContent(content, updates) {
 function freshEnvContent(updates) {
   return [
     DEFAULT_MARKER,
-    '# Composed by the disperse service — `npx mgr setup` expands this to the full template.',
+    '# Composed by the disperse service — `npx omega setup` expands this to the full template.',
     '',
     ...Object.entries(updates).map(([key, value]) => envLine(key, value)),
     '',

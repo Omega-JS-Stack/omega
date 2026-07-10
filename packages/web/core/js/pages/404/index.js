@@ -1,12 +1,12 @@
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    // Set webManager
+    // Set omega
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupPage();
 
@@ -44,5 +44,5 @@ function setupPage() {
   }
 
   // Report to Sentry
-  webManager.sentry().captureException(new Error(`404 at ${window.location.href}`));
+  omega.sentry().captureException(new Error(`404 at ${window.location.href}`));
 }

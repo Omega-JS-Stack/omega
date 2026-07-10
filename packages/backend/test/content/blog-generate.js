@@ -13,8 +13,8 @@
  *    admin/post. Same code path the daily cron uses. Costs money (AI tokens).
  *
  * Run from any consumer project's functions/ directory:
- *   npx mgr test mgr:content/blog-generate                   # config check (fast, free)
- *   TEST_EXTENDED_MODE=1  npx mgr test mgr:content/blog-generate  # full AI pipeline
+ *   npx omega test mgr:content/blog-generate                   # config check (fast, free)
+ *   TEST_EXTENDED_MODE=1  npx omega test mgr:content/blog-generate  # full AI pipeline
  *
  * --- Env vars (AI mode only, require TEST_EXTENDED_MODE=1) ---
  *   BLOG_SOURCE=<type>        Override the source type for this run.

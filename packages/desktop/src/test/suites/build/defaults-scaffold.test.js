@@ -1,5 +1,5 @@
 // Build-layer tests for the setup defaults scaffold — copyDefaults now runs through
-// the shared devkit defaults engine; these tests run the REAL copyDefaults (@omegajs/desktop's
+// the shared devkit defaults engine; these tests run the REAL copyDefaults (@omega.js/desktop's
 // actual file map) into a temp consumer dir and verify the wiring: `_.` renames,
 // `_mas/` archive skip, workflow templating, preserve-if-exists, marker merges,
 // and idempotency.
@@ -34,7 +34,7 @@ module.exports = {
         // `_`-prefixed FILENAMES are not archives — test/_init.js ships.
         ctx.expect(jetpack.exists(path.join(tmp, 'test', '_init.js'))).toBeTruthy();
 
-        // Workflow rendered with @omegajs/desktop's engines.node; GitHub's `${{ }}` tokens survive.
+        // Workflow rendered with @omega.js/desktop's engines.node; GitHub's `${{ }}` tokens survive.
         const workflow = jetpack.read(path.join(tmp, '.github', 'workflows', 'build.yml'));
         ctx.expect(workflow).toContain(String(package.engines.node));
         ctx.expect(workflow.includes('{{ versions')).toBe(false);
@@ -63,7 +63,7 @@ module.exports = {
         const env = jetpack.read(path.join(tmp, '.env'));
         const customPart = env.slice(env.indexOf(CUSTOM_MARKER));
         ctx.expect(customPart).toContain('CUSTOM_KEY="kept"');
-        // Not in @omegajs/desktop's defaults → migrated below the Custom marker.
+        // Not in @omega.js/desktop's defaults → migrated below the Custom marker.
         ctx.expect(customPart).toContain('USER_ADDED_KEY="mine"');
       },
     },

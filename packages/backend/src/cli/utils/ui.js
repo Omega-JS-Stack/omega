@@ -1,9 +1,9 @@
 const chalk = require('chalk').default;
 
 /**
- * Shared CLI styling helpers — the SSOT for @omegajs/backend's console output look.
+ * Shared CLI styling helpers — the SSOT for @omega.js/backend's console output look.
  *
- * Mirrors the OMEGA Manager (omega-manager) styling conventions so every @omegajs/backend
+ * Mirrors the OMEGA Manager (omega-manager) styling conventions so every @omega.js/backend
  * command renders with the same dividers, indentation, timestamps, colors, and
  * status symbols. Pull these helpers into any command (setup/serve/deploy/test/
  * emulator/...) instead of hand-rolling chalk + console.log.
@@ -20,7 +20,7 @@ const chalk = require('chalk').default;
 const RULE_WIDTH = 70;
 const RULE_CHAR = '━';
 
-// Status symbols — the single source of truth for @omegajs/backend's CLI iconography.
+// Status symbols — the single source of truth for @omega.js/backend's CLI iconography.
 const SYMBOLS = {
   running: '→',
   pass: '✓',

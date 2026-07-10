@@ -1,6 +1,6 @@
 # CLI Output Styling (`src/cli/utils/ui.js`)
 
-@omegajs/backend's CLI shares a single styling module so every command renders with the same
+@omega.js/backend's CLI shares a single styling module so every command renders with the same
 look as the **OMEGA Manager** (`omega-manager`): `🚀` banner, 70-char `━`
 dividers, indented tree output, dimmed labels, timestamps, and a consistent set
 of status symbols. This is the **SSOT for console output** — commands should pull
@@ -75,7 +75,7 @@ const summary = new ui.Summary().start();
 summary.pass();                        // record a pass
 summary.warn('check name', detailsArr);// record a warning (non-blocking)
 summary.fail('check name', detailsArr);// record a fail with pre-formatted detail lines
-summary.print({ hint: 'Fix the above, then run npx mgr setup again.' });
+summary.print({ hint: 'Fix the above, then run npx omega setup again.' });
 ```
 
 Results line: `36 passed, 1 warned, 0 failed` (the warned segment only appears

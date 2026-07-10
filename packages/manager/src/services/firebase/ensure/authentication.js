@@ -17,7 +17,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
+const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
 
 module.exports = async function ensureAuthentication(context) {
   const { firebaseApi: api, brandRoot, projectId, domain, serviceData = {}, options = {} } = context;

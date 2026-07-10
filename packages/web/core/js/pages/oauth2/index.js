@@ -1,15 +1,15 @@
 // Libraries
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     // Wait for auth state before handling callback
     // Required because authorizedFetch needs auth.currentUser
-    webManager.auth().listen({ once: true }, () => {
+    omega.auth().listen({ once: true }, () => {
       handleOAuthCallback();
     });
 
@@ -44,8 +44,8 @@ async function handleOAuthCallback() {
     // Update provider display (we can't read encrypted state, so use generic text)
     $provider.textContent = 'Provider';
 
-    // Build API URL using webManager (no need to read from state)
-    const apiUrl = `${webManager.getApiUrl()}/backend-manager/user/oauth2`;
+    // Build API URL using omega (no need to read from state)
+    const apiUrl = `${omega.getApiUrl()}/backend-manager/user/oauth2`;
 
     // Send tokenize request with encrypted state
     // Note: tries=1 because auth codes can only be used once

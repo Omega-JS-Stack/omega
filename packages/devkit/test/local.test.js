@@ -70,7 +70,7 @@ test('resolveMonorepoRoot throws on an invalid OMEGA_MONOREPO', () => {
 // ---- packageDir
 
 test('packageDir maps a scoped name to its packages/ directory', () => {
-  assert.equal(local.packageDir('/repo', '@omegajs/client'), path.join('/repo', 'packages', 'client'));
+  assert.equal(local.packageDir('/repo', '@omega.js/client'), path.join('/repo', 'packages', 'client'));
 });
 
 // ---- findBrandRoot / discoverApps
@@ -108,19 +108,19 @@ test('discoverApps on a standalone app returns just the app', () => {
 test('frameworkPackagesOf finds deps and devDeps with placement flags', () => {
   const site = path.join(FIXTURES, 'brand', 'apps', 'site');
   assert.deepEqual(local.frameworkPackagesOf(site), [
-    { name: '@omegajs/client', spec: '^5.0.0', dev: false, dir: site },
-    { name: '@omegajs/web', spec: '^0.2.0', dev: true, dir: site },
+    { name: '@omega.js/client', spec: '^5.0.0', dev: false, dir: site },
+    { name: '@omega.js/web', spec: '^0.2.0', dev: true, dir: site },
   ]);
 });
 
 test('frameworkPackagesOf reaches into functions/ for backend apps', () => {
   const backendApp = path.join(FIXTURES, 'brand', 'apps', 'backend-app');
   assert.deepEqual(local.frameworkPackagesOf(backendApp), [
-    { name: '@omegajs/backend', spec: '^6.0.0', dev: false, dir: path.join(backendApp, 'functions') },
+    { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: path.join(backendApp, 'functions') },
   ]);
 });
 
-test('frameworkPackagesOf is empty for a package with no @omegajs deps', () => {
+test('frameworkPackagesOf is empty for a package with no @omega.js deps', () => {
   assert.deepEqual(local.frameworkPackagesOf(path.join(FIXTURES, 'brand')), []);
 });
 
@@ -132,8 +132,8 @@ test('linkLocalPackages plans link for unlinked deps and missing for absent pack
   assert.deepEqual(
     actions.map(({ name, action }) => ({ name, action })),
     [
-      { name: '@omegajs/client', action: 'link' }, // fake monorepo has packages/client
-      { name: '@omegajs/web', action: 'missing' }, // ...but no packages/web
+      { name: '@omega.js/client', action: 'link' }, // fake monorepo has packages/client
+      { name: '@omega.js/web', action: 'missing' }, // ...but no packages/web
     ]
   );
 });
@@ -143,14 +143,14 @@ test('linkLocalPackages skips deps already resolving to the monorepo copy', asyn
   try {
     fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
       name: 'scratch-app',
-      dependencies: { '@omegajs/client': '^5.0.0' },
+      dependencies: { '@omega.js/client': '^5.0.0' },
     }));
-    fs.mkdirSync(path.join(scratch, 'node_modules', '@omegajs'), { recursive: true });
-    fs.symlinkSync(path.join(FAKE_MONOREPO, 'packages', 'client'), path.join(scratch, 'node_modules', '@omegajs', 'client'));
+    fs.mkdirSync(path.join(scratch, 'node_modules', '@omega.js'), { recursive: true });
+    fs.symlinkSync(path.join(FAKE_MONOREPO, 'packages', 'client'), path.join(scratch, 'node_modules', '@omega.js', 'client'));
 
     const actions = await local.linkLocalPackages({ dir: scratch, monorepoRoot: FAKE_MONOREPO, dryRun: true });
     assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
-      { name: '@omegajs/client', action: 'skip' },
+      { name: '@omega.js/client', action: 'skip' },
     ]);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });

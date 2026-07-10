@@ -8,7 +8,7 @@ import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { Chart, DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Register Chart.js components
 Chart.register(DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -20,9 +20,9 @@ let frequencyChart = null;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
-    webManager.auth().listen({ once: true }, async (state) => {
+    omega.auth().listen({ once: true }, async (state) => {
       if (!state.user) {
         return;
       }
@@ -56,7 +56,7 @@ async function loadDashboard() {
 // ============================================
 async function loadStatCards() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = webManager.firebaseFirestore;
+  const db = omega.firebaseFirestore;
   const now = Math.floor(Date.now() / 1000);
   const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
 
@@ -78,9 +78,9 @@ async function loadStatCards() {
 // ============================================
 async function loadSubscriberData() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = webManager.firebaseFirestore;
+  const db = omega.firebaseFirestore;
 
-  // Get product list from _config.yml (available instantly via webManager.config)
+  // Get product list from _config.yml (available instantly via omega.config)
   const products = getProducts().filter((p) => p.id !== 'basic');
   const frequencyIds = [...new Set(products.flatMap((p) => Object.keys(p.prices || {})))];
 
@@ -295,7 +295,7 @@ async function loadRecentUsers() {
   const $table = document.getElementById('recent-users-table');
   const $tbody = document.getElementById('recent-users-tbody');
 
-  const firestore = webManager.firestore();
+  const firestore = omega.firestore();
   const snapshot = await firestore.collection('users')
     .orderBy('metadata.created.timestampUNIX', 'desc')
     .limit(10)
@@ -325,9 +325,9 @@ async function loadRecentUsers() {
 
     const $row = document.createElement('tr');
     $row.innerHTML = `
-      <td class="text-truncate" style="max-width: 200px;">${webManager.utilities().escapeHTML(email)}</td>
-      <td><span class="badge bg-body-secondary text-body">${webManager.utilities().escapeHTML(capitalize(plan))}</span></td>
-      <td class="text-muted small">${webManager.utilities().escapeHTML(timeAgo)}</td>
+      <td class="text-truncate" style="max-width: 200px;">${omega.utilities().escapeHTML(email)}</td>
+      <td><span class="badge bg-body-secondary text-body">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
+      <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);
   });
@@ -342,7 +342,7 @@ async function loadRecentOrders() {
   const $table = document.getElementById('recent-orders-table');
   const $tbody = document.getElementById('recent-orders-tbody');
 
-  const firestore = webManager.firestore();
+  const firestore = omega.firestore();
   const snapshot = await firestore.collection('payments-orders')
     .orderBy('metadata.created.timestampUNIX', 'desc')
     .limit(10)
@@ -373,10 +373,10 @@ async function loadRecentOrders() {
 
     const $row = document.createElement('tr');
     $row.innerHTML = `
-      <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${webManager.utilities().escapeHTML(orderId)}">${webManager.utilities().escapeHTML(orderId)}</td>
-      <td><span class="badge bg-body-secondary text-body">${webManager.utilities().escapeHTML(capitalize(product))}</span></td>
-      <td class="small">${webManager.utilities().escapeHTML(capitalize(processor))}</td>
-      <td class="text-muted small">${webManager.utilities().escapeHTML(timeAgo)}</td>
+      <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${omega.utilities().escapeHTML(orderId)}">${omega.utilities().escapeHTML(orderId)}</td>
+      <td><span class="badge bg-body-secondary text-body">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
+      <td class="small">${omega.utilities().escapeHTML(capitalize(processor))}</td>
+      <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);
   });
@@ -406,7 +406,7 @@ async function runCron($btn) {
   if ($text) $text.textContent = 'Running...';
 
   try {
-    await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/admin/cron`, {
+    await authorizedFetch(`${omega.getApiUrl()}/backend-manager/admin/cron`, {
       method: 'POST',
       timeout: 5 * 60 * 1000,
       response: 'text',
@@ -417,13 +417,13 @@ async function runCron($btn) {
 
     if ($result) {
       $result.classList.remove('d-none');
-      $result.innerHTML = `<div class="alert alert-success small mb-0 py-2">Cron <strong>${webManager.utilities().escapeHTML(cronId)}</strong> completed successfully</div>`;
+      $result.innerHTML = `<div class="alert alert-success small mb-0 py-2">Cron <strong>${omega.utilities().escapeHTML(cronId)}</strong> completed successfully</div>`;
     }
   } catch (error) {
     console.error(`Cron ${cronId} failed:`, error);
     if ($result) {
       $result.classList.remove('d-none');
-      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Cron <strong>${webManager.utilities().escapeHTML(cronId)}</strong> failed: ${webManager.utilities().escapeHTML(error.message || 'Unknown error')}</div>`;
+      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Cron <strong>${omega.utilities().escapeHTML(cronId)}</strong> failed: ${omega.utilities().escapeHTML(error.message || 'Unknown error')}</div>`;
     }
   }
 
@@ -444,7 +444,7 @@ async function runBackup() {
   if ($text) $text.textContent = 'Running...';
 
   try {
-    await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/admin/backup`, {
+    await authorizedFetch(`${omega.getApiUrl()}/backend-manager/admin/backup`, {
       method: 'POST',
       timeout: 5 * 60 * 1000,
       response: 'json',
@@ -461,7 +461,7 @@ async function runBackup() {
     console.error('Backup failed:', error);
     if ($result) {
       $result.classList.remove('d-none');
-      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Backup failed: ${webManager.utilities().escapeHTML(error.message || 'Unknown error')}</div>`;
+      $result.innerHTML = `<div class="alert alert-danger small mb-0 py-2">Backup failed: ${omega.utilities().escapeHTML(error.message || 'Unknown error')}</div>`;
     }
   }
 

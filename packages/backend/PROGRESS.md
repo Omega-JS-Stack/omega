@@ -17,7 +17,7 @@
   * [x] Harmonized into UJM (Ian's call): same `checkCertProblem()` in `src/gulp/tasks/serve.js` + fixed its reuse lookup (`localhost*.pem` never matched mkcert's first-SAN-host naming `development.<brand>+N.pem` — certs regenerated EVERY serve). BXM/EM checked: no cert logic, nothing to harmonize
   * [x] LIVE-verified in somiibo-backend (dev-installed BEM, ran `npm start`): proxy up on 5002; curl trusting mkcert root → HTTP 200 / TLS verify 0; served cert = fresh macbookpro.lan CA (minted by Ian's post-deletion restart); full proxy→hosting-rewrite→bm_api round-trip 200. NOTE: firebase's `hosting: http://localhost:5443` log line prints in every WORKING run (internal port) — not a failure signal
   * [x] Shipped: BEM v5.11.7 (commit 2e0cfc4, release + npm), WM 4.3.4 (published by parallel agent — dev API URL https + loopback redirects), UJM v1.9.28 (cert validation + reuse-lookup fix + WM ^4.3.4 bump; 119 tests green with new WM). somiibo-backend restored to live BEM 5.11.7
-  * [ ] somiibo-website: rebuild with web-manager 4.3.4 (via UJM 1.9.28) to get HTTPS frontend dev — until then `npx mgr serve --no-https` matches the old-WM site bundle
+  * [ ] somiibo-website: rebuild with web-manager 4.3.4 (via UJM 1.9.28) to get HTTPS frontend dev — until then `npx omega serve --no-https` matches the old-WM site bundle
 * [ ] One-off: Extended-mode test hardening — 5 provider-drift failures (2026-07-03)
   * [x] Fix 1: marketing-lifecycle `add-contact` — `skipValidation: true` (suite tests add→sync→remove, not deliverability; mailbox check was 400ing the fabricated address and cascade-skipping 3 steps)
   * [x] Fix 2: AI inference tests — TEST_DOMAIN `acme.com`→`itwcreativeworks.com` (model now treats acme as placeholder → empty names), `skipValidation` isolation (mailbox ran before inference asserts), infer-contact prompt: plus-tag rule + example (production fix — `+tag` was likely read as a test marker)
@@ -28,7 +28,7 @@
   * [x] `npm run prepare`; normal-mode run green: 74 passing / 10 skipped (extended gates skip cleanly), 0 failures
   * [x] Extended-mode validation from ultimate-jekyll-backend (BEM dev-installed/symlinked): 98 passing / 0 failures — all 5 originally-failing tests green; lifecycle ran all 5 steps; itwcreativeworks.com mailbox verdict = `catchall` (deterministic success branch); new dns-short-circuit + gmail-rejection tests green. Note: `verify-edit` took the pre-existing `editSkipped` early-return this run (GitHub code search hadn't indexed the fresh post), so the new waitFor poll branch runs only when the edit lands — known, out-of-scope limitation
   * [x] CHANGELOG [Unreleased] entry (Fixed: 5 test repairs; Changed: admin 400 names failing check, prompt plus-tag rule)
-  * [x] Shipped as v5.11.6 (commit 45a2f7d, GitHub release, npm publish); pre-ship gate: full framework suite 1207/0 from ultimate-jekyll-backend (repo-fixture full run has 63 PRE-EXISTING environmental failures — identical on clean v5.11.5 HEAD, payments/rules/uuid areas, not from this change); consumer restored to published 5.11.6 via `npx mgr install live`
+  * [x] Shipped as v5.11.6 (commit 45a2f7d, GitHub release, npm publish); pre-ship gate: full framework suite 1207/0 from ultimate-jekyll-backend (repo-fixture full run has 63 PRE-EXISTING environmental failures — identical on clean v5.11.5 HEAD, payments/rules/uuid areas, not from this change); consumer restored to published 5.11.6 via `npx omega install live`
 * [x] One-off: CDP doc rewrite for the per-session isolated browser (2026-07-01)
   * [x] `docs/cdp-debugging.md` rewritten (mirrored UJM/BEM/BXM/EM/WM): sessions auto-launch their own private Chrome via the `chrome-devtools` MCP — no launch command/ports/shared profile; UJM dev URL rule: `https://localhost:4000`, NEVER the LAN IP; CLAUDE.md live-test line updated; CHANGELOG [Unreleased] added (uncommitted — ship with next release)
   * [x] OMEGA mirror mandate: Doc-update parity now documents the mirrored structure (canonical skeletons: omega:main mirror-spec); maintainer mirror note added to src/defaults/CLAUDE.md
@@ -91,7 +91,7 @@
   * [x] Task 9.8: Remove cross-feed title similarity check (too fragile — word-overlap heuristic)
   * [x] Task 9.9: Run tests (26 passing via `npm test -- mgr:helpers/content/blog-auto-publisher`)
   * [x] Task 9.10: Publish BEM v5.9.25 to npm + GitHub release
-  * [x] Task 9.11: Add "NEVER use npx mgr from framework repo" rule to ALL four OMEGA frameworks (BEM/UJM/BXM/EM CLAUDE.md + skills)
+  * [x] Task 9.11: Add "NEVER use npx omega from framework repo" rule to ALL four OMEGA frameworks (BEM/UJM/BXM/EM CLAUDE.md + skills)
   * [ ] Task 9.12: Deploy Daily Embers with new BEM version
 * [ ] Phase 6: Setup scaffolds essential configs for fresh projects
   * [x] Task 6.1: Add `templates/firebase.json` standard template
@@ -161,7 +161,7 @@
 * [ ] Phase 4: Root package.json proxy scripts
   * [x] Task 4.1: Create `root-package-json.js` setup test (proxies `projectScripts` with `cd functions &&` prefix + `preinstall` guard)
   * [x] Task 4.2: Register in setup test index (after `npm-project-scripts`)
-  * [ ] Task 4.3: Test in consumer project (`npx mgr setup` from ultimate-jekyll-backend)
+  * [ ] Task 4.3: Test in consumer project (`npx omega setup` from ultimate-jekyll-backend)
   * [ ] Task 4.4: Verify `npm test` / `npm start` work from project root
 
 ## ✅ Completed Task List
@@ -176,7 +176,7 @@
   * [x] Documentation — `docs/mcp.md`, `CLAUDE.md`
   * [x] UJM `/token` page update (separate repo)
 * [x] Phase 2: HTTPS local dev + Claude Desktop MCP testing
-  * [x] HTTPS proxy in `npx mgr serve` (mkcert certs, port 5002 → 5443)
+  * [x] HTTPS proxy in `npx omega serve` (mkcert certs, port 5002 → 5443)
   * [x] `getApiUrl()` returns `https://` when `BEM_HTTPS_PORT` is set
   * [x] Fix OAuth discovery (root-level issuer per RFC 8414)
   * [x] Add dynamic client registration (`POST /mcp/register`)

@@ -2,7 +2,7 @@
 // official electron releases feed. Returns the major version (e.g. "24") so we can write
 // `.nvmrc` and `engines.node` from it.
 //
-// Same pattern as legacy @omegajs/desktop's `process_checkNodeVersion` — fetch releases.electronjs.org once
+// Same pattern as legacy @omega.js/desktop's `process_checkNodeVersion` — fetch releases.electronjs.org once
 // per setup, find the entry matching the consumer's installed electron version, return its
 // `node` field's major.
 
@@ -34,7 +34,7 @@ async function resolveNodeMajorForElectron(electronVersion) {
     return null;
   }
 
-  // Find the *.0.0 release for this electron major (matches legacy @omegajs/desktop's behavior — the .0.0 of
+  // Find the *.0.0 release for this electron major (matches legacy @omega.js/desktop's behavior — the .0.0 of
   // each major is the canonical Node version for the line; later patch/minor electrons may bump
   // Node within the line but the major-Node mapping is stable).
   const match = releases.find((r) => r.version === `${electronMajor}.0.0`);

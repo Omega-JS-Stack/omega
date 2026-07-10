@@ -1,4 +1,4 @@
-// @omegajs/desktop Titlebar
+// @omega.js/desktop Titlebar
 // =========================================================================
 // Renders a draggable strip at the top of every page so users can move the
 // window around. The native window controls (min/max/close on Windows;
@@ -6,7 +6,7 @@
 // `titleBarStyle: 'hiddenInset'` (mac) and `titleBarOverlay` (windows). This
 // file just makes room for them and provides the drag region.
 //
-// Platform detection: @omegajs/client sets `html[data-platform]` during init to
+// Platform detection: @omega.js/client sets `html[data-platform]` during init to
 // one of "mac" / "windows" / "linux" / etc. We key off that.
 
 $em-titlebar-height: 36px !default;

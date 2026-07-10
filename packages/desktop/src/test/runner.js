@@ -1,8 +1,8 @@
 // Test runner — discovers + runs suites, reports framework-style.
 //
 // The runner CORE (discovery, suite/group/standalone execution, filtering, skip
-// semantics, init hooks, reporting) is the shared @omegajs/devkit runner-core,
-// vendored into dist/vendor/devkit at prepare time. This file is @omegajs/desktop's config:
+// semantics, init hooks, reporting) is the shared @omega.js/devkit runner-core,
+// vendored into dist/vendor/devkit at prepare time. This file is @omega.js/desktop's config:
 // title, target alias, and the framework-specific layer glue.
 //
 // Layers:
@@ -17,11 +17,11 @@
 const path = require('path');
 const chalk = require('chalk').default;
 
-const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omegajs/devkit/test/runner-core');
+const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omega.js/devkit/test/runner-core');
 
 const runner = createRunner({
   title: 'OMEGA Desktop Tests',
-  packageName: '@omegajs/desktop',
+  packageName: '@omega.js/desktop',
   targetAlias: 'desktop',
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
@@ -31,7 +31,7 @@ const runner = createRunner({
     {
       // Main + renderer share one spawned Electron process — main suites first, then a
       // hidden BrowserWindow takes over for renderer suites. This keeps a single
-      // electron boot per `npx mgr test` invocation.
+      // electron boot per `npx omega test` invocation.
       layers: ['main', 'renderer'],
       run: async ({ byLayer, wants, options, results, projectRoot }) => {
         let runElectronTests;

@@ -10,19 +10,19 @@ import * as deleteSection from './sections/delete.js';
 import * as dataRequestSection from './sections/data-request.js';
 import * as connectionsSection from './sections/connections.js';
 import * as refundSection from './sections/refund.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     try {
       await initializeAccount();
     } catch (error) {
-      webManager.sentry().captureException(new Error('Failed to initialize account page', { cause: error }));
+      omega.sentry().captureException(new Error('Failed to initialize account page', { cause: error }));
     }
 
     // Resolve after initialization
@@ -83,7 +83,7 @@ async function initializeAccount() {
   });
 
   // Setup auth listener
-  webManager.auth().listen({}, async (state) => {
+  omega.auth().listen({}, async (state) => {
     console.log('Auth state with account data:', state);
 
     /* @dev-only:start */
@@ -92,7 +92,7 @@ async function initializeAccount() {
       const urlParams = new URLSearchParams(window.location.search);
       const testSubscription = urlParams.get('_dev_subscription');
 
-      if (testSubscription && webManager.isDevelopment()) {
+      if (testSubscription && omega.isDevelopment()) {
         try {
           console.log(`Loading test subscription: ${testSubscription}`);
           const testModule = await import(`./test-subscriptions/${testSubscription}.js`);
@@ -103,7 +103,7 @@ async function initializeAccount() {
             const test = testModule.default;
             const merged = deepMerge(real, test);
 
-            // Write back so both JS and @omegajs/client bindings see the same data
+            // Write back so both JS and @omega.js/client bindings see the same data
             state.account.subscription = merged;
 
             console.log('Test subscription merged:', merged);
@@ -167,7 +167,7 @@ function loadAllSectionData(authState) {
   }
 
   if (sectionModules.connections.loadData) {
-    sectionModules.connections.loadData(account, webManager.config?.oauth2 || {});
+    sectionModules.connections.loadData(account, omega.config?.oauth2 || {});
   }
 
   if (sectionModules.refund.loadData) {
@@ -228,7 +228,7 @@ function handleHashChange() {
     } else {
       // Section doesn't exist, default to profile
       console.warn(`Section "${hash}" not found, defaulting to profile`);
-      webManager.sentry().captureException(new Error(`Invalid account section hash: ${hash}`));
+      omega.sentry().captureException(new Error(`Invalid account section hash: ${hash}`));
       window.location.hash = '#profile';
       showSection('profile');
     }

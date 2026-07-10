@@ -4,7 +4,7 @@ const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const _ = require('lodash');
 const path = require('path');
-const { loadConfig } = require('@omegajs/config');
+const { loadConfig } = require('@omega.js/config');
 
 // The framework template resolved through the SAME loader the Manager uses —
 // both sides of the comparison live in the resolved (flat) namespace. The

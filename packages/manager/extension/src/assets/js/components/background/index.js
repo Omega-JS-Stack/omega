@@ -3,7 +3,7 @@
 // ============================================
 
 // Import Browser Extension Manager
-import Manager from '@omegajs/extension/background';
+import Manager from '@omega.js/extension/background';
 
 // Import automation runner
 import { handleAutomation } from './automation/runner.js';

@@ -1,6 +1,6 @@
 /**
  * Ensure the TikTok Pixel is configured with an Events API access token
- * (TIKTOK_ACCESS_TOKEN in the brand .env — the name @omegajs/backend reads).
+ * (TIKTOK_ACCESS_TOKEN in the brand .env — the name @omega.js/backend reads).
  */
 const { ensurePixelToken } = require('../lib/pixel-token.js');
 

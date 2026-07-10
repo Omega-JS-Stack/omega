@@ -24,7 +24,7 @@ meta:
       <button id="trigger-error" class="btn btn-danger">Trigger auth signin error</button>
       <script>
         document.getElementById('trigger-error').addEventListener('click', function() {
-          Manager.webManager.auth().signInWithEmailAndPassword('invalid@example.com', 'wrongpassword')
+          Manager.omega.auth().signInWithEmailAndPassword('invalid@example.com', 'wrongpassword')
         });
       </script>
 

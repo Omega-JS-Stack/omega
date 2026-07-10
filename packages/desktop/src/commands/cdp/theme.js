@@ -1,4 +1,4 @@
-// `npx mgr cdp theme <dark|light|system>` — flip the app's theme live
+// `npx omega cdp theme <dark|light|system>` — flip the app's theme live
 // (manager.theme via the main window's renderer).
 //
 // Flips every renderer (BrowserWindows AND WebContentsViews) with no restart —
@@ -13,7 +13,7 @@ const SOURCES = ['dark', 'light', 'system'];
 module.exports = async function (options) {
   const source = options._[2];
   if (!SOURCES.includes(source)) {
-    throw new Error(`Usage: npx mgr cdp theme <${SOURCES.join('|')}>`);
+    throw new Error(`Usage: npx omega cdp theme <${SOURCES.join('|')}>`);
   }
 
   const state = await client.evaluate(client.MAIN_VIEW, `window.em.theme.set('${source}')`);

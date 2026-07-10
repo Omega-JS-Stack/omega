@@ -1,7 +1,7 @@
 {
   "name": "omega",
   "version": "0.0.0",
-  "description": "OMEGA monorepo — @omegajs framework packages, shared internals, spikes, and sandbox apps",
+  "description": "OMEGA monorepo — @omega.js framework packages, shared internals, spikes, and sandbox apps",
   "private": true,
   "workspaces": [
     "packages/*",
@@ -17,6 +17,6 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
-    "@omegajs/devkit": "*"
+    "@omega.js/devkit": "*"
   }
 }

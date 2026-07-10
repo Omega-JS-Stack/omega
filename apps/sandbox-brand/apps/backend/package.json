@@ -2,12 +2,12 @@
   "name": "sandbox-brand-backend",
   "private": true,
   "scripts": {
-    "start": "cd functions && npx mgr setup && npx mgr serve",
-    "deploy": "cd functions && npx mgr setup && npx mgr deploy",
-    "emulator": "cd functions && npx mgr setup && npx mgr emulator",
-    "test": "cd functions && npx mgr setup && npx mgr test",
-    "setup": "cd functions && npx mgr setup",
-    "test:offline": "cd functions && npx mgr test",
+    "start": "cd functions && npx omega setup && npx omega serve",
+    "deploy": "cd functions && npx omega setup && npx omega deploy",
+    "emulator": "cd functions && npx omega setup && npx omega emulator",
+    "test": "cd functions && npx omega setup && npx omega test",
+    "setup": "cd functions && npx omega setup",
+    "test:offline": "cd functions && npx omega test",
     "preinstall": "cd functions && npm install && echo \"\\n  ✓ Dependencies installed in functions/ (not project root)\\n\""
   }
 }

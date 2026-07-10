@@ -5,13 +5,13 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import fetch from 'wonderful-fetch';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupPlatformDetection();
     setupDownloadTracking();
@@ -44,7 +44,7 @@ const config = {
 
 // Setup platform detection and auto-select
 function setupPlatformDetection() {
-  const detectedPlatform = webManager.utilities().getPlatform();
+  const detectedPlatform = omega.utilities().getPlatform();
   console.log('Detected platform:', detectedPlatform);
 
   // Listen for tab changes to scroll to download card
@@ -272,7 +272,7 @@ function setupCopyButtons() {
       }
 
       try {
-        await webManager.utilities().clipboardCopy($input);
+        await omega.utilities().clipboardCopy($input);
 
         const $text = this.querySelector('.button-text');
         const originalText = $text.textContent;
@@ -302,7 +302,7 @@ function setupAutoDownload() {
   }
 
   // Find the first download link in the active platform's tab pane
-  const detectedPlatform = webManager.utilities().getPlatform();
+  const detectedPlatform = omega.utilities().getPlatform();
   const $pane = document.querySelector(`#${detectedPlatform}-pane`);
 
   if (!$pane) {
@@ -352,7 +352,7 @@ function setupMobileEmailForms() {
       console.log('Mobile email form submitted:', { platform, email: data.email });
 
       // Get API endpoint
-      const apiEndpoint = `${webManager.getApiUrl()}/backend-manager/general/email`;
+      const apiEndpoint = `${omega.getApiUrl()}/backend-manager/general/email`;
 
       // Send request using wonderful-fetch
       await fetch(apiEndpoint, {

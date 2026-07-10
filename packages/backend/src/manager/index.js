@@ -2,7 +2,7 @@
 const path = require('path');
 const { get: _get, set: _set } = require('lodash');
 const jetpack = require('fs-jetpack');
-const { hasOmegaConfig, loadConfig, formatErrors } = require('@omegajs/config');
+const { hasOmegaConfig, loadConfig, formatErrors } = require('@omega.js/config');
 const EventEmitter = require('events');
 // const EventEmitter = require('events').EventEmitter;
 const util = require('util');
@@ -23,7 +23,7 @@ const BEM_PACKAGE = require('../../package.json');
 function Manager() {
   const self = this;
 
-  // @omegajs/backend library version
+  // @omega.js/backend library version
   self.version = BEM_PACKAGE.version;
 
   // Constants
@@ -53,7 +53,7 @@ Manager.prototype.init = function (exporter, options) {
   const self = this;
 
   // Auto-detect test-runner context. The test runner sets BEM_TEST_RUNNER=1
-  // before invoking anything that loads @omegajs/backend. When detected, init() runs the
+  // before invoking anything that loads @omega.js/backend. When detected, init() runs the
   // library-loading + project-config-setup pieces normally, but skips wiring
   // Firebase Cloud Functions handlers and the custom-server boot (neither
   // works outside an actual Functions runtime). The runner has already called
@@ -136,7 +136,7 @@ Manager.prototype.init = function (exporter, options) {
   }
 
   // Load config — the consumer's config/omega.json5 resolved through
-  // @omegajs/config (brand-monorepo aware: cwd is the functions dir, the
+  // @omega.js/config (brand-monorepo aware: cwd is the functions dir, the
   // loader walks up to the brand layer when one exists). The framework
   // defaults layer is templates/config/omega.json5 resolved through the SAME
   // loader, so both sides live in one shape. Missing consumer config
@@ -149,9 +149,9 @@ Manager.prototype.init = function (exporter, options) {
     self.config = config;
 
     // Boot warns on schema findings, audit (mgr setup) throws — the two-mode
-    // contract from @omegajs/config. Secrets in the file already threw above.
+    // contract from @omega.js/config. Secrets in the file already threw above.
     if (errors.length) {
-      console.warn(`[@omegajs/backend] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+      console.warn(`[@omega.js/backend] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
     }
   } else {
     self.config = configDefaults;
@@ -208,7 +208,7 @@ Manager.prototype.init = function (exporter, options) {
     ) {
       return 'development';
     } else {
-      // Default: production. @omegajs/backend's deployed RUNTIME can legitimately lack a dev signal — a
+      // Default: production. @omega.js/backend's deployed RUNTIME can legitimately lack a dev signal — a
       // live Cloud Function has no FUNCTIONS_EMULATOR and often no ENVIRONMENT var, so
       // "no signal" IS the normal production state. Defaulting to development here would make
       // every deployed function skip real side effects (emails/analytics/webhooks).
@@ -277,8 +277,8 @@ Manager.prototype.init = function (exporter, options) {
       : self.config.brand?.url || '';
   };
 
-  // Resolve the parent @omegajs/backend's website URL (the parent's brand domain, NO `api.` subdomain).
-  // - If config.parent === 'self', THIS @omegajs/backend is the parent — returns this brand's own URL.
+  // Resolve the parent @omega.js/backend's website URL (the parent's brand domain, NO `api.` subdomain).
+  // - If config.parent === 'self', THIS @omega.js/backend is the parent — returns this brand's own URL.
   // - If config.parent is a URL, returns it as-is.
   // - Returns '' if neither is configured.
   // Use getParentApiUrl() for the API URL (with `api.` subdomain inserted).
@@ -290,7 +290,7 @@ Manager.prototype.init = function (exporter, options) {
     return parent || '';
   };
 
-  // Resolve the parent @omegajs/backend's API URL (`https://api.{parent-host}`).
+  // Resolve the parent @omega.js/backend's API URL (`https://api.{parent-host}`).
   // ALWAYS returns the live production URL — even when THIS brand is running
   // in dev/test mode. The parent's API is a real remote server (no localhost
   // equivalent), so dev-mode does NOT redirect to localhost the way getApiUrl()
@@ -300,7 +300,7 @@ Manager.prototype.init = function (exporter, options) {
     return base ? `https://api.${base}` : '';
   };
 
-  // Returns true when this @omegajs/backend IS the parent (config.parent === 'self').
+  // Returns true when this @omega.js/backend IS the parent (config.parent === 'self').
   // Gates parent-only routes like /marketing/webhook/forward.
   self.isParent = function() {
     return self.config.parent === 'self';
@@ -309,7 +309,7 @@ Manager.prototype.init = function (exporter, options) {
   // Set more properties (need to wait for assistant to determine if DEV)
   self.project.functionsUrl = self.getFunctionsUrl();
 
-  // Set API URL (like @omegajs/client's getApiUrl)
+  // Set API URL (like @omega.js/client's getApiUrl)
   // Testing: http://localhost:5002 (hosting emulator with rewrites)
   // Development: http://localhost:5002 (local hosting)
   // Production: https://api.{domain}
@@ -323,7 +323,7 @@ Manager.prototype.init = function (exporter, options) {
   // Set environment
   process.env.ENVIRONMENT = process.env.ENVIRONMENT || self.getEnvironment();
 
-  // Set @omegajs/backend env variables
+  // Set @omega.js/backend env variables
   process.env.BEM_FUNCTIONS_URL = self.project.functionsUrl;
   process.env.BEM_API_URL = self.project.apiUrl;
   process.env.BEM_WEBSITE_URL = self.project.websiteUrl;

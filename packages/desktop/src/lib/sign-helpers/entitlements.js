@@ -1,4 +1,4 @@
-// Generate dist/config/entitlements.mac.plist from @omegajs/desktop defaults + consumer overrides.
+// Generate dist/config/entitlements.mac.plist from @omega.js/desktop defaults + consumer overrides.
 //
 // Consumer config schema (in omega.json5):
 //   entitlements: {
@@ -14,7 +14,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 
-// @omegajs/desktop's canonical mac entitlement defaults. Mirrors the legacy build/entitlements.mac.plist.
+// @omega.js/desktop's canonical mac entitlement defaults. Mirrors the legacy build/entitlements.mac.plist.
 const DEFAULT_MAC_ENTITLEMENTS = {
   // Hardened runtime — required for notarization.
   'com.apple.security.cs.allow-jit':                          true,

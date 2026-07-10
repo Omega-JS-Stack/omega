@@ -2,15 +2,15 @@
  * Payment Config Library
  *
  * Reads payment configuration (products, processors, prices, limits) from
- * webManager.config.payment — which is populated from _config.yml at build time.
+ * omega.config.payment — which is populated from _config.yml at build time.
  * This eliminates the need to fetch /backend-manager/brand at runtime.
  */
 
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Get the full payment config object
 export function getPaymentConfig() {
-  return webManager.config?.payment || {};
+  return omega.config?.payment || {};
 }
 
 // Get payment processors

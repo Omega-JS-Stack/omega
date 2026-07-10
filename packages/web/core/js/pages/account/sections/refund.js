@@ -5,7 +5,7 @@
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Refund reasons (will be shuffled on each render)
 const REFUND_REASONS = [
@@ -44,7 +44,7 @@ export function onShow() {
 
 function updateRefundEligibility(account) {
   const subscription = account?.subscription || {};
-  const resolved = webManager.auth().resolveSubscription(account);
+  const resolved = omega.auth().resolveSubscription(account);
   const isPaid = subscription.product?.id !== 'basic' && !!subscription.product?.id;
   const isEligible = isPaid && (subscription.status === 'cancelled' || resolved.cancelling);
 
@@ -85,7 +85,7 @@ function setupRefundForm() {
 
     trackRefund('submit');
 
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/payments/refund`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/refund`, {
       method: 'POST',
       timeout: 30000,
       response: 'json',
@@ -128,8 +128,8 @@ function populateRefundReasons() {
 
   $container.innerHTML = shuffled.map((reason, i) => `
     <div class="form-check mb-2">
-      <input class="form-check-input" type="radio" name="refund_reason" id="refund-reason-${i}" value="${webManager.utilities().escapeHTML(reason)}" required>
-      <label class="form-check-label" for="refund-reason-${i}">${webManager.utilities().escapeHTML(reason)}</label>
+      <input class="form-check-input" type="radio" name="refund_reason" id="refund-reason-${i}" value="${omega.utilities().escapeHTML(reason)}" required>
+      <label class="form-check-label" for="refund-reason-${i}">${omega.utilities().escapeHTML(reason)}</label>
     </div>
   `).join('');
 }

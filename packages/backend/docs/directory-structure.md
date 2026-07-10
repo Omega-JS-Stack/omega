@@ -1,6 +1,6 @@
 # Directory Structure
 
-## @omegajs/backend Library (this repo)
+## @omega.js/backend Library (this repo)
 
 ```
 src/
@@ -30,7 +30,7 @@ src/
         on-delete.js                    # User doc deletion + marketing cleanup
         utils.js                        # Shared utilities (retryWrite, runAuthHook)
       cron/                             # Cron job runners
-        runner.js                       # Shared cron job runner (@omegajs/backend + consumer hooks)
+        runner.js                       # Shared cron job runner (@omega.js/backend + consumer hooks)
         daily.js                        # Daily cron entry point
         daily/{job}.js                  # Individual daily cron jobs
         frequent.js                     # Frequent cron entry point

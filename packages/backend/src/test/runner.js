@@ -21,7 +21,7 @@ class SkipError extends Error {
 }
 
 /**
- * @omegajs/backend Integration Test Runner
+ * @omega.js/backend Integration Test Runner
  * Supports standalone tests and test suites with sequential tests and shared state
  */
 class TestRunner {
@@ -56,10 +56,10 @@ class TestRunner {
    * Main run method
    */
   async run() {
-    // Abort if @omegajs/backend is running from the user's home directory (e.g., accidental ~/node_modules install)
+    // Abort if @omega.js/backend is running from the user's home directory (e.g., accidental ~/node_modules install)
     const homeDir = os.homedir();
     if (__dirname.startsWith(path.join(homeDir, 'node_modules'))) {
-      console.error(chalk.red('\n  ERROR: @omegajs/backend is running from ~/node_modules (home directory install).'));
+      console.error(chalk.red('\n  ERROR: @omega.js/backend is running from ~/node_modules (home directory install).'));
       console.error(chalk.red('  This is likely an accidental global install that shadows local project copies.'));
       console.error(chalk.red(`  Fix: rm -rf ${path.join(homeDir, 'node_modules')} ${path.join(homeDir, 'package.json')} ${path.join(homeDir, 'package-lock.json')}`));
       console.error(chalk.red(`  Running from: ${__dirname}\n`));
@@ -71,7 +71,7 @@ class TestRunner {
 
     this.results.startTime = Date.now();
 
-    console.log(chalk.bold('\n  @omegajs/backend Integration Tests\n'));
+    console.log(chalk.bold('\n  @omega.js/backend Integration Tests\n'));
 
     // Warn if TEST_EXTENDED_MODE is enabled
     if (process.env.TEST_EXTENDED_MODE) {
@@ -107,13 +107,13 @@ class TestRunner {
     }
 
     // Discover and run tests
-    // @omegajs/backend tests are in the top-level test/ directory of the package
+    // @omega.js/backend tests are in the top-level test/ directory of the package
     const frameworkTestsDir = path.resolve(__dirname, '../../test');
     const projectTestsDir = path.join(this.options.projectDir, 'test');
 
-    // Run @omegajs/backend default tests
+    // Run @omega.js/backend default tests
     if (jetpack.exists(frameworkTestsDir)) {
-      console.log(chalk.bold('  @omegajs/backend Core Tests'));
+      console.log(chalk.bold('  @omega.js/backend Core Tests'));
       await this.runTestsInDir(frameworkTestsDir, 'backend');
     }
 
@@ -185,7 +185,7 @@ class TestRunner {
         console.log(chalk.green('✓'));
 
         // Abort if the running emulator belongs to a different project.
-        // This catches the case where you run `npx mgr test` in project A
+        // This catches the case where you run `npx omega test` in project A
         // while project B's emulator is still up on the same ports — requests
         // hit the wrong hosting rewrites and tests fail with mysterious 404s.
         const mismatch = await this.checkProjectMismatch(response.data);
@@ -218,8 +218,8 @@ class TestRunner {
   /**
    * Verify the running emulator belongs to this project. Tries the Firebase
    * Emulator Hub (localhost:4400) first — it always knows the project ID
-   * regardless of @omegajs/backend version. Falls back to the health endpoint's projectId
-   * field (added in @omegajs/backend 5.3.3+). Returns true (= mismatch, abort) if the
+   * regardless of @omega.js/backend version. Falls back to the health endpoint's projectId
+   * field (added in @omega.js/backend 5.3.3+). Returns true (= mismatch, abort) if the
    * project IDs differ.
    */
   async checkProjectMismatch(healthData) {
@@ -247,14 +247,14 @@ class TestRunner {
       // Hub unreachable — fall back to health endpoint
     }
 
-    // Fall back to the health endpoint's projectId (@omegajs/backend 5.3.3+)
+    // Fall back to the health endpoint's projectId (@omega.js/backend 5.3.3+)
     if (!emulatorProjectId) {
       emulatorProjectId = healthData?.projectId;
     }
 
     if (emulatorProjectId && emulatorProjectId !== expectedProjectId) {
       console.log(chalk.red(`\n  ✗ Project mismatch: the running emulator belongs to "${emulatorProjectId}" but this project is "${expectedProjectId}".`));
-      console.log(chalk.red(`    Stop the other emulator first, then run: npx mgr emulator`));
+      console.log(chalk.red(`    Stop the other emulator first, then run: npx omega emulator`));
       return true;
     }
 
@@ -265,7 +265,7 @@ class TestRunner {
    * Setup test accounts - deletes existing test users and recreates them fresh
    */
   async setupAccounts() {
-    // Load the optional test/_init.js hooks from BOTH test roots (@omegajs/backend core +
+    // Load the optional test/_init.js hooks from BOTH test roots (@omega.js/backend core +
     // consumer project): extra `accounts` to create and `setup()` to seed fixtures.
     const initHooks = this.loadInitHooks();
 
@@ -303,7 +303,7 @@ class TestRunner {
     // Fetch account privateKeys (built-in + project-defined).
     this.accounts = await testAccounts.fetchPrivateKeys(this.options.admin, this.options.domain, this.config, initHooks.accounts);
 
-    // Run custom setup hooks (@omegajs/backend core first, then consumer). Runs AFTER the
+    // Run custom setup hooks (@omega.js/backend core first, then consumer). Runs AFTER the
     // standard test accounts exist and AFTER the clean slate, so they can seed
     // fixtures (brands, etc.) and reference the created accounts.
     for (const setup of initHooks.setups) {
@@ -418,7 +418,7 @@ class TestRunner {
 
   /**
    * Load and merge the `test/_init.js` lifecycle hooks from BOTH test roots —
-   * @omegajs/backend core (`<backend>/test/_init.js`) and the consumer project
+   * @omega.js/backend core (`<backend>/test/_init.js`) and the consumer project
    * (`<projectDir>/test/_init.js`). Same contract for both, so framework and
    * consumer authors write the identical file shape. Each exports a function
    * (see loadInit) returning:
@@ -432,15 +432,15 @@ class TestRunner {
    * every run (deleteTestUsers → flushEmulatorFirestore) and each test cleans up
    * after itself, so there is nothing project-level to tear down.
    *
-   * Returns the merged extra `accounts` map (@omegajs/backend core then consumer; consumer
-   * wins on key collision) and the ordered `setups` runners (@omegajs/backend core first).
+   * Returns the merged extra `accounts` map (@omega.js/backend core then consumer; consumer
+   * wins on key collision) and the ordered `setups` runners (@omega.js/backend core first).
    */
   loadInitHooks() {
     const frameworkTestsDir = path.resolve(__dirname, '../../test');
     const projectTestsDir = path.join(this.options.projectDir, 'test');
 
     const hooks = [
-      this.loadInit(frameworkTestsDir, '@omegajs/backend core'),
+      this.loadInit(frameworkTestsDir, '@omega.js/backend core'),
       this.loadInit(projectTestsDir, 'project'),
     ];
 
@@ -930,7 +930,7 @@ class TestRunner {
       pubsub,
       skip,
       admin: this.config.admin,
-      // Real @omegajs/backend Manager + assistant, booted by run-tests.js with BEM_TEST_RUNNER=1.
+      // Real @omega.js/backend Manager + assistant, booted by run-tests.js with BEM_TEST_RUNNER=1.
       // Tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
       // like production code — no stubs.
       Manager: this.config.Manager,

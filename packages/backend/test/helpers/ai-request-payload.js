@@ -1,7 +1,7 @@
 /**
  * Test: AI request payload shape (libraries/ai/providers/openai.js)
  *
- * Verifies the transformation from the @omegajs/backend-facing `ai.request()` options
+ * Verifies the transformation from the @omega.js/backend-facing `ai.request()` options
  * (specifically `options.prompt` in either legacy object form or array form)
  * into the eventual OpenAI HTTP payload (the `input: [...]` array).
  *

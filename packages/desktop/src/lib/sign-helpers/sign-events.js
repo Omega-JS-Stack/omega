@@ -11,7 +11,7 @@
 //   3. `C:\actions-runners\em-signing.log` on Windows — the default EM_RUNNER_HOME
 //      (matches `defaultRunnerHome()` in src/commands/runner.js). This is the
 //      machine-wide default so EVERY signing job from every org/repo writes to
-//      the same file, and `npx mgr runner monitor` with no args picks it up.
+//      the same file, and `npx omega runner monitor` with no args picks it up.
 //   4. `<RUNNER_TOOLSDIRECTORY>/em-signing.log` — legacy fallback if someone runs
 //      sign-windows outside the runner-installed path
 //   5. `<process.cwd()>/logs/signing.log` — local dev fallback (matches dev.log, build.log, etc.)

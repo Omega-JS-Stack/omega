@@ -2,9 +2,9 @@
   "name": "fixture-brand-site",
   "private": true,
   "dependencies": {
-    "@omegajs/client": "^5.0.0"
+    "@omega.js/client": "^5.0.0"
   },
   "devDependencies": {
-    "@omegajs/web": "^0.2.0"
+    "@omega.js/web": "^0.2.0"
   }
 }

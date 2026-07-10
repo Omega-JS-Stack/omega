@@ -1,5 +1,5 @@
 // reCAPTCHA management for checkout
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let recaptchaReady = false;
 let recaptchaSiteKey = null;
@@ -20,10 +20,10 @@ export async function initializeRecaptcha(siteKey) {
   }
 
   try {
-    // Use webManager.dom().loadScript()
+    // Use omega.dom().loadScript()
     const scriptUrl = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
 
-    await webManager.dom().loadScript({
+    await omega.dom().loadScript({
       src: scriptUrl,
       async: true,
       defer: true,

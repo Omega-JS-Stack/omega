@@ -1,6 +1,6 @@
 /**
  * Brand-backend calls made AS a managed user — password verification plus
- * the two @omegajs/backend endpoints the account service drives after auth changes:
+ * the two @omega.js/backend endpoints the account service drives after auth changes:
  * POST /user/signup (completes the signup flow: welcome email, marketing
  * lists, contact inference) and PUT /marketing/contact (pushes the contact
  * to every marketing provider in one call).

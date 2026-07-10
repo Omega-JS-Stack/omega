@@ -441,7 +441,7 @@ class Manager {
   // No storage operations - Web Manager handles auth state internally
   handleAuthStateChange(user) {
     this.logger.log('[AUTH] Auth state changed:', user?.email || 'signed out');
-    // Nothing else to do - contexts sync via messages, @omegajs/client handles UI
+    // Nothing else to do - contexts sync via messages, @omega.js/client handles UI
   }
 
   // Handle auth token from website (custom token from /token page)

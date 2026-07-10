@@ -1,6 +1,6 @@
 # Web Manager Bridge — Auth State Sync
 
-@omegajs/desktop keeps Firebase auth state in sync across all processes (main + every renderer window). The pattern mirrors BXM's background/foreground architecture: **main is the source of truth**, renderers reflect.
+@omega.js/desktop keeps Firebase auth state in sync across all processes (main + every renderer window). The pattern mirrors BXM's background/foreground architecture: **main is the source of truth**, renderers reflect.
 
 ## Why this exists
 
@@ -26,17 +26,17 @@ The bridge handles all three.
               │ sync-request        ▼
 ┌──────────────────────────┐  ┌──────────────────────────┐
 │  RENDERER (window 1)     │  │  RENDERER (window 2)     │
-│  @omegajs/client + Firebase  │  │  @omegajs/client + Firebase  │
+│  @omega.js/client + Firebase  │  │  @omega.js/client + Firebase  │
 └──────────────────────────┘  └──────────────────────────┘
 ```
 
 ### Auth flow: deep-link → all processes signed in
 
 1. User signs in on the website. Web-manager generates a custom token. Website opens `myapp://auth/token?token=XYZ` (deep link).
-2. @omegajs/desktop's deep-link `auth/token` built-in fires `manager.webManager.handleAuthToken(token)`.
+2. @omega.js/desktop's deep-link `auth/token` built-in fires `manager.omega.handleAuthToken(token)`.
 3. Main calls `signInWithCustomToken(auth, token)` against its own Firebase Auth → main is now signed in.
 4. Main broadcasts `desktop:auth:sign-in-with-token` IPC with the same token to all renderer windows.
-5. Each renderer receives the broadcast, calls `webManager.auth().signInWithCustomToken(token)` against its own (@omegajs/client-managed) Firebase Auth → all renderers signed in with the same user.
+5. Each renderer receives the broadcast, calls `omega.auth().signInWithCustomToken(token)` against its own (@omega.js/client-managed) Firebase Auth → all renderers signed in with the same user.
 6. Tokens are NOT stored — they expire in 1 hour. Auth state persists via Firebase's built-in IndexedDB persistence.
 
 ### Auth flow: renderer load → sync with main
@@ -51,7 +51,7 @@ When a renderer window opens (cold or warm), it asks main for the current state:
 
 ### Sign-out flow
 
-Any renderer (or main code) calls `manager.webManager.signOut()`:
+Any renderer (or main code) calls `manager.omega.signOut()`:
 
 1. Main signs out its own Firebase.
 2. Main broadcasts `desktop:auth:sign-out` IPC to all renderers.
@@ -59,41 +59,41 @@ Any renderer (or main code) calls `manager.webManager.signOut()`:
 
 ## Public API
 
-### Main process (`manager.webManager`)
+### Main process (`manager.omega`)
 
 ```js
 // Sign in via a custom token (called automatically by the auth/token deep-link route).
-await manager.webManager.handleAuthToken(token);
+await manager.omega.handleAuthToken(token);
 
 // Read the currently signed-in user (snapshot, no sensitive fields).
-manager.webManager.getCurrentUser();
+manager.omega.getCurrentUser();
 //   → { uid, email, displayName, photoURL, emailVerified } | null
 
 // Fresh Firebase ID token for calling authenticated backend routes from main
 // (send as `Authorization: Bearer <token>`). null when signed out.
-await manager.webManager.getIdToken();
+await manager.omega.getIdToken();
 
 // Subscribe to auth state changes (e.g. to refresh tray/menu items).
-const off = manager.webManager.onAuthChange((user) => {
+const off = manager.omega.onAuthChange((user) => {
   manager.tray.refresh();
   manager.menu.refresh();
 });
 off();   // unsubscribe
 
 // Sign out from any process.
-await manager.webManager.signOut();
+await manager.omega.signOut();
 
 // The renderer-resolved subscription — THE main-side plan source. Renderers run
-// @omegajs/client's full auth cycle (Firestore account fetch → resolveSubscription)
+// @omega.js/client's full auth cycle (Firestore account fetch → resolveSubscription)
 // and push the result to main (desktop:auth:account-resolved, uid-guarded); main can't
 // run Firestore itself. null until a renderer has resolved.
-manager.webManager.getResolvedPlan();
+manager.omega.getResolvedPlan();
 //   → { plan, active, trialing, cancelling } | null
-manager.webManager.getResolvedRoles();
+manager.omega.getResolvedRoles();
 //   → { admin, betaTester, ... } | null
 ```
 
-### Renderer process (the @omegajs/desktop Manager you `initialize()`)
+### Renderer process (the @omega.js/desktop Manager you `initialize()`)
 
 ```js
 // Read the user from main (always returns main's authoritative state).
@@ -104,13 +104,13 @@ await renderer.signOut();
 ```
 
 The renderer's `Manager.initialize()` automatically:
-- Boots @omegajs/client (so renderer-side Firebase is available).
+- Boots @omega.js/client (so renderer-side Firebase is available).
 - Wires the auth bridge (`desktop:auth:sync-request` on load + listens for broadcasts).
-- Runs @omegajs/client's **full auth cycle** (`auth().listen()`): waits for auth to settle,
+- Runs @omega.js/client's **full auth cycle** (`auth().listen()`): waits for auth to settle,
   fetches the Firestore account, resolves the subscription, and auto-populates the
-  **`data-wm-bind` bindings** — so @omegajs/desktop app views can use UJM/BXM-style reactive HTML
+  **`data-wm-bind` bindings** — so @omega.js/desktop app views can use UJM/BXM-style reactive HTML
   (`@show auth.user`, `@text auth.account.plan.id`, `@show auth.account.plan.id === 'premium'`,
-  see @omegajs/client's docs/bindings.md). Each settle pushes `{ resolved, roles }` to main
+  see @omega.js/client's docs/bindings.md). Each settle pushes `{ resolved, roles }` to main
   (`desktop:auth:account-resolved`) and re-offers it whenever main announces a state change,
   so a renderer that resolved before main signed in still delivers.
 
@@ -119,7 +119,7 @@ You don't write any of this — it just works.
 ## Session persistence (main)
 
 Renderers persist their Firebase sessions in IndexedDB for free (browser contexts).
-Main is Node — Firebase defaults to in-memory there — so @omegajs/desktop plugs in its own vault:
+Main is Node — Firebase defaults to in-memory there — so @omega.js/desktop plugs in its own vault:
 **`lib/auth-persistence.js`**, a PLUGGABLE strategy behind a custom Firebase
 `Persistence` (the `getReactNativePersistence()` shape).
 
@@ -129,11 +129,11 @@ Main is Node — Firebase defaults to in-memory there — so @omegajs/desktop pl
   os_crypt machinery Chromium uses for its cookie jar — stronger than browser
   IndexedDB/localStorage, which are plaintext LevelDB on disk.
 - **`none`** — explicit opt-out (in-memory, pre-1.12 behavior).
-- **Custom** — `require('@omegajs/desktop/lib/auth-persistence').register(name, { available, getItem, setItem, removeItem })` before `initialize()`, then select it via config.
+- **Custom** — `require('@omega.js/desktop/lib/auth-persistence').register(name, { available, getItem, setItem, removeItem })` before `initialize()`, then select it via config.
 
 ```jsonc
 {
-  "webManager": {
+  "omega": {
     "authPersistence": "safeStorage"   // 'safeStorage' (default) | 'none' | custom name
   }
 }
@@ -160,7 +160,7 @@ If `firebaseConfig` is empty/missing, the bridge logs a warning and runs in no-o
 
 ## Firebase (bundled)
 
-Firebase is **bundled by webpack from @omegajs/desktop's module context** (@omegajs/client owns it in @omegajs/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
+Firebase is **bundled by webpack from @omega.js/desktop's module context** (@omega.js/client owns it in @omega.js/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
 
 If you're building a no-auth Electron app, just leave `firebaseConfig` empty — the bridge is a clean no-op.
 
@@ -170,7 +170,7 @@ If you're building a no-auth Electron app, just leave `firebaseConfig` empty —
 
 ```js
 // In src/tray/index.js or wherever you have access to manager:
-manager.webManager.onAuthChange((user) => {
+manager.omega.onAuthChange((user) => {
   manager.tray.refresh();   // re-evaluates dynamic labels
 });
 ```
@@ -179,12 +179,12 @@ manager.webManager.onAuthChange((user) => {
 // In src/tray/index.js:
 tray.item({
   label: () => {
-    const user = manager.webManager.getCurrentUser();
+    const user = manager.omega.getCurrentUser();
     return user ? `Signed in as ${user.email}` : 'Sign in';
   },
   click: () => {
-    if (manager.webManager.getCurrentUser()) {
-      manager.webManager.signOut();
+    if (manager.omega.getCurrentUser()) {
+      manager.omega.signOut();
     } else {
       require('electron').shell.openExternal(`${manager.config.brand.url}/sign-in?em=true`);
     }
@@ -196,7 +196,7 @@ tray.item({
 
 ```js
 manager.deepLink.on('user/profile/:id', (ctx) => {
-  if (!manager.webManager.getCurrentUser()) {
+  if (!manager.omega.getCurrentUser()) {
     require('electron').shell.openExternal(`${manager.config.brand.url}/sign-in?return=profile/${ctx.params.id}`);
     ctx.handled = true;
     return;
@@ -239,10 +239,10 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 `client-bridge.integration.test.js` actually mints custom tokens via `firebase-admin` and signs in — it hits REAL Firebase, so it's gated behind extended mode (the cross-framework `TEST_EXTENDED_MODE` opt-in; see [test-framework.md](test-framework.md#extended-vs-normal-mode)). To run:
 
 ```bash
-npm i -D firebase-admin                                   # already in @omegajs/desktop's devDeps
+npm i -D firebase-admin                                   # already in @omega.js/desktop's devDeps
 export EM_TEST_FIREBASE_ADMIN_KEY=/path/to/service-account.json
 export EM_TEST_USER_UID=em-test-user                      # optional, defaults to em-test-user
-npx mgr test --extended                                   # or: TEST_EXTENDED_MODE=true npx mgr test
+npx omega test --extended                                   # or: TEST_EXTENDED_MODE=true npx omega test
 ```
 
 Without the extended-mode opt-in the suite skips cleanly with a clear reason; same when `EM_TEST_FIREBASE_ADMIN_KEY` (or `GOOGLE_APPLICATION_CREDENTIALS`) isn't set. CI without creds → tests stay green.
@@ -250,7 +250,7 @@ Without the extended-mode opt-in the suite skips cleanly with a clear reason; sa
 ## Implementation notes
 
 - Firebase app name in main is `em-auth` (avoids clashes if a consumer's main code also wants its own Firebase instance).
-- The bridge does NOT persist user info to @omegajs/desktop storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
+- The bridge does NOT persist user info to @omega.js/desktop storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
 - Custom tokens are NEVER stored. Renderers receive them once via broadcast, sign in, discard. Fresh tokens are minted on demand from `/backend-manager` with command `user:create-custom-token`.
 - `manager.getApiUrl()` returns the dev or prod URL, so the bridge automatically hits the right backend. Available across all four Manager contexts (main / renderer / preload / build) via the shared `src/utils/url-helpers.js` module — same code path everywhere. See CLAUDE.md → "Cross-context helpers."
 - All sensitive Firebase user fields (`stsTokenManager`, `providerData`, etc.) are stripped before sending over IPC. Only `{uid, email, displayName, photoURL, emailVerified}` cross the bridge.

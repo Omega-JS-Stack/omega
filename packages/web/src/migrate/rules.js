@@ -16,7 +16,7 @@
 // Tags whose quoted args template-kit resolves as variables — the rule-3
 // capture hoist is scoped to these (interpolation inside OTHER tags' quoted
 // strings is a Jekyll silent no-op we only report).
-const { TAGS } = require('@omegajs/template-kit');
+const { TAGS } = require('@omega.js/template-kit');
 
 // Packaged theme ids whose hardcoded layout prefixes the engine aliases
 const PACKAGED_THEMES = ['classy', 'neobrutalism', 'newsflash', 'bootstrap'];

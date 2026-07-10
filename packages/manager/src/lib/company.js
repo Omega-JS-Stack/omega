@@ -25,7 +25,7 @@ const path = require('node:path');
 const JSON5 = require('json5');
 const jetpack = require('fs-jetpack');
 
-const { resolveConfigPath, hasOmegaConfig, findSecretKeys } = require('@omegajs/config');
+const { resolveConfigPath, hasOmegaConfig, findSecretKeys } = require('@omega.js/config');
 const { resolveBrandRoot } = require('./brand.js');
 
 const MARKER_PATH = ['.omega', 'company.json'];

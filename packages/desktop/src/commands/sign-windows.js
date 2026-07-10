@@ -6,11 +6,11 @@
 //   local       — no-op (developer signs manually on their own Windows box)
 //
 // Usage:
-//   npx mgr sign-windows                                 # sign every .exe/.msi under ./release
-//   npx mgr sign-windows --in release/ --out release/signed/
-//   npx mgr sign-windows --verify-only                   # don't sign, just verify existing signatures
-//   npx mgr sign-windows --smoke                         # sign a 1-byte dummy .exe to validate the setup
-//   npx mgr sign-windows --target some-binary.exe        # sign a single specific file
+//   npx omega sign-windows                                 # sign every .exe/.msi under ./release
+//   npx omega sign-windows --in release/ --out release/signed/
+//   npx omega sign-windows --verify-only                   # don't sign, just verify existing signatures
+//   npx omega sign-windows --smoke                         # sign a 1-byte dummy .exe to validate the setup
+//   npx omega sign-windows --target some-binary.exe        # sign a single specific file
 //
 // Cloud provider modules will live in src/lib/sign-providers/{azure,sslcom,digicert}.js
 // (Pass 3 work). For now the cloud branch logs the intended provider command and exits cleanly.
@@ -60,7 +60,7 @@ module.exports = async function (options) {
 async function runSignCommand(options) {
   // Smoke test mode: create a 1-byte .exe in a temp dir, sign it, verify it, clean up.
   // This is the fastest possible end-to-end check that the EV token, drivers, signtool,
-  // and password cache are all working — no @omegajs/desktop build required.
+  // and password cache are all working — no @omega.js/desktop build required.
   if (options.smoke) {
     return smokeTest();
   }
@@ -300,7 +300,7 @@ async function verifyOnly(targets) {
 
 // Smoke test: write a 1-byte .exe to %TEMP%, run the full self-hosted signing flow against it.
 // Validates that EV token, SafeNet drivers, signtool, and the password cache are all functional
-// without needing an actual @omegajs/desktop build. Cleans up after itself.
+// without needing an actual @omega.js/desktop build. Cleans up after itself.
 async function smokeTest() {
   if (process.platform !== 'win32') {
     throw new Error('--smoke is Windows-only (signtool is required).');

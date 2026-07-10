@@ -1,35 +1,35 @@
-// Vendors private @omegajs workspace packages (devkit, account, ...) into a
+// Vendors private @omega.js workspace packages (devkit, account, ...) into a
 // framework's dist/ so published tarballs are self-contained (the shared packages
 // never ship to npm).
 //
 // Wired as the framework's prepare-package `after` hook:
-//   "preparePackage": { "hooks": { "after": "node -e \"require('@omegajs/devkit/vendor')()\"" } }
+//   "preparePackage": { "hooks": { "after": "node -e \"require('@omega.js/devkit/vendor')()\"" } }
 //
 // From the framework's cwd it:
-//   1. Scans dist/ for references to @omegajs packages — CommonJS (require,
+//   1. Scans dist/ for references to @omega.js packages — CommonJS (require,
 //      require.resolve) AND ESM (import ... from, export ... from, dynamic
-//      import(), side-effect import) — @omegajs/client's dist is ESM. Real host
+//      import(), side-effect import) — @omega.js/client's dist is ESM. Real host
 //      files only: symlinks are never followed and node_modules never entered
-//      (@omegajs/backend's dist carries a self-test fixture with a circular self-link)
+//      (@omega.js/backend's dist carries a self-test fixture with a circular self-link)
 //   2. Copies ONLY the referenced modules (plus their transitive relative
 //      requires/imports) into <dist>/vendor/<package>/ — selective, so a host
 //      that uses just safe-install doesn't ship the test runner or inherit its
 //      dependency requirements
-//   3. Rewrites every @omegajs specifier under dist/ to a relative path into
+//   3. Rewrites every @omega.js specifier under dist/ to a relative path into
 //      the matching vendor dir
 //   4. Fails if the host doesn't declare a runtime dependency the vendored modules
 //      require — vendored code resolves e.g. chalk from the HOST's node_modules
 //
 // Package convention: every vendorable package's entry is <root>/src/index.js and
-// subpath exports live beside it ('@omegajs/x/foo' → src/foo.js) — the entry's
+// subpath exports live beside it ('@omega.js/x/foo' → src/foo.js) — the entry's
 // directory is the module root, resolved via require.resolve of the bare name.
 //
 // Notes:
 //   - prepare-package `after` hooks are non-blocking (a failure warns but doesn't
 //     stop prepare). The hard gate is CI's pack→scratch-install smoke plus its
-//     "no @omegajs refs in shipped dist" check.
+//     "no @omega.js refs in shipped dist" check.
 //   - Watch mode's single-file copies skip hooks, so a freshly-saved file can hold
-//     a raw @omegajs specifier in dist. That's fine wherever dist is consumed from
+//     a raw @omega.js specifier in dist. That's fine wherever dist is consumed from
 //     the monorepo (workspace + file: installs resolve the packages up the tree); a
 //     full prepare (npm install / pack / publish) always re-runs the rewrite.
 
@@ -42,9 +42,9 @@ const Logger = require('../src/logger');
 const logger = new Logger('devkit-vendor');
 
 // Specifier body shared by every reference pattern: package name + optional subpath.
-const SPECIFIER = '@omegajs\\/([a-z0-9-]+)(?:\\/([A-Za-z0-9._/-]+))?';
+const SPECIFIER = '@omega\\.js\\/([a-z0-9-]+)(?:\\/([A-Za-z0-9._/-]+))?';
 
-// The ways dist code can reference an @omegajs package. Each pattern captures:
+// The ways dist code can reference an @omega.js package. Each pattern captures:
 // 1 = prefix (kept verbatim on rewrite), 2 = quote, 3 = package name, 4 = subpath.
 // The match ends at the closing quote, so trailing syntax (`)`, `;`) is untouched.
 const REFERENCE_PATTERNS = [
@@ -96,11 +96,11 @@ function specifierToPackageName(specifier) {
 }
 
 // Collect the .js files under dir that are host code: never follows symlinks
-// (@omegajs/backend's self-test fixture ships a circular self-link inside a dist
+// (@omega.js/backend's self-test fixture ships a circular self-link inside a dist
 // node_modules — jetpack.find follows it until ENAMETOOLONG) and never
 // descends into node_modules, the vendor output, or dist/defaults (none is
 // host code to scan or rewrite — defaults are consumer templates scaffolded
-// into consumer projects, where @omegajs/* specifiers must survive as package
+// into consumer projects, where @omega.js/* specifiers must survive as package
 // requires; a framework's own defaults reference the framework itself, which
 // would otherwise vendor the host into itself).
 function findHostJsFiles(dir, vendorRoot) {
@@ -135,9 +135,9 @@ function findHostJsFiles(dir, vendorRoot) {
 // devkit always self-resolves.
 function resolvePackageRoot(name, cwd) {
   try {
-    return path.dirname(require.resolve(`@omegajs/${name}`, { paths: [cwd, __dirname] }));
+    return path.dirname(require.resolve(`@omega.js/${name}`, { paths: [cwd, __dirname] }));
   } catch (error) {
-    throw new Error(`[devkit vendor] Cannot resolve '@omegajs/${name}' from ${cwd} — is it a devDependency of the host?`);
+    throw new Error(`[devkit vendor] Cannot resolve '@omega.js/${name}' from ${cwd} — is it a devDependency of the host?`);
   }
 }
 
@@ -153,7 +153,7 @@ function resolveNeededFiles(name, packageRoot, seeds) {
 
     const abs = path.join(packageRoot, relative);
     if (!jetpack.exists(abs)) {
-      throw new Error(`[devkit vendor] '@omegajs/${name}' has no module '${relative}' (requested by the host or a package-internal require)`);
+      throw new Error(`[devkit vendor] '@omega.js/${name}' has no module '${relative}' (requested by the host or a package-internal require)`);
     }
     needed.add(relative);
 
@@ -171,7 +171,7 @@ function resolveNeededFiles(name, packageRoot, seeds) {
 }
 
 /**
- * Vendor the @omegajs modules a host framework actually uses into its dist and
+ * Vendor the @omega.js modules a host framework actually uses into its dist and
  * rewrite the references.
  *
  * @param {object} [options]
@@ -200,12 +200,12 @@ function vendorPackages(options) {
   // CONSUMER context where the name resolves via the consumer's node_modules —
   // vendoring would fold the host into itself, and rewriting would break that
   // runtime resolution. Those references survive verbatim.
-  const hostSelfName = (hostPackage.name || '').startsWith('@omegajs/')
-    ? hostPackage.name.slice('@omegajs/'.length)
+  const hostSelfName = (hostPackage.name || '').startsWith('@omega.js/')
+    ? hostPackage.name.slice('@omega.js/'.length)
     : null;
 
-  // Published @omegajs RUNTIME deps (dependencies/peer/optional — e.g. desktop's
-  // and extension's @omegajs/client) are never vendor candidates either: they
+  // Published @omega.js RUNTIME deps (dependencies/peer/optional — e.g. desktop's
+  // and extension's @omega.js/client) are never vendor candidates either: they
   // ship to consumers via npm and must resolve to the installed package, not a
   // pinned snapshot (client is a shared singleton — a vendored copy duplicates
   // it and freezes its version). Vendoring is ONLY for the private devDep
@@ -216,18 +216,18 @@ function vendorPackages(options) {
       ...(hostPackage.peerDependencies || {}),
       ...(hostPackage.optionalDependencies || {}),
     })
-      .filter((name) => name.startsWith('@omegajs/'))
-      .map((name) => name.slice('@omegajs/'.length))
+      .filter((name) => name.startsWith('@omega.js/'))
+      .map((name) => name.slice('@omega.js/'.length))
   );
   const neverVendor = (name) => name === hostSelfName || publishedNames.has(name);
 
-  // 1. Scan dist for @omegajs references: which files need rewriting, which
+  // 1. Scan dist for @omega.js references: which files need rewriting, which
   // modules of which packages are used.
   const seedsByPackage = new Map();
   const filesToRewrite = [];
   findHostJsFiles(distPath, vendorRoot).forEach((abs) => {
     const contents = jetpack.read(abs);
-    if (!contents || !contents.includes('@omegajs/')) {
+    if (!contents || !contents.includes('@omega.js/')) {
       return;
     }
     let uses = false;
@@ -243,11 +243,11 @@ function vendorPackages(options) {
     if (uses) filesToRewrite.push(abs);
   });
 
-  // Nothing references @omegajs — clear any stale vendor dir and exit.
+  // Nothing references @omega.js — clear any stale vendor dir and exit.
   // (Everything under dist/vendor is generated by this tool, so a full reset is safe.)
   jetpack.remove(vendorRoot);
   if (seedsByPackage.size === 0) {
-    logger.log(`No @omegajs references found in ${hostPackage.name} dist — nothing to vendor`);
+    logger.log(`No @omega.js references found in ${hostPackage.name} dist — nothing to vendor`);
     return { rewritten: 0, vendored: {}, vendorRoot };
   }
 
@@ -262,7 +262,7 @@ function vendorPackages(options) {
     vendored[name] = [...needed].sort();
   }
 
-  // 3. Rewrite the @omegajs references to relative paths into the vendor dirs.
+  // 3. Rewrite the @omega.js references to relative paths into the vendor dirs.
   let rewritten = 0;
   filesToRewrite.forEach((abs) => {
     const contents = jetpack.read(abs);
@@ -298,9 +298,9 @@ function vendorPackages(options) {
     for (const pattern of BARE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         const name = specifierToPackageName(match[2]);
-        // Cross-references between @omegajs packages are never host deps —
-        // leftovers in shipped dist are caught by CI's no-@omegajs-refs check.
-        if (name.startsWith('@omegajs/')) {
+        // Cross-references between @omega.js packages are never host deps —
+        // leftovers in shipped dist are caught by CI's no-@omega.js-refs check.
+        if (name.startsWith('@omega.js/')) {
           continue;
         }
         if (!isBuiltin(name) && !hostRuntimeDeps[name]) {

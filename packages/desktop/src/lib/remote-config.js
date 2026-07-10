@@ -177,7 +177,7 @@ const remoteConfig = {
     if (!data || typeof data !== 'object') return null;
 
     // Layer fresh fetch on top of defaults so consumers can omit fields from
-    // their hosted JSON and @omegajs/desktop still has sensible values.
+    // their hosted JSON and @omega.js/desktop still has sensible values.
     remoteConfig._data = { ...DEFAULTS, ...data };
     remoteConfig._manager.storage.set(STORAGE_KEY, data);
     remoteConfig._emit('update', remoteConfig._data);

@@ -1,9 +1,9 @@
-// `npx mgr cdp capture <out.png>` — composited window capture: what the user
+// `npx omega cdp capture <out.png>` — composited window capture: what the user
 // ACTUALLY sees (the BrowserWindow document + every WebContentsView stacked by
 // the window server), normalized to sRGB.
 //
-//   npx mgr cdp capture <out.png> [--window-id <CGWindowID>]
-//   npx mgr cdp capture --find-window-id
+//   npx omega cdp capture <out.png> [--window-id <CGWindowID>]
+//   npx omega cdp capture --find-window-id
 //
 // Default path: raises the app (System Events), reads the window rect over
 // CDP, region-captures it. Anything overlapping that region after the raise
@@ -74,7 +74,7 @@ module.exports = async function (options) {
 
   const outPath = options._[2];
   if (!outPath) {
-    throw new Error('Usage: npx mgr cdp capture <out.png> [--window-id <id>] | --find-window-id');
+    throw new Error('Usage: npx omega cdp capture <out.png> [--window-id <id>] | --find-window-id');
   }
 
   const windowId = options['window-id'] || options.windowId;

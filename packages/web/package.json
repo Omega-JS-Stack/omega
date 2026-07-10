@@ -1,11 +1,12 @@
 {
-  "name": "@omegajs/web",
-  "version": "0.2.1",
-  "description": "The OMEGA web framework (UJM successor) — Eleventy 3 + LiquidJS + @omegajs/template-kit engine core with the `omega` CLI: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, the esbuild/sass/PurgeCSS asset pipeline, and the ESM boot runtime. Private until first publish.",
+  "name": "@omega.js/web",
+  "version": "0.3.0",
+  "description": "The OMEGA web framework (UJM successor) — Eleventy 3 + LiquidJS + @omega.js/template-kit engine core with the `omega` CLI: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, the esbuild/sass/PurgeCSS asset pipeline, and the ESM boot runtime. Private until first publish.",
   "private": true,
   "main": "./src/index.js",
   "bin": {
-    "omega": "./bin/omega"
+    "omega": "./bin/omega",
+    "omg": "./bin/omg"
   },
   "exports": {
     ".": "./src/index.js",
@@ -20,16 +21,17 @@
     "./paths": "./src/paths.js",
     "./consumer": "./src/consumer.js",
     "./scaffold": "./src/scaffold.js",
-    "./migrate": "./src/migrate/index.js"
+    "./migrate": "./src/migrate/index.js",
+    "./cli": "./src/cli-run.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@11ty/eleventy": "^3.1.6",
-    "@omegajs/config": "*",
-    "@omegajs/devkit": "*",
-    "@omegajs/template-kit": "*",
+    "@omega.js/config": "*",
+    "@omega.js/devkit": "*",
+    "@omega.js/template-kit": "*",
     "@popperjs/core": "^2.11.8",
     "chart.js": "^4.5.1",
     "dompurify": "^3.4.11",

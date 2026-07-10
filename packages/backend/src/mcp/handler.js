@@ -37,7 +37,7 @@ function getConsumerTools(cwd) {
  * @param {IncomingMessage} req
  * @param {ServerResponse} res
  * @param {object} options
- * @param {object} options.Manager - @omegajs/backend Manager instance
+ * @param {object} options.Manager - @omega.js/backend Manager instance
  * @param {string} options.routePath - Resolved route path (e.g. "mcp", "mcp/authorize")
  */
 async function handleMcpRoute(req, res, options) {
@@ -383,7 +383,7 @@ async function handleMcpProtocol(req, res, options) {
   // Create MCP server
   const server = new Server(
     {
-      name: '@omegajs/backend',
+      name: '@omega.js/backend',
       version: packageJSON.version,
     },
     {

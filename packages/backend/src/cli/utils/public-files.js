@@ -15,7 +15,7 @@
 const jetpack = require('fs-jetpack');
 const path = require('path');
 const powertools = require('node-powertools');
-const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
 const TEMPLATE_DIR = path.resolve(__dirname, '../../../templates/public');
 const FILES = ['index.html', '404.html'];

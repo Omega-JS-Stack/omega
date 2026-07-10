@@ -6,7 +6,7 @@
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 let firebaseAuth = null;
 let signinMethodForms = new Map(); // Store FormManager instances for signin methods
@@ -50,7 +50,7 @@ async function initializeSigninMethods() {
   console.log('[DEBUG] security.js - initializeSigninMethods() called');
 
   // Get Firebase auth instance
-  firebaseAuth = webManager.firebaseAuth;
+  firebaseAuth = omega.firebaseAuth;
 
   // Check for redirect result (in case user is returning from Google auth)
   checkRedirectResult();
@@ -66,13 +66,13 @@ async function checkRedirectResult() {
     const result = await getRedirectResult(firebaseAuth);
 
     if (result && result.user) {
-      webManager.utilities().showNotification('Google account connected successfully', 'success');
+      omega.utilities().showNotification('Google account connected successfully', 'success');
       updateSigninMethods();
     }
   } catch (error) {
     if (error.code && error.code !== 'auth/no-auth-event') {
       console.error('Redirect result error:', error);
-      webManager.utilities().showNotification('Failed to connect Google account', 'danger');
+      omega.utilities().showNotification('Failed to connect Google account', 'danger');
     }
   }
 }
@@ -88,8 +88,8 @@ async function updateSigninMethods() {
     return;
   }
 
-  // Get the formatted user from webManager for consistency, but we'll use firebaseUser for provider data
-  const user = webManager.auth().getUser();
+  // Get the formatted user from omega for consistency, but we'll use firebaseUser for provider data
+  const user = omega.auth().getUser();
   if (!user) {
     console.log('[DEBUG] security.js - No user, returning');
     return;
@@ -198,7 +198,7 @@ async function updateActiveSessions(account) {
 
   // Fetch other active sessions from server
   try {
-    const serverApiURL = `${webManager.getApiUrl()}/backend-manager/user/sessions`;
+    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/sessions`;
 
     const data = await authorizedFetch(serverApiURL, {
       method: 'GET',
@@ -295,14 +295,14 @@ async function updateActiveSessions(account) {
             ${getDeviceIcon(session.platform || deviceName)}
           </div>
           <div>
-            <strong>${webManager.utilities().escapeHTML(deviceName)}</strong>
-            <div class="text-muted small">${webManager.utilities().escapeHTML(browserName)}${session.mobile !== undefined ? ` • ${session.mobile ? 'Mobile' : 'Desktop'}` : ''}</div>
-            ${location ? `<div class="text-muted small">${webManager.utilities().escapeHTML(location)}</div>` : ''}
-            ${session.ip ? `<div class="text-muted small">IP: ${webManager.utilities().escapeHTML(session.ip)}</div>` : ''}
+            <strong>${omega.utilities().escapeHTML(deviceName)}</strong>
+            <div class="text-muted small">${omega.utilities().escapeHTML(browserName)}${session.mobile !== undefined ? ` • ${session.mobile ? 'Mobile' : 'Desktop'}` : ''}</div>
+            ${location ? `<div class="text-muted small">${omega.utilities().escapeHTML(location)}</div>` : ''}
+            ${session.ip ? `<div class="text-muted small">IP: ${omega.utilities().escapeHTML(session.ip)}</div>` : ''}
           </div>
         </div>
         <div class="text-end">
-          <small class="text-muted">${webManager.utilities().escapeHTML(formatDate(session.timestamp || (session.timestampUNIX * 1000)))}</small>
+          <small class="text-muted">${omega.utilities().escapeHTML(formatDate(session.timestamp || (session.timestampUNIX * 1000)))}</small>
           ${session.isCurrent ? '<span class="badge bg-primary ms-2">Current</span>' : ''}
         </div>
       </div>
@@ -392,7 +392,7 @@ function initializeSignoutAllForm() {
       }
 
       // Sign out of all sessions
-      await webManager.auth().signOut();
+      await omega.auth().signOut();
 
       // Show success message
       signoutAllFormManager.showSuccess('Successfully signed out of all sessions.');
@@ -405,7 +405,7 @@ function initializeSignoutAllForm() {
 // Initialize signin link generator (advanced feature).
 // Creates a temporary signin URL using a Firebase custom token. The link grants
 // full account access to anyone who holds it, so we gate it behind a typed
-// confirmation phrase before hitting @omegajs/backend's /user/token route.
+// confirmation phrase before hitting @omega.js/backend's /user/token route.
 function initializeSigninLinkGenerator() {
   const $modal = document.getElementById('generate-signin-link-modal');
   if (!$modal) {
@@ -449,7 +449,7 @@ function initializeSigninLinkGenerator() {
     $generateBtn.querySelector('.button-text').textContent = 'Generating...';
 
     try {
-      const tokenURL = `${webManager.getApiUrl()}/backend-manager/user/token`;
+      const tokenURL = `${omega.getApiUrl()}/backend-manager/user/token`;
       const data = await authorizedFetch(tokenURL, {
         method: 'POST',
         timeout: 60000,
@@ -470,7 +470,7 @@ function initializeSigninLinkGenerator() {
       $resultView.classList.remove('d-none');
     } catch (error) {
       console.error('[Security] Failed to generate signin link:', error);
-      webManager.utilities().showNotification(
+      omega.utilities().showNotification(
         `Failed to generate signin link: ${error.message || 'Unknown error'}`,
         { type: 'danger', timeout: 8000 }
       );
@@ -483,11 +483,11 @@ function initializeSigninLinkGenerator() {
   $copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText($output.value);
-      webManager.utilities().showNotification('Signin link copied to clipboard', 'success');
+      omega.utilities().showNotification('Signin link copied to clipboard', 'success');
     } catch (error) {
       $output.select();
       document.execCommand('copy');
-      webManager.utilities().showNotification('Signin link copied to clipboard', 'success');
+      omega.utilities().showNotification('Signin link copied to clipboard', 'success');
     }
   });
 }
@@ -503,7 +503,7 @@ async function connectGoogleProvider() {
   if (useAuthPopup) {
     try {
       const result = await linkWithPopup(firebaseAuth.currentUser, provider);
-      webManager.utilities().showNotification('Google account connected successfully', 'success');
+      omega.utilities().showNotification('Google account connected successfully', 'success');
 
       // Force refresh of the current user to get updated provider data
       await firebaseAuth.currentUser.reload();
@@ -556,7 +556,7 @@ async function disconnectGoogleProvider() {
 
   try {
     await unlink(user, 'google.com');
-    webManager.utilities().showNotification('Google account disconnected successfully', 'success');
+    omega.utilities().showNotification('Google account disconnected successfully', 'success');
   } catch (error) {
     if (error.code === 'auth/no-such-provider') {
       throw new Error('Google account is not connected');
@@ -568,7 +568,7 @@ async function disconnectGoogleProvider() {
 
 // Handle change password
 async function handleChangePassword() {
-  const user = webManager.auth().getUser();
+  const user = omega.auth().getUser();
   if (!user || !user.email) {
     throw new Error('Please log in to reset your password.');
   }

@@ -11,28 +11,28 @@ class Notifications {
     const stored = storage.get('notifications');
     const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
 
-    console.log('[@omegajs/client:push] Page load check:', { storedSubscribed: stored?.subscribed, storedToken: stored?.token?.slice(-8), permission });
+    console.log('[@omega.js/client:push] Page load check:', { storedSubscribed: stored?.subscribed, storedToken: stored?.token?.slice(-8), permission });
 
     // If localStorage says subscribed but browser permission disagrees, clear it
     if (stored?.subscribed && permission !== 'granted') {
-      console.log('[@omegajs/client:push] Clearing stale subscription — permission is', permission);
+      console.log('[@omega.js/client:push] Clearing stale subscription — permission is', permission);
       storage.set('notifications', { subscribed: false, token: null });
     }
 
     // Arm auto-request if not currently subscribed (including just-cleared)
     const autoRequest = config?.autoRequest;
     if ((!stored?.subscribed || permission !== 'granted') && autoRequest > 0) {
-      console.log('[@omegajs/client:push] Arming auto-request (delay:', autoRequest + 'ms)');
+      console.log('[@omega.js/client:push] Arming auto-request (delay:', autoRequest + 'ms)');
       this._setupAutoRequest(autoRequest);
     }
 
     // Listen for foreground messages (tab is focused)
     if (permission === 'granted') {
-      console.log('[@omegajs/client:push] Setting up foreground listener...', { supported: this.isSupported(), hasMessaging: !!this.manager.firebaseMessaging });
+      console.log('[@omega.js/client:push] Setting up foreground listener...', { supported: this.isSupported(), hasMessaging: !!this.manager.firebaseMessaging });
       this.onMessage((payload) => {
-        console.log('[@omegajs/client:push] Foreground message received:', payload);
+        console.log('[@omega.js/client:push] Foreground message received:', payload);
       }).then(unsub => {
-        console.log('[@omegajs/client:push] Foreground listener registered:', typeof unsub === 'function' ? 'OK' : 'FAILED (got empty fn)');
+        console.log('[@omega.js/client:push] Foreground listener registered:', typeof unsub === 'function' ? 'OK' : 'FAILED (got empty fn)');
       });
     }
   }
@@ -46,9 +46,9 @@ class Notifications {
       document.removeEventListener('click', handleClick);
 
       setTimeout(() => {
-        console.log('[@omegajs/client:push] Auto-requesting notification permissions...');
+        console.log('[@omega.js/client:push] Auto-requesting notification permissions...');
         this.subscribe().catch(err => {
-          console.error('[@omegajs/client:push] Auto-subscription failed:', err.message);
+          console.error('[@omega.js/client:push] Auto-subscription failed:', err.message);
         });
       }, delay);
     };
@@ -284,14 +284,14 @@ class Notifications {
 
       const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
 
-      console.log('[@omegajs/client:push:sync] Starting sync:', { storedSubscribed: storedNotification?.subscribed, storedToken: storedNotification?.token?.slice(-8), permission });
+      console.log('[@omega.js/client:push:sync] Starting sync:', { storedSubscribed: storedNotification?.subscribed, storedToken: storedNotification?.token?.slice(-8), permission });
 
       if (permission !== 'granted') {
         if (storedNotification?.subscribed) {
-          console.log('[@omegajs/client:push:sync] Permission not granted — clearing localStorage');
+          console.log('[@omega.js/client:push:sync] Permission not granted — clearing localStorage');
           storage.set('notifications', { subscribed: false, token: null });
         } else {
-          console.log('[@omegajs/client:push:sync] Permission not granted and not subscribed — nothing to do');
+          console.log('[@omega.js/client:push:sync] Permission not granted and not subscribed — nothing to do');
         }
         return false;
       }
@@ -300,12 +300,12 @@ class Notifications {
       const currentToken = await this.getToken();
 
       if (!currentToken) {
-        console.log('[@omegajs/client:push:sync] Token fetch returned null — clearing localStorage');
+        console.log('[@omega.js/client:push:sync] Token fetch returned null — clearing localStorage');
         storage.set('notifications', { subscribed: false, token: null });
         return false;
       }
 
-      console.log('[@omegajs/client:push:sync] Token valid:', currentToken.slice(-8), storedNotification?.token ? (storedNotification.token.slice(-8) === currentToken.slice(-8) ? '(unchanged)' : '(CHANGED from ' + storedNotification.token.slice(-8) + ')') : '(recovered — localStorage was empty)');
+      console.log('[@omega.js/client:push:sync] Token valid:', currentToken.slice(-8), storedNotification?.token ? (storedNotification.token.slice(-8) === currentToken.slice(-8) ? '(unchanged)' : '(CHANGED from ' + storedNotification.token.slice(-8) + ')') : '(recovered — localStorage was empty)');
 
       await this._saveSubscription(currentToken);
 
@@ -317,10 +317,10 @@ class Notifications {
         timestamp: new Date().toISOString(),
       });
 
-      console.log('[@omegajs/client:push:sync] Sync complete — subscribed');
+      console.log('[@omega.js/client:push:sync] Sync complete — subscribed');
       return true;
     } catch (error) {
-      console.error('[@omegajs/client:push:sync] Sync error:', error);
+      console.error('[@omega.js/client:push:sync] Sync error:', error);
       return false;
     }
   }

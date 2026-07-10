@@ -4,7 +4,7 @@
 
 // Libraries
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // State
 let formManager = null;
@@ -12,9 +12,9 @@ let formManager = null;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
-    webManager.auth().listen({ once: true }, async (state) => {
+    omega.auth().listen({ once: true }, async (state) => {
       if (!state.user) {
         return;
       }
@@ -48,7 +48,7 @@ function initForm() {
     const { initializeApp, deleteApp } = await import('firebase/app');
     const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
 
-    const tempApp = initializeApp(webManager.firebaseApp.options, '_temp_create_user_');
+    const tempApp = initializeApp(omega.firebaseApp.options, '_temp_create_user_');
     const tempAuth = getAuth(tempApp);
 
     try {

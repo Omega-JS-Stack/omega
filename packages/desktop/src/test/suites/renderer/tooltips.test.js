@@ -1,4 +1,4 @@
-// Renderer-layer suite — verifies @omegajs/desktop's zero-setup Bootstrap tooltips: the
+// Renderer-layer suite — verifies @omega.js/desktop's zero-setup Bootstrap tooltips: the
 // prebuilt Bootstrap bundle (Popper inlined) loads, every
 // `[data-bs-toggle="tooltip"]` element is auto-initialized (including ones
 // inserted after boot), title changes update the live instance, and removal
@@ -44,7 +44,7 @@ module.exports = {
         el.type = 'button';
         el.id = 'tt-show';
         el.setAttribute('data-bs-toggle', 'tooltip');
-        el.setAttribute('data-bs-title', 'Hello from @omegajs/desktop');
+        el.setAttribute('data-bs-title', 'Hello from @omega.js/desktop');
         el.textContent = 'hover me';
         document.body.appendChild(el);
 
@@ -54,7 +54,7 @@ module.exports = {
         const shown = window.__emTestTooltip.showDirect('tt-show');
         ctx.expect(shown).toBe(true);
         await until(() => document.querySelector('.tooltip .tooltip-inner'));
-        ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('Hello from @omegajs/desktop');
+        ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('Hello from @omega.js/desktop');
 
         // Removing the host while shown must clean up the tip (dispose path).
         el.remove();

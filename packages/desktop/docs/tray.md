@@ -1,6 +1,6 @@
 # Tray
 
-File-based tray/menubar. @omegajs/desktop looks for `src/integrations/tray/index.js`; if it exists, the exported function is called during boot with a builder API + id-path API. If absent, @omegajs/desktop ships a default tray template (see ids below).
+File-based tray/menubar. @omega.js/desktop looks for `src/integrations/tray/index.js`; if it exists, the exported function is called during boot with a builder API + id-path API. If absent, @omega.js/desktop ships a default tray template (see ids below).
 
 ## Config
 
@@ -11,14 +11,14 @@ No config block. Path is conventional: `src/integrations/tray/index.js`. To opt 
 ```js
 // src/integrations/tray/index.js
 module.exports = ({ manager, tray }) => {
-  // @omegajs/desktop auto-resolves the tray icon from config/icons/<platform>/tray.png at build
+  // @omega.js/desktop auto-resolves the tray icon from config/icons/<platform>/tray.png at build
   // time, so explicit tray.icon() is OPTIONAL. Call it only to override.
   // Note: on macOS, if you pass your own path, the filename MUST end in
   // `Template.png` for the OS to auto-invert it in dark mode.
   // tray.icon('src/assets/icons/my-trayTemplate.png');
   tray.tooltip(manager.config?.app?.productName);
 
-  // Easiest: start from @omegajs/desktop's default template.
+  // Easiest: start from @omega.js/desktop's default template.
   tray.useDefaults();
 
   // Then customize by id (flat — no `tray/` prefix needed):
@@ -41,7 +41,7 @@ tray.tooltip(text)
 tray.item(descriptor)          // see "Item descriptors" below
 tray.separator()
 tray.submenu(label, items)
-tray.useDefaults()             // populate with @omegajs/desktop's default template (id-tagged)
+tray.useDefaults()             // populate with @omega.js/desktop's default template (id-tagged)
 tray.clear()                   // start over
 ```
 
@@ -161,4 +161,4 @@ manager.tray.define(({ manager, tray }) => {
 
 ## Default scaffold
 
-`npx mgr setup` ships `src/integrations/tray/index.js` calling `tray.useDefaults()` so you start with the same items the framework would supply on its own — plus commented-out examples covering insertAfter, update, remove, hide, enable, and submenus.
+`npx omega setup` ships `src/integrations/tray/index.js` calling `tray.useDefaults()` so you start with the same items the framework would supply on its own — plus commented-out examples covering insertAfter, update, remove, hide, enable, and submenus.

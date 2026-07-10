@@ -4,7 +4,7 @@
  * Why this exists as a unit test (not an emulator test):
  *
  * The forwarder is gated on Manager.isParent() (config.parent === 'self'). In real test runs
- * we run AGAINST a child brand's @omegajs/backend (Somiibo, etc.), so the route is invisible
+ * we run AGAINST a child brand's @omega.js/backend (Somiibo, etc.), so the route is invisible
  * (404). To verify the fan-out logic, we exercise the route handler directly
  * against a mocked admin SDK + mocked fetch, no HTTP needed.
  *
@@ -376,7 +376,7 @@ module.exports = {
       async run({ assert }) {
         // The parent's own brand IS expected to be in the brands collection.
         // It should be fanned to via HTTP like any other brand, so its own
-        // @omegajs/backend processes its own user updates the same way as siblings.
+        // @omega.js/backend processes its own user updates the same way as siblings.
         await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });

@@ -118,7 +118,7 @@ const Stripe = {
    *
    * @param {object} rawSubscription - Raw Stripe subscription object
    * @param {object} options
-   * @param {object} options.config - @omegajs/backend config (must contain products array)
+   * @param {object} options.config - @omega.js/backend config (must contain products array)
    * @param {string} options.eventName - Name of the webhook event (e.g., 'customer.subscription.updated')
    * @param {string} options.eventId - ID of the webhook event (e.g., 'evt_xxx')
    * @returns {object} Unified subscription object
@@ -453,7 +453,7 @@ function resolveProduct(raw, config) {
   }
 
   // Test-mode sentinel: the test processor synthesizes "_test_<id>" when no real
-  // Stripe product is configured. Map it back to the matching @omegajs/backend product so the
+  // Stripe product is configured. Map it back to the matching @omega.js/backend product so the
   // pipeline can be exercised end-to-end without real Stripe credentials.
   if (typeof stripeProductId === 'string' && stripeProductId.startsWith('_test_')) {
     const bemId = stripeProductId.slice('_test_'.length);

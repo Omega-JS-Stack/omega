@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { acquireWatchLock, releaseWatchLock } = require('@omegajs/devkit/local');
+const { acquireWatchLock, releaseWatchLock } = require('@omega.js/devkit/local');
 
 // Constants
 const ROOT = path.resolve(__dirname, '..');

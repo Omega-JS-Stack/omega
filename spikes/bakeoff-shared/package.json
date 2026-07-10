@@ -1,7 +1,7 @@
 {
-  "name": "@omegajs/bakeoff-shared",
+  "name": "@omega.js/bakeoff-shared",
   "version": "0.1.0",
-  "description": "Shared corpus generator + bench harness + scorecard/decision records for the Eleventy vs Astro bake-off (Phase 2). The SSG-agnostic engine pieces (asset pipeline, layered resolution, frontmatter Liquid, consumer scan) and the test fixtures were promoted to @omegajs/web in B1.",
+  "description": "Shared corpus generator + bench harness + scorecard/decision records for the Eleventy vs Astro bake-off (Phase 2). The SSG-agnostic engine pieces (asset pipeline, layered resolution, frontmatter Liquid, consumer scan) and the test fixtures were promoted to @omega.js/web in B1.",
   "private": true,
   "main": "./src/generate-corpus.js",
   "scripts": {

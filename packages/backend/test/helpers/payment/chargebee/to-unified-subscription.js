@@ -14,7 +14,7 @@ const FIXTURE_NON_RENEWING = require('../../../fixtures/chargebee/subscription-n
 const FIXTURE_PAUSED = require('../../../fixtures/chargebee/subscription-paused.json');
 const FIXTURE_LEGACY = require('../../../fixtures/chargebee/subscription-legacy-plan.json');
 
-// Mock config matching the @omegajs/backend template
+// Mock config matching the @omega.js/backend template
 const MOCK_CONFIG = {
   payment: {
     products: [

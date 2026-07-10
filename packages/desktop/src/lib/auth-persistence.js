@@ -25,9 +25,9 @@
 //        than "store it in a browser session".
 //   'none' — explicit opt-out; Firebase stays in-memory (pre-1.12 behavior).
 //
-// Select via config `webManager.authPersistence` ('safeStorage' | 'none' | a custom
+// Select via config `omega.authPersistence` ('safeStorage' | 'none' | a custom
 // registered name). Register custom strategies BEFORE manager.initialize():
-//   require('@omegajs/desktop/lib/auth-persistence').register('keytar', {...})
+//   require('@omega.js/desktop/lib/auth-persistence').register('keytar', {...})
 //
 // The firebase adapter mirrors firebase's own getReactNativePersistence(): a class
 // implementing the internal Persistence surface (_set/_get/_remove) over an
@@ -120,7 +120,7 @@ const authPersistence = {
   _active: null,   // the strategy resolve() settled on (null until resolved)
 
   // Lib-shape conformance — the real work happens in resolve(), called by the
-  // @omegajs/client bridge at auth boot (it needs the async availability check).
+  // @omega.js/client bridge at auth boot (it needs the async availability check).
   initialize(manager) {
     if (authPersistence._initialized) {
       return;
@@ -140,7 +140,7 @@ const authPersistence = {
   // Pick + availability-check the configured strategy. Returns the active strategy
   // or null (→ caller falls back to firebase's in-memory default).
   async resolve(manager) {
-    const wanted = manager.config?.webManager?.authPersistence || 'safeStorage';
+    const wanted = manager.config?.omega?.authPersistence || 'safeStorage';
     const strategy = authPersistence._strategies[wanted];
 
     if (!strategy) {

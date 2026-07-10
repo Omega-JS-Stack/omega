@@ -117,7 +117,7 @@ to any consumer):
    needs an engine-level home — B3 design item, doc-level frontmatter interim.
 
 Engine features BOTH candidates needed for the real layouts (— these are
-@omegajs/web requirements regardless of winner): team collection for
+@omega.js/web requirements regardless of winner): team collection for
 `uj_member`, consumer `_includes` in the Liquid roots (existing dirs only),
 page-scoped frontmatter Liquid (`{{ page.recipe.title }}` in layout meta
 defers to a per-page copy-on-write render — the site-scope cache would poison
@@ -144,7 +144,7 @@ measure content, not the SSG; deferred to B5 `omega verify` per-site gates.
 |------|:--------:|:-----:|
 | Base layout chain | ✅ | ✅ .astro slot chain (3-deep: package → solution → base) |
 | blueprint/index + pricing (incl. resolve-plan math) | ✅ | ✅ math as plain JS in plan-card component |
-| Auth signin/signup (FormManager + web-manager boot) | ✅ real @omegajs/client bundled via `web-manager` esbuild alias | ✅ same (shared asset pipeline) |
+| Auth signin/signup (FormManager + web-manager boot) | ✅ real @omega.js/client bundled via `web-manager` esbuild alias | ✅ same (shared asset pipeline) |
 | Blog with pagination + taxonomy | ✅ | ✅ injected routes (integration) over content collections |
 | 404 | ✅ | ✅ reserved `src/pages/404.astro` |
 | One frontmatter-only override page (consumer data over layout defaults) | ✅ native data cascade | ✅ `computeResolved()` deep-merge over exported layout defaults |
@@ -172,8 +172,8 @@ vs Eleventy's in-process toJSON (suite ~1 s).
 
 **Eleventy wins — 4.70 vs 3.55 (margin 1.15, decision rule needed only
 < 0.5).** Full rationale, consequences, and the consumer conversion plan:
-[DECISION.md](DECISION.md). Phase B builds `@omegajs/web` on Eleventy 3;
+[DECISION.md](DECISION.md). Phase B builds `@omega.js/web` on Eleventy 3;
 the Astro spike stays in-tree as reference. Everything engine-agnostic
-carries forward regardless: template-kit, @omegajs/config, the shared asset
+carries forward regardless: template-kit, @omega.js/config, the shared asset
 pipeline, the layered-theme model, default-pages-with-suppression, and the
 codemod rule list above.

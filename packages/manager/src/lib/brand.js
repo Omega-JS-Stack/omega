@@ -1,6 +1,6 @@
 /**
  * Brand-monorepo loading — resolve the brand root from any cwd inside it,
- * load config/omega.json5 through @omegajs/config (whole-file merge, manager
+ * load config/omega.json5 through @omega.js/config (whole-file merge, manager
  * defaults as the lowest layer), enumerate enabled targets, and discover the
  * apps under apps/.
  *
@@ -21,13 +21,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 
-const { loadConfig, resolveConfigPath, getEnabledTargets, deepMerge } = require('@omegajs/config');
+const { loadConfig, resolveConfigPath, getEnabledTargets, deepMerge } = require('@omega.js/config');
 const { DEFAULTS, APP_DIR_TARGETS, templateObject } = require('../config.js');
 
 /**
  * Walk up from startDir to the brand-monorepo root: the nearest ancestor with
  * an omega.json5 that is not an APP of a brand above it. "App" uses the exact
- * rule @omegajs/config's brand walk-up uses: directly under an apps/ dir AND
+ * rule @omega.js/config's brand walk-up uses: directly under an apps/ dir AND
  * a brand-level config/omega.json5 exists one level above that — so a brand
  * that itself lives inside some larger workspace's apps/ folder (the
  * monorepo's sandbox brand) still resolves as a brand root. Works from the

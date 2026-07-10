@@ -3,7 +3,7 @@
 // ============================================
 
 // Import Browser Extension Manager
-import Manager from '@omegajs/extension/page';
+import Manager from '@omega.js/extension/page';
 
 // Create instance
 const manager = new Manager();
@@ -12,7 +12,7 @@ const manager = new Manager();
 manager.initialize()
 .then(() => {
   // Shortcuts
-  const { extension, messenger, logger, webManager } = manager;
+  const { extension, messenger, logger, omega } = manager;
 
   // Add your project-specific page logic here
   // ...

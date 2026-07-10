@@ -1,5 +1,5 @@
 /**
- * Loader tests for @omegajs/config — file discovery (standalone + standalone
+ * Loader tests for @omega.js/config — file discovery (standalone + standalone
  * backend + brand monorepo), the five-layer resolution chain, targets
  * semantics, and the raw-file hard fails (secrets, legacy targets array).
  *
@@ -179,7 +179,7 @@ test('no target: whole files merge (targets map included) — the disperse shape
 });
 
 test('backend runtime cwd (the functions/ dir) still walks up to the brand config', (t) => {
-  // @omegajs/backend's Manager boots with cwd = {brand}/apps/backend/functions — the app
+  // @omega.js/backend's Manager boots with cwd = {brand}/apps/backend/functions — the app
   // root is one up, and the brand layer must still resolve from there.
   const root = makeFixture('functions-cwd', {
     'config/omega.json5': `{

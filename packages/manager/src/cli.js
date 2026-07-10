@@ -1,12 +1,12 @@
 /**
- * The @omegajs/manager CLI dispatcher — devkit's shared router over
+ * The @omega.js/manager CLI dispatcher — devkit's shared router over
  * src/commands/. `omega-manager` with no command runs manage (the whole
  * point of the tool: walk every service and reconcile the brand to its
  * omega.json5).
  */
 const path = require('node:path');
 
-const { createCliRouter } = require('@omegajs/devkit/cli-router');
+const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
 // Command name → positional/flag aliases
 const ALIASES = {

@@ -1,8 +1,8 @@
-# @omegajs/template-kit — the uj_* template surface as plain JS
+# @omega.js/template-kit — the uj_* template surface as plain JS
 
 The complete filter/tag surface of jekyll-uj-powertools (READ-ONLY reference
 repo), ported to engine-neutral JavaScript for the SSG bake-off and
-`@omegajs/web`. Private workspace package (`packages/template-kit`), vendored
+`@omega.js/web`. Private workspace package (`packages/template-kit`), vendored
 into frameworks at prepare time like the other shared packages.
 
 Two consumption paths (plan §4 A0):
@@ -65,7 +65,7 @@ the SIMPLE expression subset (`item.path <op> literal`, contains, bare truthy)
 
 ```js
 registerLiquid(new Liquid({ jekyllInclude: true }), {
-  site,                                  // the site.* global — pair with @omegajs/config's toSiteGlobal()
+  site,                                  // the site.* global — pair with @omega.js/config's toSiteGlobal()
   getCollection: (name) => docs,         // docs: { id: '/team/x', url, data }  (Jekyll doc parity)
   getCollectionNames: () => [...],
   fileExists: (path) => boolean,
@@ -75,7 +75,7 @@ registerLiquid(new Liquid({ jekyllInclude: true }), {
 });
 ```
 
-`site.*` comes from `@omegajs/config`'s **`toSiteGlobal(resolvedConfig)`**
+`site.*` comes from `@omega.js/config`'s **`toSiteGlobal(resolvedConfig)`**
 (`packages/config/src/site-global.js`): identity mapping of the resolved
 config (machinery keys `targets`/`enabled` stripped; `url` derived from
 `brand.url` unless explicit; `baseurl` defaulted) — the site.* audit showed

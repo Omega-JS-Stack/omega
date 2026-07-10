@@ -1,4 +1,4 @@
-// test-stealth — single source of truth for "should @omegajs/desktop keep test-run UI invisible
+// test-stealth — single source of truth for "should @omega.js/desktop keep test-run UI invisible
 // and non-intrusive?".
 //
 // True when the process is in Testing mode AND the developer hasn't opted into

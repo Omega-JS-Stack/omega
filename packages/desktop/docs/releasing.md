@@ -4,7 +4,7 @@ End-to-end walkthrough for cutting a signed + notarized + published release of a
 
 ## Repo layout (private app, public releases)
 
-@omegajs/desktop separates **three** GitHub repos for a typical app:
+@omega.js/desktop separates **three** GitHub repos for a typical app:
 
 | Repo | Visibility | Purpose |
 |---|---|---|
@@ -14,7 +14,7 @@ End-to-end walkthrough for cutting a signed + notarized + published release of a
 
 Why three? Auto-update feeds and marketing downloads MUST be publicly accessible (no auth headers in `electron-updater` or in `<a href>`). Your app source can stay private. The two public repos contain only binaries — no source code.
 
-`npx mgr setup` auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/omega.json5`:
+`npx omega setup` auto-creates the two public repos if they don't exist (uses `GH_TOKEN`). Configure via `config/omega.json5`:
 
 ```jsonc
 releases: {
@@ -47,13 +47,13 @@ See [`docs/signing.md`](signing.md) for full cert setup details.
 
 ```bash
 cd <your-app>
-npm i @omegajs/desktop --save-dev
-npx mgr setup
+npm i @omega.js/desktop --save-dev
+npx omega setup
 ```
 
 `setup`:
 1. Ensures peer deps (`gulp`, `electron`, `electron-builder`) are installed.
-2. Writes @omegajs/desktop's `projectScripts` into your `package.json` (`start`, `build`, `release`, `test`).
+2. Writes @omega.js/desktop's `projectScripts` into your `package.json` (`start`, `build`, `release`, `test`).
 3. Copies framework defaults (config, builder yml, hooks, scaffold src/, build/) — merging `.env` and `.gitignore` so user customizations are preserved.
 4. Validates signing prereqs (warns if missing — non-fatal).
 5. Pushes secrets from `.env` → GitHub Actions if `GH_TOKEN` is present.
@@ -83,7 +83,7 @@ APPLE_TEAM_ID="XXXXXXXXXX"
 Re-run setup to push the now-populated secrets to GitHub:
 
 ```bash
-npx mgr setup
+npx omega setup
 ```
 
 You should see ✓ for each secret in the output.
@@ -100,7 +100,7 @@ This runs as a **single gulp invocation** (`gulp publish` with `EM_BUILD_MODE=tr
 1. **build** — defaults → distribute → webpack/sass/html → audit → build-config (materializes `dist/electron-builder.yml` with mode-dependent injections like `LSUIElement` for tray-only)
 2. **release** — `electron-builder build --publish always`
    - Signs the `.app` with your Developer ID Application cert
-   - Calls @omegajs/desktop's built-in `afterSign` hook which submits to Apple notarytool via the API key (consumer can extend via `hooks/notarize/post.js`)
+   - Calls @omega.js/desktop's built-in `afterSign` hook which submits to Apple notarytool via the API key (consumer can extend via `hooks/notarize/post.js`)
    - Stapling + final `.dmg` / `.zip` packaging
    - Uploads to GitHub Releases (using `GH_TOKEN`)
 
@@ -126,13 +126,13 @@ CI handles the cross-platform matrix. The default workflow (`.github/workflows/b
 
 ```
 build (matrix: macos-latest, windows-latest, ubuntu-latest)
-  └─ npm ci → npx mgr setup → platform-specific signing
+  └─ npm ci → npx omega setup → platform-specific signing
 windows-sign (only if platforms.win.signing.strategy != "local")
   └─ runs on a self-hosted runner with EV USB token (or hosted windows-latest for cloud strategy)
   └─ signs + uploads release artifacts
 ```
 
-The macOS step decodes `secrets.CSC_LINK` and `secrets.APPLE_API_KEY` (uploaded by `npx mgr push-secrets` as base64-encoded file contents) back to disk before running `npm run release`.
+The macOS step decodes `secrets.CSC_LINK` and `secrets.APPLE_API_KEY` (uploaded by `npx omega push-secrets` as base64-encoded file contents) back to disk before running `npm run release`.
 
 To trigger a release:
 1. Bump version in `package.json` and `config/omega.json5` (`app.version`).
@@ -153,8 +153,8 @@ Set `platforms.win.signing.strategy` in `config/omega.json5`:
 
 | Strategy | What runs | When to use |
 |---|---|---|
-| `self-hosted` (default) | Self-hosted runner with EV USB token; `npx mgr sign-windows` drives `signtool` | You own the EV token |
-| `cloud` | Hosted `windows-latest`; `npx mgr sign-windows` shells out to provider CLI (Azure / SSL.com / DigiCert) | Future cloud-signing migration |
+| `self-hosted` (default) | Self-hosted runner with EV USB token; `npx omega sign-windows` drives `signtool` | You own the EV token |
+| `cloud` | Hosted `windows-latest`; `npx omega sign-windows` shells out to provider CLI (Azure / SSL.com / DigiCert) | Future cloud-signing migration |
 | `local` | CI uploads unsigned; you sign manually on your Windows box | No runner, no cloud — fallback |
 
 For details see [`docs/signing.md`](signing.md#windows-setup).
@@ -174,7 +174,7 @@ For details see [`docs/signing.md`](signing.md#windows-setup).
 - Check the App Store Connect notarization history at https://appstoreconnect.apple.com/apps for status / errors.
 
 ### "Hardened runtime requires entitlements"
-- @omegajs/desktop generates `dist/config/entitlements.mac.plist` at build time from defaults + your `entitlements.mac` overrides in `config/omega.json5`.
+- @omega.js/desktop generates `dist/config/entitlements.mac.plist` at build time from defaults + your `entitlements.mac` overrides in `config/omega.json5`.
 - For extra capabilities (camera, mic, etc.), add keys to `entitlements.mac`. See `docs/signing.md` for the override syntax.
 
 ### CI: GitHub Releases upload fails

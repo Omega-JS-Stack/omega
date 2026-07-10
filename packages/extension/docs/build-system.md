@@ -1,6 +1,6 @@
 # Build System
 
-@omegajs/extension uses **gulp + webpack + sass + custom HTML templating + an electron-builder-style packaging step** to compile extension source into a Chrome-loadable, multi-browser-ready build.
+@omega.js/extension uses **gulp + webpack + sass + custom HTML templating + an electron-builder-style packaging step** to compile extension source into a Chrome-loadable, multi-browser-ready build.
 
 ## Pipeline overview
 
@@ -104,7 +104,7 @@ Env vars that drive the pipeline:
 - `BXM_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
 - `BXM_IS_PUBLISH=true` — also publish to extension stores after packaging
 - `BXM_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
-- `BXM_TEST_MODE=true` — running in @omegajs/extension's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
+- `BXM_TEST_MODE=true` — running in @omega.js/extension's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
 - `BXM_LOG_FILE` — override the stdout/stderr tee path, or set to `false` to disable it (see [Log files](#log-files)).
 
 ## Live reload
@@ -113,7 +113,7 @@ Env vars that drive the pipeline:
 
 ## Log files
 
-The gulp pipeline tees all output to `logs/dev.log` (`npm start`) / `logs/build.log` (`npm run build`), and `npx mgr test` tees to `logs/test.log`. Full reference — file table, capture behavior, `BXM_LOG_FILE` controls: [logging.md](logging.md).
+The gulp pipeline tees all output to `logs/dev.log` (`npm start`) / `logs/build.log` (`npm run build`), and `npx omega test` tees to `logs/test.log`. Full reference — file table, capture behavior, `BXM_LOG_FILE` controls: [logging.md](logging.md).
 
 ## Output for Chrome's "Load unpacked"
 

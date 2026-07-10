@@ -1,9 +1,9 @@
 // Backend URL helpers, shared across all Manager contexts (main / renderer / preload /
-// build). Mirror @omegajs/client's contract so @omegajs/desktop apps can hit the same dev/prod backends as
+// build). Mirror @omega.js/client's contract so @omega.js/desktop apps can hit the same dev/prod backends as
 // UJM and BXM consumers.
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
-// (alongside the is*() family; mirrors @omegajs/backend/UJM/BXM). It returns exactly ONE of
+// (alongside the is*() family; mirrors @omega.js/backend/UJM/BXM). It returns exactly ONE of
 // 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
 //
 // `getFunctionsUrl()` / `getApiUrl()` / `getWebsiteUrl()` route through
@@ -35,7 +35,7 @@ function getApiUrl(environment) {
     return 'http://localhost:5002';
   }
 
-  // Prod: api.<authDomain>. Mirrors @omegajs/client.getApiUrl behavior.
+  // Prod: api.<authDomain>. Mirrors @omega.js/client.getApiUrl behavior.
   const authDomain = this?.config?.firebaseConfig?.authDomain;
   if (!authDomain) {
     throw new Error('firebaseConfig.authDomain not set in config/omega.json5');
@@ -44,7 +44,7 @@ function getApiUrl(environment) {
   return `https://api.${authDomain}`;
 }
 
-// Marketing-site / brand website URL. Dev → `https://localhost:4000` (matches @omegajs/backend's
+// Marketing-site / brand website URL. Dev → `https://localhost:4000` (matches @omega.js/backend's
 // jekyll-emulator port convention). Prod → `config.brand.url`. Use this whenever app
 // code wants to link out to "the website" (Help → Website tray/menu items, "Open in
 // browser," billing portal landings) so dev runs don't punch out to the real domain.
@@ -69,7 +69,7 @@ function getWebsiteUrl(environment) {
 // deep-link built-in that hands the token to client-bridge (signInWithCustomToken).
 // Same env split as getWebsiteUrl: dev/test → the local website, prod → brand.url.
 // The token page redirects with ?authToken=<token> — the ONE modern shape the
-// auth/token route reads (legacy-app formats are UJM's concern, not @omegajs/desktop's).
+// auth/token route reads (legacy-app formats are UJM's concern, not @omega.js/desktop's).
 //
 // `returnUrl` overrides the final hop (default: `<brand.id>://auth/token`). Used by
 // lib/auth-flow.js in dev, where the custom scheme isn't OS-registered — the flow

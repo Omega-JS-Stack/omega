@@ -2,7 +2,7 @@
 //
 // `TEST_EXTENDED_MODE` is the shared, unprefixed env var that opts a test run into
 // hitting REAL external services instead of skipping/stubbing them. Off by default so
-// `npx mgr test` stays fast and offline-safe. Each framework passes its own detail
+// `npx omega test` stays fast and offline-safe. Each framework passes its own detail
 // lines describing what "real calls" means on its surface; the headline is shared.
 
 /**

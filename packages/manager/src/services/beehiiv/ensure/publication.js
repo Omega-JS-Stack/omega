@@ -11,8 +11,8 @@
  * comment-preserving) and mirrored in state.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowserAndPoll } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 
 const CREATE_URL = 'https://app.beehiiv.com/settings/workspace/overview?create_publication=true';

@@ -1,13 +1,13 @@
 /**
  * Calendar Events (Campaign Editor)
- * Campaign CRUD via FormManager + @omegajs/backend API, modal management,
+ * Campaign CRUD via FormManager + @omega.js/backend API, modal management,
  * type toggling (email/push), and results viewer.
  */
 
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 import { DISPLAY_TYPES, formatDateUTC, formatTimeUTC, todayUTC } from './calendar-core.js';
 import { renderEmailPreview, renderPushPreview } from './campaign-preview.js';
 
@@ -117,7 +117,7 @@ export default class CalendarEvents {
           payload.recurringId = this.editingCampaignId;
         }
 
-        const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;
+        const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
         await authorizedFetch(url, {
           method: 'POST',
           timeout: 60000,
@@ -204,7 +204,7 @@ export default class CalendarEvents {
         $container.innerHTML = renderPushPreview(data);
       }
     } catch (error) {
-      $container.innerHTML = `<div class="text-danger small">Preview failed: ${webManager.utilities().escapeHTML(error.message)}</div>`;
+      $container.innerHTML = `<div class="text-danger small">Preview failed: ${omega.utilities().escapeHTML(error.message)}</div>`;
     }
   }
 
@@ -636,10 +636,10 @@ export default class CalendarEvents {
   }
 
   // ============================================
-  // @omegajs/backend API Calls
+  // @omega.js/backend API Calls
   // ============================================
   async _createCampaign(payload) {
-    const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
     const response = await authorizedFetch(url, {
       method: 'POST',
       timeout: 60000,
@@ -657,7 +657,7 @@ export default class CalendarEvents {
 
   async _updateCampaign(id, payload) {
     payload.id = id;
-    const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
     const response = await authorizedFetch(url, {
       method: 'PUT',
       timeout: 60000,
@@ -674,7 +674,7 @@ export default class CalendarEvents {
   }
 
   async _deleteCampaign(id) {
-    const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
     const response = await authorizedFetch(url, {
       method: 'DELETE',
       timeout: 60000,
@@ -692,7 +692,7 @@ export default class CalendarEvents {
    * Reschedule a one-off campaign (drag-and-drop)
    */
   async rescheduleCampaign(id, newSendAt) {
-    const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
     return authorizedFetch(url, {
       method: 'PUT',
       timeout: 60000,
@@ -739,7 +739,7 @@ export default class CalendarEvents {
     // Optimistic update: move the seed sendAt, re-render immediately
     const rollback = this.core.optimisticUpdateSendAt(templateId, newSendAtUNIX);
 
-    const url = `${webManager.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
     return authorizedFetch(url, {
       method: 'PUT',
       timeout: 60000,
@@ -781,38 +781,38 @@ export default class CalendarEvents {
     html += `<span class="badge bg-${campaign.type === 'email' ? 'primary' : 'success'}">${campaign.type === 'email' ? 'Email' : 'Push'}</span>`;
     html += `</div>`;
     html += `<table class="table table-sm table-borderless mb-0">`;
-    html += `<tr><td class="text-muted" style="width:120px">ID</td><td><code>${webManager.utilities().escapeHTML(campaign.id)}</code></td></tr>`;
-    html += `<tr><td class="text-muted">Name</td><td>${webManager.utilities().escapeHTML(settings.name || '')}</td></tr>`;
-    html += `<tr><td class="text-muted">Subject</td><td>${webManager.utilities().escapeHTML(settings.subject || '')}</td></tr>`;
+    html += `<tr><td class="text-muted" style="width:120px">ID</td><td><code>${omega.utilities().escapeHTML(campaign.id)}</code></td></tr>`;
+    html += `<tr><td class="text-muted">Name</td><td>${omega.utilities().escapeHTML(settings.name || '')}</td></tr>`;
+    html += `<tr><td class="text-muted">Subject</td><td>${omega.utilities().escapeHTML(settings.subject || '')}</td></tr>`;
     html += `<tr><td class="text-muted">Test</td><td>${settings.test ? '<span class="badge bg-warning">Yes</span>' : 'No'}</td></tr>`;
     const localStr = d.toLocaleString('en', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
     html += `<tr><td class="text-muted">Sent At</td><td>${formatDateUTC(d)} ${formatTimeUTC(d)} UTC <span class="text-muted">(${localStr})</span></td></tr>`;
 
     if (campaign.type === 'email') {
       if (settings.preheader) {
-        html += `<tr><td class="text-muted">Preheader</td><td>${webManager.utilities().escapeHTML(settings.preheader)}</td></tr>`;
+        html += `<tr><td class="text-muted">Preheader</td><td>${omega.utilities().escapeHTML(settings.preheader)}</td></tr>`;
       }
       if (settings.sender) {
-        html += `<tr><td class="text-muted">Sender</td><td>${webManager.utilities().escapeHTML(settings.sender)}</td></tr>`;
+        html += `<tr><td class="text-muted">Sender</td><td>${omega.utilities().escapeHTML(settings.sender)}</td></tr>`;
       }
       if (settings.template) {
-        html += `<tr><td class="text-muted">Template</td><td>${webManager.utilities().escapeHTML(settings.template)}</td></tr>`;
+        html += `<tr><td class="text-muted">Template</td><td>${omega.utilities().escapeHTML(settings.template)}</td></tr>`;
       }
     }
 
     if (campaign.type === 'push') {
       if (settings.icon) {
-        const iconUrl = /^https?:\/\//i.test(settings.icon) ? webManager.utilities().escapeHTML(settings.icon) : '#';
-        html += `<tr><td class="text-muted">Icon</td><td><a href="${iconUrl}" target="_blank" rel="noopener">${webManager.utilities().escapeHTML(settings.icon)}</a></td></tr>`;
+        const iconUrl = /^https?:\/\//i.test(settings.icon) ? omega.utilities().escapeHTML(settings.icon) : '#';
+        html += `<tr><td class="text-muted">Icon</td><td><a href="${iconUrl}" target="_blank" rel="noopener">${omega.utilities().escapeHTML(settings.icon)}</a></td></tr>`;
       }
       if (settings.clickAction) {
-        const clickUrl = /^https?:\/\//i.test(settings.clickAction) ? webManager.utilities().escapeHTML(settings.clickAction) : '#';
-        html += `<tr><td class="text-muted">Click URL</td><td><a href="${clickUrl}" target="_blank" rel="noopener">${webManager.utilities().escapeHTML(settings.clickAction)}</a></td></tr>`;
+        const clickUrl = /^https?:\/\//i.test(settings.clickAction) ? omega.utilities().escapeHTML(settings.clickAction) : '#';
+        html += `<tr><td class="text-muted">Click URL</td><td><a href="${clickUrl}" target="_blank" rel="noopener">${omega.utilities().escapeHTML(settings.clickAction)}</a></td></tr>`;
       }
     }
 
     if (campaign.recurringId) {
-      html += `<tr><td class="text-muted">Recurring</td><td>${webManager.utilities().escapeHTML(campaign.recurringId)}</td></tr>`;
+      html += `<tr><td class="text-muted">Recurring</td><td>${omega.utilities().escapeHTML(campaign.recurringId)}</td></tr>`;
     }
 
     html += `</table>`;
@@ -823,7 +823,7 @@ export default class CalendarEvents {
     if (campaign.type === 'email' && resultContent) {
       html += '<div class="mb-4">';
       html += '<h6>Content</h6>';
-      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:200px;overflow-y:auto">${webManager.utilities().escapeHTML(resultContent)}</pre>`;
+      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:200px;overflow-y:auto">${omega.utilities().escapeHTML(resultContent)}</pre>`;
       html += '</div>';
     }
 
@@ -831,7 +831,7 @@ export default class CalendarEvents {
     if (Object.keys(results).length > 0) {
       html += '<div class="mb-3">';
       html += '<h6>Results</h6>';
-      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:300px;overflow-y:auto">${webManager.utilities().escapeHTML(JSON.stringify(results, null, 2))}</pre>`;
+      html += `<pre class="bg-body-tertiary p-3 rounded small" style="white-space:pre-wrap;max-height:300px;overflow-y:auto">${omega.utilities().escapeHTML(JSON.stringify(results, null, 2))}</pre>`;
       html += '</div>';
     }
 

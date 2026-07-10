@@ -25,6 +25,6 @@ export default defineConfig({
     resolve: { alias: { '@omega': path.join(SPIKE, 'src', 'omega') } },
     // Linked CJS workspace packages: let Node require() them at SSR time
     // (Rollup can't synthesize default exports from linked CJS source)
-    ssr: { external: ['@omegajs/template-kit', '@omegajs/config', '@omegajs/bakeoff-shared', '@omegajs/web'] },
+    ssr: { external: ['@omega.js/template-kit', '@omega.js/config', '@omega.js/bakeoff-shared', '@omega.js/web'] },
   },
 });

@@ -64,7 +64,7 @@ module.exports = async function (options) {
   }
 
   // Resolve the required Node major from the consumer's electron version (via the electron
-  // releases feed). Falls back to @omegajs/desktop's package.json engines.node if the lookup fails.
+  // releases feed). Falls back to @omega.js/desktop's package.json engines.node if the lookup fails.
   // Write .nvmrc FIRST so the pin is correct even if the user's current Node is stale.
   if (options.checkNode !== false) {
     const requiredMajor = await resolveRequiredNodeMajor();
@@ -93,7 +93,7 @@ module.exports = async function (options) {
       const validateCerts = require('./validate-certs.js');
       const result = await validateCerts({ strict: false });
       if (result?.ok === false) {
-        logger.log('(Run `npx mgr validate-certs` after wiring up your signing assets to re-check.)');
+        logger.log('(Run `npx omega validate-certs` after wiring up your signing assets to re-check.)');
       }
     } catch (e) {
       logger.warn(`validate-certs threw during setup (non-fatal): ${e.message}`);
@@ -129,7 +129,7 @@ module.exports = async function (options) {
       } else {
         require('dotenv').config({ path: envPath });
         if (!process.env.GH_TOKEN) {
-          logger.log('(Skipping push-secrets: GH_TOKEN not set in .env. Run `npx mgr push-secrets` after filling it in.)');
+          logger.log('(Skipping push-secrets: GH_TOKEN not set in .env. Run `npx omega push-secrets` after filling it in.)');
         } else {
           const pushSecrets = require('./push-secrets.js');
           await pushSecrets({});
@@ -175,10 +175,10 @@ async function updateManager() {
 }
 
 // Resolve the required Node major for the consumer's installed electron version by hitting
-// the official electron releases feed. Falls back to @omegajs/desktop's own engines.node if the network is
+// the official electron releases feed. Falls back to @omega.js/desktop's own engines.node if the network is
 // down or the electron version can't be resolved.
 async function resolveRequiredNodeMajor() {
-  // Look at the consumer's electron version FIRST (peer dep), then fall back to @omegajs/desktop's pin.
+  // Look at the consumer's electron version FIRST (peer dep), then fall back to @omega.js/desktop's pin.
   const consumerElectron = project?.devDependencies?.electron || project?.dependencies?.electron || package?.peerDependencies?.electron;
   if (consumerElectron) {
     try {
@@ -187,7 +187,7 @@ async function resolveRequiredNodeMajor() {
       if (node) return node;
     } catch (e) { /* fall through to static value */ }
   }
-  // Fallback: @omegajs/desktop's package.json engines.node (last-known-good).
+  // Fallback: @omega.js/desktop's package.json engines.node (last-known-good).
   return version.clean(package.engines.node).split('.')[0];
 }
 
@@ -268,17 +268,17 @@ async function copyDefaults(targetDir) {
   }
 
   // Template substitution context — `{{ versions.node }}` etc. resolved at scaffold time.
-  // Source of truth is @omegajs/desktop's own package.json `engines` block. @omegajs/desktop auto-syncs `engines.node`
+  // Source of truth is @omega.js/desktop's own package.json `engines` block. @omega.js/desktop auto-syncs `engines.node`
   // to whatever Electron's bundled Node version is via scripts/sync-nvmrc.js, so consumers'
   // workflows track Electron-Node automatically without manual bumps.
   const templateContext = { versions: package.engines || {} };
 
   // Scaffolding runs through the shared devkit engine (vendored at prepare time).
-  // Engine built-ins cover @omegajs/desktop's structural rules: `_.` renames (`_.env` → `.env`),
+  // Engine built-ins cover @omega.js/desktop's structural rules: `_.` renames (`_.env` → `.env`),
   // archive-dir skips (`_mas/` reference plists ship in the package, never to
   // consumers — `_`-prefixed FILENAMES like `test/_init.js` still copy), and
   // write-only-if-changed.
-  const { applyDefaults } = require('@omegajs/devkit/defaults-engine');
+  const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
   applyDefaults({
     defaultsDir,
@@ -287,13 +287,13 @@ async function copyDefaults(targetDir) {
       // Consumers own their files — never overwrite what exists.
       '**/*': { overwrite: false },
       // Marker-section merges: framework owns the Default section, consumer owns
-      // everything below the Custom marker. Re-running `npx mgr setup` keeps the
+      // everything below the Custom marker. Re-running `npx omega setup` keeps the
       // framework section live-synced without clobbering the consumer's values.
       '_.env': { mergeLines: true, template: templateContext },
       '_.gitignore': { mergeLines: true, template: templateContext },
       'CLAUDE.md': { mergeLines: true, template: templateContext },
       // Workflow YAMLs are framework-owned: always re-rendered so they track changes in
-      // @omegajs/desktop's defaults (e.g. engines.node bumping when Electron updates). The
+      // @omega.js/desktop's defaults (e.g. engines.node bumping when Electron updates). The
       // renderer is tolerant — GitHub Actions' `${{ secrets.X }}` survives — and
       // the engine skips the write when the rendered content is byte-identical.
       '**/*.{yml,yaml}': { overwrite: true, template: templateContext },
@@ -353,7 +353,7 @@ async function provisionReleaseRepos() {
       name:        'releases (auto-update feed)',
       owner:       config.releases?.owner || appOwner,
       repo:        config.releases?.repo || 'update-server',
-      description: `Public release artifacts + auto-update feed for ${appOwner}'s @omegajs/desktop apps. Managed by @omegajs/desktop.`,
+      description: `Public release artifacts + auto-update feed for ${appOwner}'s @omega.js/desktop apps. Managed by @omega.js/desktop.`,
     });
   }
   if (config.downloads?.enabled !== false) {
@@ -361,7 +361,7 @@ async function provisionReleaseRepos() {
       name:        'downloads (fixed-name mirror)',
       owner:       config.downloads?.owner || appOwner,
       repo:        config.downloads?.repo || 'download-server',
-      description: `Fixed-name download mirror for ${appOwner}'s @omegajs/desktop apps. Managed by @omegajs/desktop.`,
+      description: `Fixed-name download mirror for ${appOwner}'s @omega.js/desktop apps. Managed by @omega.js/desktop.`,
     });
   }
 

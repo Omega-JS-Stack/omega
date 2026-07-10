@@ -5,10 +5,10 @@ A singleton that normalizes the `chrome.*` / `browser.*` / `window.*` extension 
 ## Import
 
 ```js
-const ext = require('@omegajs/extension/lib/extension');
+const ext = require('@omega.js/extension/lib/extension');
 
 // or as a Manager property:
-const Manager = new (require('@omegajs/extension/popup'));
+const Manager = new (require('@omega.js/extension/popup'));
 await Manager.initialize();
 const { extension } = Manager;     // same singleton
 ```
@@ -44,7 +44,7 @@ If a browser doesn't expose a given API, the property is `null` (not undefined),
 ## Usage
 
 ```js
-const Manager = new (require('@omegajs/extension/popup'));
+const Manager = new (require('@omega.js/extension/popup'));
 await Manager.initialize();
 const { extension } = Manager;
 
@@ -71,11 +71,11 @@ If you specifically need local-only storage (per-machine, larger quota), use `ch
 
 ## Node-safe by design
 
-The wrapper imports cleanly from Node (build-time scripts, tests, gulp tasks) — every property is `null` in that context because none of the browser globals exist. This is what makes @omegajs/extension's build-layer tests possible:
+The wrapper imports cleanly from Node (build-time scripts, tests, gulp tasks) — every property is `null` in that context because none of the browser globals exist. This is what makes @omega.js/extension's build-layer tests possible:
 
 ```js
 // build-layer test (Node)
-const ext = require('@omegajs/extension/lib/extension');
+const ext = require('@omega.js/extension/lib/extension');
 ctx.expect(ext.runtime).toBeNull();   // no chrome global in Node
 ```
 
@@ -86,7 +86,7 @@ ctx.expect(ext.runtime).toBeNull();   // no chrome global in Node
 - Doesn't address the case where APIs simply don't exist on a browser (e.g. `sidePanel` on Firefox)
 - Slow boot in SW context
 
-@omegajs/extension's wrapper is simpler: detect what's there, expose null when it isn't, let user code branch. Combine with the promisification Chrome added in MV3 (callbacks return promises when omitted) for a polyfill-free async-friendly API.
+@omega.js/extension's wrapper is simpler: detect what's there, expose null when it isn't, let user code branch. Combine with the promisification Chrome added in MV3 (callbacks return promises when omitted) for a polyfill-free async-friendly API.
 
 ## See also
 

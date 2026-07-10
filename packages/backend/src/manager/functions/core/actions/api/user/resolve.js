@@ -19,8 +19,8 @@ Module.prototype.main = function () {
       // - Usage for the account
       // - Plan for the account
 
-      // used in EM, @omegajs/client when signing in or running account().resolve()
-      // on @omegajs/client, it should hide and show the auth-xxx-xxx things in @omegajs/client
+      // used in EM, @omega.js/client when signing in or running account().resolve()
+      // on @omega.js/client, it should hide and show the auth-xxx-xxx things in @omega.js/client
     })
     .catch(e => {
       return reject(e);

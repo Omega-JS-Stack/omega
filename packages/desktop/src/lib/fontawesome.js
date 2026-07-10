@@ -1,5 +1,5 @@
 // FontAwesome — the bundled Font Awesome Pro icon library (solid + brands SVGs
-// shipped inside @omegajs/desktop at assets/icons/font-awesome/), served to renderers on
+// shipped inside @omega.js/desktop at assets/icons/font-awesome/), served to renderers on
 // demand so consumers get icons with ZERO setup.
 //
 // Main-side API:
@@ -9,7 +9,7 @@
 // Renderer-side (preload contextBridge):
 //   window.em.fontawesome.get(name, style) → Promise<svg string | null>
 //
-// Renderers normally never call this directly — @omegajs/desktop's renderer bootstrap
+// Renderers normally never call this directly — @omega.js/desktop's renderer bootstrap
 // auto-renders any `<i class="fa-solid fa-play">` element by injecting the SVG
 // inline (see src/renderer.js _wireFontAwesome). The SVGs ship with
 // fill="currentColor" and are served with width/height="1em", so icons inherit
@@ -63,7 +63,7 @@ const fontawesome = {
     fontawesome._initialized = true;
   },
 
-  // The SVGs ship inside @omegajs/desktop's dist/. When main runs UNBUNDLED (@omegajs/desktop's own test
+  // The SVGs ship inside @omega.js/desktop's dist/. When main runs UNBUNDLED (@omega.js/desktop's own test
   // harness, plain node) __dirname points there directly; a consumer's
   // webpack-bundled main loses the module's real __dirname, so fall back to
   // the installed package under the app root — valid in dev AND inside a
@@ -73,7 +73,7 @@ const fontawesome = {
     try {
       const { app } = require('electron');
       if (app) {
-        candidates.push(path.join(app.getAppPath(), 'node_modules', '@omegajs/desktop', 'dist', 'assets', 'icons', 'font-awesome'));
+        candidates.push(path.join(app.getAppPath(), 'node_modules', '@omega.js/desktop', 'dist', 'assets', 'icons', 'font-awesome'));
       }
     } catch (e) {
       // Not running under Electron — the unbundled candidate is the only one.

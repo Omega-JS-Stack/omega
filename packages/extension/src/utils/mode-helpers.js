@@ -1,4 +1,4 @@
-// Runtime mode helpers (@omegajs/backend/EM/UJM-pattern), shared across BXM's eight context Managers
+// Runtime mode helpers (@omega.js/backend/EM/UJM-pattern), shared across BXM's eight context Managers
 // (build / background / popup / options / content / sidepanel / page / offscreen).
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH: it is the ONLY function that reads the
@@ -52,7 +52,7 @@ function getEnvironment() {
   // 4. Default: development. BXM's deployed artifacts ALWAYS carry their signal — a packed /
   //    store extension has `manifest.update_url`, and build-time Node sets BXM_BUILD_MODE. So
   //    reaching here means a bare tooling / unpacked context, where development is the sensible
-  //    answer. (Contrast @omegajs/backend/EM, whose deployed RUNTIME can legitimately lack a signal, so they
+  //    answer. (Contrast @omega.js/backend/EM, whose deployed RUNTIME can legitimately lack a signal, so they
   //    default to production.)
   return 'development';
 }
@@ -92,7 +92,7 @@ function getVersion() {
 }
 
 // Mix the helpers into a Manager constructor's prototype + the constructor itself
-// (so `Manager.isTesting()` works statically too, matching @omegajs/backend/EM/UJM pattern).
+// (so `Manager.isTesting()` works statically too, matching @omega.js/backend/EM/UJM pattern).
 // getEnvironment() is the SSOT and is attached here too — build.js no longer defines it.
 function attachTo(Manager) {
   Manager.prototype.getEnvironment = getEnvironment;

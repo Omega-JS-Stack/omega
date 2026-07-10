@@ -1,10 +1,10 @@
-// `npx mgr launch [app-path] [--args ...]` — open a packaged Electron app with a clean
+// `npx omega launch [app-path] [--args ...]` — open a packaged Electron app with a clean
 // environment (specifically: ELECTRON_RUN_AS_NODE stripped from inherited env).
 //
 // Why this exists:
-//   When @omegajs/desktop is running inside a host process that has ELECTRON_RUN_AS_NODE=1 set
+//   When @omega.js/desktop is running inside a host process that has ELECTRON_RUN_AS_NODE=1 set
 //   (e.g., VS Code's Claude Code extension, which lives in a `node.mojom.NodeService`
-//   utility process), every shell @omegajs/desktop spawns inherits that variable. Launching a
+//   utility process), every shell @omega.js/desktop spawns inherits that variable. Launching a
 //   packaged Electron app from such a shell — via `open .../MyApp.app` or by running
 //   the binary directly — propagates the variable to the app, which Electron then
 //   honors by running as plain Node: no `app` API, no BrowserWindow, no window. The
@@ -16,15 +16,15 @@
 //   command is the manual-launch equivalent of those boundary strips.
 //
 // Usage:
-//   npx mgr launch                                                # auto-find a .app/.exe under release/<host-platform>-<host-arch>/
-//   npx mgr launch ./release/mac-arm64/MyApp.app                  # explicit path
-//   npx mgr launch /Applications/MyApp.app                        # an installed .app
+//   npx omega launch                                                # auto-find a .app/.exe under release/<host-platform>-<host-arch>/
+//   npx omega launch ./release/mac-arm64/MyApp.app                  # explicit path
+//   npx omega launch /Applications/MyApp.app                        # an installed .app
 //
 // Forwarding argv to the app (for hidden-mode tests, custom flags, etc.):
-//   npx mgr launch --args="--em-launched-at-login"                # single flag (quoted to keep yargs from eating it)
-//   npx mgr launch --args="--foo=bar --baz"                       # multiple, space-separated inside the quotes
+//   npx omega launch --args="--em-launched-at-login"                # single flag (quoted to keep yargs from eating it)
+//   npx omega launch --args="--foo=bar --baz"                       # multiple, space-separated inside the quotes
 //
-// Aliases: `npx mgr open`, `npx mgr --launch`.
+// Aliases: `npx omega open`, `npx omega --launch`.
 
 const path     = require('path');
 const fs       = require('fs');
@@ -47,7 +47,7 @@ module.exports = async function (options) {
   if (!appPath) {
     appPath = autoDiscoverApp();
     if (!appPath) {
-      throw new Error(`No app path supplied and could not auto-discover a packaged app. Tried release/<platform>-<arch>/. Pass an explicit path: \`npx mgr launch ./release/...\``);
+      throw new Error(`No app path supplied and could not auto-discover a packaged app. Tried release/<platform>-<arch>/. Pass an explicit path: \`npx omega launch ./release/...\``);
     }
     logger.log(`auto-discovered: ${path.relative(process.cwd(), appPath)}`);
   }

@@ -1,7 +1,7 @@
 /**
- * @omegajs/backend HTTP Client
+ * @omega.js/backend HTTP Client
  *
- * Makes authenticated HTTP calls to a running @omegajs/backend server (local or production).
+ * Makes authenticated HTTP calls to a running @omega.js/backend server (local or production).
  * Supports admin key auth (backendManagerKey) and user token auth (API key from OAuth flow).
  */
 const fetch = require('wonderful-fetch');
@@ -16,7 +16,7 @@ class BEMClient {
   }
 
   /**
-   * Call a @omegajs/backend route
+   * Call a @omega.js/backend route
    * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
    * @param {string} path - Route path (e.g. "admin/firestore")
    * @param {object} params - Request parameters

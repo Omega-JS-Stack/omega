@@ -4,7 +4,7 @@ const path = require('path');
 
 class NpmProjectScriptsTest extends BaseTest {
   getName() {
-    return 'has all @omegajs/backend project scripts';
+    return 'has all @omega.js/backend project scripts';
   }
 
   async run() {

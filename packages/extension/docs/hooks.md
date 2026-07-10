@@ -93,7 +93,7 @@ Hooks are awaited — the build waits for them to resolve before continuing. Thr
 
 ## Why not just edit gulp tasks?
 
-You COULD fork @omegajs/extension's gulp tasks for any custom build behavior. Hooks exist so consumers don't need to. Hooks are stable contract (the `index` object shape doesn't change), survive @omegajs/extension upgrades, and live in the consumer's repo (where build-specific concerns belong).
+You COULD fork @omega.js/extension's gulp tasks for any custom build behavior. Hooks exist so consumers don't need to. Hooks are stable contract (the `index` object shape doesn't change), survive @omega.js/extension upgrades, and live in the consumer's repo (where build-specific concerns belong).
 
 ## See also
 

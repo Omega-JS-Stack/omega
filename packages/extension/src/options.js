@@ -1,5 +1,5 @@
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 import extension from './lib/extension.js';
 import LoggerLite from './lib/logger-lite.js';
 import { syncWithBackground, setupAuthBroadcastListener, setupSignOutListener, setupAuthEventListeners, openAuthPage as openAuthPageHelper } from './lib/auth-helpers.js';
@@ -15,7 +15,7 @@ class Manager {
     this.extension = null;
     this.messenger = null;
     this.logger = null;
-    this.webManager = webManager;
+    this.omega = omega;
   }
 
   async initialize() {
@@ -28,14 +28,14 @@ class Manager {
     this.logger = new LoggerLite('options');
 
     // Initialize
-    await this.webManager.initialize(configuration);
+    await this.omega.initialize(configuration);
 
     // Set up auth state listener (updates bindings with user/account state)
-    this.webManager.auth().listen((state) => {
+    this.omega.auth().listen((state) => {
       this.logger.log('Auth state changed:', state);
     });
 
-    // Sync auth with background.js (waits for @omegajs/client auth to settle first)
+    // Sync auth with background.js (waits for @omega.js/client auth to settle first)
     await syncWithBackground(this);
 
     // Set up broadcast listener for sign-in/sign-out from background

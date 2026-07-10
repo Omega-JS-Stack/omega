@@ -5,13 +5,13 @@
  * - resolveMonorepoRoot()  — find the Omega monorepo on this machine
  * - findBrandRoot()        — walk up from a cwd to the brand repo root
  * - discoverApps()         — list the brand's app directories
- * - frameworkPackagesOf()  — which @omegajs packages an app depends on
+ * - frameworkPackagesOf()  — which @omega.js packages an app depends on
  * - linkLocalPackages()    — file:-install those from the monorepo (idempotent)
  * - startMonorepoWatch()   — spawn the monorepo's src→dist watch (`npm start`)
  * - acquireWatchLock() / releaseWatchLock() — single-instance guard for the watch
  *
- * Consumers: `omega dev --local` (@omegajs/web), `mgr i local`
- * (@omegajs/backend, @omegajs/desktop, @omegajs/extension), and the monorepo's
+ * Consumers: `omega dev --local` (@omega.js/web), `mgr i local`
+ * (@omega.js/backend, @omega.js/desktop, @omega.js/extension), and the monorepo's
  * own scripts/watch-all.js (lock helpers).
  */
 
@@ -23,7 +23,7 @@ const { spawn } = require('child_process');
 const { safeInstall } = require('./safe-install');
 
 // Constants
-const SCOPE = '@omegajs/';
+const SCOPE = '@omega.js/';
 const DEFAULT_MONOREPO = path.join(os.homedir(), 'Developer', 'Repositories', 'Omega', 'omega');
 const WATCH_LOCK = path.join('.omega', 'dev-watch.lock');
 
@@ -85,9 +85,9 @@ function resolveMonorepoRoot() {
 }
 
 /**
- * Map an @omegajs package name to its monorepo package directory.
+ * Map an @omega.js package name to its monorepo package directory.
  * @param {string} monorepoRoot - Monorepo root path.
- * @param {string} name - Package name (e.g. '@omegajs/client').
+ * @param {string} name - Package name (e.g. '@omega.js/client').
  * @returns {string} Absolute path to packages/<short-name>.
  */
 function packageDir(monorepoRoot, name) {
@@ -163,7 +163,7 @@ function discoverApps(brandRoot) {
 }
 
 /**
- * Collect an app's @omegajs dependencies from its package.json — and, for
+ * Collect an app's @omega.js dependencies from its package.json — and, for
  * backend apps, from functions/package.json (where the framework dep lives).
  * @param {string} appDir - App directory.
  * @returns {Array<{name: string, spec: string, dev: boolean, dir: string}>}
@@ -226,7 +226,7 @@ function isLinkedTo(dir, name, targetDir) {
 }
 
 /**
- * file:-install an app's @omegajs dependencies from the local monorepo.
+ * file:-install an app's @omega.js dependencies from the local monorepo.
  * Idempotent: dependencies already resolving to the monorepo copy are skipped.
  * @param {object} options
  * @param {string} options.dir - App directory to link.

@@ -42,7 +42,7 @@ class FirebaseFunctionsTest extends BaseTest {
 
   bemPackageVersionWarning(packageName, current, latest) {
     if (wonderfulVersion.greaterThan(latest, current)) {
-      console.log(chalk.yellow(`${packageName} needs to be updated in @omegajs/backend: ${current} => ${latest}`));
+      console.log(chalk.yellow(`${packageName} needs to be updated in @omega.js/backend: ${current} => ${latest}`));
     }
   }
 

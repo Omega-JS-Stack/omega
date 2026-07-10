@@ -44,16 +44,16 @@ The problem: if a user keeps their app open for weeks, an update may download bu
 
 The gate:
 
-1. **First download wins.** When `update-downloaded` fires, @omegajs/desktop stores `pendingUpdate = { version, downloadedAt: Date.now() }` to `storage.autoUpdater.pendingUpdate`.
+1. **First download wins.** When `update-downloaded` fires, @omega.js/desktop stores `pendingUpdate = { version, downloadedAt: Date.now() }` to `storage.autoUpdater.pendingUpdate`.
 2. **Subsequent downloads do NOT reset the timer.** If a newer update downloads later, `downloadedAt` stays at the original time. (Otherwise the user could keep dodging by triggering re-checks.)
-3. **Every poll tick + at init**, @omegajs/desktop checks if `Date.now() - downloadedAt >= maxAgeMs`. If yes → `quitAndInstall()`. Force.
+3. **Every poll tick + at init**, @omega.js/desktop checks if `Date.now() - downloadedAt >= maxAgeMs`. If yes → `quitAndInstall()`. Force.
 4. **Cleared on apply.** When the app next launches and `app.getVersion() === pendingUpdate.version`, the flag is cleared automatically (the user successfully restarted into the new version).
 
-This guarantees no app on @omegajs/desktop stays > maxAgeMs days behind a downloaded update.
+This guarantees no app on @omega.js/desktop stays > maxAgeMs days behind a downloaded update.
 
 ## Idle-aware install (15-min default)
 
-When an update finishes downloading via a background poll (NOT a user-initiated check), @omegajs/desktop does NOT immediately quit-and-install. Instead, the install decision is folded into the existing periodic tick (`_periodicTick`, fires every `intervalMs`, default 60s) which runs three steps in order: re-check the feed → enforce the 30-day max-age gate → evaluate idle install. Single timer, single decision flow.
+When an update finishes downloading via a background poll (NOT a user-initiated check), @omega.js/desktop does NOT immediately quit-and-install. Instead, the install decision is folded into the existing periodic tick (`_periodicTick`, fires every `intervalMs`, default 60s) which runs three steps in order: re-check the feed → enforce the 30-day max-age gate → evaluate idle install. Single timer, single decision flow.
 
 ### Activity signals
 
@@ -118,7 +118,7 @@ This lets the framework's own integration tests drive the full sequence (`EM_DEV
 
 ## Menu integration
 
-@omegajs/desktop's default menu template includes a "Check for Updates..." item with id `desktop:check-for-updates`. The auto-updater listens to its own status changes and updates the item's label + enabled state, VS Code-style:
+@omega.js/desktop's default menu template includes a "Check for Updates..." item with id `desktop:check-for-updates`. The auto-updater listens to its own status changes and updates the item's label + enabled state, VS Code-style:
 
 | State | Label | Enabled |
 |---|---|---|
@@ -175,7 +175,7 @@ In dev simulation mode, `quitAndInstall()` is a no-op (no actual restart) so you
 
 ## Production: how electron-updater finds the feed
 
-`electron-updater` reads the `publish` block from the embedded `app-update.yml` (baked into the `.app` / `.exe` at build time by electron-builder). @omegajs/desktop's `gulp/build-config` injects `publish` from `config.releases.{owner,repo}` into `dist/electron-builder.yml` before packaging, so the published `app-update.yml` points at:
+`electron-updater` reads the `publish` block from the embedded `app-update.yml` (baked into the `.app` / `.exe` at build time by electron-builder). @omega.js/desktop's `gulp/build-config` injects `publish` from `config.releases.{owner,repo}` into `dist/electron-builder.yml` before packaging, so the published `app-update.yml` points at:
 
 ```
 provider: github

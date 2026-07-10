@@ -1,7 +1,7 @@
 // Main-process tests for lib/theme.js — source/resolved round-trip, nativeTheme
 // wiring, persistence, change events (with dedupe), IPC handlers, validation.
 //
-// ctx.manager is a fully-initialized @omegajs/desktop Manager. Every test that mutates the theme
+// ctx.manager is a fully-initialized @omega.js/desktop Manager. Every test that mutates the theme
 // restores it; cleanup() resets to the pre-suite source and clears the persisted
 // override so later suites (and re-runs) start clean.
 

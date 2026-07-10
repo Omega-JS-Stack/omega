@@ -1,14 +1,14 @@
-// `npx mgr cdp <subcommand>` — drive the RUNNING dev app over the Chrome
+// `npx omega cdp <subcommand>` — drive the RUNNING dev app over the Chrome
 // DevTools Protocol: orient (status), act (eval, theme), see (shot, capture),
 // and run the no-watch iterate loop (relaunch / quit).
 //
-//   npx mgr cdp status                          # running? targets, window rect, theme
-//   npx mgr cdp eval <match> '<expr>'           # evaluate JS in any webContents
-//   npx mgr cdp shot <match> <out.png>          # ONE renderer's own pixels
-//   npx mgr cdp capture <out.png>               # the COMPOSITED window (macOS)
-//   npx mgr cdp theme <dark|light|system>       # flip the live theme
-//   npx mgr cdp relaunch                        # quit → npm start → wait for boot
-//   npx mgr cdp quit                            # quit + wait for the process tree to drain
+//   npx omega cdp status                          # running? targets, window rect, theme
+//   npx omega cdp eval <match> '<expr>'           # evaluate JS in any webContents
+//   npx omega cdp shot <match> <out.png>          # ONE renderer's own pixels
+//   npx omega cdp capture <out.png>               # the COMPOSITED window (macOS)
+//   npx omega cdp theme <dark|light|system>       # flip the live theme
+//   npx omega cdp relaunch                        # quit → npm start → wait for boot
+//   npx omega cdp quit                            # quit + wait for the process tree to drain
 //
 // All subcommands read EM_CDP_PORT (default 9222) — the same env var `npm
 // start` uses to open the endpoint — or take `--port <n>` (which wins).
@@ -23,7 +23,7 @@ const path = require('path');
 const SUBCOMMANDS = ['status', 'eval', 'shot', 'capture', 'theme', 'relaunch', 'quit'];
 
 const USAGE = [
-  'Usage: npx mgr cdp <subcommand> [--port <n>]   (port default: EM_CDP_PORT or 9222)',
+  'Usage: npx omega cdp <subcommand> [--port <n>]   (port default: EM_CDP_PORT or 9222)',
   '  status                       app up? targets, window rect, theme',
   "  eval <match> '<expr>'        evaluate JS in the matched webContents",
   '  shot <match> <out.png>       per-renderer screenshot',

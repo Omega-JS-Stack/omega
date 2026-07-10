@@ -3,7 +3,7 @@
  *
  * JS: UJM consumers ship `src/assets/js/main.js` importing
  * 'ultimate-jekyll-manager' (webpack bundled the runtime through it). In
- * @omegajs/web the core asset layer OWNS main.js and the boot runtime does
+ * @omega.js/web the core asset layer OWNS main.js and the boot runtime does
  * the initialize dance — a consumer main.js SHADOWS the core one entirely.
  * - Seed-identical main.js (the untouched UJM scaffold) → deleted; the core
  *   main takes over. Detected by comment/whitespace-insensitive comparison.
@@ -30,7 +30,7 @@
  * dropped.
  *
  * Page modules (`js/pages/**`) already match the new `{ manager, options }`
- * export-default convention and import '@omegajs/client' (aliased by the asset
+ * export-default convention and import '@omega.js/client' (aliased by the asset
  * pipeline) — they port verbatim, nothing to do.
  */
 const fs = require('node:fs');
@@ -121,7 +121,7 @@ function migrateConsumerAssets(root, options = {}) {
       file: rel, line: 1, check: 'ujm-import', severity: 'error',
       message: rel.endsWith(`${path.sep}main.js`)
         ? 'customized main.js imports ultimate-jekyll-manager — port manually: `import coreMain from \'__main_assets__/js/main.js\'` inside `export default async (context) => { await coreMain(context); /* custom code */ }`'
-        : 'imports ultimate-jekyll-manager — no such module in @omegajs/web; port to @omegajs/client or a core module',
+        : 'imports ultimate-jekyll-manager — no such module in @omega.js/web; port to @omega.js/client or a core module',
     });
   }
 

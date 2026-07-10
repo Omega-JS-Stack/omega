@@ -23,7 +23,7 @@ function withCwd(dir, fn) {
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'logs command — `npx mgr logs`',
+  description: 'logs command — `npx omega logs`',
   tests: [
     {
       name: 'module exports an async function',

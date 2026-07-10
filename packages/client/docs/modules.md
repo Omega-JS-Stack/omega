@@ -12,7 +12,7 @@
 - **Class**: `Auth`
 - **Key Methods**: `listen(options, callback)`, `isAuthenticated()`, `getUser()`, `signInWithEmailAndPassword()`, `signOut()`, `getIdToken()`, `resolveSubscription(account?)`
 - **Bindings**: Updates `auth` and `usage` context on auth settle
-- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with product limits from `config.payment.products` (OMEGA-canonical shape — same key name in @omegajs/backend, UJM, and @omegajs/desktop) to produce the `usage` bindings key (e.g., `{ credits: { monthly: 5, limit: 100 } }`)
+- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with product limits from `config.payment.products` (OMEGA-canonical shape — same key name in @omega.js/backend, UJM, and @omega.js/desktop) to produce the `usage` bindings key (e.g., `{ credits: { monthly: 5, limit: 100 } }`)
 
 ### resolveSubscription(account?)
 
@@ -28,7 +28,7 @@ const resolved = auth.resolveSubscription(account);
 - `trialing`: In an active trial (status `'active'` + `trial.claimed` + unexpired `trial.expires`)
 - `cancelling`: Cancellation pending (status `'active'` + `cancellation.pending` + NOT trialing)
 
-**Unified with @omegajs/backend**: The same function exists on `User.resolveSubscription(account)` in @omegajs/backend (`helpers/user.js`) with identical logic and return shape.
+**Unified with @omega.js/backend**: The same function exists on `User.resolveSubscription(account)` in @omega.js/backend (`helpers/user.js`) with identical logic and return shape.
 
 ### Auth Settler Pattern
 

@@ -1,4 +1,4 @@
-# OMEGA Client (@omegajs/client)
+# OMEGA Client (@omega.js/client)
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to deep references. The **meat** (module APIs, patterns, behavior tables) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
@@ -9,11 +9,11 @@ OMEGA Client is a modern JavaScript utility library for web applications with Fi
 - A singleton `Manager` instance exposing authentication, reactive DOM data binding, Firestore, storage, push notifications, error tracking (Sentry), service-worker helpers, and DOM/utility functions
 - Lazy Firebase imports to keep consumer bundles small
 - Reactive `data-wm-bind` DOM directives wired to auth + usage state
-- A `resolveSubscription()` helper unified with @omegajs/backend's `User.resolveSubscription()` so subscription-state logic is identical across frontend and backend
+- A `resolveSubscription()` helper unified with @omega.js/backend's `User.resolveSubscription()` so subscription-state logic is identical across frontend and backend
 
 ### Consumed by the frontend Manager family
 
-OMEGA Client is the runtime singleton powering **@omegajs/web**, **@omegajs/extension**, and **@omegajs/desktop**. Each framework initializes the singleton once and exposes it as `manager.webManager`. Any consumer of those frameworks gets a fully-wired @omegajs/client via `import webManager from '@omegajs/client'`.
+OMEGA Client is the runtime singleton powering **@omega.js/web**, **@omega.js/extension**, and **@omega.js/desktop**. Each framework initializes the singleton once and exposes it as `manager.omega`. Any consumer of those frameworks gets a fully-wired @omega.js/client via `import omega from '@omega.js/client'`.
 
 ## Recommended skills
 
@@ -23,14 +23,14 @@ OMEGA Client is the runtime singleton powering **@omegajs/web**, **@omegajs/exte
 
 ### For Consuming Projects
 
-OMEGA Client is consumed indirectly through @omegajs/web, @omegajs/extension, or @omegajs/desktop — those frameworks initialize the singleton for you. Inside any consuming code:
+OMEGA Client is consumed indirectly through @omega.js/web, @omega.js/extension, or @omega.js/desktop — those frameworks initialize the singleton for you. Inside any consuming code:
 
 ```javascript
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
-webManager.auth().listen({ once: true }, async () => { /* auth settled */ });
-webManager.utilities().escapeHTML(untrustedText);
-webManager.firestore().doc('users/abc').get();
+omega.auth().listen({ once: true }, async () => { /* auth settled */ });
+omega.utilities().escapeHTML(untrustedText);
+omega.firestore().doc('users/abc').get();
 ```
 
 ### For Framework Development (This Repository)
@@ -40,11 +40,11 @@ webManager.firestore().doc('users/abc').get();
 3. `npm start` — watch mode (rebuild on change)
 4. `npm test` — run Mocha tests
 
-> **Important:** OMEGA Client is a library, not an app. There is no `npm run build` / `npm run serve` here. Consume it from inside an @omegajs/web / @omegajs/extension / @omegajs/desktop project for end-to-end behavior.
+> **Important:** OMEGA Client is a library, not an app. There is no `npm run build` / `npm run serve` here. Consume it from inside an @omega.js/web / @omega.js/extension / @omega.js/desktop project for end-to-end behavior.
 
 ## Architecture
 
-OMEGA Client exports a singleton `Manager` instance from `src/index.js`. Every `import webManager from '@omegajs/client'` returns the same already-initialized object — do NOT call `new Manager()`, and do NOT pass `webManager` through function params or module-level variables.
+OMEGA Client exports a singleton `Manager` instance from `src/index.js`. Every `import omega from '@omega.js/client'` returns the same already-initialized object — do NOT call `new Manager()`, and do NOT pass `omega` through function params or module-level variables.
 
 The singleton owns nine feature modules under `src/modules/`: `storage`, `auth`, `bindings`, `firestore`, `notifications`, `service-worker`, `sentry`, `dom`, `utilities`. Firebase modules are dynamically imported to keep the bundle small. See [docs/architecture.md](docs/architecture.md) for the directory structure and module dependency graph, and [docs/modules.md](docs/modules.md) for the API reference of each module.
 
@@ -69,7 +69,7 @@ Whenever you make a behavioral change (new module, new method, new pattern, remo
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** @omegajs/client follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** @omega.js/client follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / @omega.js/backend / @omega.js/extension / @omega.js/desktop / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 
@@ -81,6 +81,6 @@ Deep references live in `docs/`. Treat docs as a first-class deliverable. **When
 - [docs/bindings.md](docs/bindings.md) — `data-wm-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
 - [docs/build-system.md](docs/build-system.md) — `prepare-package` ES5 transpile, build commands, package exports
 - [docs/testing.md](docs/testing.md) — Mocha test setup
-- [docs/cdp-debugging.md](docs/cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omegajs/client inside a consuming site
+- [docs/cdp-debugging.md](docs/cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omega.js/client inside a consuming site
 - [docs/common-tasks.md](docs/common-tasks.md) — adding a utility, adding a module, modifying config defaults, payment config (OMEGA SSOT shape), adding a binding action
 - [docs/dependencies.md](docs/dependencies.md) — dependencies table + important notes (no TypeScript, prefer fs-jetpack, no backwards-compat requirement, etc.)

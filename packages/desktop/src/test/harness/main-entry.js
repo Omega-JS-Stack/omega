@@ -9,7 +9,7 @@
 //   { event: 'skip',    name, reason }
 //   { event: 'end',     passed, failed, skipped }
 //
-// The parent runner reads stdout, renders the @omegajs/backend-style output, and the harness
+// The parent runner reads stdout, renders the @omega.js/backend-style output, and the harness
 // exits 0 on success / 1 on any failure.
 
 const path = require('path');
@@ -100,12 +100,12 @@ async function runSuites() {
   const Manager = require('../../main.js');
   const manager = new Manager();
 
-  // Test mode: load default config from @omegajs/desktop defaults (since the harness CWD won't have
-  // one), resolved for the desktop target via @omegajs/config, and skip window creation
+  // Test mode: load default config from @omega.js/desktop defaults (since the harness CWD won't have
+  // one), resolved for the desktop target via @omega.js/config, and skip window creation
   // so we don't pop a UI during tests.
   const fs = require('fs');
   const JSON5 = require('json5');
-  const { loadConfig } = require('@omegajs/config');
+  const { loadConfig } = require('@omega.js/config');
   const defaultConfig = loadConfig(path.join(__dirname, '..', '..', 'defaults'), 'desktop').config;
 
   await manager.initialize(defaultConfig, { skipWindowCreation: true });

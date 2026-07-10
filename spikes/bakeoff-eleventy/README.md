@@ -1,4 +1,4 @@
-# bakeoff-eleventy — bench harness (engine promoted to @omegajs/web)
+# bakeoff-eleventy — bench harness (engine promoted to @omega.js/web)
 
 **The engine core built here WON the bake-off and was promoted to
 [packages/web](../../packages/web) in Phase B1** (decision:
@@ -7,7 +7,7 @@ module map, engine facts, and the 22-test suite now live with the package —
 this directory is the remaining **corpus-scale harness**:
 
 ```bash
-npm run build   # corpus (if absent) → @omegajs/web buildSite (assets → Eleventy → PurgeCSS)
+npm run build   # corpus (if absent) → @omega.js/web buildSite (assets → Eleventy → PurgeCSS)
 npm run dev     # eleventy --serve over the corpus (farm layouts, watchable)
 npm run bench   # cold ×3 (+warmup) + watch-mode incremental touches
 ```

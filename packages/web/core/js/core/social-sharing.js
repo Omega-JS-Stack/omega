@@ -1,10 +1,10 @@
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Social Sharing Module
 export default function () {
 
   // Configuration with defaults merged with supplied config
-  const config = webManager.config.socialSharing.config;
+  const config = omega.config.socialSharing.config;
 
   // CDN base URL for Font Awesome SVG icons
   const ICON_BASE_URL = 'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.0.0/svgs';
@@ -68,7 +68,7 @@ export default function () {
   };
 
   // Wait for DOM to be ready
-  webManager.dom().ready().then(() => {
+  omega.dom().ready().then(() => {
     initSocialSharing();
   });
 
@@ -246,8 +246,8 @@ export default function () {
   function copyToClipboard(shareConfig) {
     const url = shareConfig.url;
 
-    // Use webManager utility for clipboard copy
-    webManager.utilities().clipboardCopy(url);
+    // Use omega utility for clipboard copy
+    omega.utilities().clipboardCopy(url);
 
     // Show success message
     showCopySuccess();

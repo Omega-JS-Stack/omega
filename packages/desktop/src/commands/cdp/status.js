@@ -1,4 +1,4 @@
-// `npx mgr cdp status` — is the dev app up, and what's in it? One-stop
+// `npx omega cdp status` — is the dev app up, and what's in it? One-stop
 // orientation: every CDP page target (the main window's document is marked),
 // the window geometry, and the live theme.
 

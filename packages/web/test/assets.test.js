@@ -1,9 +1,9 @@
 /**
  * Asset-pipeline invariants over LAYER ROOTS (site → theme(s) → core): page
- * modules layered via esbuild boot stubs, ESM + code splitting (@omegajs/client
+ * modules layered via esbuild boot stubs, ESM + code splitting (@omega.js/client
  * and the boot runtime in ONE shared chunk — the cross-bundle singleton),
  * the real UJM main bundle (core runtime + dynamic theme import via
- * __theme__), the real @omegajs/client via the @omegajs/client alias (subpaths
+ * __theme__), the real @omega.js/client via the @omega.js/client alias (subpaths
  * included), layered sass through omega:theme (per-theme main css + theme
  * page css namespaces), dev-mode stable names, and the PurgeCSS pass.
  */
@@ -85,7 +85,7 @@ test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runti
   assert.ok(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph');
 });
 
-test('ESM splitting: @omegajs/client singleton lives in exactly ONE shared chunk', async () => {
+test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chunk', async () => {
   const manifest = await build(['classy']);
 
   // Page entries are thin boot stubs importing shared chunks
@@ -99,7 +99,7 @@ test('ESM splitting: @omegajs/client singleton lives in exactly ONE shared chunk
   assert.strictEqual(withClient.length, 1, `client code in exactly one file (found ${withClient.length})`);
   assert.ok(withClient[0].includes(`${path.sep}chunks${path.sep}`), 'client lives in a shared chunk');
 
-  // The page's own code is still in its graph (via the @omegajs/client alias)
+  // The page's own code is still in its graph (via the @omega.js/client alias)
   const graph = readGraph(manifest.js.pages['signin/index']);
   assert.ok(graph.includes('Email is required'), 'real UJM auth page module code present');
   assert.ok(graph.includes('_authReady'), 'client reachable from the page graph');

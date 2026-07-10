@@ -1,8 +1,8 @@
 # CDP Debugging (Claude ↔ Electron)
 
-@omegajs/desktop's `serve` task forwards all `--` CLI flags to the Electron child process. This enables Chrome DevTools Protocol (CDP) debugging, which lets Claude (or any CDP client) interact with the running Electron app — take screenshots, click elements, type text, evaluate JS, read console logs, inspect network requests, etc.
+@omega.js/desktop's `serve` task forwards all `--` CLI flags to the Electron child process. This enables Chrome DevTools Protocol (CDP) debugging, which lets Claude (or any CDP client) interact with the running Electron app — take screenshots, click elements, type text, evaluate JS, read console logs, inspect network requests, etc.
 
-Two ways to use it: **the built-in `npx mgr cdp` toolkit** (below — zero setup, multi-target, knows @omegajs/desktop's conventions) and the `chrome-devtools-electron` MCP (further down — richer single-page interaction: click/fill/network/traces).
+Two ways to use it: **the built-in `npx omega cdp` toolkit** (below — zero setup, multi-target, knows @omega.js/desktop's conventions) and the `chrome-devtools-electron` MCP (further down — richer single-page interaction: click/fill/network/traces).
 
 ## Launching with CDP
 
@@ -29,26 +29,26 @@ curl -s http://localhost:9222/json
 
 Zero-dependency subcommands for driving the running dev app — see, act, and run the no-watch iterate loop. All read `EM_CDP_PORT` (default 9222), or take `--port <n>` (which wins).
 
-**Pinning a port in an npm script? Use `--port`, never `cross-env`.** `npx cross-env EM_CDP_PORT=… npx mgr cdp eval … "window.em.ipc.invoke('my:channel')"` STRIPS the inner quotes from the expression before it reaches V8 (`invoke(my:channel)` → `SyntaxError: missing ) after argument list`). `npx mgr cdp eval … "…" --port <n>` keeps the expression intact.
+**Pinning a port in an npm script? Use `--port`, never `cross-env`.** `npx cross-env EM_CDP_PORT=… npx omega cdp eval … "window.em.ipc.invoke('my:channel')"` STRIPS the inner quotes from the expression before it reaches V8 (`invoke(my:channel)` → `SyntaxError: missing ) after argument list`). `npx omega cdp eval … "…" --port <n>` keeps the expression intact.
 
 ```bash
-npx mgr cdp status                          # running? targets, window rect, theme
-npx mgr cdp eval <match> '<expr>'           # evaluate JS in any webContents
-npx mgr cdp shot <match> <out.png>          # ONE renderer's own pixels
-npx mgr cdp capture <out.png>               # the COMPOSITED window (macOS)
-npx mgr cdp theme <dark|light|system>       # flip the live theme (manager.theme)
-npx mgr cdp relaunch                        # quit → npm start → wait for boot
-npx mgr cdp quit                            # quit + wait for the process tree to drain
+npx omega cdp status                          # running? targets, window rect, theme
+npx omega cdp eval <match> '<expr>'           # evaluate JS in any webContents
+npx omega cdp shot <match> <out.png>          # ONE renderer's own pixels
+npx omega cdp capture <out.png>               # the COMPOSITED window (macOS)
+npx omega cdp theme <dark|light|system>       # flip the live theme (manager.theme)
+npx omega cdp relaunch                        # quit → npm start → wait for boot
+npx omega cdp quit                            # quit + wait for the process tree to drain
 ```
 
 ### The multi-target model
 
-An @omegajs/desktop app is one window but potentially MANY webContents (every BrowserWindow + every `WebContentsView` is its own CDP page target). Every subcommand takes a **URL-substring matcher** instead of a "current page": the main window's document is always `/views/main/` (@omegajs/desktop's templating convention); other views match by their own URLs. `status` lists what's live.
+An @omega.js/desktop app is one window but potentially MANY webContents (every BrowserWindow + every `WebContentsView` is its own CDP page target). Every subcommand takes a **URL-substring matcher** instead of a "current page": the main window's document is always `/views/main/` (@omega.js/desktop's templating convention); other views match by their own URLs. `status` lists what's live.
 
 ```bash
-npx mgr cdp eval "/views/main/" 'document.title'
-npx mgr cdp eval "example.com" 'getComputedStyle(document.body).backgroundColor'
-npx mgr cdp eval "/views/main/" "window.em.ipc.invoke('my-app:some-channel')"   # the real IPC surface
+npx omega cdp eval "/views/main/" 'document.title'
+npx omega cdp eval "example.com" 'getComputedStyle(document.body).backgroundColor'
+npx omega cdp eval "/views/main/" "window.em.ipc.invoke('my-app:some-channel')"   # the real IPC surface
 ```
 
 Promises are awaited, results print as JSON, and expressions run with a user gesture (focus()/clipboard-ish APIs behave like real input).
@@ -68,7 +68,7 @@ Caveats:
 
 ### relaunch / quit — the iterate loop
 
-@omegajs/desktop dev has **no watch** (`npm start` builds once, then runs) — every `src/` edit needs quit → rebuild → boot. `relaunch` is that loop in one command: it quits the app (real quit — `before-quit` handlers run), waits for the **full process tree to drain** (port-down alone is NOT that signal — the npm-start chain takes a few more seconds, and a test run started inside that window gets contaminated with flaky boot suites), spawns a detached `npm start` with `EM_CDP_PORT`, and waits for the boot signal. `quit` is the first half alone — safe to run `npx mgr test` the moment it returns. **Never run tests while the app is up or going down** (both rebuild `dist/`).
+@omega.js/desktop dev has **no watch** (`npm start` builds once, then runs) — every `src/` edit needs quit → rebuild → boot. `relaunch` is that loop in one command: it quits the app (real quit — `before-quit` handlers run), waits for the **full process tree to drain** (port-down alone is NOT that signal — the npm-start chain takes a few more seconds, and a test run started inside that window gets contaminated with flaky boot suites), spawns a detached `npm start` with `EM_CDP_PORT`, and waits for the boot signal. `quit` is the first half alone — safe to run `npx omega test` the moment it returns. **Never run tests while the app is up or going down** (both rebuild `dist/`).
 
 The boot signal defaults to the main window's document target. Apps whose boot completes later than first paint override it in `config/omega.json5`:
 
@@ -84,7 +84,7 @@ The packaged-app process name (for quit/raise/window-id matching) comes from con
 
 Sometimes the thing to drive is a regular **Chrome** — the marketing site, a web flow, an OAuth page — not the Electron app.
 
-> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / @omegajs/desktop / @omegajs/client) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omega.js/backend / BXM / @omega.js/desktop / @omega.js/client) — same core section, framework-flavored. Edit all five together.
 
 Browser work runs through the **`chrome-devtools` MCP** (via mcp-router). There is NO launch procedure anymore — no ports, no profile dirs, no curl checks:
 
@@ -97,7 +97,7 @@ Browser work runs through the **`chrome-devtools` MCP** (via mcp-router). There 
 
 Humans: the agent's Chrome window is visible — you can watch it drive. Full reference: `~/.claude/mcp-server/servers/chrome-devtools/CLAUDE.md`.
 
-@omegajs/desktop specifics:
+@omega.js/desktop specifics:
 
 - **The Electron app stays attach-by-port** — that's the whole rest of this doc (`mgr cdp` per invocation, or the `chrome-devtools-electron` MCP below). Port convention: **9222** = the Electron app. The isolated `chrome-devtools` browser has nothing to do with the app.
 - **Navigating to a brand's UJM dev site (the local marketing site)?** **`https://localhost:4000` — NEVER the LAN IP** (`https://192.168.x.x:...`). Port 4000 by default, increments to 4001+ when multiple sites run; exact port in `.temp/_config_browsersync.yml` at the root of the WEBSITE project (the UJM consumer — e.g. `<brand>-website/.temp/_config_browsersync.yml`, NOT this app repo).
@@ -165,5 +165,5 @@ CDP gives full control of the renderer — any local process can connect and rea
 The args are passed to `spawn(electronBin, ['.', ...extraArgs])`. The main process boot log shows the received argv:
 
 ```
-[info] (main) Initializing @omegajs/desktop (main)... argv=[".","--remote-debugging-port=9222"]
+[info] (main) Initializing @omega.js/desktop (main)... argv=[".","--remote-debugging-port=9222"]
 ```

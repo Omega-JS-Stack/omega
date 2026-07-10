@@ -27,23 +27,23 @@ module.exports = {
       name: 'resolve(): default is safeStorage; explicit none disables; unknown warns to null',
       run: async (ctx) => {
         const m = ctx.manager;
-        m.config.webManager = m.config.webManager || {};
-        const orig = m.config.webManager.authPersistence;
+        m.config.omega = m.config.omega || {};
+        const orig = m.config.omega.authPersistence;
         try {
-          delete m.config.webManager.authPersistence;
+          delete m.config.omega.authPersistence;
           const def = await authPersistence.resolve(m);
           // Default resolves to safeStorage when the OS vault is available, null otherwise —
           // both are valid environments; assert it never picks something else.
           if (def) ctx.expect(def.name).toBe('safeStorage');
 
-          m.config.webManager.authPersistence = 'none';
+          m.config.omega.authPersistence = 'none';
           ctx.expect(await authPersistence.resolve(m)).toBeNull();
 
-          m.config.webManager.authPersistence = 'does-not-exist';
+          m.config.omega.authPersistence = 'does-not-exist';
           ctx.expect(await authPersistence.resolve(m)).toBeNull();
         } finally {
-          if (orig !== undefined) m.config.webManager.authPersistence = orig;
-          else delete m.config.webManager.authPersistence;
+          if (orig !== undefined) m.config.omega.authPersistence = orig;
+          else delete m.config.omega.authPersistence;
           await authPersistence.resolve(m); // restore the active strategy for later suites
         }
       },
@@ -55,15 +55,15 @@ module.exports = {
         ctx.expect(() => authPersistence.register('bad', {})).toThrow(/must implement/);
 
         authPersistence.register('em-test-custom', fakeStrategy());
-        m.config.webManager = m.config.webManager || {};
-        const orig = m.config.webManager.authPersistence;
+        m.config.omega = m.config.omega || {};
+        const orig = m.config.omega.authPersistence;
         try {
-          m.config.webManager.authPersistence = 'em-test-custom';
+          m.config.omega.authPersistence = 'em-test-custom';
           const active = await authPersistence.resolve(m);
           ctx.expect(active.name).toBe('em-test-custom');
         } finally {
-          if (orig !== undefined) m.config.webManager.authPersistence = orig;
-          else delete m.config.webManager.authPersistence;
+          if (orig !== undefined) m.config.omega.authPersistence = orig;
+          else delete m.config.omega.authPersistence;
           delete authPersistence._strategies['em-test-custom'];
           await authPersistence.resolve(m);
         }
@@ -121,7 +121,7 @@ module.exports = {
       name: 'bridge account-resolved intake: uid-guarded, cached, broadcast once per change, cleared on sign-out',
       run: async (ctx) => {
         const m = ctx.manager;
-        const bridge = m.webManager;
+        const bridge = m.omega;
         const origAuth = bridge._firebaseAuth;
         const origBroadcast = m.ipc.broadcast;
         const broadcasts = [];

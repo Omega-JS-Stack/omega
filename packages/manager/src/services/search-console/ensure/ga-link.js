@@ -8,7 +8,7 @@
  * the link is confirmed (`gaLinked` in state).
  */
 const chalk = require('chalk').default;
-const { confirm, isInteractive } = require('@omegajs/devkit/prompt');
+const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
 
 module.exports = async function ensureGaLink(context) {
   const { brandConfig, serviceData, options = {} } = context;

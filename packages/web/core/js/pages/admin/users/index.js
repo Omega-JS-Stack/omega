@@ -7,7 +7,7 @@ import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // State
 let formManager = null;
@@ -20,9 +20,9 @@ const SEARCH_LIMIT = 50;
 // Module
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
-    webManager.auth().listen({ once: true }, async (state) => {
+    omega.auth().listen({ once: true }, async (state) => {
       if (!state.user) {
         return;
       }
@@ -56,7 +56,7 @@ function initForm() {
 // Load stat card counts
 async function loadStatCards() {
   const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
-  const db = webManager.firebaseFirestore;
+  const db = omega.firebaseFirestore;
   const now = Math.floor(Date.now() / 1000);
   const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
 
@@ -76,7 +76,7 @@ async function loadStatCards() {
 // Search users by email prefix or UID prefix
 // Uses Firestore >= / \uf8ff range trick for prefix matching on both
 async function searchUsers(term) {
-  const firestore = webManager.firestore();
+  const firestore = omega.firestore();
   const results = new Map();
   const prefixEnd = term + '\uf8ff';
 
@@ -137,7 +137,7 @@ function renderUsers() {
   searchResults.forEach((user) => {
     const email = user?.auth?.email || 'Unknown';
     const uid = user.id;
-    const resolved = webManager.auth().resolveSubscription(user);
+    const resolved = omega.auth().resolveSubscription(user);
     const plan = resolved.plan;
     const isPaid = plan !== 'basic';
     const expiresUNIX = user?.subscription?.expires?.timestampUNIX;
@@ -162,12 +162,12 @@ function renderUsers() {
         <div class="d-flex align-items-center">
           ${getPrerenderedIcon('user', 'fa-sm me-2 text-muted')}
           <div>
-            <div class="text-truncate" style="max-width: 220px;">${webManager.utilities().escapeHTML(email)}</div>
-            <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${webManager.utilities().escapeHTML(uid)}</div>
+            <div class="text-truncate" style="max-width: 220px;">${omega.utilities().escapeHTML(email)}</div>
+            <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${omega.utilities().escapeHTML(uid)}</div>
           </div>
         </div>
       </td>
-      <td><span class="badge ${badgeClass}">${webManager.utilities().escapeHTML(capitalize(plan))}</span></td>
+      <td><span class="badge ${badgeClass}">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
       <td class="small ${expiresText === 'Expired' ? 'text-danger' : 'text-muted'}">${expiresText}</td>
       <td class="text-muted small">${updatedText}</td>
       <td>
@@ -282,7 +282,7 @@ async function signInAsUser(uid, email) {
   openSignInAsModalLoading(email);
 
   try {
-    const response = await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/user/token`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user/token`, {
       method: 'POST',
       timeout: 30000,
       response: 'json',
@@ -383,7 +383,7 @@ async function deleteUser(uid, email) {
   }
 
   try {
-    await authorizedFetch(`${webManager.getApiUrl()}/backend-manager/user`, {
+    await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user`, {
       method: 'DELETE',
       timeout: 30000,
       response: 'json',
@@ -454,7 +454,7 @@ function initEditForm() {
       return;
     }
 
-    const firestore = webManager.firestore();
+    const firestore = omega.firestore();
 
     // Build the update document
     const update = {

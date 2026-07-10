@@ -54,6 +54,6 @@ In main, `manager.storage.onChange(key, fn)` registers a callback fired with `(v
 ## Implementation notes
 
 - Storage initialization is async — `Manager.initialize()` `await`s it before any other lib boots, since features like `app-state` and `windows` rely on it.
-- IPC handlers (`desktop:storage:get` etc.) are registered on the @omegajs/desktop `ipc` bus, not directly on `ipcMain`. See [ipc.md](ipc.md).
+- IPC handlers (`desktop:storage:get` etc.) are registered on the @omega.js/desktop `ipc` bus, not directly on `ipcMain`. See [ipc.md](ipc.md).
 - The store uses `name: 'em-storage'` (filename `em-storage.json`). Don't reuse this name in a separate `electron-store` instance.
-- `electron-store@11` is ESM-only. Webpack bundles it INTO `main.bundle.js` (static-specifier `import()` with `webpackMode: "eager"` in `lib/storage.js`) — consumers install NOTHING; packaged apps carry it inside the bundle with no runtime resolution. (It used to be a `webpackIgnore`'d runtime import, which silently no-op'd storage in packaged consumers — @omegajs/desktop is a devDependency and never ships in the asar.)
+- `electron-store@11` is ESM-only. Webpack bundles it INTO `main.bundle.js` (static-specifier `import()` with `webpackMode: "eager"` in `lib/storage.js`) — consumers install NOTHING; packaged apps carry it inside the bundle with no runtime resolution. (It used to be a `webpackIgnore`'d runtime import, which silently no-op'd storage in packaged consumers — @omega.js/desktop is a devDependency and never ships in the asar.)

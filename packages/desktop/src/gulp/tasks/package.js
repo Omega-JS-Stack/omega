@@ -22,7 +22,7 @@ module.exports = function packageApp(done) {
     return done(new Error(`Missing ${config}. Run gulp/build-config first (it generates this file from omega.json5).`));
   }
 
-  // Resolve electron-builder from the consumer's node_modules first, then @omegajs/desktop's bundled one.
+  // Resolve electron-builder from the consumer's node_modules first, then @omega.js/desktop's bundled one.
   let builder;
   try {
     builder = Manager.require('electron-builder');

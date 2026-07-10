@@ -585,7 +585,7 @@ test('workers: no workers configured → no API traffic', async () => {
 
 // ─── Interactive verification polls (fake TTY + stubbed browser) ─────────────
 
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
 test('zone: pending zone with a manual registrar opens its nameserver page and polls until active', async () => {

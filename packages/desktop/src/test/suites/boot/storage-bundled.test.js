@@ -2,9 +2,9 @@
 //
 // Why this suite exists: electron-store is ESM-only and used to be loaded via a
 // `webpackIgnore`'d dynamic import — a runtime resolution that accidentally worked
-// in this harness (the fixture lives inside the @omegajs/desktop repo, so Node's upward
-// node_modules walk finds @omegajs/desktop's copy) but FAILED in real packaged consumers, where
-// @omegajs/desktop is a devDependency that never ships in the asar. Storage silently became a
+// in this harness (the fixture lives inside the @omega.js/desktop repo, so Node's upward
+// node_modules walk finds @omega.js/desktop's copy) but FAILED in real packaged consumers, where
+// @omega.js/desktop is a devDependency that never ships in the asar. Storage silently became a
 // no-op. The functional round-trip below would therefore pass either way — the
 // regression assertion is the BUNDLE TEXT one: no live `import('electron-store')`
 // call may survive webpack (eager bundling compiles it to __webpack_require__).

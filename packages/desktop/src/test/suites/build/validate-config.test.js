@@ -1,10 +1,10 @@
-// Build-layer tests for config validation via @omegajs/config — @omegajs/desktop's integration
+// Build-layer tests for config validation via @omega.js/config — @omega.js/desktop's integration
 // surface only. The engine semantics (required/type/match/enum, conditional required,
 // secrets, targets sanity) are deep-tested in the config package's own suite; here we
 // prove the vendored package loads from dist, the desktop refinements apply, and the
 // shipped defaults stay compatible with the shared schema.
 
-const { validateConfig, runSchema, formatErrors, loadConfig } = require('@omegajs/config');
+const { validateConfig, runSchema, formatErrors, loadConfig } = require('@omega.js/config');
 
 const path = require('path');
 const Manager = require('../../../build.js');
@@ -18,7 +18,7 @@ const VALID = {
 module.exports = {
   type: 'suite',
   layer: 'build',
-  description: 'config validation — @omegajs/config integration',
+  description: 'config validation — @omega.js/config integration',
   tests: [
     {
       name: 'package loads with the full validation surface',
@@ -77,7 +77,7 @@ module.exports = {
       },
     },
     {
-      name: '@omegajs/desktop shipped defaults resolve + validate clean for desktop',
+      name: '@omega.js/desktop shipped defaults resolve + validate clean for desktop',
       run: (ctx) => {
         // Anything failing here means our defaults are incompatible with the shared schema.
         const { errors, enabled } = loadConfig(path.join(root, 'dist', 'defaults'), 'desktop');

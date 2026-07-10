@@ -1,6 +1,6 @@
-// Analytics — GA4 via Measurement Protocol. Mirrors @omegajs/backend's
+// Analytics — GA4 via Measurement Protocol. Mirrors @omega.js/backend's
 // `Manager.config.analytics.providers.google.id` shape so the same person can be
-// tracked across desktop (@omegajs/desktop) + web (UJM/@omegajs/client) + backend (@omegajs/backend) by
+// tracked across desktop (@omega.js/desktop) + web (UJM/@omega.js/client) + backend (@omega.js/backend) by
 // referencing a single namespaced UUIDv5 identity.
 //
 // Cross-platform identity (the key feature):
@@ -8,7 +8,7 @@
 //   user_id   = uuidv5(firebaseUid, namespace) // same human across all surfaces
 //
 // `namespace` is the consumer's `firebaseConfig.projectId` re-encoded as a UUIDv5
-// namespace via uuidv5.URL of the projectId string. Same projectId in @omegajs/backend/@omegajs/client/@omegajs/desktop
+// namespace via uuidv5.URL of the projectId string. Same projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop
 // → identical uuidv5 outputs everywhere → unified analytics.
 //
 // Anonymous (client-bridge hasn't reported auth yet) → user_id stays null.
@@ -19,7 +19,7 @@
 //   manager.analytics.event(name, params?)         // generic event
 //   manager.analytics.pageview(path?)              // convenience wrapper
 //   manager.analytics.screenview(name?)            // convenience wrapper
-//   manager.analytics.setUserId(uid)               // manual override; auto-wired to webManager
+//   manager.analytics.setUserId(uid)               // manual override; auto-wired to omega
 //   manager.analytics.setUserProperties(props)     // merge into user_properties block
 //
 // Events fired during normal operation are queued until init completes (we need
@@ -36,7 +36,7 @@
 //     },
 //   }
 //
-// Secret comes from `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omegajs/backend). Webpack's
+// Secret comes from `process.env.GOOGLE_ANALYTICS_SECRET` (matches @omega.js/backend). Webpack's
 // DefinePlugin injects it at build time so packaged apps don't need .env at runtime.
 // Without the secret, the module logs a warning + becomes a no-op.
 
@@ -72,7 +72,7 @@ const analytics = {
     const cfg = manager.config.analytics || {};
 
     // Presence-driven: providers.google.id presence enables analytics. No separate
-    // `enabled` flag (matches @omegajs/backend convention — credentials are the enable signal).
+    // `enabled` flag (matches @omega.js/backend convention — credentials are the enable signal).
     analytics._measurementId = cfg.providers?.google?.id || null;
     // Secret comes from env. In packaged builds, webpack's DefinePlugin replaces
     // `process.env.GOOGLE_ANALYTICS_SECRET` with the build-time literal so the
@@ -92,7 +92,7 @@ const analytics = {
     analytics._enabled = true;
 
     // Namespace = uuidv5 of the firebase project ID (or app id as fallback). Same
-    // projectId in @omegajs/backend/@omegajs/client/@omegajs/desktop → same namespace → same per-uid UUIDv5
+    // projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop → same namespace → same per-uid UUIDv5
     // everywhere. UUIDv5 needs a UUID-shaped namespace — we derive one from the
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
     const projectId = manager.config.firebaseConfig?.projectId
@@ -106,11 +106,11 @@ const analytics = {
     analytics._clientId = uuidv5(deviceId, analytics._namespace);
 
     // Wire auth subscription so user_id flips automatically on login/logout.
-    analytics._authUnsub = manager.webManager.onAuthChange((snap) => {
+    analytics._authUnsub = manager.omega.onAuthChange((snap) => {
       analytics._handleAuthChange(snap);
     });
     // Pull current state immediately in case auth already resolved.
-    const current = manager.webManager.getCurrentUser();
+    const current = manager.omega.getCurrentUser();
     if (current?.uid) analytics._handleAuthChange(current);
 
     // Compute initial user_properties from context + usage.

@@ -2,7 +2,7 @@
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('install');
 const { safeInstall } = require('../utils/safe-install');
-const local = require('@omegajs/devkit/local');
+const local = require('@omega.js/devkit/local');
 
 const package = Manager.getPackage('main');
 

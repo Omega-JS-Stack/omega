@@ -1,5 +1,5 @@
 // Build-layer tests for lib/restart-manager/protocol.js — the protocol v1 SSOT
-// both @omegajs/desktop and the Restart Manager app import. Pure functions, plain Node.
+// both @omega.js/desktop and the Restart Manager app import. Pure functions, plain Node.
 
 const path = require('path');
 const protocol = require('../../../lib/restart-manager/protocol.js');
@@ -18,7 +18,7 @@ module.exports = {
           ctx.expect(typeof protocol.ENDPOINTS[key]).toBe('string');
           ctx.expect(protocol.ENDPOINTS[key].startsWith('/v1/')).toBe(true);
         }
-        // No /v1/quit — RM self-updates via @omegajs/desktop's autoUpdater; nothing external quits it.
+        // No /v1/quit — RM self-updates via @omega.js/desktop's autoUpdater; nothing external quits it.
         ctx.expect(Object.keys(protocol.ENDPOINTS).length).toBe(endpoints.length);
       },
     },

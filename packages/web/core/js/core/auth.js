@@ -1,5 +1,5 @@
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Enforce page-load consent guard. When true, any authenticated user whose doc has
 // consent.legal.status !== 'granted' is silently signed out. Keep FALSE until the
@@ -10,7 +10,7 @@ const ENFORCE_CONSENT_GUARD = true;
 // Auth Module
 export default function () {
   // Get auth policy
-  const config = webManager.config.auth.config;
+  const config = omega.config.auth.config;
   const policy = config.policy;
   const requiredRoles = config.roles || null;
 
@@ -38,11 +38,11 @@ export default function () {
 
   // Setup Auth listener
   try {
-    webManager.auth().listen({}, async (state) => {
+    omega.auth().listen({}, async (state) => {
       const user = state.user;
       const url = new URL(window.location.href);
       const authReturnUrlRaw = url.searchParams.get('authReturnUrl');
-      const authReturnUrl = authReturnUrlRaw && webManager.isValidRedirectUrl(authReturnUrlRaw) ? authReturnUrlRaw : null;
+      const authReturnUrl = authReturnUrlRaw && omega.isValidRedirectUrl(authReturnUrlRaw) ? authReturnUrlRaw : null;
       const authSignout = url.searchParams.get('authSignout');
 
       // Log
@@ -96,8 +96,8 @@ export default function () {
           const legalStatus = state.account?.consent?.legal?.status;
           if (signupProcessed && legalStatus && legalStatus !== 'granted') {
             console.warn('[Auth] Signing out user with no legal consent on record');
-            await webManager.auth().signOut();
-            webManager.utilities().showNotification(
+            await omega.auth().signOut();
+            omega.utilities().showNotification(
               `This account hasn't completed setup. Please sign up first.`,
               { type: 'danger', timeout: 8000 }
             );
@@ -106,7 +106,7 @@ export default function () {
         }
 
         // Prompt for push notification subscription (fire-and-forget)
-        webManager.notifications().subscribe().catch((e) => {
+        omega.notifications().subscribe().catch((e) => {
           console.warn('[Auth] Notification subscribe failed:', e.message);
         });
 
@@ -218,7 +218,7 @@ function updateAuthLinks() {
 function setAnalyticsUserId(user) {
   const userId = user?.uid;
   const email = user?.email;
-  const metaPixelId = webManager.config.analytics?.meta;
+  const metaPixelId = omega.config.analytics?.meta;
 
   // Short-circuit if no user
   if (!userId) {
@@ -285,19 +285,19 @@ async function sendUserSignupMetadata(account) {
     }
 
     // Get attribution data from storage
-    const attribution = webManager.storage().get('attribution', {});
-    const consent = webManager.storage().get('consent', {});
+    const attribution = omega.storage().get('attribution', {});
+    const consent = omega.storage().get('consent', {});
 
     // Build the payload
     const payload = {
       // New structure
       attribution: attribution,
-      context: webManager.utilities().getContext(),
+      context: omega.utilities().getContext(),
       consent: consent,
     };
 
     // Get server API URL
-    const serverApiURL = `${webManager.getApiUrl()}/backend-manager/user/signup`;
+    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/signup`;
 
     // Log
     console.log('[Auth] Sending user metadata:', payload);
@@ -319,7 +319,7 @@ async function sendUserSignupMetadata(account) {
     // signupProcessed=false, so a refresh / next page load retries automatically.
 
     /* @dev-only:start */
-    webManager.utilities().showNotification(
+    omega.utilities().showNotification(
       `[DEV] Failed to send signup metadata. Will retry on next page load (flags.signupProcessed is still false).`,
       { type: 'warning', timeout: 1000 }
     );

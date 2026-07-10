@@ -11,7 +11,7 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { bench } = require('@omegajs/bakeoff-shared/src/bench.js');
+const { bench } = require('@omega.js/bakeoff-shared/src/bench.js');
 
 const SPIKE = path.resolve(__dirname, '..');
 const ROOT = path.resolve(SPIKE, '..', '..');

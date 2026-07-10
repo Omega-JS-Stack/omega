@@ -1,6 +1,6 @@
 # IPC
 
-Typed channel bus for main ↔ renderer communication. All @omegajs/desktop features register their channels through this single layer rather than calling `ipcMain.handle` directly, so you have one place to look and one place to instrument.
+Typed channel bus for main ↔ renderer communication. All @omega.js/desktop features register their channels through this single layer rather than calling `ipcMain.handle` directly, so you have one place to look and one place to instrument.
 
 ## Main-process API
 

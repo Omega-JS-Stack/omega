@@ -1,8 +1,8 @@
 // Default export — re-exports per-process Managers + version.
 // Most consumers should use the per-process subpath imports instead:
-//   require('@omegajs/desktop/main')
-//   require('@omegajs/desktop/renderer')
-//   require('@omegajs/desktop/preload')
+//   require('@omega.js/desktop/main')
+//   require('@omega.js/desktop/renderer')
+//   require('@omega.js/desktop/preload')
 const package = require('../package.json');
 
 module.exports = {

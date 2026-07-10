@@ -4,7 +4,7 @@
  * command exists so the CLI surface is complete and the failure is explicit
  * rather than a missing command.
  */
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 
 const logger = new Logger('omega:audit');
 

@@ -5,7 +5,7 @@
 // (WebSocket connections, long-running tasks, etc.)
 
 // Import OMEGA Extension
-import Manager from '@omegajs/extension/offscreen';
+import Manager from '@omega.js/extension/offscreen';
 
 // Create instance
 const manager = new Manager();

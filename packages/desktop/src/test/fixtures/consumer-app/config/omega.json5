@@ -1,13 +1,13 @@
 {
-  // Minimal @omegajs/desktop consumer config used ONLY by @omegajs/desktop's own boot-layer self-test. The fixture
+  // Minimal @omega.js/desktop consumer config used ONLY by @omega.js/desktop's own boot-layer self-test. The fixture
   // is webpack-built (dist/main.bundle.js) and booted by src/test/runners/boot.js when
-  // EM_TEST_BOOT_PROJECT points here — auto-set when @omegajs/desktop tests itself (src/commands/test.js).
+  // EM_TEST_BOOT_PROJECT points here — auto-set when @omega.js/desktop tests itself (src/commands/test.js).
   // Not a real app; never published.
   brand: {
     id: 'em-fixture',
     name: 'Desktop Fixture Consumer',
     images: {
-      // Empty → build-config falls back to @omegajs/desktop's bundled default icon (no icon file shipped).
+      // Empty → build-config falls back to @omega.js/desktop's bundled default icon (no icon file shipped).
       icon: '',
     },
   },

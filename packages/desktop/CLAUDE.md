@@ -1,53 +1,53 @@
-# OMEGA Desktop (@omegajs/desktop)
+# OMEGA Desktop (@omega.js/desktop)
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to the deep references. The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
-> **Mirrored structure:** @omegajs/backend, UJM, @omegajs/extension, and @omegajs/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** @omega.js/backend, UJM, @omega.js/extension, and @omega.js/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
 ## Identity
 
-OMEGA Desktop (@omegajs/desktop) is a comprehensive framework for building modern Electron desktop apps. Sister project to @omegajs/extension and Ultimate Jekyll Manager (UJM). Provides one-line-import bootstrap per Electron process, modular feature library with file-based extensibility, a multi-platform build/release pipeline, and a built-in test framework.
+OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building modern Electron desktop apps. Sister project to @omega.js/extension and Ultimate Jekyll Manager (UJM). Provides one-line-import bootstrap per Electron process, modular feature library with file-based extensibility, a multi-platform build/release pipeline, and a built-in test framework.
 
 ## Recommended skills
 
-- **`omega:em`** — router skill. Auto-loads on desktop-specific keywords (`manager.windows`, `manager.tray`, `electron-builder`, `npx mgr setup`, etc.) and points back to this CLAUDE.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
+- **`omega:em`** — router skill. Auto-loads on desktop-specific keywords (`manager.windows`, `manager.tray`, `electron-builder`, `npx omega setup`, etc.) and points back to this CLAUDE.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omegajs/desktop ships `@omegajs/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omegajs/client as much as with @omegajs/desktop.
+**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
-- **`node_modules/@omegajs/client/CLAUDE.md`** — top-level overview + index
-- **`node_modules/@omegajs/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omega.js/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start
 
 ### For Consuming Projects
 
-1. `npm install @omegajs/desktop --save-dev`
-2. `npx mgr setup` — scaffolds the project (writes `config/omega.json5`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`).
+1. `npm install @omega.js/desktop --save-dev`
+2. `npx omega setup` — scaffolds the project (writes `config/omega.json5`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`).
 3. `npm start` — dev (gulp → webpack → electron .)
 4. `npm run build` — local production build (compiles bundles only, no installer)
 5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally.
 6. `npm run package` — full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux). ~3min on mac.
 7. `npm run release` — signed + published release (requires certs)
-8. `npx mgr test` — runs framework + project test suites
-   - `npx mgr test build/config` — run a specific test by path (relative to `test/`, matches both sources)
-   - `npx mgr test project:` — run ONLY consumer project tests (no framework suites)
-   - `npx mgr test project:custom-test` — run only that project test file
-   - `npx mgr test mgr:` — run ONLY framework tests (universal cross-framework alias for "the manager's own tests")
-   - `npx mgr test desktop:build/config` — run only framework tests matching a path (`em:` aliases `framework:`, both equivalent to `mgr:`)
+8. `npx omega test` — runs framework + project test suites
+   - `npx omega test build/config` — run a specific test by path (relative to `test/`, matches both sources)
+   - `npx omega test project:` — run ONLY consumer project tests (no framework suites)
+   - `npx omega test project:custom-test` — run only that project test file
+   - `npx omega test mgr:` — run ONLY framework tests (universal cross-framework alias for "the manager's own tests")
+   - `npx omega test desktop:build/config` — run only framework tests matching a path (`em:` aliases `framework:`, both equivalent to `mgr:`)
    - `--filter=<substring>` matches test NAMES (orthogonal to the path target)
-   - `npx mgr test --extended` (or `TEST_EXTENDED_MODE=true`) opts into tests that hit real external services (Firebase, analytics, update feeds) — off by default. `TEST_EXTENDED_MODE` is the shared, unprefixed env var across @omegajs/backend, @omegajs/extension, UJM, and @omegajs/desktop; it propagates to every spawned test environment and prints a warning when on. See [docs/test-framework.md](docs/test-framework.md#extended-vs-normal-mode).
+   - `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`) opts into tests that hit real external services (Firebase, analytics, update feeds) — off by default. `TEST_EXTENDED_MODE` is the shared, unprefixed env var across @omega.js/backend, @omega.js/extension, UJM, and @omega.js/desktop; it propagates to every spawned test environment and prints a warning when on. See [docs/test-framework.md](docs/test-framework.md#extended-vs-normal-mode).
 
 ### For Framework Development (This Repository)
 
-> **🚫 NEVER use `npx mgr ...` from the framework repo.** `npx mgr` is for CONSUMER projects only (where the bin is linked in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call the local `bin/` directly. This applies to ALL four OMEGA frameworks (@omegajs/backend, UJM, @omegajs/extension, @omegajs/desktop).
+> **🚫 NEVER use `npx omega ...` from the framework repo.** `npx omega` is for CONSUMER projects only (where the bin is linked in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call the local `bin/` directly. This applies to ALL four OMEGA frameworks (@omega.js/backend, UJM, @omega.js/extension, @omega.js/desktop).
 
 1. `npm install`
 2. `npm start` — watch + compile `src/` → `dist/` via prepare-package
-3. Test in the **designated test consumer** — `../../Deployment-Playground/deployment-playground-desktop` is @omegajs/desktop's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From inside it, run `npx mgr install dev` to swap @omegajs/desktop to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omegajs/desktop`). Reverse with `npx mgr install live`.
+3. Test in the **designated test consumer** — `../../Deployment-Playground/deployment-playground-desktop` is @omega.js/desktop's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From inside it, run `npx omega install dev` to swap @omega.js/desktop to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/desktop`). Reverse with `npx omega install live`.
 4. `npm test` — runs the framework's own suites
 
 ## Architecture
@@ -58,16 +58,16 @@ Each Electron process has its own one-line bootstrap:
 
 ```js
 // src/main.js
-new (require('@omegajs/desktop/main'))().initialize();      // auto-loads JSON5 config
+new (require('@omega.js/desktop/main'))().initialize();      // auto-loads JSON5 config
 
 // src/preload.js
-new (require('@omegajs/desktop/preload'))().initialize();   // exposes window.em
+new (require('@omega.js/desktop/preload'))().initialize();   // exposes window.em
 
 // src/assets/js/components/<view>/index.js
-new (require('@omegajs/desktop/renderer'))().initialize();
+new (require('@omega.js/desktop/renderer'))().initialize();
 ```
 
-`manager.initialize()` runs a fixed boot order (startup → ipc → storage → theme → sentry → protocol → deepLink → appState → whenReady → autoUpdater → tray/menu/contextMenu → startup → webManager → remoteConfig → remoteScripts → windows). See [docs/boot-sequence.md](docs/boot-sequence.md) for the full ordered list + rationale.
+`manager.initialize()` runs a fixed boot order (startup → ipc → storage → theme → sentry → protocol → deepLink → appState → whenReady → autoUpdater → tray/menu/contextMenu → startup → omega → remoteConfig → remoteScripts → windows). See [docs/boot-sequence.md](docs/boot-sequence.md) for the full ordered list + rationale.
 
 ### Lib modules
 
@@ -84,8 +84,8 @@ new (require('@omegajs/desktop/renderer'))().initialize();
 | `app-state` | storage-backed launch flags + crash sentinel |
 | `protocol` | single-instance lock + scheme registration |
 | `deep-link` | unified deep-link dispatch (cold + warm start, mac + win + linux), built-in routes, pattern matching |
-| `client-bridge` | main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the @omegajs/client-resolved plan → `getResolvedPlan()` |
-| `auth-persistence` | pluggable main-session vault (default: safeStorage OS-keychain encryption; `webManager.authPersistence` config) |
+| `client-bridge` | main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the @omega.js/client-resolved plan → `getResolvedPlan()` |
+| `auth-persistence` | pluggable main-session vault (default: safeStorage OS-keychain encryption; `omega.authPersistence` config) |
 | `auto-updater` | electron-updater wrapper, idle-aware install, 30-day pending gate, dev simulation |
 | `sentry` | per-context split, auto auth attribution, dev-mode gating |
 | `templating` | `{{ }}` token replacement (BXM/UJM convention), used at build time by `gulp/html` |
@@ -94,7 +94,7 @@ new (require('@omegajs/desktop/renderer'))().initialize();
 | `remote-config` | "Hot config" fetched from `${brand.url}/data/resources/main.json`, polled hourly |
 | `remote-scripts` | Emergency remote code execution — fetches `${brand.url}/data/scripts/main.js`, content-hash dedup, async `manager` + `require` in scope |
 | `analytics` | GA4 Measurement Protocol; cross-platform `uuidv5` identity |
-| `restart-manager` | external guardian app for crash relaunches — localhost HTTP protocol v1 (register/heartbeat/deregister), silent install when missing (mac zip / win NSIS `/S` / linux AppImage; RM self-updates via its own @omegajs/desktop autoUpdater); split dir ships the protocol SSOT the RM app imports |
+| `restart-manager` | external guardian app for crash relaunches — localhost HTTP protocol v1 (register/heartbeat/deregister), silent install when missing (mac zip / win NSIS `/S` / linux AppImage; RM self-updates via its own @omega.js/desktop autoUpdater); split dir ships the protocol SSOT the RM app imports |
 
 ### File-based feature definitions
 
@@ -104,25 +104,25 @@ All three ship sensible default templates and share a unified id-path API (`.fin
 
 ### Windows
 
-@omegajs/desktop does NOT auto-create any windows. Consumers call `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(...)`. Inset titlebar by default; Discord-style hide-on-close on `main`; auto re-surface on user re-launch. See [docs/windows.md](docs/windows.md).
+@omega.js/desktop does NOT auto-create any windows. Consumers call `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(...)`. Inset titlebar by default; Discord-style hide-on-close on `main`; auto re-surface on user re-launch. See [docs/windows.md](docs/windows.md).
 
 ### Icons
 
-Convention-only. Drop PNGs at `config/icons/<platform>/<slot>.png` (platform-specific) or `config/icons/global/<slot>.png` (universal fallback). Resolution per slot: platform → global → (Linux only) windows → bundled default. Ship @2x native size only — @omegajs/desktop downscales the @1x sibling via sharp. macOS tray input is `tray.png` (consumer-friendly); @omegajs/desktop renames the dist output to `trayTemplate.png` for OS dark-mode auto-inversion. No `app.icons` config block. See [docs/icons.md](docs/icons.md).
+Convention-only. Drop PNGs at `config/icons/<platform>/<slot>.png` (platform-specific) or `config/icons/global/<slot>.png` (universal fallback). Resolution per slot: platform → global → (Linux only) windows → bundled default. Ship @2x native size only — @omega.js/desktop downscales the @1x sibling via sharp. macOS tray input is `tray.png` (consumer-friendly); @omega.js/desktop renames the dist output to `trayTemplate.png` for OS dark-mode auto-inversion. No `app.icons` config block. See [docs/icons.md](docs/icons.md).
 
 ### Build system
 
-prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets, all bundled) + electron-builder. `gulp/build-config` generates `dist/electron-builder.yml` + `dist/config/entitlements.mac.plist` from @omegajs/desktop defaults + consumer config. Strategy-pluggable Windows signing (`platforms.win.signing.strategy`: `self-hosted` | `cloud` | `local`). See [docs/build-system.md](docs/build-system.md), [docs/installer-options.md](docs/installer-options.md), [docs/signing.md](docs/signing.md).
+prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets, all bundled) + electron-builder. `gulp/build-config` generates `dist/electron-builder.yml` + `dist/config/entitlements.mac.plist` from @omega.js/desktop defaults + consumer config. Strategy-pluggable Windows signing (`platforms.win.signing.strategy`: `self-hosted` | `cloud` | `local`). See [docs/build-system.md](docs/build-system.md), [docs/installer-options.md](docs/installer-options.md), [docs/signing.md](docs/signing.md).
 
 ### Config flow
 
-`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omegajs/config` — `targets.desktop` overlays the top level, brand-monorepo walk-up included — then applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `EM_BUILD_JSON`. Runtime reads `EM_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
+`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omega.js/config` — `targets.desktop` overlays the top level, brand-monorepo walk-up included — then applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `EM_BUILD_JSON`. Runtime reads `EM_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
 
 Required fields: `brand.id` + `brand.name`. Everything else has defaults. See [docs/installer-options.md](docs/installer-options.md) for the full defaults table.
 
 ### Schema validation
 
-Every field in `config/omega.json5` is declared in `@omegajs/config` — the shared OMEGA schema plus the desktop refinements (`TARGET_SCHEMAS.desktop`), vendored into `dist/vendor/config/` and exposed to consumers as `require('@omegajs/desktop/config')`. Runs at boot (hard-fails `manager.initialize()` if invalid) AND in `gulp/audit` (plus build-pipeline extras). See [docs/config-schema.md](docs/config-schema.md).
+Every field in `config/omega.json5` is declared in `@omega.js/config` — the shared OMEGA schema plus the desktop refinements (`TARGET_SCHEMAS.desktop`), vendored into `dist/vendor/config/` and exposed to consumers as `require('@omega.js/desktop/config')`. Runs at boot (hard-fails `manager.initialize()` if invalid) AND in `gulp/audit` (plus build-pipeline extras). See [docs/config-schema.md](docs/config-schema.md).
 
 ### Cross-context helpers
 
@@ -130,7 +130,7 @@ Four Managers (main / renderer / preload / build-time) all mix in shared helpers
 
 ### Test framework
 
-`npx mgr test` discovers + runs framework suites (`<@omegajs/desktop>/dist/test/suites/**`) plus consumer suites (`<cwd>/test/**`). Four layers: **build** (plain Node), **main** (spawned Electron), **renderer** (hidden BrowserWindow), **boot** (consumer's actual built bundle for end-to-end smoke tests). See [docs/test-framework.md](docs/test-framework.md), [docs/test-boot-layer.md](docs/test-boot-layer.md).
+`npx omega test` discovers + runs framework suites (`<@omega.js/desktop>/dist/test/suites/**`) plus consumer suites (`<cwd>/test/**`). Four layers: **build** (plain Node), **main** (spawned Electron), **renderer** (hidden BrowserWindow), **boot** (consumer's actual built bundle for end-to-end smoke tests). See [docs/test-framework.md](docs/test-framework.md), [docs/test-boot-layer.md](docs/test-boot-layer.md).
 
 ### Test coverage
 
@@ -138,15 +138,15 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 ### Dev logs
 
-Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm start` or `logs/build.log` on a production build/package (`EM_BUILD_MODE=true`) — chosen by build mode, path via `EM_LOG_FILE`; disable with `EM_LOG_FILE=false`. `npx mgr test` likewise tees its output to `<projectRoot>/logs/test.log`, and `npm run release` streams the GH Actions run to `logs/ci.log`. When debugging via Claude, prefer `cat logs/dev.log` / `cat logs/test.log` over copy-pasting terminal scrollback. See [docs/logging.md](docs/logging.md).
+Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm start` or `logs/build.log` on a production build/package (`EM_BUILD_MODE=true`) — chosen by build mode, path via `EM_LOG_FILE`; disable with `EM_LOG_FILE=false`. `npx omega test` likewise tees its output to `<projectRoot>/logs/test.log`, and `npm run release` streams the GH Actions run to `logs/ci.log`. When debugging via Claude, prefer `cat logs/dev.log` / `cat logs/test.log` over copy-pasting terminal scrollback. See [docs/logging.md](docs/logging.md).
 
 ### CDP debugging (Claude ↔ Electron)
 
-`serve` forwards all `--` CLI flags to the Electron child process. Set `EM_CDP_PORT=9222` (or pass `--remote-debugging-port=9222` via `--`) to expose Chrome DevTools Protocol on that port. Drive the running app with the built-in toolkit — `npx mgr cdp status|eval|shot|capture|theme|relaunch|quit` (multi-target by URL substring; `relaunch` IS the dev iterate loop since serve has no watch) — or via the `chrome-devtools-electron` MCP upstream for richer single-page interaction (click, fill, network, traces). See [docs/cdp-debugging.md](docs/cdp-debugging.md).
+`serve` forwards all `--` CLI flags to the Electron child process. Set `EM_CDP_PORT=9222` (or pass `--remote-debugging-port=9222` via `--`) to expose Chrome DevTools Protocol on that port. Drive the running app with the built-in toolkit — `npx omega cdp status|eval|shot|capture|theme|relaunch|quit` (multi-target by URL substring; `relaunch` IS the dev iterate loop since serve has no watch) — or via the `chrome-devtools-electron` MCP upstream for richer single-page interaction (click, fill, network, traces). See [docs/cdp-debugging.md](docs/cdp-debugging.md).
 
 ## CLI
 
-`npx mgr <command>` (aliases `em`, `@omegajs/desktop`):
+`npx omega <command>` (aliases `em`, `@omega.js/desktop`):
 
 | Command | Description |
 |---|---|
@@ -169,25 +169,25 @@ See [docs/releasing.md](docs/releasing.md) for the end-to-end flow.
 
 ## Dependency Resolution
 
-- **Consumer code can `require()` any @omegajs/desktop dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `fs-jetpack`, `@omegajs/client`, or any other @omegajs/desktop transitive dep. If a dep doesn't resolve, the fix is in @omegajs/desktop's webpack config — not the consumer's `package.json`.
-- **@omegajs/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `require('@omegajs/client')` → `webManager.auth()`, `webManager.firestore()` in renderers. In main process, use `manager.webManager` (the @omegajs/desktop bridge). Same rule in BXM and UJM.
-- **`Manager.require(name)`** resolves from @omegajs/desktop's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
+- **Consumer code can `require()` any @omega.js/desktop dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `fs-jetpack`, `@omega.js/client`, or any other @omega.js/desktop transitive dep. If a dep doesn't resolve, the fix is in @omega.js/desktop's webpack config — not the consumer's `package.json`.
+- **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `require('@omega.js/client')` → `omega.auth()`, `omega.firestore()` in renderers. In main process, use `manager.omega` (the @omega.js/desktop bridge). Same rule in BXM and UJM.
+- **`Manager.require(name)`** resolves from @omega.js/desktop's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
 
 ## Development Workflow
 
-- **🚫 NEVER use `npx mgr ...` from the framework repo** — `npx mgr` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call `node bin/omega-desktop` directly. This applies to ALL four OMEGA frameworks (@omegajs/backend, UJM, @omegajs/extension, @omegajs/desktop).
-- **🚫 NEVER run `npm start`** (consumer projects) — it's the user's long-running dev process. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `runtime.log`, `test.log`) — never tail/attach to the process. Running `npx mgr test` is fine.
+- **🚫 NEVER use `npx omega ...` from the framework repo** — `npx omega` is for CONSUMER projects only (where the bin lives in `node_modules/.bin/`). From the framework repo, use `npm test`, `npm start`, etc. — the `scripts` in `package.json` call `node bin/omega-desktop` directly. This applies to ALL four OMEGA frameworks (@omega.js/backend, UJM, @omega.js/extension, @omega.js/desktop).
+- **🚫 NEVER run `npm start`** (consumer projects) — it's the user's long-running dev process. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `runtime.log`, `test.log`) — never tail/attach to the process. Running `npx omega test` is fine.
 - **After editing files**, verify the gulp watcher recompiled successfully. Check for webpack/sass errors in the console output. A change that breaks the build is not a completed change.
 - **Live-test UI changes via CDP.** After code changes compile, use the `chrome-devtools-electron` MCP tools (screenshots, click, evaluate JS, console logs) to verify the change works in the running app. This is the primary way to confirm UI/renderer changes — type-checking and test suites verify code correctness, not feature correctness. See [docs/cdp-debugging.md](docs/cdp-debugging.md) and `~/.claude/mcp-server/servers/chrome-devtools-electron/CLAUDE.md`.
 
 ## Supply-Chain Security
 
-All `npm install` calls in CLI commands (`npx mgr i`, `npx mgr setup`, `npx mgr runner`) route through the `safeInstall()` helper (`src/utils/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm ci`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
+All `npm install` calls in CLI commands (`npx omega i`, `npx omega setup`, `npx omega runner`) route through the `safeInstall()` helper (`src/utils/safe-install.js`). It prefixes `sfw` (Socket Firewall) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. CI workflows install sfw globally and run `sfw npm ci`. Installs will **fail if sfw detects confirmed malware** in any package in the dependency tree; non-critical CVEs and quality warnings pass through.
 
 ## File Conventions
 
-- **CommonJS** (`require()`) throughout. Node 24 runs ESM deps natively via `require()` — no need for dynamic `import()` unless a package is genuinely ESM-only. For ESM-only deps in code that webpack bundles, use a STATIC-specifier `await import(/* webpackMode: "eager" */ 'pkg')` — webpack inlines the module into the consumer's bundle so packaged apps need nothing installed (e.g. `electron-store@11` in `lib/storage.js`). NEVER `webpackIgnore` a dep import: it leaves a runtime resolution that fails in packaged consumers (@omegajs/desktop is a devDependency — it never ships in the asar).
-- **Node version auto-synced from Electron.** `npx mgr setup` queries `releases.electronjs.org` and writes the consumer's `.nvmrc` to match.
+- **CommonJS** (`require()`) throughout. Node 24 runs ESM deps natively via `require()` — no need for dynamic `import()` unless a package is genuinely ESM-only. For ESM-only deps in code that webpack bundles, use a STATIC-specifier `await import(/* webpackMode: "eager" */ 'pkg')` — webpack inlines the module into the consumer's bundle so packaged apps need nothing installed (e.g. `electron-store@11` in `lib/storage.js`). NEVER `webpackIgnore` a dep import: it leaves a runtime resolution that fails in packaged consumers (@omega.js/desktop is a devDependency — it never ships in the asar).
+- **Node version auto-synced from Electron.** `npx omega setup` queries `releases.electronjs.org` and writes the consumer's `.nvmrc` to match.
 - One `module.exports = ...` per file.
 - Logical operators at the **start** of continuation lines.
 - Short-circuit early returns rather than nested ifs.
@@ -209,7 +209,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — @omegajs/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omega.js/backend / @omega.js/extension / @omega.js/desktop / MAM — @omega.js/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 
@@ -226,20 +226,20 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/startup.md](docs/startup.md) — launch modes, zero-bounce production
 - [docs/app-state.md](docs/app-state.md) — launch flags, crash sentinel
 - [docs/deep-link.md](docs/deep-link.md) — cross-platform deep links, single-instance, built-in routes
-- [docs/client-bridge.md](docs/client-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omegajs/client auth cycle (`data-wm-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
+- [docs/client-bridge.md](docs/client-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omega.js/client auth cycle (`data-wm-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
 - [docs/auto-updater.md](docs/auto-updater.md) — startup + periodic checks, 30-day pending-update gate, idle-aware install
 - [docs/analytics.md](docs/analytics.md) — GA4 Measurement Protocol, cross-platform `uuidv5` identity
 - [docs/context.md](docs/context.md) — runtime context block (geolocation, client, session, app)
 - [docs/usage.md](docs/usage.md) — opens / hoursTotal / hoursThisSession; clean-exit accumulation
 - [docs/remote-config.md](docs/remote-config.md) — "hot config" fetched from brand site
 - [docs/remote-scripts.md](docs/remote-scripts.md) — emergency remote code execution, content-hash dedup
-- [docs/restart-manager.md](docs/restart-manager.md) — the external guardian app: HTTP protocol v1 (SSOT), silent install, self-updates via its own @omegajs/desktop autoUpdater, threat model
+- [docs/restart-manager.md](docs/restart-manager.md) — the external guardian app: HTTP protocol v1 (SSOT), silent install, self-updates via its own @omega.js/desktop autoUpdater, threat model
 - [docs/config-schema.md](docs/config-schema.md) — canonical schema + validator
 - [docs/sentry.md](docs/sentry.md) — per-context split, auto auth attribution
 - [docs/templating.md](docs/templating.md) — `{{ }}` token replacement, page vars, HTML pipeline
 - [docs/logging.md](docs/logging.md) — runtime logger (main + preload + renderer → one `runtime.log`)
 - [docs/themes.md](docs/themes.md) — vendored classy + bootstrap themes, per-page CSS bundles, system-aware appearance (`manager.theme`)
-- [docs/tooltips.md](docs/tooltips.md) — Bootstrap JS ships in @omegajs/desktop (prebuilt bundle, Popper inlined): zero-setup auto-initialized tooltips, `window.bootstrap` namespace
+- [docs/tooltips.md](docs/tooltips.md) — Bootstrap JS ships in @omega.js/desktop (prebuilt bundle, Popper inlined): zero-setup auto-initialized tooltips, `window.bootstrap` namespace
 - [docs/css.md](docs/css.md) — SCSS architecture: main entry, theme `@use` config, per-window bundles, Bootstrap-first
 - [docs/hooks.md](docs/hooks.md) — lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize/post)
 - [docs/icons.md](docs/icons.md) — convention-only icon resolution (`global/` + per-platform), retina derivation, macOS Template magic
@@ -249,7 +249,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/releasing.md](docs/releasing.md) — end-to-end release walkthrough
 - [docs/runner.md](docs/runner.md) — Windows EV-token signing runner
 - [docs/test-framework.md](docs/test-framework.md) — writing tests, running them, layers
-- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot` test layer: consumer end-to-end smoke + @omegajs/desktop's framework self-test from the repo via the bundled fixture (`src/test/fixtures/consumer-app/`) + `EM_TEST_BOOT_PROJECT` (@omegajs/desktop's analog of @omegajs/backend/BXM/UJM `*_TEST_BOOT_PROJECT`)
+- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot` test layer: consumer end-to-end smoke + @omega.js/desktop's framework self-test from the repo via the bundled fixture (`src/test/fixtures/consumer-app/`) + `EM_TEST_BOOT_PROJECT` (@omega.js/desktop's analog of @omega.js/backend/BXM/UJM `*_TEST_BOOT_PROJECT`)
 - [docs/build-system.md](docs/build-system.md) — gulp, webpack, electron-builder pipeline
 - [docs/environment-detection.md](docs/environment-detection.md) — `isDevelopment`/`isTesting`/`getApiUrl` etc., adding new helpers
 - [docs/common-mistakes.md](docs/common-mistakes.md) — the canonical "don't do this" list

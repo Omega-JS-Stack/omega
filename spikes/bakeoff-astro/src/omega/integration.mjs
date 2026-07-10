@@ -6,7 +6,7 @@
  * route's suppression instead; see src/pages/[...slug].astro.)
  */
 import path from 'node:path';
-import consumerScan from '@omegajs/web/consumer-scan';
+import consumerScan from '@omega.js/web/consumer-scan';
 import { SPIKE, consumerDir } from './paths.mjs';
 
 const { scanConsumerPermalinks } = consumerScan;

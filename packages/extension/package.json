@@ -1,6 +1,6 @@
 {
-  "name": "@omegajs/extension",
-  "version": "2.0.1",
+  "name": "@omega.js/extension",
+  "version": "2.1.0",
   "description": "OMEGA extension framework — build, test, and package Chrome/Firefox extensions (MV3)",
   "main": "dist/index.js",
   "exports": {
@@ -17,7 +17,8 @@
     "./lib/affiliatizer": "./dist/lib/affiliatizer.js",
     "./lib/extension": "./dist/lib/extension.js",
     "./lib/logger-lite": "./dist/lib/logger-lite.js",
-    "./lib/messaging": "./dist/lib/messaging.js"
+    "./lib/messaging": "./dist/lib/messaging.js",
+    "./cli": "./dist/cli-run.js"
   },
   "scripts": {
     "start": "npm run prepare:watch",
@@ -26,8 +27,10 @@
     "test": "node ./bin/omega-extension test"
   },
   "bin": {
-    "omega-extension": "bin/omega-extension",
-    "mgr": "bin/omega-extension"
+    "omega": "./bin/omega",
+    "omg": "./bin/omg",
+    "mgr": "./bin/omega",
+    "omega-extension": "./bin/omega-extension"
   },
   "files": [
     "bin/",
@@ -41,16 +44,16 @@
     "replace": {},
     "type": "copy",
     "hooks": {
-      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
     }
   },
   "projectScripts": {
-    "start": "npx mgr clean && npx mgr setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omegajs/extension/dist/gulp/main.js",
-    "build": "npx mgr clean && npx mgr setup && BXM_BUILD_MODE=true npm run gulp -- build",
+    "start": "npx omega clean && npx omega setup && npm run gulp --",
+    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omega.js/extension/dist/gulp/main.js",
+    "build": "npx omega clean && npx omega setup && BXM_BUILD_MODE=true npm run gulp -- build",
     "publish": "BXM_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",
-    "test": "npx mgr test"
+    "test": "npx omega test"
   },
   "engines": {
     "node": "22"
@@ -91,7 +94,7 @@
     "node-powertools": "^3.0.0",
     "npm-api": "^1.0.1",
     "sass": "^1.100.0",
-    "@omegajs/client": "^5.0.0",
+    "@omega.js/client": "^5.0.0",
     "webpack": "^5.107.2",
     "wonderful-fetch": "^2.0.5",
     "wonderful-version": "^1.3.2",
@@ -102,8 +105,8 @@
     "gulp": "^5.0.1"
   },
   "devDependencies": {
-    "@omegajs/config": "*",
-    "@omegajs/devkit": "*",
+    "@omega.js/config": "*",
+    "@omega.js/devkit": "*",
     "prepare-package": "^2.1.0",
     "puppeteer": "^24.43.1"
   }

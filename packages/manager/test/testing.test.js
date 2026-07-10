@@ -44,14 +44,14 @@ function stageWebApp(root, { dist = true, declared = null, installed = null } = 
   jetpack.write(join(appPath, 'package.json'), {
     name: 'fixture-website',
     private: true,
-    ...(declared ? { dependencies: { '@omegajs/web': declared } } : {}),
+    ...(declared ? { dependencies: { '@omega.js/web': declared } } : {}),
   });
   if (dist) {
     jetpack.write(join(appPath, 'dist', 'index.html'), '<!doctype html><title>fixture</title>');
   }
   if (installed) {
-    jetpack.write(join(appPath, 'node_modules', '@omegajs/web', 'package.json'), {
-      name: '@omegajs/web',
+    jetpack.write(join(appPath, 'node_modules', '@omega.js/web', 'package.json'), {
+      name: '@omega.js/web',
       version: installed,
     });
   }
@@ -66,11 +66,11 @@ function stageBackendApp(root, { installed = '5.9.0' } = {}) {
   jetpack.write(join(appPath, 'functions', 'package.json'), {
     name: 'fixture-functions',
     private: true,
-    dependencies: { '@omegajs/backend': 'file:../../../../packages/backend' },
+    dependencies: { '@omega.js/backend': 'file:../../../../packages/backend' },
   });
   if (installed) {
-    jetpack.write(join(appPath, 'functions', 'node_modules', '@omegajs/backend', 'package.json'), {
-      name: '@omegajs/backend',
+    jetpack.write(join(appPath, 'functions', 'node_modules', '@omega.js/backend', 'package.json'), {
+      name: '@omega.js/backend',
       version: installed,
     });
   }
@@ -149,10 +149,10 @@ test('testing: last in SERVICE_ORDER, with the target-checks operation', () => {
 
 test('testing: TARGET_FRAMEWORKS maps every checkable target, mobile reserved', () => {
   assert.deepEqual(TARGET_FRAMEWORKS, {
-    web: '@omegajs/web',
-    backend: '@omegajs/backend',
-    extension: '@omegajs/extension',
-    desktop: '@omegajs/desktop',
+    web: '@omega.js/web',
+    backend: '@omega.js/backend',
+    extension: '@omega.js/extension',
+    desktop: '@omega.js/desktop',
   });
 });
 
@@ -167,7 +167,7 @@ test('installedVersion: resolves through the node_modules climb, null when absen
   const app = stageWebApp(root, { installed: '1.4.2' });
 
   // From a nested dir inside the app, the climb still finds it
-  assert.equal(installedVersion(join(app.path, 'dist'), '@omegajs/web'), '1.4.2');
+  assert.equal(installedVersion(join(app.path, 'dist'), '@omega.js/web'), '1.4.2');
   assert.equal(installedVersion(app.path, 'no-such-package'), null);
 });
 
@@ -184,8 +184,8 @@ test('testing: web + backend all green — exact pass set, single npm view per p
     [API_URL]: { status: 200, body: { status: 'healthy', backendVersion: '5.9.0' } },
   });
   const exec = fakeExec({
-    'npm view @omegajs/web version': '1.0.0\n',
-    'npm view @omegajs/backend version': '5.9.0\n',
+    'npm view @omega.js/web version': '1.0.0\n',
+    'npm view @omega.js/backend version': '5.9.0\n',
     [GIT_CMD]: '',
   });
 
@@ -197,12 +197,12 @@ test('testing: web + backend all green — exact pass set, single npm view per p
       passed: [
         'website: package.json',
         'website: build output',
-        'website: @omegajs/web',
+        'website: @omega.js/web',
         'website: homepage',
         'backend: package.json',
         'backend: firebase.json',
         'backend: functions/package.json',
-        'backend: @omegajs/backend',
+        'backend: @omega.js/backend',
         'backend: API health',
         'backend: deployed backend',
         'working tree',
@@ -217,8 +217,8 @@ test('testing: web + backend all green — exact pass set, single npm view per p
   // cache), git scoped to the brand root
   assert.deepEqual(fetch.calls, [HOMEPAGE, API_URL]);
   assert.deepEqual(exec.calls, [
-    ['npm view @omegajs/web version', null],
-    ['npm view @omegajs/backend version', null],
+    ['npm view @omega.js/web version', null],
+    ['npm view @omega.js/backend version', null],
     [GIT_CMD, root],
   ]);
 });
@@ -229,13 +229,13 @@ test('testing: outdated framework → warned with the version delta', async () =
   const root = stageBrand();
   const apps = [stageWebApp(root, { declared: '^1.0.0', installed: '1.0.0' })];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
-  const exec = fakeExec({ 'npm view @omegajs/web version': '1.2.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omega.js/web version': '1.2.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig(), { root, apps, fetch, exec });
 
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
-    { name: 'website: @omegajs/web', warning: 'outdated (1.0.0 → 1.2.0)' },
+    { name: 'website: @omega.js/web', warning: 'outdated (1.0.0 → 1.2.0)' },
   ]);
 });
 
@@ -244,14 +244,14 @@ test('testing: unpublished framework (npm view fails) dims out — no warning, n
   const apps = [stageWebApp(root, { declared: '^1.0.0', installed: '1.0.0' })];
   const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
   const exec = fakeExec({
-    'npm view @omegajs/web version': new Error('404 Not Found - @omegajs/web'),
+    'npm view @omega.js/web version': new Error('404 Not Found - @omega.js/web'),
     [GIT_CMD]: '',
   });
 
   const report = await runService(brandConfig(), { root, apps, fetch, exec });
 
   assert.equal(report.status, 'success');
-  assert.ok(!report.output.results.passed.includes('website: @omegajs/web'));
+  assert.ok(!report.output.results.passed.includes('website: @omega.js/web'));
   assert.deepEqual(report.output.results.warned, []);
 });
 
@@ -304,7 +304,7 @@ test('testing: shared Firebase project → API health dims out, zero fetches', a
   const root = stageBrand();
   const apps = [stageBackendApp(root)];
   const fetch = fakeFetch({});
-  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig({ firebase: { shared: true }, targets: { backend: {} } }), { root, apps, fetch, exec });
 
@@ -316,7 +316,7 @@ test('testing: deployed backend older than npm latest → warned', async () => {
   const root = stageBrand();
   const apps = [stageBackendApp(root, { installed: '5.9.0' })];
   const fetch = fakeFetch({ [API_URL]: { status: 200, body: { backendVersion: '5.0.0' } } });
-  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig({ targets: { backend: {} } }), { root, apps, fetch, exec });
 
@@ -330,7 +330,7 @@ test('testing: API returning 503 retries 3× then fails', async () => {
   const root = stageBrand();
   const apps = [stageBackendApp(root, { installed: null })];
   const fetch = fakeFetch({ [API_URL]: { status: 503 } });
-  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const report = await runService(brandConfig({ targets: { backend: {} } }), { root, apps, fetch, exec });
 
@@ -345,7 +345,7 @@ test('testing: no brand.url → homepage and API health warn, zero fetches', asy
   const root = stageBrand();
   const apps = [stageWebApp(root), stageBackendApp(root)];
   const fetch = fakeFetch({});
-  const exec = fakeExec({ 'npm view @omegajs/backend version': '5.9.0\n', [GIT_CMD]: '' });
+  const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
 
   const config = brandConfig();
   delete config.brand.url;

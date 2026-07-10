@@ -41,7 +41,7 @@ class BaseCommand {
   }
 
   /**
-   * Resolve a path for a human-readable log file. @omegajs/backend-owned logs (dev.log,
+   * Resolve a path for a human-readable log file. @omega.js/backend-owned logs (dev.log,
    * emulator.log, test.log, production.log) live in `functions/` alongside
    * firebase-tools' own *-debug.log files so all log output is grep-able from
    * one place. Reset sentinels and other internal-only artifacts use
@@ -57,7 +57,7 @@ class BaseCommand {
   }
 
   /**
-   * Sweep stale @omegajs/backend-owned logs out of `functions/`. Catches `.log` files
+   * Sweep stale @omega.js/backend-owned logs out of `functions/`. Catches `.log` files
    * from previous runs so each emulator/serve/test boot starts with a clean
    * slate. Also catches stale `.reset` sentinels in `.temp/` that a crashed
    * process may have left behind.

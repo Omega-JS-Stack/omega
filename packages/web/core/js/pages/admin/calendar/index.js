@@ -6,15 +6,15 @@
 import CalendarCore from './calendar-core.js';
 import CalendarRenderer from './calendar-renderer.js';
 import CalendarEvents from './calendar-events.js';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
-    webManager.auth().listen({ once: true }, async (state) => {
+    omega.auth().listen({ once: true }, async (state) => {
       if (!state.user) {
         return;
       }

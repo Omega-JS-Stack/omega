@@ -1,6 +1,6 @@
-// `npx mgr cdp quit` — quit the running dev app and WAIT for its full process
+// `npx omega cdp quit` — quit the running dev app and WAIT for its full process
 // tree to drain (Electron mains + the npm-start chain), so it's safe to run
-// `npx mgr test` the moment this returns. Port-down alone is NOT that signal —
+// `npx omega test` the moment this returns. Port-down alone is NOT that signal —
 // the chain takes a few more seconds to flush, and a test run started inside
 // that window gets contaminated (slow polls, flaky boot suites).
 //

@@ -1,7 +1,7 @@
 /**
  * `omega version` — print the framework version.
  */
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 
 const logger = new Logger('omega:version');
 const pkg = require('../../package.json');

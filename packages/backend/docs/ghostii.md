@@ -188,24 +188,24 @@ The brand's `instructions` field is injected into both templates and can overrid
 ### Unit tests (fast, free)
 
 ```bash
-npx mgr test mgr:helpers/content/feed-parser          # 32 tests: RSS/Atom/JSON parsing, edge cases
-npx mgr test mgr:helpers/content/ghostii-write-article # 15 tests: override pass-through, sourceContent
-npx mgr test mgr:helpers/content/blog-auto-publisher   # 25+ tests: source detection, feed processing, tracking
-npx mgr test mgr:helpers/content/ghostii-blocks        # 8 tests: blocksToPost()
+npx omega test mgr:helpers/content/feed-parser          # 32 tests: RSS/Atom/JSON parsing, edge cases
+npx omega test mgr:helpers/content/ghostii-write-article # 15 tests: override pass-through, sourceContent
+npx omega test mgr:helpers/content/blog-auto-publisher   # 25+ tests: source detection, feed processing, tracking
+npx omega test mgr:helpers/content/ghostii-blocks        # 8 tests: blocksToPost()
 ```
 
 ### Blog generation (full AI pipeline)
 
 ```bash
 # Config check only (fast, free)
-npx mgr test mgr:content/blog-generate
+npx omega test mgr:content/blog-generate
 
 # Full AI pipeline — generates article, does NOT publish
-BLOG_NO_PUBLISH=1 TEST_EXTENDED_MODE=1 npx mgr test mgr:content/blog-generate
+BLOG_NO_PUBLISH=1 TEST_EXTENDED_MODE=1 npx omega test mgr:content/blog-generate
 
 # Override source type
 BLOG_SOURCE='$feed:https://feeds.arstechnica.com/arstechnica/index' \
-  BLOG_NO_PUBLISH=1 TEST_EXTENDED_MODE=1 npx mgr test mgr:content/blog-generate
+  BLOG_NO_PUBLISH=1 TEST_EXTENDED_MODE=1 npx omega test mgr:content/blog-generate
 ```
 
 | Env var | Description |
@@ -219,11 +219,11 @@ BLOG_SOURCE='$feed:https://feeds.arstechnica.com/arstechnica/index' \
 
 ```bash
 # Fixture render only (fast, free)
-npx mgr test mgr:email/newsletter-generate
+npx omega test mgr:email/newsletter-generate
 
 # Full AI pipeline with feed source — generates newsletter, does NOT publish article
 NEWSLETTER_SOURCE='$feed:https://feeds.arstechnica.com/arstechnica/index' \
-  NEWSLETTER_NO_IMAGES=1 TEST_EXTENDED_MODE=1 npx mgr test mgr:email/newsletter-generate
+  NEWSLETTER_NO_IMAGES=1 TEST_EXTENDED_MODE=1 npx omega test mgr:email/newsletter-generate
 ```
 
 | Env var | Description |

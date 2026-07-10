@@ -1,12 +1,12 @@
-// Boot-layer self-test — @omegajs/desktop's analog of "does the extension load?" (BXM) / "does the
+// Boot-layer self-test — @omega.js/desktop's analog of "does the extension load?" (BXM) / "does the
 // site boot?" (UJM). The boot runner webpack-builds the bundled fixture consumer
 // (src/test/fixtures/consumer-app) into a real dist/main.bundle.js, spawns Electron with
 // it (the actual production boot path — bundled, not the unbundled lib code that the
 // `main` layer exercises), then runs these inspects against the live manager.
 //
-// In @omegajs/desktop's own test run, EM_TEST_BOOT_PROJECT points at the fixture (auto-set in
-// src/commands/test.js when the cwd is the @omegajs/desktop repo). In a real consumer's
-// `npx mgr test` run, the framework boot/ suites are excluded entirely (runner.js
+// In @omega.js/desktop's own test run, EM_TEST_BOOT_PROJECT points at the fixture (auto-set in
+// src/commands/test.js when the cwd is the @omega.js/desktop repo). In a real consumer's
+// `npx omega test` run, the framework boot/ suites are excluded entirely (runner.js
 // discovery skips boot/** unless isFrameworkSelfTest) — consumers write their own
 // boot tests under <cwd>/test/boot/.
 //
@@ -25,7 +25,7 @@ module.exports = {
       inspect: async ({ manager, expect }) => {
         expect(manager).toBeTruthy();
         expect(manager._initialized).toBe(true);
-        for (const lib of ['storage', 'ipc', 'windows', 'tray', 'menu', 'contextMenu', 'webManager']) {
+        for (const lib of ['storage', 'ipc', 'windows', 'tray', 'menu', 'contextMenu', 'omega']) {
           expect(Boolean(manager[lib])).toBe(true);
         }
       },

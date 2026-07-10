@@ -80,13 +80,13 @@ Use `config.backendManagerWebhookKey || config.backendManagerKey` everywhere so 
 
 1. **Local test (no `BACKEND_MANAGER_WEBHOOK_KEY` set)** — confirm legacy fallback still passes:
    ```bash
-   npx mgr test routes/payments/webhook routes/payments/dispute-alert events/payments
+   npx omega test routes/payments/webhook routes/payments/dispute-alert events/payments
    ```
    Expect green.
 
 2. **Local test (`BACKEND_MANAGER_WEBHOOK_KEY` set to a different value)** — confirm the new key is accepted AND the legacy key still works:
    ```bash
-   BACKEND_MANAGER_WEBHOOK_KEY=test-webhook-key npx mgr test routes/payments/webhook routes/payments/dispute-alert events/payments
+   BACKEND_MANAGER_WEBHOOK_KEY=test-webhook-key npx omega test routes/payments/webhook routes/payments/dispute-alert events/payments
    ```
    Expect green.
 

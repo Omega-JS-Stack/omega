@@ -6,7 +6,7 @@
  * so clips look identical at any size.
  */
 
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 
 const BASE_W = 960;
@@ -22,9 +22,9 @@ let formManager = null;
 
 export default () => {
   return new Promise(async function (resolve) {
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
-    webManager.auth().listen({ once: true }, (auth) => {
+    omega.auth().listen({ once: true }, (auth) => {
       if (!auth.user) {
         return;
       }

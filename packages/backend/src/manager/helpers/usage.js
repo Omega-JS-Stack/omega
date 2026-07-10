@@ -49,7 +49,7 @@ Usage.prototype.init = function (assistant, options) {
       return reject(new Error('Missing required {assistant} parameter'));
     }
 
-    // Add @omegajs/backend to whitelist keys
+    // Add @omega.js/backend to whitelist keys
     options.whitelistKeys.push(process.env.BACKEND_MANAGER_KEY);
 
     // Set options

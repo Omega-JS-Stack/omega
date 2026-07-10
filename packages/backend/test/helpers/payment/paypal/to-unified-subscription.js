@@ -12,7 +12,7 @@ const FIXTURE_ACTIVE = require('../../../fixtures/paypal/subscription-active.jso
 const FIXTURE_CANCELLED = require('../../../fixtures/paypal/subscription-cancelled.json');
 const FIXTURE_SUSPENDED = require('../../../fixtures/paypal/subscription-suspended.json');
 
-// Mock config matching the @omegajs/backend template (new flat price structure)
+// Mock config matching the @omega.js/backend template (new flat price structure)
 const MOCK_CONFIG = {
   payment: {
     products: [

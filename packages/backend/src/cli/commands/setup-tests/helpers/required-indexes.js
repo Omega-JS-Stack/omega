@@ -1,5 +1,5 @@
 /**
- * Required Firestore compound indexes for @omegajs/backend routes
+ * Required Firestore compound indexes for @omega.js/backend routes
  * These are automatically added to firestore.indexes.json during `npx bm setup`
  */
 module.exports = [

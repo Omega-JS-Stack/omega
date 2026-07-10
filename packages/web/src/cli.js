@@ -1,5 +1,5 @@
 /**
- * The @omegajs/web CLI dispatcher — devkit's shared router over
+ * The @omega.js/web CLI dispatcher — devkit's shared router over
  * src/commands/. `omega` with no command runs setup (OMEGA convention).
  */
 const path = require('node:path');
@@ -7,7 +7,7 @@ const path = require('node:path');
 // Load .env from the consumer project root before any command runs
 require('dotenv').config({ path: path.join(process.cwd(), '.env'), quiet: true });
 
-const { createCliRouter } = require('@omegajs/devkit/cli-router');
+const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
 // Command name → positional/flag aliases (UJM alias table, adapted)
 const ALIASES = {

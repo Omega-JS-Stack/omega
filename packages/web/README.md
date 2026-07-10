@@ -1,7 +1,7 @@
-# @omegajs/web
+# @omega.js/web
 
 The OMEGA web framework — the UJM (Jekyll) successor, built on **Eleventy 3 +
-LiquidJS + [@omegajs/template-kit](../template-kit)** per the Phase 2 bake-off
+LiquidJS + [@omega.js/template-kit](../template-kit)** per the Phase 2 bake-off
 decision ([spikes/bakeoff-shared/DECISION.md](../../spikes/bakeoff-shared/DECISION.md):
 Eleventy 4.70 vs Astro 3.55 weighted). B1 promoted the engine core from the
 winning spike; **B2 ported the REAL UJM content** — the full blueprint layout
@@ -17,14 +17,14 @@ migrate → 2,556 pages, ~3.2× the whole Jekyll pipeline).**
 # In a consumer project (scaffolded scripts call these):
 npx omega setup     # scaffold/refresh defaults + sync package.json scripts
 npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds (--port=N)
-                    #   --local: first link every @omegajs dep brand-wide from the local
+                    #   --local: first link every @omega.js dep brand-wide from the local
                     #   Omega monorepo + start its src→dist watch (docs/local-dev.md there)
 npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → dist/
 npx omega test      # production build + smoke checks + consumer test/ (node --test)
 npx omega deploy    # refuse file: deps → npm run build → `npu sync --message='Deploy'`
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
-npx omega migrate           # UJM (Jekyll) consumer → @omegajs/web, in place
+npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place
 npx omega migrate --check   # full report (config + codemod preview + lint), zero writes
 # translate / audit: explicit not-ported-yet stubs (subsystems ride later checkpoints)
 
@@ -49,14 +49,14 @@ see the harness README for the honest before/after numbers.
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
-| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omegajs/client` → @omegajs/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
+| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
 | [build.js](src/build.js) | `buildSite()` — assets → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime) + `resolveClientEntry()` |
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
 | [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/config.md](../../docs/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registerLiquid path), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
-| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (webManager + mode helpers) |
+| [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (omega + mode helpers) |
 
 ## Packaged content (the real UJM port, B2)
 
@@ -114,20 +114,20 @@ see the harness README for the honest before/after numbers.
   `js/pages/**`, `css/main.scss`, `css/pages/**`, theme roots add
   `_theme.scss`/`_theme.js`). `__main_assets__/*` resolves to the core layer /
   themes dir, `__theme__/*` to the active theme (classy fallback),
-  `@omegajs/client` (subpaths included) to @omegajs/client. Manifest:
+  `@omega.js/client` (subpaths included) to @omega.js/client. Manifest:
   `{ js: { main, pages }, css: { main, pages, themePages } }` — base page css
   and the active theme's page css BOTH load. The engine's `pageAssets`
   computed resolves each page's entries (`asset_path` override honored).
   Dev mode (`omega dev`): stable un-hashed names + no minify, so in-place
   asset rebuilds keep their URLs without an HTML re-render.
 - **Boot runtime (ESM + code splitting)** — all bundles come out of ONE
-  esbuild call with `splitting: true`, so @omegajs/client and `runtime/boot.js`
+  esbuild call with `splitting: true`, so @omega.js/client and `runtime/boot.js`
   land in a shared chunk the browser evaluates ONCE per page: every
-  `import webManager from '@omegajs/client'` — in the main bundle, a page module,
+  `import omega from '@omega.js/client'` — in the main bundle, a page module,
   anywhere — is the SAME initialized singleton (webpack's single module
   graph, reproduced with `<script type="module">` semantics; both scripts are
   deferred and execute in document order). The handshake: main stub →
-  `bootMain(mod)` (webManager.initialize(window.Configuration) → dev lib in
+  `bootMain(mod)` (omega.initialize(window.Configuration) → dev lib in
   development → global module), page stub → `bootPage(mod)` (awaits the main
   boot, then `mod({ manager, options })` — the UJM page-module contract,
   with `manager` the frontend Manager wrapper carrying mode helpers).

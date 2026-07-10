@@ -1,9 +1,9 @@
 // Methods are defined as arrow class fields so `this` is permanently bound to the instance.
 // This means consumers can safely alias or destructure methods without losing context:
-//   const { escapeHTML } = webManager.utilities(); // ✓ works
-//   const escape = webManager.utilities().escapeHTML; // ✓ works
-//   items.map(webManager.utilities().escapeHTML); // ✓ works
-// Safe because webManager.utilities() is a singleton — only one instance ever exists.
+//   const { escapeHTML } = omega.utilities(); // ✓ works
+//   const escape = omega.utilities().escapeHTML; // ✓ works
+//   items.map(omega.utilities().escapeHTML); // ✓ works
+// Safe because omega.utilities() is a singleton — only one instance ever exists.
 class Utilities {
   constructor(manager) {
     this.manager = manager;

@@ -9,7 +9,7 @@
  * The private key lives in gitignored state, never omega.json5.
  */
 const chalk = require('chalk').default;
-const { input, isInteractive } = require('@omegajs/devkit/prompt');
+const { input, isInteractive } = require('@omega.js/devkit/prompt');
 
 module.exports = async function ensureCloudMessaging(context) {
   const { firebaseApi: api, projectId, serviceData = {}, options = {} } = context;

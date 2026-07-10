@@ -43,8 +43,8 @@ const storage = {
     try {
       // electron-store is ESM-only. The static specifier + eager mode makes webpack
       // bundle it INTO main.bundle.js (no split chunk, no runtime resolution) — packaged
-      // consumers need nothing installed. Outside webpack (@omegajs/desktop's own unbundled harness),
-      // Node ignores the magic comment and resolves it from @omegajs/desktop's node_modules.
+      // consumers need nothing installed. Outside webpack (@omega.js/desktop's own unbundled harness),
+      // Node ignores the magic comment and resolves it from @omega.js/desktop's node_modules.
       const mod = await import(/* webpackMode: "eager" */ 'electron-store');
       ElectronStore = mod.default || mod;
     } catch (e) {

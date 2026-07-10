@@ -1,4 +1,4 @@
-// `npx mgr runner <subcommand>` — Windows EV-token signing runner manager.
+// `npx omega runner <subcommand>` — Windows EV-token signing runner manager.
 //
 // v1.2.36+: install runs entirely at user privilege (RUNNER_HOME is in
 // %LOCALAPPDATA%, no admin prompts, no UAC), and at end of install the
@@ -16,7 +16,7 @@
 //   uninstall            Remove everything.
 //   set-credentials      Save Windows account credentials for the runner service.
 //                        Encrypted via DPAPI, only the current user can decrypt.
-//   self-update          Force an immediate self-update of @omegajs/desktop (npm i -g @omegajs/desktop@latest).
+//   self-update          Force an immediate self-update of @omega.js/desktop (npm i -g @omega.js/desktop@latest).
 //
 // All commands except `install` and `register-org` are no-ops on non-Windows platforms.
 
@@ -186,7 +186,7 @@ async function install(options) {
   logger.log('');
 
   if (succeeded.length === 0 && orgs.length > 0) {
-    logger.error(`Install failed: 0 of ${orgs.length} orgs registered. Fix the errors above, then run 'npx mgr runner install' again.`);
+    logger.error(`Install failed: 0 of ${orgs.length} orgs registered. Fix the errors above, then run 'npx omega runner install' again.`);
     process.exitCode = 1;
     return;
   }
@@ -215,7 +215,7 @@ async function install(options) {
       logger.log('');
       logger.warn(`Skipping foreground start: a runner under ${orgRunnerDir} is already alive.`);
       for (const { pid, sessionId } of existing) logger.warn(`  · PID=${pid} session=${sessionId}`);
-      logger.warn(`Use 'npx mgr runner stop' to kill it, then 'npx mgr runner start' to bring up a fresh one in this terminal.`);
+      logger.warn(`Use 'npx omega runner stop' to kill it, then 'npx omega runner start' to bring up a fresh one in this terminal.`);
       return;
     }
     logger.log('');
@@ -227,7 +227,7 @@ async function install(options) {
       stdio: 'inherit',
     });
   } else {
-    logger.log(`Run 'npx mgr runner start' to bring the runner online now, or log out + back in.`);
+    logger.log(`Run 'npx omega runner start' to bring the runner online now, or log out + back in.`);
   }
 }
 
@@ -237,7 +237,7 @@ async function setCredentials(options) {
   const creds = await promptForLogonCredentials();
   saveLogonCredentials(creds);
   logger.log(`✓ Credentials saved (encrypted via DPAPI) for ${creds.account}.`);
-  logger.log('Re-run `npx mgr runner install` to apply them to the runner services.');
+  logger.log('Re-run `npx omega runner install` to apply them to the runner services.');
 }
 
 // ─── register-org ───────────────────────────────────────────────────────────────
@@ -246,7 +246,7 @@ async function registerOrg(options) {
   ensureGhToken();
 
   const org = options._?.[2] || options.org;
-  if (!org) throw new Error('Usage: npx mgr runner register-org <org-name>');
+  if (!org) throw new Error('Usage: npx omega runner register-org <org-name>');
 
   const { getOctokit } = require('../utils/github.js');
   const octokit = getOctokit();
@@ -301,7 +301,7 @@ async function registerOrg(options) {
   const orgRunnerDir = path.join(RUNNER_HOME, `actions-runner-${org.toLowerCase()}`);
   const templateDir  = options._templateDir || path.join(RUNNER_HOME, '_template');
   if (!jetpack.exists(path.join(templateDir, 'config.cmd'))) {
-    throw new Error(`actions/runner template not found at ${templateDir}. Run 'npx mgr runner install' first.`);
+    throw new Error(`actions/runner template not found at ${templateDir}. Run 'npx omega runner install' first.`);
   }
   if (jetpack.exists(orgRunnerDir)) {
     logger.log(`  Removing stale actions-runner-${org.toLowerCase()}/ before re-clone…`);
@@ -400,7 +400,7 @@ async function startServices() {
   ensureWindows();
   const shortcuts = listRunnerStartupShortcuts();
   if (shortcuts.length === 0) {
-    logger.warn('No em-runner-* Startup shortcuts installed. Run `npx mgr runner install` first.');
+    logger.warn('No em-runner-* Startup shortcuts installed. Run `npx omega runner install` first.');
     return;
   }
   // Map the first shortcut name back to its runner dir. The shortcut naming
@@ -430,7 +430,7 @@ async function startServices() {
       const pathStr = execPath || '(path unavailable)';
       logger.warn(`  · PID=${pid} session=${sessionId} ${pathStr}`);
     }
-    logger.warn(`Refusing to start a duplicate. Use 'npx mgr runner stop' to kill it first, or 'npx mgr runner status' to inspect.`);
+    logger.warn(`Refusing to start a duplicate. Use 'npx omega runner stop' to kill it first, or 'npx omega runner status' to inspect.`);
     process.exitCode = 1;
     return;
   }
@@ -488,7 +488,7 @@ async function statusServices() {
   const shortcuts = listRunnerStartupShortcuts();
   if (shortcuts.length === 0) {
     logger.warn('No em-runner-* Startup shortcuts installed.');
-    logger.warn('Run `npx mgr runner install` to create them — registration alone is not enough.');
+    logger.warn('Run `npx omega runner install` to create them — registration alone is not enough.');
   } else {
     logger.log(`Runner Startup shortcuts (${shortcuts.length}):`);
     for (const name of shortcuts) {
@@ -501,7 +501,7 @@ async function statusServices() {
   const procs = listRunnerListenerProcessesUnder(RUNNER_HOME);
   if (procs.length === 0) {
     logger.warn('No Runner.Listener.exe processes are running under RUNNER_HOME.');
-    logger.warn('Run `npx mgr runner start` to spawn them, or log out and back in.');
+    logger.warn('Run `npx omega runner start` to spawn them, or log out and back in.');
   } else {
     logger.log(`Running runners (${procs.length}):`);
     for (const { pid, sessionId, execPath } of procs) {
@@ -518,16 +518,16 @@ async function statusServices() {
   const legacyServices = listActionsRunnerServices();
   if (legacyServices.length > 0) {
     logger.log('');
-    logger.warn(`Legacy actions.runner.* services detected (${legacyServices.length}). Run 'npx mgr runner uninstall' to remove them.`);
+    logger.warn(`Legacy actions.runner.* services detected (${legacyServices.length}). Run 'npx omega runner uninstall' to remove them.`);
     for (const name of legacyServices) logger.log(`  · ${name}`);
   }
 
   // Surface a leftover watcher service if one is still installed from older
-  // @omegajs/desktop versions — v1.2.35+ doesn't install it, but upgraders may have one.
+  // @omega.js/desktop versions — v1.2.35+ doesn't install it, but upgraders may have one.
   const watcherState = scState(WATCHER_SERVICE_NAME);
   if (watcherState !== 'NOT_INSTALLED') {
     logger.log('');
-    logger.warn(`Legacy watcher service detected: ${WATCHER_SERVICE_NAME} (${watcherState}). v1.2.35+ doesn't use it. Run 'npx mgr runner uninstall' to remove.`);
+    logger.warn(`Legacy watcher service detected: ${WATCHER_SERVICE_NAME} (${watcherState}). v1.2.35+ doesn't use it. Run 'npx omega runner uninstall' to remove.`);
   }
 }
 
@@ -558,7 +558,7 @@ async function uninstall(options) {
   // don't keep spawning Session 0 zombies after upgrade.
   await uninstallLegacyLogonTasks();
 
-  // Stop + delete any leftover legacy actions.runner.* services from old @omegajs/desktop
+  // Stop + delete any leftover legacy actions.runner.* services from old @omega.js/desktop
   // versions that registered runners as Windows services. Idempotent — no-op
   // if there are none.
   await uninstallActionsRunnerServices();
@@ -786,11 +786,11 @@ function identifyHandleHolders(targetPath) {
 // ─── self-update ────────────────────────────────────────────────────────────────
 async function selfUpdate() {
   const { execute } = require('node-powertools');
-  logger.log('Updating @omegajs/desktop to latest…');
+  logger.log('Updating @omega.js/desktop to latest…');
   try {
-    const out = await safeInstall('npm i -g @omegajs/desktop@latest');
+    const out = await safeInstall('npm i -g @omega.js/desktop@latest');
     logger.log(out);
-    logger.log('✓ @omegajs/desktop updated.');
+    logger.log('✓ @omega.js/desktop updated.');
   } catch (e) {
     logger.warn(`Self-update failed: ${e.message}`);
   }
@@ -835,7 +835,7 @@ function ensureWindowsAdmin(options) {
   // relaunchElevated() exits this process — control never returns past this point.
 }
 
-// Re-launch the original `npx mgr ...` invocation in a new elevated cmd.exe window via
+// Re-launch the original `npx omega ...` invocation in a new elevated cmd.exe window via
 // PowerShell's Start-Process -Verb RunAs (triggers UAC prompt). The new window:
 //   - inherits this process's env (including PATH so `npx` works)
 //   - has cwd set to the current cwd (UAC defaults to system32 otherwise)
@@ -847,12 +847,12 @@ function relaunchElevated() {
 
   // Reconstruct the original argv. process.argv[0] is the node binary, [1] is the
   // entry script (bin/omega-desktop), the rest are user args. We re-invoke via
-  // `npx mgr ...` so the elevated cmd doesn't need to know about node-version
+  // `npx omega ...` so the elevated cmd doesn't need to know about node-version
   // managers (nvm-windows etc.) — npx handles resolution.
   const userArgs = process.argv.slice(2);   // strip node + entry
   // Quote any arg that contains a space.
   const quoted = userArgs.map((a) => /\s/.test(a) ? `"${a}"` : a).join(' ');
-  const cmdLine = `cd /d "${cwd}" && npx mgr ${quoted}`;
+  const cmdLine = `cd /d "${cwd}" && npx omega ${quoted}`;
 
   // PowerShell Start-Process -Verb RunAs is the documented way to trigger UAC.
   // -ArgumentList passes args; -WorkingDirectory sets the new process's cwd.
@@ -952,8 +952,8 @@ async function installWatcherService() {
   const watcherDir  = path.join(RUNNER_HOME, 'watcher');
   jetpack.dir(watcherDir);
 
-  // Copy our own watcher.js into the watcher dir so it's stable across `npm i -g @omegajs/desktop` upgrades.
-  // Each tick, the watcher re-resolves the latest @omegajs/desktop and runs it — gives self-update for free.
+  // Copy our own watcher.js into the watcher dir so it's stable across `npm i -g @omega.js/desktop` upgrades.
+  // Each tick, the watcher re-resolves the latest @omega.js/desktop and runs it — gives self-update for free.
   const sourceWatcher = path.join(__dirname, '..', 'runner', 'watcher.js');
   jetpack.copy(sourceWatcher, path.join(watcherDir, 'watcher.js'), { overwrite: true });
 
@@ -962,14 +962,14 @@ async function installWatcherService() {
   try {
     Service = require('node-windows').Service;
   } catch (e) {
-    throw new Error('node-windows missing. Run `npm i -g node-windows` on the Windows box, then re-run `npx mgr runner install`.');
+    throw new Error('node-windows missing. Run `npm i -g node-windows` on the Windows box, then re-run `npx omega runner install`.');
   }
 
   // Bake RUNNER_HOME into the service env so the watcher resolves the same paths the
   // install used, regardless of what its cwd ends up being once Windows starts the service.
   const svc = new Service({
     name:        WATCHER_SERVICE_NAME,
-    description: '@omegajs/desktop runner watcher (auto-registers new GitHub orgs to the EV-token runner)',
+    description: '@omega.js/desktop runner watcher (auto-registers new GitHub orgs to the EV-token runner)',
     script:      path.join(watcherDir, 'watcher.js'),
     nodeOptions: [],
     workingDirectory: watcherDir,
@@ -1142,7 +1142,7 @@ function listRunnerStartupShortcuts() {
 // a long-lived cmd.exe holding cwd inside RUNNER_HOME blocks every later
 // uninstall with EPERM. Bypassing run.cmd loses its self-update relaunch
 // path, but `mgr runner install` refreshing the runner binary is the
-// preferred update mechanism in @omegajs/desktop anyway.
+// preferred update mechanism in @omega.js/desktop anyway.
 //
 // Detached + windowsHide + ignored stdio = no console window flashes during
 // install and the listener survives the install command's exit. UAC-
@@ -1251,21 +1251,21 @@ async function uninstallLegacyLogonTasks() {
 // service to run AS the user instead. config.cmd accepts:
 //   --windowslogonaccount <user> --windowslogonpassword <pass>
 //
-// To avoid making the user re-enter their password every install, @omegajs/desktop stores
+// To avoid making the user re-enter their password every install, @omega.js/desktop stores
 // the password encrypted via Windows DPAPI (only the current user can decrypt
 // it; even another admin on the same box can't). Stored at
-// %APPDATA%\@omegajs/desktop\runner-logon.json
+// %APPDATA%\@omega.js/desktop\runner-logon.json
 //
 // Three ways to supply credentials, in priority order:
 //   1. WIN_RUNNER_LOGON_ACCOUNT + WIN_RUNNER_LOGON_PASSWORD env vars (CI/.env)
-//   2. The DPAPI-encrypted file at %APPDATA%\@omegajs/desktop\runner-logon.json
+//   2. The DPAPI-encrypted file at %APPDATA%\@omega.js/desktop\runner-logon.json
 //   3. Interactive prompt (only when neither of the above exist + stdin is a TTY)
 //
 // If we end up with nothing, fall back to NETWORK SERVICE (current behavior).
 
 const LOGON_FILE = process.platform === 'win32'
-  ? path.join(process.env.APPDATA || os.homedir(), '@omegajs/desktop', 'runner-logon.json')
-  : path.join(os.homedir(), '.@omegajs/desktop', 'runner-logon.json');
+  ? path.join(process.env.APPDATA || os.homedir(), '@omega.js/desktop', 'runner-logon.json')
+  : path.join(os.homedir(), '.@omega.js/desktop', 'runner-logon.json');
 
 async function getLogonCredentials() {
   // 1. Env vars take precedence (CI / .env-driven automation).
@@ -1425,7 +1425,7 @@ function saveConfig(data) {
 
 // ─── monitor ────────────────────────────────────────────────────────────────────
 //
-// `npx mgr runner monitor` — pretty-prints the JSONL signing event log in real time.
+// `npx omega runner monitor` — pretty-prints the JSONL signing event log in real time.
 //
 // Reads the same path `sign-windows` writes to (see sign-events.js for the full
 // resolution chain). Uses signEvents.getLogPath() so it always stays in sync.
@@ -1458,7 +1458,7 @@ async function monitor(options) {
   }
 
   if (orgs.length === 0) {
-    logger.log('(no orgs registered yet — run `npx mgr runner install` first)');
+    logger.log('(no orgs registered yet — run `npx omega runner install` first)');
   } else {
     logger.log(`Monitoring signing requests across ${orgs.length} org(s):`);
     // Build the expected task name for each org via the same helper that creates them

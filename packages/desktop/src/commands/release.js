@@ -1,7 +1,7 @@
 // release — trigger the GitHub Actions Build & Release workflow + stream logs locally.
 //
 // Replaces the old "do it from my laptop" release flow with "let CI do it, but make it
-// feel local." User runs `npm run release` (or `npx mgr release`) and gets:
+// feel local." User runs `npm run release` (or `npx omega release`) and gets:
 //   1. A workflow_dispatch POST to GH Actions on the consumer's repo (owner/repo derived
 //      from package.json#repository.url, falling back to git remote origin).
 //   2. A few seconds of waiting while GH spins up the run.

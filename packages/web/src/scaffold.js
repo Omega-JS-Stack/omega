@@ -1,7 +1,7 @@
 /**
- * @omegajs/web's defaults scaffolding — applies the framework's scaffold tree
+ * @omega.js/web's defaults scaffolding — applies the framework's scaffold tree
  * (scaffold/ in the package) to the consumer project root via the shared
- * devkit engine. Exported standalone (@omegajs/backend/BXM pattern) so the framework
+ * devkit engine. Exported standalone (@omega.js/backend/BXM pattern) so the framework
  * test suite can exercise the REAL file map against a temp dir.
  *
  * UJM-setup semantics preserved, minus what the new architecture deletes:
@@ -12,7 +12,7 @@
  *     the consumer's Custom section survives verbatim
  */
 const path = require('node:path');
-const { applyDefaults } = require('@omegajs/devkit/defaults-engine');
+const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 const { PATHS } = require('./paths.js');
 
 // The Node major scaffolded into .nvmrc and the CI workflow (monorepo standard).
@@ -34,7 +34,7 @@ const FILE_MAP = {
 };
 
 /**
- * Scaffold @omegajs/web's defaults into a consumer project.
+ * Scaffold @omega.js/web's defaults into a consumer project.
  * @param {object} options
  * @param {string} options.outputDir - consumer project root
  * @param {string} [options.defaultsDir] - override the scaffold tree root (tests)

@@ -12,8 +12,8 @@
  */
 
 // Libraries
-import { ready as domReady } from '@omegajs/client/modules/dom.js';
-import webManager from '@omegajs/client';
+import { ready as domReady } from '@omega.js/client/modules/dom.js';
+import omega from '@omega.js/client';
 
 // Constants
 const HONEYPOT_SELECTOR = '[data-honey], [name="honey"]';
@@ -239,7 +239,7 @@ export class FormManager {
 
     // Focus the field with autofocus attribute if it exists (desktop only)
     const $autofocusField = this.$form.querySelector('[autofocus]');
-    if ($autofocusField && !$autofocusField.disabled && webManager.utilities().getDevice() === 'desktop') {
+    if ($autofocusField && !$autofocusField.disabled && omega.utilities().getDevice() === 'desktop') {
       this._focusField($autofocusField);
     }
   }
@@ -831,7 +831,7 @@ export class FormManager {
         $btn._originalHTML = $btn.innerHTML;
         const text = this.config.submittingText;
         $btn.innerHTML = text
-          ? `<span class="spinner-border spinner-border-sm me-2"></span>${webManager.utilities().escapeHTML(text)}`
+          ? `<span class="spinner-border spinner-border-sm me-2"></span>${omega.utilities().escapeHTML(text)}`
           : '<span class="spinner-border spinner-border-sm"></span>';
       } else if ($btn._originalHTML) {
         $btn.innerHTML = $btn._originalHTML;
@@ -987,7 +987,7 @@ export class FormManager {
     }
     /* @dev-only:end */
 
-    webManager.utilities().showNotification(message, { type: 'success' });
+    omega.utilities().showNotification(message, { type: 'success' });
   }
 
   /**
@@ -1000,7 +1000,7 @@ export class FormManager {
     }
     /* @dev-only:end */
 
-    webManager.utilities().showNotification(message, { type: 'danger' });
+    omega.utilities().showNotification(message, { type: 'danger' });
   }
 
   /**

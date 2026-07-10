@@ -57,7 +57,7 @@
 //   - ctx.state        — shared object across tests in a suite/group
 //   - ctx.skip(reason) — throw to skip the current test at runtime
 //   - ctx.layer        — current layer name
-//   - ctx.manager      — @omegajs/desktop Manager instance (main layer only — added in 2.3b)
+//   - ctx.manager      — @omega.js/desktop Manager instance (main layer only — added in 2.3b)
 //   - ctx.page         — BrowserWindow page (renderer layer only — added in 2.3c)
 
 module.exports = {

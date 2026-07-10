@@ -1,5 +1,5 @@
 /**
- * Ensure @omegajs/backend's segments exist on the Beehiiv publication.
+ * Ensure @omega.js/backend's segments exist on the Beehiiv publication.
  *
  * Beehiiv has NO segment-create API — the read side lists what exists,
  * and creation happens through the dashboard UI. Interactive runs offer
@@ -10,8 +10,8 @@
  * mutate: missing segments warn with human-readable conditions.
  */
 const chalk = require('chalk').default;
-const { select, isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowserAndPoll } = require('@omegajs/devkit/flows');
+const { select, isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { segmentsFor } = require('../../../lib/backend-marketing.js');
 const { AutomationClient } = require('../../../lib/automation-client.js');
 const { formatCondition, automateCreateSegment } = require('../lib/segment-automation.js');
@@ -19,7 +19,7 @@ const { formatCondition, automateCreateSegment } = require('../lib/segment-autom
 const BEEHIIV_SEGMENTS = segmentsFor('beehiiv');
 const SEGMENTS_URL = 'https://app.beehiiv.com/segments';
 
-/** Names of the @omegajs/backend segments missing from the publication. */
+/** Names of the @omega.js/backend segments missing from the publication. */
 async function listMissing(api, publicationId) {
   const existing = await api.getSegments(publicationId);
   const existingByName = new Set(existing.map((s) => s.name));

@@ -1,6 +1,6 @@
 /**
  * Test lifecycle hook for this project. Runs before any test (not a test itself).
- * See @omegajs/backend/docs/test-framework.md → "test/_init.js".
+ * See @omega.js/backend/docs/test-framework.md → "test/_init.js".
  */
 
 module.exports = ({ config }) => ({

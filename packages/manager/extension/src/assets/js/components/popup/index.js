@@ -4,7 +4,7 @@
 // ============================================
 
 // Import Browser Extension Manager
-import Manager from '@omegajs/extension/popup';
+import Manager from '@omega.js/extension/popup';
 
 // Category icons
 const CATEGORY_ICONS = {

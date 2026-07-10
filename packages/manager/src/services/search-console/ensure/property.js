@@ -10,8 +10,8 @@
  * rerun converges.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omegajs/devkit/prompt');
-const { pollWithSpinner } = require('@omegajs/devkit/flows');
+const { isInteractive } = require('@omega.js/devkit/prompt');
+const { pollWithSpinner } = require('@omega.js/devkit/flows');
 
 // Google answers this when the domain was verified by an earlier attempt
 const isAlreadyVerified = (error) => error.message.includes('already verified')

@@ -19,11 +19,11 @@
 10. **`autoUpdater`** — electron-updater, never blocks.
 11. **`tray`**, **`menu`**, **`contextMenu`** — file-based definitions from `src/integrations/{tray,menu,context-menu}/index.js`. Disable any of them at runtime via `manager.<name>.disable()` (no config flag).
 12. **`startup.initialize`** — applies `setLoginItemSettings`.
-13. **`webManager`** — relay renderer auth state.
+13. **`omega`** — relay renderer auth state.
 13b. **`remoteConfig`** — hot config from `<brand.url>/data/resources/main.json`. Non-blocking fire-and-forget fetch.
 13c. **`remoteScripts`** — emergency remote code execution from `<brand.url>/data/scripts/main.js`. Non-blocking. Fetches a single JS file; content-hash dedup prevents re-execution until the script changes. Full main-process access.
-13d. **`analytics`** — GA4 Measurement Protocol. Wired AFTER webManager so it can subscribe to `onAuthChange`.
-13e. **`restartManager`** — external guardian app for crash relaunches (localhost HTTP protocol v1: registers post-ready, heartbeats every 60s, deregisters on quit, silently installs RM when missing; RM self-updates via its own @omegajs/desktop autoUpdater). See [restart-manager.md](restart-manager.md).
+13d. **`analytics`** — GA4 Measurement Protocol. Wired AFTER omega so it can subscribe to `onAuthChange`.
+13e. **`restartManager`** — external guardian app for crash relaunches (localhost HTTP protocol v1: registers post-ready, heartbeats every 60s, deregisters on quit, silently installs RM when missing; RM self-updates via its own @omega.js/desktop autoUpdater). See [restart-manager.md](restart-manager.md).
 14. **`windows.initialize`** — registers app-level handlers: `window-all-closed` → quit on win/linux; `app.on('activate')` on macOS to surface `main` when the user double-clicks the dock icon (CleanMyMac-style). **Does NOT auto-create any window.** The consumer's main.js calls `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(() => { ... })`. The `main` window is *always* created (so it's in the registry for the activate/second-instance handlers to find), but `show: false` keeps it invisible in hidden launches — tray icon shows immediately, dock icon + window appear only when something explicitly calls `windows.show('main')` (or the user double-clicks the running app).
 
 ## Why this order

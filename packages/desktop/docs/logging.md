@@ -1,6 +1,6 @@
 # Logging
 
-@omegajs/desktop ships a runtime logger that writes to **both the console and a file on disk**, so production issues are inspectable without remoting into the user's machine.
+@omega.js/desktop ships a runtime logger that writes to **both the console and a file on disk**, so production issues are inspectable without remoting into the user's machine.
 
 ## What you get
 
@@ -16,14 +16,14 @@
 | Dev (`npm start`, `app.isPackaged === false`) | `<projectRoot>/logs/runtime.log` |
 | Prod (installed `.dmg` / `.exe` / `.deb`, `app.isPackaged === true`) | OS log dir: `~/Library/Logs/<ProductName>/runtime.log` (macOS), `%APPDATA%\<ProductName>\logs\runtime.log` (Windows), `~/.config/<ProductName>/logs/runtime.log` (Linux) |
 
-`<ProductName>` = `config.app.productName` (falls back to `config.brand.name`). @omegajs/desktop calls `app.setName(productName)` at boot so `app.getPath('logs')` uses the human-readable brand name, not `package.json#name`.
+`<ProductName>` = `config.app.productName` (falls back to `config.brand.name`). @omega.js/desktop calls `app.setName(productName)` at boot so `app.getPath('logs')` uses the human-readable brand name, not `package.json#name`.
 
 ## How to write logs
 
 In **main process** (uses the same `manager.logger` you've always had):
 
 ```js
-const Manager = require('@omegajs/desktop/main');
+const Manager = require('@omega.js/desktop/main');
 const manager = new Manager();
 await manager.initialize();
 
@@ -35,7 +35,7 @@ manager.logger.error(new Error('boom'));
 In **preload**:
 
 ```js
-const Manager = require('@omegajs/desktop/preload');
+const Manager = require('@omega.js/desktop/preload');
 const manager = new Manager();
 await manager.initialize();
 manager.logger.log('preload ready');
@@ -65,24 +65,24 @@ Grep one context with:
 grep ' main ' logs/runtime.log
 ```
 
-## CLI: `npx mgr logs`
+## CLI: `npx omega logs`
 
 For dev-loop convenience. From the consumer project root:
 
 | Command | Effect |
 |---|---|
-| `npx mgr logs` | Print path, then `tail -50` of the file |
-| `npx mgr logs --tail` (or `-f`) | Follow mode (like `tail -f`). Ctrl+C to stop. Cross-platform. |
-| `npx mgr logs --path` (or `-p`) | Print the resolved path only (pipe-friendly) |
-| `npx mgr logs --open` | Open the log file in OS default editor |
-| `npx mgr logs --lines=100` | Default mode with custom tail length |
+| `npx omega logs` | Print path, then `tail -50` of the file |
+| `npx omega logs --tail` (or `-f`) | Follow mode (like `tail -f`). Ctrl+C to stop. Cross-platform. |
+| `npx omega logs --path` (or `-p`) | Print the resolved path only (pipe-friendly) |
+| `npx omega logs --open` | Open the log file in OS default editor |
+| `npx omega logs --lines=100` | Default mode with custom tail length |
 
 `mgr logs` only resolves the dev path (`<cwd>/logs/runtime.log`). To find the production log on a user's machine, use the table above or call `getLogFilePath()` from app code.
 
 ## How to find the file path from app code
 
 ```js
-const LoggerLite = require('@omegajs/desktop/lib/logger-lite');
+const LoggerLite = require('@omega.js/desktop/lib/logger-lite');
 const filePath = LoggerLite.getLogFilePath();
 // → '/Users/<user>/Library/Logs/MyApp/runtime.log' in production
 ```
@@ -92,14 +92,14 @@ Useful for:
 - Programmatic log shipping (e.g. POSTing the file to your support backend)
 - Crash reporters that want to attach the runtime log
 
-## What @omegajs/desktop logs automatically
+## What @omega.js/desktop logs automatically
 
-Beyond what you write yourself, @omegajs/desktop emits a fixed set of high-signal lifecycle lines so post-mortem debugging works without redeploying:
+Beyond what you write yourself, @omega.js/desktop emits a fixed set of high-signal lifecycle lines so post-mortem debugging works without redeploying:
 
 **At boot (`manager.initialize()`):**
 
 ```
-(main)     Initializing @omegajs/desktop (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--em-launched-at-login"]
+(main)     Initializing @omega.js/desktop (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--em-launched-at-login"]
 (startup)  startup boot summary — RAW inputs:
 (startup)    process.argv:            ["--em-launched-at-login"]
 (startup)    process.platform:        darwin
@@ -116,9 +116,9 @@ Beyond what you write yourself, @omegajs/desktop emits a fixed set of high-signa
 (startup)    isLaunchHidden():        true
 ```
 
-The boot summary has two parallel blocks: **RAW inputs** (what the OS / shell gave us) and **RESOLVED values** (what @omegajs/desktop decided to act on). Use it to debug both directions:
-- "Why is @omegajs/desktop behaving like X?" → check resolved values
-- "Why did @omegajs/desktop decide X?" → check raw inputs
+The boot summary has two parallel blocks: **RAW inputs** (what the OS / shell gave us) and **RESOLVED values** (what @omega.js/desktop decided to act on). Use it to debug both directions:
+- "Why is @omega.js/desktop behaving like X?" → check resolved values
+- "Why did @omega.js/desktop decide X?" → check raw inputs
 
 The `via:` annotation on `wasLaunchedAtLogin()` distinguishes a real login launch (`via:macos-wasOpenedAtLogin`) from a flag-based simulation (`via:argv-flag` — i.e. the user passed `--em-launched-at-login`).
 
@@ -182,7 +182,7 @@ Default is `silly` (everything) on both.
 
 ## How it works under the hood
 
-@omegajs/desktop's runtime logger (`lib/logger-lite.js`) detects which process it's in:
+@omega.js/desktop's runtime logger (`lib/logger-lite.js`) detects which process it's in:
 
 - **Main**: writes to `runtime.log` directly via [electron-log](https://github.com/megahertz/electron-log)'s file transport. Sets up an IPC listener on channel `desktop:log:forward` to receive forwarded calls from preload + renderer.
 - **Preload**: writes to console (DevTools) AND forwards each call via `ipcRenderer.send('desktop:log:forward', ...)` to main.
@@ -206,7 +206,7 @@ Five separate logs in `<projectRoot>/logs/`:
 | `runtime.log` | Packaged-app runtime in dev mode | Truncated each boot |
 | `dev.log` | Gulp pipeline + spawned Electron child stdout (`npm start`) | Truncated each `npm start` |
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `EM_BUILD_MODE=true`) | Truncated each build |
-| `test.log` | `npx mgr test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
+| `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
 | `ci.log` | GH Actions release run output (streamed locally during `npm run release`) | Truncated each release run |
 | `signing.log` | JSONL signing events from Windows code-signing (local dev fallback; on CI this writes to the runner home as `em-signing.log` instead) | Appended (not truncated) |
 

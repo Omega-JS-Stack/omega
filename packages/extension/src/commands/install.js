@@ -2,7 +2,7 @@
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('install');
 const { safeInstall } = require('../lib/safe-install');
-const local = require('@omegajs/devkit/local');
+const local = require('@omega.js/devkit/local');
 
 // Load package
 const package = Manager.getPackage('main');
@@ -34,7 +34,7 @@ module.exports = async function (options) {
       // Log
       logger.log('Installing development (local Omega monorepo)...');
 
-      // Link every @omegajs dependency to the monorepo (idempotent)
+      // Link every @omega.js dependency to the monorepo (idempotent)
       await local.linkLocalPackages({
         dir: process.cwd(),
         monorepoRoot: local.resolveMonorepoRoot(),

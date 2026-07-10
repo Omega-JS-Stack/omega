@@ -165,7 +165,7 @@ test('recaptcha: dry-run behaves identically — the probe is a pure read', asyn
 
 // ─── Interactive add-domain confirm (manual-only poll + state stamp) ─────────
 
-const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
 test('site-key: interactive run opens the console and stamps the confirmed domain list', async () => {

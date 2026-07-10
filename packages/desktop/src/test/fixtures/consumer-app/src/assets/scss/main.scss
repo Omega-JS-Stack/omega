@@ -1,3 +1,3 @@
-// Minimal theme entry for the boot-layer self-test fixture — pulls in the @omegajs/desktop/classy
+// Minimal theme entry for the boot-layer self-test fixture — pulls in the @omega.js/desktop/classy
 // theme so the sass build path is exercised exactly like a real consumer's.
 @use 'omega-desktop' as *;

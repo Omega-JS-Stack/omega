@@ -19,7 +19,7 @@ const BATCH_SIZE = 500;
 /**
  * Send push notification to FCM subscribers.
  *
- * @param {object} assistant - @omegajs/backend assistant instance
+ * @param {object} assistant - @omega.js/backend assistant instance
  * @param {object} options
  * @param {string} options.title - Notification title
  * @param {string} options.body - Notification body

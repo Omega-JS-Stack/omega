@@ -1,14 +1,14 @@
 # ========== Default Values ==========
-# @omegajs/web — consumer project
+# @omega.js/web — consumer project
 
 ## Framework
 
-This project consumes **@omegajs/web** — the OMEGA web framework (Eleventy 3 + LiquidJS). It ships ~60 default pages as virtual templates (nothing copied into this repo), layered themes with zero file copying, a `page.resolved` data cascade, the esbuild/sass/PurgeCSS asset pipeline, and an ESM boot runtime around the @omegajs/client singleton.
+This project consumes **@omega.js/web** — the OMEGA web framework (Eleventy 3 + LiquidJS). It ships ~60 default pages as virtual templates (nothing copied into this repo), layered themes with zero file copying, a `page.resolved` data cascade, the esbuild/sass/PurgeCSS asset pipeline, and an ESM boot runtime around the @omega.js/client singleton.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
 **Before doing ANY work on this codebase, read the framework documentation:**
-- **`node_modules/@omegajs/web/README.md`** — architecture, engine facts, conventions
+- **`node_modules/@omega.js/web/README.md`** — architecture, engine facts, conventions
 
 ## Quick start
 

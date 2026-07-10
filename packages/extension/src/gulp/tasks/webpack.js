@@ -55,7 +55,7 @@ const watchInput = [
   // All BXM package src files - watch for changes (includes background.js, popup.js, etc.)
   `${rootPathPackage}/src/**/*.js`,
 
-  // So we can watch for changes while we're developing @omegajs/client
+  // So we can watch for changes while we're developing @omega.js/client
   `${rootPathPackage}/../client/src`,
 ];
 
@@ -106,7 +106,7 @@ function getSettings() {
       },
       // Add module resolution paths
       modules: [
-        // Local @omegajs/client's node_modules (for when we're using "@omegajs/client": "file:../@omegajs/client")
+        // Local @omega.js/client's node_modules (for when we're using "@omega.js/client": "file:../@omega.js/client")
         path.resolve(rootPathPackage, '../client/node_modules'),
 
         // Package's node_modules
@@ -434,13 +434,13 @@ function getTemplateReplaceOptions() {
     environment: Manager.getEnvironment(),
 
     // Specific
-    firebaseVersion: version.clean(require('@omegajs/client/package.json').dependencies.firebase),
+    firebaseVersion: version.clean(require('@omega.js/client/package.json').dependencies.firebase),
     liveReloadPort: Manager.getLiveReloadPort(),
   }
   const now = Math.round(new Date().getTime() / 1000);
 
-  // Set webManagerConfiguration (matching @omegajs/client's expected structure)
-  const webManagerConfig = options.webManager || {};
+  // Set webManagerConfiguration (matching @omega.js/client's expected structure)
+  const webManagerConfig = options.omega || {};
   options.webManagerConfiguration = JSON.stringify({
     environment: options.environment || 'production',
     buildTime: now,

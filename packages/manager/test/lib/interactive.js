@@ -1,5 +1,5 @@
 /**
- * Interactive-prompt test harness — routes @omegajs/devkit/prompt through
+ * Interactive-prompt test harness — routes @omega.js/devkit/prompt through
  * fake TTY streams so tests drive the REAL inquirer prompts with keystrokes
  * (no mocks; the devkit module treats an isTTY input stream as interactive).
  *
@@ -14,7 +14,7 @@
  *   }
  */
 const { PassThrough } = require('node:stream');
-const { setPromptStreams } = require('@omegajs/devkit/prompt');
+const { setPromptStreams } = require('@omega.js/devkit/prompt');
 
 function openTtyPrompt() {
   const input = new PassThrough();

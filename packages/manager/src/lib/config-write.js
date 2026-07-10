@@ -1,5 +1,5 @@
 /**
- * Brand-config writeback — the manager side of @omegajs/config's
+ * Brand-config writeback — the manager side of @omega.js/config's
  * comment-preserving editor. Services resolve IDs against external APIs
  * (SendGrid list, Beehiiv publication, payment product IDs, the Firebase SDK
  * config) and land them in config/omega.json5, their one authoritative home;
@@ -8,7 +8,7 @@
  */
 
 const chalk = require('chalk').default;
-const { writeConfigValues } = require('@omegajs/config');
+const { writeConfigValues } = require('@omega.js/config');
 
 /**
  * Write resolved values into the brand's omega.json5. Already-equal values
@@ -17,7 +17,7 @@ const { writeConfigValues } = require('@omegajs/config');
  * touches nothing.
  *
  * @param {Object} context - Handler context ({ brandRoot, options }).
- * @param {Object<string, *>} edits - Dot-path → value (see @omegajs/config
+ * @param {Object<string, *>} edits - Dot-path → value (see @omega.js/config
  *   edit paths: dots, numeric indexes, and [key=value] array matchers).
  * @returns {string[]} The paths actually written (empty on dry-run or no-op).
  */

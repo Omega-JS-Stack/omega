@@ -1,5 +1,5 @@
 // Referrals section module
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Initialize referrals section
 export function init() {
@@ -109,13 +109,13 @@ function updateReferralsList(referrals) {
                 <div class="d-flex align-items-center">
                   <span class="badge bg-secondary me-2">#${sortedReferrals.length - index}</span>
                   <div>
-                    <strong class="font-monospace small">${webManager.utilities().escapeHTML(referral.uid || 'Unknown User')}</strong>
-                    <div class="text-muted small">${webManager.utilities().escapeHTML(dateStr)}${timeStr ? ` at ${webManager.utilities().escapeHTML(timeStr)}` : ''}</div>
+                    <strong class="font-monospace small">${omega.utilities().escapeHTML(referral.uid || 'Unknown User')}</strong>
+                    <div class="text-muted small">${omega.utilities().escapeHTML(dateStr)}${timeStr ? ` at ${omega.utilities().escapeHTML(timeStr)}` : ''}</div>
                   </div>
                 </div>
               </div>
               <div class="text-end">
-                <small class="text-muted">${webManager.utilities().escapeHTML(getTimeSince(timestamp))}</small>
+                <small class="text-muted">${omega.utilities().escapeHTML(getTimeSince(timestamp))}</small>
               </div>
             </div>
           </div>
@@ -197,13 +197,13 @@ async function handleCopyReferralCode() {
   const $copyBtn = document.getElementById('copy-referral-code-btn');
 
   if (!$codeInput || !$codeInput.value || $codeInput.value === 'No referral link available') {
-    webManager.utilities().showNotification('No referral link to copy', 'warning');
+    omega.utilities().showNotification('No referral link to copy', 'warning');
     return;
   }
 
   try {
     // Copy the full URL directly from the input (it now contains the full URL)
-    await webManager.utilities().clipboardCopy($codeInput);
+    await omega.utilities().clipboardCopy($codeInput);
 
     // Update button text temporarily
     const $text = $copyBtn.querySelector('.button-text');
@@ -222,7 +222,7 @@ async function handleCopyReferralCode() {
 
   } catch (err) {
     console.error('Failed to copy referral link:', err);
-    webManager.utilities().showNotification('Failed to copy referral link', 'danger');
+    omega.utilities().showNotification('Failed to copy referral link', 'danger');
   }
 }
 

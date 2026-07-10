@@ -1,11 +1,11 @@
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     insertBlogPostAds();
 
@@ -94,7 +94,7 @@ function insertBlogPostAds() {
 
     // Build data-lazy object
     const lazyConfig = {
-      src: `${window.location.origin}/assets/js/modules/vert.bundle.js?cb=${webManager.config.buildTime}`,
+      src: `${window.location.origin}/assets/js/modules/vert.bundle.js?cb=${omega.config.buildTime}`,
       attributes: {
         'data-ad-client': adConfig.client,
         'data-ad-type': adConfig.type,

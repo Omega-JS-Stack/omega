@@ -5,13 +5,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/npm/v/@omegajs/extension.svg">
-  <img src="https://img.shields.io/npm/dm/@omegajs/extension.svg">
-  <img src="https://img.shields.io/node/v/@omegajs/extension.svg">
-  <img src="https://img.shields.io/npm/l/@omegajs/extension.svg">
+  <img src="https://img.shields.io/npm/v/@omega.js/extension.svg">
+  <img src="https://img.shields.io/npm/dm/@omega.js/extension.svg">
+  <img src="https://img.shields.io/node/v/@omega.js/extension.svg">
+  <img src="https://img.shields.io/npm/l/@omega.js/extension.svg">
   <br>
   <br>
-  <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/@omegajs/extension">NPM Module</a> | <a href="https://github.com/ITW-Creative-Works/omega">Omega Monorepo</a>
+  <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/@omega.js/extension">NPM Module</a> | <a href="https://github.com/ITW-Creative-Works/omega">Omega Monorepo</a>
   <br>
   <br>
   <strong>OMEGA Extension</strong> is a framework for building modern cross-browser extensions. One-line bootstrap per context, component-based architecture, multi-browser build pipeline, cross-context auth, auto-translation across 16 languages, and a four-layer test framework.
@@ -31,12 +31,12 @@
 
 ## 🚀 Getting started
 
-1. [Create a repo](https://github.com/itw-creative-works/ultimate-browser-extension/generate) from the **Ultimate Browser Extension** template (or `npm i @omegajs/extension` in an existing project).
+1. [Create a repo](https://github.com/itw-creative-works/ultimate-browser-extension/generate) from the **Ultimate Browser Extension** template (or `npm i @omega.js/extension` in an existing project).
 2. Clone the repo to your local machine.
 3. Set up + run:
    ```bash
    npm install
-   npx mgr setup
+   npx omega setup
    npm start
    ```
 4. Open Chrome and navigate to `chrome://extensions`.
@@ -46,29 +46,29 @@
 
 ## 📦 Sync with the template
 
-Run `npx mgr setup` again to pull the latest framework defaults. Files you've edited are preserved; only missing or framework-owned files update.
+Run `npx omega setup` again to pull the latest framework defaults. Files you've edited are preserved; only missing or framework-owned files update.
 
 ## 🧪 Testing
 
-@omegajs/extension ships a built-in four-layer test framework. Write tests under `test/<layer>/*.test.js` and run with:
+@omega.js/extension ships a built-in four-layer test framework. Write tests under `test/<layer>/*.test.js` and run with:
 
 ```bash
-npx mgr test                   # all layers
-npx mgr test --layer build     # build layer only (plain Node, fast)
-npx mgr test --layer boot      # real-Chromium end-to-end test
-npx mgr test project:          # ONLY your project's tests (mgr: → only framework tests)
-npx mgr test --extended        # also run extended suites against REAL external services (Firebase, etc.)
+npx omega test                   # all layers
+npx omega test --layer build     # build layer only (plain Node, fast)
+npx omega test --layer boot      # real-Chromium end-to-end test
+npx omega test project:          # ONLY your project's tests (mgr: → only framework tests)
+npx omega test --extended        # also run extended suites against REAL external services (Firebase, etc.)
 ```
 
 Tests run against the **real** harness — a real MV3 service worker, a real Chromium tab, the real packaged extension. **Never mock** (`chrome`, the Manager, contexts are all real); only pure, I/O-free functions are called directly. Real external APIs are gated behind **extended mode** — `--extended` or the shared, unprefixed `TEST_EXTENDED_MODE=true` env var (skipped in-source otherwise, never mocked).
 
-All CLI output also lands in `logs/` (ANSI-stripped, truncated each run) — `test.log` from `npx mgr test`, `dev.log` from `npm start`, `build.log` from `npm run build`. Details: [docs/logging.md](docs/logging.md).
+All CLI output also lands in `logs/` (ANSI-stripped, truncated each run) — `test.log` from `npx omega test`, `dev.log` from `npm start`, `build.log` from `npm run build`. Details: [docs/logging.md](docs/logging.md).
 
 Test files use Jest-compatible matchers:
 
 ```js
 // test/build/manifest.test.js
-const Manager = require('@omegajs/extension/build');
+const Manager = require('@omega.js/extension/build');
 
 module.exports = {
   layer: 'build',
@@ -85,7 +85,7 @@ Full guide: [docs/test-framework.md](docs/test-framework.md). End-to-end "did my
 
 ## 🌐 Auto-translation
 
-When you run `npm run build`, @omegajs/extension auto-translates `src/_locales/en/messages.json` to 16 languages via Claude CLI:
+When you run `npm run build`, @omega.js/extension auto-translates `src/_locales/en/messages.json` to 16 languages via Claude CLI:
 
 `zh`, `es`, `hi`, `ar`, `pt`, `ru`, `ja`, `de`, `fr`, `ko`, `ur`, `id`, `bn`, `tl`, `vi`, `it`
 
@@ -131,7 +131,7 @@ Only stores with configured credentials get published to. Full guide: [docs/publ
 
 ## 🔐 Authentication
 
-@omegajs/extension provides built-in cross-context authentication that syncs across all extension contexts (popup, options, sidepanel, pages, background) without using `chrome.storage`.
+@omega.js/extension provides built-in cross-context authentication that syncs across all extension contexts (popup, options, sidepanel, pages, background) without using `chrome.storage`.
 
 **Background.js is the source of truth.** Auth syncs via messaging — sign-in / sign-out events propagate across all open contexts, and new contexts handshake with background on load.
 
@@ -164,7 +164,7 @@ Full guide: [docs/auth.md](docs/auth.md).
 
 ## 🔒 Supply-chain security
 
-All `npm install` calls in @omegajs/extension CLI commands (`npx mgr setup`, `npx mgr install`) route through [Socket Firewall](https://socket.dev/) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. Consumer CI workflows (`publish.yml` default) install sfw globally and run `sfw npm install`.
+All `npm install` calls in @omega.js/extension CLI commands (`npx omega setup`, `npx omega install`) route through [Socket Firewall](https://socket.dev/) when installed — blocking confirmed malware at the network level before packages reach disk. Falls back to plain npm if sfw isn't available. Consumer CI workflows (`publish.yml` default) install sfw globally and run `sfw npm install`.
 
 ## 📚 Documentation
 
@@ -172,6 +172,6 @@ In-depth docs for every subsystem live in [docs/](docs/). See [CLAUDE.md](CLAUDE
 
 ## 🧰 Sister projects
 
-- [@omegajs/desktop](../desktop/) — same patterns, but for Electron desktop apps
+- [@omega.js/desktop](../desktop/) — same patterns, but for Electron desktop apps
 - [Ultimate Jekyll Manager (UJM)](https://github.com/itw-creative-works/ultimate-jekyll-manager) — Jekyll static-site framework
-- [Backend Manager (@omegajs/backend)](https://github.com/itw-creative-works/backend-manager) — Firebase Functions backend framework
+- [Backend Manager (@omega.js/backend)](https://github.com/itw-creative-works/backend-manager) — Firebase Functions backend framework

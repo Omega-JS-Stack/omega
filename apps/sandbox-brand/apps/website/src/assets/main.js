@@ -1,13 +1,13 @@
 /**
- * Sandbox brand website entry — boots @omegajs/client against the emulated sandbox
+ * Sandbox brand website entry — boots @omega.js/client against the emulated sandbox
  * backend and exposes the hooks the cross-stack e2e driver (../../e2e/run.js) calls.
  *
  * Configuration mirrors the brand config (config/omega.json5 at the brand root)
  * (demo-sandbox-brand, fake-by-design values). environment=development +
- * env.FIREBASE_EMULATOR_CONNECT makes @omegajs/client connect to the local emulator
+ * env.FIREBASE_EMULATOR_CONNECT makes @omega.js/client connect to the local emulator
  * suite instead of live Firebase — the same switch UJM's serve task injects.
  */
-import manager from '@omegajs/client';
+import manager from '@omega.js/client';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const CONFIGURATION = {
@@ -39,7 +39,7 @@ function setStatus(text) {
 /**
  * Await one settled auth state ({ user, account, resolved }). Each call re-fetches
  * the account from Firestore — the driver polls this to observe the user doc
- * created by @omegajs/backend's auth onCreate trigger.
+ * created by @omega.js/backend's auth onCreate trigger.
  */
 function authState() {
   return new Promise((resolve) => {
@@ -53,7 +53,7 @@ window.__omega = {
   manager,
 
   // Signup is page-side in the real stack too: pages create the Firebase auth
-  // user directly; @omegajs/backend's auth onCreate trigger then creates the Firestore doc.
+  // user directly; @omega.js/backend's auth onCreate trigger then creates the Firestore doc.
   signUp(email, password) {
     return createUserWithEmailAndPassword(manager.firebaseAuth, email, password)
       .then((credential) => credential.user.uid);

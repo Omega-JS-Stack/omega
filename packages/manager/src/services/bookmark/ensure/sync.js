@@ -14,7 +14,7 @@
 const { execSync } = require('node:child_process');
 const chalk = require('chalk').default;
 const { WebSocketServer } = require('ws');
-const { isInteractive } = require('@omegajs/devkit/prompt');
+const { isInteractive } = require('@omega.js/devkit/prompt');
 const { resolveExtensionPort } = require('../../../lib/automation-client.js');
 
 const CONNECT_TIMEOUT = 10000;

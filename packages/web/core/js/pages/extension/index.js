@@ -3,13 +3,13 @@
  */
 
 // Libraries
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupBrowserDetection();
     setupInstallTracking();
@@ -39,7 +39,7 @@ const config = {
 
 // Setup browser detection and auto-select
 function setupBrowserDetection() {
-  const detectedBrowser = webManager.utilities().getBrowser();
+  const detectedBrowser = omega.utilities().getBrowser();
   console.log('Detected browser:', detectedBrowser);
 
   // Listen for tab changes to scroll to download card
@@ -112,7 +112,7 @@ function trackInstallClick(browser, installUrl) {
 
 // Trigger install for testing (simulates clicking the install button)
 function triggerInstall(browser) {
-  const browserId = browser || webManager.utilities().getBrowser();
+  const browserId = browser || omega.utilities().getBrowser();
   const $button = document.querySelector(`.tab-pane[data-browser="${browserId}"] .btn-primary`);
 
   if (!$button) {

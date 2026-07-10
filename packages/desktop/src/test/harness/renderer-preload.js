@@ -54,7 +54,7 @@ contextBridge.exposeInMainWorld('__emTest', {
 // getVersion / getEnvironment / getApiUrl / getFunctionsUrl / getWebsiteUrl). We
 // instantiate the renderer Manager here in the preload (before contextIsolation
 // closes off `require`) and forward each helper as a sync contextBridge function.
-// We deliberately do NOT call `manager.initialize()` — that touches @omegajs/client /
+// We deliberately do NOT call `manager.initialize()` — that touches @omega.js/client /
 // firebase / IPC, which is heavy + flaky for a helper-shape assertion. Instead we
 // stub `manager.config` from a built-time-injected blob so config-dependent
 // helpers (getEnvironment fallback, getWebsiteUrl prod path) have something to read.
@@ -62,10 +62,10 @@ let testManager;
 try {
   // The renderer test harness loads the renderer Manager by absolute dist path
   // injected by the boot harness. In its absence, fall back to require-by-name
-  // (works when the harness is run from a consumer with @omegajs/desktop in node_modules).
+  // (works when the harness is run from a consumer with @omega.js/desktop in node_modules).
   const RendererManager = process.env.EM_TEST_RENDERER_MANAGER_PATH
     ? require(process.env.EM_TEST_RENDERER_MANAGER_PATH)
-    : require('@omegajs/desktop/renderer');
+    : require('@omega.js/desktop/renderer');
   testManager = new RendererManager();
   // Seed config so getApiUrl / getFunctionsUrl / getWebsiteUrl have something to
   // read in their prod branches. Tests can mutate this via __emTestManager.config.set().

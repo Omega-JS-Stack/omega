@@ -42,7 +42,7 @@ function formatCondition(condition) {
 }
 
 /**
- * Map a @omegajs/backend operator to the Beehiiv dropdown text.
+ * Map a @omega.js/backend operator to the Beehiiv dropdown text.
  */
 function beehiivOperator(op) {
   switch (op) {
@@ -67,7 +67,7 @@ function beehiivOperator(op) {
  * exact dashboard steps).
  *
  * @param {AutomationClient} client - Connected automation client
- * @param {Object} segment - @omegajs/backend segment ({ name, display, conditions, logic })
+ * @param {Object} segment - @omega.js/backend segment ({ name, display, conditions, logic })
  */
 async function automateCreateSegment(client, segment) {
   const log = (msg) => console.log(`        ${chalk.dim(msg)}`);

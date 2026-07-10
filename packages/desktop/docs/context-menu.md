@@ -11,7 +11,7 @@ No config block. Path is conventional: `src/integrations/context-menu/index.js`.
 ```js
 // src/integrations/context-menu/index.js
 module.exports = ({ manager, menu, params, webContents }) => {
-  // Easiest: start from @omegajs/desktop's defaults, then customize per event.
+  // Easiest: start from @omega.js/desktop's defaults, then customize per event.
   menu.useDefaults();
 
   // Add a "Search Google" entry when text is selected:
@@ -38,7 +38,7 @@ Calling no `menu.*` methods (or `menu.clear()` after `useDefaults()` with nothin
 menu.item(descriptor)
 menu.separator()
 menu.submenu(label, items)
-menu.useDefaults()             // populate with @omegajs/desktop's defaults based on params
+menu.useDefaults()             // populate with @omega.js/desktop's defaults based on params
 menu.clear()                   // wipe items added so far this event
 ```
 
@@ -65,7 +65,7 @@ Context-menu ids are **flat** — no `context/` prefix needed (the lib namespace
 
 ## Default template ids
 
-@omegajs/desktop's `useDefaults()` populates items based on `params`. Every default item carries an id you can target:
+@omega.js/desktop's `useDefaults()` populates items based on `params`. Every default item carries an id you can target:
 
 | ID | When it appears |
 |---|---|
@@ -80,7 +80,7 @@ Context-menu ids are **flat** — no `context/` prefix needed (the lib namespace
 
 | Arg | Description |
 |---|---|
-| `manager` | The running @omegajs/desktop Manager |
+| `manager` | The running @omega.js/desktop Manager |
 | `menu` | Per-event builder + id-path API |
 | `params` | Electron's [`ContextMenuParams`](https://www.electronjs.org/docs/latest/api/web-contents#event-context-menu) — `selectionText`, `isEditable`, `linkURL`, `srcURL`, `mediaType`, `editFlags`, `x`, `y`, etc. |
 | `webContents` | The `webContents` that fired the event |
@@ -105,8 +105,8 @@ manager.contextMenu.hasCustomDefinition()   // false → using the built-in defa
 
 ## Default fn
 
-Without a consumer file, @omegajs/desktop uses a built-in fallback that just calls `useDefaults()` — sensible undo/redo/cut/copy/paste/link/reload/inspect baseline. Same behavior as the default scaffold.
+Without a consumer file, @omega.js/desktop uses a built-in fallback that just calls `useDefaults()` — sensible undo/redo/cut/copy/paste/link/reload/inspect baseline. Same behavior as the default scaffold.
 
 ## Default scaffold
 
-`npx mgr setup` ships `src/integrations/context-menu/index.js` calling `menu.useDefaults()` plus commented-out examples covering insertAfter, remove, hide, enable, and building from scratch.
+`npx omega setup` ships `src/integrations/context-menu/index.js` calling `menu.useDefaults()` plus commented-out examples covering insertAfter, remove, hide, enable, and building from scratch.

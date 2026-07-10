@@ -1,16 +1,16 @@
 # Audit Workflow
 
-Full-project audit for @omegajs/extension — runs against a CONSUMER extension or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:bxm` skill (`/omega:bxm audit`) or any "audit this extension/project" request.
+Full-project audit for @omega.js/extension — runs against a CONSUMER extension or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:bxm` skill (`/omega:bxm audit`) or any "audit this extension/project" request.
 
 Every check has a stable ID, a severity, and a scope. Findings are reported as `ID @ file:line`, fixed one at a time, then re-verified. The tables below do NOT restate the rules — each check links to the doc that owns the rule and the fix.
 
 ## Protocol
 
-1. **Detect scope** — read `package.json`: `name` is `@omegajs/extension` → **framework audit** (U + @omegajs/extension + F checks); `@omegajs/extension` in (dev)dependencies → **consumer audit** (U + @omegajs/extension checks).
+1. **Detect scope** — read `package.json`: `name` is `@omega.js/extension` → **framework audit** (U + @omega.js/extension + F checks); `@omega.js/extension` in (dev)dependencies → **consumer audit** (U + @omega.js/extension checks).
 2. **Run the catalog** — every check matching the scope. Search with Grep/Glob/Read over `src/` (+ `test/`, `config/`, `hooks/`); ALWAYS exclude `dist/`, `packaged/`, `node_modules/`, `_legacy/`, `_backup/`, `.temp/`, `.cache/`. Record each finding as `ID @ file:line` + a one-line description.
 3. **Persist the report** — write the findings list to `.temp/audit/claude-audit.md` so a long fix loop survives session breaks. Summarize counts by severity in chat.
 4. **Fix loop** — TodoWrite per finding, highest severity first, ONE at a time: mark in-progress → root cause → fix → verify → complete. Ask before structural or destructive fixes (file deletions, component restructures, manifest permission changes).
-5. **Re-verify** — re-run every check that produced findings until clean; finish with `npx mgr test` (must be green).
+5. **Re-verify** — re-run every check that produced findings until clean; finish with `npx omega test` (must be green).
 6. **Doc parity** — if fixes changed behavior, update README / CLAUDE.md / `docs/<topic>.md` / CHANGELOG in the same change set.
 
 Severity: **CRIT** security or broken functionality · **HIGH** hard-rule violation · **MED** convention drift · **LOW** optional improvement.
@@ -24,9 +24,9 @@ Mirrored across all four OMEGA frameworks — same ID means the same check every
 |----|-----|-------|-------|
 | U-01 | HIGH | B | Every feature has tests at EVERY layer it surfaces (build / background / view / boot) — never mocked, real harness only ([test-framework.md](test-framework.md)) |
 | U-02 | HIGH | B | Test hygiene — real-external-API tests gated behind `TEST_EXTENDED_MODE` in-source via `ctx.skip(...)` (not mocked); no tests that assert nothing ([test-framework.md](test-framework.md)) |
-| U-03 | CRIT | B | XSS — inline `webManager.utilities().escapeHTML(value)` at EVERY DOM sink, `sanitizeURL(url)` at executable URL sinks, zero local escape helpers ([xss-prevention.md](xss-prevention.md)) |
-| U-04 | HIGH | B | @omegajs/client owns Firebase — no direct `firebase` imports anywhere; `webManager.auth()` / `.firestore()` ([common-mistakes.md](common-mistakes.md)) |
-| U-05 | HIGH | C | No @omegajs/extension transitive deps installed in the consumer `package.json` (`firebase`, `@omegajs/client`, `json5`, …) — webpack `resolve.modules` / `Manager.require()` resolve them ([common-mistakes.md](common-mistakes.md), [CLAUDE.md](../CLAUDE.md) §Dependency Resolution) |
+| U-03 | CRIT | B | XSS — inline `omega.utilities().escapeHTML(value)` at EVERY DOM sink, `sanitizeURL(url)` at executable URL sinks, zero local escape helpers ([xss-prevention.md](xss-prevention.md)) |
+| U-04 | HIGH | B | @omega.js/client owns Firebase — no direct `firebase` imports anywhere; `omega.auth()` / `.firestore()` ([common-mistakes.md](common-mistakes.md)) |
+| U-05 | HIGH | C | No @omega.js/extension transitive deps installed in the consumer `package.json` (`firebase`, `@omega.js/client`, `json5`, …) — webpack `resolve.modules` / `Manager.require()` resolve them ([common-mistakes.md](common-mistakes.md), [CLAUDE.md](../CLAUDE.md) §Dependency Resolution) |
 | U-06 | HIGH | B | Env behavior gated on the INTENTIONAL check — `isProduction()` or `isDevelopment() \|\| isTesting()`, never `!isDevelopment()`; no ad-hoc `process.env.BXM_*` reads where a helper exists ([environment-detection.md](environment-detection.md)) |
 | U-07 | HIGH | B | Config canon — `config/omega.json5` + `src/manifest.json` match the documented shapes; canonical cross-framework blocks (`brand`, flat 8-key `firebaseConfig`, …) not reinvented ([defaults.md](defaults.md), [components.md](components.md)) |
 | U-08 | CRIT | B | No private credentials committed — store-publishing credentials, `.env`, tokens, secret keys; `.gitignore` covers them ([publishing.md](publishing.md)). (The Firebase WEB `apiKey` is public by design — do NOT flag it.) |
@@ -50,14 +50,14 @@ Mirrored across all four OMEGA frameworks — same ID means the same check every
 
 ## Framework-repo checks (F-xx)
 
-Only when auditing the @omegajs/extension repo itself. Mirrored across the four frameworks.
+Only when auditing the @omega.js/extension repo itself. Mirrored across the four frameworks.
 
 | ID | Sev | Check |
 |----|-----|-------|
-| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / @omegajs/backend / EM; deviations are deliberate and documented |
-| F-02 | HIGH | Consumer-shipped defaults in sync — what `npx mgr setup` scaffolds (`src/defaults/` via `FILE_MAP`) matches current conventions and docs ([defaults.md](defaults.md)) |
+| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / @omega.js/backend / EM; deviations are deliberate and documented |
+| F-02 | HIGH | Consumer-shipped defaults in sync — what `npx omega setup` scaffolds (`src/defaults/` via `FILE_MAP`) matches current conventions and docs ([defaults.md](defaults.md)) |
 | F-03 | MED | Docs completeness — every `docs/*.md` indexed in CLAUDE.md; every subsystem has a doc; no "(planned)" links for things that have shipped |
-| F-04 | HIGH | `npx mgr test mgr:` green before treating the audit as complete |
+| F-04 | HIGH | `npx omega test mgr:` green before treating the audit as complete |
 
 ## See also
 

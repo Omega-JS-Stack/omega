@@ -1,32 +1,32 @@
 // Restart Manager protocol v1 — the shared contract SSOT.
 //
 // BOTH sides of the Restart Manager system import this file:
-//   - @omegajs/desktop's own lib (src/lib/restart-manager/index.js) — the registering side that
-//     every @omegajs/desktop app runs.
-//   - The Restart Manager app itself (an @omegajs/desktop consumer) via the sanctioned deep
-//     require: require('@omegajs/desktop/lib/restart-manager/protocol').
+//   - @omega.js/desktop's own lib (src/lib/restart-manager/index.js) — the registering side that
+//     every @omega.js/desktop app runs.
+//   - The Restart Manager app itself (an @omega.js/desktop consumer) via the sanctioned deep
+//     require: require('@omega.js/desktop/lib/restart-manager/protocol').
 //
 // NEVER copy these constants into another repo — this file is the single
 // authoritative definition of the wire protocol, the shared filesystem layout,
 // and the payload shapes. Bump PROTOCOL_VERSION on any breaking change.
 //
-// Deliberately pure Node: no electron import, no @omegajs/desktop imports, no I/O. Everything
+// Deliberately pure Node: no electron import, no @omega.js/desktop imports, no I/O. Everything
 // takes plain values so it's testable at the build layer and bundles anywhere.
 //
 // The shared root (`<appData>/restart-manager/`) is NEUTRAL ground — it is NOT
-// any app's userData dir, so @omegajs/desktop's dev/test userData suffixing never moves it:
+// any app's userData dir, so @omega.js/desktop's dev/test userData suffixing never moves it:
 //   runtime.json    — written atomically by the RM app while its HTTP server is
 //                     listening; removed on graceful quit. The pid inside is the
 //                     liveness truth check — a stale file is harmless.
-//   app/            — the installed RM app on mac/linux (owned by @omegajs/desktop's install
+//   app/            — the installed RM app on mac/linux (owned by @omega.js/desktop's install
 //                     machinery). Windows installs via silent NSIS instead, so
 //                     the exe lives in %LOCALAPPDATA%\Programs\ (see
 //                     getInstalledAppPath) — NSIS is what lets RM self-update
 //                     through electron-updater on Windows.
-//   install.lock    — advisory lock so two @omegajs/desktop apps can't run installers concurrently.
+//   install.lock    — advisory lock so two @omega.js/desktop apps can't run installers concurrently.
 //
-// Updates: RM updates ITSELF via @omegajs/desktop's standard autoUpdater (registrations are
-// storage-persisted, so they survive the update relaunch). @omegajs/desktop's lib only ever
+// Updates: RM updates ITSELF via @omega.js/desktop's standard autoUpdater (registrations are
+// storage-persisted, so they survive the update relaunch). @omega.js/desktop's lib only ever
 // installs RM when it's missing.
 //
 // Full reference: docs/restart-manager.md.

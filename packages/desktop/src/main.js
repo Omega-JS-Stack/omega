@@ -1,5 +1,5 @@
 // Main-process Manager singleton.
-// Consumer entry: `new (require('@omegajs/desktop/main'))().initialize()` — config auto-loads (config/omega.json5).
+// Consumer entry: `new (require('@omega.js/desktop/main'))().initialize()` — config auto-loads (config/omega.json5).
 // Boot sequence below — each step delegates to a `lib/*.js` module. Stubs today, real impls land in pass 2.
 
 const LoggerLite = require('./lib/logger-lite.js');
@@ -56,7 +56,7 @@ function Manager() {
   self.menu        = menu;
   self.contextMenu = ctxMenu;
   self.startup     = startup;
-  self.webManager  = wmBridge;
+  self.omega  = wmBridge;
   self.windows     = windows;
   self.context     = context;
   self.usage       = usage;
@@ -70,7 +70,7 @@ function Manager() {
 
 // Open the sign-in round trip in the user's default browser (lib/auth-flow.js).
 // Resolves once launched; completion arrives via the auth/token deep-link route →
-// webManager.handleAuthToken → the desktop:auth:sign-in-with-token broadcast.
+// omega.handleAuthToken → the desktop:auth:sign-in-with-token broadcast.
 Manager.prototype.openAuthFlow = function (options) {
   return authFlow.open(options);
 };
@@ -126,8 +126,8 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   //      authoritative in packaged apps because config/omega.json5 is inside the asar —
   //      not loadable from disk. It's the RESOLVED config (Manager.getConfig() output —
   //      shared sections + targets.desktop overlaid) snapshotted at build time.
-  //   2. <appRoot>/config/omega.json5 — resolved via @omegajs/config for dev mode where
-  //      @omegajs/desktop is loaded directly (no webpack bundling). appRoot = the consumer project dir.
+  //   2. <appRoot>/config/omega.json5 — resolved via @omega.js/config for dev mode where
+  //      @omega.js/desktop is loaded directly (no webpack bundling). appRoot = the consumer project dir.
   if (typeof consumerConfig === 'string') {
     consumerConfig = loadResolvedConfig(consumerConfig);
   } else if (!consumerConfig) {
@@ -158,7 +158,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     try { fs.writeFileSync(_logPath, ''); } catch (e) {}
   }
 
-  self.logger.log(`Initializing @omegajs/desktop (main)... pid=${process.pid} platform=${process.platform} arch=${process.arch} packaged=${require('electron').app.isPackaged} argv=${JSON.stringify(process.argv.slice(1))}`);
+  self.logger.log(`Initializing @omega.js/desktop (main)... pid=${process.pid} platform=${process.platform} arch=${process.arch} packaged=${require('electron').app.isPackaged} argv=${JSON.stringify(process.argv.slice(1))}`);
 
   try { if (require('electron').app.isPackaged) {
     const { execFile } = require('child_process');
@@ -193,14 +193,14 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   } } catch (e) { self.logger.warn(`signing: check failed (${e.message})`); }
 
   // Schema validation. Hard-fail boot if required fields are missing — same rules as
-  // gulp/audit (single source of truth in @omegajs/config: shared schema + the desktop
+  // gulp/audit (single source of truth in @omega.js/config: shared schema + the desktop
   // target refinements). We do this before any lib initializes so a misconfigured app
   // fails loud + early instead of partway through boot with a confusing stack trace.
   {
-    const { validateConfig, formatErrors } = require('@omegajs/config');
+    const { validateConfig, formatErrors } = require('@omega.js/config');
     const { errors } = validateConfig(self.config, { target: 'desktop' });
     if (errors.length > 0) {
-      throw new Error(`@omegajs/desktop: config validation failed — fix the following in config/omega.json5:\n${formatErrors(errors)}`);
+      throw new Error(`@omega.js/desktop: config validation failed — fix the following in config/omega.json5:\n${formatErrors(errors)}`);
     }
   }
 
@@ -322,10 +322,10 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     self.logger.log(`userData path: ${app.getPath('userData')} (production)`);
   }
 
-  // 1c. Set the global user agent fallback. Default template applied to every @omegajs/desktop app so
+  // 1c. Set the global user agent fallback. Default template applied to every @omega.js/desktop app so
   //     web requests (BrowserWindow loads, fetch, electron-updater downloads) carry a
   //     branded UA — Mozilla parsers see a normal Chrome UA + we tag with the app's
-  //     name/version for our own server-side telemetry. Legacy @omegajs/desktop did the
+  //     name/version for our own server-side telemetry. Legacy @omega.js/desktop did the
   //     same; merge tags now use node-powertools.template (single-curly syntax).
   {
     const { template } = require('node-powertools');
@@ -420,7 +420,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   self.startup.initialize(self);
 
   // 12. Web-manager bridge (main-side Firebase Auth source of truth, IPC handlers for renderers)
-  await self.webManager.initialize(self);
+  await self.omega.initialize(self);
 
   // 12b. Remote config — fetches `<brand.url>/data/resources/main.json` for hot
   // config flips (force-update gate, default user agents, etc.). Polls hourly.
@@ -440,7 +440,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // Registers over RM's loopback HTTP protocol (runtime.json advertises the port),
   // heartbeats every 60s, deregisters on graceful quit, and silently installs RM
   // when missing (mac zip / win silent NSIS / linux AppImage — RM then self-updates
-  // via its own @omegajs/desktop autoUpdater). Skips itself when this app IS restart-manager, in
+  // via its own @omega.js/desktop autoUpdater). Skips itself when this app IS restart-manager, in
   // dev (unless EM_RESTART_MANAGER_DEV=1), or when restartManager.enabled=false.
   // See docs/restart-manager.md.
   self.restartManager.initialize(self);
@@ -453,7 +453,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   self.windows.initialize(self);
 
   self._initialized = true;
-  self.logger.log('@omegajs/desktop (main) initialized.');
+  self.logger.log('@omega.js/desktop (main) initialized.');
 
   // Boot test harness — runs against the live manager AFTER all libs are up. Test runner
   // sets EM_TEST_BOOT=1 + EM_TEST_BOOT_HARNESS=<absolute path> + EM_TEST_BOOT_SPEC=<path>
@@ -461,7 +461,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // by runners/boot.js) then app.exit()s.
   //
   // We use a runtime env-var path (not a static `require('./test/harness/...')`) because
-  // @omegajs/desktop is webpacked into the consumer's bundle, and a static require would either get
+  // @omega.js/desktop is webpacked into the consumer's bundle, and a static require would either get
   // inlined (bundling test code into production) or dead-code-eliminated. An env-var
   // path stays external and can only resolve when the runner sets it.
   if (process.env.EM_TEST_BOOT === '1') {
@@ -469,7 +469,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     const harnessPath = process.env.EM_TEST_BOOT_HARNESS;
     if (harnessPath) {
       // Defer the harness so the consumer's `manager.initialize().then(() => { ... })`
-      // callback gets a chance to run first. @omegajs/desktop doesn't auto-create any windows; the
+      // callback gets a chance to run first. @omega.js/desktop doesn't auto-create any windows; the
       // consumer's main.js does it inside .then(). If we ran the harness synchronously
       // here, that callback wouldn't have fired yet and `manager.windows.get('main')`
       // would be null. setImmediate flushes the microtask queue (where promise callbacks
@@ -500,10 +500,10 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
 };
 
 function loadResolvedConfig(projectDir) {
-  // @omegajs/config is vendored into dist (and bundled by webpack from there) — it
+  // @omega.js/config is vendored into dist (and bundled by webpack from there) — it
   // finds config/omega.json5 under the project dir and resolves the desktop target
   // (shared sections + targets.desktop overlaid, brand-monorepo walk-up included).
-  const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+  const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
   if (!hasOmegaConfig(projectDir)) {
     return {};
@@ -517,9 +517,9 @@ function loadResolvedConfig(projectDir) {
 // src/build.js. All four Manager constructors mix them in via their respective
 // `attachTo(Manager)` calls — see the bottom of this file.
 
-// Require — lets consumer main-process code load @omegajs/desktop's bundled dependencies at runtime
-// (e.g. `manager.require('fs-jetpack')`). Resolves from @omegajs/desktop's module context, not the
-// consumer's. Mirrors @omegajs/backend's Manager.require(). For build-time (webpack) resolution,
+// Require — lets consumer main-process code load @omega.js/desktop's bundled dependencies at runtime
+// (e.g. `manager.require('fs-jetpack')`). Resolves from @omega.js/desktop's module context, not the
+// consumer's. Mirrors @omega.js/backend's Manager.require(). For build-time (webpack) resolution,
 // the webpack config's resolve.modules handles this automatically.
 Manager.prototype.require = function (name) {
   return require(name);

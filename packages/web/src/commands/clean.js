@@ -2,7 +2,7 @@
  * `omega clean` — remove build output and machinery (dist/, .omega/).
  */
 const jetpack = require('fs-jetpack');
-const Logger = require('@omegajs/devkit/logger');
+const Logger = require('@omega.js/devkit/logger');
 const { consumerPaths } = require('../consumer.js');
 
 const logger = new Logger('omega:clean');

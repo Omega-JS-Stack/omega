@@ -1,6 +1,6 @@
 // Purchase analytics tracking for confirmation page
 // All three platforms tracked together, no conditional checks
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Build common item array for tracking
 function buildItems(state) {
@@ -50,7 +50,7 @@ function trackPurchase(state) {
 
 // Track purchase only if the track=true URL param is present
 // Removes the param after tracking to prevent duplicates on refresh
-// Also stores orderId in webManager storage as a backup guard
+// Also stores orderId in omega storage as a backup guard
 export function trackPurchaseIfNeeded(state) {
   const urlParams = new URLSearchParams(window.location.search);
   const shouldTrack = urlParams.get('track') === 'true';
@@ -70,7 +70,7 @@ export function trackPurchaseIfNeeded(state) {
   window.history.replaceState({}, document.title, newUrl);
 
   // Backup: store orderId in storage
-  const trackedOrders = webManager.storage().get('trackedPurchases', []);
+  const trackedOrders = omega.storage().get('trackedPurchases', []);
   if (!trackedOrders.includes(state.orderId)) {
     trackedOrders.push(state.orderId);
 
@@ -79,6 +79,6 @@ export function trackPurchaseIfNeeded(state) {
       trackedOrders.shift();
     }
 
-    webManager.storage().set('trackedPurchases', trackedOrders);
+    omega.storage().set('trackedPurchases', trackedOrders);
   }
 }

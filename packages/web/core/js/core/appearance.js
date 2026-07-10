@@ -2,7 +2,7 @@
  * Appearance Module
  * Handles theme appearance switching (dark, light, system)
  */
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Constants
 const STORAGE_KEY = 'appearance.preference';
@@ -20,7 +20,7 @@ export default () => {
      * Get the current saved preference
      * @returns {string|null} 'dark', 'light', 'system', or null if not set
      */
-    get: () => webManager.storage().get(STORAGE_KEY) || null,
+    get: () => omega.storage().get(STORAGE_KEY) || null,
 
     /**
      * Get the resolved (actual) theme being displayed
@@ -40,7 +40,7 @@ export default () => {
       }
 
       // Save preference
-      webManager.storage().set(STORAGE_KEY, value);
+      omega.storage().set(STORAGE_KEY, value);
 
       // Apply theme
       applyTheme(value);
@@ -76,14 +76,14 @@ export default () => {
      * Clear saved preference (revert to site default)
      */
     clear: () => {
-      webManager.storage().remove(STORAGE_KEY);
+      omega.storage().remove(STORAGE_KEY);
       updateUI(null);
       setupSystemListener(false);
     }
   };
 
   // Register on UJ library
-  webManager._ujLibrary.appearance = appearanceAPI;
+  omega._ujLibrary.appearance = appearanceAPI;
 
   // Initialize UI event listeners
   initializeUI();
@@ -159,7 +159,7 @@ const initializeUI = () => {
     event.preventDefault();
 
     const value = $target.getAttribute('data-appearance-set');
-    webManager.uj().appearance.set(value);
+    omega.uj().appearance.set(value);
   });
 };
 

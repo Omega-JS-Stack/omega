@@ -11,8 +11,8 @@
  * processor stays unconfigured and its operations print their dim note.
  */
 const chalk = require('chalk').default;
-const { input, select, isInteractive } = require('@omegajs/devkit/prompt');
-const { openBrowser } = require('@omegajs/devkit/flows');
+const { input, select, isInteractive } = require('@omega.js/devkit/prompt');
+const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { setAtPath } = require('../../../lib/config-flow.js');
 const { writeEnvValue } = require('../../../lib/env-secret.js');

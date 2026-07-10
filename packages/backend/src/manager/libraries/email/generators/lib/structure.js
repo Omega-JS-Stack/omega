@@ -129,9 +129,9 @@ function defaultBuildPrompt({ brand, newsletterConfig, sources }) {
  * @param {object} args
  * @param {Array<object>} args.sources - Newsletter source records (id, subject, ai: { headline, summary, takeaways })
  * @param {object} args.brand - { name, url, id, description? }
- * @param {object} args.newsletterConfig - marketing.newsletter.content from @omegajs/backend config
+ * @param {object} args.newsletterConfig - marketing.newsletter.content from @omega.js/backend config
  * @param {object} args.ai - AI instance from Manager.AI(assistant)
- * @param {object} args.assistant - @omegajs/backend assistant
+ * @param {object} args.assistant - @omega.js/backend assistant
  * @returns {Promise<object>} Structured newsletter object
  */
 async function generateStructure({ sources, brand, newsletterConfig, ai, assistant }) {

@@ -1,6 +1,6 @@
 # Config schema
 
-@omegajs/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omegajs/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omegajs/desktop/config')`). The shared schema covers the cross-framework sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
+@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
 
 Validation runs in two places:
 
@@ -22,7 +22,7 @@ Validation runs in two places:
 
 ## The `required` flag
 
-@omegajs/desktop keeps validation simple: **`required` is either `true`, `false`, or a function**.
+@omega.js/desktop keeps validation simple: **`required` is either `true`, `false`, or a function**.
 
 ```js
 required: true                    // hard-fail if missing
@@ -46,7 +46,7 @@ This is identical strictness in dev and production. There's no separate `'publis
 
 They **only run when the value is present**. A missing field with `required: false` is silent. A missing field with `required: true` fires the "missing" error and nothing else — so consumers don't see a confusing flood of "missing AND wrong type AND doesn't match" for the same field.
 
-## Presence-driven feature flags (@omegajs/backend convention)
+## Presence-driven feature flags (@omega.js/backend convention)
 
 A non-empty credential value enables a feature — there is no separate `enabled: true/false` flag for credential-gated features:
 
@@ -60,9 +60,9 @@ A non-empty credential value enables a feature — there is no separate `enabled
 
 ## Adding a new field
 
-When you add a new config knob anywhere in @omegajs/desktop:
+When you add a new config knob anywhere in @omega.js/desktop:
 
-1. Add an entry to `TARGET_SCHEMAS.desktop` in `@omegajs/config` (`packages/config/src/schema.js` in the Omega monorepo) — or to `SHARED_SCHEMA` if the field is genuinely cross-framework.
+1. Add an entry to `TARGET_SCHEMAS.desktop` in `@omega.js/config` (`packages/config/src/schema.js` in the Omega monorepo) — or to `SHARED_SCHEMA` if the field is genuinely cross-framework.
 2. If it has a default, set it in [`src/defaults/config/omega.json5`](../src/defaults/config/omega.json5) (under `targets.desktop` for desktop-scoped fields).
 3. That's it. No separate validation logic to add elsewhere — the schema entry is the validation.
 
@@ -81,7 +81,7 @@ These are kept in `audit.js` so the schema stays a pure description of the confi
 Required field missing:
 
 ```
-@omegajs/desktop: config validation failed — fix the following in config/omega.json5:
+@omega.js/desktop: config validation failed — fix the following in config/omega.json5:
   1. config.brand.id is required — URL-scheme-safe slug. Used as deep-link scheme + default appId. Must be lowercase, start with a letter, alnum/+/-/.
 ```
 
@@ -94,9 +94,9 @@ Field present but invalid:
 
 Errors are numbered so you can fix everything in one pass instead of fix-rebuild-fix-rebuild.
 
-## Adding payment fields (@omegajs/backend-shaped)
+## Adding payment fields (@omega.js/backend-shaped)
 
-@omegajs/desktop's schema mirrors [@omegajs/backend's `manager-config.example.json`](https://github.com/itw-creative-works/backend-manager) shape for payment so the same product catalog reads identically on backend, web, and desktop:
+@omega.js/desktop's schema mirrors [@omega.js/backend's `manager-config.example.json`](https://github.com/itw-creative-works/backend-manager) shape for payment so the same product catalog reads identically on backend, web, and desktop:
 
 ```js
 {
@@ -112,9 +112,9 @@ Errors are numbered so you can fix everything in one pass instead of fix-rebuild
 }
 ```
 
-The schema only enforces shape for the few well-defined publishable keys — the product catalog itself is freeform so @omegajs/backend can extend it without @omegajs/desktop caring.
+The schema only enforces shape for the few well-defined publishable keys — the product catalog itself is freeform so @omega.js/backend can extend it without @omega.js/desktop caring.
 
 ## Source
 
-- Schema definitions + validator engine: `@omegajs/config` (`packages/config/src/{schema,validate}.js` in the Omega monorepo; vendored copy at `dist/vendor/config/`)
-- @omegajs/desktop integration tests: [`src/test/suites/build/validate-config.test.js`](../src/test/suites/build/validate-config.test.js)
+- Schema definitions + validator engine: `@omega.js/config` (`packages/config/src/{schema,validate}.js` in the Omega monorepo; vendored copy at `dist/vendor/config/`)
+- @omega.js/desktop integration tests: [`src/test/suites/build/validate-config.test.js`](../src/test/suites/build/validate-config.test.js)

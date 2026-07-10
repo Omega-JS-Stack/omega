@@ -1,11 +1,11 @@
 // Authorized Fetch - Wrapper for wonderful-fetch with Firebase Authentication
 import fetch from 'wonderful-fetch';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 /**
  * Makes an authorized API request with Firebase token.
  * Automatically extracts usage data from bm-properties response header
- * and updates webManager bindings so data-wm-bind elements stay in sync.
+ * and updates omega bindings so data-wm-bind elements stay in sync.
  *
  * @param {string} url - The API endpoint URL
  * @param {Object} options - Request options for wonderful-fetch
@@ -51,7 +51,7 @@ export async function authorizedFetch(url, options = {}) {
 
 /**
  * Sync usage data from bm-properties response header into the top-level
- * `usage` bindings key (same key @omegajs/client seeds on auth settle).
+ * `usage` bindings key (same key @omega.js/client seeds on auth settle).
  *
  * Merges fresh usage counters + limits so the structure becomes:
  *   { credits: { monthly: 5, daily: 2, limit: 100 } }
@@ -68,7 +68,7 @@ function _syncUsageFromHeaders(headers) {
   }
 
   // Get existing usage context and merge fresh data
-  const existing = webManager.bindings().getContext().usage || {};
+  const existing = omega.bindings().getContext().usage || {};
   const usage = { ...existing };
 
   for (const key of Object.keys(current)) {
@@ -79,7 +79,7 @@ function _syncUsageFromHeaders(headers) {
     };
   }
 
-  webManager.bindings().update({ usage });
+  omega.bindings().update({ usage });
 }
 
 // Export default

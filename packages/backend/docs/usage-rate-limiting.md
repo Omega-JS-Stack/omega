@@ -10,7 +10,7 @@ Usage is tracked per-metric (e.g., `requests`, `sponsorships`) with four fields:
 
 ## Core API
 
-Routes receive `usage` in their context object, already initialized for the authenticated user. **Always use these methods** — never manually read/write `usage` fields on Firestore docs; the field path is always `{doc}.usage.{metric}`, and @omegajs/backend creates the structure on first write (do NOT pre-initialize usage fields on document creation).
+Routes receive `usage` in their context object, already initialized for the authenticated user. **Always use these methods** — never manually read/write `usage` fields on Firestore docs; the field path is always `{doc}.usage.{metric}`, and @omega.js/backend creates the structure on first write (do NOT pre-initialize usage fields on document creation).
 
 | Method | Sync? | What it does |
 |--------|-------|--------------|

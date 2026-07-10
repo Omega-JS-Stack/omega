@@ -1,9 +1,9 @@
 // Restart Manager install machinery — feed discovery, artifact download, and
-// silent per-platform install. Install ONLY — RM updates ITSELF via @omegajs/desktop's
+// silent per-platform install. Install ONLY — RM updates ITSELF via @omega.js/desktop's
 // standard autoUpdater once it's running (that's also why Windows uses NSIS:
 // electron-updater can only self-update NSIS installs).
 //
-// The RM app publishes releases through @omegajs/desktop's standard pipeline: versioned
+// The RM app publishes releases through @omega.js/desktop's standard pipeline: versioned
 // artifacts + electron-updater feed files (latest-mac.yml / latest.yml /
 // latest-linux.yml) on `github.com/<owner>/<repo>/releases`. We fetch the feed
 // from the stable `releases/latest/download/<feed>` URL, pick the artifact,
@@ -15,7 +15,7 @@
 //   linux  — copy + chmod 755 → app/Restart-Manager.AppImage (no root, no .deb)
 //
 // mac/linux extract into `app.tmp/` first, then swap into `app/` — a torn
-// install is never observable. The advisory install.lock keeps two @omegajs/desktop apps on
+// install is never observable. The advisory install.lock keeps two @omega.js/desktop apps on
 // the same machine from running installers concurrently; RM itself ignores it.
 //
 // Pure helpers (parseFeed, pickArtifact, URL builders) are exported individually
@@ -35,7 +35,7 @@ const logger = new LoggerLite('restart-manager');
 
 const WIN_INSTALLER_TIMEOUT_MS = 2 * 60 * 1000;   // NSIS /S should finish well inside this
 
-// electron-updater feed file per platform (produced by @omegajs/desktop's release pipeline).
+// electron-updater feed file per platform (produced by @omega.js/desktop's release pipeline).
 const FEED_FILES = Object.freeze({
   darwin: 'latest-mac.yml',
   win32:  'latest.yml',
@@ -65,7 +65,7 @@ function buildFeedUrl(feedCfg, platform) {
  * Build the artifact download URL next to the feed.
  * Artifact names are URL-encoded — GitHub renames uploaded assets containing
  * spaces (space → dot) while the feed keeps the original name, so encoding is
- * belt-and-suspenders on top of @omegajs/desktop's already-sanitized artifact names.
+ * belt-and-suspenders on top of @omega.js/desktop's already-sanitized artifact names.
  *
  * @param {{ owner?: string, repo?: string, url?: string }} feedCfg
  * @param {string} artifactName - files[].url entry from the parsed feed.

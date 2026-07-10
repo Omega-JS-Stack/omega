@@ -3,7 +3,7 @@ const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const chalk = require('chalk').default;
 const helpers = require('./helpers');
-const { hasOmegaConfig, loadConfig } = require('@omegajs/config');
+const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
 /**
  * Ensures projectId is consistent across all configuration files:

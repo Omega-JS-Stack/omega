@@ -16,7 +16,7 @@ Controls how the app launches: full normal launch vs completely hidden backgroun
 
 `mode` is what happens when **the user launches the app directly** (clicks the dock icon / Start menu / etc.).
 
-`openAtLogin.mode` is what happens when **the OS auto-launches the app at login**. It applies *only* when the launch is detected as a login-launch (macOS: `wasOpenedAtLogin` flag; Windows/Linux: presence of the `--em-launched-at-login` arg @omegajs/desktop passes when registering the login item).
+`openAtLogin.mode` is what happens when **the OS auto-launches the app at login**. It applies *only* when the launch is detected as a login-launch (macOS: `wasOpenedAtLogin` flag; Windows/Linux: presence of the `--em-launched-at-login` arg @omega.js/desktop passes when registering the login item).
 
 The default behavior — `mode: 'normal'` + `openAtLogin: { enabled: true, mode: 'hidden' }` — means: the app auto-starts at login but stays out of the way until the user opens it themselves. User-direct launches show the main window like any normal app.
 
@@ -30,7 +30,7 @@ Standard app behavior. Your `main.js` calls `windows.create('main', { show: !sta
 
 App launches **completely invisible**: no dock icon, no Cmd+Tab presence, no taskbar entry. Tray + notifications + networking + IPC + auto-update all still work — only the visible UI is suppressed. Production builds inject `LSUIElement: true` into `Info.plist` (via `gulp/build-config`) so macOS treats the process as a background agent from launch — **zero dock bounce**.
 
-The `main` window is still created (just with `show: false`) so it sits in @omegajs/desktop's window registry. When the user double-clicks the running app's icon, @omegajs/desktop's `app.on('activate')` (macOS) / `app.on('second-instance')` (win/linux) handler finds `main` in the registry and calls `windows.show('main')` — which auto-runs `app.dock.show()` so the dock icon appears alongside the window. Same thing happens when the consumer manually surfaces UI from a tray click / deep-link / IPC event via `windows.show('main')`. The reverse is automatic too: hiding the last visible window (including the hide-on-close X) re-runs `app.dock.hide()`, so a hidden-mode app never strands a dock icon after its UI is dismissed.
+The `main` window is still created (just with `show: false`) so it sits in @omega.js/desktop's window registry. When the user double-clicks the running app's icon, @omega.js/desktop's `app.on('activate')` (macOS) / `app.on('second-instance')` (win/linux) handler finds `main` in the registry and calls `windows.show('main')` — which auto-runs `app.dock.show()` so the dock icon appears alongside the window. Same thing happens when the consumer manually surfaces UI from a tray click / deep-link / IPC event via `windows.show('main')`. The reverse is automatic too: hiding the last visible window (including the hide-on-close X) re-runs `app.dock.hide()`, so a hidden-mode app never strands a dock icon after its UI is dismissed.
 
 Use this for: menubar apps, agent apps (clipboard managers, time trackers, system monitors), apps that should be invisible at boot but available on demand.
 
@@ -59,7 +59,7 @@ manager.startup.isOpenAtLogin()            // read live OS state
 manager.initialize().then(() => {
   // Always create the main window. In hidden launches, `show: false` keeps it
   // invisible until something explicitly calls windows.show('main') — but it's
-  // in the registry, so @omegajs/desktop's activate/second-instance handlers can find and
+  // in the registry, so @omega.js/desktop's activate/second-instance handlers can find and
   // surface it when the user double-clicks the running app.
   manager.windows.create('main', {
     show: !manager.startup.isLaunchHidden(),
@@ -73,26 +73,26 @@ Don't conditionally skip `create()` for hidden launches — without `main` in th
 
 `startup.applyEarly()` is the **first** call in `Manager.initialize()` — before `whenReady`, before any other lib. The goal: spend as little time as possible in the dock-bounce window.
 
-Sequence: applyEarly → before-quit hook → ipc → storage → sentry → protocol → deep-link → app-state → whenReady → updater → tray/menu/contextMenu → startup.initialize → @omegajs/client → windows.initialize. **@omegajs/desktop no longer auto-creates the main window** — your `main.js` does that inside the `.then()` callback after `initialize()` resolves.
+Sequence: applyEarly → before-quit hook → ipc → storage → sentry → protocol → deep-link → app-state → whenReady → updater → tray/menu/contextMenu → startup.initialize → @omega.js/client → windows.initialize. **@omega.js/desktop no longer auto-creates the main window** — your `main.js` does that inside the `.then()` callback after `initialize()` resolves.
 
 ## How zero-bounce works on macOS
 
 `LSUIElement` is an `Info.plist` key that tells macOS *before launch* "this app is a background agent — don't put it in the dock or app switcher." Setting it at runtime (`app.dock.hide()`) is too late — by the time JS runs, the dock-bounce animation has already started.
 
-@omegajs/desktop handles this at build time:
+@omega.js/desktop handles this at build time:
 1. `gulp/build-config` reads `config/omega.json5`.
 2. If `startup.mode === 'hidden'` **or** `startup.openAtLogin.mode === 'hidden'`, it injects `mac.extendInfo.LSUIElement: true` into the materialized `dist/electron-builder.yml`. (The openAtLogin case matters for `mode: 'normal'` apps that launch hidden at login — without the plist key, the login launch flashes the dock before `applyEarly()`'s `dock.hide()` can run.)
 3. `electron-builder` packages the app with that key in the final `Info.plist`.
 
 With the key baked, a MANUAL launch also starts dockless — the dock icon appears the moment the main window surfaces (every surface path runs `_ensureDockVisible()` → `app.dock.show()`), so the visible difference is only that the bounce animation is replaced by the icon appearing when the window is ready.
 
-At runtime, when the consumer first calls `manager.windows.show()` (or the `windows.create()` call resolves with `show: true`), @omegajs/desktop calls `app.dock.show()` so the dock icon appears alongside the window. Reverses cleanly via `app.dock.hide()` if you want to go back to invisible.
+At runtime, when the consumer first calls `manager.windows.show()` (or the `windows.create()` call resolves with `show: true`), @omega.js/desktop calls `app.dock.show()` so the dock icon appears alongside the window. Reverses cleanly via `app.dock.hide()` if you want to go back to invisible.
 
 The injection is YAML-text-level (preserves comments, idempotent, merges with existing `extendInfo`). See `src/gulp/tasks/build-config.js`.
 
 ## Re-surfacing on user re-launch
 
-When the user double-clicks a running hidden-mode app (or clicks its dock icon on macOS), @omegajs/desktop transparently surfaces the main window — no consumer wiring needed. Mechanisms:
+When the user double-clicks a running hidden-mode app (or clicks its dock icon on macOS), @omega.js/desktop transparently surfaces the main window — no consumer wiring needed. Mechanisms:
 
 - **macOS**: `window-manager.initialize()` registers `app.on('activate')` which calls `windows.show('main')` if `main` is in the registry.
 - **Windows / Linux**: `deep-link.initialize()` registers `app.on('second-instance')` which does the same. (The OS spawns a duplicate process, the single-instance lock kills it, and forwards its argv to the original instance.)
@@ -101,16 +101,16 @@ Both handlers are no-ops if `main` isn't in the registry, so consumers who genui
 
 ## Testing the login-launch path locally
 
-Pass `--em-launched-at-login` as a command-line arg when launching the .app; @omegajs/desktop treats it identically to a real OS-driven login launch (`startup.wasLaunchedAtLogin()` returns `true`, with `via:argv-flag` in the boot summary log). Useful for testing hidden-mode behavior without configuring login items + rebooting.
+Pass `--em-launched-at-login` as a command-line arg when launching the .app; @omega.js/desktop treats it identically to a real OS-driven login launch (`startup.wasLaunchedAtLogin()` returns `true`, with `via:argv-flag` in the boot summary log). Useful for testing hidden-mode behavior without configuring login items + rebooting.
 
 The easiest way is `mgr launch`, which auto-strips `ELECTRON_RUN_AS_NODE` and uses `open -n` under the hood:
 
 ```bash
 # Auto-discover the most recent `mgr package:quick` build:
-npx mgr launch --args="--em-launched-at-login"
+npx omega launch --args="--em-launched-at-login"
 
 # Or pass an explicit path:
-npx mgr launch /Applications/MyApp.app --args="--em-launched-at-login"
+npx omega launch /Applications/MyApp.app --args="--em-launched-at-login"
 ```
 
 If you'd rather call `open` directly, remember to strip `ELECTRON_RUN_AS_NODE` first (the variable leaks into shells from common host processes like VS Code's Claude Code extension and silently breaks Electron):
@@ -139,4 +139,4 @@ And in `src/integrations/tray/index.js`:
 tray.update('open', { click: () => manager.windows.show('main') });
 ```
 
-The window is created at boot but invisible. When the user clicks the tray's "Open" item (or double-clicks the app icon), `windows.show('main')` runs, @omegajs/desktop calls `app.dock.show()`, and the user sees both the dock icon and the window appear together.
+The window is created at boot but invisible. When the user clicks the tray's "Open" item (or double-clicks the app icon), `windows.show('main')` runs, @omega.js/desktop calls `app.dock.show()`, and the user sees both the dock icon and the window appear together.

@@ -179,7 +179,7 @@ function resolveStripeProductId(productId, config) {
   }
 
   // Real Stripe product ID if configured, otherwise the "_test_<id>" sentinel that the
-  // Stripe resolver recognizes and maps back to the @omegajs/backend product. Lets reconstruction
+  // Stripe resolver recognizes and maps back to the @omega.js/backend product. Lets reconstruction
   // work in brands without real Stripe (Somiibo uses PayPal, Chargebee, etc.).
   return product.stripe?.productId || `_test_${product.id}`;
 }

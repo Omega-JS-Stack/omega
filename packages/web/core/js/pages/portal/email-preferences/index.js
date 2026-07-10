@@ -6,13 +6,13 @@
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import fetch from 'wonderful-fetch';
-import webManager from '@omegajs/client';
+import omega from '@omega.js/client';
 
 // Module
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
-    await webManager.dom().ready();
+    await omega.dom().ready();
 
     setupForm();
 
@@ -139,7 +139,7 @@ function setupForm() {
     trackEmailPreference(action);
 
     try {
-      await fetch(`${webManager.getApiUrl()}/backend-manager/marketing/email-preferences`, {
+      await fetch(`${omega.getApiUrl()}/backend-manager/marketing/email-preferences`, {
         method: 'POST',
         response: 'json',
         body: {
@@ -157,7 +157,7 @@ function setupForm() {
         formManager.showSuccess('You have been successfully resubscribed. You will start receiving these emails again.');
       }
     } catch (error) {
-      webManager.sentry().captureException(new Error('Email preferences error', { cause: error }));
+      omega.sentry().captureException(new Error('Email preferences error', { cause: error }));
       throw new Error('An error occurred while processing your request. Please try again.');
     }
   });

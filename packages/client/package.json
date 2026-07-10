@@ -1,5 +1,5 @@
 {
-  "name": "@omegajs/client",
+  "name": "@omega.js/client",
   "version": "5.0.0",
   "description": "OMEGA client runtime — the shared frontend singleton (Firebase auth, account, analytics, notifications, bindings) embedded by the OMEGA web, desktop, and extension frameworks",
   "main": "dist/index.js",
@@ -36,11 +36,11 @@
     "replace": {},
     "type": "copy",
     "hooks": {
-      "after": "node -e \"require('@omegajs/devkit/vendor')()\""
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
     }
   },
   "notes": {
-    "@sentry/browser": "Resolved by using OVERRIDES in @omegajs/client (lighthouse is the issue"
+    "@sentry/browser": "Resolved by using OVERRIDES in @omega.js/client (lighthouse is the issue"
   },
   "dependencies": {
     "@sentry/browser": "^10.57.0",
@@ -50,8 +50,8 @@
     "lodash": "^4.18.1"
   },
   "devDependencies": {
-    "@omegajs/account": "*",
-    "@omegajs/devkit": "*",
+    "@omega.js/account": "*",
+    "@omega.js/devkit": "*",
     "mocha": "^11.7.6",
     "prepare-package": "^2.1.0"
   }

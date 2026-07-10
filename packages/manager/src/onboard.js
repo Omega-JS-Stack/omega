@@ -23,8 +23,8 @@ const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
-const { input, select, checkbox, confirm, isInteractive } = require('@omegajs/devkit/prompt');
-const { TARGETS, hasOmegaConfig } = require('@omegajs/config');
+const { input, select, checkbox, confirm, isInteractive } = require('@omega.js/devkit/prompt');
+const { TARGETS, hasOmegaConfig } = require('@omega.js/config');
 
 const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('./config.js');
 const { DEFAULT_BRAND_ROOTS, resolveManageRoot, readRawConfig, stampCompanyMarker } = require('./lib/company.js');

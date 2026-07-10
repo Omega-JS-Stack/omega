@@ -1,13 +1,13 @@
 # Bootstrap JS & Tooltips
 
-@omegajs/desktop ships **Bootstrap's JavaScript** (v5.3, Popper inlined) as a prebuilt bundle
+@omega.js/desktop ships **Bootstrap's JavaScript** (v5.3, Popper inlined) as a prebuilt bundle
 — `assets/themes/bootstrap/js/bootstrap.bundle.js` — loaded by the renderer
 bootstrap. Consumers add **zero setup** and never vendor Bootstrap JS
 themselves.
 
 ## Tooltips (auto-initialized)
 
-Bootstrap makes tooltips opt-in (they need a JS instance per element); @omegajs/desktop does
+Bootstrap makes tooltips opt-in (they need a JS instance per element); @omega.js/desktop does
 the opt-in for you. Any element carrying the standard Bootstrap markup gets a
 live tooltip:
 
@@ -65,8 +65,8 @@ collapse.show();
 
 ## Rebuilding the bundle
 
-The bundle is built from @omegajs/desktop's vendored Bootstrap source
-(`src/assets/themes/bootstrap/js/src/`, v5.3.x) plus `@popperjs/core` (an @omegajs/desktop
+The bundle is built from @omega.js/desktop's vendored Bootstrap source
+(`src/assets/themes/bootstrap/js/src/`, v5.3.x) plus `@popperjs/core` (an @omega.js/desktop
 dependency), webpack production mode, UMD output
 (`library: { name: 'bootstrap', export: 'default' }`). Rebuild only when the
 vendored Bootstrap source is upgraded.

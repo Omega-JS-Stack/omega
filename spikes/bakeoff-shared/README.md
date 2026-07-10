@@ -1,4 +1,4 @@
-# @omegajs/bakeoff-shared
+# @omega.js/bakeoff-shared
 
 Shared infrastructure for the Eleventy vs Astro bake-off (master plan Phase 2,
 A0–A2). Private workspace package — never published.

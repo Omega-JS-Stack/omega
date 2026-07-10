@@ -1,7 +1,7 @@
 const assert = require('assert');
 
 /**
- * Custom assertion helpers for @omegajs/backend tests
+ * Custom assertion helpers for @omega.js/backend tests
  */
 const assertions = {
   /**

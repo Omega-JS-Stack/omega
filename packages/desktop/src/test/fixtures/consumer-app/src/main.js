@@ -1,7 +1,7 @@
-// Minimal main entry for @omegajs/desktop's boot-layer self-test fixture. Mirrors a real consumer:
+// Minimal main entry for @omega.js/desktop's boot-layer self-test fixture. Mirrors a real consumer:
 // one-line bootstrap, then create the main window once initialize() resolves. The boot
 // harness (src/test/harness/boot-entry.js) inspects the live manager after this runs.
-const Manager = require('@omegajs/desktop/main');
+const Manager = require('@omega.js/desktop/main');
 
 const manager = new Manager();
 
@@ -13,5 +13,5 @@ manager.initialize()
     // EXISTS + loaded the built view, never that it's visible on screen.
     windows.create('main', { show: false });
 
-    logger.log('@omegajs/desktop fixture consumer main initialized!');
+    logger.log('@omega.js/desktop fixture consumer main initialized!');
   });
