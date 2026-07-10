@@ -63,8 +63,8 @@ try {
   // The renderer test harness loads the renderer Manager by absolute dist path
   // injected by the boot harness. In its absence, fall back to require-by-name
   // (works when the harness is run from a consumer with @omega.js/desktop in node_modules).
-  const RendererManager = process.env.EM_TEST_RENDERER_MANAGER_PATH
-    ? require(process.env.EM_TEST_RENDERER_MANAGER_PATH)
+  const RendererManager = process.env.OMEGA_TEST_RENDERER_MANAGER_PATH
+    ? require(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH)
     : require('@omega.js/desktop/renderer');
   testManager = new RendererManager();
   // Seed config so getApiUrl / getFunctionsUrl / getWebsiteUrl have something to
@@ -107,9 +107,9 @@ contextBridge.exposeInMainWorld('__emTestTooltip', {
   // reason the bundle can't load (not just "no documentElement yet").
   error: () => {
     try {
-      if (process.env.EM_TEST_RENDERER_MANAGER_PATH) {
+      if (process.env.OMEGA_TEST_RENDERER_MANAGER_PATH) {
         const path = require('path');
-        require(path.join(path.dirname(process.env.EM_TEST_RENDERER_MANAGER_PATH), 'assets', 'themes', 'bootstrap', 'js', 'bootstrap.bundle.js'));
+        require(path.join(path.dirname(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH), 'assets', 'themes', 'bootstrap', 'js', 'bootstrap.bundle.js'));
       }
       return null;
     } catch (e) {

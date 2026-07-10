@@ -1,6 +1,6 @@
 # Publishing
 
-`BXM_IS_PUBLISH=true npm run build` packages AND uploads to extension stores in one step.
+`OMEGA_IS_PUBLISH=true npm run build` packages AND uploads to extension stores in one step.
 
 ## Supported stores
 
@@ -56,20 +56,20 @@ EDGE_API_KEY="..."
 ## Publish flow
 
 ```bash
-BXM_IS_PUBLISH=true npm run build
+OMEGA_IS_PUBLISH=true npm run build
 ```
 
 What happens:
 
 1. `npm run build` runs the full gulp pipeline (build → package → packaged/<browser>/raw + zip)
-2. `gulp/tasks/package.js` detects `BXM_IS_PUBLISH=true`
+2. `gulp/tasks/package.js` detects `OMEGA_IS_PUBLISH=true`
 3. For each browser, reads the store credentials from `.env`
 4. If credentials are present, uploads the `.zip` via the store's API
 5. Logs success / failure per store; exits non-zero if any upload fails
 
 ## Manual upload
 
-Run `npm run build` without `BXM_IS_PUBLISH=true` — you get unsigned `.zip` files per browser under `packaged/`:
+Run `npm run build` without `OMEGA_IS_PUBLISH=true` — you get unsigned `.zip` files per browser under `packaged/`:
 
 ```
 packaged/
@@ -87,7 +87,7 @@ For automated releases, store credentials as encrypted GitHub Actions secrets. A
 ```yaml
 - name: Build + publish
   env:
-    BXM_IS_PUBLISH:        true
+    OMEGA_IS_PUBLISH:        true
     CHROME_EXTENSION_ID:   ${{ secrets.CHROME_EXTENSION_ID }}
     CHROME_CLIENT_ID:      ${{ secrets.CHROME_CLIENT_ID }}
     CHROME_CLIENT_SECRET:  ${{ secrets.CHROME_CLIENT_SECRET }}

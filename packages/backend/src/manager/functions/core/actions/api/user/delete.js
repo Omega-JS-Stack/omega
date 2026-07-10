@@ -29,14 +29,14 @@ Module.prototype.main = function () {
 
       // Signout of all sessions
       assistant.log(`Signout of all sessions...`);
-      await fetch(`${self.Manager.getApiUrl()}/backend-manager`, {
+      await fetch(`${self.Manager.getApiUrl()}/omega`, {
         method: 'post',
         timeout: 60000,
         response: 'json',
         tries: 2,
         log: true,
         body: {
-          backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+          backendManagerKey: process.env.OMEGA_ADMIN_KEY,
           command: 'user:sign-out-all-sessions',
           payload: {
             uid: uid,

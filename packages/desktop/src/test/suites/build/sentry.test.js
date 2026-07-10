@@ -37,19 +37,19 @@ module.exports = {
       },
     },
     {
-      name: 'resolveConfig: disabled in dev mode unless EM_SENTRY_FORCE',
+      name: 'resolveConfig: disabled in dev mode unless OMEGA_SENTRY_FORCE',
       run: (ctx) => {
         const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const orig = { mode: process.env.EM_BUILD_MODE, force: process.env.EM_SENTRY_FORCE };
-        delete process.env.EM_BUILD_MODE;
-        delete process.env.EM_SENTRY_FORCE;
+        const orig = { mode: process.env.OMEGA_BUILD_MODE, force: process.env.OMEGA_SENTRY_FORCE };
+        delete process.env.OMEGA_BUILD_MODE;
+        delete process.env.OMEGA_SENTRY_FORCE;
         try {
           const result = resolveConfig({ config: { sentry: { dsn: 'https://x@y.io/1' } } });
           ctx.expect(result.shouldEnable).toBe(false);
           ctx.expect(result.reason).toMatch(/dev mode/);
         } finally {
-          if (orig.mode !== undefined) process.env.EM_BUILD_MODE = orig.mode;
-          if (orig.force !== undefined) process.env.EM_SENTRY_FORCE = orig.force;
+          if (orig.mode !== undefined) process.env.OMEGA_BUILD_MODE = orig.mode;
+          if (orig.force !== undefined) process.env.OMEGA_SENTRY_FORCE = orig.force;
         }
       },
     },
@@ -57,33 +57,33 @@ module.exports = {
       name: 'resolveConfig: enabled in production with DSN',
       run: (ctx) => {
         const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const orig = process.env.EM_BUILD_MODE;
-        process.env.EM_BUILD_MODE = 'true';
+        const orig = process.env.OMEGA_BUILD_MODE;
+        process.env.OMEGA_BUILD_MODE = 'true';
         try {
           const result = resolveConfig({ config: { sentry: { dsn: 'https://x@y.io/1' } } });
           ctx.expect(result.shouldEnable).toBe(true);
           ctx.expect(result.options.environment).toBe('production');
           ctx.expect(result.options.dsn).toBe('https://x@y.io/1');
         } finally {
-          if (orig === undefined) delete process.env.EM_BUILD_MODE; else process.env.EM_BUILD_MODE = orig;
+          if (orig === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = orig;
         }
       },
     },
     {
-      name: 'resolveConfig: EM_SENTRY_ENABLED=false overrides everything',
+      name: 'resolveConfig: OMEGA_SENTRY_ENABLED=false overrides everything',
       run: (ctx) => {
         const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const origMode = process.env.EM_BUILD_MODE;
-        const origEnabled = process.env.EM_SENTRY_ENABLED;
-        process.env.EM_BUILD_MODE = 'true';
-        process.env.EM_SENTRY_ENABLED = 'false';
+        const origMode = process.env.OMEGA_BUILD_MODE;
+        const origEnabled = process.env.OMEGA_SENTRY_ENABLED;
+        process.env.OMEGA_BUILD_MODE = 'true';
+        process.env.OMEGA_SENTRY_ENABLED = 'false';
         try {
           const result = resolveConfig({ config: { sentry: { dsn: 'https://x@y.io/1' } } });
           ctx.expect(result.shouldEnable).toBe(false);
-          ctx.expect(result.reason).toMatch(/EM_SENTRY_ENABLED/);
+          ctx.expect(result.reason).toMatch(/OMEGA_SENTRY_ENABLED/);
         } finally {
-          if (origMode === undefined) delete process.env.EM_BUILD_MODE; else process.env.EM_BUILD_MODE = origMode;
-          if (origEnabled === undefined) delete process.env.EM_SENTRY_ENABLED; else process.env.EM_SENTRY_ENABLED = origEnabled;
+          if (origMode === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = origMode;
+          if (origEnabled === undefined) delete process.env.OMEGA_SENTRY_ENABLED; else process.env.OMEGA_SENTRY_ENABLED = origEnabled;
         }
       },
     },

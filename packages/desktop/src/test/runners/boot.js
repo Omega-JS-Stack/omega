@@ -22,12 +22,12 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
     return { passed: 0, failed: 0, skipped: 0 };
   }
 
-  // EM_TEST_BOOT_PROJECT — boot a different project root than the CWD. Auto-set to the
+  // OMEGA_TEST_BOOT_PROJECT — boot a different project root than the CWD. Auto-set to the
   // bundled fixture when @omega.js/desktop self-tests (see commands/test.js); set it explicitly to boot a
   // real consumer (e.g. deployment-playground-desktop) without cd-ing into it. Mirrors
-  // BXM's BXM_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
-  const effectiveRoot = process.env.EM_TEST_BOOT_PROJECT
-    ? path.resolve(process.env.EM_TEST_BOOT_PROJECT)
+  // BXM's OMEGA_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
+  const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
+    ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
     : projectRoot;
 
   // The bundled fixture ships as SOURCE only (no node_modules). Symlink the two deps the
@@ -67,9 +67,9 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
   // outdated code. Always-build is ~10s slower than a staleness check, but a staleness
   // heuristic (mtime comparison) can be defeated by editor backdating, git restores, or
   // file copies — and a silently-stale test is worse than a slow one.
-  // Set EM_TEST_SKIP_BUILD=1 to opt out (CI scenarios where build ran in a separate step).
+  // Set OMEGA_TEST_SKIP_BUILD=1 to opt out (CI scenarios where build ran in a separate step).
   const bundlePath = path.join(effectiveRoot, 'dist', 'main.bundle.js');
-  if (process.env.EM_TEST_SKIP_BUILD !== '1') {
+  if (process.env.OMEGA_TEST_SKIP_BUILD !== '1') {
     console.log(chalk.gray(`      Building bundle for boot tests...`));
     const buildResult = runGulpBuild(effectiveRoot);
     if (buildResult !== 0) {
@@ -77,7 +77,7 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
       return { passed: 0, failed: tests.length, skipped: 0 };
     }
   } else if (!fs.existsSync(bundlePath)) {
-    console.log(chalk.yellow(`    ○ boot tests skipped (no bundle at ${bundlePath}, EM_TEST_SKIP_BUILD=1 set)`));
+    console.log(chalk.yellow(`    ○ boot tests skipped (no bundle at ${bundlePath}, OMEGA_TEST_SKIP_BUILD=1 set)`));
     return { passed: 0, failed: 0, skipped: tests.length };
   }
 
@@ -101,18 +101,18 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
 
   // Tell the consumer's main.js to publish the manager + run the boot harness.
   // Three env vars are picked up by @omega.js/desktop's main.js after init completes:
-  //   EM_TEST_BOOT          — gate; "1" turns on harness loading
-  //   EM_TEST_BOOT_HARNESS  — absolute path to harness module (resolved here so it works
+  //   OMEGA_TEST_BOOT          — gate; "1" turns on harness loading
+  //   OMEGA_TEST_BOOT_HARNESS  — absolute path to harness module (resolved here so it works
   //                           even though main.js is webpacked into the consumer bundle)
-  //   EM_TEST_BOOT_SPEC     — JSON file with the test definitions
+  //   OMEGA_TEST_BOOT_SPEC     — JSON file with the test definitions
   // Argv would be cleaner but Electron rejects unknown CLI flags.
   const childEnv = Object.assign({}, process.env, {
-    EM_TEST_MODE:                  'true',   // canonical signal — manager.isTesting() picks it up
-    EM_TEST_BOOT:                  '1',      // boot-runner-specific dispatch marker (main.js reads this to load the harness instead of doing normal init)
-    EM_TEST_BOOT_HARNESS:          bootEntry,
-    EM_TEST_BOOT_SPEC:             specFile,
+    OMEGA_TEST_MODE:                  'true',   // canonical signal — manager.isTesting() picks it up
+    OMEGA_TEST_BOOT:                  '1',      // boot-runner-specific dispatch marker (main.js reads this to load the harness instead of doing normal init)
+    OMEGA_TEST_BOOT_HARNESS:          bootEntry,
+    OMEGA_TEST_BOOT_SPEC:             specFile,
     // Tray on macOS pops a real menubar icon; suppress to keep the test invisible.
-    EM_TEST_HEADLESS:              '1',
+    OMEGA_TEST_HEADLESS:              '1',
     // Suppress dev-mode dock-bounce / startup item changes during the test.
     NODE_ENV:                      process.env.NODE_ENV || 'test',
   });
@@ -123,7 +123,7 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
   //   effectiveRoot — load the consumer project (package.json#main = dist/main.bundle.js).
   //
   // We don't use `--require <bootEntry>` because Electron rejects unknown CLI flags. Instead,
-  // @omega.js/desktop's main.js detects EM_TEST_BOOT and `require()`s the boot harness itself after init.
+  // @omega.js/desktop's main.js detects OMEGA_TEST_BOOT and `require()`s the boot harness itself after init.
   const args = [effectiveRoot];
 
   return new Promise((resolve) => {
@@ -144,14 +144,14 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
         buffer = buffer.slice(nl + 1);
         if (line.startsWith('__EM_TEST__')) {
           handleEvent(JSON.parse(line.slice('__EM_TEST__'.length)));
-        } else if (process.env.EM_TEST_DEBUG && line.trim().length > 0) {
+        } else if (process.env.OMEGA_TEST_DEBUG && line.trim().length > 0) {
           process.stdout.write(chalk.gray(`      ${line}\n`));
         }
       }
     });
 
     child.stderr.on('data', (chunk) => {
-      if (process.env.EM_TEST_DEBUG) {
+      if (process.env.OMEGA_TEST_DEBUG) {
         process.stderr.write(chalk.gray(`[boot:stderr] ${chunk.toString()}`));
       }
     });
@@ -216,7 +216,7 @@ function runGulpBuild(projectRoot) {
   const gulpfile = path.join(projectRoot, 'node_modules', '@omega.js/desktop', 'dist', 'gulp', 'main.js');
   const result = spawnSync('npx', ['gulp', '--cwd', projectRoot, '--gulpfile', gulpfile, 'build'], {
     cwd:   projectRoot,
-    env:   Object.assign({}, process.env, { EM_BUILD_MODE: 'true' }),
+    env:   Object.assign({}, process.env, { OMEGA_BUILD_MODE: 'true' }),
     stdio: 'inherit',
   });
   return result.status == null ? 1 : result.status;
@@ -228,7 +228,7 @@ function runGulpBuild(projectRoot) {
 //     (the gulpfile path) resolves AND webpack's `require('@omega.js/desktop/main')` resolves.
 //   - electron → @omega.js/desktop's own electron, so the runner's `require('<root>/node_modules/electron')`
 //     binary lookup + the spawned bundle's `require('electron')` resolve.
-// Creates only what's MISSING — a no-op for a real consumer (EM_TEST_BOOT_PROJECT pointed at
+// Creates only what's MISSING — a no-op for a real consumer (OMEGA_TEST_BOOT_PROJECT pointed at
 // an installed app already has both). Returns the link paths it created so the caller can
 // remove exactly those (and ONLY those) after the run. Runtime-only; the fixture .gitignore
 // is belt-and-suspenders for crashed runs.
@@ -263,7 +263,7 @@ function ensureFixtureDeps(effectiveRoot, emRoot) {
     } catch (e) {
       // Best-effort — if it mattered, the gulp build / electron lookup below surfaces a
       // far clearer error than anything we'd throw here.
-      if (process.env.EM_TEST_DEBUG) {
+      if (process.env.OMEGA_TEST_DEBUG) {
         console.log(chalk.gray(`      [boot] could not link ${name}: ${e.message}`));
       }
     }

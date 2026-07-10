@@ -55,6 +55,9 @@
 11. ✅ **Assets root-first**: brand-root `assets/` = SSOT (logos, icons, og images, fonts); manager derives per-target outputs into each app; app-local assets only for genuinely app-specific extras. Principle: shared-by-default at root, local only when truly local. **Addendum (Ian 2026-07-10):** the assets are SCAFFOLDED at onboarding (placeholders/templates at brand root) and stay MANAGED by the omega system — the manager's assets service re-derives per-target outputs idempotently on every run, not a one-time copy.
 
 12. ✅ **Provider-discriminated config keys** (added post-decide — Ian 2026-07-10, `# more`): keys that name a ROLE with a `provider` discriminator instead of provider-named top-levels — e.g. `firebaseConfig` becomes `<role>: { provider: 'firebase', … }` — so a consumer could someday switch (supabase etc.) without a config-shape break. NO alternative providers actually built now; shape-only future-proofing. Exact key names land in N4's config review (cheap pre-dogfood, expensive after brands migrate).
+    **D5 addendum (Ian 2026-07-10):** the legacy `/backend-manager` route prefix stays accepted as an ALIAS to the new `omega_api` function (hosting-rewrite glob + router strip + cloudflare proxy worker) so migrating brands' in-the-wild clients keep working; everything else (docs, callers, function names, env) speaks `/omega` only. Shipped in cp72.
+13. ✅ **Deliberate deploys — commits never auto-publish** (Ian 2026-07-10): the old UJM autopublish-on-push dies. Save = commit; publish = an explicit deploy action — from the CLI, an HTTP command, or the CMS — all converging on the ONE executor from D9's addendum, and uniform across every target. Subtle consequences to implement with it: content-publish actions imply deploy (the admin post route gains a `deploy` option defaulting TRUE — posting an article means publishing it), while code/config commits deploy nothing. Lands with C1 (template workflows) + the D9 executor; the admin-post tweak rides the backend work then.
+14. ✅ **Crypto-strong key provisioning at setup** (Ian 2026-07-10): omega-owned secrets are GENERATED, never left blank — `OMEGA_ADMIN_KEY`/`OMEGA_WEBHOOK_KEY` = `randomBytes(32)` base64url, `OMEGA_NAMESPACE` = `randomUUID()` (uuidv5 namespace must be UUID-shaped). Shipped in cp72: the onboarding .env stub provisions them; external API keys stay user-filled placeholders.
 
 ### E. LATER (post-dogfood backlog, roughly ordered)
 
@@ -204,7 +207,7 @@ Basically, we want ALL OF THE BS PARTS OF A SAAS PLATFORM TO BE HABDLED BY OMEGA
 
 
 # more
-> (triaged 2026-07-10 → per-target answer in A, provider keys = D12, churn retention = L11)
+> (triaged 2026-07-10 → per-target answer in A, provider keys = D12, churn retention = L11; second batch: route alias = D5 addendum, deliberate deploys = D13, key provisioning = D14)
 
 better churn retention
 * popup if cancelling during free trial (trial will be canceld)
@@ -214,3 +217,9 @@ options
 * maybe have options for providers for things in case the consuemr wants to switch?
   * instaed of things lie firebaseConfig being toplevel, maybe have "something".provider = 'firebase'? "something" is the name for whatever firebase is (alternatives would be supabase, etc, but we would nto support that yet at all, just leaving the otpion open for later?)
   * also did we make it so tht we can have different config values per target like sentry, analytics, etc? i think we did but just checking.
+
+on the renames.. yes lets move towards getting rid of "backend-manager", BACKEND_MANAGER, bem* etc... for routes we should do {domain}/omega/* andthat incldues hosting rewrites + the setup task that fixes that. mayeb for backwards compat we can also still allow {domain}/backend-manager for the new omega_api function?
+
+just an idea,.. in old omega, the website repo would autopublish on commits.. i feel liek htis is bad design esp since its a monorepo now... what do you rthink about switching it to deliberate deploy commands? which can be done in cli, https, or cms? so like save-->commit, publiush-->deploy? then evey target is the same. only deliberate deploy/publish does something, not just simpel commits. we will ahe to change some subtle things such as the admin post route which now needs to probably have an option to deploy it, defaulting to true??
+
+other small things... thge omega setup prcesss should use uuid or a more secure random string to provision the keys like OMEGA_MANAGER_KEY, etc.

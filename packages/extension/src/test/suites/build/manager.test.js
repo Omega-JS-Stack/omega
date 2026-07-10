@@ -149,51 +149,51 @@ module.exports = {
       },
     },
     {
-      name: 'getEnvironment returns "testing" when BXM_TEST_MODE === "true" (takes precedence)',
+      name: 'getEnvironment returns "testing" when OMEGA_TEST_MODE === "true" (takes precedence)',
       run: (ctx) => {
         const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const origTest = process.env.BXM_TEST_MODE;
-        const origBuild = process.env.BXM_BUILD_MODE;
-        process.env.BXM_TEST_MODE = 'true';
-        process.env.BXM_BUILD_MODE = 'true'; // even with build mode set, testing wins
+        const origTest = process.env.OMEGA_TEST_MODE;
+        const origBuild = process.env.OMEGA_BUILD_MODE;
+        process.env.OMEGA_TEST_MODE = 'true';
+        process.env.OMEGA_BUILD_MODE = 'true'; // even with build mode set, testing wins
         try {
           ctx.expect(Manager.getEnvironment()).toBe('testing');
         } finally {
-          if (origTest === undefined) delete process.env.BXM_TEST_MODE; else process.env.BXM_TEST_MODE = origTest;
-          if (origBuild === undefined) delete process.env.BXM_BUILD_MODE; else process.env.BXM_BUILD_MODE = origBuild;
+          if (origTest === undefined) delete process.env.OMEGA_TEST_MODE; else process.env.OMEGA_TEST_MODE = origTest;
+          if (origBuild === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = origBuild;
         }
       },
     },
     {
-      name: 'getEnvironment returns "development" when BXM_BUILD_MODE !== "true" (and not testing)',
+      name: 'getEnvironment returns "development" when OMEGA_BUILD_MODE !== "true" (and not testing)',
       run: (ctx) => {
         const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const original = process.env.BXM_BUILD_MODE;
-        const origTest = process.env.BXM_TEST_MODE;
-        delete process.env.BXM_BUILD_MODE;
-        delete process.env.BXM_TEST_MODE;
+        const original = process.env.OMEGA_BUILD_MODE;
+        const origTest = process.env.OMEGA_TEST_MODE;
+        delete process.env.OMEGA_BUILD_MODE;
+        delete process.env.OMEGA_TEST_MODE;
         try {
           ctx.expect(Manager.getEnvironment()).toBe('development');
         } finally {
-          if (original !== undefined) process.env.BXM_BUILD_MODE = original;
-          if (origTest !== undefined) process.env.BXM_TEST_MODE = origTest;
+          if (original !== undefined) process.env.OMEGA_BUILD_MODE = original;
+          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
         }
       },
     },
     {
-      name: 'getEnvironment returns "production" when BXM_BUILD_MODE === "true" (and not testing)',
+      name: 'getEnvironment returns "production" when OMEGA_BUILD_MODE === "true" (and not testing)',
       run: (ctx) => {
         const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const original = process.env.BXM_BUILD_MODE;
-        const origTest = process.env.BXM_TEST_MODE;
-        delete process.env.BXM_TEST_MODE;
-        process.env.BXM_BUILD_MODE = 'true';
+        const original = process.env.OMEGA_BUILD_MODE;
+        const origTest = process.env.OMEGA_TEST_MODE;
+        delete process.env.OMEGA_TEST_MODE;
+        process.env.OMEGA_BUILD_MODE = 'true';
         try {
           ctx.expect(Manager.getEnvironment()).toBe('production');
         } finally {
-          if (original === undefined) delete process.env.BXM_BUILD_MODE;
-          else                        process.env.BXM_BUILD_MODE = original;
-          if (origTest !== undefined) process.env.BXM_TEST_MODE = origTest;
+          if (original === undefined) delete process.env.OMEGA_BUILD_MODE;
+          else                        process.env.OMEGA_BUILD_MODE = original;
+          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
         }
       },
     },
@@ -201,12 +201,12 @@ module.exports = {
       name: 'getLiveReloadPort defaults to 35729',
       run: (ctx) => {
         const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
-        const original = process.env.BXM_LIVERELOAD_PORT;
-        delete process.env.BXM_LIVERELOAD_PORT;
+        const original = process.env.OMEGA_LIVERELOAD_PORT;
+        delete process.env.OMEGA_LIVERELOAD_PORT;
         try {
           ctx.expect(Manager.getLiveReloadPort()).toBe(35729);
         } finally {
-          if (original !== undefined) process.env.BXM_LIVERELOAD_PORT = original;
+          if (original !== undefined) process.env.OMEGA_LIVERELOAD_PORT = original;
         }
       },
     },

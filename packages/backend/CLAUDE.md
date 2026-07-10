@@ -6,13 +6,13 @@
 
 ## Identity
 
-OMEGA Backend (@omega.js/backend) is a comprehensive framework for building modern Firebase Cloud Functions backends. Sister project to Electron Manager (EM), Browser Extension Manager (BXM), and Ultimate Jekyll Manager (UJM). Provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`bm_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, marketing campaign automation, an MCP server, and a CLI for emulator/deploy/logs/auth/Firestore operations.
+OMEGA Backend (@omega.js/backend) is a comprehensive framework for building modern Firebase Cloud Functions backends. Sister project to Electron Manager (EM), Browser Extension Manager (BXM), and Ultimate Jekyll Manager (UJM). Provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, marketing campaign automation, an MCP server, and a CLI for emulator/deploy/logs/auth/Firestore operations.
 
 **This repository** is the @omega.js/backend library itself. **Consumer projects** are Firebase projects that `require('@omega.js/backend')` in their `functions/index.js`, with `config/omega.json5` + `service-account.json` alongside, plus optional `routes/`, `schemas/`, and `hooks/` directories for custom endpoints. Config is loaded via `@omega.js/config` (shared sections top-level, backend settings under `targets.backend`; brand-monorepo hierarchy supported).
 
 ## Recommended skills
 
-- **`omega:bem`** — router skill. Auto-loads on @omega.js/backend-specific keywords (`route`, `schema`, `endpoint`, `bm_api`, `Manager.init`, `npx omega test`, `gcloud logs`, etc.) and points back to this CLAUDE.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
+- **`omega:bem`** — router skill. Auto-loads on @omega.js/backend-specific keywords (`route`, `schema`, `endpoint`, `omega_api`, `Manager.init`, `npx omega test`, `gcloud logs`, etc.) and points back to this CLAUDE.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 
 ## Quick Start
@@ -51,7 +51,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 ## Architecture
 
-@omega.js/backend exposes a single `Manager` class that orchestrates everything: it initializes Firebase Admin, wires built-in functions (`bm_api`, auth events, cron), and hands out helper instances via factory methods. Supports **two deployment modes** — Firebase Functions (`projectType: 'firebase'`) or Custom Server (`projectType: 'custom'`). See [docs/architecture.md](docs/architecture.md) for the full overview of the Manager class, dual-mode support, and helper factory pattern.
+@omega.js/backend exposes a single `Manager` class that orchestrates everything: it initializes Firebase Admin, wires built-in functions (`omega_api`, auth events, cron), and hands out helper instances via factory methods. Supports **two deployment modes** — Firebase Functions (`projectType: 'firebase'`) or Custom Server (`projectType: 'custom'`). See [docs/architecture.md](docs/architecture.md) for the full overview of the Manager class, dual-mode support, and helper factory pattern.
 
 For the directory layout of both the @omega.js/backend library and consumer projects, see [docs/directory-structure.md](docs/directory-structure.md).
 
@@ -152,7 +152,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/key-files.md](docs/key-files.md) — quick lookup for the most-touched files (Manager, helpers, auth events, cron, payment processors, CLI commands)
 - [docs/cli-output.md](docs/cli-output.md) — shared CLI styling module (`src/cli/utils/ui.js`): OMEGA-style banner/dividers/sections/status symbols + the `Summary` block (pass/warn/fail); setup check return types (`true`/`false`/`Error`/`'warn'`); used by `setup`, adoptable by other commands
 - [docs/environment-detection.md](docs/environment-detection.md) — `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive); gate side effects on the INTENTIONAL check (`isProduction()` for prod-only, `isDevelopment() || isTesting()` for local-or-test) — never `!isDevelopment()`. Plus the URL helper convention (always `Manager.getApiUrl()` — auto-resolves local in dev+test, never read `project.apiUrl`)
-- [docs/response-headers.md](docs/response-headers.md) — automatic `bm-properties` header
+- [docs/response-headers.md](docs/response-headers.md) — automatic `omega-properties` header
 
 ### Building Routes & Components
 
@@ -162,7 +162,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/migration.md](docs/migration.md) — legacy-project migration: runtime config → top-level env vars, `Manager.config.*` → `process.env.*`, constructor routes / tiered schemas → current format
 - [docs/sanitization.md](docs/sanitization.md) — middleware trim-only default; opt-in HTML strip (`{ sanitize: true }`) with per-field opt-out (`sanitize: false`); manual `utilities.sanitize()` for HTML-insertion sites
 - [docs/auth-hooks.md](docs/auth-hooks.md) — consumer hooks for `before-create`/`before-signin`/`on-create`/`on-delete` (blocking + non-blocking examples)
-- [docs/common-operations.md](docs/common-operations.md) — inside-the-handler patterns: authenticate, read/write Firestore, error handling, send response, `bm_api` hook
+- [docs/common-operations.md](docs/common-operations.md) — inside-the-handler patterns: authenticate, read/write Firestore, error handling, send response, `omega_api` hook
 
 ### Built-in Routes
 
@@ -184,7 +184,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 ### Testing & CLI
 
 - [docs/test-framework.md](docs/test-framework.md) — running, filtering, log files, test types (standalone/suite/group), context object, assertions, auth levels. **NEVER mock — test against the real emulator.** No `mockManager`/`mockAdmin`/fake `firestore`/stubbed `assistant`; every `run()` gets the real `Manager`/`assistant`/`firestore`/`http`/`accounts` — use them. Pure functions (zero I/O) are the only thing you call directly; anything touching Firestore or an external API runs for real. Real external APIs (OpenAI/PayPal/GitHub/SendGrid/Stripe) are gated behind `TEST_EXTENDED_MODE` in-source (not mocked) — opt in with `--extended` or `TEST_EXTENDED_MODE=true` (shared, unprefixed across @omega.js/backend/BXM/UJM/EM; propagates to BOTH runner + emulator) — and anything an extended test creates externally must be cleaned up by the test. **Each test file `module.exports` a `{ description, type, tests }` object — NOT raw Mocha (`describe`/`it`/`beforeEach`); those globals are not injected and the file fails to load. The only lifecycle hook is `cleanup` — exported `before`/`after` properties are silently IGNORED (do setup inside the tests via an idempotent helper, or in `test/_init.js`). Split tests one-file-per-concern under `test/<area>/`, never one giant `test/test.js`.** **All cleanup runs at the START of every run, never at the end** — the runner flushes the ENTIRE emulator Firestore before every run, so there's nothing to register; seed any needed fixtures in `test/_init.js`'s `setup()`, and never add a trailing cleanup step. Marketing providers (SendGrid/Beehiiv) don't need a special exception — `_test.*` emails are blocked at the validation layer so test signups never reach providers. The `_test.allow_*` carve-out exists only for the live-provider lifecycle test (`test/marketing/consent-lifecycle.js`), which manages its own teardown.
-- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot/` smoke layer: framework self-test from the repo via the bundled fixture project + `BEM_TEST_BOOT_PROJECT` (@omega.js/backend's analog of BXM/UJM `*_TEST_BOOT_PROJECT`)
+- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot/` smoke layer: framework self-test from the repo via the bundled fixture project + `OMEGA_TEST_BOOT_PROJECT` (@omega.js/backend's analog of BXM/UJM `*_TEST_BOOT_PROJECT`)
 - [docs/cli-firestore-auth.md](docs/cli-firestore-auth.md) — `npx omega firestore:*` and `auth:*` commands, shared flags, examples
 - [docs/cli-logs.md](docs/cli-logs.md) — `npx omega logs:read` / `logs:tail` with full flag reference and built-in Cloud Function names
 - [docs/logging.md](docs/logging.md) — `functions/*.log` file table (the `functions/` location exception), `production.log`

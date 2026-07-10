@@ -30,9 +30,9 @@ module.exports = {
       },
     },
     {
-      name: 'BXM_TEST_MODE is wired on globalThis (harness sets it on boot)',
+      name: 'OMEGA_TEST_MODE is wired on globalThis (harness sets it on boot)',
       run: async (ctx) => {
-        ctx.expect(globalThis.BXM_TEST_MODE).toBe(true);
+        ctx.expect(globalThis.OMEGA_TEST_MODE).toBe(true);
       },
     },
     {

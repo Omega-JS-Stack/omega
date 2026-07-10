@@ -6,7 +6,7 @@
 
 Two transport modes:
 - **Stdio** (local): `npx omega mcp` — for Claude Code / Claude Desktop
-- **Streamable HTTP** (remote): `POST /backend-manager/mcp` — for Claude Chat / Claude Desktop custom connectors (stateless, Firebase Functions compatible)
+- **Streamable HTTP** (remote): `POST /omega/mcp` — for Claude Chat / Claude Desktop custom connectors (stateless, Firebase Functions compatible)
 
 ## Roles
 
@@ -68,16 +68,16 @@ Consumer tools can set all the same annotations — they're passed through autom
 
 ### OAuth Flow (HTTP transport — Claude Desktop / Claude Chat)
 
-1. Client sends `POST /backend-manager/mcp` with no auth → 401 with `WWW-Authenticate` header
+1. Client sends `POST /omega/mcp` with no auth → 401 with `WWW-Authenticate` header
 2. Client discovers `/.well-known/oauth-protected-resource` → finds authorization server
 3. Client discovers `/.well-known/oauth-authorization-server` → gets endpoints
-4. Client registers via `POST /backend-manager/mcp/register` (RFC 7591 Dynamic Client Registration)
-5. Client opens browser to `/backend-manager/mcp/authorize`
+4. Client registers via `POST /omega/mcp/register` (RFC 7591 Dynamic Client Registration)
+5. Client opens browser to `/omega/mcp/authorize`
    - If `client_id` matches admin key → auto-redirects (admin access)
    - Otherwise → redirects to consumer's website (`/token?redirect_uri=...&state=...&mcp=true`)
 6. User signs in on their familiar site, gets a Firebase ID token
 7. Consumer's `/token` page redirects back with `code={idToken}&state={state}`
-8. Client exchanges code: `POST /backend-manager/mcp/token` → @omega.js/backend verifies ID token, returns `api.privateKey` as `access_token`
+8. Client exchanges code: `POST /omega/mcp/token` → @omega.js/backend verifies ID token, returns `api.privateKey` as `access_token`
 9. Client uses the API key for all future MCP requests as `Authorization: Bearer {key}`
 
 The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves localhost in dev, production domain otherwise), or overridden via `mcp.authUrl` in `config/omega.json5`.
@@ -85,7 +85,7 @@ The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves 
 ### Admin (Stdio)
 
 ```bash
-npx omega mcp    # Reads BACKEND_MANAGER_KEY from functions/.env — sees all 25 tools
+npx omega mcp    # Reads OMEGA_ADMIN_KEY from functions/.env — sees all 25 tools
 ```
 
 ### User (Stdio)
@@ -165,16 +165,16 @@ The `npx omega setup` command automatically adds required Firebase Hosting rewri
 
 ```json
 {
-  "source": "{/backend-manager,/backend-manager/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token}",
-  "function": "bm_api"
+  "source": "{/omega,/omega/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token}",
+  "function": "omega_api"
 }
 ```
 
 ## Claude Desktop Configuration
 
 1. Go to Settings → Integrations → Add Custom Integration
-2. **URL:** `https://api.yourdomain.com/backend-manager/mcp` (production) or `https://localhost:5002/backend-manager/mcp` (local dev with HTTPS proxy)
-3. For admin access: set **OAuth Client ID** to your `BACKEND_MANAGER_KEY`
+2. **URL:** `https://api.yourdomain.com/omega/mcp` (production) or `https://localhost:5002/omega/mcp` (local dev with HTTPS proxy)
+3. For admin access: set **OAuth Client ID** to your `OMEGA_ADMIN_KEY`
 4. For user access: leave Client ID empty — the OAuth flow redirects to the consumer's website for sign-in
 
 ## Claude Code Configuration

@@ -16,7 +16,7 @@ const supportedProviders = ['google', 'discord', 'github', 'twitter', 'facebook'
 
 // Get API URL helper
 function getApiUrl() {
-  return `${omega.getApiUrl()}/backend-manager/user/oauth2`;
+  return `${omega.getApiUrl()}/omega/user/oauth2`;
 }
 
 // Initialize connections section

@@ -1,5 +1,5 @@
 // webpack — three configs (main / preload / renderer), compiled in parallel.
-// Each target gets `EM_BUILD_JSON` injected via DefinePlugin.
+// Each target gets `OMEGA_BUILD_JSON` injected via DefinePlugin.
 
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('webpack');
@@ -28,7 +28,7 @@ module.exports = function webpackTask(done) {
   const isProd = mode.environment === 'production';
   const config = Manager.getConfig();
 
-  // EM_BUILD_JSON — frozen at build time, accessible at runtime as window/globalThis.EM_BUILD_JSON.
+  // OMEGA_BUILD_JSON — frozen at build time, accessible at runtime as window/globalThis.OMEGA_BUILD_JSON.
   const buildJson = {
     config,
     package: Manager.getPackage('project'),
@@ -79,11 +79,11 @@ module.exports = function webpackTask(done) {
   });
 };
 
-// Inject EM_BUILD_JSON into every bundle two ways:
-// 1. DefinePlugin replaces the bare `EM_BUILD_JSON` identifier with the literal at build time
+// Inject OMEGA_BUILD_JSON into every bundle two ways:
+// 1. DefinePlugin replaces the bare `OMEGA_BUILD_JSON` identifier with the literal at build time
 //    (so framework code can reference it without globals).
-// 2. BannerPlugin prepends a tiny IIFE that assigns the same value to globalThis.EM_BUILD_JSON
-//    (so it's reachable from DevTools and consumer code via window.EM_BUILD_JSON).
+// 2. BannerPlugin prepends a tiny IIFE that assigns the same value to globalThis.OMEGA_BUILD_JSON
+//    (so it's reachable from DevTools and consumer code via window.OMEGA_BUILD_JSON).
 //
 // Also: bake build-time secrets (GOOGLE_ANALYTICS_SECRET) into the bundle as a
 // DefinePlugin replacement of `process.env.GOOGLE_ANALYTICS_SECRET`. Packaged
@@ -94,7 +94,7 @@ module.exports = function webpackTask(done) {
 function buildJsonPlugins(buildJson) {
   const literal = JSON.stringify(buildJson);
   const definitions = {
-    EM_BUILD_JSON: literal,
+    OMEGA_BUILD_JSON: literal,
   };
   // Bake build-time analytics secret into bundles when present in the build env.
   // Mirror @omega.js/backend's env-var name (`GOOGLE_ANALYTICS_SECRET`).
@@ -104,7 +104,7 @@ function buildJsonPlugins(buildJson) {
   return [
     new webpack.DefinePlugin(definitions),
     new webpack.BannerPlugin({
-      banner: `(function(){var __em=${literal};if(typeof globalThis!=='undefined'){globalThis.EM_BUILD_JSON=__em;}if(typeof window!=='undefined'){window.EM_BUILD_JSON=__em;}})();`,
+      banner: `(function(){var __em=${literal};if(typeof globalThis!=='undefined'){globalThis.OMEGA_BUILD_JSON=__em;}if(typeof window!=='undefined'){window.OMEGA_BUILD_JSON=__em;}})();`,
       raw:    true,
       entryOnly: true,
     }),

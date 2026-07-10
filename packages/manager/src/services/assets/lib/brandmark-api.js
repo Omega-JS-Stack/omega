@@ -6,7 +6,7 @@
  *
  *   assets: {
  *     brandmark: {
- *       apiUrl: 'https://api.mrlogo.ai/backend-manager/logos',
+ *       apiUrl: 'https://api.mrlogo.ai/omega/logos',
  *       providerBrand: 'mrlogo',        // sibling brand hosting the API
  *       adminEmail: 'admin@company.com' // its Firebase admin user
  *     }

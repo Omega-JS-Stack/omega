@@ -117,7 +117,7 @@ export default class CalendarEvents {
           payload.recurringId = this.editingCampaignId;
         }
 
-        const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
+        const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
         await authorizedFetch(url, {
           method: 'POST',
           timeout: 60000,
@@ -639,7 +639,7 @@ export default class CalendarEvents {
   // @omega.js/backend API Calls
   // ============================================
   async _createCampaign(payload) {
-    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
     const response = await authorizedFetch(url, {
       method: 'POST',
       timeout: 60000,
@@ -657,7 +657,7 @@ export default class CalendarEvents {
 
   async _updateCampaign(id, payload) {
     payload.id = id;
-    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
     const response = await authorizedFetch(url, {
       method: 'PUT',
       timeout: 60000,
@@ -674,7 +674,7 @@ export default class CalendarEvents {
   }
 
   async _deleteCampaign(id) {
-    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
     const response = await authorizedFetch(url, {
       method: 'DELETE',
       timeout: 60000,
@@ -692,7 +692,7 @@ export default class CalendarEvents {
    * Reschedule a one-off campaign (drag-and-drop)
    */
   async rescheduleCampaign(id, newSendAt) {
-    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
     return authorizedFetch(url, {
       method: 'PUT',
       timeout: 60000,
@@ -739,7 +739,7 @@ export default class CalendarEvents {
     // Optimistic update: move the seed sendAt, re-render immediately
     const rollback = this.core.optimisticUpdateSendAt(templateId, newSendAtUNIX);
 
-    const url = `${omega.getApiUrl()}/backend-manager/marketing/campaign`;
+    const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
     return authorizedFetch(url, {
       method: 'PUT',
       timeout: 60000,

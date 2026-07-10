@@ -1,14 +1,14 @@
 // Structured signing event log — appends JSONL lines to `<runner-dir>/em-signing.log`
-// (or another path via `EM_SIGN_LOG`) so a separate `mgr runner monitor` process can
+// (or another path via `OMEGA_SIGN_LOG`) so a separate `mgr runner monitor` process can
 // tail + pretty-print them in real time on the Windows box.
 //
 // Why JSONL not plain text: lets the monitor pretty-print durations, color the failure
 // events distinctively, and group sign-start / sign-done pairs without parsing English.
 //
 // Where the file lands (resolved in this priority order):
-//   1. `EM_SIGN_LOG` env var (explicit override) — wins if set
-//   2. `<EM_RUNNER_HOME>/em-signing.log` — when caller has set the runner home
-//   3. `C:\actions-runners\em-signing.log` on Windows — the default EM_RUNNER_HOME
+//   1. `OMEGA_SIGN_LOG` env var (explicit override) — wins if set
+//   2. `<OMEGA_RUNNER_HOME>/em-signing.log` — when caller has set the runner home
+//   3. `C:\actions-runners\em-signing.log` on Windows — the default OMEGA_RUNNER_HOME
 //      (matches `defaultRunnerHome()` in src/commands/runner.js). This is the
 //      machine-wide default so EVERY signing job from every org/repo writes to
 //      the same file, and `npx omega runner monitor` with no args picks it up.
@@ -21,9 +21,9 @@ const os   = require('os');
 const path = require('path');
 
 function resolveLogPath() {
-  if (process.env.EM_SIGN_LOG) return process.env.EM_SIGN_LOG;
-  if (process.env.EM_RUNNER_HOME) {
-    return path.join(process.env.EM_RUNNER_HOME, 'em-signing.log');
+  if (process.env.OMEGA_SIGN_LOG) return process.env.OMEGA_SIGN_LOG;
+  if (process.env.OMEGA_RUNNER_HOME) {
+    return path.join(process.env.OMEGA_RUNNER_HOME, 'em-signing.log');
   }
   if (process.platform === 'win32') {
     return 'C:\\actions-runners\\em-signing.log';

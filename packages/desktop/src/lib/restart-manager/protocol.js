@@ -64,7 +64,7 @@ const ENVIRONMENTS = Object.freeze(['development', 'testing', 'production']);
 
 /**
  * Resolve the shared root directory both sides agree on.
- * `EM_RM_ROOT` is the cross-repo isolation seam: tests (and parallel dev setups)
+ * `OMEGA_RM_ROOT` is the cross-repo isolation seam: tests (and parallel dev setups)
  * set it to keep dev/test runs away from the real `<appData>/restart-manager`.
  *
  * @param {string} appDataPath - `app.getPath('appData')` (the PARENT of userData dirs).
@@ -73,7 +73,7 @@ const ENVIRONMENTS = Object.freeze(['development', 'testing', 'production']);
  */
 function resolveSharedRoot(appDataPath, env) {
   const e = env || process.env;
-  return e.EM_RM_ROOT || path.join(appDataPath, SHARED_DIR_NAME);
+  return e.OMEGA_RM_ROOT || path.join(appDataPath, SHARED_DIR_NAME);
 }
 
 /**

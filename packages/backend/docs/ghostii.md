@@ -1,6 +1,6 @@
 # Blog Auto-Publisher (Ghostii Provider)
 
-The blog system generates and publishes blog posts via the daily `bm_cronDaily` cron job. Two independent paths:
+The blog system generates and publishes blog posts via the daily `omega_cronDaily` cron job. Two independent paths:
 
 1. **Standalone publisher** — `config.blog` with `enabled: true`: daily cron picks sources, calls the configured platform provider (default: Ghostii AI API), publishes via `admin/post`.
 2. **Newsletter-linked articles** — `marketing.newsletter.content.article.enabled`: the newsletter generator expands its lead section into a full blog post via Ghostii.

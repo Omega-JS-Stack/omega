@@ -40,14 +40,14 @@ function gaussianRandomInt(min, max) {
  *   ({ title, description, body, json, headerImageUrl, categories, keywords, ... })
  */
 async function writeArticle({ brandConfig, description, links = [], sourceContent, overrides = {} }) {
-  if (!process.env.BACKEND_MANAGER_KEY) {
-    throw new Error('BACKEND_MANAGER_KEY is not set — required to call the Ghostii API (brand or company .env)');
+  if (!process.env.OMEGA_ADMIN_KEY) {
+    throw new Error('OMEGA_ADMIN_KEY is not set — required to call the Ghostii API (brand or company .env)');
   }
 
   const { brand } = brandConfig;
 
   const body = {
-    backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+    backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     keywords: overrides.keywords || [],
     description: description.slice(0, MAX_DESCRIPTION_LENGTH),
     insertLinks: overrides.insertLinks ?? true,

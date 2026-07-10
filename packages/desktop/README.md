@@ -35,7 +35,7 @@ npm install @omega.js/desktop --save-dev
 npx omega setup            # scaffolds project; auto-resolves & writes correct .nvmrc from electron version
 nvm use                  # switch to the Node version Electron uses (one-time per shell)
 npm start                # dev: gulp → webpack → electron .
-EM_CDP_PORT=9222 npm start  # dev + expose Chrome DevTools Protocol for Claude/MCP debugging
+OMEGA_CDP_PORT=9222 npm start  # dev + expose Chrome DevTools Protocol for Claude/MCP debugging
 npx omega cdp status       # drive the running dev app over CDP: status|eval|shot|capture|theme|relaunch|quit (docs/cdp-debugging.md)
 npm run build            # local production build (bundles only, no installer)
 npm run package:quick    # fast packaged build for host platform/arch (.app/.exe-folder/linux-unpacked, ~20-30s) — for smoke-testing packaged behavior
@@ -79,7 +79,7 @@ Five logs in `<projectRoot>/logs/`, each with its own purpose:
 |---|---|---|
 | `runtime.log` | Your packaged app's runtime — main + preload + renderer all converge here via electron-log | Persistent, rotates at 10 MB |
 | `dev.log` | Gulp pipeline output — sass, webpack, html, electron child stdout from `npm start` | Truncated each `npm start` |
-| `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `EM_BUILD_MODE=true`) | Truncated each build |
+| `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail, harness boot lines) | Truncated each test run |
 | `ci.log` | `npm run release` — streamed GH Actions output during a CI release | Truncated each release |
 
@@ -97,7 +97,7 @@ In production, `runtime.log` lives at `app.getPath('logs')`:
 
 See [docs/logging.md](docs/logging.md) for the full picture (renderer forwarding, log levels, programmatic path access).
 
-Override gulp's `dev.log` path via `EM_LOG_FILE=<path>`; disable entirely via `EM_LOG_FILE=false`. The default `.gitignore` includes `logs/`.
+Override gulp's `dev.log` path via `OMEGA_LOG_FILE=<path>`; disable entirely via `OMEGA_LOG_FILE=false`. The default `.gitignore` includes `logs/`.
 
 ## Per-process imports
 

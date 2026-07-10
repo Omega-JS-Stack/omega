@@ -20,7 +20,7 @@ class Manager {
 
   async initialize() {
     // Configuration
-    const configuration = window.BXM_BUILD_JSON?.config;
+    const configuration = window.OMEGA_BUILD_JSON?.config;
 
     // Set properties
     this.extension = extension;

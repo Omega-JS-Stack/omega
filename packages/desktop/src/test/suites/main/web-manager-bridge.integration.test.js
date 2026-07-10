@@ -1,22 +1,22 @@
 // Integration tests for client-bridge — actually hits Firebase.
 //
-// Skipped automatically unless EM_TEST_FIREBASE_ADMIN_KEY (or GOOGLE_APPLICATION_CREDENTIALS)
+// Skipped automatically unless OMEGA_TEST_FIREBASE_ADMIN_KEY (or GOOGLE_APPLICATION_CREDENTIALS)
 // points to a Firebase service-account JSON file. This keeps `npx omega test` fast & green
 // offline / on machines without backend creds.
 //
 // To run:
 //   1. Install firebase-admin: `npm i -D firebase-admin` (already in @omega.js/desktop's devDeps)
 //   2. Drop a service-account JSON in a safe place
-//   3. Set EM_TEST_FIREBASE_ADMIN_KEY=/path/to/file.json (or use GOOGLE_APPLICATION_CREDENTIALS)
-//   4. Optionally EM_TEST_USER_UID=your-test-uid (defaults to 'em-test-user')
+//   3. Set OMEGA_TEST_FIREBASE_ADMIN_KEY=/path/to/file.json (or use GOOGLE_APPLICATION_CREDENTIALS)
+//   4. Optionally OMEGA_TEST_USER_UID=your-test-uid (defaults to 'em-test-user')
 //   5. `npx omega test`
 
 const fs = require('fs');
 
-const ADMIN_KEY = process.env.EM_TEST_FIREBASE_ADMIN_KEY
+const ADMIN_KEY = process.env.OMEGA_TEST_FIREBASE_ADMIN_KEY
                 || process.env.GOOGLE_APPLICATION_CREDENTIALS
                 || null;
-const USER_UID = process.env.EM_TEST_USER_UID || 'em-test-user';
+const USER_UID = process.env.OMEGA_TEST_USER_UID || 'em-test-user';
 // These hit REAL Firebase, so they're gated behind extended mode (the cross-framework
 // `TEST_EXTENDED_MODE` opt-in). `npx omega test --extended` (or TEST_EXTENDED_MODE=true) runs
 // them; default is skip so `npx omega test` stays fast + offline-safe.
@@ -25,7 +25,7 @@ const EXTENDED_OPTED_IN = process.env.TEST_EXTENDED_MODE === 'true'
 
 function checkSkipReason() {
   if (!EXTENDED_OPTED_IN) return 'extended tests skipped — pass --extended or set TEST_EXTENDED_MODE=true';
-  if (!ADMIN_KEY) return 'no EM_TEST_FIREBASE_ADMIN_KEY / GOOGLE_APPLICATION_CREDENTIALS';
+  if (!ADMIN_KEY) return 'no OMEGA_TEST_FIREBASE_ADMIN_KEY / GOOGLE_APPLICATION_CREDENTIALS';
   if (!fs.existsSync(ADMIN_KEY)) return `service-account file not found at ${ADMIN_KEY}`;
   try {
     require.resolve('firebase-admin');

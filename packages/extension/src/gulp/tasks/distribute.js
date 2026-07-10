@@ -16,7 +16,7 @@ const rootPathPackage = Manager.getRootPath('main');
 const rootPathProject = Manager.getRootPath('project');
 
 // Constants
-const LOUD = process.env.BXM_LOUD_LOGS === 'true';
+const LOUD = process.env.OMEGA_LOUD_LOGS === 'true';
 
 // Glob
 const input = [

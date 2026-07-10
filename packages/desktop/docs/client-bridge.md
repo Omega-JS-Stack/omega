@@ -47,7 +47,7 @@ When a renderer window opens (cold or warm), it asks main for the current state:
 2. Main compares with its own UID:
    - **Same UID** → no sync needed, returns `{ needsSync: false }`.
    - **Main signed out, renderer signed in** → returns `{ needsSync: true, signOut: true }`. Renderer signs out.
-   - **Main signed in, renderer not (or different user)** → main fetches a fresh custom token from `${apiUrl}/backend-manager` (command `user:create-custom-token`) and returns `{ needsSync: true, customToken, user }`. Renderer signs in with that token.
+   - **Main signed in, renderer not (or different user)** → main fetches a fresh custom token from `${apiUrl}/omega` (command `user:create-custom-token`) and returns `{ needsSync: true, customToken, user }`. Renderer signs in with that token.
 
 ### Sign-out flow
 
@@ -240,17 +240,17 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 
 ```bash
 npm i -D firebase-admin                                   # already in @omega.js/desktop's devDeps
-export EM_TEST_FIREBASE_ADMIN_KEY=/path/to/service-account.json
-export EM_TEST_USER_UID=em-test-user                      # optional, defaults to em-test-user
+export OMEGA_TEST_FIREBASE_ADMIN_KEY=/path/to/service-account.json
+export OMEGA_TEST_USER_UID=em-test-user                      # optional, defaults to em-test-user
 npx omega test --extended                                   # or: TEST_EXTENDED_MODE=true npx omega test
 ```
 
-Without the extended-mode opt-in the suite skips cleanly with a clear reason; same when `EM_TEST_FIREBASE_ADMIN_KEY` (or `GOOGLE_APPLICATION_CREDENTIALS`) isn't set. CI without creds → tests stay green.
+Without the extended-mode opt-in the suite skips cleanly with a clear reason; same when `OMEGA_TEST_FIREBASE_ADMIN_KEY` (or `GOOGLE_APPLICATION_CREDENTIALS`) isn't set. CI without creds → tests stay green.
 
 ## Implementation notes
 
 - Firebase app name in main is `em-auth` (avoids clashes if a consumer's main code also wants its own Firebase instance).
 - The bridge does NOT persist user info to @omega.js/desktop storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
-- Custom tokens are NEVER stored. Renderers receive them once via broadcast, sign in, discard. Fresh tokens are minted on demand from `/backend-manager` with command `user:create-custom-token`.
+- Custom tokens are NEVER stored. Renderers receive them once via broadcast, sign in, discard. Fresh tokens are minted on demand from `/omega` with command `user:create-custom-token`.
 - `manager.getApiUrl()` returns the dev or prod URL, so the bridge automatically hits the right backend. Available across all four Manager contexts (main / renderer / preload / build) via the shared `src/utils/url-helpers.js` module — same code path everywhere. See CLAUDE.md → "Cross-context helpers."
 - All sensitive Firebase user fields (`stsTokenManager`, `providerData`, etc.) are stripped before sending over IPC. Only `{uid, email, displayName, photoURL, emailVerified}` cross the bridge.

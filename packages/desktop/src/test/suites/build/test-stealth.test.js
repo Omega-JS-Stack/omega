@@ -2,12 +2,12 @@
 // invisible and non-intrusive". Consumed by window-manager (stealth surfacing),
 // main.js (macOS app-activation suppression), and the test harness.
 //
-// Build layer runs in plain Node, so the env-var contract (EM_TEST_MODE /
-// EM_TEST_SHOW) is exercised directly with save/restore around each case.
+// Build layer runs in plain Node, so the env-var contract (OMEGA_TEST_MODE /
+// OMEGA_TEST_SHOW) is exercised directly with save/restore around each case.
 
 const isTestStealth = require('../../../utils/test-stealth.js');
 
-// Run fn with EM_TEST_MODE / EM_TEST_SHOW set to the given values (undefined = unset),
+// Run fn with OMEGA_TEST_MODE / OMEGA_TEST_SHOW set to the given values (undefined = unset),
 // restoring the real environment afterwards so other build suites are unaffected.
 function withEnv(vars, fn) {
   const saved = {};
@@ -38,25 +38,25 @@ module.exports = {
   description: 'test-stealth predicate',
   tests: [
     {
-      name: 'true in testing mode without EM_TEST_SHOW',
+      name: 'true in testing mode without OMEGA_TEST_SHOW',
       run: (ctx) => {
-        withEnv({ EM_TEST_MODE: 'true', EM_TEST_SHOW: undefined }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true', OMEGA_TEST_SHOW: undefined }, () => {
           ctx.expect(isTestStealth()).toBe(true);
         });
       },
     },
     {
-      name: 'EM_TEST_SHOW=1 opts out even in testing mode',
+      name: 'OMEGA_TEST_SHOW=1 opts out even in testing mode',
       run: (ctx) => {
-        withEnv({ EM_TEST_MODE: 'true', EM_TEST_SHOW: '1' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true', OMEGA_TEST_SHOW: '1' }, () => {
           ctx.expect(isTestStealth()).toBe(false);
         });
       },
     },
     {
-      name: 'false outside testing mode regardless of EM_TEST_SHOW',
+      name: 'false outside testing mode regardless of OMEGA_TEST_SHOW',
       run: (ctx) => {
-        withEnv({ EM_TEST_MODE: undefined, EM_TEST_SHOW: undefined, EM_BUILD_MODE: undefined, NODE_ENV: 'development' }, () => {
+        withEnv({ OMEGA_TEST_MODE: undefined, OMEGA_TEST_SHOW: undefined, OMEGA_BUILD_MODE: undefined, NODE_ENV: 'development' }, () => {
           ctx.expect(isTestStealth()).toBe(false);
         });
       },
@@ -67,7 +67,7 @@ module.exports = {
         // Build-time Manager carries the same mode-helpers mixin as the runtime
         // Managers — config.em.environment overrides the env detection.
         const Manager = require('../../../build.js');
-        withEnv({ EM_TEST_MODE: undefined, EM_TEST_SHOW: undefined }, () => {
+        withEnv({ OMEGA_TEST_MODE: undefined, OMEGA_TEST_SHOW: undefined }, () => {
           const testing = new Manager();
           testing.config = { em: { environment: 'testing' } };
           ctx.expect(isTestStealth(testing)).toBe(true);

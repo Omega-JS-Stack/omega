@@ -215,7 +215,7 @@ function assertAllowedEnvironment(Manager) {
   }
 
   // No Manager (pure unit tests) — allow only under explicit test/emulator signals
-  if (process.env.BEM_TESTING === 'true' || process.env.FUNCTIONS_EMULATOR) {
+  if (process.env.OMEGA_TEST_MODE === 'true' || process.env.FUNCTIONS_EMULATOR) {
     return;
   }
 

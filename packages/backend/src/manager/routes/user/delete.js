@@ -46,7 +46,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   // Sign out of all sessions first
   assistant.log(`Signing out of all sessions for ${uid}...`);
 
-  await fetch(`${Manager.getApiUrl()}/backend-manager/user/sessions`, {
+  await fetch(`${Manager.getApiUrl()}/omega/user/sessions`, {
     method: 'delete',
     timeout: 60000,
     response: 'json',
@@ -54,7 +54,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     log: true,
     body: {
       uid,
-      backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+      backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     },
   })
     .then((json) => {

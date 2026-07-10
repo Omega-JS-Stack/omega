@@ -39,7 +39,7 @@ class ServeCommand extends BaseCommand {
     this.startStripeWebhookForwarding();
 
     // Start HTTPS proxy if enabled. If certs can't be obtained, fall back to
-    // plain HTTP — don't set BEM_HTTPS_PORT or redirect to the internal port.
+    // plain HTTP — don't set OMEGA_HTTPS_PORT or redirect to the internal port.
     const httpsReady = httpsEnabled
       ? await this._startHttpsProxy(port, internalPort, projectDir)
       : false;
@@ -98,7 +98,7 @@ class ServeCommand extends BaseCommand {
     if (httpsReady) {
       // Internal calls (getApiUrl → BEMClient) loop through the HTTPS proxy with a self-signed cert
       firebaseEnv.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-      firebaseEnv.BEM_HTTPS_PORT = String(port);
+      firebaseEnv.OMEGA_HTTPS_PORT = String(port);
     }
 
     try {

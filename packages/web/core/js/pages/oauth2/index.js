@@ -45,7 +45,7 @@ async function handleOAuthCallback() {
     $provider.textContent = 'Provider';
 
     // Build API URL using omega (no need to read from state)
-    const apiUrl = `${omega.getApiUrl()}/backend-manager/user/oauth2`;
+    const apiUrl = `${omega.getApiUrl()}/omega/user/oauth2`;
 
     // Send tokenize request with encrypted state
     // Note: tries=1 because auth codes can only be used once

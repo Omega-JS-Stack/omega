@@ -418,7 +418,7 @@ const windowManager = {
   // developer: shown INACTIVE (keyboard focus never leaves their editor),
   // opacity 0, and click-through (real OS clicks pass through to whatever is
   // underneath; synthetic test input — executeJavaScript, sendInputEvent — is
-  // unaffected). Set EM_TEST_SHOW=1 to surface windows normally and watch a
+  // unaffected). Set OMEGA_TEST_SHOW=1 to surface windows normally and watch a
   // run live.
   //
   // Deliberately NOT hide()/minimize(): occluded windows get throttled by
@@ -439,7 +439,7 @@ const windowManager = {
   // main.js's browser-window-created hook, which covers RAW windows).
   _surface(win, name) {
     if (windowManager._isStealth()) {
-      logger.log(`window "${name}": surfacing STEALTH (testing) — inactive, opacity 0, click-through (EM_TEST_SHOW=1 to watch)`);
+      logger.log(`window "${name}": surfacing STEALTH (testing) — inactive, opacity 0, click-through (OMEGA_TEST_SHOW=1 to watch)`);
       require('../utils/stealth-window.js').applyStealth(win);
       win.showInactive();
       return;

@@ -282,7 +282,7 @@ class BaseCommand {
     this.log(chalk.gray('  (Stripe webhook forwarding is currently disabled - coming soon!)\n'));
     return null;
 
-    // Load .env so STRIPE_SECRET_KEY and BACKEND_MANAGER_WEBHOOK_KEY are available
+    // Load .env so STRIPE_SECRET_KEY and OMEGA_WEBHOOK_KEY are available
     const envPath = path.join(functionsDir, '.env');
     if (jetpack.exists(envPath)) {
       require('dotenv').config({ path: envPath, quiet: true });
@@ -295,8 +295,8 @@ class BaseCommand {
     }
 
     // Check for OMEGA Backend webhook key
-    if (!process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
-      this.log(chalk.gray('  (Stripe webhook forwarding disabled - BACKEND_MANAGER_WEBHOOK_KEY not set in .env)\n'));
+    if (!process.env.OMEGA_WEBHOOK_KEY) {
+      this.log(chalk.gray('  (Stripe webhook forwarding disabled - OMEGA_WEBHOOK_KEY not set in .env)\n'));
       return null;
     }
 
@@ -322,7 +322,7 @@ class BaseCommand {
       }
     }
 
-    const forwardUrl = `http://localhost:${hostingPort}/backend-manager/payments/webhook?processor=stripe&key=${process.env.BACKEND_MANAGER_WEBHOOK_KEY}`;
+    const forwardUrl = `http://localhost:${hostingPort}/omega/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 
     this.log(chalk.gray(`  Stripe webhook forwarding -> localhost:${hostingPort}\n`));
 

@@ -31,15 +31,15 @@ module.exports = async function ensureEventWebhook(context) {
     return {};
   }
 
-  if (!process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
-    console.log(`      ${chalk.yellow('⚠')} No BACKEND_MANAGER_WEBHOOK_KEY in the brand .env — the forwarder URL can't be built`);
+  if (!process.env.OMEGA_WEBHOOK_KEY) {
+    console.log(`      ${chalk.yellow('⚠')} No OMEGA_WEBHOOK_KEY in the brand .env — the forwarder URL can't be built`);
     return { status: 'warned', output: { eventWebhook: { missingWebhookKey: true } } };
   }
 
   const parentHost = parent === 'self'
     ? domain
     : parent.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const desiredUrl = `https://api.${parentHost}/backend-manager/marketing/webhook/forward?provider=sendgrid&key=${process.env.BACKEND_MANAGER_WEBHOOK_KEY}`;
+  const desiredUrl = `https://api.${parentHost}/omega/marketing/webhook/forward?provider=sendgrid&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 
   const current = await api.getEventWebhookSettings();
 
@@ -58,7 +58,7 @@ module.exports = async function ensureEventWebhook(context) {
 
   if (Object.keys(patch).length === 0) {
     console.log(`      ${chalk.green('✓')} Event Webhook up to date`);
-    console.log(`      ${chalk.dim('→')} ${chalk.dim(`https://api.${parentHost}/backend-manager/marketing/webhook/forward`)}`);
+    console.log(`      ${chalk.dim('→')} ${chalk.dim(`https://api.${parentHost}/omega/marketing/webhook/forward`)}`);
     return { output: { eventWebhook: { url: 'converged' } } };
   }
 

@@ -89,7 +89,7 @@ const Manager = (new (require('@omega.js/backend'))).init(exports, options);
 |--------|---------|-------------|
 | `initialize` | `true` | Initialize Firebase Admin SDK |
 | `projectType` | `'firebase'` | `'firebase'` for Cloud Functions, `'custom'` for Express server |
-| `setupFunctions` | `true` | Setup built-in Cloud Functions (`bm_api`, etc.) |
+| `setupFunctions` | `true` | Setup built-in Cloud Functions (`omega_api`, etc.) |
 | `setupFunctionsIdentity` | `true` | Setup auth event functions (onCreate, onDelete, beforeCreate, beforeSignIn) |
 | `setupFunctionsLegacy` | `false` | Setup legacy admin functions |
 | `setupServer` | `true` | Setup custom Express server for routes |
@@ -284,19 +284,19 @@ Manager.Middleware(req, res).run('routeName', {
 
 ## Hook System
 
-Intercept and modify `bm_api` requests before/after processing:
+Intercept and modify `omega_api` requests before/after processing:
 
 ```javascript
 const Manager = (new (require('@omega.js/backend'))).init(exports, {});
 
-Manager.handlers.bm_api = function (mod, position) {
+Manager.handlers.omega_api = function (mod, position) {
   const assistant = mod.assistant;
 
   return new Promise(async function(resolve, reject) {
     const command = mod.assistant.request.data.command || '';
     const payload = mod.assistant.request.data.payload || {};
 
-    assistant.log('Intercepted bm_api', position, command, payload);
+    assistant.log('Intercepted omega_api', position, command, payload);
 
     // Handle specific commands
     if (command === 'user:sign-up') {
@@ -325,12 +325,12 @@ Manager.handlers.bm_api = function (mod, position) {
 
 ## Built-in Functions
 
-### HTTP API (`bm_api`)
+### HTTP API (`omega_api`)
 
 The main API endpoint accepts commands in the format `category:action`:
 
 ```javascript
-// POST to https://us-central1-{project}.cloudfunctions.net/bm_api
+// POST to https://us-central1-{project}.cloudfunctions.net/omega_api
 {
   "command": "general:generate-uuid",
   "payload": {
@@ -356,22 +356,22 @@ The main API endpoint accepts commands in the format `category:action`:
 
 | Function | Trigger | Description |
 |----------|---------|-------------|
-| `bm_authBeforeCreate` | `beforeUserCreated` | Runs before user creation, can block signup |
-| `bm_authBeforeSignIn` | `beforeUserSignedIn` | Runs before sign-in, can block login |
-| `bm_authOnCreate` | `onCreate` | Runs after user creation, creates user document |
-| `bm_authOnDelete` | `onDelete` | Runs when user is deleted, cleanup |
+| `omega_authBeforeCreate` | `beforeUserCreated` | Runs before user creation, can block signup |
+| `omega_authBeforeSignIn` | `beforeUserSignedIn` | Runs before sign-in, can block login |
+| `omega_authOnCreate` | `onCreate` | Runs after user creation, creates user document |
+| `omega_authOnDelete` | `onDelete` | Runs when user is deleted, cleanup |
 
 ### Firestore Events
 
 | Function | Trigger | Description |
 |----------|---------|-------------|
-| `bm_notificationsOnWrite` | `onWrite` | Triggers on `notifications/{id}` changes |
+| `omega_notificationsOnWrite` | `onWrite` | Triggers on `notifications/{id}` changes |
 
 ### Cron Jobs
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `bm_cronDaily` | Every 24 hours | Runs daily jobs from `cron/daily/` and `hooks/cron/daily/` |
+| `omega_cronDaily` | Every 24 hours | Runs daily jobs from `cron/daily/` and `hooks/cron/daily/` |
 
 **Creating Custom Cron Jobs:**
 
@@ -815,7 +815,7 @@ Set these in your `functions/.env` file:
 
 | Variable | Description |
 |----------|-------------|
-| `BACKEND_MANAGER_KEY` | Admin authentication key |
+| `OMEGA_ADMIN_KEY` | Admin authentication key |
 | `STRIPE_SECRET_KEY` | Stripe secret key (enables auto webhook forwarding in `serve`/`emulator`) |
 
 ## Response Headers
@@ -823,7 +823,7 @@ Set these in your `functions/.env` file:
 @omega.js/backend attaches metadata to responses:
 
 ```
-bm-properties: {"code":200,"tag":"functionName/executionId","usage":{...},"schema":{...}}
+omega-properties: {"code":200,"tag":"functionName/executionId","usage":{...},"schema":{...}}
 ```
 
 ## Testing

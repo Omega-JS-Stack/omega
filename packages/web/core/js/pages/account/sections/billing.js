@@ -187,7 +187,7 @@ async function openBillingPortal() {
     if ($manageBtn) $manageBtn.disabled = true;
     if ($btnText) $btnText.textContent = 'Opening...';
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/portal`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/portal`, {
       method: 'POST',
       timeout: 15000,
       response: 'json',
@@ -242,7 +242,7 @@ function setupCancellationForm() {
 
     trackBilling('cancel_submit');
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/cancel`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/cancel`, {
       method: 'POST',
       timeout: 30000,
       response: 'json',

@@ -14,7 +14,7 @@ npx omega test --filter "messaging"     # only suites/tests whose name contains 
 npx omega test --extended               # run extended suites against REAL external services (Firebase, etc.) — normal mode skips them in-source, never mocks them
 TEST_EXTENDED_MODE=true npx omega test  # same as --extended (the shared, unprefixed env var across all OMEGA frameworks)
 npx omega test --reporter json          # pretty output + machine-readable {"event":"summary",...} line
-BXM_TEST_DEBUG=1 npx omega test         # see Chromium/SW stderr (otherwise drained silently)
+OMEGA_TEST_DEBUG=1 npx omega test         # see Chromium/SW stderr (otherwise drained silently)
 ```
 
 In @omega.js/extension itself, `npm test` does the same.
@@ -142,14 +142,14 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 **Skipping a layer is the exception, not the default.** A layer may be skipped ONLY when the feature genuinely has no surface there — a pure build-time utility has no UI; a CSS-only tweak has no logic to call. Convenience is never a reason: "the logic test already covers it" does NOT excuse the UI test — logic tests prove the logic, UI tests prove the wiring (a button can come unhooked while every logic test stays green), boot tests prove the packaging. When in doubt, write the test.
 
-## `BXM_TEST_MODE=true` — the canonical "we're in tests" signal
+## `OMEGA_TEST_MODE=true` — the canonical "we're in tests" signal
 
-Both @omega.js/extension test runners set `BXM_TEST_MODE=true` in spawned child envs. That powers `manager.isTesting()` (and `Manager.isTesting()` static) — the cross-context helper anything in @omega.js/extension/consumer code should check when behavior needs to differ in tests. See [environment-detection.md](environment-detection.md).
+Both @omega.js/extension test runners set `OMEGA_TEST_MODE=true` in spawned child envs. That powers `manager.isTesting()` (and `Manager.isTesting()` static) — the cross-context helper anything in @omega.js/extension/consumer code should check when behavior needs to differ in tests. See [environment-detection.md](environment-detection.md).
 
 Consumers writing their own tests get this automatically when running through `npx omega test`. To set it manually in another runner:
 
 ```json
-"test": "BXM_TEST_MODE=true vitest"
+"test": "OMEGA_TEST_MODE=true vitest"
 ```
 
 ## Test discovery

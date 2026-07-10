@@ -10,7 +10,7 @@ module.exports = async function (options) {
   // Refuse to publish without cert validation passing
   await validateCerts(options);
 
-  process.env.EM_IS_PUBLISH = 'true';
+  process.env.OMEGA_IS_PUBLISH = 'true';
 
   await execute('npm run publish', { log: true });
 };

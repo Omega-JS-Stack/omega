@@ -177,7 +177,7 @@ GitHub Actions secrets you'll need (per repo):
 | Secret | Purpose |
 |---|---|
 | `GH_TOKEN` | Cross-repo publish, secret rotation |
-| `BACKEND_MANAGER_KEY` | Privileged backend API calls |
+| `OMEGA_ADMIN_KEY` | Privileged backend API calls |
 | `CSC_LINK` | base64-encoded `.p12` (workflow decodes to file) |
 | `CSC_KEY_PASSWORD` | `.p12` password |
 | `APPLE_API_KEY` | base64-encoded `.p8` |

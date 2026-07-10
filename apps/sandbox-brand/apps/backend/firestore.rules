@@ -4,7 +4,7 @@ service cloud.firestore {
     // Custom rules
     // ...
 
-    ///---backend-manager---///
+    ///---omega---///
     ///---version=5.11.7---///
     // Lock by default
     match /{document=**} {

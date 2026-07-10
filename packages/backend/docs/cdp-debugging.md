@@ -19,7 +19,7 @@ Humans: the agent's Chrome window is visible — you can watch it drive. Full re
 
 ## Electron apps are the exception (attach, don't launch)
 
-An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx omega cdp`. See EM's `docs/cdp-debugging.md`.
+An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `OMEGA_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx omega cdp`. See EM's `docs/cdp-debugging.md`.
 
 ## @omega.js/backend specifics
 

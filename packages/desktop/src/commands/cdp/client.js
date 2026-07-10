@@ -1,6 +1,6 @@
 // Shared CDP plumbing for the `mgr cdp` toolkit — zero dependencies (Node 22+
 // global fetch + WebSocket). Talks to the RUNNING dev app's DevTools endpoint
-// (launch with `EM_CDP_PORT=9222 npm start`, or `npx omega cdp relaunch`).
+// (launch with `OMEGA_CDP_PORT=9222 npm start`, or `npx omega cdp relaunch`).
 //
 // @omega.js/desktop apps are MULTI-TARGET — one debuggable page per webContents (every
 // BrowserWindow and WebContentsView). Every helper takes a URL-substring
@@ -15,14 +15,14 @@
 const MAIN_VIEW = '/views/main/';
 
 function port() {
-  return Number(process.env.EM_CDP_PORT || 9222);
+  return Number(process.env.OMEGA_CDP_PORT || 9222);
 }
 
 // List the app's debuggable pages (type === 'page' targets only).
 async function targets() {
   const response = await fetch(`http://127.0.0.1:${port()}/json`).catch(() => null);
   if (!response || !response.ok) {
-    throw new Error(`No CDP endpoint on port ${port()} — is the app running? (EM_CDP_PORT=${port()} npm start, or npx omega cdp relaunch)`);
+    throw new Error(`No CDP endpoint on port ${port()} — is the app running? (OMEGA_CDP_PORT=${port()} npm start, or npx omega cdp relaunch)`);
   }
   const list = await response.json();
   return list.filter((t) => t.type === 'page');

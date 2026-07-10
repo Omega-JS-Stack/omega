@@ -91,7 +91,7 @@ async function fetchPost(assistant, url) {
   const fetch = Manager.require('wonderful-fetch');
 
   // Use NEW API format
-  const result = await fetch(`${Manager.getApiUrl()}/backend-manager/content/post`, {
+  const result = await fetch(`${Manager.getApiUrl()}/omega/content/post`, {
     method: 'get',
     response: 'json',
     timeout: 190000,

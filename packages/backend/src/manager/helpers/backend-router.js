@@ -5,9 +5,9 @@
  *
  * Detection rules:
  * - Legacy: command with ':' AND no meaningful route path
- *   - Direct function call: /us-central1/bm_api (no path after prefix)
- *   - Hosting rewrite: /backend-manager (no path after prefix)
- * - New: URL path like /backend-manager/user/sign-up (has path after prefix)
+ *   - Direct function call: /us-central1/omega_api (no path after prefix)
+ *   - Hosting rewrite: /omega (no path after prefix)
+ * - New: URL path like /omega/user/sign-up (has path after prefix)
  */
 
 function BackendRouter(Manager, req, res) {
@@ -30,9 +30,11 @@ BackendRouter.prototype.resolve = function () {
   // Extract URL path
   const urlPath = req.path || '';
 
-  // Strip prefix: /backend-manager/ or /bm_api/ or leading slash
+  // Strip prefix: /omega/, /omega_api/ (direct function URL), the legacy
+  // /backend-manager/ alias (kept so migrating brands' in-the-wild clients
+  // keep working), or leading slash
   const routePath = urlPath
-    .replace(/^\/(backend-manager|bm_api)\/?/, '')
+    .replace(/^\/(omega|omega_api|backend-manager)\/?/, '')
     .replace(/^\//, '');
 
   // Legacy if: command contains ':' AND routePath is empty

@@ -2,15 +2,14 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N3 wire/env harmonization (cp72) — route prefix `/omega`, functions `omega_*`, runtime-config key `omega`, env `OMEGA_*`; CI runs 2–3 verifying in background
+- N4 architecture sweep (cp73) — DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys; CI run 5 verifying the emulator-hang fix in background
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. N4 migrated-code architecture sweep (DRY/SSOT review of packages/*) + zod route schemas (data shapes + route semantics preserved) + provider-discriminated config keys (D12)
-2. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
-3. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
-4. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002)
-5. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`)
-6. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
+1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
+2. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
+3. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002; unified `OMEGA_LIVERELOAD_PORT` needs per-target allocation)
+4. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
+5. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - electron-manager@1.12.1/1.13.0 publish — 1.12.0 on npm breaks fresh installs; the LEGACY repo now carries both commits (the other agent's merge), so Ian publishes straight from it — the monorepo pre-rename tag (`pre-desktop-rename`, cp66) is just backup
@@ -33,7 +32,9 @@
 - Local-first (Ian 2026-07-09): build the NEW system locally — zero npm publishes until Ian finalizes versions (orgs now claimed; `@omega.js` names land at N2); migrators/verifiers pinned.
 
 ## ⚠ Parked findings (detail: the named task's CHANGELOG entry)
-- ~~Env prefixes + backend wire format~~ GRADUATED to queue N3 (Ian approved the breaking renames, 70); ~~BEM hardcoded emulator ports~~ GRADUATED to queue N7 (70)
+- ~~Env prefixes + backend wire format~~ SHIPPED (72); ~~BEM hardcoded emulator ports~~ GRADUATED to queue N7 (70)
+- Ghostii devlog auth still sends the `backendManagerKey` payload field — live external API contract; rename when Ghostii itself migrates to the new stack (72)
+- CI watch: 'Failed to load function' flurries in the sandbox onDelete storm on runners (run 4 log) — corpus green locally + labeled failures now; if run 5+ sandbox jobs flake, start here (72)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
@@ -41,6 +42,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 72 N3 wire/env harmonization — `/omega` routes (legacy `/backend-manager` alias kept per Ian), `omega_*` functions, `omega` config section, `///---omega---///` markers, `omega-properties` header, `omega-api-proxy` worker; ~60 env vars → unified `OMEGA_*` (BUILD_JSON/TEST_MODE/AUDIT_FORCE unified cross-framework; UJ_AUDIT_FORCE extension leak fixed); D14 crypto-provisioned keys at onboarding; 10 suites + sandbox corpus + cross-stack e2e + pack-smoke ×4 (this commit) → CHANGELOG
 - [x] 71 Great Rename — `@omega.js` scope everywhere (650 files; lockfiles regenerated, dists re-vendored, regex gates escaped); universal `omega`/`omg`/`mgr` dispatcher bins (devkit 1.2.0, hoist-winner-proof, bootstrap fallback, live cross-dispatch proof); `window.webManager` → `window.omega` sweep (127 files; migrate-codemod collision caught + repaired by fixture tests); docs flip to `npx omega`; 10 suites + pack-smoke ×4 green (this commit) → CHANGELOG
 - [x] 70 core-changes graduation + N1 re-sync + first real CI — inbox DECIDED 10/10 binding, queue = N1–N7 + dogfood, continuous mode ON; repo live at github.com/Omega-JS-Stack/omega; sweep verdict: monorepo is a superset of ALL legacy repos (one gap: 9 UJM redirect shortlinks → web 0.2.1); desktop webpack `global` fix (2.0.2) + CI env fixes (firebase-tools, puppeteer) (this commit) → CHANGELOG
 - [x] 69 local-linking DX (plan §8) — devkit/local + concurrent root `npm start` + `omega dev --local` + `mgr i local` ×3 (desktop/extension were broken since their renames); vendor fix: published runtime deps (client) never vendored; live proofs + 7 suites + pack-smoke ×4 (this commit) → CHANGELOG + docs/local-dev.md
@@ -64,4 +66,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 1:25 PM (checkpoint 71 done; 72 = N3 wire/env harmonization in flight)*
+*Last updated: 2026-07-10 3:05 PM (checkpoint 72 done; 73 = N4 architecture sweep next)*

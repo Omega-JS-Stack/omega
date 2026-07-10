@@ -3,21 +3,21 @@
 /**
  * @omega.js/backend Test Runner Entry Point
  * This script is executed by the CLI test command inside the Firebase emulator
- * It reads configuration from BEM_TEST_CONFIG environment variable and runs the test suite
+ * It reads configuration from OMEGA_TEST_CONFIG environment variable and runs the test suite
  */
 
 // Mark this process as the test runner BEFORE loading any @omega.js/backend code. Manager.init()
 // auto-detects this and skips Firebase Functions / server / Sentry wiring (which
 // can't run outside a real Functions runtime). This is what lets tests receive a
 // fully-wired Manager + assistant in their context — no per-test stub.
-process.env.BEM_TEST_RUNNER = '1';
+process.env.OMEGA_TEST_RUNNER = '1';
 
 const path = require('path');
 const TestRunner = require('./runner.js');
 
 async function main() {
   // Parse config from base64-encoded env var
-  const configBase64 = process.env.BEM_TEST_CONFIG || '';
+  const configBase64 = process.env.OMEGA_TEST_CONFIG || '';
   const testConfig = configBase64
     ? JSON.parse(Buffer.from(configBase64, 'base64').toString('utf8'))
     : {};
@@ -40,7 +40,7 @@ async function main() {
     console.error('Warning: Could not initialize Firebase Admin:', error.message);
   }
 
-  // Boot a real Manager. With BEM_TEST_RUNNER set, init() loads libraries +
+  // Boot a real Manager. With OMEGA_TEST_RUNNER set, init() loads libraries +
   // resolves project config but skips the parts that need a Functions runtime
   // (handler wiring, server boot, Sentry, admin.initializeApp re-init).
   // The resulting Manager + assistant are passed into every test context, so

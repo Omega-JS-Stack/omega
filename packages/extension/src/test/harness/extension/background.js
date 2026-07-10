@@ -6,14 +6,14 @@
 // directly from the parent Node process — this file is intentionally minimal.
 //
 // We set a couple of globals the injected test code can rely on:
-//   globalThis.BXM_TEST_MODE — picked up by Manager.isTesting()
+//   globalThis.OMEGA_TEST_MODE — picked up by Manager.isTesting()
 //   globalThis.__bxmTestEmit — defined by the runner before each test;
 //                              used by injected code to report results
 //
 // We also publish a `chrome.runtime.onMessage` ping handler so view-layer tests
 // (running in popup/options/sidepanel tabs) can verify the SW is alive.
 
-globalThis.BXM_TEST_MODE = true;
+globalThis.OMEGA_TEST_MODE = true;
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'bxm:test:ping') {

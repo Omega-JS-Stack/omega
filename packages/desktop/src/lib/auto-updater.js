@@ -19,7 +19,7 @@
 // State machine (broadcast to renderers as `desktop:auto-updater:status`):
 //   idle / checking / available / downloading / downloaded / not-available / error
 //
-// Dev simulation: set `EM_DEV_UPDATE=available|unavailable|error` env var. The updater synthesizes
+// Dev simulation: set `OMEGA_DEV_UPDATE=available|unavailable|error` env var. The updater synthesizes
 // the appropriate event sequence so you can test the UI flow without a real update server.
 //
 // Renderer surface (added to preload.js as `window.em.autoUpdater`):
@@ -131,7 +131,7 @@ const autoUpdater = {
 
     // 2. Wire the electron-updater instance (or dev simulator).
     if (autoUpdater._isSimulating()) {
-      logger.log(`Dev simulation mode active (EM_DEV_UPDATE=${process.env.EM_DEV_UPDATE})`);
+      logger.log(`Dev simulation mode active (OMEGA_DEV_UPDATE=${process.env.OMEGA_DEV_UPDATE})`);
       autoUpdater._wireDevSimulator();
     } else {
       autoUpdater._wireElectronUpdater();
@@ -316,11 +316,11 @@ const autoUpdater = {
 
   // Auto-updater dev SIMULATION mode — controls whether checkForUpdates() is wired
   // to electron-updater (real) or our synthetic event sequence (fake). Triggered by
-  // setting EM_DEV_UPDATE=available|unavailable|error. NOT the same as
+  // setting OMEGA_DEV_UPDATE=available|unavailable|error. NOT the same as
   // `manager.isDevelopment()` (which is the runtime "are we packaged" signal); a
-  // packaged production build can absolutely run with EM_DEV_UPDATE set for QA.
+  // packaged production build can absolutely run with OMEGA_DEV_UPDATE set for QA.
   _isSimulating() {
-    return !!process.env.EM_DEV_UPDATE;
+    return !!process.env.OMEGA_DEV_UPDATE;
   },
 
   _idleThresholdMs() {
@@ -595,7 +595,7 @@ const autoUpdater = {
     if (autoUpdater._devSimulating) return;
     autoUpdater._devSimulating = true;
 
-    const scenario = (process.env.EM_DEV_UPDATE || 'available').toLowerCase();
+    const scenario = (process.env.OMEGA_DEV_UPDATE || 'available').toLowerCase();
     const NEW_VERSION = '999.0.0';
 
     autoUpdater._setState({ code: 'checking' });

@@ -1050,7 +1050,7 @@ export default function () {
 
   // Wakeup server to prevent cold start on signup API call
   function wakeupServer() {
-    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/signup?wakeup=true`;
+    const serverApiURL = `${omega.getApiUrl()}/omega/user/signup?wakeup=true`;
 
     fetch(serverApiURL, { method: 'POST' })
       .then(() => console.log('[Auth] Server wakeup sent'))

@@ -2,7 +2,7 @@
 // `npm start` has NO watch (build once, then run), so every src/ edit needs
 // quit → rebuild → boot.
 //
-// Boots with CDP on EM_CDP_PORT (default 9222) so the other cdp subcommands
+// Boots with CDP on OMEGA_CDP_PORT (default 9222) so the other cdp subcommands
 // can attach. "Booted" = a page target matching the ready signal exists —
 // default: the main window's document (`/views/main/`); consumers whose boot
 // completes later than first paint override via config `cdp.readySignal`
@@ -49,7 +49,7 @@ module.exports = async function (options) {
 
   const child = spawn('npm', ['start'], {
     cwd: process.cwd(),
-    env: { ...process.env, EM_CDP_PORT: String(client.port()) },
+    env: { ...process.env, OMEGA_CDP_PORT: String(client.port()) },
     detached: true,
     stdio: 'ignore',
   });

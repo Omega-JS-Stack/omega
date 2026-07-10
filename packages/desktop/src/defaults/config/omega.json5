@@ -173,7 +173,7 @@
         },
       },
       // Auto-updater (electron-updater wrapper). Feed URL is auto-derived from `releases` (below).
-      // Set `EM_DEV_UPDATE=available|unavailable|error` to simulate updates in dev.
+      // Set `OMEGA_DEV_UPDATE=available|unavailable|error` to simulate updates in dev.
       autoUpdate: {
         enabled:        true,
         channel:        'latest',
@@ -263,7 +263,7 @@
       // quit, and silently installs RM when missing (mac zip / win silent NSIS /
       // linux AppImage — no installer UI, no admin; RM then keeps itself updated via
       // its own standard @omega.js/desktop auto-updater). Set false to disable entirely. In dev
-      // mode it's skipped unless EM_RESTART_MANAGER_DEV=1.
+      // mode it's skipped unless OMEGA_RESTART_MANAGER_DEV=1.
       restartManager: {
         enabled: true,
         // feed: { owner: 'restart-manager', repo: 'update-server' },  // override for forks/mirrors

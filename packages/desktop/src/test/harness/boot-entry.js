@@ -1,10 +1,10 @@
 // Boot harness — invoked from @omega.js/desktop's main.js after manager.initialize() resolves
-// when EM_TEST_BOOT=1. Reads the spec file pointed to by EM_TEST_BOOT_SPEC,
+// when OMEGA_TEST_BOOT=1. Reads the spec file pointed to by OMEGA_TEST_BOOT_SPEC,
 // runs each `inspect` against the live manager, emits results, and quits.
 //
 // Why call from main.js instead of preloading via electron's --require?
 // Because Electron rejects unknown CLI flags, we can't sneak args/preload modules in.
-// So @omega.js/desktop's main.js opts into the harness when it sees EM_TEST_BOOT=1, after a
+// So @omega.js/desktop's main.js opts into the harness when it sees OMEGA_TEST_BOOT=1, after a
 // fully-completed initialize() guarantees every lib is up.
 //
 // Protocol matches main-entry.js — emit `__EM_TEST__` JSON lines on stdout.
@@ -27,9 +27,9 @@ async function run(manager) {
   // when inspecting window state.
   await waitForMainWindow(manager, 3000);
 
-  const specPath = process.env.EM_TEST_BOOT_SPEC;
+  const specPath = process.env.OMEGA_TEST_BOOT_SPEC;
   if (!specPath) {
-    emit({ event: 'fatal', message: 'boot-entry.js: EM_TEST_BOOT_SPEC env var not set' });
+    emit({ event: 'fatal', message: 'boot-entry.js: OMEGA_TEST_BOOT_SPEC env var not set' });
     app.exit(1);
     return;
   }

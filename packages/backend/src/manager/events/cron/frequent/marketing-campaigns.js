@@ -33,7 +33,7 @@
  * Unknown campaign types / generators are marked 'failed' (they can never
  * succeed — usually a config typo — so retrying forever just burns runs).
  *
- * Runs on bm_cronFrequent (every 10 minutes).
+ * Runs on omega_cronFrequent (every 10 minutes).
  */
 const moment = require('moment');
 const pushid = require('pushid');

@@ -39,7 +39,7 @@ module.exports = {
     {
       name: 'authorize auto-approves when client_id is admin key',
       async run({ http, assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await http.as('none').get(
           'backend-manager/mcp/authorize',
           {
@@ -60,7 +60,7 @@ module.exports = {
         // to example.com/token. This proves the redirect path works.
         try {
           const response = await fetch(
-            `${BASE_URL}/backend-manager/mcp/authorize?redirect_uri=https://example.com/callback&state=abc`,
+            `${BASE_URL}/omega/mcp/authorize?redirect_uri=https://example.com/callback&state=abc`,
             { method: 'GET', response: 'text', timeout: 10000 },
           );
           assert.ok(response, 'Should get a response after following redirect');
@@ -76,7 +76,7 @@ module.exports = {
     {
       name: 'token rejects GET method',
       async run({ assert }) {
-        const response = await fetchJSON(`${BASE_URL}/backend-manager/mcp/token`, {
+        const response = await fetchJSON(`${BASE_URL}/omega/mcp/token`, {
           method: 'GET',
         });
 
@@ -87,8 +87,8 @@ module.exports = {
     {
       name: 'token exchanges admin key for access_token',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
-        const response = await fetchJSON(`${BASE_URL}/backend-manager/mcp/token`, {
+        const key = process.env.OMEGA_ADMIN_KEY;
+        const response = await fetchJSON(`${BASE_URL}/omega/mcp/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: key }),
@@ -103,7 +103,7 @@ module.exports = {
     {
       name: 'token rejects invalid code',
       async run({ assert }) {
-        const response = await fetchJSON(`${BASE_URL}/backend-manager/mcp/token`, {
+        const response = await fetchJSON(`${BASE_URL}/omega/mcp/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: 'invalid-key-12345' }),
@@ -117,7 +117,7 @@ module.exports = {
     {
       name: 'token rejects empty body',
       async run({ assert }) {
-        const response = await fetchJSON(`${BASE_URL}/backend-manager/mcp/token`, {
+        const response = await fetchJSON(`${BASE_URL}/omega/mcp/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
@@ -132,7 +132,7 @@ module.exports = {
     {
       name: 'register returns a client_id',
       async run({ assert }) {
-        const response = await fetchJSON(`${BASE_URL}/backend-manager/mcp/register`, {
+        const response = await fetchJSON(`${BASE_URL}/omega/mcp/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -150,7 +150,7 @@ module.exports = {
     {
       name: 'register rejects GET method',
       async run({ assert }) {
-        const response = await fetchJSON(`${BASE_URL}/backend-manager/mcp/register`, {
+        const response = await fetchJSON(`${BASE_URL}/omega/mcp/register`, {
           method: 'GET',
         });
 

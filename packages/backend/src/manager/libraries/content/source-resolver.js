@@ -213,7 +213,7 @@ async function loadParentPool(state) {
   for (const category of categoriesToFetch) {
     const query = {
       limit: PARENT_SOURCES_PER_CATEGORY,
-      backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+      backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     };
 
     if (category) {

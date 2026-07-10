@@ -25,7 +25,7 @@ delete process.env.RECAPTCHA_SECRET_KEY;
 delete process.env.META_ACCESS_TOKEN;
 delete process.env.TIKTOK_ACCESS_TOKEN;
 delete process.env.SENDGRID_API_KEY;
-delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+delete process.env.OMEGA_WEBHOOK_KEY;
 delete process.env.BEEHIIV_API_KEY;
 delete process.env.STRIPE_SECRET_KEY;
 delete process.env.PAYPAL_CLIENT_SECRET;

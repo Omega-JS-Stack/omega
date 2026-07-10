@@ -122,7 +122,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
 
   // Accept either an already-RESOLVED config object, a string path to a consumer
   // project dir, or nothing. Default resolution order (when called with no arg):
-  //   1. EM_BUILD_JSON.config — injected at build time by webpack DefinePlugin. This is
+  //   1. OMEGA_BUILD_JSON.config — injected at build time by webpack DefinePlugin. This is
   //      authoritative in packaged apps because config/omega.json5 is inside the asar —
   //      not loadable from disk. It's the RESOLVED config (Manager.getConfig() output —
   //      shared sections + targets.desktop overlaid) snapshotted at build time.
@@ -131,9 +131,9 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   if (typeof consumerConfig === 'string') {
     consumerConfig = loadResolvedConfig(consumerConfig);
   } else if (!consumerConfig) {
-    // Try EM_BUILD_JSON (set by DefinePlugin in packaged builds) first.
-    if (typeof EM_BUILD_JSON !== 'undefined' && EM_BUILD_JSON?.config) {
-      consumerConfig = EM_BUILD_JSON.config;
+    // Try OMEGA_BUILD_JSON (set by DefinePlugin in packaged builds) first.
+    if (typeof OMEGA_BUILD_JSON !== 'undefined' && OMEGA_BUILD_JSON?.config) {
+      consumerConfig = OMEGA_BUILD_JSON.config;
     } else {
       const appRoot = require('./utils/app-root.js')();
       consumerConfig = loadResolvedConfig(appRoot);
@@ -260,7 +260,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   //     switch app.dock.hide() flips, and what LSUIElement bakes for packaged
   //     hidden-mode apps) keeps the test process from ever activating; windows still
   //     render normally. Must run before app ready — activation happens when the app
-  //     finishes launching. EM_TEST_SHOW=1 restores normal activation along with
+  //     finishes launching. OMEGA_TEST_SHOW=1 restores normal activation along with
   //     visible windows.
   if (process.platform === 'darwin' && require('./utils/test-stealth.js')(self)) {
     app.dock.hide();
@@ -272,7 +272,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   //        a consumer's automation popup). Window-manager stealths only its own
   //        named windows via _surface(); this hook closes the gap so no window
   //        can flash or steal focus during a test run. The predicate is evaluated
-  //        PER WINDOW so EM_TEST_SHOW=1 keeps working even when flipped mid-run
+  //        PER WINDOW so OMEGA_TEST_SHOW=1 keeps working even when flipped mid-run
   //        (the window-manager suite does exactly that).
   if (self.isTesting()) {
     app.on('browser-window-created', (_event, win) => {
@@ -292,7 +292,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
       if (!require('./utils/test-stealth.js')(self)) return;
       wc.focus = () => {};
     });
-    self.logger.log('test stealth: every BrowserWindow (raw ones included) surfaces invisible + unfocusable, webContents.focus() suppressed (EM_TEST_SHOW=1 to watch)');
+    self.logger.log('test stealth: every BrowserWindow (raw ones included) surfaces invisible + unfocusable, webContents.focus() suppressed (OMEGA_TEST_SHOW=1 to watch)');
   }
 
   // 1b. Isolate the userData path per environment. MUST run before
@@ -303,11 +303,11 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   //       testing     → <name> (Testing)       (wiped at boot — every test run starts
   //                                             from a clean slate; post-run state stays
   //                                             on disk for inspection until the next run.
-  //                                             Set EM_TEST_KEEP_USERDATA=1 to skip the wipe.)
+  //                                             Set OMEGA_TEST_KEEP_USERDATA=1 to skip the wipe.)
   if (self.isTesting()) {
     const before = app.getPath('userData');
     const after  = `${before} (Testing)`;
-    const keep   = process.env.EM_TEST_KEEP_USERDATA === '1';
+    const keep   = process.env.OMEGA_TEST_KEEP_USERDATA === '1';
     if (!keep) {
       require('fs').rmSync(after, { recursive: true, force: true });
     }
@@ -441,7 +441,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // heartbeats every 60s, deregisters on graceful quit, and silently installs RM
   // when missing (mac zip / win silent NSIS / linux AppImage — RM then self-updates
   // via its own @omega.js/desktop autoUpdater). Skips itself when this app IS restart-manager, in
-  // dev (unless EM_RESTART_MANAGER_DEV=1), or when restartManager.enabled=false.
+  // dev (unless OMEGA_RESTART_MANAGER_DEV=1), or when restartManager.enabled=false.
   // See docs/restart-manager.md.
   self.restartManager.initialize(self);
 
@@ -456,7 +456,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   self.logger.log('@omega.js/desktop (main) initialized.');
 
   // Boot test harness — runs against the live manager AFTER all libs are up. Test runner
-  // sets EM_TEST_BOOT=1 + EM_TEST_BOOT_HARNESS=<absolute path> + EM_TEST_BOOT_SPEC=<path>
+  // sets OMEGA_TEST_BOOT=1 + OMEGA_TEST_BOOT_HARNESS=<absolute path> + OMEGA_TEST_BOOT_SPEC=<path>
   // before spawning electron. The harness emits __EM_TEST__ JSON lines on stdout (parsed
   // by runners/boot.js) then app.exit()s.
   //
@@ -464,9 +464,9 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // @omega.js/desktop is webpacked into the consumer's bundle, and a static require would either get
   // inlined (bundling test code into production) or dead-code-eliminated. An env-var
   // path stays external and can only resolve when the runner sets it.
-  if (process.env.EM_TEST_BOOT === '1') {
+  if (process.env.OMEGA_TEST_BOOT === '1') {
     global.__em_manager = self;
-    const harnessPath = process.env.EM_TEST_BOOT_HARNESS;
+    const harnessPath = process.env.OMEGA_TEST_BOOT_HARNESS;
     if (harnessPath) {
       // Defer the harness so the consumer's `manager.initialize().then(() => { ... })`
       // callback gets a chance to run first. @omega.js/desktop doesn't auto-create any windows; the
@@ -491,7 +491,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
       });
     } else {
       const { app } = require('electron');
-      process.stdout.write(`__EM_TEST__${JSON.stringify({ event: 'fatal', message: 'EM_TEST_BOOT=1 but EM_TEST_BOOT_HARNESS not set' })}\n`);
+      process.stdout.write(`__EM_TEST__${JSON.stringify({ event: 'fatal', message: 'OMEGA_TEST_BOOT=1 but OMEGA_TEST_BOOT_HARNESS not set' })}\n`);
       app.exit(1);
     }
   }

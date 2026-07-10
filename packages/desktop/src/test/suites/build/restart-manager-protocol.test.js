@@ -23,12 +23,12 @@ module.exports = {
       },
     },
     {
-      name: 'resolveSharedRoot: default under appData, EM_RM_ROOT override wins',
+      name: 'resolveSharedRoot: default under appData, OMEGA_RM_ROOT override wins',
       run: (ctx) => {
         const def = protocol.resolveSharedRoot('/x/appData', {});
         ctx.expect(def).toBe(path.join('/x/appData', 'restart-manager'));
 
-        const overridden = protocol.resolveSharedRoot('/x/appData', { EM_RM_ROOT: '/tmp/rm-isolated' });
+        const overridden = protocol.resolveSharedRoot('/x/appData', { OMEGA_RM_ROOT: '/tmp/rm-isolated' });
         ctx.expect(overridden).toBe('/tmp/rm-isolated');
       },
     },

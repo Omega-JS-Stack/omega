@@ -5,7 +5,7 @@
 // This task does NOT publish — it just produces local artifacts under `release/`.
 // For publishing, see gulp/release.js.
 //
-// Skip Windows code signing during this step on the windows runner if EM_SKIP_WIN_SIGN=true
+// Skip Windows code signing during this step on the windows runner if OMEGA_SKIP_WIN_SIGN=true
 // is set — the windows-sign job in CI signs separately.
 
 const path    = require('path');

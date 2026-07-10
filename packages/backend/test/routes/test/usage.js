@@ -239,7 +239,7 @@ module.exports = {
     // Test 9: Cron resets daily counters for authenticated users
     {
       name: 'cron-resets-daily-counters',
-      // bm_cronDaily runs all daily jobs serially; reset-usage is at the end of
+      // omega_cronDaily runs all daily jobs serially; reset-usage is at the end of
       // the alphabetical sequence. In EXTENDED mode the real-API jobs ahead of
       // it can take ~50s combined — override the suite's 30s default.
       timeout: 75000,
@@ -253,10 +253,10 @@ module.exports = {
         state.totalBeforeCron = beforeDoc.usage.requests.total;
 
         // Trigger cron via PubSub
-        await pubsub.trigger('bm_cronDaily');
+        await pubsub.trigger('omega_cronDaily');
 
         // Wait for cron to reset daily counter.
-        // bm_cronDaily executes every registered daily job sequentially. In EXTENDED
+        // omega_cronDaily executes every registered daily job sequentially. In EXTENDED
         // mode the real-API jobs (expire-paypal-cancellations,
         // blog-auto-publisher, etc.) can take 40-50s combined before reset-usage
         // (alphabetical tail) gets its turn. 70s gives that the headroom it needs;

@@ -50,7 +50,7 @@ assistant.respond('https://example.com', { code: 302 });
 ## Use Hooks (Consumer Project)
 
 ```javascript
-Manager.handlers.bm_api = function (mod, position) {
+Manager.handlers.omega_api = function (mod, position) {
   const assistant = mod.assistant;
   const command = assistant.request.data.command;
 

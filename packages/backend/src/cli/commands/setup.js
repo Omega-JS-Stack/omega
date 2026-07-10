@@ -8,7 +8,7 @@ const fetch = require('wonderful-fetch');
 const omegaConfig = require('@omega.js/config');
 
 // Regex patterns (used by getRulesFile)
-const bem_allRulesRegex = /(\/\/\/---backend-manager---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
+const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
 
 class SetupCommand extends BaseCommand {
   async execute() {
@@ -153,10 +153,10 @@ class SetupCommand extends BaseCommand {
   getRulesFile() {
     const self = this.main;
     self.default.firestoreRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/firestore.rules`))).replace('=0.0.0-', `=${self.default.version}-`);
-    self.default.firestoreRulesCore = self.default.firestoreRulesWhole.match(bem_allRulesRegex)[0];
+    self.default.firestoreRulesCore = self.default.firestoreRulesWhole.match(omegaAllRulesRegex)[0];
 
     self.default.databaseRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/database.rules.json`))).replace('=0.0.0-', `=${self.default.version}-`);
-    self.default.databaseRulesCore = self.default.databaseRulesWhole.match(bem_allRulesRegex)[0];
+    self.default.databaseRulesCore = self.default.databaseRulesWhole.match(omegaAllRulesRegex)[0];
   }
 
   // Copy default files (src/defaults/**) into the consumer project root via the
@@ -346,13 +346,13 @@ class SetupCommand extends BaseCommand {
 
   async fetchStats() {
     const self = this.main;
-    const url = `${self.apiUrl}/backend-manager/admin/stats`;
+    const url = `${self.apiUrl}/omega/admin/stats`;
     const statsFetchResult = await fetch(url, {
       method: 'GET',
       timeout: 30000,
       response: 'json',
       query: {
-        backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
       },
     })
     .then(json => json)

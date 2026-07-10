@@ -33,7 +33,7 @@ module.exports = async function (options) {
   // Quick mode (mirrors UJM's UJ_QUICK pattern): skip every network-bound / GitHub-talking /
   // cert-checking step. Keep only the local-only, idempotent, fast steps (scaffold, projectScripts,
   // .nvmrc write, locality check). Used for inner-loop dev once a full setup has succeeded once.
-  // Triggered by `--quick` / `-q` CLI flag (or `EM_QUICK=true` env), plumbed via Manager.isQuickMode().
+  // Triggered by `--quick` / `-q` CLI flag (or `OMEGA_QUICK=true` env), plumbed via Manager.isQuickMode().
   if (options.quick === true || options.q === true || Manager.isQuickMode()) {
     logger.log('Quick mode: Skipping slow setup operations');
     options.checkManager          = false;

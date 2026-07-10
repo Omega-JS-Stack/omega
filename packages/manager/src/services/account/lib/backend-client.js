@@ -94,12 +94,12 @@ function createBackendClient({ authAdmin, apiKey, apiBaseUrl }) {
 
     /** Complete the signup flow for a freshly created user. */
     signup(uid) {
-      return callBackend('POST', '/backend-manager/user/signup', uid);
+      return callBackend('POST', '/omega/user/signup', uid);
     },
 
     /** Push the user's contact data to all marketing providers. */
     syncMarketingContact(uid) {
-      return callBackend('PUT', '/backend-manager/marketing/contact', uid);
+      return callBackend('PUT', '/omega/marketing/contact', uid);
     },
   };
 }

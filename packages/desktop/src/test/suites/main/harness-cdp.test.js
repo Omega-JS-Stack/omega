@@ -1,6 +1,6 @@
 // Main-process tests for the harness CDP endpoint: test/harness/main-entry.js
 // appends --remote-debugging-port=0 at require time and publishes the resolved
-// port as process.env.EM_CDP_PORT before suites run — so consumer suites can
+// port as process.env.OMEGA_CDP_PORT before suites run — so consumer suites can
 // drive real browser automation (playwright-core connectOverCDP) against the
 // harness Electron itself.
 
@@ -17,9 +17,9 @@ module.exports = {
       },
     },
     {
-      name: 'EM_CDP_PORT is published with the resolved (non-zero) port',
+      name: 'OMEGA_CDP_PORT is published with the resolved (non-zero) port',
       run: (ctx) => {
-        const port = Number(process.env.EM_CDP_PORT);
+        const port = Number(process.env.OMEGA_CDP_PORT);
         ctx.expect(Number.isInteger(port)).toBe(true);
         ctx.expect(port > 0).toBe(true);
         ctx.state.port = port;

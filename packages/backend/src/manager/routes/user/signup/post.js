@@ -356,7 +356,7 @@ async function syncMarketingContact(assistant, uid, email) {
   const shouldSend = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldSend) {
-    assistant.log(`signup(): Skipping marketing sync (BEM_TESTING=true, TEST_EXTENDED_MODE not set)`);
+    assistant.log(`signup(): Skipping marketing sync (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
     return;
   }
 
@@ -385,7 +385,7 @@ async function sendWelcomeEmails(assistant, uid, firstName) {
   const shouldSend = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldSend) {
-    assistant.log(`signup(): Skipping welcome emails (BEM_TESTING=true, TEST_EXTENDED_MODE not set)`);
+    assistant.log(`signup(): Skipping welcome emails (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
     return;
   }
 

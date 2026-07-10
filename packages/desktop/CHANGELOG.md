@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Security` in case of vulnerabilities.
 
 ---
+## [2.2.0] - 2026-07-10
+
+- Changed
+  - Env prefix `EM_*` → `OMEGA_*` across the framework (~40 vars): the build-info global `EM_BUILD_JSON` → `OMEGA_BUILD_JSON` (now the SAME global the extension framework injects), `OMEGA_BUILD_MODE`/`OMEGA_IS_PUBLISH`/`OMEGA_IS_SERVER` (package scripts + scaffolded workflows updated), dev/CDP seams (`OMEGA_CDP_PORT`, `OMEGA_DEV_UPDATE`, `OMEGA_SENTRY_*`, `OMEGA_RM_*`), runner/signing (`OMEGA_RUNNER_*`, `OMEGA_SIGN_LOG`, `OMEGA_SKIP_WIN_SIGN`), and the whole `OMEGA_TEST_*` family. External tool vars (`CSC_*`, `APPLE_*`, `GH_TOKEN`, …) untouched.
+  - Backend calls go to `/omega` (client-bridge token mint); brand `.env` template documents `OMEGA_ADMIN_KEY`.
+
 ## [2.1.0] - 2026-07-10
 
 - Added

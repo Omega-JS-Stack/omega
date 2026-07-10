@@ -6,7 +6,7 @@
  * missing. Chargebee's API doesn't return enabled_events, so event drift
  * can't be diffed — events are set on create only (delete + recreate to
  * change them). Skipped for shared Firebase projects. Requires
- * BACKEND_MANAGER_WEBHOOK_KEY.
+ * OMEGA_WEBHOOK_KEY.
  */
 const chalk = require('chalk').default;
 const { buildWebhookUrl } = require('../lib/payment-utils.js');
@@ -50,9 +50,9 @@ module.exports = async function ensureChargebeeWebhook(context) {
     return {};
   }
 
-  if (!process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
-    console.log(`      ${chalk.yellow('⚠')} BACKEND_MANAGER_WEBHOOK_KEY not set in the brand .env — webhook not managed`);
-    return { status: 'warned', output: { chargebeeWebhook: { skipped: 'no BACKEND_MANAGER_WEBHOOK_KEY' } } };
+  if (!process.env.OMEGA_WEBHOOK_KEY) {
+    console.log(`      ${chalk.yellow('⚠')} OMEGA_WEBHOOK_KEY not set in the brand .env — webhook not managed`);
+    return { status: 'warned', output: { chargebeeWebhook: { skipped: 'no OMEGA_WEBHOOK_KEY' } } };
   }
 
   const desiredUrl = buildWebhookUrl(brandConfig, 'chargebee', brandId);

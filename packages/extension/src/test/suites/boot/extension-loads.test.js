@@ -3,7 +3,7 @@
 // popup renders end-to-end. This is the integration equivalent to "did the
 // real consumer extension start without throwing".
 //
-// In BXM's own test run, BXM_TEST_BOOT_PROJECT points at the fixture under
+// In BXM's own test run, OMEGA_TEST_BOOT_PROJECT points at the fixture under
 // src/test/fixtures/consumer-extension. In a real consumer's `npx omega test`
 // run, the env var is unset and boot tests target the consumer's own
 // `<cwd>/dist/`.

@@ -97,7 +97,7 @@ usage.{feature}.limit                # Plan limit for this feature
 
 Example: `usage.credits.monthly`, `usage.credits.limit`
 
-Seeded on auth settle from `account.usage` + the site's payment plan config. Refreshed after every `authorizedFetch` call from `bm-properties` response headers.
+Seeded on auth settle from `account.usage` + the site's payment plan config. Refreshed after every `authorizedFetch` call from `omega-properties` response headers.
 
 ### Custom state (set via JS)
 

@@ -47,20 +47,20 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
   // Web Store). It's the actual production-equivalent surface.
   //
   // Discovery order:
-  //   1. BXM_TEST_BOOT_DIR (explicit absolute path) — full override
+  //   1. OMEGA_TEST_BOOT_DIR (explicit absolute path) — full override
   //   2. <projectRoot>/packaged/chromium/raw   — default for BXM consumers
   //   3. <projectRoot>/dist                    — fallback for non-standard pipelines
   //
   // BXM's own framework boot tests use a fixture extension under
   // src/test/fixtures/consumer-extension/dist (no `packaged/` step needed — the
-  // fixture is already strict JSON), so BXM_TEST_BOOT_PROJECT points there and
+  // fixture is already strict JSON), so OMEGA_TEST_BOOT_PROJECT points there and
   // the discovery falls through to `dist`.
-  const effectiveRoot = process.env.BXM_TEST_BOOT_PROJECT
-    ? path.resolve(process.env.BXM_TEST_BOOT_PROJECT)
+  const effectiveRoot = process.env.OMEGA_TEST_BOOT_PROJECT
+    ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
     : projectRoot;
 
   const candidates = [];
-  if (process.env.BXM_TEST_BOOT_DIR) candidates.push(path.resolve(process.env.BXM_TEST_BOOT_DIR));
+  if (process.env.OMEGA_TEST_BOOT_DIR) candidates.push(path.resolve(process.env.OMEGA_TEST_BOOT_DIR));
   candidates.push(path.join(effectiveRoot, 'packaged', 'chromium', 'raw'));
   candidates.push(path.join(effectiveRoot, 'dist'));
 
@@ -96,10 +96,10 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
     console.log(chalk.gray(`      Parser error: ${e.message}`));
     console.log(chalk.gray(`      If you see this, the runner picked an intermediate dist/ output instead of a`));
     console.log(chalk.gray(`      packaged/<browser>/raw/ output. Run \`npm run build\` to produce the packaged dir,`));
-    console.log(chalk.gray(`      or set BXM_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.`));
+    console.log(chalk.gray(`      or set OMEGA_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.`));
     return { passed: 0, failed: tests.length, skipped: 0 };
   }
-  if (process.env.BXM_TEST_DEBUG) {
+  if (process.env.OMEGA_TEST_DEBUG) {
     console.log(chalk.gray(`      [boot] loading extension from ${consumerDist}`));
   }
 

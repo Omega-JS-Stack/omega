@@ -115,12 +115,12 @@ async function runBackgroundSuites({ browser, swTarget, suiteFiles, filter }) {
 
   // Subscribe to console output from the SW. Each '__BXM_TEST__...' line is a
   // structured test event. Anything else is incidental SW logging — surface it
-  // in BXM_TEST_DEBUG mode.
+  // in OMEGA_TEST_DEBUG mode.
   const consoleHandler = (msg) => {
     const text = msg.text();
     if (text.startsWith('__BXM_TEST__')) {
       handleConsoleLine(text, counts);
-    } else if (process.env.BXM_TEST_DEBUG) {
+    } else if (process.env.OMEGA_TEST_DEBUG) {
       process.stdout.write(chalk.gray(`      [sw:${msg.type()}] ${text}\n`));
     }
   };
@@ -216,7 +216,7 @@ async function runViewSuites({ browser, extId, suiteFiles, filter }) {
       const text = msg.text();
       if (text.startsWith('__BXM_TEST__')) {
         handleConsoleLine(text, counts);
-      } else if (process.env.BXM_TEST_DEBUG) {
+      } else if (process.env.OMEGA_TEST_DEBUG) {
         process.stdout.write(chalk.gray(`      [tab:${msg.type()}] ${text}\n`));
       }
     };

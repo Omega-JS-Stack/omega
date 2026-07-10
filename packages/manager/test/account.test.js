@@ -372,7 +372,7 @@ test('account: a failed signup call downgrades to warned and the run continues',
   });
   const firestore = fakeFirestore({ getDoc: null, patchDoc: undefined, runQuery: [{ id: 'uid-new', data: {} }] });
   const backend = fakeBackend({
-    signup: () => { throw new Error('POST /backend-manager/user/signup failed (503)'); },
+    signup: () => { throw new Error('POST /omega/user/signup failed (503)'); },
   });
 
   const result = await runService(brandConfig(), { auth, firestore, backend });

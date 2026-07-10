@@ -10,7 +10,7 @@ Manager.isTesting()         // true ONLY in testing
 Manager.isProduction()      // true ONLY in production
 ```
 
-**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`EM_TEST_MODE` / Electron `app.isPackaged` / `config.em.environment` / `EM_BUILD_MODE` / `NODE_ENV`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
+**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`OMEGA_TEST_MODE` / Electron `app.isPackaged` / `config.em.environment` / `OMEGA_BUILD_MODE` / `NODE_ENV`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
 
 **One implementation, mixed into all four Managers.** @omega.js/desktop has four Manager entry points (main / renderer / preload / build). The helpers are defined once in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) and mixed into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
 
@@ -27,7 +27,7 @@ Manager.isTesting()         // static form, for build-time scripts
 |---|---|
 | `getEnvironment()` | `'development' \| 'testing' \| 'production'` — the SSOT resolver; the only reader of raw signals. |
 | `isDevelopment()` | `true` ONLY in development (running unpackaged / `electron .` / dev), and NOT testing. Derives from `getEnvironment()`. |
-| `isTesting()` | `true` ONLY in testing (`EM_TEST_MODE === 'true'`). **Takes precedence** — a test run is unpackaged, but it's a test, not development. |
+| `isTesting()` | `true` ONLY in testing (`OMEGA_TEST_MODE === 'true'`). **Takes precedence** — a test run is unpackaged, but it's a test, not development. |
 | `isProduction()` | `true` ONLY in production (packaged & distributed, `app.isPackaged === true`). A **real positive check** — NOT `!isDevelopment()`. |
 
 ## Gating side effects — use the INTENTIONAL check
@@ -69,10 +69,10 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 
 `getEnvironment()` resolves in this precedence order:
 
-1. **Testing** — `process.env.EM_TEST_MODE === 'true'` (set by @omega.js/desktop's test runners). A test run is a test run regardless of packaged state.
+1. **Testing** — `process.env.OMEGA_TEST_MODE === 'true'` (set by @omega.js/desktop's test runners). A test run is a test run regardless of packaged state.
 2. **Config override** — `config.em.environment` (`'development'` / `'testing'` / `'production'`), the consumer's explicit choice. It beats the auto-detected `app.isPackaged` below.
 3. **Production / Development (runtime)** — Electron `app.isPackaged`: packaged → production, unpackaged → development. This is the authoritative runtime signal in the main process. In renderer / preload / plain Node, `app` is unavailable, so it falls through.
-4. **Build-time signals** — `EM_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development.
+4. **Build-time signals** — `OMEGA_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development.
 5. **Default** — production. @omega.js/desktop's deployed *runtime* can reach here without a dev signal (a packaged binary whose `app.isPackaged` didn't resolve is still a shipped app), so production is the safe assumption. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. @omega.js/backend defaults to production for the same reason as @omega.js/desktop.)
 
 ## Adding a new helper
@@ -81,12 +81,12 @@ Write the function in a `src/utils/<topic>-helpers.js` module, expose `attachTo(
 
 ## Why this matters
 
-**One signal, used everywhere.** The test runner sets `EM_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
+**One signal, used everywhere.** The test runner sets `OMEGA_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
 
 **Sub-modules check the same signal.** When framework code (an auto-update poll, a restart-manager registration) needs to skip side effects in tests, it checks `isTesting()` — the same answer the consumer's own code gets. No drift.
 
-**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals (`app.isPackaged` vs `EM_BUILD_MODE`), there is exactly one definition of "what environment is this," and a wrong-but-confident gate is structurally impossible.
+**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals (`app.isPackaged` vs `OMEGA_BUILD_MODE`), there is exactly one definition of "what environment is this," and a wrong-but-confident gate is structurally impossible.
 
 ## See also
 
-- [test-framework.md](test-framework.md) — `EM_TEST_MODE` is set automatically by the test runners; extended mode (`--extended` / `TEST_EXTENDED_MODE`) gates real external APIs.
+- [test-framework.md](test-framework.md) — `OMEGA_TEST_MODE` is set automatically by the test runners; extended mode (`--extended` / `TEST_EXTENDED_MODE`) gates real external APIs.

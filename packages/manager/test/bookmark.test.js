@@ -52,13 +52,13 @@ function freePort() {
 
 test('bookmark: full config derives every group with new-world shapes', () => {
   const apps = [{ name: 'backend', target: 'backend' }, { name: 'web', target: 'web' }];
-  const links = generateLinks(FULL_CONFIG, {}, apps, { deployedFunctions: ['bm_api', 'bm_signup'] });
+  const links = generateLinks(FULL_CONFIG, {}, apps, { deployedFunctions: ['omega_api', 'omega_signup'] });
 
   assert.deepEqual(Object.keys(links), ['Cloud', 'Firebase', 'Analytics', 'Search', 'Stripe', 'GitHub', 'Live']);
 
   // Cloud: 3 console links + separator + one log link per deployed function
   assert.equal(links.Cloud.length, 6);
-  assert.ok(links.Cloud[4].title === 'bm_api()' && links.Cloud[4].url.includes('function_name%3D%22bm_api%22'));
+  assert.ok(links.Cloud[4].title === 'omega_api()' && links.Cloud[4].url.includes('function_name%3D%22omega_api%22'));
 
   // Analytics URLs embed accountId + propertyId
   assert.ok(links.Analytics[0].url.includes('#/a111p222/'));

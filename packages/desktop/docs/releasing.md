@@ -69,7 +69,7 @@ Edit `.env`:
 
 ```bash
 GH_TOKEN="ghp_..."
-BACKEND_MANAGER_KEY="..."
+OMEGA_ADMIN_KEY="..."
 
 CSC_LINK="config/certs/developer-id-application.p12"
 CSC_KEY_PASSWORD="<password>"
@@ -96,7 +96,7 @@ For testing the full sign + notarize + publish flow on your own machine:
 npm run release
 ```
 
-This runs as a **single gulp invocation** (`gulp publish` with `EM_BUILD_MODE=true EM_IS_PUBLISH=true`):
+This runs as a **single gulp invocation** (`gulp publish` with `OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true`):
 1. **build** — defaults → distribute → webpack/sass/html → audit → build-config (materializes `dist/electron-builder.yml` with mode-dependent injections like `LSUIElement` for tray-only)
 2. **release** — `electron-builder build --publish always`
    - Signs the `.app` with your Developer ID Application cert

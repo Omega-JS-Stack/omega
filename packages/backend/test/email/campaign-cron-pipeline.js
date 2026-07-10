@@ -1,7 +1,7 @@
 /**
  * Test: Campaign cron pipeline
  *
- * Verifies that bm_cronFrequent correctly picks up and processes campaigns
+ * Verifies that omega_cronFrequent correctly picks up and processes campaigns
  * from the marketing-campaigns collection when their sendAt is past due.
  *
  * Covers:
@@ -240,7 +240,7 @@ module.exports = {
       timeout: 120000,
 
       async run({ pubsub, waitFor, firestore, state }) {
-        await pubsub.trigger('bm_cronFrequent');
+        await pubsub.trigger('omega_cronFrequent');
 
         // Wait for the fast (non-generator) campaigns to reach a terminal
         // state. The cron processes campaigns in parallel via

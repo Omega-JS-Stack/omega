@@ -77,7 +77,7 @@ Each boot test gets a **fresh** `page` (closed at the end of the test). The brow
 
 The runner looks for the consumer's Chrome-loadable build in this order:
 
-1. `BXM_TEST_BOOT_DIR` env var (absolute path) — full override
+1. `OMEGA_TEST_BOOT_DIR` env var (absolute path) — full override
 2. `<consumer>/packaged/chromium/raw/` — default. This is what @omega.js/extension's gulp pipeline produces. Strict JSON manifest, all bundles compiled, locale files in place. Same dir a developer points "Load unpacked" at.
 3. `<consumer>/dist/` — fallback for non-standard pipelines
 
@@ -89,17 +89,17 @@ The intermediate `<consumer>/dist/` typically has a JSON5 manifest (framework-au
   Parser error: Expected property name or '}' in JSON at position 4
   If you see this, the runner picked an intermediate dist/ output instead of a
   packaged/<browser>/raw/ output. Run `npm run build` to produce the packaged dir,
-  or set BXM_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.
+  or set OMEGA_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.
 ```
 
 Most consumers don't need to think about this — `npm run build && npx omega test` works.
 
-## BXM_TEST_BOOT_PROJECT vs BXM_TEST_BOOT_DIR
+## OMEGA_TEST_BOOT_PROJECT vs OMEGA_TEST_BOOT_DIR
 
 | Env | Purpose |
 |---|---|
-| `BXM_TEST_BOOT_PROJECT` | Root of a different project to use instead of cwd. Auto-set when @omega.js/extension tests itself (points at the in-tree fixture under `src/test/fixtures/consumer-extension`). |
-| `BXM_TEST_BOOT_DIR` | Absolute path of the directory holding `manifest.json` — short-circuits the discovery order entirely. Use for monorepo layouts or custom output dirs. |
+| `OMEGA_TEST_BOOT_PROJECT` | Root of a different project to use instead of cwd. Auto-set when @omega.js/extension tests itself (points at the in-tree fixture under `src/test/fixtures/consumer-extension`). |
+| `OMEGA_TEST_BOOT_DIR` | Absolute path of the directory holding `manifest.json` — short-circuits the discovery order entirely. Use for monorepo layouts or custom output dirs. |
 
 ## What happens when the extension can't load
 

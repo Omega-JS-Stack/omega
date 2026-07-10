@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+# [6.2.0] - 2026-07-10
+
+### BREAKING
+- **Wire format renamed to omega** (nothing is deployed on this stack yet; old names live only in the legacy repos):
+  - Route prefix `/backend-manager` → **`/omega`** — hosting-rewrite glob, router strip, every internal caller, MCP discovery endpoints, docs. The legacy `/backend-manager` prefix REMAINS ACCEPTED as an alias to the new function (rewrite glob + router strip) so migrating brands' in-the-wild clients keep working.
+  - Function exports `bm_*` → **`omega_*`** (all 20: `omega_api`, `omega_authOnCreate`, `omega_cronDaily`, …).
+  - Response header `bm-properties` → **`omega-properties`** (Access-Control-Expose-Headers follows).
+  - Rules markers `///---backend-manager---///` → **`///---omega---///`** (templates + splice regexes).
+  - omega.json5 custom section `backend_manager` → **`omega`** (`omega.key` / `omega.webhookKey` / `omega.namespace`).
+- **Env vars unified under `OMEGA_*`**: `BACKEND_MANAGER_KEY` → `OMEGA_ADMIN_KEY`, `BACKEND_MANAGER_WEBHOOK_KEY` → `OMEGA_WEBHOOK_KEY`, `BACKEND_MANAGER_NAMESPACE` → `OMEGA_NAMESPACE`, `BACKEND_MANAGER_{OPENAI,ANTHROPIC}_API_KEY` → `OMEGA_{OPENAI,ANTHROPIC}_API_KEY` (unprefixed tool-standard fallbacks unchanged); `BEM_TESTING` → `OMEGA_TEST_MODE`, `BEM_{API,FUNCTIONS,WEBSITE}_URL` → `OMEGA_{API,FUNCTIONS,WEBSITE}_URL`, `BEM_URL` → `OMEGA_BACKEND_URL`, `BEM_HTTPS_PORT` → `OMEGA_HTTPS_PORT`, `BEM_TEST_*` → `OMEGA_TEST_*`.
+
 # [6.1.0] - 2026-07-10
 
 - Added

@@ -26,7 +26,7 @@ class BEMClient {
     params = params || {};
     method = method.toUpperCase();
 
-    const url = new URL(`${this.baseUrl}/backend-manager/${path}`);
+    const url = new URL(`${this.baseUrl}/omega/${path}`);
 
     const fetchOptions = {
       method: method,

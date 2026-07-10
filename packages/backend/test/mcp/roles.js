@@ -6,7 +6,7 @@
  */
 const fetch = require('wonderful-fetch');
 
-const MCP_ENDPOINT = 'http://localhost:5002/backend-manager/mcp';
+const MCP_ENDPOINT = 'http://localhost:5002/omega/mcp';
 
 function parseSSE(text) {
   const lines = text.split('\n');
@@ -61,7 +61,7 @@ module.exports = {
     {
       name: 'admin sees all 19 tools',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/list', {}, key);
 
         assert.ok(response?.result?.tools, 'Should return tools list');
@@ -143,7 +143,7 @@ module.exports = {
     {
       name: 'admin can call an admin tool',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'health_check',
           arguments: {},

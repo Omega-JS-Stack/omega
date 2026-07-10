@@ -7,7 +7,7 @@ function Module() {
 }
 
 /*
-  authorize: redirect or send back the URL for authorization, which will go to UJ page that sends the data back to bm_api
+  authorize: redirect or send back the URL for authorization, which will go to UJ page that sends the data back to omega_api
     - if no client_id is provided, fetch from ITW/APP
   tokenize: save the credentials in firestore and redirect or respond with URL to the desired end page
   deauthorize: delete from firestore
@@ -40,7 +40,7 @@ Module.prototype.main = function () {
         : payload.data.payload.referrer
 
       payload.data.payload.serverUrl = typeof payload.data.payload.serverUrl === 'undefined'
-        ? `${Manager.getApiUrl()}/backend-manager`
+        ? `${Manager.getApiUrl()}/omega`
         : payload.data.payload.serverUrl
 
       payload.data.payload.provider = payload.data.payload.provider || '';

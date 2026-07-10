@@ -28,7 +28,7 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`) — a comprehe
 ```bash
 npm start                   # dev with live reload (gulp → webpack → serve)
 npm run build               # production build → dist/ + packaged/<browser>/raw/ + .zip per browser
-BXM_IS_PUBLISH=true npm run build   # build + auto-upload to Chrome / Firefox / Edge stores
+OMEGA_IS_PUBLISH=true npm run build   # build + auto-upload to Chrome / Firefox / Edge stores
 npx omega test                # run framework + project test suites
 npx omega test build/config         # bare path: run tests matching a path in BOTH sources
 npx omega test project:             # run ONLY your project tests (project:<path> to narrow)

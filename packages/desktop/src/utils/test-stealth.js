@@ -2,7 +2,7 @@
 // and non-intrusive?".
 //
 // True when the process is in Testing mode AND the developer hasn't opted into
-// watching the run (EM_TEST_SHOW=1). Shared by:
+// watching the run (OMEGA_TEST_SHOW=1). Shared by:
 //   - lib/window-manager.js — stealth window surfacing (showInactive + opacity 0
 //     + click-through)
 //   - main.js — app-level activation suppression on macOS (accessory policy via
@@ -13,7 +13,7 @@
 //
 // Pass the Manager when you have one — its isTesting() is authoritative (honors
 // config.em.environment overrides). Without one (the harness, pre-Manager code),
-// falls back to the standalone mode-helpers check (EM_TEST_MODE=true).
+// falls back to the standalone mode-helpers check (OMEGA_TEST_MODE=true).
 //
 // Usage:
 //   const isTestStealth = require('./utils/test-stealth.js');
@@ -23,7 +23,7 @@ const { isTesting } = require('./mode-helpers.js');
 
 function isTestStealth(manager) {
   const testing = manager ? manager.isTesting() : isTesting();
-  return testing && process.env.EM_TEST_SHOW !== '1';
+  return testing && process.env.OMEGA_TEST_SHOW !== '1';
 }
 
 module.exports = isTestStealth;

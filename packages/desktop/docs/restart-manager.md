@@ -16,7 +16,7 @@ Both sides import the same file — contract constants are never copied between 
 
 ### The shared root
 
-Neutral ground, deliberately NOT any app's userData (@omega.js/desktop's dev/test userData suffixing never moves it): `resolveSharedRoot(appDataPath, env)` → `env.EM_RM_ROOT || <appData>/restart-manager/`.
+Neutral ground, deliberately NOT any app's userData (@omega.js/desktop's dev/test userData suffixing never moves it): `resolveSharedRoot(appDataPath, env)` → `env.OMEGA_RM_ROOT || <appData>/restart-manager/`.
 
 ```
 <appData>/restart-manager/
@@ -32,7 +32,7 @@ Neutral ground, deliberately NOT any app's userData (@omega.js/desktop's dev/tes
                         @omega.js/desktop apps can't run installers concurrently
 ```
 
-`EM_RM_ROOT` is the cross-repo test/dev isolation seam. In @omega.js/desktop's own test mode the lib roots at `<userData>/restart-manager` (the ` (Testing)` dir, wiped per run) — tests never touch the real root.
+`OMEGA_RM_ROOT` is the cross-repo test/dev isolation seam. In @omega.js/desktop's own test mode the lib roots at `<userData>/restart-manager` (the ` (Testing)` dir, wiped per run) — tests never touch the real root.
 
 ### HTTP endpoints (RM serves; 127.0.0.1 bind + peer check; no bearer — same-user threat model)
 
@@ -79,7 +79,7 @@ The update relaunch is safe by construction: RM's registrations are **storage-pe
 - **`manager.isTesting()`** — nothing fires on its own: no timers, no before-quit hook (a preventDefault would wedge the harness quit), and the root is isolated under the testing userData. Tests drive `register()`/`ensureInstalled()` explicitly against fixture servers; the network and spawn paths stay dead (`ensureInstalled` refuses network without `TEST_EXTENDED_MODE`, `ensureRunning` never spawns in testing).
 - `manager.config.brand.id === 'restart-manager'` — RM doesn't manage itself.
 - `config.restartManager.enabled === false` — explicit opt-out.
-- Non-production without `EM_RESTART_MANAGER_DEV=1` — dev noise guard.
+- Non-production without `OMEGA_RESTART_MANAGER_DEV=1` — dev noise guard.
 
 ## Config
 
@@ -109,7 +109,7 @@ manager.restartManager.getStatus()         // { enabled, bailed, bailReason, roo
 
 Loopback bind + per-request peer-address check on RM's side; no bearer auth because the callers are same-user local processes with no secret worth protecting (a malicious same-user process can already spawn/kill apps directly). Cross-user access is blocked by the OS. Every payload goes through the protocol validators on both sides.
 
-**Dev and prod share one root per user** (by design — a dev RM must be findable by `EM_RESTART_MANAGER_DEV=1` consumers). The lib logs the connected RM's version + environment on first probe. Quitting a dev RM deletes runtime.json under production apps; their 60s heartbeat respawns the installed RM — self-healing.
+**Dev and prod share one root per user** (by design — a dev RM must be findable by `OMEGA_RESTART_MANAGER_DEV=1` consumers). The lib logs the connected RM's version + environment on first probe. Quitting a dev RM deletes runtime.json under production apps; their 60s heartbeat respawns the installed RM — self-healing.
 
 ## Why a separate helper?
 
@@ -127,7 +127,7 @@ cd restart-manager-desktop && npx omega install dev && npm start
 cat ~/Library/Application\ Support/restart-manager/runtime.json
 
 # 2. Any @omega.js/desktop consumer registers against it
-EM_RESTART_MANAGER_DEV=1 npm start          # registers ~3s after ready (dev delay)
+OMEGA_RESTART_MANAGER_DEV=1 npm start          # registers ~3s after ready (dev delay)
 curl 127.0.0.1:<port>/v1/apps               # the consumer listed, status alive
 
 # 3. Graceful quit → the entry disappears (≤1s flush), NO relaunch

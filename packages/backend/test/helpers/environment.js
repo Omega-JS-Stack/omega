@@ -8,7 +8,7 @@
  *
  * Contract (see docs/environment-detection.md):
  *   - getEnvironment() is the SINGLE SOURCE OF TRUTH — the only reader of the raw env
- *     vars (BEM_TESTING / ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM). Returns
+ *     vars (OMEGA_TEST_MODE / ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM). Returns
  *     exactly ONE of 'development' | 'testing' | 'production' (testing wins).
  *   - isDevelopment()/isProduction()/isTesting() DERIVE from getEnvironment() — they
  *     never read raw signals, so they can NEVER disagree with it. Exactly one is true.
@@ -20,7 +20,7 @@
 // Run a thunk with the env-detection vars cleared, restoring them afterward. These are
 // the only inputs getEnvironment() reads, so clearing them gives a clean slate per case.
 function withEnv(overrides, fn) {
-  const KEYS = ['BEM_TESTING', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
+  const KEYS = ['OMEGA_TEST_MODE', 'ENVIRONMENT', 'FUNCTIONS_EMULATOR', 'TERM_PROGRAM'];
   const saved = {};
   for (const k of KEYS) saved[k] = process.env[k];
   try {
@@ -43,9 +43,9 @@ module.exports = {
     // ─── getEnvironment() resolution + precedence ───
 
     {
-      name: 'getEnvironment: testing wins over everything (BEM_TESTING=true)',
+      name: 'getEnvironment: testing wins over everything (OMEGA_TEST_MODE=true)',
       async run({ Manager, assert }) {
-        withEnv({ BEM_TESTING: 'true', ENVIRONMENT: 'production' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true', ENVIRONMENT: 'production' }, () => {
           assert.equal(Manager.getEnvironment(), 'testing');
         });
       },
@@ -89,7 +89,7 @@ module.exports = {
       name: 'invariant: is*() exactly matches getEnvironment() across every scenario',
       async run({ Manager, assert }) {
         const scenarios = [
-          { env: { BEM_TESTING: 'true', ENVIRONMENT: 'production' }, expect: 'testing' },
+          { env: { OMEGA_TEST_MODE: 'true', ENVIRONMENT: 'production' }, expect: 'testing' },
           { env: { ENVIRONMENT: 'production' },                     expect: 'production' },
           { env: { ENVIRONMENT: 'development' },                    expect: 'development' },
           { env: { FUNCTIONS_EMULATOR: 'true' },                    expect: 'development' },
@@ -111,7 +111,7 @@ module.exports = {
       name: 'invariant: exactly one of is*() is true in every scenario (mutually exclusive)',
       async run({ Manager, assert }) {
         const envs = [
-          { BEM_TESTING: 'true' },
+          { OMEGA_TEST_MODE: 'true' },
           { ENVIRONMENT: 'production' },
           { ENVIRONMENT: 'development' },
           { FUNCTIONS_EMULATOR: 'true' },
@@ -129,7 +129,7 @@ module.exports = {
     {
       name: 'isProduction is a real positive check (NOT just !isDevelopment) — false in testing',
       async run({ Manager, assert }) {
-        withEnv({ BEM_TESTING: 'true' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
           assert.equal(Manager.isDevelopment(), false, 'isDevelopment false in testing');
           assert.equal(Manager.isProduction(),  false, 'isProduction false in testing');
           assert.equal(Manager.isTesting(),     true,  'isTesting true in testing');
@@ -143,7 +143,7 @@ module.exports = {
       name: 'assistant forwards getEnvironment()/is*() to the Manager (identical)',
       async run({ Manager, assistant, assert }) {
         const cases = [
-          { BEM_TESTING: 'true' },
+          { OMEGA_TEST_MODE: 'true' },
           { ENVIRONMENT: 'production' },
           { ENVIRONMENT: 'development' },
         ];
@@ -166,7 +166,7 @@ module.exports = {
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
           assert.equal(Manager.getApiUrl(), 'http://localhost:5002', 'dev → localhost');
         });
-        withEnv({ BEM_TESTING: 'true' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
           assert.equal(Manager.getApiUrl(), 'http://localhost:5002', 'testing → localhost');
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {
@@ -188,7 +188,7 @@ module.exports = {
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
           assert.match(Manager.getFunctionsUrl(), /^http:\/\/localhost:5001\//, 'dev → localhost:5001');
         });
-        withEnv({ BEM_TESTING: 'true' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
           assert.match(Manager.getFunctionsUrl(), /^http:\/\/localhost:5001\//, 'testing → localhost:5001');
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {
@@ -202,7 +202,7 @@ module.exports = {
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
           assert.equal(Manager.getWebsiteUrl(), 'https://localhost:4000', 'dev → localhost:4000');
         });
-        withEnv({ BEM_TESTING: 'true' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
           assert.equal(Manager.getWebsiteUrl(), 'https://localhost:4000', 'testing → localhost:4000');
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {

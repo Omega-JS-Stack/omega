@@ -236,7 +236,7 @@ test('env: desktop .env composed against the real framework template', async () 
   setEnv({
     APPLE_API_KEY_ID: KEY_ID,
     GH_TOKEN: 'fixture-gh-token',
-    BACKEND_MANAGER_KEY: 'fixture-bm-key',
+    OMEGA_ADMIN_KEY: 'fixture-bm-key',
     CSC_KEY_PASSWORD: 'fixture-csc-password',
     APPLE_API_ISSUER: 'fixture-issuer',
     APPLE_TEAM_ID: 'FIXTEAM99',
@@ -261,7 +261,7 @@ test('env: desktop .env composed against the real framework template', async () 
   // Unset brand env leaves the template placeholder untouched
   assert.match(env, /^WIN_EV_TOKEN_PATH=""$/m);
   // Unmanaged template keys and the Custom section survive verbatim
-  assert.match(env, /^EM_TEST_USER_UID="em-test-user"$/m);
+  assert.match(env, /^OMEGA_TEST_USER_UID="em-test-user"$/m);
   assert.match(env, /Custom Values/);
 });
 

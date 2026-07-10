@@ -25,7 +25,7 @@ Module.prototype.main = function () {
       },
       delay: 1,
       payload: {
-        backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
         brand: Manager.config.brand.id,
       },
     }
@@ -83,12 +83,12 @@ Module.prototype.main = function () {
     assistant.log('Email payload:', emailPayload);
 
     // Send the email via admin:send-email
-    await fetch(`${Manager.getApiUrl()}/backend-manager`, {
+    await fetch(`${Manager.getApiUrl()}/omega`, {
       method: 'post',
       response: 'json',
       log: true,
       body: {
-        backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
         command: 'admin:send-email',
         payload: emailPayload.payload,
       },

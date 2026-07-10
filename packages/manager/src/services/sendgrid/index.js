@@ -11,7 +11,7 @@
  * sibling brands share the account.
  *
  * Auth: SENDGRID_API_KEY in the brand .env; the event-webhook operation
- * additionally needs BACKEND_MANAGER_WEBHOOK_KEY. No API key → clean skip.
+ * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');

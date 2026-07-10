@@ -7,7 +7,7 @@
 //                     false`. Falls back to NODE_ENV when `app` isn't available (preload,
 //                     build-time scripts, renderer).
 //   isTesting()     — app being tested (@omega.js/desktop's test framework running this process). Single
-//                     canonical env var: `EM_TEST_MODE=true`. TAKES PRECEDENCE over dev:
+//                     canonical env var: `OMEGA_TEST_MODE=true`. TAKES PRECEDENCE over dev:
 //                     a test run is unpackaged, but it's a TEST, not development.
 //   isProduction()  — app packaged & distributed to users (`app.isPackaged === true`),
 //                     and NOT testing. A real positive check — NOT `!isDevelopment()`.
@@ -25,7 +25,7 @@
 // (the renderer's `electron` import surface has `ipcRenderer`, `contextBridge`,
 // etc. — no `app`). Same in preload. So those contexts fall back to NODE_ENV /
 // config.em.environment. To get a renderer-truthful signal, the consumer can have
-// main inject the value into `EM_BUILD_JSON.runtime` at build time (future
+// main inject the value into `OMEGA_BUILD_JSON.runtime` at build time (future
 // enhancement); for now, NODE_ENV being inherited from the parent process is the
 // pragmatic answer.
 //
@@ -35,7 +35,7 @@
 
 // The three environment checks are MUTUALLY EXCLUSIVE — exactly one is true:
 //   isDevelopment() — app run from source / being developed (unpackaged, NOT testing).
-//   isTesting()     — app being tested (EM_TEST_MODE=true). Takes precedence over dev.
+//   isTesting()     — app being tested (OMEGA_TEST_MODE=true). Takes precedence over dev.
 //   isProduction()  — app packaged & distributed to users (real positive check, NOT testing).
 // Testing wins first: a test run is unpackaged, but it's a TEST, not development.
 
@@ -43,8 +43,8 @@
 // exactly ONE of 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
 // Precedence: testing → explicit config override → Electron app.isPackaged → build-time signal.
 function getEnvironment() {
-  // 1. Testing wins — set by @omega.js/desktop's test runners (EM_TEST_MODE=true), regardless of packaged state.
-  if (process.env.EM_TEST_MODE === 'true') return 'testing';
+  // 1. Testing wins — set by @omega.js/desktop's test runners (OMEGA_TEST_MODE=true), regardless of packaged state.
+  if (process.env.OMEGA_TEST_MODE === 'true') return 'testing';
 
   // 2. An explicit config.em.environment override — the consumer's deliberate decision. It beats
   //    the auto-detected app.isPackaged (e.g. a packaged app the consumer wants to treat as dev).
@@ -63,9 +63,9 @@ function getEnvironment() {
     } catch (_) {}
   }
 
-  // 4. Build-time / Node signals. EM_BUILD_MODE=true is set during a production build
+  // 4. Build-time / Node signals. OMEGA_BUILD_MODE=true is set during a production build
   //    (npm run build / npm run release); NODE_ENV=development is the dev fallback.
-  if (process.env.EM_BUILD_MODE === 'true') return 'production';
+  if (process.env.OMEGA_BUILD_MODE === 'true') return 'production';
   if (process.env.NODE_ENV === 'development') return 'development';
 
   // 5. Default: production. @omega.js/desktop's deployed RUNTIME can reach here without a dev signal — a
@@ -100,7 +100,7 @@ function isTesting() {
 // Renderer caveat: same as isDevelopment — `electron.app` isn't available in renderer,
 // so the fallback to `process.cwd()/package.json` won't find anything useful in a
 // packaged app. Renderers that need the version should ask main via IPC, or read
-// `EM_BUILD_JSON.package.version` (injected by webpack DefinePlugin).
+// `OMEGA_BUILD_JSON.package.version` (injected by webpack DefinePlugin).
 function getVersion() {
   if (typeof require !== 'undefined') {
     try {

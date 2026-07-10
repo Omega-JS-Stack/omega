@@ -1,5 +1,5 @@
 // @omega.js/backend self-test fixture config — omega.json5 shape: shared sections top-level,
-// targets.backend presence = backend enabled. backend_manager holds the
+// targets.backend presence = backend enabled. omega holds the
 // fixture's admin keys (test-only values, injected into env by the runner).
 {
   brand: {
@@ -10,7 +10,7 @@
       email: 'fixture@example.com',
     },
   },
-  backend_manager: {
+  omega: {
     key: 'fixture-admin-key',
     webhookKey: 'fixture-webhook-key',
     namespace: '00000000-0000-0000-0000-000000000000',

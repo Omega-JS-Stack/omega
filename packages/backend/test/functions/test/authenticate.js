@@ -36,7 +36,7 @@ module.exports = {
       name: 'invalid-private-key',
       auth: 'none',
       async run({ http, assert }) {
-        const response = await http.post('/bm_api', {
+        const response = await http.post('/omega_api', {
           command: 'test:authenticate',
           payload: {},
         }, {

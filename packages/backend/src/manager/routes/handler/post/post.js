@@ -36,7 +36,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
       method: 'POST',
       response: 'json',
       body: {
-        backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
         method: 'post',
         service: 'paypal',
         command: 'v2/invoicing/invoices',
@@ -79,7 +79,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
       method: 'POST',
       response: 'json',
       body: {
-        backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
         service: 'paypal',
         command: `v2/invoicing/invoices/${createdInvoiceId}/send`,
         method: 'post',
@@ -100,11 +100,11 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   // Send notification (unless explicitly disabled)
   if (settings.sendNotification !== false) {
     // Use NEW API format
-    await fetch(`${Manager.getApiUrl()}/backend-manager/admin/notification`, {
+    await fetch(`${Manager.getApiUrl()}/omega/admin/notification`, {
       method: 'POST',
       response: 'json',
       headers: {
-        'Authorization': `Bearer ${process.env.BACKEND_MANAGER_KEY}`,
+        'Authorization': `Bearer ${process.env.OMEGA_ADMIN_KEY}`,
       },
       body: {
         notification: {

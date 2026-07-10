@@ -37,13 +37,13 @@ module.exports = async function (options) {
 
   // When @omega.js/desktop itself runs its own boot-layer tests (the cwd's package.json is @omega.js/desktop's), there's
   // no real consumer app to boot. Point the boot runner at the fixture under
-  // dist/test/fixtures/consumer-app unless the caller has already set EM_TEST_BOOT_PROJECT
-  // explicitly. Mirrors BXM's BXM_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
-  if (!process.env.EM_TEST_BOOT_PROJECT) {
+  // dist/test/fixtures/consumer-app unless the caller has already set OMEGA_TEST_BOOT_PROJECT
+  // explicitly. Mirrors BXM's OMEGA_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
+  if (!process.env.OMEGA_TEST_BOOT_PROJECT) {
     try {
       const cwdPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
       if (cwdPkg.name === '@omega.js/desktop') {
-        process.env.EM_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-app');
+        process.env.OMEGA_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-app');
       }
     } catch (_) { /* no package.json — leave unset */ }
   }

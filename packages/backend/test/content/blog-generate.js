@@ -25,8 +25,8 @@
  *   BLOG_OPEN=1               Auto-open the generated article in the default browser (macOS only).
  *
  * AI mode requires:
- *   BACKEND_MANAGER_KEY   — authenticates with Ghostii + parent server
- *   OPENAI_API_KEY        — Ghostii uses OpenAI internally (or BACKEND_MANAGER_OPENAI_API_KEY)
+ *   OMEGA_ADMIN_KEY   — authenticates with Ghostii + parent server
+ *   OPENAI_API_KEY        — Ghostii uses OpenAI internally (or OMEGA_OPENAI_API_KEY)
  *   PARENT_API_URL        — or set `parent` in config/omega.json5 (for $parent sources)
  *
  * Default mode requires: nothing.

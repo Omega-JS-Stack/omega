@@ -143,7 +143,7 @@ oauth2) move to the TOP LEVEL verbatim; everything framework-specific moves unde
 | Legacy | New |
 |---|---|
 | `brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2` | top level, unchanged |
-| custom keys (`backend_manager`, `mcp`, …) | top level, unchanged |
+| custom keys (`omega`, `mcp`, …) | top level, unchanged |
 | `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | `targets.backend.<same key>` |
 
 Notes: @omega.js/backend's framework-defaults layer is `templates/config/omega.json5` resolved through
@@ -164,7 +164,7 @@ the backend app file carries only `targets.backend`.
 
 Notes: `Manager.getConfig()` returns the RESOLVED config (missing file → `{}`; schema
 findings warn once per process — BXM has no separate audit surface). The build snapshot
-(`build.json` / `BXM_BUILD_JSON`) bakes `GOOGLE_ANALYTICS_SECRET` from the environment at
+(`build.json` / `OMEGA_BUILD_JSON`) bakes `GOOGLE_ANALYTICS_SECRET` from the environment at
 build time, same value flow as before. `bxm setup` scaffolds + merges `config/omega.json5`
 (the defaults merge now preserves consumer-only keys at every level — it previously
 dropped them).

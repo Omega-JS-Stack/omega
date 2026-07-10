@@ -13,8 +13,8 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  BXM_BUILD_MODE: 'true'
-  BXM_IS_PUBLISH: 'true'
+  OMEGA_BUILD_MODE: 'true'
+  OMEGA_IS_PUBLISH: 'true'
 
   # Chrome Web Store credentials
   CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}

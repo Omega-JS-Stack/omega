@@ -31,7 +31,7 @@ delete process.env.RECAPTCHA_SECRET_KEY;
 delete process.env.META_ACCESS_TOKEN;
 delete process.env.TIKTOK_ACCESS_TOKEN;
 delete process.env.SENDGRID_API_KEY;
-delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+delete process.env.OMEGA_WEBHOOK_KEY;
 delete process.env.BEEHIIV_API_KEY;
 delete process.env.STRIPE_SECRET_KEY;
 delete process.env.PAYPAL_CLIENT_SECRET;
@@ -119,11 +119,17 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   const appPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'website', 'package.json'), 'utf8'));
   assert.equal(appPkg.name, 'acme-website');
 
-  // The .env stub documents the credential entry points, all commented out
+  // The .env stub documents the credential entry points: external keys
+  // commented out, omega-owned keys provisioned with generated secrets
   const env = fs.readFileSync(path.join(root, '.env'), 'utf8');
   assert.ok(env.includes('# CLOUDFLARE_TOKEN='));
   assert.ok(env.includes('# STRIPE_SECRET_KEY='));
-  assert.ok(!env.split('\n').some((line) => line.trim() && !line.trim().startsWith('#')));
+  assert.match(env, /^OMEGA_ADMIN_KEY=[A-Za-z0-9_-]{43}$/m);
+  assert.match(env, /^OMEGA_WEBHOOK_KEY=[A-Za-z0-9_-]{43}$/m);
+  assert.match(env, /^OMEGA_NAMESPACE=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/m);
+  assert.notEqual(env.match(/^OMEGA_ADMIN_KEY=(.+)$/m)[1], env.match(/^OMEGA_WEBHOOK_KEY=(.+)$/m)[1]);
+  const uncommented = env.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
+  assert.ok(uncommented.every((line) => line.startsWith('OMEGA_')), 'only omega-owned keys are provisioned');
 
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
   for (const entry of ['node_modules/', '.omega/', '.env', 'dist/']) {

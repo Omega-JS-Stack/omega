@@ -28,7 +28,7 @@ class Manager {
     this.serviceWorker = null;
 
     // Load config from build.js
-    this.config = serviceWorker.BXM_BUILD_JSON?.config || {};
+    this.config = serviceWorker.OMEGA_BUILD_JSON?.config || {};
 
     // Defaults
     this.version = this.config?.version || 'unknown';
@@ -74,7 +74,7 @@ class Manager {
 
     // Log
     this.logger.log('Initialized!', this.version, this.cache.name, this);
-    this.logger.log('Config loaded from BXM_BUILD_JSON:', this.config);
+    this.logger.log('Config loaded from OMEGA_BUILD_JSON:', this.config);
 
     // Return manager instance
     return this;
@@ -177,7 +177,7 @@ class Manager {
       const idToken = await bgUser.getIdToken(true);
 
       // Fetch fresh custom token from server
-      const response = await fetch(`${apiUrl}/backend-manager`, {
+      const response = await fetch(`${apiUrl}/omega`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,7 +319,7 @@ class Manager {
     // DEBUG: Log the full config to see what we have
     console.log('[AUTH] setupAuthTokenListener called');
     console.log('[AUTH] this.config:', this.config);
-    console.log('[AUTH] BXM_BUILD_JSON:', serviceWorker.BXM_BUILD_JSON);
+    console.log('[AUTH] OMEGA_BUILD_JSON:', serviceWorker.OMEGA_BUILD_JSON);
 
     // Get auth domain from config
     // Structure is: this.config.firebase.app.config.authDomain
@@ -615,7 +615,7 @@ function setupGlobalHandlers() {
     }
 
     // Get website URL from config
-    const config = serviceWorker.BXM_BUILD_JSON?.config || {};
+    const config = serviceWorker.OMEGA_BUILD_JSON?.config || {};
     const website = config?.brand?.url;
 
     // Skip if no website configured

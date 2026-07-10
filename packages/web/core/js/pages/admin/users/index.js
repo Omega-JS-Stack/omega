@@ -282,7 +282,7 @@ async function signInAsUser(uid, email) {
   openSignInAsModalLoading(email);
 
   try {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user/token`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/token`, {
       method: 'POST',
       timeout: 30000,
       response: 'json',
@@ -383,7 +383,7 @@ async function deleteUser(uid, email) {
   }
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user`, {
+    await authorizedFetch(`${omega.getApiUrl()}/omega/user`, {
       method: 'DELETE',
       timeout: 30000,
       response: 'json',

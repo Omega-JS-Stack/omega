@@ -13,7 +13,7 @@ function escapeRegex(str) {
 
 module.exports = function stripDevBlocksLoader(source) {
   // Only strip in build mode
-  if (process.env.BXM_BUILD_MODE !== 'true') {
+  if (process.env.OMEGA_BUILD_MODE !== 'true') {
     return source;
   }
 

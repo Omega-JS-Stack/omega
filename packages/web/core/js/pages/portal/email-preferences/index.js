@@ -139,7 +139,7 @@ function setupForm() {
     trackEmailPreference(action);
 
     try {
-      await fetch(`${omega.getApiUrl()}/backend-manager/marketing/email-preferences`, {
+      await fetch(`${omega.getApiUrl()}/omega/marketing/email-preferences`, {
         method: 'POST',
         response: 'json',
         body: {

@@ -17,7 +17,7 @@
  * Segment keys are resolved to provider-specific IDs at runtime.
  * Requires marketing.prune.enabled = true in config/omega.json5.
  *
- * Runs on bm_cronDaily.
+ * Runs on omega_cronDaily.
  */
 const sendgridProvider = require('../../../libraries/email/providers/sendgrid.js');
 

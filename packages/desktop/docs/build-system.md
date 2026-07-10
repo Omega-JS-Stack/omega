@@ -42,7 +42,7 @@ Auto-loads tasks from `<@omega.js/desktop>/dist/gulp/tasks/*.js` via `<@omega.js
 | `package-quick` | real | Quick-package for host platform/arch only — `--dir` mode, no DMG/zip/universal/notarize. ~20-30s vs ~3min for full `package`. Output: `release/<platform>-<arch>/<ProductName>.app` (or `.exe`-folder/linux-unpacked) — directly launchable. Used for smoke-testing packaged-mode behavior locally. |
 | `release` | real | `electron-builder build --publish always` |
 | `audit` | real | Validate consumer config (required keys, valid enums, deep-link scheme format), ensure icon + entrypoints exist; in publish mode also requires `releases.repo` + `electron-builder.yml`. Throws with a numbered list of every problem found |
-| `serve` | real | Spawns `electron .` against the build output, websocket on `EM_LIVERELOAD_PORT` |
+| `serve` | real | Spawns `electron .` against the build output, websocket on `OMEGA_LIVERELOAD_PORT` |
 
 ### Composition
 
@@ -89,9 +89,9 @@ All bundled in production for source protection. `app.asar` alone is not obfusca
 
 `output.module = false` per target so flipping to ESM later is a config switch, not a refactor.
 
-### EM_BUILD_JSON injection
+### OMEGA_BUILD_JSON injection
 
-DefinePlugin replaces the bare identifier `EM_BUILD_JSON` with the parsed config. BannerPlugin prepends an IIFE that assigns it to `globalThis` and `window` so renderer code can read `window.EM_BUILD_JSON.config`.
+DefinePlugin replaces the bare identifier `OMEGA_BUILD_JSON` with the parsed config. BannerPlugin prepends an IIFE that assigns it to `globalThis` and `window` so renderer code can read `window.OMEGA_BUILD_JSON.config`.
 
 ## electron-builder
 
@@ -117,9 +117,9 @@ Environment variables (set by `npm run build` / `npm run release`):
 
 | Var | Effect |
 |---|---|
-| `EM_BUILD_MODE=true` | Production webpack (minified, name-mangled, no sourcemaps) |
-| `EM_IS_PUBLISH=true` | electron-builder runs with `--publish always` |
-| `EM_IS_SERVER=true` | Running in CI |
+| `OMEGA_BUILD_MODE=true` | Production webpack (minified, name-mangled, no sourcemaps) |
+| `OMEGA_IS_PUBLISH=true` | electron-builder runs with `--publish always` |
+| `OMEGA_IS_SERVER=true` | Running in CI |
 
 ## Windows code signing
 
@@ -141,9 +141,9 @@ Env vars set globally:
 
 ```yaml
 NODE_VERSION:  '22'
-EM_BUILD_MODE: 'true'
-EM_IS_PUBLISH: 'true'
-EM_IS_SERVER:  'true'
+OMEGA_BUILD_MODE: 'true'
+OMEGA_IS_PUBLISH: 'true'
+OMEGA_IS_SERVER:  'true'
 GH_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
 ```
 

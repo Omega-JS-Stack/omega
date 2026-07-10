@@ -28,10 +28,10 @@ module.exports = function serve(done) {
   // Forward all --flags from process.argv to the Electron child. Chromium silently ignores
   // flags it doesn't recognize, so gulp's own (--cwd, --gulpfile, etc.) are harmless noise.
   // Usage: `npm start -- --remote-debugging-port=9222`
-  // Shorthand: `EM_CDP_PORT=9222 npm start`
+  // Shorthand: `OMEGA_CDP_PORT=9222 npm start`
   const extraArgs = process.argv.slice(2).filter(arg => arg.startsWith('--'));
-  if (process.env.EM_CDP_PORT && !extraArgs.some(a => a.startsWith('--remote-debugging-port'))) {
-    extraArgs.push(`--remote-debugging-port=${process.env.EM_CDP_PORT}`);
+  if (process.env.OMEGA_CDP_PORT && !extraArgs.some(a => a.startsWith('--remote-debugging-port'))) {
+    extraArgs.push(`--remote-debugging-port=${process.env.OMEGA_CDP_PORT}`);
   }
   const electronArgs = ['.', ...extraArgs];
 
@@ -40,7 +40,7 @@ module.exports = function serve(done) {
   // ELECTRON_RUN_AS_NODE is already stripped by gulp/main.js at the gulp boundary, so the
   // child env is clean — no extra delete here.
   const childEnv = Object.assign({}, process.env, {
-    EM_LIVERELOAD_PORT: String(port),
+    OMEGA_LIVERELOAD_PORT: String(port),
     // Force chalk to keep colors when stdout is a pipe; the tee strips them before writing
     // to the log file but the terminal still gets colored output.
     FORCE_COLOR: '1',
@@ -59,7 +59,7 @@ module.exports = function serve(done) {
   child.stderr.on('data', (chunk) => process.stderr.write(chunk));
 
   // If CDP was requested, verify the port came up after Electron boots.
-  const cdpPort = (process.env.EM_CDP_PORT || '').trim()
+  const cdpPort = (process.env.OMEGA_CDP_PORT || '').trim()
     || (extraArgs.find(a => a.startsWith('--remote-debugging-port=')) || '').split('=')[1];
   if (cdpPort) {
     setTimeout(() => {
@@ -77,7 +77,7 @@ module.exports = function serve(done) {
         });
       });
       req.on('error', () => {
-        logger.warn(`CDP port ${cdpPort} not responding — port may be taken by another process. Try a different port: EM_CDP_PORT=${Number(cdpPort) + 1} npm start`);
+        logger.warn(`CDP port ${cdpPort} not responding — port may be taken by another process. Try a different port: OMEGA_CDP_PORT=${Number(cdpPort) + 1} npm start`);
       });
       req.setTimeout(3000, () => { req.destroy(); });
     }, 5000);

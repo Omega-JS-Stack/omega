@@ -165,7 +165,7 @@ function setupResetApiKeyForm() {
       throw new Error('API key reset cancelled.');
     }
 
-    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/api-keys`;
+    const serverApiURL = `${omega.getApiUrl()}/omega/user/api-keys`;
 
     const response = await authorizedFetch(serverApiURL, {
       method: 'POST',

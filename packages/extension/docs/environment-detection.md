@@ -10,7 +10,7 @@ Manager.isTesting()         // true ONLY in testing
 Manager.isProduction()      // true ONLY in production
 ```
 
-**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`BXM_TEST_MODE` / `chrome.runtime.getManifest().update_url` / `BXM_BUILD_MODE` / `NODE_ENV` / `config.bxm.environment`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
+**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`OMEGA_TEST_MODE` / `chrome.runtime.getManifest().update_url` / `OMEGA_BUILD_MODE` / `NODE_ENV` / `config.bxm.environment`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
 
 **One implementation, mixed into all eight Managers.** @omega.js/extension has eight Manager entry points (build / background / popup / options / content / sidepanel / page / offscreen). The helpers are defined once in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) and mixed into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
 
@@ -27,7 +27,7 @@ Manager.isTesting()         // static form, for build-time scripts
 |---|---|
 | `getEnvironment()` | `'development' \| 'testing' \| 'production'` — the SSOT resolver; the only reader of raw signals. |
 | `isDevelopment()` | `true` ONLY in development (unpacked extension via chrome://extensions / dev build), and NOT testing. Derives from `getEnvironment()`. |
-| `isTesting()` | `true` ONLY in testing (`BXM_TEST_MODE === 'true'`). **Takes precedence** — a test run is not development. |
+| `isTesting()` | `true` ONLY in testing (`OMEGA_TEST_MODE === 'true'`). **Takes precedence** — a test run is not development. |
 | `isProduction()` | `true` ONLY in production (packed / store-installed extension, `manifest.update_url` present). A **real positive check** — NOT `!isDevelopment()`. |
 
 ## Gating side effects — use the INTENTIONAL check
@@ -57,10 +57,10 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 
 `getEnvironment()` resolves in this precedence order:
 
-1. **Testing** — `process.env.BXM_TEST_MODE === 'true'`, `globalThis.BXM_TEST_MODE === true`, or a build baked with `config.bxm.environment === 'testing'` (set by the harness before any consumer JS runs). A test run is a test run regardless of any other signal.
+1. **Testing** — `process.env.OMEGA_TEST_MODE === 'true'`, `globalThis.OMEGA_TEST_MODE === true`, or a build baked with `config.bxm.environment === 'testing'` (set by the harness before any consumer JS runs). A test run is a test run regardless of any other signal.
 2. **Production / Development (runtime)** — `chrome.runtime.getManifest().update_url`: present → production (packed / store-installed), absent → development (unpacked). This is the authoritative runtime signal in an extension context. In build-time Node, `chrome` is undefined, so it falls through.
-3. **Build-time + config signals** — `BXM_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development; `config.bxm.environment` (`'development'` / `'production'`) override.
-4. **Default** — development. @omega.js/extension's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `BXM_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast @omega.js/backend/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
+3. **Build-time + config signals** — `OMEGA_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development; `config.bxm.environment` (`'development'` / `'production'`) override.
+4. **Default** — development. @omega.js/extension's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `OMEGA_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast @omega.js/backend/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
 
 ## Adding a new helper
 
@@ -68,12 +68,12 @@ Write the function in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) 
 
 ## Why this matters
 
-**One signal, used everywhere.** The test runner sets `BXM_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
+**One signal, used everywhere.** The test runner sets `OMEGA_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
 
 **Sub-modules check the same signal.** When framework code (an auto-update probe, an analytics flush) needs to skip side effects in tests, it checks `isTesting()` — the same answer the consumer's own code gets. No drift.
 
-**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals (`manifest.update_url` vs `BXM_BUILD_MODE`), there is exactly one definition of "what environment is this," and a wrong-but-confident gate is structurally impossible.
+**`is*()` can never disagree with `getEnvironment()`.** Because the checks derive from the single resolver instead of reading raw signals (`manifest.update_url` vs `OMEGA_BUILD_MODE`), there is exactly one definition of "what environment is this," and a wrong-but-confident gate is structurally impossible.
 
 ## See also
 
-- [test-framework.md](test-framework.md) — `BXM_TEST_MODE` is set automatically by the test runners; extended mode (`--extended` / `TEST_EXTENDED_MODE=true`) gates real external APIs.
+- [test-framework.md](test-framework.md) — `OMEGA_TEST_MODE` is set automatically by the test runners; extended mode (`--extended` / `TEST_EXTENDED_MODE=true`) gates real external APIs.

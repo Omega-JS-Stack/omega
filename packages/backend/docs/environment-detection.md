@@ -10,7 +10,7 @@ Manager.isTesting()         // true ONLY in testing
 Manager.isProduction()      // true ONLY in production
 ```
 
-**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`BEM_TESTING` / `ENVIRONMENT` / `FUNCTIONS_EMULATOR` / `TERM_PROGRAM`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
+**The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`OMEGA_TEST_MODE` / `ENVIRONMENT` / `FUNCTIONS_EMULATOR` / `TERM_PROGRAM`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
 
 **The assistant forwards to the Manager.** Request handlers receive an `assistant`, so the same methods are exposed there and return identical results — call whichever is in scope:
 
@@ -29,7 +29,7 @@ assistant.isTesting()       // === Manager.isTesting()
 |---|---|
 | `getEnvironment()` | `'development' \| 'testing' \| 'production'` — the SSOT resolver; the only reader of raw signals. |
 | `isDevelopment()` | `true` ONLY in development (local Firebase emulator / dev), and NOT testing. Derives from `getEnvironment()`. |
-| `isTesting()` | `true` ONLY in testing (`BEM_TESTING === 'true'`). **Takes precedence** — a test run is not development. |
+| `isTesting()` | `true` ONLY in testing (`OMEGA_TEST_MODE === 'true'`). **Takes precedence** — a test run is not development. |
 | `isProduction()` | `true` ONLY in production (deployed Cloud Functions). A **real positive check** — NOT `!isDevelopment()`. |
 
 ## Gating side effects — use the INTENTIONAL check
@@ -53,7 +53,7 @@ if (isDevelopment() || isTesting()) { /* localhost URL, console logging, etc. */
 Manager.getApiUrl()  // this brand's API URL — the SSOT for calling the @omega.js/backend API
 ```
 
-**`Manager.getApiUrl()` is the one and only way to get the API URL.** It resolves to the **local** hosting emulator (`http://localhost:5002`) in development OR testing, and to production (`https://api.{domain}`) otherwise. Always call `getApiUrl()` directly — do NOT read the cached `Manager.project.apiUrl` property (it's a boot-time snapshot kept only for internal env-var export; the getter is the SSOT and always fresh). Build full endpoints by appending the path: `` `${Manager.getApiUrl()}/backend-manager/admin/post` ``.
+**`Manager.getApiUrl()` is the one and only way to get the API URL.** It resolves to the **local** hosting emulator (`http://localhost:5002`) in development OR testing, and to production (`https://api.{domain}`) otherwise. Always call `getApiUrl()` directly — do NOT read the cached `Manager.project.apiUrl` property (it's a boot-time snapshot kept only for internal env-var export; the getter is the SSOT and always fresh). Build full endpoints by appending the path: `` `${Manager.getApiUrl()}/omega/admin/post` ``.
 
 Resolving local in test mode is required because tests hit the local emulator — without it, internal @omega.js/backend→@omega.js/backend calls (and tests calling `getApiUrl()`) would leak to the live production server. Pass an explicit `env` arg (`getApiUrl('production')`) only to force a specific environment regardless of the current one — rarely needed, and mainly used by tests to pin a specific environment's mapping.
 
@@ -69,7 +69,7 @@ Source: [src/manager/index.js](../src/manager/index.js). @omega.js/backend has a
 
 `getEnvironment()` resolves in this precedence order:
 
-1. **Testing** — `process.env.BEM_TESTING === 'true'` (set by the test runner / emulator). A test run is a test run regardless of any other signal.
+1. **Testing** — `process.env.OMEGA_TEST_MODE === 'true'` (set by the test runner / emulator). A test run is a test run regardless of any other signal.
 2. **Production** — `process.env.ENVIRONMENT === 'production'`.
 3. **Development** — `process.env.ENVIRONMENT === 'development'`, or `FUNCTIONS_EMULATOR` is set, or `TERM_PROGRAM` is `Apple_Terminal` / `vscode` (running locally).
 4. **Default** — production. @omega.js/backend's deployed *runtime* can legitimately lack a dev signal (a live Cloud Function has no `FUNCTIONS_EMULATOR`), so "no signal" IS the normal production state. (Contrast UJM/BXM, whose deployed artifacts always carry their signal baked in, so they default to **development** — a bare context there is just build tooling. EM defaults to production for the same reason as @omega.js/backend.)
@@ -80,7 +80,7 @@ If you need a new environment-derived helper, add it next to the others on the M
 
 ## Why this matters
 
-**One signal, used everywhere.** The test runner sets `BEM_TESTING=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
+**One signal, used everywhere.** The test runner sets `OMEGA_TEST_MODE=true`; every piece of code that calls `isTesting()` (framework or consumer) then sees `true` — no need to invent a per-module env var.
 
 **Sub-modules check the same signal.** When framework code (an analytics flush, a webhook fan-out) needs to skip side effects in tests, it checks `isTesting()` — the same answer the consumer's own code gets. No drift.
 
@@ -88,4 +88,4 @@ If you need a new environment-derived helper, add it next to the others on the M
 
 ## See also
 
-- [test-framework.md](test-framework.md) — `BEM_TESTING` is set automatically by the test runner; `TEST_EXTENDED_MODE` gates real external APIs.
+- [test-framework.md](test-framework.md) — `OMEGA_TEST_MODE` is set automatically by the test runner; `TEST_EXTENDED_MODE` gates real external APIs.

@@ -20,7 +20,7 @@ const { openTtyPrompt } = require('./lib/interactive.js');
 delete process.env.STRIPE_SECRET_KEY;
 delete process.env.PAYPAL_CLIENT_SECRET;
 delete process.env.CHARGEBEE_API_KEY;
-delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+delete process.env.OMEGA_WEBHOOK_KEY;
 
 const BRAND_ID = 'fixture-brand';
 const DOMAIN = 'fixture-brand.test';
@@ -30,9 +30,9 @@ const BRAND_DESC = 'A fixture brand';
 const CONTACT_EMAIL = `support@${DOMAIN}`;
 const BRANDMARK = `${BRAND_URL}/brandmark.png`;
 const WEBHOOK_KEY = 'fixture-webhook-key';
-const STRIPE_WEBHOOK_URL = `https://api.${DOMAIN}/backend-manager/payments/webhook?processor=stripe&key=${WEBHOOK_KEY}`;
-const PAYPAL_WEBHOOK_URL = `https://api.${DOMAIN}/backend-manager/payments/webhook?processor=paypal&key=${WEBHOOK_KEY}`;
-const CHARGEBEE_WEBHOOK_URL = `https://api.${DOMAIN}/backend-manager/payments/webhook?processor=chargebee&brand=${BRAND_ID}&key=${WEBHOOK_KEY}`;
+const STRIPE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=stripe&key=${WEBHOOK_KEY}`;
+const PAYPAL_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=paypal&key=${WEBHOOK_KEY}`;
+const CHARGEBEE_WEBHOOK_URL = `https://api.${DOMAIN}/omega/payments/webhook?processor=chargebee&brand=${BRAND_ID}&key=${WEBHOOK_KEY}`;
 
 // Mirrors of the handlers' event lists (pins the desired sets)
 const STRIPE_EVENTS = [
@@ -244,9 +244,9 @@ function writebackSource(config) {
 
 function runService(config, { stripe = null, paypal = null, chargebee = null, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
-    process.env.BACKEND_MANAGER_WEBHOOK_KEY = WEBHOOK_KEY;
+    process.env.OMEGA_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
-    delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+    delete process.env.OMEGA_WEBHOOK_KEY;
   }
 
   return service.run({
@@ -611,7 +611,7 @@ test('stripe-webhook: disabled endpoint → re-enabled (events already converged
   ]);
 });
 
-test('payment: missing BACKEND_MANAGER_WEBHOOK_KEY → warned, webhooks never listed', async () => {
+test('payment: missing OMEGA_WEBHOOK_KEY → warned, webhooks never listed', async () => {
   const stripe = fakeStripe(stripeConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }) });
 
@@ -621,7 +621,7 @@ test('payment: missing BACKEND_MANAGER_WEBHOOK_KEY → warned, webhooks never li
   });
 
   assert.equal(result.status, 'warned');
-  assert.deepEqual(result.output.stripeWebhook, { skipped: 'no BACKEND_MANAGER_WEBHOOK_KEY' });
+  assert.deepEqual(result.output.stripeWebhook, { skipped: 'no OMEGA_WEBHOOK_KEY' });
   assert.equal(stripe.callsTo('listWebhookEndpoints').length, 0);
   assert.deepEqual(stripe.mutations(), []);
 });

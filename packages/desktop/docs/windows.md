@@ -141,7 +141,7 @@ Every window created via `manager.windows.create()` is automatically wired up wi
 
 ## Testing mode: stealth surfacing
 
-When `manager.isTesting()` (i.e. under `npx omega test`), every surfacing path in this lib — `ready-to-show`, `windows.show()`, the create-dedup focus — goes **stealth** instead of `win.show()`: `_surface()` applies the shared recipe from `src/utils/stealth-window.js` and surfaces via `showInactive()`, with no `win.focus()`/dock surfacing. **The full stealth story lives in [test-framework.md](test-framework.md) (SSOT)** — the recipe and why it's not `hide()`/`minimize()`, the raw-window `browser-window-created` hook, `webContents.focus()` suppression, macOS app-level activation suppression, and the **`EM_TEST_SHOW=1`** opt-out. Covered by `suites/main/stealth-window.test.js`.
+When `manager.isTesting()` (i.e. under `npx omega test`), every surfacing path in this lib — `ready-to-show`, `windows.show()`, the create-dedup focus — goes **stealth** instead of `win.show()`: `_surface()` applies the shared recipe from `src/utils/stealth-window.js` and surfaces via `showInactive()`, with no `win.focus()`/dock surfacing. **The full stealth story lives in [test-framework.md](test-framework.md) (SSOT)** — the recipe and why it's not `hide()`/`minimize()`, the raw-window `browser-window-created` hook, `webContents.focus()` suppression, macOS app-level activation suppression, and the **`OMEGA_TEST_SHOW=1`** opt-out. Covered by `suites/main/stealth-window.test.js`.
 
 ## Platform behavior
 

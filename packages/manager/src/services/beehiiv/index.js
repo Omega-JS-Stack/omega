@@ -10,7 +10,7 @@
  * prints the exact values to copy when none matches.
  *
  * Auth: BEEHIIV_API_KEY in the brand .env; the webhook operation
- * additionally needs BACKEND_MANAGER_WEBHOOK_KEY. No API key → clean skip.
+ * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { BeehiivAPI } = require('./lib/beehiiv-api.js');

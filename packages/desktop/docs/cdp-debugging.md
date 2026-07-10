@@ -10,7 +10,7 @@ Two equivalent ways:
 
 ```bash
 # Env var (recommended)
-EM_CDP_PORT=9222 npm start
+OMEGA_CDP_PORT=9222 npm start
 
 # CLI flag
 npm start -- --remote-debugging-port=9222
@@ -27,9 +27,9 @@ curl -s http://localhost:9222/json
 
 ## The `mgr cdp` toolkit
 
-Zero-dependency subcommands for driving the running dev app — see, act, and run the no-watch iterate loop. All read `EM_CDP_PORT` (default 9222), or take `--port <n>` (which wins).
+Zero-dependency subcommands for driving the running dev app — see, act, and run the no-watch iterate loop. All read `OMEGA_CDP_PORT` (default 9222), or take `--port <n>` (which wins).
 
-**Pinning a port in an npm script? Use `--port`, never `cross-env`.** `npx cross-env EM_CDP_PORT=… npx omega cdp eval … "window.em.ipc.invoke('my:channel')"` STRIPS the inner quotes from the expression before it reaches V8 (`invoke(my:channel)` → `SyntaxError: missing ) after argument list`). `npx omega cdp eval … "…" --port <n>` keeps the expression intact.
+**Pinning a port in an npm script? Use `--port`, never `cross-env`.** `npx cross-env OMEGA_CDP_PORT=… npx omega cdp eval … "window.em.ipc.invoke('my:channel')"` STRIPS the inner quotes from the expression before it reaches V8 (`invoke(my:channel)` → `SyntaxError: missing ) after argument list`). `npx omega cdp eval … "…" --port <n>` keeps the expression intact.
 
 ```bash
 npx omega cdp status                          # running? targets, window rect, theme
@@ -68,7 +68,7 @@ Caveats:
 
 ### relaunch / quit — the iterate loop
 
-@omega.js/desktop dev has **no watch** (`npm start` builds once, then runs) — every `src/` edit needs quit → rebuild → boot. `relaunch` is that loop in one command: it quits the app (real quit — `before-quit` handlers run), waits for the **full process tree to drain** (port-down alone is NOT that signal — the npm-start chain takes a few more seconds, and a test run started inside that window gets contaminated with flaky boot suites), spawns a detached `npm start` with `EM_CDP_PORT`, and waits for the boot signal. `quit` is the first half alone — safe to run `npx omega test` the moment it returns. **Never run tests while the app is up or going down** (both rebuild `dist/`).
+@omega.js/desktop dev has **no watch** (`npm start` builds once, then runs) — every `src/` edit needs quit → rebuild → boot. `relaunch` is that loop in one command: it quits the app (real quit — `before-quit` handlers run), waits for the **full process tree to drain** (port-down alone is NOT that signal — the npm-start chain takes a few more seconds, and a test run started inside that window gets contaminated with flaky boot suites), spawns a detached `npm start` with `OMEGA_CDP_PORT`, and waits for the boot signal. `quit` is the first half alone — safe to run `npx omega test` the moment it returns. **Never run tests while the app is up or going down** (both rebuild `dist/`).
 
 The boot signal defaults to the main window's document target. Apps whose boot completes later than first paint override it in `config/omega.json5`:
 
@@ -110,13 +110,13 @@ Humans: the agent's Chrome window is visible — you can watch it drive. Full re
 
 ## MCP setup (Claude ↔ Electron)
 
-A `chrome-devtools-electron` MCP upstream is configured at `~/.claude/mcp-server/servers/chrome-devtools-electron/config.json`. It reads `EM_CDP_PORT` from the environment at spawn time (defaults to 9222), so the same upstream works for any Electron app — just set the env var **BEFORE launching `claude`** (it's expanded once, when the session's router spawns the upstream; mid-session changes do nothing).
+A `chrome-devtools-electron` MCP upstream is configured at `~/.claude/mcp-server/servers/chrome-devtools-electron/config.json`. It reads `OMEGA_CDP_PORT` from the environment at spawn time (defaults to 9222), so the same upstream works for any Electron app — just set the env var **BEFORE launching `claude`** (it's expanded once, when the session's router spawns the upstream; mid-session changes do nothing).
 
 ```json
 {
   "enabled": true,
   "command": "sh",
-  "args": ["-c", "exec /Users/ian/.nvm/default-bin/npx -y chrome-devtools-mcp@latest --browserUrl=http://127.0.0.1:${EM_CDP_PORT:-9222} --usage-statistics=false"]
+  "args": ["-c", "exec /Users/ian/.nvm/default-bin/npx -y chrome-devtools-mcp@latest --browserUrl=http://127.0.0.1:${OMEGA_CDP_PORT:-9222} --usage-statistics=false"]
 }
 ```
 
@@ -124,7 +124,7 @@ This runs alongside the regular `chrome-devtools` upstream (which launches its o
 - `chrome-devtools__take_screenshot` → the session's own Chrome browser
 - `chrome-devtools-electron__take_screenshot` → the running Electron app
 
-Multiple Claude sessions can debug different apps simultaneously — each terminal sets its own `EM_CDP_PORT`. See `~/.claude/mcp-server/README.md`.
+Multiple Claude sessions can debug different apps simultaneously — each terminal sets its own `OMEGA_CDP_PORT`. See `~/.claude/mcp-server/README.md`.
 
 ### Available MCP tools (29)
 
@@ -153,14 +153,14 @@ Use 9222 for `--remote-debugging-port` (industry standard). Avoid 9229 — that'
 
 ## Security
 
-CDP gives full control of the renderer — any local process can connect and read/modify anything. **Never ship with `--remote-debugging-port` baked in.** It's dev-only, gated behind `EM_CDP_PORT` which is never set in production.
+CDP gives full control of the renderer — any local process can connect and read/modify anything. **Never ship with `--remote-debugging-port` baked in.** It's dev-only, gated behind `OMEGA_CDP_PORT` which is never set in production.
 
 ## How it works
 
 `src/gulp/tasks/serve.js` collects extra args in two ways:
 
 1. **CLI flags**: `process.argv.slice(2).filter(arg => arg.startsWith('--'))` — forwards all `--` flags from the gulp process to Electron
-2. **`EM_CDP_PORT` env var**: if set and no `--remote-debugging-port` is already in the args, appends `--remote-debugging-port=${EM_CDP_PORT}`
+2. **`OMEGA_CDP_PORT` env var**: if set and no `--remote-debugging-port` is already in the args, appends `--remote-debugging-port=${OMEGA_CDP_PORT}`
 
 The args are passed to `spawn(electronBin, ['.', ...extraArgs])`. The main process boot log shows the received argv:
 

@@ -1,5 +1,5 @@
 /**
- * POST /marketing/webhook/forward?provider=sendgrid|beehiiv&key=<BACKEND_MANAGER_WEBHOOK_KEY>
+ * POST /marketing/webhook/forward?provider=sendgrid|beehiiv&key=<OMEGA_WEBHOOK_KEY>
  *
  * Parent-only forwarder. SendGrid and Beehiiv send webhooks to this single URL
  * on the parent @omega.js/backend. The parent reads its `brands` collection and re-POSTs the
@@ -9,14 +9,14 @@
  * Gating:
  *   - Only enabled when Manager.config.parent === 'self'. Any other value (a URL
  *     pointing TO the parent, the typical setup for child BEMs) returns 404.
- *   - Same BACKEND_MANAGER_WEBHOOK_KEY is shared across all brands, so the
+ *   - Same OMEGA_WEBHOOK_KEY is shared across all brands, so the
  *     parent forwards the key it received (already validated) when calling
  *     each child.
  *
  * Brand URL derivation:
  *   - Each brand doc in the `brands` collection has `brand.url` (e.g. 'https://somiibo.com').
  *   - API URL is derived by inserting 'api.' subdomain: 'https://api.somiibo.com'.
- *   - Child receivers live at `/backend-manager/marketing/webhook` on that host.
+ *   - Child receivers live at `/omega/marketing/webhook` on that host.
  *
  * Self-inclusion:
  *   - The parent's own brand IS included in the fan-out. The parent @omega.js/backend has
@@ -53,7 +53,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
 
   // Same key used for the receiver — parent validates incoming, then re-uses
   // it for outbound calls to children (all brands share this env value).
-  if (!key || key !== process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
+  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 
@@ -145,7 +145,7 @@ async function forwardToChild({ assistant, brandId, brandUrl, provider, key, bod
   try {
     const url = new URL(brandUrl);
     url.hostname = `api.${url.hostname}`;
-    url.pathname = '/backend-manager/marketing/webhook';
+    url.pathname = '/omega/marketing/webhook';
     url.search = `?provider=${encodeURIComponent(provider)}&key=${encodeURIComponent(key)}`;
     apiUrl = url.toString();
   } catch (e) {

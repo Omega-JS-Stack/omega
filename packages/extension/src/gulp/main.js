@@ -16,10 +16,10 @@ require('dotenv').config({ path: path.join(projectRoot, '.env') });
 
 // Tee all stdout/stderr to <projectRoot>/logs/<dev|build>.log for easy `tail -f` / grep / Claude
 // inspection — captures gulp task output, webpack/serve output, console.log calls, the works.
-// build.log for production builds (BXM_BUILD_MODE=true), dev.log for `npm start`.
-// Disable via BXM_LOG_FILE=false. Override path via BXM_LOG_FILE=<path>.
+// build.log for production builds (OMEGA_BUILD_MODE=true), dev.log for `npm start`.
+// Disable via OMEGA_LOG_FILE=false. Override path via OMEGA_LOG_FILE=<path>.
 const attachLogFile = require('../utils/attach-log-file.js');
-const logFileEnv = process.env.BXM_LOG_FILE;
+const logFileEnv = process.env.OMEGA_LOG_FILE;
 if (logFileEnv !== 'false' && logFileEnv !== '0') {
   const defaultName = Manager.isBuildMode() ? 'build.log' : 'dev.log';
   const logPath = (logFileEnv && logFileEnv !== 'true') ? logFileEnv : path.join(projectRoot, 'logs', defaultName);

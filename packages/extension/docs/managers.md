@@ -49,10 +49,10 @@ Manager.getPackage('project');   // → cwd's package.json
 Manager.getPackage('main');      // → @omega.js/extension's own package.json
 Manager.getRootPath('project');  // → process.cwd()
 Manager.getRootPath('main');     // → path to @omega.js/extension's dist
-Manager.getEnvironment();    // → 'production' if BXM_BUILD_MODE=true else 'development'
+Manager.getEnvironment();    // → 'production' if OMEGA_BUILD_MODE=true else 'development'
 Manager.getLiveReloadPort(); // → 35729 by default
 Manager.isBuildMode();       // → boolean
-Manager.actLikeProduction(); // → buildMode || UJ_AUDIT_FORCE
+Manager.actLikeProduction(); // → buildMode || OMEGA_AUDIT_FORCE
 Manager.require(name);       // → borrow any of @omega.js/extension's bundled deps (json5, fs-jetpack, etc.)
 Manager.logger(name);        // → new logger('name') instance
 Manager.reportBuildError(e); // → notifly + log
@@ -64,7 +64,7 @@ Cross-context helpers (`isTesting/isDevelopment/isProduction/getVersion`) are av
 
 Each Manager's `initialize()`:
 
-1. **Read configuration** — from `window.BXM_BUILD_JSON?.config` (injected by webpack at build time)
+1. **Read configuration** — from `window.OMEGA_BUILD_JSON?.config` (injected by webpack at build time)
 2. **Wire `extension`** — singleton from [src/lib/extension.js](../src/lib/extension.js), normalized chrome.*/browser.* API
 3. **Construct `logger`** — `new LoggerLite('<context>')` from [src/lib/logger-lite.js](../src/lib/logger-lite.js)
 4. **Initialize `omega`** (popup/options/sidepanel/page only) — `omega.initialize(config)`

@@ -29,7 +29,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 2. `npx omega setup` — scaffolds the project (copies `src/defaults/` into the project: `src/manifest.json`, `src/views/`, `src/assets/`, `config/omega.json5`, etc.)
 3. `npm start` — dev (gulp → webpack → serve with live reload)
 4. `npm run build` — production build (compiles `dist/`, packages per-browser into `packaged/<browser>/raw/` + `.zip`)
-5. `BXM_IS_PUBLISH=true npm run build` — also uploads to Chrome / Firefox / Edge stores (see [docs/publishing.md](docs/publishing.md))
+5. `OMEGA_IS_PUBLISH=true npm run build` — also uploads to Chrome / Firefox / Edge stores (see [docs/publishing.md](docs/publishing.md))
 6. `npx omega test` — runs framework + project test suites
    - `npx omega test build/config` — bare path: run tests matching a path in BOTH sources
    - `npx omega test project:` — run ONLY consumer project tests (`project:<path>` to narrow)
@@ -118,11 +118,11 @@ See [docs/build-system.md](docs/build-system.md).
 
 ### Build modes
 
-- `BXM_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
-- `BXM_IS_PUBLISH=true` — also publish to Chrome / Firefox / Edge stores after packaging
-- `BXM_TEST_MODE=true` — running inside @omega.js/extension's test framework. Powers `Manager.isTesting()`.
-- `BXM_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task
-- `BXM_LOG_FILE` — override the gulp stdout/stderr tee path, or `false` to disable it
+- `OMEGA_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
+- `OMEGA_IS_PUBLISH=true` — also publish to Chrome / Firefox / Edge stores after packaging
+- `OMEGA_TEST_MODE=true` — running inside @omega.js/extension's test framework. Powers `Manager.isTesting()`.
+- `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task
+- `OMEGA_LOG_FILE` — override the gulp stdout/stderr tee path, or `false` to disable it
 
 ### Themes
 
@@ -140,7 +140,7 @@ Two themes ship with @omega.js/extension: `bootstrap` (pure Bootstrap 5.3+) and 
 
 Two lifecycle hooks let consumers run custom logic during packaging:
 - `hooks/build:pre.js` — after `dist/` is built but before `packaged/` is assembled
-- `hooks/build:post.js` — after packaging (and after store publishing if `BXM_IS_PUBLISH=true`)
+- `hooks/build:post.js` — after packaging (and after store publishing if `OMEGA_IS_PUBLISH=true`)
 
 Both receive an `index` build-info object (package, manifest, config, paths, env). Async. See [docs/hooks.md](docs/hooks.md).
 
@@ -149,7 +149,7 @@ Both receive an `index` build-info object (package, manifest, config, paths, env
 Every Manager (build + 7 runtime contexts) has the same set of static + instance helpers via `attachTo(Manager)` mixin from `src/utils/mode-helpers.js`:
 
 - `Manager.isDevelopment()` — running unpacked, and NOT testing
-- `Manager.isTesting()` — `BXM_TEST_MODE=true` (takes precedence over development)
+- `Manager.isTesting()` — `OMEGA_TEST_MODE=true` (takes precedence over development)
 - `Manager.isProduction()` — running packed (from store), and NOT testing. A real positive check, NOT `!isDevelopment()`
 - `Manager.getEnvironment()` — `'development' | 'testing' | 'production'` (mutually exclusive; testing wins)
 - `Manager.getVersion()` — extension version (`chrome.runtime.getManifest().version` in browser, `package.json#version` in Node)
@@ -204,7 +204,7 @@ See [docs/cli.md](docs/cli.md).
 - **🚫 NEVER run `npm start`** (consumer projects) — it's the user's long-running dev watcher. Assume it's already running; if it isn't, **instruct the user to run it** rather than running it yourself (running it again kills theirs). To see output, **read the `logs/*.log` files** (`dev.log`, `build.log`, `test.log`) — never tail/attach to the process. Running `npx omega test` is fine.
 - **Where the output logs live:** the gulp pipeline tees all stdout/stderr to `<projectRoot>/logs/dev.log` (on `npm start`) or `logs/build.log` (on `npm run build`), truncated fresh each run, ANSI-stripped. `cat logs/dev.log` (or `grep` it) instead of scrolling scrollback. `npx omega test` writes `logs/test.log`. See [docs/build-system.md](docs/build-system.md#log-files).
 - **After editing files**, verify the gulp watcher recompiled successfully. Check for webpack/sass errors in the console output. A change that breaks the build is not a completed change.
-- **Live-test the extension via CDP.** Use the `chrome-devtools-extension` MCP upstream — it launches a per-session Chrome for Testing with the unpacked extension pre-loaded (`BXM_EXTENSION_PATH="$(pwd)/packaged/chromium/raw" claude`, then `router__enable_upstream`; stable Chrome ignores `--load-extension`). Plain web pages (no extension needed): the regular `chrome-devtools` MCP tools — your session auto-launches its own private Chrome on the first tool call. This is the primary way to confirm UI changes — type-checking and test suites verify code correctness, not feature correctness. See [docs/cdp-debugging.md](docs/cdp-debugging.md) + `~/.claude/mcp-server/servers/chrome-devtools-extension/CLAUDE.md`.
+- **Live-test the extension via CDP.** Use the `chrome-devtools-extension` MCP upstream — it launches a per-session Chrome for Testing with the unpacked extension pre-loaded (`OMEGA_CDP_EXTENSION_PATH="$(pwd)/packaged/chromium/raw" claude`, then `router__enable_upstream`; stable Chrome ignores `--load-extension`). Plain web pages (no extension needed): the regular `chrome-devtools` MCP tools — your session auto-launches its own private Chrome on the first tool call. This is the primary way to confirm UI changes — type-checking and test suites verify code correctness, not feature correctness. See [docs/cdp-debugging.md](docs/cdp-debugging.md) + `~/.claude/mcp-server/servers/chrome-devtools-extension/CLAUDE.md`.
 
 ## Supply-Chain Security
 

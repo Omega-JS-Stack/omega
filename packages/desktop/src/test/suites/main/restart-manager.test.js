@@ -157,9 +157,9 @@ module.exports = {
       },
     },
     {
-      name: 'non-production without EM_RESTART_MANAGER_DEV: nothing scheduled',
+      name: 'non-production without OMEGA_RESTART_MANAGER_DEV: nothing scheduled',
       run: (ctx) => {
-        ctx.expect(process.env.EM_RESTART_MANAGER_DEV).not.toBe('1');
+        ctx.expect(process.env.OMEGA_RESTART_MANAGER_DEV).not.toBe('1');
         ctx.expect(ctx.manager.isProduction()).toBe(false);
         ctx.expect(ctx.manager.restartManager._registerTimer).toBe(null);
       },

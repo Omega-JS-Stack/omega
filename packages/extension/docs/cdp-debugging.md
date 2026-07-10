@@ -19,7 +19,7 @@ Humans: the agent's Chrome window is visible — you can watch it drive. Full re
 
 ## Electron apps are the exception (attach, don't launch)
 
-An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx omega cdp`. See EM's `docs/cdp-debugging.md`.
+An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `OMEGA_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx omega cdp`. See EM's `docs/cdp-debugging.md`.
 
 ## @omega.js/extension specifics: testing the extension (`chrome-devtools-extension` upstream)
 
@@ -30,7 +30,7 @@ The recipe:
 1. **Build the loadable output**: `npm run build` → `packaged/chromium/raw/` (strict-JSON manifest; `dist/` is NOT Chrome-loadable — its manifest is JSON5).
 2. **Launch the session with the extension path** (env is expanded ONCE at session start — set it BEFORE `claude`):
    ```bash
-   BXM_EXTENSION_PATH="$(pwd)/packaged/chromium/raw" claude
+   OMEGA_CDP_EXTENSION_PATH="$(pwd)/packaged/chromium/raw" claude
    ```
 3. **In the session, enable the upstream** (it's on-demand): `router__enable_upstream { name: "chrome-devtools-extension" }`. The first tool call launches CfT with the extension loaded. Tools are namespaced `chrome-devtools-extension__*` (34 tools — the base set + extension tools).
 4. **Rebuild loop**: after `npm run build`, `router__disable_upstream` + `router__enable_upstream` → fresh browser with the rebuilt extension (the profile is ephemeral; the extension loads at launch).

@@ -18,14 +18,14 @@ const service = require('../src/services/sendgrid/index.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.SENDGRID_API_KEY;
-delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+delete process.env.OMEGA_WEBHOOK_KEY;
 delete process.env.CLOUDFLARE_TOKEN;
 
 const DOMAIN = 'fixture-brand.test';
 const BRAND_NAME = 'Fixture Brand';
 const FROM_EMAIL = `offers@${DOMAIN}`;
 const WEBHOOK_KEY = 'fixture-webhook-key';
-const WEBHOOK_URL = `https://api.${DOMAIN}/backend-manager/marketing/webhook/forward?provider=sendgrid&key=${WEBHOOK_KEY}`;
+const WEBHOOK_URL = `https://api.${DOMAIN}/omega/marketing/webhook/forward?provider=sendgrid&key=${WEBHOOK_KEY}`;
 
 const SENDGRID_FIELDS = fieldsFor('sendgrid');
 const SENDGRID_SEGMENTS = segmentsFor('sendgrid');
@@ -151,9 +151,9 @@ const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
 
 function runService(config, { sendgrid, cloudflare = null, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
-    process.env.BACKEND_MANAGER_WEBHOOK_KEY = WEBHOOK_KEY;
+    process.env.OMEGA_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
-    delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+    delete process.env.OMEGA_WEBHOOK_KEY;
   }
 
   return service.run({
@@ -465,7 +465,7 @@ test('sendgrid: a rejected segment PATCH falls back to delete + recreate', async
 
 // ─── event-webhook ───────────────────────────────────────────────────────────
 
-test('sendgrid: missing BACKEND_MANAGER_WEBHOOK_KEY warns', async () => {
+test('sendgrid: missing OMEGA_WEBHOOK_KEY warns', async () => {
   const api = fakeSendgrid(convergedResponses());
 
   const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, webhookKey: false });
@@ -486,7 +486,7 @@ test('sendgrid: no parent configured → nothing to point the webhook at', async
 });
 
 test('sendgrid: webhook drift is patched with the minimum diff against the parent forwarder', async () => {
-  const parentUrl = `https://api.parent-brand.test/backend-manager/marketing/webhook/forward?provider=sendgrid&key=${WEBHOOK_KEY}`;
+  const parentUrl = `https://api.parent-brand.test/omega/marketing/webhook/forward?provider=sendgrid&key=${WEBHOOK_KEY}`;
   const api = fakeSendgrid({
     ...convergedResponses(),
     getEventWebhookSettings: {

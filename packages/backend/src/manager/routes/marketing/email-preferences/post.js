@@ -97,7 +97,7 @@ async function handleAuthenticated({ assistant, Manager, user, settings, analyti
       // Doc is already updated — provider sync is best-effort. Don't fail the request.
     }
   } else {
-    assistant.log('email-preferences (auth): Skipping provider calls (BEM_TESTING=true)');
+    assistant.log('email-preferences (auth): Skipping provider calls (OMEGA_TEST_MODE=true)');
   }
 
   analytics.event('marketing/email-preferences', { action, mode: 'authenticated' });
@@ -160,7 +160,7 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
   const shouldCallExternalAPIs = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldCallExternalAPIs) {
-    assistant.log('email-preferences (anon): Skipping SendGrid (BEM_TESTING=true)');
+    assistant.log('email-preferences (anon): Skipping SendGrid (OMEGA_TEST_MODE=true)');
     return assistant.respond({ success: true });
   }
 

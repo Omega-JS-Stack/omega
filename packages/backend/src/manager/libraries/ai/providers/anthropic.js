@@ -30,7 +30,7 @@ function Anthropic(assistant, key) {
   self.key = key
     || self.Manager?.config?.anthropic?.key
     || process.env.ANTHROPIC_API_KEY
-    || process.env.BACKEND_MANAGER_ANTHROPIC_API_KEY;
+    || process.env.OMEGA_ANTHROPIC_API_KEY;
 
   self.tokens = {
     total:  { count: 0, price: 0 },
@@ -52,7 +52,7 @@ Anthropic.prototype.request = async function (options) {
   options.timeout = options.timeout || 120000;
 
   if (!self.key) {
-    throw new Error('Anthropic API key not configured (set BACKEND_MANAGER_ANTHROPIC_API_KEY)');
+    throw new Error('Anthropic API key not configured (set OMEGA_ANTHROPIC_API_KEY)');
   }
 
   // Lazy-require the SDK so projects that don't use Anthropic don't need it installed

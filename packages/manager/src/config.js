@@ -179,7 +179,7 @@ const DEFAULTS = {
   // listId/publicationId are resolved by the services and written back here
   // (comment-preserving writeback), with a state mirror as the resolution
   // cache. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
-  // (+ BACKEND_MANAGER_WEBHOOK_KEY for the webhook operations).
+  // (+ OMEGA_WEBHOOK_KEY for the webhook operations).
   // omega-manager also carried a newsletter.content generator blob here —
   // it's @omega.js/backend newsletter-generator data, not service config; it rides the
   // config-hierarchy dispersal story.

@@ -10,11 +10,11 @@ const { execute } = require('node-powertools');
 // Load package
 const project = Manager.getPackage('project');
 
-// Helper to parse browser filter from --browser flag or BXM_BROWSER env var
+// Helper to parse browser filter from --browser flag or OMEGA_BROWSER env var
 // Returns array of browser names to publish to, or null for all
 function getBrowserFilter() {
   // Check env var first (works across npm && chains), then CLI arg
-  const browser = process.env.BXM_BROWSER || argv.browser;
+  const browser = process.env.OMEGA_BROWSER || argv.browser;
 
   // If true or undefined, publish to all
   if (browser === true || browser === undefined) {
@@ -93,8 +93,8 @@ const STORES = {
 // Main publish task
 async function publish(complete) {
   // Check if publish mode is enabled
-  if (!process.env.BXM_IS_PUBLISH) {
-    logger.log('Skipping publish (BXM_IS_PUBLISH not set)');
+  if (!process.env.OMEGA_IS_PUBLISH) {
+    logger.log('Skipping publish (OMEGA_IS_PUBLISH not set)');
     return complete();
   }
 

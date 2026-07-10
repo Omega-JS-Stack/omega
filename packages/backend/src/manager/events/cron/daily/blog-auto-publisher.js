@@ -36,7 +36,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
   // External boundary (live feed fetches + AI generation + publishing) — the
   // cron entry gates itself like every other external call. Ungated, a normal
   // test run harvests real feeds from the consumer's blog config, delaying the
-  // serial bm_cronDaily sequence past the usage suite's reset-usage deadline.
+  // serial omega_cronDaily sequence past the usage suite's reset-usage deadline.
   if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) {
     assistant.log('Blog auto-publisher skipped (test mode without TEST_EXTENDED_MODE)');
     return;
@@ -113,7 +113,7 @@ function buildBrandConfig(config) {
 
 function fetchRemoteBrand(brandUrl) {
   const fetch = require('wonderful-fetch');
-  return fetch(`${brandUrl}/backend-manager/brand`, {
+  return fetch(`${brandUrl}/omega/brand`, {
     timeout: 120000,
     tries: 3,
     response: 'json',

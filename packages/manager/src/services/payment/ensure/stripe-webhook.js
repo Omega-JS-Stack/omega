@@ -4,7 +4,7 @@
  * Matches by exact URL, re-enables endpoints Stripe auto-disabled after
  * repeated failures, diffs enabled_events, updates when drifted, creates
  * when missing. Skipped for shared Firebase projects (no api.{domain}
- * backend to receive events). Requires BACKEND_MANAGER_WEBHOOK_KEY.
+ * backend to receive events). Requires OMEGA_WEBHOOK_KEY.
  */
 const chalk = require('chalk').default;
 const { buildWebhookUrl, diffEventSets } = require('../lib/payment-utils.js');
@@ -52,9 +52,9 @@ module.exports = async function ensureStripeWebhook(context) {
     return {};
   }
 
-  if (!process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
-    console.log(`      ${chalk.yellow('⚠')} BACKEND_MANAGER_WEBHOOK_KEY not set in the brand .env — webhook not managed`);
-    return { status: 'warned', output: { stripeWebhook: { skipped: 'no BACKEND_MANAGER_WEBHOOK_KEY' } } };
+  if (!process.env.OMEGA_WEBHOOK_KEY) {
+    console.log(`      ${chalk.yellow('⚠')} OMEGA_WEBHOOK_KEY not set in the brand .env — webhook not managed`);
+    return { status: 'warned', output: { stripeWebhook: { skipped: 'no OMEGA_WEBHOOK_KEY' } } };
   }
 
   const desiredUrl = buildWebhookUrl(brandConfig, 'stripe');

@@ -71,7 +71,7 @@ class TestCommand extends BaseCommand {
     }
 
     // Build unified test config object
-    // Use hosting URL for all API requests (rewrites to bm_api function)
+    // Use hosting URL for all API requests (rewrites to omega_api function)
     const testConfig = {
       ...projectConfig,
       apiUrl: `http://127.0.0.1:${emulatorPorts.hosting}`,
@@ -147,8 +147,8 @@ class TestCommand extends BaseCommand {
     }
 
     // Derive computed values (not in config file)
-    const backendManagerKey = argv.key || process.env.BACKEND_MANAGER_KEY;
-    const backendManagerWebhookKey = argv.webhookKey || process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+    const backendManagerKey = argv.key || process.env.OMEGA_ADMIN_KEY;
+    const backendManagerWebhookKey = argv.webhookKey || process.env.OMEGA_WEBHOOK_KEY;
     const contactEmail = config.brand?.contact?.email || '';
     const domain = contactEmail.includes('@') ? contactEmail.split('@')[1] : '';
 
@@ -160,13 +160,13 @@ class TestCommand extends BaseCommand {
 
     if (!backendManagerKey) {
       this.logError('Error: Missing backend manager key');
-      this.log(chalk.gray('  Set BACKEND_MANAGER_KEY in your .env file or pass --key flag'));
+      this.log(chalk.gray('  Set OMEGA_ADMIN_KEY in your .env file or pass --key flag'));
       return null;
     }
 
     if (!backendManagerWebhookKey) {
       this.logError('Error: Missing backend manager webhook key');
-      this.log(chalk.gray('  Set BACKEND_MANAGER_WEBHOOK_KEY in your .env file or pass --webhook-key flag'));
+      this.log(chalk.gray('  Set OMEGA_WEBHOOK_KEY in your .env file or pass --webhook-key flag'));
       return null;
     }
 
@@ -196,10 +196,10 @@ class TestCommand extends BaseCommand {
    * Framework self-test detection + fixture wiring.
    *
    * When `npx omega test` runs from a directory that is NOT a Firebase project
-   * (no firebase.json) AND is the @omega.js/backend repo (or BEM_TEST_BOOT_PROJECT
+   * (no firebase.json) AND is the @omega.js/backend repo (or OMEGA_TEST_BOOT_PROJECT
    * is set), point the run at the bundled fixture project and link the local
    * framework + firebase deps into it so the emulator's function workers resolve
-   * them. This is @omega.js/backend's equivalent of BXM's BXM_TEST_BOOT_PROJECT / UJM's
+   * them. This is @omega.js/backend's equivalent of BXM's OMEGA_TEST_BOOT_PROJECT / UJM's
    * UJ_TEST_BOOT_PROJECT. Returns true if self-test wiring was applied.
    */
   setupSelfTest() {
@@ -210,8 +210,8 @@ class TestCommand extends BaseCommand {
       return false;
     }
 
-    // Self-test if BEM_TEST_BOOT_PROJECT is set, or cwd is the @omega.js/backend repo.
-    let isSelfTest = !!process.env.BEM_TEST_BOOT_PROJECT;
+    // Self-test if OMEGA_TEST_BOOT_PROJECT is set, or cwd is the @omega.js/backend repo.
+    let isSelfTest = !!process.env.OMEGA_TEST_BOOT_PROJECT;
     if (!isSelfTest) {
       try {
         isSelfTest = require(path.join(process.cwd(), 'package.json')).name === '@omega.js/backend';
@@ -221,11 +221,11 @@ class TestCommand extends BaseCommand {
       return false;
     }
 
-    const fixture = process.env.BEM_TEST_BOOT_PROJECT
-      ? path.resolve(process.env.BEM_TEST_BOOT_PROJECT)
+    const fixture = process.env.OMEGA_TEST_BOOT_PROJECT
+      ? path.resolve(process.env.OMEGA_TEST_BOOT_PROJECT)
       : path.resolve(__dirname, '..', '..', 'test', 'fixtures', 'firebase-project');
 
-    process.env.BEM_TEST_BOOT_PROJECT = fixture;
+    process.env.OMEGA_TEST_BOOT_PROJECT = fixture;
     self.firebaseProjectPath = fixture;
 
     // The test HTTP client authenticates with the fixture's admin keys (the
@@ -234,8 +234,8 @@ class TestCommand extends BaseCommand {
     // needed (single source = the fixture config).
     try {
       const cfg = require('@omega.js/config').loadConfig(fixture, 'backend').config;
-      process.env.BACKEND_MANAGER_KEY = process.env.BACKEND_MANAGER_KEY || cfg.backend_manager?.key;
-      process.env.BACKEND_MANAGER_WEBHOOK_KEY = process.env.BACKEND_MANAGER_WEBHOOK_KEY || cfg.backend_manager?.webhookKey;
+      process.env.OMEGA_ADMIN_KEY = process.env.OMEGA_ADMIN_KEY || cfg.omega?.key;
+      process.env.OMEGA_WEBHOOK_KEY = process.env.OMEGA_WEBHOOK_KEY || cfg.omega?.webhookKey;
     } catch (_) { /* fixture config unreadable — let the normal key check report it */ }
 
     // Anonymous HMAC unsubscribe tests sign links with this shared secret; the
@@ -322,7 +322,7 @@ class TestCommand extends BaseCommand {
 
     // Pass entire config as base64-encoded JSON to avoid shell escaping issues
     const testEnv = {
-      BEM_TEST_CONFIG: Buffer.from(JSON.stringify(testConfig)).toString('base64'),
+      OMEGA_TEST_CONFIG: Buffer.from(JSON.stringify(testConfig)).toString('base64'),
       FIRESTORE_EMULATOR_HOST: `127.0.0.1:${testConfig.emulatorPorts.firestore}`,
       FIREBASE_AUTH_EMULATOR_HOST: `127.0.0.1:${testConfig.emulatorPorts.auth}`,
     };

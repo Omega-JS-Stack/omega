@@ -1,8 +1,8 @@
 /**
- * POST /marketing/webhook?provider=sendgrid|beehiiv&key=<BACKEND_MANAGER_WEBHOOK_KEY>
+ * POST /marketing/webhook?provider=sendgrid|beehiiv&key=<OMEGA_WEBHOOK_KEY>
  *
  * Receives cross-provider unsubscribe webhooks (SendGrid + Beehiiv) and:
- *   1. Authenticates via ?key= query param (BACKEND_MANAGER_WEBHOOK_KEY env)
+ *   1. Authenticates via ?key= query param (OMEGA_WEBHOOK_KEY env)
  *   2. Optionally rejects mismatched brand via ?brand= filter
  *   3. Loads the matching processor module from ./processors/{provider}.js
  *   4. Parses the webhook payload into one or more normalized events
@@ -31,9 +31,9 @@ module.exports = async ({ assistant, Manager }) => {
     return assistant.respond('Missing provider parameter', { code: 400 });
   }
 
-  // Validate key against BACKEND_MANAGER_WEBHOOK_KEY (separate from BACKEND_MANAGER_KEY
+  // Validate key against OMEGA_WEBHOOK_KEY (separate from OMEGA_ADMIN_KEY
   // so it can be rotated independently and scoped narrowly)
-  if (!key || key !== process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
+  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 

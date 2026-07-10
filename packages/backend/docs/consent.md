@@ -87,7 +87,7 @@ There are five places where consent gets recorded or updated. All five converge 
 [src/manager/routes/marketing/email-preferences/post.js](../src/manager/routes/marketing/email-preferences/post.js) — authenticated mode.
 
 ```
-POST /backend-manager/marketing/email-preferences
+POST /omega/marketing/email-preferences
 Body: { action: 'subscribe' | 'unsubscribe' }
 ```
 
@@ -103,7 +103,7 @@ Note: `grantedAt.text` is `null` for account-page subscribes because the marketi
 Same route, anonymous mode. The existing email-footer unsubscribe link flow:
 
 ```
-POST /backend-manager/marketing/email-preferences
+POST /omega/marketing/email-preferences
 Body: { email, asmId, sig, action: 'subscribe' | 'unsubscribe' }
 ```
 
@@ -119,8 +119,8 @@ Body: { email, asmId, sig, action: 'subscribe' | 'unsubscribe' }
 [src/manager/routes/marketing/webhook/post.js](../src/manager/routes/marketing/webhook/post.js) — receives unsub / spam / bounce events from SendGrid and Beehiiv.
 
 ```
-POST /backend-manager/marketing/webhook?provider=sendgrid&key=<BACKEND_MANAGER_WEBHOOK_KEY>
-POST /backend-manager/marketing/webhook?provider=beehiiv&key=<BACKEND_MANAGER_WEBHOOK_KEY>
+POST /omega/marketing/webhook?provider=sendgrid&key=<OMEGA_WEBHOOK_KEY>
+POST /omega/marketing/webhook?provider=beehiiv&key=<OMEGA_WEBHOOK_KEY>
 ```
 
 The dispatcher loads `processors/{provider}.js`, parses the event(s), and for each event:
@@ -152,7 +152,7 @@ Each processor's `handleEvent` does the same shape of work:
 [src/manager/routes/marketing/contact/delete.js](../src/manager/routes/marketing/contact/delete.js) — admin-only endpoint.
 
 ```
-DELETE /backend-manager/marketing/contact
+DELETE /omega/marketing/contact
 Body: { email }
 ```
 
@@ -165,17 +165,17 @@ After removing the contact from all providers, the route mirrors `consent.market
 SendGrid and Beehiiv only let you configure a small number of webhook URLs (often one per account). With many brands sharing the same SendGrid account, we can't point the webhook at every brand's @omega.js/backend directly. Instead:
 
 ```
-SendGrid → POST https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=sendgrid&key=X
-Beehiiv  → POST https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=beehiiv&key=X
+SendGrid → POST https://api.itwcreativeworks.com/omega/marketing/webhook/forward?provider=sendgrid&key=X
+Beehiiv  → POST https://api.itwcreativeworks.com/omega/marketing/webhook/forward?provider=beehiiv&key=X
 ```
 
 The **parent @omega.js/backend** (the one whose `config/omega.json5` has `parent: 'self'` under `targets.backend`) exposes the forwarder route. Every other @omega.js/backend has the route but it returns 404 (gated on `Manager.config.parent === 'self'`).
 
 The parent forwarder:
 
-1. Validates `?provider=X&key=Y` (same `BACKEND_MANAGER_WEBHOOK_KEY` env var — shared across all brands).
+1. Validates `?provider=X&key=Y` (same `OMEGA_WEBHOOK_KEY` env var — shared across all brands).
 2. Reads the `brands` collection from the parent's own Firestore.
-3. For each brand: derives the child API URL by inserting `api.` into the brand's URL (`https://somiibo.com` → `https://api.somiibo.com/backend-manager/marketing/webhook?provider=X&key=Y`).
+3. For each brand: derives the child API URL by inserting `api.` into the brand's URL (`https://somiibo.com` → `https://api.somiibo.com/omega/marketing/webhook?provider=X&key=Y`).
 4. POSTs the raw provider body to every child in parallel via `Promise.allSettled`.
 5. Returns 200 even if some children fail — idempotent child handlers make provider retries (and re-fans) safe.
 
@@ -223,7 +223,7 @@ The gate logic is unit-tested without Firestore in [src/manager/libraries/email/
 
 ```bash
 # All brands
-BACKEND_MANAGER_WEBHOOK_KEY="<shared-across-all-brands>"
+OMEGA_WEBHOOK_KEY="<shared-across-all-brands>"
 
 # Existing (unchanged)
 UNSUBSCRIBE_HMAC_KEY="<existing-value>"
@@ -236,7 +236,7 @@ The webhook key is shared because it has to be the same value the parent forward
 
 **SendGrid Event Webhook** (Settings → Mail Settings → Event Webhook):
 ```
-URL: https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=sendgrid&key=<BACKEND_MANAGER_WEBHOOK_KEY>
+URL: https://api.itwcreativeworks.com/omega/marketing/webhook/forward?provider=sendgrid&key=<OMEGA_WEBHOOK_KEY>
 Events: Group Unsubscribe, Unsubscribe, Spam Report, Bounce, Dropped
 ```
 
@@ -245,7 +245,7 @@ Events: Group Unsubscribe, Unsubscribe, Spam Report, Bounce, Dropped
 - Shared "devbeans" publication: point at the parent URL — fan-out handles the routing.
 
 ```
-URL: https://api.itwcreativeworks.com/backend-manager/marketing/webhook/forward?provider=beehiiv&key=<BACKEND_MANAGER_WEBHOOK_KEY>
+URL: https://api.itwcreativeworks.com/omega/marketing/webhook/forward?provider=beehiiv&key=<OMEGA_WEBHOOK_KEY>
 Events: subscription.unsubscribed, subscription.deleted, subscription.paused
 ```
 

@@ -363,7 +363,7 @@ module.exports = {
         // Public request without auth must be rejected. The exact rejection mechanism
         // depends on environment:
         //   - Production: missing reCAPTCHA token → 403
-        //   - Local emulator (BEM_TESTING=true): reCAPTCHA is bypassed, but unauthenticated
+        //   - Local emulator (OMEGA_TEST_MODE=true): reCAPTCHA is bypassed, but unauthenticated
         //     users hit the marketing-subscribe rate limit (quota 0/0) → 429
         // Both are correct: the route protects itself from anonymous abuse. Accept either.
         const response = await http.post('backend-manager/marketing/contact', {

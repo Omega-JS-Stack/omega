@@ -35,9 +35,9 @@ const JSONP_TEMPLATE = `
   const config = { config };
 
   // Assign to various global scopes for compatibility
-  if (typeof self !== 'undefined') self.BXM_BUILD_JSON = config;
-  if (typeof window !== 'undefined') window.BXM_BUILD_JSON = config;
-  if (typeof globalThis !== 'undefined') globalThis.BXM_BUILD_JSON = config;
+  if (typeof self !== 'undefined') self.OMEGA_BUILD_JSON = config;
+  if (typeof window !== 'undefined') window.OMEGA_BUILD_JSON = config;
+  if (typeof globalThis !== 'undefined') globalThis.OMEGA_BUILD_JSON = config;
 })();
 `.trim();
 

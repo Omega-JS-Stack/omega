@@ -3,7 +3,7 @@
  *
  * Reads consent.marketing.status from the user doc for the toggle's initial state.
  * User flips the toggle then clicks Save; on submit, POSTs to
- * /backend-manager/marketing/email-preferences with subscribe|unsubscribe.
+ * /omega/marketing/email-preferences with subscribe|unsubscribe.
  * The server writes consent.marketing to the user doc + syncs SendGrid + Beehiiv.
  *
  * Uses FormManager for standard in-flight/success/error UX. On failure, the
@@ -36,7 +36,7 @@ export function init() {
   formManager.on('submit', async ({ data }) => {
     const action = data.enabled ? 'subscribe' : 'unsubscribe';
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/marketing/email-preferences`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/marketing/email-preferences`, {
       method: 'POST',
       timeout: 60000,
       response: 'json',

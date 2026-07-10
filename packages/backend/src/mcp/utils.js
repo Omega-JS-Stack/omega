@@ -11,7 +11,7 @@ const ROLE_HIERARCHY = {
  * Actual validation happens at the route level when a tool is called.
  */
 function resolveAuthInfo(token) {
-  const configKey = process.env.BACKEND_MANAGER_KEY || '';
+  const configKey = process.env.OMEGA_ADMIN_KEY || '';
 
   if (token && configKey && token === configKey) {
     return { role: 'admin', authType: 'adminKey', token };

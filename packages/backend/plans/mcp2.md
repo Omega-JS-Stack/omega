@@ -2,7 +2,7 @@
 
 ## Context
 
-The BEM MCP server currently works only for admins — a single `BACKEND_MANAGER_KEY` grants access to all 19 tools. Regular users can't connect at all, and consumer BEM projects have no way to add custom MCP tools. This plan adds:
+The BEM MCP server currently works only for admins — a single `OMEGA_ADMIN_KEY` grants access to all 19 tools. Regular users can't connect at all, and consumer BEM projects have no way to add custom MCP tools. This plan adds:
 
 1. **Role-based tool scoping** — tools tagged `admin`, `user`, or `public`; connections only see tools matching their role
 2. **User authentication** — seamless OAuth sign-in flow + API key as long-lived credential
@@ -39,7 +39,7 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated sees only `pu
    GET /backend-manager/mcp/authorize?redirect_uri=CLAUDE_CALLBACK&state=STATE
 
 3. BEM authorize checks the request:
-   - If client_id === BACKEND_MANAGER_KEY → auto-redirect (admin, unchanged)
+   - If client_id === OMEGA_ADMIN_KEY → auto-redirect (admin, unchanged)
    - Otherwise → redirect to consumer's /token page:
      https://app.example.com/token?redirect_uri=CLAUDE_CALLBACK&state=STATE
 
@@ -55,7 +55,7 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated sees only `pu
    { code: FIREBASE_ID_TOKEN }
 
 7. BEM token endpoint:
-   - If code === BACKEND_MANAGER_KEY → return it as access_token (admin, unchanged)
+   - If code === OMEGA_ADMIN_KEY → return it as access_token (admin, unchanged)
    - Otherwise → verify Firebase ID token with admin.auth().verifyIdToken()
      → look up user doc → return user's api.privateKey as access_token
 
@@ -79,7 +79,7 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated sees only `pu
 
 `resolveAuthInfo(token)` classifies the Bearer token for tool filtering:
 
-- Token matches `BACKEND_MANAGER_KEY` → `role: 'admin'`
+- Token matches `OMEGA_ADMIN_KEY` → `role: 'admin'`
 - Any other non-empty token → `role: 'user'` (API key from the OAuth flow)
 - No token → `role: 'public'`
 
@@ -237,7 +237,7 @@ This is a small addition to the existing `/token` page layout. Files:
 
 ## Verification
 
-1. **Existing admin flow**: `npx omega mcp` with `BACKEND_MANAGER_KEY` → all 19 tools listed, all callable
+1. **Existing admin flow**: `npx omega mcp` with `OMEGA_ADMIN_KEY` → all 19 tools listed, all callable
 2. **User flow (stdio)**: `npx omega mcp --token <api-key>` → only user+public tools listed
 3. **Public flow**: `npx omega mcp` (no key, no token) → only public tools listed
 4. **Consumer tools**: Create `functions/mcp.js` in a consumer project → tools appear in listing

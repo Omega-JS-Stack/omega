@@ -49,7 +49,7 @@ npx omega test
 
 ### Self-test from the framework repo (bundled fixture)
 
-`npx omega test` run **from the @omega.js/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `bm_api` → health returns 200). Mirrors BXM's `BXM_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `BEM_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx omega install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
+`npx omega test` run **from the @omega.js/backend repo itself** is a framework self-test: the repo has no `firebase.json`, so the runner boots a **bundled fixture project** ([`src/test/fixtures/firebase-project/`](../src/test/fixtures/firebase-project)) and runs ONLY the `test/boot/` smoke (emulator boots → fixture `Manager.init()` wires `omega_api` → health returns 200). Mirrors BXM's `OMEGA_TEST_BOOT_PROJECT` / UJM's `UJ_TEST_BOOT_PROJECT`. Set `OMEGA_TEST_BOOT_PROJECT=<path>` to self-test against a real consumer instead. The full `routes`/`events`/`rules` suites need a real consumer (use the designated test consumer `ultimate-jekyll-backend` after `npx omega install dev`); the `boot/` smoke is excluded from consumer runs. **Full reference: [test-boot-layer.md](test-boot-layer.md).**
 
 ### Filtering tests
 
@@ -302,7 +302,7 @@ module.exports = {
 The `http` client sends requests directly to the hosting emulator (`http://localhost:5002`) with no magic prefix. The route string you pass becomes the URL path as-is — the hosting emulator's `firebase.json` rewrites handle routing to the correct Cloud Function.
 
 ```javascript
-// @omega.js/backend built-in routes — go through bm_api via firebase.json rewrite
+// @omega.js/backend built-in routes — go through omega_api via firebase.json rewrite
 http.post('backend-manager/payments/intent', { ... })
 http.as('admin').get('backend-manager/admin/stats')
 http.as('none').post('backend-manager/marketing/webhook?provider=sendgrid&key=...', [...])
@@ -313,7 +313,7 @@ http.get('sender-accounts', { projectId: 'abc' })
 http.as('none').post('webhooks', { event: 'reply', campaignId: '...' })
 ```
 
-@omega.js/backend routes live under `/backend-manager/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
+@omega.js/backend routes live under `/omega/*` — always include that prefix. Consumer routes use whatever path is in their `firebase.json` rewrites — no prefix needed.
 
 ## Assert Methods
 

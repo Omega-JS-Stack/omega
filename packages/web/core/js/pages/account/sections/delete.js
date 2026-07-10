@@ -41,7 +41,7 @@ function setupDeleteAccountForm() {
     }
 
     // Send delete request to server
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user`, {
       method: 'DELETE',
       timeout: 30000,
       response: 'json',

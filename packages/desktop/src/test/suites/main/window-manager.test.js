@@ -94,11 +94,11 @@ module.exports = {
       },
     },
     {
-      name: 'EM_TEST_SHOW=1 opts out: windows surface normally (opacity 1)',
+      name: 'OMEGA_TEST_SHOW=1 opts out: windows surface normally (opacity 1)',
       run: (ctx) => {
         const { BrowserWindow } = require('electron');
 
-        process.env.EM_TEST_SHOW = '1';
+        process.env.OMEGA_TEST_SHOW = '1';
         try {
           ctx.expect(ctx.manager.windows._isStealth()).toBe(false);
 
@@ -123,7 +123,7 @@ module.exports = {
 
           win.destroy();
         } finally {
-          delete process.env.EM_TEST_SHOW;
+          delete process.env.OMEGA_TEST_SHOW;
           // Restore the launch-time activation suppression for the rest of the run.
           if (process.platform === 'darwin') {
             require('electron').app.dock.hide();

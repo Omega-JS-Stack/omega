@@ -25,7 +25,7 @@ Consumers can inject custom logic at well-defined points without forking @omega.
 | `hooks/release/post.js`  | After release publishes + mirror-downloads finish | `{ manager, projectRoot, mode }` |
 | `hooks/notarize/post.js` | After @omega.js/desktop's built-in macOS notarization completes (extension only — @omega.js/desktop's notarize is the real entrypoint) | electron-builder afterSign context |
 
-`mode` is `'production'` when `EM_BUILD_MODE=true`, else `'development'`.
+`mode` is `'production'` when `OMEGA_BUILD_MODE=true`, else `'development'`.
 
 ## Why this design
 

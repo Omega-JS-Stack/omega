@@ -15,13 +15,13 @@ module.exports = {
       run: (ctx) => {
         const existing = `${DEFAULT_MARKER}
 GH_TOKEN=ghp_secret123
-BACKEND_MANAGER_KEY=
+OMEGA_ADMIN_KEY=
 
 ${CUSTOM_MARKER}
 `;
         const incoming = `${DEFAULT_MARKER}
 GH_TOKEN=""
-BACKEND_MANAGER_KEY=""
+OMEGA_ADMIN_KEY=""
 
 ${CUSTOM_MARKER}
 `;
@@ -29,7 +29,7 @@ ${CUSTOM_MARKER}
         // Value is preserved AND now wrapped in double quotes.
         ctx.expect(merged).toContain('GH_TOKEN="ghp_secret123"');
         // Empty value stays unquoted.
-        ctx.expect(merged).toMatch(/BACKEND_MANAGER_KEY=\s*$|BACKEND_MANAGER_KEY=""/m);
+        ctx.expect(merged).toMatch(/OMEGA_ADMIN_KEY=\s*$|OMEGA_ADMIN_KEY=""/m);
       },
     },
     {

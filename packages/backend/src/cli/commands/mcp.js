@@ -6,7 +6,7 @@ class McpCommand extends BaseCommand {
     const self = this;
     const functionsDir = path.join(self.firebaseProjectPath, 'functions');
 
-    // Load .env from functions directory so BACKEND_MANAGER_KEY is available
+    // Load .env from functions directory so OMEGA_ADMIN_KEY is available
     const jetpack = require('fs-jetpack');
     const envPath = path.join(functionsDir, '.env');
     if (jetpack.exists(envPath)) {
@@ -15,12 +15,12 @@ class McpCommand extends BaseCommand {
 
     // Resolve the @omega.js/backend server URL
     const baseUrl = self.argv.url
-      || process.env.BEM_URL
+      || process.env.OMEGA_BACKEND_URL
       || 'http://localhost:5002';
 
     // Resolve auth credentials
     const backendManagerKey = self.argv.key
-      || process.env.BACKEND_MANAGER_KEY
+      || process.env.OMEGA_ADMIN_KEY
       || '';
     const userToken = self.argv.token || '';
 

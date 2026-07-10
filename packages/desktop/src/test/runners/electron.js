@@ -37,7 +37,7 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
     // ELECTRON_RUN_AS_NODE is already stripped by bin/mgr at the CLI boundary, so the child
     // env is clean — no extra delete here.
     const childEnv = Object.assign({}, process.env, {
-      EM_TEST_MODE:              'true',   // canonical signal — manager.isTesting() picks it up
+      OMEGA_TEST_MODE:              'true',   // canonical signal — manager.isTesting() picks it up
       ELECTRON_NO_ATTACH_CONSOLE: '1',
       NODE_OPTIONS:              '',
     });
@@ -69,16 +69,16 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
     });
 
     // Always consume stderr (otherwise the pipe fills and the child blocks).
-    // Default: silent. Set EM_TEST_DEBUG=1 to see what electron is logging.
+    // Default: silent. Set OMEGA_TEST_DEBUG=1 to see what electron is logging.
     child.stderr.on('data', (chunk) => {
-      if (process.env.EM_TEST_DEBUG) {
+      if (process.env.OMEGA_TEST_DEBUG) {
         const text = chunk.toString();
         process.stderr.write(chalk.gray(`[stderr] ${text}`));
       }
     });
 
     child.on('exit', (code, signal) => {
-      if (process.env.EM_TEST_DEBUG) {
+      if (process.env.OMEGA_TEST_DEBUG) {
         console.log(chalk.gray(`[harness exit code=${code} signal=${signal}]`));
       }
     });

@@ -41,7 +41,7 @@ function runAudit(cwd, env = {}) {
     const origCwd = process.cwd();
     // Force build/publish env off — minimal scaffolds don't include icons/cert files.
     // Tests that want to exercise publish-mode checks pass env explicitly.
-    const baseEnv = { EM_BUILD_MODE: '', EM_IS_PUBLISH: '', EM_IS_SERVER: '' };
+    const baseEnv = { OMEGA_BUILD_MODE: '', OMEGA_IS_PUBLISH: '', OMEGA_IS_SERVER: '' };
     const allEnv  = { ...baseEnv, ...env };
     const origEnv = {};
     for (const k of Object.keys(allEnv)) {
@@ -141,7 +141,7 @@ module.exports = {
           app:   { appId: 'com.test.app', productName: 'TestApp' },
         });
         try {
-          const err = await runAudit(tmp, { EM_BUILD_MODE: 'true' });
+          const err = await runAudit(tmp, { OMEGA_BUILD_MODE: 'true' });
           ctx.expect(err).toBeDefined();
           ctx.expect(err.message).toMatch(/icon.*not found/);
         } finally {

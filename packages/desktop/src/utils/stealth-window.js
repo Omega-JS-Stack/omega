@@ -12,7 +12,7 @@
 // automation popup) call win.show() themselves: show() becomes showInactive()
 // so the window surfaces without taking keyboard focus, and focus() becomes a
 // no-op. Stealth is decided at application time — a window stealthed here stays
-// stealthed for its lifetime (EM_TEST_SHOW=1 is honored by the callers, per
+// stealthed for its lifetime (OMEGA_TEST_SHOW=1 is honored by the callers, per
 // window, at creation/surface time).
 //
 // Consumers: lib/window-manager.js `_surface()` (named windows) and main.js's

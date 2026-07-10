@@ -1,7 +1,7 @@
 // Build-layer tests for src/utils/electron-node-version.js — resolves the Node.js major
 // version Electron's bundled runtime ships with by querying the electron releases feed.
 //
-// Network-dependent: skipped if EM_TEST_OFFLINE=true.
+// Network-dependent: skipped if OMEGA_TEST_OFFLINE=true.
 
 const path = require('path');
 
@@ -29,7 +29,7 @@ module.exports = {
     {
       name: 'resolveNodeMajorForElectron("^41.0.0") returns 24 (real lookup)',
       run: async (ctx) => {
-        if (process.env.EM_TEST_OFFLINE === 'true') ctx.skip('offline mode');
+        if (process.env.OMEGA_TEST_OFFLINE === 'true') ctx.skip('offline mode');
         const { resolveNodeMajorForElectron } = require(path.join(__dirname, '..', '..', '..', 'utils', 'electron-node-version.js'));
         const result = await resolveNodeMajorForElectron('^41.0.0');
         ctx.expect(String(result)).toBe('24');
@@ -38,7 +38,7 @@ module.exports = {
     {
       name: 'resolveNodeMajorForElectron("^999.0.0") returns null (no match)',
       run: async (ctx) => {
-        if (process.env.EM_TEST_OFFLINE === 'true') ctx.skip('offline mode');
+        if (process.env.OMEGA_TEST_OFFLINE === 'true') ctx.skip('offline mode');
         const { resolveNodeMajorForElectron } = require(path.join(__dirname, '..', '..', '..', 'utils', 'electron-node-version.js'));
         const result = await resolveNodeMajorForElectron('^999.0.0');
         ctx.expect(result).toBe(null);

@@ -67,9 +67,9 @@ module.exports = {
     {
       name: 'infer-contact-no-ai-returns-none',
       async run({ assert }) {
-        // Without BACKEND_MANAGER_OPENAI_API_KEY, should return empty result
-        const originalKey = process.env.BACKEND_MANAGER_OPENAI_API_KEY;
-        delete process.env.BACKEND_MANAGER_OPENAI_API_KEY;
+        // Without OMEGA_OPENAI_API_KEY, should return empty result
+        const originalKey = process.env.OMEGA_OPENAI_API_KEY;
+        delete process.env.OMEGA_OPENAI_API_KEY;
 
         try {
           const result = await inferContact('alice.wonderland@example.com');
@@ -81,7 +81,7 @@ module.exports = {
           assert.equal(result.confidence, 0, 'Confidence should be 0');
         } finally {
           if (originalKey) {
-            process.env.BACKEND_MANAGER_OPENAI_API_KEY = originalKey;
+            process.env.OMEGA_OPENAI_API_KEY = originalKey;
           }
         }
       },
@@ -95,8 +95,8 @@ module.exports = {
       timeout: 30000,
 
       async run({ assert, Manager, skip }) {
-        if (!process.env.BACKEND_MANAGER_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
-          return skip('BACKEND_MANAGER_OPENAI_API_KEY not set');
+        if (!process.env.OMEGA_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
+          return skip('OMEGA_OPENAI_API_KEY not set');
         }
 
         const assistant = Manager.Assistant();

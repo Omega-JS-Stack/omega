@@ -44,15 +44,15 @@ module.exports = {
       name: 'runner install on non-Windows refuses without override',
       run: async (ctx) => {
         const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
-        const origForce = process.env.EM_RUNNER_FORCE;
-        delete process.env.EM_RUNNER_FORCE;
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
+        delete process.env.OMEGA_RUNNER_FORCE;
 
         let threw;
         try {
           await runner({ _: ['runner', 'install'] });
         } catch (e) { threw = e; }
 
-        if (origForce !== undefined) process.env.EM_RUNNER_FORCE = origForce;
+        if (origForce !== undefined) process.env.OMEGA_RUNNER_FORCE = origForce;
 
         ctx.expect(threw).toBeDefined();
         // On macOS we expect the platform check to win
@@ -65,9 +65,9 @@ module.exports = {
       name: 'runner register-org without org throws clear error',
       run: async (ctx) => {
         const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
-        const origForce = process.env.EM_RUNNER_FORCE;
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
         const origToken = process.env.GH_TOKEN;
-        process.env.EM_RUNNER_FORCE = '1';
+        process.env.OMEGA_RUNNER_FORCE = '1';
         process.env.GH_TOKEN = 'ghp_test_dummy';
 
         let threw;
@@ -75,8 +75,8 @@ module.exports = {
           await runner({ _: ['runner', 'register-org'] });   // no org
         } catch (e) { threw = e; }
 
-        if (origForce !== undefined) process.env.EM_RUNNER_FORCE = origForce;
-        else delete process.env.EM_RUNNER_FORCE;
+        if (origForce !== undefined) process.env.OMEGA_RUNNER_FORCE = origForce;
+        else delete process.env.OMEGA_RUNNER_FORCE;
         if (origToken !== undefined) process.env.GH_TOKEN = origToken;
         else delete process.env.GH_TOKEN;
 
@@ -88,9 +88,9 @@ module.exports = {
       name: 'runner install without GH_TOKEN throws',
       run: async (ctx) => {
         const runner = require(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'));
-        const origForce = process.env.EM_RUNNER_FORCE;
+        const origForce = process.env.OMEGA_RUNNER_FORCE;
         const origToken = process.env.GH_TOKEN;
-        process.env.EM_RUNNER_FORCE = '1';
+        process.env.OMEGA_RUNNER_FORCE = '1';
         delete process.env.GH_TOKEN;
 
         let threw;
@@ -98,8 +98,8 @@ module.exports = {
           await runner({ _: ['runner', 'install'] });
         } catch (e) { threw = e; }
 
-        if (origForce !== undefined) process.env.EM_RUNNER_FORCE = origForce;
-        else delete process.env.EM_RUNNER_FORCE;
+        if (origForce !== undefined) process.env.OMEGA_RUNNER_FORCE = origForce;
+        else delete process.env.OMEGA_RUNNER_FORCE;
         if (origToken !== undefined) process.env.GH_TOKEN = origToken;
 
         ctx.expect(threw).toBeDefined();
@@ -244,16 +244,16 @@ module.exports = {
         const fs = require('fs');
         const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'), 'utf8');
         ctx.expect(src).toContain(".gh-runners");
-        ctx.expect(src).toContain('EM_RUNNER_HOME');
+        ctx.expect(src).toContain('OMEGA_RUNNER_HOME');
         ctx.expect(src).not.toMatch(/path\.join\(os\.homedir\(\),\s*['"]\.em-runner['"]/);
       },
     },
     {
-      name: 'install honors EM_RUNNER_ORGS filter from env',
+      name: 'install honors OMEGA_RUNNER_ORGS filter from env',
       run: (ctx) => {
         const fs = require('fs');
         const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'), 'utf8');
-        ctx.expect(src).toContain('EM_RUNNER_ORGS');
+        ctx.expect(src).toContain('OMEGA_RUNNER_ORGS');
         ctx.expect(src).toContain('filter');
       },
     },

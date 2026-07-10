@@ -12,9 +12,9 @@ on:
 
 env:
   NODE_VERSION: '{{ versions.node }}'
-  EM_BUILD_MODE: 'true'
-  EM_IS_PUBLISH: 'true'
-  EM_IS_SERVER:  'true'
+  OMEGA_BUILD_MODE: 'true'
+  OMEGA_IS_PUBLISH: 'true'
+  OMEGA_IS_SERVER:  'true'
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 concurrency:
@@ -71,8 +71,8 @@ jobs:
     env:
       # Audit/build tests stage minimal scaffolds without icons / signing — explicitly
       # off the publish path so they don't fail required-file checks meant for real builds.
-      EM_BUILD_MODE: 'false'
-      EM_IS_PUBLISH: 'false'
+      OMEGA_BUILD_MODE: 'false'
+      OMEGA_IS_PUBLISH: 'false'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -198,7 +198,7 @@ jobs:
       - if: matrix.os == 'windows-latest'
         shell: cmd
         env:
-          EM_SKIP_WIN_SIGN: 'true'
+          OMEGA_SKIP_WIN_SIGN: 'true'
         run: npm run package
 
       - if: matrix.os == 'windows-latest'

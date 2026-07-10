@@ -19,24 +19,24 @@ function resolveConfig(manager) {
   const cfg = (manager && manager.config && manager.config.sentry) || {};
   const opts = { ...DEFAULTS, ...cfg };
 
-  if (process.env.EM_SENTRY_ENABLED === 'false') {
-    return { shouldEnable: false, options: opts, reason: 'EM_SENTRY_ENABLED=false' };
+  if (process.env.OMEGA_SENTRY_ENABLED === 'false') {
+    return { shouldEnable: false, options: opts, reason: 'OMEGA_SENTRY_ENABLED=false' };
   }
   if (!opts.dsn) {
     return { shouldEnable: false, options: opts, reason: 'no dsn set' };
   }
 
-  // Dev gating: enable sentry only in a real production BUILD, unless EM_SENTRY_FORCE=true.
-  // This intentionally keys on the build-time signal (EM_BUILD_MODE) — NOT the runtime
+  // Dev gating: enable sentry only in a real production BUILD, unless OMEGA_SENTRY_FORCE=true.
+  // This intentionally keys on the build-time signal (OMEGA_BUILD_MODE) — NOT the runtime
   // getEnvironment() — because "should we ship telemetry" is a property of the build, not
-  // of the current process. A dev machine (no EM_BUILD_MODE) and a test run both correctly
+  // of the current process. A dev machine (no OMEGA_BUILD_MODE) and a test run both correctly
   // resolve to non-production here, so telemetry stays disabled. (getEnvironment()'s
   // no-signal default is 'production' for RUNTIME gating; that's the wrong default for this
-  // build-time question, which is why we read EM_BUILD_MODE directly.)
-  const isProduction = process.env.EM_BUILD_MODE === 'true';
-  const forced = process.env.EM_SENTRY_FORCE === 'true';
+  // build-time question, which is why we read OMEGA_BUILD_MODE directly.)
+  const isProduction = process.env.OMEGA_BUILD_MODE === 'true';
+  const forced = process.env.OMEGA_SENTRY_FORCE === 'true';
   if (!isProduction && !forced) {
-    return { shouldEnable: false, options: opts, reason: 'dev mode (set EM_SENTRY_FORCE=true to override)' };
+    return { shouldEnable: false, options: opts, reason: 'dev mode (set OMEGA_SENTRY_FORCE=true to override)' };
   }
 
   // Default environment from build mode.

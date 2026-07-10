@@ -1,12 +1,12 @@
 /**
  * Test: MCP protocol endpoint — happy path, sad path, edge cases
- * Tests the Streamable HTTP transport at POST /backend-manager/mcp
+ * Tests the Streamable HTTP transport at POST /omega/mcp
  *
  * Run: npx omega test backend:mcp/protocol
  */
 const fetch = require('wonderful-fetch');
 
-const MCP_ENDPOINT = 'http://localhost:5002/backend-manager/mcp';
+const MCP_ENDPOINT = 'http://localhost:5002/omega/mcp';
 
 function parseSSE(text) {
   const lines = text.split('\n');
@@ -66,7 +66,7 @@ module.exports = {
     {
       name: 'tools/list returns tool definitions with schemas',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/list', {}, key);
 
         assert.ok(response?.result, 'Should have result');
@@ -83,7 +83,7 @@ module.exports = {
     {
       name: 'tools/call health_check succeeds',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'health_check',
           arguments: {},
@@ -100,7 +100,7 @@ module.exports = {
     {
       name: 'tools/call generate_uuid returns valid response',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'generate_uuid',
           arguments: { version: '4' },
@@ -119,7 +119,7 @@ module.exports = {
     {
       name: 'tools/call unknown tool returns error',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'nonexistent_tool',
           arguments: {},
@@ -134,7 +134,7 @@ module.exports = {
     {
       name: 'GET method returns 405',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
 
         try {
           const response = await fetch(MCP_ENDPOINT, {
@@ -157,7 +157,7 @@ module.exports = {
     {
       name: 'DELETE method returns 200 (session cleanup)',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
 
         try {
           await fetch(MCP_ENDPOINT, {
@@ -181,7 +181,7 @@ module.exports = {
     {
       name: 'tools/call with empty object arguments still works',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'health_check',
           arguments: {},
@@ -195,7 +195,7 @@ module.exports = {
     {
       name: 'tools/call with missing arguments still works',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'health_check',
         }, key);
@@ -208,7 +208,7 @@ module.exports = {
     {
       name: 'response preserves jsonrpc 2.0 envelope',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/list', {}, key, { id: 42 });
 
         assert.equal(response?.jsonrpc, '2.0', 'Should have jsonrpc 2.0');
@@ -241,7 +241,7 @@ module.exports = {
     {
       name: 'tools include annotations with title and hints',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/list', {}, key);
 
         const tool = response.result.tools.find((t) => t.name === 'health_check');
@@ -254,7 +254,7 @@ module.exports = {
     {
       name: 'admin can call public-role tool (role escalation works upward)',
       async run({ assert }) {
-        const key = process.env.BACKEND_MANAGER_KEY;
+        const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/call', {
           name: 'health_check',
           arguments: {},

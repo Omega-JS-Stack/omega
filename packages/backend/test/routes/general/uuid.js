@@ -12,7 +12,7 @@ module.exports = {
       timeout: 10000,
 
       async run({ http, assert }) {
-        // POST /backend-manager/general/uuid
+        // POST /omega/general/uuid
         const response = await http.post('backend-manager/general/uuid', {
           version: '4',
         });

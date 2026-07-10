@@ -42,7 +42,7 @@ function productImage(brandConfig) {
 
 /**
  * The brand backend's payment webhook URL for a processor.
- * Requires BACKEND_MANAGER_WEBHOOK_KEY in the brand .env.
+ * Requires OMEGA_WEBHOOK_KEY in the brand .env.
  *
  * @param {Object} brandConfig - Merged brand config
  * @param {string} processor - 'stripe' | 'paypal' | 'chargebee'
@@ -51,10 +51,10 @@ function productImage(brandConfig) {
  */
 function buildWebhookUrl(brandConfig, processor, brandId) {
   const domain = brandConfig.brand.url.replace(/^https?:\/\//, '');
-  const key = process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+  const key = process.env.OMEGA_WEBHOOK_KEY;
   const brandParam = brandId ? `&brand=${brandId}` : '';
 
-  return `https://api.${domain}/backend-manager/payments/webhook?processor=${processor}${brandParam}&key=${key}`;
+  return `https://api.${domain}/omega/payments/webhook?processor=${processor}${brandParam}&key=${key}`;
 }
 
 /**

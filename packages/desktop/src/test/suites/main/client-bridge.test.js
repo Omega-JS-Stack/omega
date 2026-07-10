@@ -1,7 +1,7 @@
 // Main-process tests for lib/client-bridge.js — unit-level coverage that doesn't hit Firebase.
 //
 // Real Firebase integration tests live in client-bridge.integration.test.js
-// (gated on EM_TEST_FIREBASE_ADMIN_KEY presence).
+// (gated on OMEGA_TEST_FIREBASE_ADMIN_KEY presence).
 
 module.exports = {
   type: 'suite',

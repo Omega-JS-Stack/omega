@@ -16,6 +16,7 @@
  */
 
 const path = require('node:path');
+const { randomBytes, randomUUID } = require('node:crypto');
 const jetpack = require('fs-jetpack');
 
 const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
@@ -30,7 +31,7 @@ const ENV_GROUPS = [
   { comment: 'Google OAuth client (firebase, analytics, search-console, adsense services)', keys: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] },
   { comment: 'Classic reCAPTCHA keys, shared across brands (recaptcha service)', keys: ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY'] },
   { comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)', keys: ['META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN'] },
-  { comment: 'Email marketing (sendgrid + beehiiv services) + the parent @omega.js/backend webhook key', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY', 'BACKEND_MANAGER_WEBHOOK_KEY'] },
+  { comment: 'Email marketing (sendgrid + beehiiv services)', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY'] },
   { comment: 'Payment processors (payment service; public halves live in omega.json5)', keys: ['STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY'] },
   { comment: 'Operator service accounts (slapform/chatsy/replyify/server services) — paths to service-account JSON files', keys: ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT'] },
   { comment: 'Apple signing (certificates service — desktop/mobile targets)', keys: ['APPLE_API_ISSUER', 'APPLE_API_KEY_ID', 'APPLE_TEAM_ID'] },
@@ -124,6 +125,13 @@ function renderEnvStub(answers) {
     `# ${answers.name} — brand secrets (gitignored; loaded before every omega-manager run).`,
     '# Uncomment and fill what this brand uses. Services without their credentials',
     '# skip cleanly, so add these as the brand adopts each service.',
+    '',
+    '# ── Omega keys (auto-generated at scaffold — rotate by replacing the value) ──',
+    '# Admin key: grants admin on your backend. Webhook key: authenticates third-party',
+    '# webhook deliveries. Namespace: the brand UUID namespace for deterministic ids.',
+    `OMEGA_ADMIN_KEY=${randomBytes(32).toString('base64url')}`,
+    `OMEGA_WEBHOOK_KEY=${randomBytes(32).toString('base64url')}`,
+    `OMEGA_NAMESPACE=${randomUUID()}`,
   ];
 
   for (const group of ENV_GROUPS) {

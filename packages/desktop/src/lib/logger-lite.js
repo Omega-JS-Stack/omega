@@ -103,8 +103,8 @@ function ensureMainFileTransport() {
   //   - console transport keeps existing stderr/stdout output during dev
   //   - log level: 'silly' captures everything; consumers can dial down via env
   log.transports.file.resolvePathFn = () => _logFilePath;
-  log.transports.file.level = process.env.EM_LOG_LEVEL_FILE || 'silly';
-  log.transports.console.level = process.env.EM_LOG_LEVEL_CONSOLE || 'silly';
+  log.transports.file.level = process.env.OMEGA_LOG_LEVEL_FILE || 'silly';
+  log.transports.console.level = process.env.OMEGA_LOG_LEVEL_CONSOLE || 'silly';
   log.transports.file.maxSize = 10 * 1024 * 1024; // 10 MB → rotates to runtime.old.log
 
   // Time format: 24-hour HH:MM:SS.ms — readable + grep-friendly. electron-log

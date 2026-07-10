@@ -7,7 +7,7 @@
 // Cross-platform behavior:
 //   - macOS: signs + notarizes (via the afterSign hook) + uploads .dmg / .zip
 //   - Linux: builds + uploads .AppImage / .deb (no signing)
-//   - Windows: when EM_SKIP_WIN_SIGN=true (CI macOS/linux runners), this never runs the
+//   - Windows: when OMEGA_SKIP_WIN_SIGN=true (CI macOS/linux runners), this never runs the
 //              Windows target. The dedicated windows-sign job in CI handles that path.
 //
 // For local single-platform release runs, electron-builder targets only the host OS by default.

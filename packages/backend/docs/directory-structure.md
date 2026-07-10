@@ -46,7 +46,7 @@ src/
             one-time/                   # One-time payment transition handlers
     functions/core/                     # Built-in functions
       actions/
-        api.js                          # Main bm_api handler
+        api.js                          # Main omega_api handler
         api/{category}/{action}.js      # API command handlers
     routes/                           # Built-in routes
       admin/

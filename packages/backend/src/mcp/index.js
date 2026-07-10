@@ -7,13 +7,13 @@
  * can interact with a running @omega.js/backend instance — local or production.
  *
  * Usage:
- *   npx bm mcp                       # admin (uses BACKEND_MANAGER_KEY)
+ *   npx bm mcp                       # admin (uses OMEGA_ADMIN_KEY)
  *   npx bm mcp --token <api-key>     # user-level (uses API key)
  *   npx bm mcp                       # public-only (no key, no token)
  *
  * Environment variables:
- *   BEM_URL              - @omega.js/backend server URL (default: http://localhost:5002)
- *   BACKEND_MANAGER_KEY  - Admin API key for authentication
+ *   OMEGA_BACKEND_URL              - @omega.js/backend server URL (default: http://localhost:5002)
+ *   OMEGA_ADMIN_KEY  - Admin API key for authentication
  */
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
@@ -35,10 +35,10 @@ async function startServer(options) {
   options = options || {};
 
   const baseUrl = options.baseUrl
-    || process.env.BEM_URL
+    || process.env.OMEGA_BACKEND_URL
     || 'http://localhost:5002';
   const backendManagerKey = options.backendManagerKey
-    || process.env.BACKEND_MANAGER_KEY
+    || process.env.OMEGA_ADMIN_KEY
     || '';
   const userToken = options.userToken || '';
 

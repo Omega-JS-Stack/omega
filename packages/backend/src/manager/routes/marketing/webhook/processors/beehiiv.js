@@ -184,7 +184,7 @@ async function handleEvent({ Manager, assistant, parsed }) {
       assistant.error(`beehiiv webhook: cross-provider sync failed for ${email}:`, e);
     }
   } else {
-    assistant.log('beehiiv webhook: skipping cross-provider sync (BEM_TESTING=true)');
+    assistant.log('beehiiv webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
   }
 
   return { handled: true, uid, email, eventType };

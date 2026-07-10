@@ -225,7 +225,7 @@ Existing classic-shape templates (`clean`, `editorial`) share their schema via `
 
 `test/marketing/newsletter-generate.js` runs in **fixture mode by default** — it loads `test/marketing/fixtures/<active-template>.json` and renders straight through MJML. ~25-50ms, no AI, $0. This is what runs in CI and what you use for layout iteration.
 
-Set `TEST_EXTENDED_MODE=1` to switch to the full AI pipeline against real sources from the parent server. That mode requires `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `BACKEND_MANAGER_KEY`, and a parent URL.
+Set `TEST_EXTENDED_MODE=1` to switch to the full AI pipeline against real sources from the parent server. That mode requires `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OMEGA_ADMIN_KEY`, and a parent URL.
 
 Per-brand customization lives under `marketing.newsletter.content` — nested under `newsletter` because the newsletter role owns the content pipeline. The whole pipeline is gated by `marketing.newsletter.enabled`. Each role specifies its platform via a `platform` key (e.g. `platform: 'beehiiv'`):
 

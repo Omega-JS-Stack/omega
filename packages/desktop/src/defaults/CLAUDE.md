@@ -78,7 +78,7 @@ new (require('@omega.js/desktop/renderer'))().initialize();
 
 In main: `manager.storage`, `manager.ipc`, `manager.windows`, `manager.tray`, `manager.menu`, `manager.contextMenu`, `manager.startup`, `manager.appState`, `manager.deepLink`, `manager.autoUpdater`, `manager.sentry`, `manager.omega`, `manager.context`, `manager.usage`, `manager.remoteConfig`, `manager.analytics`, `manager.restartManager`.
 
-In renderer: `window.em.storage`, `window.em.ipc`, `window.em.logger`, `EM_BUILD_JSON.config`.
+In renderer: `window.em.storage`, `window.em.ipc`, `window.em.logger`, `OMEGA_BUILD_JSON.config`.
 
 ## Dependency resolution
 
@@ -88,7 +88,7 @@ In renderer: `window.em.storage`, `window.em.ipc`, `window.em.logger`, `EM_BUILD
 
 ## Testing
 
-Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/main/`), **UI** (`test/renderer/` — real events on the real DOM), and **end-to-end** (`test/boot/`). Skip a layer only when the feature genuinely has no surface there — "the logic test covers it" does not excuse the UI test. Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `EM_TEST_SHOW=1` to watch a run live). See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
+Every feature ships with tests at every layer it has a surface in: **logic** (`test/build/`, `test/main/`), **UI** (`test/renderer/` — real events on the real DOM), and **end-to-end** (`test/boot/`). Skip a layer only when the feature genuinely has no surface there — "the logic test covers it" does not excuse the UI test. Test runs are invisible and never steal keyboard focus (@omega.js/desktop test stealth; set `OMEGA_TEST_SHOW=1` to watch a run live). See `test/README.md` and `node_modules/@omega.js/desktop/docs/test-framework.md`.
 
 <!-- Everything above this marker is owned by the framework and rewritten on every `npx omega setup`. Add your project-specific notes below — they are preserved across setups. -->
 

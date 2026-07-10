@@ -3,7 +3,7 @@
  *
  * Reads payment configuration (products, processors, prices, limits) from
  * omega.config.payment — which is populated from _config.yml at build time.
- * This eliminates the need to fetch /backend-manager/brand at runtime.
+ * This eliminates the need to fetch /omega/brand at runtime.
  */
 
 import omega from '@omega.js/client';

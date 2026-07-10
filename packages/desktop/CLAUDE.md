@@ -116,7 +116,7 @@ prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets,
 
 ### Config flow
 
-`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omega.js/config` — `targets.desktop` overlays the top level, brand-monorepo walk-up included — then applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `EM_BUILD_JSON`. Runtime reads `EM_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
+`config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omega.js/config` — `targets.desktop` overlays the top level, brand-monorepo walk-up included — then applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `OMEGA_BUILD_JSON`. Runtime reads `OMEGA_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.
 
 Required fields: `brand.id` + `brand.name`. Everything else has defaults. See [docs/installer-options.md](docs/installer-options.md) for the full defaults table.
 
@@ -138,11 +138,11 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 ### Dev logs
 
-Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm start` or `logs/build.log` on a production build/package (`EM_BUILD_MODE=true`) — chosen by build mode, path via `EM_LOG_FILE`; disable with `EM_LOG_FILE=false`. `npx omega test` likewise tees its output to `<projectRoot>/logs/test.log`, and `npm run release` streams the GH Actions run to `logs/ci.log`. When debugging via Claude, prefer `cat logs/dev.log` / `cat logs/test.log` over copy-pasting terminal scrollback. See [docs/logging.md](docs/logging.md).
+Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm start` or `logs/build.log` on a production build/package (`OMEGA_BUILD_MODE=true`) — chosen by build mode, path via `OMEGA_LOG_FILE`; disable with `OMEGA_LOG_FILE=false`. `npx omega test` likewise tees its output to `<projectRoot>/logs/test.log`, and `npm run release` streams the GH Actions run to `logs/ci.log`. When debugging via Claude, prefer `cat logs/dev.log` / `cat logs/test.log` over copy-pasting terminal scrollback. See [docs/logging.md](docs/logging.md).
 
 ### CDP debugging (Claude ↔ Electron)
 
-`serve` forwards all `--` CLI flags to the Electron child process. Set `EM_CDP_PORT=9222` (or pass `--remote-debugging-port=9222` via `--`) to expose Chrome DevTools Protocol on that port. Drive the running app with the built-in toolkit — `npx omega cdp status|eval|shot|capture|theme|relaunch|quit` (multi-target by URL substring; `relaunch` IS the dev iterate loop since serve has no watch) — or via the `chrome-devtools-electron` MCP upstream for richer single-page interaction (click, fill, network, traces). See [docs/cdp-debugging.md](docs/cdp-debugging.md).
+`serve` forwards all `--` CLI flags to the Electron child process. Set `OMEGA_CDP_PORT=9222` (or pass `--remote-debugging-port=9222` via `--`) to expose Chrome DevTools Protocol on that port. Drive the running app with the built-in toolkit — `npx omega cdp status|eval|shot|capture|theme|relaunch|quit` (multi-target by URL substring; `relaunch` IS the dev iterate loop since serve has no watch) — or via the `chrome-devtools-electron` MCP upstream for richer single-page interaction (click, fill, network, traces). See [docs/cdp-debugging.md](docs/cdp-debugging.md).
 
 ## CLI
 
@@ -155,8 +155,8 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 | `install` | install peer deps |
 | `version` | print versions |
 | `test` | run framework + project test suites |
-| `build` | shells `gulp build` with `EM_BUILD_MODE=true` |
-| `publish` | full sign + notarize + GH release upload (`EM_IS_PUBLISH=true`) |
+| `build` | shells `gulp build` with `OMEGA_BUILD_MODE=true` |
+| `publish` | full sign + notarize + GH release upload (`OMEGA_IS_PUBLISH=true`) |
 | `validate-certs` | check cert files, env vars, profile expiration, Keychain identity. Auto-runs at end of `setup` |
 | `push-secrets` | encrypt `.env` Default section via libsodium → GH Actions secrets. Auto-runs at end of `setup` when `GH_TOKEN` is set |
 | `sign-windows` | strategy-aware EV/cloud/local signer; emits JSONL events for `runner monitor` |
@@ -249,11 +249,11 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/releasing.md](docs/releasing.md) — end-to-end release walkthrough
 - [docs/runner.md](docs/runner.md) — Windows EV-token signing runner
 - [docs/test-framework.md](docs/test-framework.md) — writing tests, running them, layers
-- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot` test layer: consumer end-to-end smoke + @omega.js/desktop's framework self-test from the repo via the bundled fixture (`src/test/fixtures/consumer-app/`) + `EM_TEST_BOOT_PROJECT` (@omega.js/desktop's analog of @omega.js/backend/BXM/UJM `*_TEST_BOOT_PROJECT`)
+- [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot` test layer: consumer end-to-end smoke + @omega.js/desktop's framework self-test from the repo via the bundled fixture (`src/test/fixtures/consumer-app/`) + `OMEGA_TEST_BOOT_PROJECT` (@omega.js/desktop's analog of @omega.js/backend/BXM/UJM `*_TEST_BOOT_PROJECT`)
 - [docs/build-system.md](docs/build-system.md) — gulp, webpack, electron-builder pipeline
 - [docs/environment-detection.md](docs/environment-detection.md) — `isDevelopment`/`isTesting`/`getApiUrl` etc., adding new helpers
 - [docs/common-mistakes.md](docs/common-mistakes.md) — the canonical "don't do this" list
 - [docs/audit.md](docs/audit.md) — full-audit check catalog (U-xx universal / DSK-xx / F-xx IDs with severity + scope), protocol + fix loop
-- [docs/cdp-debugging.md](docs/cdp-debugging.md) — Claude ↔ Electron via CDP: the `mgr cdp` toolkit (status/eval/shot/capture/theme/relaunch/quit), `EM_CDP_PORT`, MCP setup
+- [docs/cdp-debugging.md](docs/cdp-debugging.md) — Claude ↔ Electron via CDP: the `mgr cdp` toolkit (status/eval/shot/capture/theme/relaunch/quit), `OMEGA_CDP_PORT`, MCP setup
 
 `PROGRESS.md` tracks pass-by-pass progress and decisions.

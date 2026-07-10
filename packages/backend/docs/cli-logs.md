@@ -8,15 +8,15 @@ Fetch or stream Cloud Function logs from Google Cloud Logging. Requires `gcloud`
 
 ```bash
 npx omega logs:read                                     # Read last 1h of logs (default: 300 entries, newest first)
-npx omega logs:read --fn bm_api                         # Filter by function name
-npx omega logs:read --fn bm_api --severity ERROR        # Filter by severity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+npx omega logs:read --fn omega_api                         # Filter by function name
+npx omega logs:read --fn omega_api --severity ERROR        # Filter by severity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 npx omega logs:read --since 2d --limit 100              # Custom time range and limit
 npx omega logs:read --search "72.134.242.25"            # Search textPayload for a string (IP, email, error, etc.)
-npx omega logs:read --fn bm_authBeforeCreate --search "ian@example.com" --since 7d  # Combined filters
+npx omega logs:read --fn omega_authBeforeCreate --search "ian@example.com" --since 7d  # Combined filters
 npx omega logs:read --order asc                         # Oldest first (default: desc/newest first)
 npx omega logs:read --filter 'jsonPayload.level="error"'  # Raw gcloud filter passthrough
 npx omega logs:tail                                     # Stream live logs
-npx omega logs:tail --fn bm_paymentsWebhookOnWrite      # Stream filtered live logs
+npx omega logs:tail --fn omega_paymentsWebhookOnWrite      # Stream filtered live logs
 ```
 
 Both commands save output to `functions/production.log` (overwritten on each run). `logs:read` saves raw JSON; `logs:tail` streams text.
@@ -45,23 +45,23 @@ The `--fn` flag uses the **deployed Cloud Function name**, not the route path.
 
 | Function name | Type | Description |
 |---------------|------|-------------|
-| `bm_api` | HTTPS | Main API router — all consumer routes (GET/POST/PUT/DELETE) go through this |
-| `bm_authBeforeCreate` | Auth blocking | Before user creation: disposable email blocking, IP rate limiting, consumer hooks |
-| `bm_authBeforeSignIn` | Auth blocking | Before sign-in: consumer hooks |
-| `bm_authOnCreate` | Auth event | After user creation: user doc setup |
-| `bm_authOnDelete` | Auth event | After user deletion |
-| `bm_paymentsWebhookOnWrite` | Firestore trigger | Processes payment webhooks |
-| `bm_paymentsDisputeOnWrite` | Firestore trigger | Processes payment disputes |
-| `bm_notificationsOnWrite` | Firestore trigger | Sends push notifications |
-| `bm_cronDaily` | Scheduled | Daily cron (midnight UTC) |
-| `bm_cronFrequent` | Scheduled | Frequent cron (every 10 min) |
+| `omega_api` | HTTPS | Main API router — all consumer routes (GET/POST/PUT/DELETE) go through this |
+| `omega_authBeforeCreate` | Auth blocking | Before user creation: disposable email blocking, IP rate limiting, consumer hooks |
+| `omega_authBeforeSignIn` | Auth blocking | Before sign-in: consumer hooks |
+| `omega_authOnCreate` | Auth event | After user creation: user doc setup |
+| `omega_authOnDelete` | Auth event | After user deletion |
+| `omega_paymentsWebhookOnWrite` | Firestore trigger | Processes payment webhooks |
+| `omega_paymentsDisputeOnWrite` | Firestore trigger | Processes payment disputes |
+| `omega_notificationsOnWrite` | Firestore trigger | Sends push notifications |
+| `omega_cronDaily` | Scheduled | Daily cron (midnight UTC) |
+| `omega_cronFrequent` | Scheduled | Frequent cron (every 10 min) |
 
 **Consumer-defined functions** use the export name from `functions/index.js` (e.g., `exports.items = ...` → `--fn items`).
 
 **Quick lookup — which function to query:**
-- API route errors → `--fn bm_api`
-- Signup/auth blocked → `--fn bm_authBeforeCreate`
-- Sign-in issues → `--fn bm_authBeforeSignIn`
-- User doc not created → `--fn bm_authOnCreate`
-- Payment not processing → `--fn bm_paymentsWebhookOnWrite`
-- Cron job issues → `--fn bm_cronDaily` or `--fn bm_cronFrequent`
+- API route errors → `--fn omega_api`
+- Signup/auth blocked → `--fn omega_authBeforeCreate`
+- Sign-in issues → `--fn omega_authBeforeSignIn`
+- User doc not created → `--fn omega_authOnCreate`
+- Payment not processing → `--fn omega_paymentsWebhookOnWrite`
+- Cron job issues → `--fn omega_cronDaily` or `--fn omega_cronFrequent`

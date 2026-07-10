@@ -113,9 +113,9 @@ const startup = {
 
   // Should we suppress login-item changes? Suppressed in any non-production run (dev OR
   // testing) so we never touch the real user's OS login items outside a packaged build.
-  // EM_FORCE_LOGIN_ITEM=1 bypasses the guard so you can intentionally exercise the flow.
+  // OMEGA_FORCE_LOGIN_ITEM=1 bypasses the guard so you can intentionally exercise the flow.
   _isDev() {
-    if (process.env.EM_FORCE_LOGIN_ITEM === '1') return false;
+    if (process.env.OMEGA_FORCE_LOGIN_ITEM === '1') return false;
     return !startup._manager.isProduction();
   },
 
@@ -178,7 +178,7 @@ const startup = {
   // No-op in dev (no packaged build = no point registering electron.app for login-launch).
   setOpenAtLogin(input) {
     if (startup._isDev()) {
-      logger.log('setOpenAtLogin ignored — running in dev mode (set EM_FORCE_LOGIN_ITEM=1 to override)');
+      logger.log('setOpenAtLogin ignored — running in dev mode (set OMEGA_FORCE_LOGIN_ITEM=1 to override)');
       return;
     }
 

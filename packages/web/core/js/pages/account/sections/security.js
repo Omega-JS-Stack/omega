@@ -198,7 +198,7 @@ async function updateActiveSessions(account) {
 
   // Fetch other active sessions from server
   try {
-    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/sessions`;
+    const serverApiURL = `${omega.getApiUrl()}/omega/user/sessions`;
 
     const data = await authorizedFetch(serverApiURL, {
       method: 'GET',
@@ -449,7 +449,7 @@ function initializeSigninLinkGenerator() {
     $generateBtn.querySelector('.button-text').textContent = 'Generating...';
 
     try {
-      const tokenURL = `${omega.getApiUrl()}/backend-manager/user/token`;
+      const tokenURL = `${omega.getApiUrl()}/omega/user/token`;
       const data = await authorizedFetch(tokenURL, {
         method: 'POST',
         timeout: 60000,

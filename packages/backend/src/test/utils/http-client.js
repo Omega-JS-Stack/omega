@@ -12,8 +12,8 @@ class HttpClient {
     options = options || {};
 
     // Use API URL (port 5002, the hosting emulator) for all requests, not the
-    // functions URL (port 5001). All requests go through /backend-manager which
-    // rewrites to the bm_api function.
+    // functions URL (port 5001). All requests go through /omega which
+    // rewrites to the omega_api function.
     this.baseUrl = options.apiUrl || '';
     this.defaultHeaders = {};
     this.defaultAuthParams = {};
@@ -167,7 +167,7 @@ class HttpClient {
   async _commandWithAuth(command, payload, authConfig, options) {
     options = options || {};
 
-    return this._fetch('post', '/backend-manager/', {
+    return this._fetch('post', '/omega/', {
       command: command,
       payload: payload || {},
       options: options.commandOptions || {},
@@ -243,7 +243,7 @@ class HttpClient {
   }
 
   /**
-   * Call a bm_api command (uses default auth from setAuth)
+   * Call a omega_api command (uses default auth from setAuth)
    */
   async command(command, payload, options) {
     return this._commandWithAuth(command, payload, this._getDefaultAuthConfig(), options);

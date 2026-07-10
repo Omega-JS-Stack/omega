@@ -15,7 +15,7 @@
  * public keys land in omega.json5, secrets in the brand .env); otherwise
  * the processor is skipped per-operation with a dim note. The service only
  * skips when NO processor is configured. The webhook operations
- * additionally need BACKEND_MANAGER_WEBHOOK_KEY.
+ * additionally need OMEGA_WEBHOOK_KEY.
  *
  * --processor=stripe|paypal|chargebee narrows the run to one processor's
  * operations (omega-manager's flag, unchanged).

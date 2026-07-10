@@ -12,7 +12,7 @@ Return shape (same for all providers): `{ content, output, tokens, raw }` — pl
 
 `options.response: 'json'` triggers JSON parsing — all providers strip fences and parse with JSON5 for robustness. `options.schema` enforces structure on OpenAI (real JSON schema) and is injected into the system prompt on Anthropic / claude-code.
 
-API keys: `BACKEND_MANAGER_OPENAI_API_KEY`, `BACKEND_MANAGER_ANTHROPIC_API_KEY` (process.env or config).
+API keys: `OMEGA_OPENAI_API_KEY`, `OMEGA_ANTHROPIC_API_KEY` (process.env or config).
 
 ## Image generation (OpenAI)
 
@@ -34,7 +34,7 @@ Return shape (single image): `{ buffer, b64, mime, revisedPrompt, model, size, q
 
 `gpt-image-2` always returns base64 (no URL round-trip). Generation is slow — `medium`/`1024²` ≈ 40-50s; the default request timeout is 5 minutes. Only `openai` implements `image()`; calling it on another provider throws.
 
-API key resolution is the same as `request()` — `BACKEND_MANAGER_OPENAI_API_KEY` / `OPENAI_API_KEY` (process.env or config).
+API key resolution is the same as `request()` — `OMEGA_OPENAI_API_KEY` / `OPENAI_API_KEY` (process.env or config).
 
 ## Tools — cross-provider function calling (agentic loops)
 
@@ -119,7 +119,7 @@ Token resolution (first match wins): `options.apiKey` / constructor key → `con
 
 Mint the token with `claude setup-token` (valid ~1 year). When it expires, requests 401 — re-mint and update the `CLAUDE_CODE_OAUTH_TOKEN` secret. There is no automatic refresh; renewal is a manual yearly step.
 
-> **Caveats:** the Bearer/beta subscription path is undocumented and may change. Usage is subject to the subscription's rate limits (not API-tier limits). For high-volume production traffic, prefer `anthropic` + `BACKEND_MANAGER_ANTHROPIC_API_KEY`.
+> **Caveats:** the Bearer/beta subscription path is undocumented and may change. Usage is subject to the subscription's rate limits (not API-tier limits). For high-volume production traffic, prefer `anthropic` + `OMEGA_ANTHROPIC_API_KEY`.
 
 The legacy `src/manager/libraries/openai.js` is a thin compatibility shim that re-exports the OpenAI provider class — existing callers using `new OpenAI(assistant, key)` still work unchanged.
 

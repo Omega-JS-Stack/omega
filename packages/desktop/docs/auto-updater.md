@@ -108,13 +108,13 @@ Long enough that an actively-used app won't surprise-quit mid-task. Short enough
 
 ### Test mode behavior
 
-When `manager.isTesting() === true` (canonical signal: `EM_TEST_MODE=true`), the auto-updater swaps in test-friendly defaults so a real download → idle wait → install can complete in seconds instead of minutes:
+When `manager.isTesting() === true` (canonical signal: `OMEGA_TEST_MODE=true`), the auto-updater swaps in test-friendly defaults so a real download → idle wait → install can complete in seconds instead of minutes:
 
 - **Idle threshold**: `IDLE_INSTALL_THRESHOLD_MS_TESTING = 3000ms` (3 sec) instead of 15 min.
 - **Periodic tick**: `IDLE_TICK_MS_TESTING = 500ms` instead of `intervalMs` (default 60s).
 - **`_promptToInstall` short-circuits** before invoking `dialog.showMessageBox`. The native dialog is modal + blocking + would pop a window the test process can't dismiss programmatically. In test mode the prompt logs `[testing] _promptToInstall(...) — skipped native dialog.` and returns. Tests that want to assert prompt behavior override `_promptToInstall` per-test (see `auto-updater.test.js`).
 
-This lets the framework's own integration tests drive the full sequence (`EM_DEV_UPDATE=available` → state machine → 500ms tick → 3s idle threshold elapses → stubbed `installNow` fires) in ~5s. Consumers running their own tests should set `EM_TEST_MODE=true` to inherit the same defaults.
+This lets the framework's own integration tests drive the full sequence (`OMEGA_DEV_UPDATE=available` → state machine → 500ms tick → 3s idle threshold elapses → stubbed `installNow` fires) in ~5s. Consumers running their own tests should set `OMEGA_TEST_MODE=true` to inherit the same defaults.
 
 ## Menu integration
 
@@ -162,13 +162,13 @@ Without a real update server you can validate the entire flow via env vars:
 
 ```bash
 # Simulate "update available" — full cascade through downloading → downloaded
-EM_DEV_UPDATE=available npm start
+OMEGA_DEV_UPDATE=available npm start
 
 # Simulate "no update available" — lands in not-available
-EM_DEV_UPDATE=unavailable npm start
+OMEGA_DEV_UPDATE=unavailable npm start
 
 # Simulate a feed failure — lands in error
-EM_DEV_UPDATE=error npm start
+OMEGA_DEV_UPDATE=error npm start
 ```
 
 In dev simulation mode, `quitAndInstall()` is a no-op (no actual restart) so you can step through the dialog flow without the app exiting.

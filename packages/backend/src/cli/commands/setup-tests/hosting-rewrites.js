@@ -2,14 +2,15 @@ const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const _ = require('lodash');
 
-// The expected source pattern for bm_api hosting rewrite
-// Includes /backend-manager/* routes and root-level MCP OAuth paths
-// that Claude Chat sends directly (e.g. /authorize, /token, /.well-known/*)
-const BM_API_SOURCE = '{/backend-manager,/backend-manager/**,/mcp,/mcp/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token,/register}';
+// The expected source pattern for omega_api hosting rewrite
+// Includes /omega/* routes, the legacy /backend-manager/* alias (kept so
+// migrating brands’ in-the-wild clients keep working), and root-level MCP
+// OAuth paths that Claude Chat sends directly (e.g. /authorize, /token, /.well-known/*)
+const OMEGA_API_SOURCE = '{/omega,/omega/**,/backend-manager,/backend-manager/**,/mcp,/mcp/**,/.well-known/oauth-protected-resource,/.well-known/oauth-authorization-server,/authorize,/token,/register}';
 
 class HostingRewritesTest extends BaseTest {
   getName() {
-    return 'hosting rewrites have bm_api';
+    return 'hosting rewrites have omega_api';
   }
 
   async run() {
@@ -17,12 +18,12 @@ class HostingRewritesTest extends BaseTest {
     const firstRewrite = rewrites[0];
 
     // Check first rule is correct (matches current expected pattern)
-    const firstIsCorrect = firstRewrite?.source === BM_API_SOURCE && firstRewrite?.function === 'bm_api';
+    const firstIsCorrect = firstRewrite?.source === OMEGA_API_SOURCE && firstRewrite?.function === 'omega_api';
 
-    // Check no duplicates exist (only one bm_api rule allowed)
-    const bmApiCount = rewrites.filter(r => r.function === 'bm_api').length;
+    // Check no duplicates exist (only one omega_api rule allowed)
+    const omegaApiCount = rewrites.filter(r => r.function === 'omega_api').length;
 
-    return firstIsCorrect && bmApiCount === 1;
+    return firstIsCorrect && omegaApiCount === 1;
   }
 
   async fix() {
@@ -31,13 +32,13 @@ class HostingRewritesTest extends BaseTest {
     // Set default
     hosting.rewrites = hosting.rewrites || [];
 
-    // Remove any existing bm_api rewrites (handles legacy single-pattern rewrites too)
-    hosting.rewrites = hosting.rewrites.filter(rewrite => rewrite.function !== 'bm_api');
+    // Remove any existing omega_api rewrites (handles legacy single-pattern rewrites too)
+    hosting.rewrites = hosting.rewrites.filter(rewrite => rewrite.function !== 'omega_api');
 
     // Add to top with full pattern including MCP OAuth paths
     hosting.rewrites.unshift({
-      source: BM_API_SOURCE,
-      function: 'bm_api',
+      source: OMEGA_API_SOURCE,
+      function: 'omega_api',
     });
 
     // Set

@@ -52,14 +52,14 @@ util.inherits(Manager, EventEmitter);
 Manager.prototype.init = function (exporter, options) {
   const self = this;
 
-  // Auto-detect test-runner context. The test runner sets BEM_TEST_RUNNER=1
+  // Auto-detect test-runner context. The test runner sets OMEGA_TEST_RUNNER=1
   // before invoking anything that loads @omega.js/backend. When detected, init() runs the
   // library-loading + project-config-setup pieces normally, but skips wiring
   // Firebase Cloud Functions handlers and the custom-server boot (neither
   // works outside an actual Functions runtime). The runner has already called
   // firebase-admin.initializeApp() so we also skip that step to avoid the
   // "default app already initialized" crash.
-  const isTestRunner = !!process.env.BEM_TEST_RUNNER;
+  const isTestRunner = !!process.env.OMEGA_TEST_RUNNER;
 
   // Set options defaults
   options = options || {};
@@ -186,15 +186,15 @@ Manager.prototype.init = function (exporter, options) {
 
   // Environment helpers — the Manager is the SINGLE SOURCE OF TRUTH (mirrors EM/UJM/BXM,
   // where the Manager owns these). getEnvironment() is the ONLY place that reads the raw
-  // env vars (BEM_TESTING / ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM); the three
+  // env vars (OMEGA_TEST_MODE / ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM); the three
   // is*() checks derive from it live on every call. They return exactly ONE of three
   // mutually-exclusive values — testing wins, then production, else development.
   // The assistant exposes the same methods but FORWARDS to these (assistant.isTesting()
   // → Manager.isTesting()), so request handlers can keep calling `assistant.*`.
   // Defined BEFORE the assistant is constructed so the assistant's own init() can call back.
   self.getEnvironment = function() {
-    // Testing takes precedence — set by the test runner / emulator (BEM_TESTING=true).
-    if (process.env.BEM_TESTING === 'true') {
+    // Testing takes precedence — set by the test runner / emulator (OMEGA_TEST_MODE=true).
+    if (process.env.OMEGA_TEST_MODE === 'true') {
       return 'testing';
     }
     if (process.env.ENVIRONMENT === 'production') {
@@ -260,7 +260,7 @@ Manager.prototype.init = function (exporter, options) {
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
     if (isDev) {
-      const httpsPort = process.env.BEM_HTTPS_PORT;
+      const httpsPort = process.env.OMEGA_HTTPS_PORT;
       return httpsPort ? `https://localhost:${httpsPort}` : 'http://localhost:5002';
     }
     return `https://api.${(self.config.brand?.url || '').replace(/^https?:\/\//, '')}`;
@@ -324,9 +324,9 @@ Manager.prototype.init = function (exporter, options) {
   process.env.ENVIRONMENT = process.env.ENVIRONMENT || self.getEnvironment();
 
   // Set @omega.js/backend env variables
-  process.env.BEM_FUNCTIONS_URL = self.project.functionsUrl;
-  process.env.BEM_API_URL = self.project.apiUrl;
-  process.env.BEM_WEBSITE_URL = self.project.websiteUrl;
+  process.env.OMEGA_FUNCTIONS_URL = self.project.functionsUrl;
+  process.env.OMEGA_API_URL = self.project.apiUrl;
+  process.env.OMEGA_WEBSITE_URL = self.project.websiteUrl;
 
   // Use the working Firebase logger that they disabled for whatever reason
   // Load the Firebase logger compat shim only in production (NOT development or testing).
@@ -920,7 +920,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
   }
 
   // Setup functions
-  exporter.bm_api =
+  exporter.omega_api =
   fn({memory: '256MB', timeoutSeconds: 60 * 5})
   .https.onRequest(async (req, res) => {
     const route = self.BackendRouter(req, res).resolve();
@@ -942,7 +942,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
 
   // Setup legacy functions
   if (options.setupFunctionsLegacy) {
-    exporter.bm_signUpHandler =
+    exporter.omega_signUpHandler =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/actions/sign-up-handler.js`);
@@ -957,7 +957,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
     });
 
     // Admin
-    exporter.bm_createPost =
+    exporter.omega_createPost =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/admin/create-post.js`);
@@ -971,7 +971,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_firestoreWrite =
+    exporter.omega_firestoreWrite =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/admin/firestore-write.js`);
@@ -985,7 +985,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_getStats =
+    exporter.omega_getStats =
     fn({memory: '256MB', timeoutSeconds: 420})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/admin/get-stats.js`);
@@ -999,7 +999,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_sendNotification =
+    exporter.omega_sendNotification =
     fn({memory: '1GB', timeoutSeconds: 420})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/admin/send-notification.js`);
@@ -1013,7 +1013,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_query =
+    exporter.omega_query =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/admin/query.js`);
@@ -1027,7 +1027,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_createPostHandler =
+    exporter.omega_createPostHandler =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/actions/create-post-handler.js`);
@@ -1041,7 +1041,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_generateUuid =
+    exporter.omega_generateUuid =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/actions/generate-uuid.js`);
@@ -1056,7 +1056,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
     });
 
     // Test
-    exporter.bm_test_authenticate =
+    exporter.omega_test_authenticate =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/test/authenticate.js`);
@@ -1070,7 +1070,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       });
     });
 
-    exporter.bm_test_webhook =
+    exporter.omega_test_webhook =
     fn({memory: '256MB', timeoutSeconds: 60})
     .https.onRequest(async (req, res) => {
       const Module = require(`${_legacy}/test/webhook.js`);
@@ -1087,45 +1087,45 @@ Manager.prototype.setupFunctions = function (exporter, options) {
 
   // Setup identity functions
   if (options.setupFunctionsIdentity) {
-    exporter.bm_authBeforeCreate =
+    exporter.omega_authBeforeCreate =
     fn({memory: '256MB', timeoutSeconds: 60})
     .auth.user()
     .beforeCreate((user, context) => self.EventMiddleware({ user, context }).run(`${events}/auth/before-create.js`));
 
-    exporter.bm_authBeforeSignIn =
+    exporter.omega_authBeforeSignIn =
     fn({memory: '256MB', timeoutSeconds: 60})
     .auth.user()
     .beforeSignIn((user, context) => self.EventMiddleware({ user, context }).run(`${events}/auth/before-signin.js`));
   }
 
   // Setup events
-  exporter.bm_authOnCreate =
+  exporter.omega_authOnCreate =
   fn({memory: '256MB', timeoutSeconds: 60})
   .auth.user()
   .onCreate((user, context) => self.EventMiddleware({ user, context }).run(`${events}/auth/on-create.js`));
 
-  exporter.bm_authOnDelete =
+  exporter.omega_authOnDelete =
   fn({memory: '256MB', timeoutSeconds: 60})
   .auth.user()
   .onDelete((user, context) => self.EventMiddleware({ user, context }).run(`${events}/auth/on-delete.js`));
 
-  exporter.bm_notificationsOnWrite =
+  exporter.omega_notificationsOnWrite =
   fn({memory: '256MB', timeoutSeconds: 60})
   .firestore.document('notifications/{token}')
   .onWrite((change, context) => self.EventMiddleware({ change, context }).run(`${events}/firestore/notifications/on-write.js`));
 
-  exporter.bm_paymentsWebhookOnWrite =
+  exporter.omega_paymentsWebhookOnWrite =
   fn({memory: '256MB', timeoutSeconds: 60})
   .firestore.document('payments-webhooks/{eventId}')
   .onWrite((change, context) => self.EventMiddleware({ change, context }).run(`${events}/firestore/payments-webhooks/on-write.js`));
 
-  exporter.bm_paymentsDisputeOnWrite =
+  exporter.omega_paymentsDisputeOnWrite =
   fn({memory: '256MB', timeoutSeconds: 60})
   .firestore.document('payments-disputes/{alertId}')
   .onWrite((change, context) => self.EventMiddleware({ change, context }).run(`${events}/firestore/payments-disputes/on-write.js`));
 
   // Setup cron jobs
-  exporter.bm_cronDaily =
+  exporter.omega_cronDaily =
   fn({memory: '256MB', timeoutSeconds: 60 * 5})
   .pubsub.schedule('0 0 * * *')
   .onRun((context) => self.EventMiddleware({ context }).run(`${cron}/daily.js`));
@@ -1134,7 +1134,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
   // images + article + uploads) — needs the v1 max timeout. If a run times out
   // or OOMs, the campaign lease reclaim in marketing-campaigns.js retries it
   // safely.
-  exporter.bm_cronFrequent =
+  exporter.omega_cronFrequent =
   fn({memory: '256MB', timeoutSeconds: 540})
   .pubsub.schedule('*/10 * * * *')
   .onRun((context) => self.EventMiddleware({ context }).run(`${cron}/frequent.js`));
@@ -1318,13 +1318,13 @@ function resolveProjectPackage(dir) {
 
 /**
  * Check if a routePath is an MCP-related route and normalize it.
- * Handles /backend-manager/mcp/* paths and /.well-known/oauth-* discovery.
+ * Handles /omega/mcp/* paths and /.well-known/oauth-* discovery.
  *
  * @param {string} routePath - Resolved route path from BackendRouter
  * @returns {string|null} - Normalized MCP route path, or null if not MCP
  */
 function resolveMcpRoutePath(routePath) {
-  // Direct MCP paths (via /mcp/* or /backend-manager/mcp/*)
+  // Direct MCP paths (via /mcp/* or /omega/mcp/*)
   if (routePath === 'mcp' || routePath.startsWith('mcp/')) {
     return routePath;
   }

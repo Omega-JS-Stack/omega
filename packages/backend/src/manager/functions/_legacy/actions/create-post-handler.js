@@ -51,11 +51,11 @@ let Module = {
         assistant.error(response.error)
       } else {
         mailchimp = new Mailchimp(self.Manager.config?.mailchimp?.key ?? '');
-        await fetch(`${self.Manager.getApiUrl()}/backend-manager`, {
+        await fetch(`${self.Manager.getApiUrl()}/omega`, {
           method: 'POST',
           response: 'json',
           body: {
-            backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+            backendManagerKey: process.env.OMEGA_ADMIN_KEY,
             command: 'admin:send-notification',
             payload: {
               notification: {

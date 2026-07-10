@@ -13,7 +13,7 @@
  *   - Auth: returns 401 if key missing/wrong
  *   - Provider validation: returns 400 if missing
  *   - Brand iteration: reads brands collection, derives API URLs
- *   - URL derivation: brand.url 'https://somiibo.com' → 'https://api.somiibo.com/backend-manager/marketing/webhook?provider=X&key=Y'
+ *   - URL derivation: brand.url 'https://somiibo.com' → 'https://api.somiibo.com/omega/marketing/webhook?provider=X&key=Y'
  *   - Body forwarding: raw body POSTed to every child unchanged
  *   - Failure isolation: one failed child doesn't break the others
  *   - Brands without brand.url skipped silently
@@ -146,7 +146,7 @@ module.exports = {
     {
       name: 'returns-404-when-parent-not-self',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
           const Manager = makeManager({ parent: 'https://api.itwcreativeworks.com' }); // NOT 'self'
@@ -164,7 +164,7 @@ module.exports = {
     {
       name: 'allows-route-when-parent-is-self',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
           const Manager = makeManager({ parent: 'self' });
@@ -183,7 +183,7 @@ module.exports = {
     {
       name: 'rejects-missing-provider',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { key: 'test-key' } }); // no provider
           const Manager = makeManager();
@@ -199,7 +199,7 @@ module.exports = {
     {
       name: 'rejects-missing-key',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid' } }); // no key
           const Manager = makeManager();
@@ -215,7 +215,7 @@ module.exports = {
     {
       name: 'rejects-wrong-key',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'real-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'real-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'wrong-key' } });
           const Manager = makeManager();
@@ -233,7 +233,7 @@ module.exports = {
     {
       name: 'derives-api-url-from-brand-url-and-fans-out',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const body = [{ sg_event_id: 'evt1', event: 'group_unsubscribe', email: 't@example.com' }];
           const assistant = makeAssistant({
@@ -251,12 +251,12 @@ module.exports = {
           assert.equal(fetchCalls.length, 2, 'should fan out to both brands');
           assert.equal(
             fetchCalls[0].url,
-            'https://api.somiibo.com/backend-manager/marketing/webhook?provider=sendgrid&key=test-key',
+            'https://api.somiibo.com/omega/marketing/webhook?provider=sendgrid&key=test-key',
             'first child URL derived correctly'
           );
           assert.equal(
             fetchCalls[1].url,
-            'https://api.chatsy.com/backend-manager/marketing/webhook?provider=sendgrid&key=test-key',
+            'https://api.chatsy.com/omega/marketing/webhook?provider=sendgrid&key=test-key',
             'second child URL derived correctly'
           );
           assert.deepEqual(fetchCalls[0].opts.body, body, 'raw body forwarded unchanged');
@@ -268,7 +268,7 @@ module.exports = {
     {
       name: 'forwards-raw-body-unchanged-for-beehiiv',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const body = {
             id: 'beehiiv-evt1',
@@ -297,7 +297,7 @@ module.exports = {
     {
       name: 'skips-brands-without-brand-url',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();
@@ -318,7 +318,7 @@ module.exports = {
     {
       name: 'failure-isolation-one-bad-child-does-not-break-others',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           fetchMockBehavior = (url) => {
             if (url.includes('chatsy.com')) {
@@ -351,7 +351,7 @@ module.exports = {
     {
       name: 'invalid-brand-url-counted-as-failure-not-thrown',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();
@@ -377,7 +377,7 @@ module.exports = {
         // The parent's own brand IS expected to be in the brands collection.
         // It should be fanned to via HTTP like any other brand, so its own
         // @omega.js/backend processes its own user updates the same way as siblings.
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager({ brand: { id: 'itw-creative-works' } });
@@ -400,7 +400,7 @@ module.exports = {
     {
       name: 'zero-brands-handled-gracefully',
       async run({ assert }) {
-        await withEnv({ BACKEND_MANAGER_WEBHOOK_KEY: 'test-key' }, async () => {
+        await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();

@@ -77,7 +77,7 @@ function setupForm() {
   formManager.on('submit', async ({ data }) => {
     trackFeedbackSubmit(data.rating);
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/user/feedback`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/feedback`, {
       method: 'POST',
       response: 'json',
       timeout: 30000,

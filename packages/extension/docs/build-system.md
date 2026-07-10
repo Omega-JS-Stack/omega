@@ -16,7 +16,7 @@ src/
 │   ├── css/main.scss + components/          # SCSS
 │   └── images/icon.png                      # source icon (1024×1024)
 └── ...
-        ↓ gulp build (BXM_BUILD_MODE=true)
+        ↓ gulp build (OMEGA_BUILD_MODE=true)
 dist/
 ├── manifest.json                            # still JSON5 — used by serve, not Chrome
 ├── views/<component>/index.html             # templated
@@ -95,25 +95,25 @@ Views in `src/views/<component>/index.html` go through two passes of `{{ }}` tok
 3. **Per-browser asset copy** to `packaged/<browser>/raw/`
 4. **Zip** to `packaged/<browser>/<name>.zip`
 5. **Post-hook** — runs `hooks/build:post.js`
-6. **Auto-publish** (if `BXM_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).
+6. **Auto-publish** (if `OMEGA_IS_PUBLISH=true`) — uploads to Chrome Web Store / Firefox Add-ons / Edge Add-ons stores. See [publishing.md](publishing.md).
 
 ## Build modes
 
 Env vars that drive the pipeline:
 
-- `BXM_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
-- `BXM_IS_PUBLISH=true` — also publish to extension stores after packaging
-- `BXM_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
-- `BXM_TEST_MODE=true` — running in @omega.js/extension's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
-- `BXM_LOG_FILE` — override the stdout/stderr tee path, or set to `false` to disable it (see [Log files](#log-files)).
+- `OMEGA_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
+- `OMEGA_IS_PUBLISH=true` — also publish to extension stores after packaging
+- `OMEGA_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
+- `OMEGA_TEST_MODE=true` — running in @omega.js/extension's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
+- `OMEGA_LOG_FILE` — override the stdout/stderr tee path, or set to `false` to disable it (see [Log files](#log-files)).
 
 ## Live reload
 
-`npm start` (= `gulp` with no args, by default invokes `serve`) watches `src/` and recompiles on change. A WebSocket server on `BXM_LIVERELOAD_PORT` (35729) notifies the extension's contexts. Background SW reloads itself via `chrome.runtime.reload()`; other contexts reload via `window.location.reload()`.
+`npm start` (= `gulp` with no args, by default invokes `serve`) watches `src/` and recompiles on change. A WebSocket server on `OMEGA_LIVERELOAD_PORT` (35729) notifies the extension's contexts. Background SW reloads itself via `chrome.runtime.reload()`; other contexts reload via `window.location.reload()`.
 
 ## Log files
 
-The gulp pipeline tees all output to `logs/dev.log` (`npm start`) / `logs/build.log` (`npm run build`), and `npx omega test` tees to `logs/test.log`. Full reference — file table, capture behavior, `BXM_LOG_FILE` controls: [logging.md](logging.md).
+The gulp pipeline tees all output to `logs/dev.log` (`npm start`) / `logs/build.log` (`npm run build`), and `npx omega test` tees to `logs/test.log`. Full reference — file table, capture behavior, `OMEGA_LOG_FILE` controls: [logging.md](logging.md).
 
 ## Output for Chrome's "Load unpacked"
 

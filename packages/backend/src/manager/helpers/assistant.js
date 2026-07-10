@@ -599,14 +599,14 @@ function _attachHeaderProperties(self, options, error) {
 
   // Attach properties if this assistant has a res (it sometimes does not, like in auth().onCreate() triggers)
   if (res?.header && res?.get) {
-    res.header('bm-properties', JSON.stringify(headers));
+    res.header('omega-properties', JSON.stringify(headers));
 
-    // Add bm-properties to Access-Control-Expose-Headers
+    // Add omega-properties to Access-Control-Expose-Headers
     const existingExposed = res.get('Access-Control-Expose-Headers') || '';
 
     // If it does not exist, add it
-    if (!existingExposed.match(/bm-properties/i)) {
-      const newExposed = `${existingExposed}, bm-properties`.replace(/^, /, '');
+    if (!existingExposed.match(/omega-properties/i)) {
+      const newExposed = `${existingExposed}, omega-properties`.replace(/^, /, '');
       res.header('Access-Control-Expose-Headers', newExposed);
     }
   }
@@ -631,7 +631,7 @@ BackendAssistant.prototype.authenticate = async function (options) {
   const data = self.request.data;
 
   // Get stored backendManagerKey
-  const BACKEND_MANAGER_KEY = process.env.BACKEND_MANAGER_KEY || '';
+  const OMEGA_ADMIN_KEY = process.env.OMEGA_ADMIN_KEY || '';
 
   // Build the ID token from the request
   let idToken;
@@ -650,8 +650,8 @@ BackendAssistant.prototype.authenticate = async function (options) {
       ? false
       : user.authenticated;
 
-    // Validate BACKEND_MANAGER_KEY
-    if (backendManagerKey && backendManagerKey === BACKEND_MANAGER_KEY) {
+    // Validate OMEGA_ADMIN_KEY
+    if (backendManagerKey && backendManagerKey === OMEGA_ADMIN_KEY) {
       // Update roles
       user.roles = user.roles || {};
       user.roles.admin = true;

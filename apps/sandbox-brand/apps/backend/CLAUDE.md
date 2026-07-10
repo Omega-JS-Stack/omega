@@ -5,7 +5,7 @@
 
 ## Framework
 
-This project consumes **Backend Manager** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`bm_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
+This project consumes **Backend Manager** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
@@ -39,13 +39,13 @@ All `npx omega <cmd>` aliases — `npx bm <cmd>`, `npx bem <cmd>`, `npx @omega.j
 
 - `functions/index.js` — entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
 - `functions/config/omega.json5` — OMEGA config: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
-- `functions/.env` — secrets (BACKEND_MANAGER_KEY, third-party API keys). Gitignored.
+- `functions/.env` — secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored.
 - `functions/service-account.json` — Firebase Admin credentials. Gitignored.
 - `functions/routes/<verb>/<path>.js` — custom routes mounted at runtime (e.g. `routes/get/hello.js` → `GET /hello`).
 - `functions/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
 - `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Some fields managed by `npx omega setup`.
 - `.firebaserc` — Firebase project ID alias.
-- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `///---backend-manager---///` block inside each; everything outside is yours.
+- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `///---omega---///` block inside each; everything outside is yours.
 
 ## Per-context imports
 

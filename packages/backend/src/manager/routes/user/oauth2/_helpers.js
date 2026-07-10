@@ -5,9 +5,9 @@ const { arrayify } = require('node-powertools');
 // Constants
 const STATE_TTL_MINUTES = 10;
 
-// Derive OAuth state encryption key from BACKEND_MANAGER_KEY
-const STATE_KEY = process.env.BACKEND_MANAGER_KEY
-  ? crypto.createHash('sha256').update(`oauth2-state:${process.env.BACKEND_MANAGER_KEY}`).digest('hex')
+// Derive OAuth state encryption key from OMEGA_ADMIN_KEY
+const STATE_KEY = process.env.OMEGA_ADMIN_KEY
+  ? crypto.createHash('sha256').update(`oauth2-state:${process.env.OMEGA_ADMIN_KEY}`).digest('hex')
   : null;
 
 /**
@@ -121,7 +121,7 @@ function generateCsrfToken() {
 
 function encryptState(data) {
   if (!STATE_KEY) {
-    throw new Error('BACKEND_MANAGER_KEY not configured');
+    throw new Error('OMEGA_ADMIN_KEY not configured');
   }
 
   const iv = crypto.randomBytes(16);
@@ -137,7 +137,7 @@ function encryptState(data) {
 
 function decryptState(encryptedState) {
   if (!STATE_KEY) {
-    throw new Error('BACKEND_MANAGER_KEY not configured');
+    throw new Error('OMEGA_ADMIN_KEY not configured');
   }
 
   const parts = encryptedState.split('.');

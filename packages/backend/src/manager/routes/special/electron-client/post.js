@@ -37,7 +37,7 @@ module.exports = async ({ assistant, Manager, settings, analytics, libraries }) 
   }
 
   // Validate config
-  if (config.backendManagerKey === process.env.BACKEND_MANAGER_KEY && process.env.BACKEND_MANAGER_KEY) {
+  if (config.backendManagerKey === process.env.OMEGA_ADMIN_KEY && process.env.OMEGA_ADMIN_KEY) {
     assistant.log('Validated config', config);
   } else {
     config = {};

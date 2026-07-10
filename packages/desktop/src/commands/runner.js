@@ -47,7 +47,7 @@ function runnerTaskName(org) {
 // the runner in a separate elevated cmd window. With per-user storage we drop
 // elevation entirely: install, register-org, start, and uninstall all run in
 // the user's normal terminal, the runner foregrounds in that same terminal,
-// and Ctrl+C stops it cleanly. Set EM_RUNNER_HOME to override.
+// and Ctrl+C stops it cleanly. Set OMEGA_RUNNER_HOME to override.
 function defaultRunnerHome() {
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
@@ -55,7 +55,7 @@ function defaultRunnerHome() {
   }
   return path.join(process.cwd(), '.gh-runners');
 }
-const RUNNER_HOME = process.env.EM_RUNNER_HOME || defaultRunnerHome();
+const RUNNER_HOME = process.env.OMEGA_RUNNER_HOME || defaultRunnerHome();
 const ACTIONS_RUNNER_VERSION = '2.319.1';   // pinned; bump intentionally
 
 module.exports = async function (options) {
@@ -106,24 +106,24 @@ async function install(options) {
   const templateDir = path.join(RUNNER_HOME, '_template');
   await downloadActionsRunner(templateDir);
 
-  // 2. Resolve target orgs: filter list from EM_RUNNER_ORGS if set, otherwise all admin orgs.
+  // 2. Resolve target orgs: filter list from OMEGA_RUNNER_ORGS if set, otherwise all admin orgs.
   const allAdminOrgs = await discoverAdminOrgs();
   if (allAdminOrgs.length === 0) {
     logger.warn('Your GH_TOKEN has no orgs you can admin.');
   }
 
-  const filterRaw = process.env.EM_RUNNER_ORGS || '';
+  const filterRaw = process.env.OMEGA_RUNNER_ORGS || '';
   const filter = filterRaw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
   let orgs;
   if (filter.length > 0) {
     const filterSet = new Set(filter.map((o) => o.toLowerCase()));
     orgs = allAdminOrgs.filter((o) => filterSet.has(o.toLowerCase()));
     const unmatched = filter.filter((f) => !allAdminOrgs.find((a) => a.toLowerCase() === f.toLowerCase()));
-    logger.log(`EM_RUNNER_ORGS filter applied: ${orgs.length} matched (out of ${allAdminOrgs.length} admin orgs)`);
-    if (unmatched.length > 0) logger.warn(`EM_RUNNER_ORGS lists ${unmatched.length} org(s) you don't admin: ${unmatched.join(', ')}`);
+    logger.log(`OMEGA_RUNNER_ORGS filter applied: ${orgs.length} matched (out of ${allAdminOrgs.length} admin orgs)`);
+    if (unmatched.length > 0) logger.warn(`OMEGA_RUNNER_ORGS lists ${unmatched.length} org(s) you don't admin: ${unmatched.join(', ')}`);
   } else {
     orgs = allAdminOrgs;
-    logger.log(`Detected ${orgs.length} admin org(s) (set EM_RUNNER_ORGS in .env to install against a subset): ${orgs.join(', ')}`);
+    logger.log(`Detected ${orgs.length} admin org(s) (set OMEGA_RUNNER_ORGS in .env to install against a subset): ${orgs.join(', ')}`);
   }
 
   // 3a. Fetch logon credentials ONCE (env > DPAPI file > prompt). Reused across all
@@ -801,8 +801,8 @@ async function selfUpdate() {
 const WATCHER_SERVICE_NAME = 'em-runner-watcher';
 
 function ensureWindows() {
-  if (process.platform !== 'win32' && !process.env.EM_RUNNER_FORCE) {
-    throw new Error('This command only runs on Windows. Set EM_RUNNER_FORCE=1 to override (testing only).');
+  if (process.platform !== 'win32' && !process.env.OMEGA_RUNNER_FORCE) {
+    throw new Error('This command only runs on Windows. Set OMEGA_RUNNER_FORCE=1 to override (testing only).');
   }
 }
 
@@ -825,7 +825,7 @@ function ensureWindowsAdmin(options) {
   const optsBlock = options || {};
   const autoElevate = process.stdin.isTTY
     && !optsBlock['no-auto-elevate']
-    && !process.env.EM_RUNNER_NO_AUTO_ELEVATE;
+    && !process.env.OMEGA_RUNNER_NO_AUTO_ELEVATE;
 
   if (!autoElevate) {
     throw new Error('This command needs an elevated cmd.exe (Run as Administrator). Service install/uninstall and `sc` commands fail silently without admin rights.');
@@ -975,8 +975,8 @@ async function installWatcherService() {
     workingDirectory: watcherDir,
     env: [
       { name: 'GH_TOKEN',       value: process.env.GH_TOKEN },
-      { name: 'EM_RUNNER_HOME', value: RUNNER_HOME },
-      ...(process.env.EM_RUNNER_ORGS ? [{ name: 'EM_RUNNER_ORGS', value: process.env.EM_RUNNER_ORGS }] : []),
+      { name: 'OMEGA_RUNNER_HOME', value: RUNNER_HOME },
+      ...(process.env.OMEGA_RUNNER_ORGS ? [{ name: 'OMEGA_RUNNER_ORGS', value: process.env.OMEGA_RUNNER_ORGS }] : []),
     ],
   });
 
@@ -1366,10 +1366,10 @@ function dpapiProtect(plaintext) {
   const { spawnSync } = require('child_process');
   const r = spawnSync('powershell', [
     '-NoProfile', '-NonInteractive', '-Command',
-    `$s = ConvertTo-SecureString -String $env:EM_DPAPI_INPUT -AsPlainText -Force; ConvertFrom-SecureString -SecureString $s`,
+    `$s = ConvertTo-SecureString -String $env:OMEGA_DPAPI_INPUT -AsPlainText -Force; ConvertFrom-SecureString -SecureString $s`,
   ], {
     encoding: 'utf8',
-    env: { ...process.env, EM_DPAPI_INPUT: plaintext },
+    env: { ...process.env, OMEGA_DPAPI_INPUT: plaintext },
   });
   if (r.status !== 0) {
     throw new Error(`DPAPI encrypt failed: ${(r.stderr || '').trim()}`);
@@ -1382,10 +1382,10 @@ function dpapiUnprotect(encryptedBlob) {
   const { spawnSync } = require('child_process');
   const r = spawnSync('powershell', [
     '-NoProfile', '-NonInteractive', '-Command',
-    `$s = ConvertTo-SecureString -String $env:EM_DPAPI_INPUT; [System.Net.NetworkCredential]::new('', $s).Password`,
+    `$s = ConvertTo-SecureString -String $env:OMEGA_DPAPI_INPUT; [System.Net.NetworkCredential]::new('', $s).Password`,
   ], {
     encoding: 'utf8',
-    env: { ...process.env, EM_DPAPI_INPUT: encryptedBlob },
+    env: { ...process.env, OMEGA_DPAPI_INPUT: encryptedBlob },
   });
   if (r.status !== 0) {
     throw new Error(`DPAPI decrypt failed: ${(r.stderr || '').trim()}`);
@@ -1445,16 +1445,16 @@ async function monitor(options) {
   // List the registered orgs (and per-org runner tasks + state) so the user can see
   // exactly which orgs the monitor will pick up signing events from.
   //
-  // We trust EM_RUNNER_ORGS over config.registeredOrgs when set, because installs
+  // We trust OMEGA_RUNNER_ORGS over config.registeredOrgs when set, because installs
   // that predated the filter often left a stale full-org list in config.json.
   const cfg = readConfig();
   let orgs = cfg.registeredOrgs || [];
-  const filterRaw = process.env.EM_RUNNER_ORGS || '';
+  const filterRaw = process.env.OMEGA_RUNNER_ORGS || '';
   const filter = filterRaw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
   if (filter.length > 0) {
     const filterSet = new Set(filter.map((o) => o.toLowerCase()));
     orgs = orgs.filter((o) => filterSet.has(o.toLowerCase()));
-    if (orgs.length === 0) orgs = filter;   // EM_RUNNER_ORGS set but no matches in config — show the filter directly
+    if (orgs.length === 0) orgs = filter;   // OMEGA_RUNNER_ORGS set but no matches in config — show the filter directly
   }
 
   if (orgs.length === 0) {
@@ -1480,7 +1480,7 @@ async function monitor(options) {
   if (!fs.existsSync(file)) {
     // Make sure the parent dir exists so events written before monitor sees the file
     // don't fail (sign-events.js handles its own write errors, but pre-creating the dir
-    // avoids a confusing "waiting forever" UX when EM_RUNNER_HOME hasn't been used yet).
+    // avoids a confusing "waiting forever" UX when OMEGA_RUNNER_HOME hasn't been used yet).
     try {
       jetpack.dir(path.dirname(file));
     } catch (_) { /* best-effort */ }

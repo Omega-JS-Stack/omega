@@ -406,7 +406,7 @@ async function runCron($btn) {
   if ($text) $text.textContent = 'Running...';
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/backend-manager/admin/cron`, {
+    await authorizedFetch(`${omega.getApiUrl()}/omega/admin/cron`, {
       method: 'POST',
       timeout: 5 * 60 * 1000,
       response: 'text',
@@ -444,7 +444,7 @@ async function runBackup() {
   if ($text) $text.textContent = 'Running...';
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/backend-manager/admin/backup`, {
+    await authorizedFetch(`${omega.getApiUrl()}/omega/admin/backup`, {
       method: 'POST',
       timeout: 5 * 60 * 1000,
       response: 'json',

@@ -10,7 +10,7 @@ const TestProvider = require('../../src/manager/libraries/ai/providers/test.js')
 const { parseScript } = TestProvider._internals;
 
 function makeProvider() {
-  // No Manager — the provider falls back to the BEM_TESTING signal, which the
+  // No Manager — the provider falls back to the OMEGA_TEST_MODE signal, which the
   // test runner sets
   return new TestProvider({});
 }

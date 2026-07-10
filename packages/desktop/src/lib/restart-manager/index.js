@@ -33,7 +33,7 @@
 //     stay dead so tests never touch network or real OS state.
 //   - brand.id === 'restart-manager' (RM doesn't manage itself)
 //   - config.restartManager.enabled === false
-//   - non-production without EM_RESTART_MANAGER_DEV=1 (dev noise guard)
+//   - non-production without OMEGA_RESTART_MANAGER_DEV=1 (dev noise guard)
 //
 // Full reference: docs/restart-manager.md.
 
@@ -102,7 +102,7 @@ const restartManager = {
     // Root resolution. Testing gets an isolated root under the ` (Testing)`
     // userData (wiped every run) so explicit test calls never touch the real
     // neutral root; everything else shares `<appData>/restart-manager` (or the
-    // EM_RM_ROOT override — the cross-repo dev/test isolation seam).
+    // OMEGA_RM_ROOT override — the cross-repo dev/test isolation seam).
     restartManager._root = manager.isTesting()
       ? path.join(app.getPath('userData'), protocol.SHARED_DIR_NAME)
       : protocol.resolveSharedRoot(app.getPath('appData'), process.env);
@@ -129,8 +129,8 @@ const restartManager = {
 
     // Bail #4: dev mode unless explicitly opted in — avoids feed fetches and
     // spawn thrash during local dev where RM likely isn't installed.
-    if (!manager.isProduction() && process.env.EM_RESTART_MANAGER_DEV !== '1') {
-      restartManager._bail('dev', 'skipping outside production (set EM_RESTART_MANAGER_DEV=1 to test).');
+    if (!manager.isProduction() && process.env.OMEGA_RESTART_MANAGER_DEV !== '1') {
+      restartManager._bail('dev', 'skipping outside production (set OMEGA_RESTART_MANAGER_DEV=1 to test).');
       return;
     }
 

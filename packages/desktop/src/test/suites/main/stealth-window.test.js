@@ -50,13 +50,13 @@ module.exports = {
       },
     },
     {
-      name: 'EM_TEST_SHOW=1 opts out — raw windows are NOT stealthed at creation',
+      name: 'OMEGA_TEST_SHOW=1 opts out — raw windows are NOT stealthed at creation',
       run: (ctx) => {
         if (process.platform === 'linux') {
           return ctx.skip('setOpacity is unsupported on Linux');
         }
         const { BrowserWindow } = require('electron');
-        process.env.EM_TEST_SHOW = '1';
+        process.env.OMEGA_TEST_SHOW = '1';
         try {
           // Never shown — opacity alone proves the hook skipped it, without any
           // risk of activating the test process mid-run.
@@ -64,7 +64,7 @@ module.exports = {
           ctx.expect(win.getOpacity()).toBe(1);
           win.destroy();
         } finally {
-          delete process.env.EM_TEST_SHOW;
+          delete process.env.OMEGA_TEST_SHOW;
         }
       },
     },

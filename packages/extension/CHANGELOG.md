@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   1. Create `config/omega.json5` next to the old file.
   2. Shared sections move over UNCHANGED at the top level: `brand`, `firebaseConfig`, `analytics`, `sentry`, `theme` (custom top-level keys like `liveReloadPort` also carry over unchanged).
   3. Add `targets: { extension: {} }` — key presence marks the extension target enabled; extension-specific settings (and per-surface overrides of any shared key) go inside it.
-  4. **Move `analytics.providers.google.secret` to `.env` as `GOOGLE_ANALYTICS_SECRET`** — secrets never live in omega.json5; the loader hard-fails on secret-shaped keys (`…secret`, `…privateKey`). The build snapshot (`build.json` / `BXM_BUILD_JSON`) bakes it in at build time exactly as before, now sourced from the environment (matches BEM/EM convention).
+  4. **Move `analytics.providers.google.secret` to `.env` as `GOOGLE_ANALYTICS_SECRET`** — secrets never live in omega.json5; the loader hard-fails on secret-shaped keys (`…secret`, `…privateKey`). The build snapshot (`build.json` / `OMEGA_BUILD_JSON`) bakes it in at build time exactly as before, now sourced from the environment (matches BEM/EM convention).
   5. Delete `config/browser-extension-manager.json`.
   In a brand monorepo (`{brand}/apps/{app}/…`), shared sections can live at the brand level (`{brand}/config/omega.json5`) and the app file carries only `targets.extension` — `Manager.getConfig()` returns the RESOLVED merge.
 - **`Manager.getConfig()` semantics** — returns the resolved config (target section overlaid onto the top level; brand walk-up in monorepos). Missing config now returns `{}` instead of throwing; schema findings warn once per process.
@@ -37,6 +37,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - **`bxm setup` config merge no longer drops consumer-only keys.** The defaults merge started from the framework template and only walked template keys, so any consumer key absent from the template (e.g. `liveReloadPort`, or anything under `targets.extension`) was silently deleted on every setup. Consumer-only keys now survive at every nesting level.
+
+## [2.2.0] - 2026-07-10
+
+- Changed
+  - Env prefix `BXM_*` → `OMEGA_*` (~13 vars): `BXM_BUILD_JSON` → `OMEGA_BUILD_JSON` (unified with desktop's global), `OMEGA_BUILD_MODE`/`OMEGA_IS_PUBLISH` (package scripts + scaffolded publish workflow), the `OMEGA_TEST_*` family, `BXM_EXTENSION_PATH` → `OMEGA_CDP_EXTENSION_PATH`.
+  - Backend calls go to `/omega` (background auth fetch).
+- Fixed
+  - `Manager.actLikeProduction()` read UJM's `UJ_AUDIT_FORCE` instead of an extension-owned var — now the unified `OMEGA_AUDIT_FORCE`.
 
 ## [2.1.0] - 2026-07-10
 

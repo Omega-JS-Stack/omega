@@ -297,7 +297,7 @@ async function sendUserSignupMetadata(account) {
     };
 
     // Get server API URL
-    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/signup`;
+    const serverApiURL = `${omega.getApiUrl()}/omega/user/signup`;
 
     // Log
     console.log('[Auth] Sending user metadata:', payload);

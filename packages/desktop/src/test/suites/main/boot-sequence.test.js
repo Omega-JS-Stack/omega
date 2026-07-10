@@ -67,7 +67,7 @@ module.exports = {
     {
       name: 'getEnvironment returns testing under the test harness',
       run: (ctx) => {
-        // The harness spawn sets EM_TEST_MODE=true → testing wins over everything.
+        // The harness spawn sets OMEGA_TEST_MODE=true → testing wins over everything.
         ctx.expect(ctx.manager.getEnvironment()).toBe('testing');
       },
     },

@@ -10,54 +10,54 @@ module.exports = {
   description: 'url-helpers (cross-context)',
   tests: [
     {
-      name: 'getEnvironment: testing (EM_TEST_MODE) wins; else config.em.environment',
+      name: 'getEnvironment: testing (OMEGA_TEST_MODE) wins; else config.em.environment',
       run: (ctx) => {
         const m = ctx.manager;
         const orig = m.config?.em?.environment;
-        const origTest = process.env.EM_TEST_MODE;
+        const origTest = process.env.OMEGA_TEST_MODE;
         m.config.em = m.config.em || {};
         try {
           // Testing takes precedence over the config override.
-          process.env.EM_TEST_MODE = 'true';
+          process.env.OMEGA_TEST_MODE = 'true';
           m.config.em.environment = 'production';
           ctx.expect(m.getEnvironment()).toBe('testing');
           // With testing cleared, the config override is honored.
-          delete process.env.EM_TEST_MODE;
+          delete process.env.OMEGA_TEST_MODE;
           m.config.em.environment = 'development';
           ctx.expect(m.getEnvironment()).toBe('development');
           m.config.em.environment = 'production';
           ctx.expect(m.getEnvironment()).toBe('production');
         } finally {
           m.config.em.environment = orig;
-          if (origTest === undefined) delete process.env.EM_TEST_MODE; else process.env.EM_TEST_MODE = origTest;
+          if (origTest === undefined) delete process.env.OMEGA_TEST_MODE; else process.env.OMEGA_TEST_MODE = origTest;
         }
       },
     },
     {
       // In the MAIN process, app.isPackaged is the authoritative signal and beats the
-      // EM_BUILD_MODE fallback. The test harness is unpackaged, so once testing + config are
+      // OMEGA_BUILD_MODE fallback. The test harness is unpackaged, so once testing + config are
       // cleared, getEnvironment() resolves to 'development' from app.isPackaged === false —
-      // regardless of EM_BUILD_MODE. (The EM_BUILD_MODE fallback only applies where `app` is
+      // regardless of OMEGA_BUILD_MODE. (The OMEGA_BUILD_MODE fallback only applies where `app` is
       // unavailable: renderer / preload / plain Node — covered by the build-layer manager test.)
-      name: 'getEnvironment: app.isPackaged (unpackaged → development) wins over EM_BUILD_MODE in main',
+      name: 'getEnvironment: app.isPackaged (unpackaged → development) wins over OMEGA_BUILD_MODE in main',
       run: (ctx) => {
         const m = ctx.manager;
         const origEnv  = m.config?.em?.environment;
-        const origBuild = process.env.EM_BUILD_MODE;
-        const origTest = process.env.EM_TEST_MODE;
+        const origBuild = process.env.OMEGA_BUILD_MODE;
+        const origTest = process.env.OMEGA_TEST_MODE;
         if (m.config.em) delete m.config.em.environment;
-        delete process.env.EM_TEST_MODE; // isolate from testing precedence
+        delete process.env.OMEGA_TEST_MODE; // isolate from testing precedence
         try {
-          // Unpackaged harness → 'development' even with EM_BUILD_MODE set (app.isPackaged wins).
-          process.env.EM_BUILD_MODE = 'true';
+          // Unpackaged harness → 'development' even with OMEGA_BUILD_MODE set (app.isPackaged wins).
+          process.env.OMEGA_BUILD_MODE = 'true';
           ctx.expect(m.getEnvironment()).toBe('development');
-          delete process.env.EM_BUILD_MODE;
+          delete process.env.OMEGA_BUILD_MODE;
           ctx.expect(m.getEnvironment()).toBe('development');
         } finally {
           if (origEnv !== undefined) m.config.em.environment = origEnv;
-          if (origBuild !== undefined) process.env.EM_BUILD_MODE = origBuild;
-          else delete process.env.EM_BUILD_MODE;
-          if (origTest !== undefined) process.env.EM_TEST_MODE = origTest;
+          if (origBuild !== undefined) process.env.OMEGA_BUILD_MODE = origBuild;
+          else delete process.env.OMEGA_BUILD_MODE;
+          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
         }
       },
     },
@@ -261,14 +261,14 @@ module.exports = {
       run: (ctx) => {
         const m = ctx.manager;
         const origEnv = m.config.em?.environment;
-        const origTest = process.env.EM_TEST_MODE;
+        const origTest = process.env.OMEGA_TEST_MODE;
         m.config.em = m.config.em || {};
         m.config.brand = m.config.brand || {};
         const origUrl = m.config.brand.url;
         m.config.brand.url = 'https://example.com';
-        // Clear EM_TEST_MODE so the config override is exercised — otherwise testing wins
+        // Clear OMEGA_TEST_MODE so the config override is exercised — otherwise testing wins
         // (correctly) and every URL resolves local regardless of config.
-        delete process.env.EM_TEST_MODE;
+        delete process.env.OMEGA_TEST_MODE;
         try {
           m.config.em.environment = 'development';
           ctx.expect(m.getWebsiteUrl()).toBe('https://localhost:4000');
@@ -277,7 +277,7 @@ module.exports = {
         } finally {
           if (origEnv !== undefined) m.config.em.environment = origEnv;
           else delete m.config.em.environment;
-          if (origTest !== undefined) process.env.EM_TEST_MODE = origTest;
+          if (origTest !== undefined) process.env.OMEGA_TEST_MODE = origTest;
           m.config.brand.url = origUrl;
         }
       },

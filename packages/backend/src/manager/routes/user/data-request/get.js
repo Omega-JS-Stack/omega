@@ -5,7 +5,7 @@
  * action=download: Compiles user data live and returns it. Only works when status is 'completed'.
  *
  * Statuses:
- *   pending   — request submitted, waiting to be processed (bm_cronDaily sets to 'completed' after 14 days)
+ *   pending   — request submitted, waiting to be processed (omega_cronDaily sets to 'completed' after 14 days)
  *   completed — data is available for download (downloads counter tracks how many times downloaded)
  */
 module.exports = async ({ assistant, Manager, user, settings, libraries }) => {

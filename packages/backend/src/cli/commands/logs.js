@@ -56,7 +56,7 @@ class LogsCommand extends BaseCommand {
 
   /**
    * Fetch historical logs.
-   * Usage: npx bm logs:read [--fn bm_api] [--severity ERROR] [--since 1h] [--limit 300] [--search "text"] [--order desc] [--filter 'raw gcloud filter']
+   * Usage: npx bm logs:read [--fn omega_api] [--severity ERROR] [--since 1h] [--limit 300] [--search "text"] [--order desc] [--filter 'raw gcloud filter']
    */
   async read(projectId, argv) {
     const filter = this.buildFilter(argv);
@@ -117,7 +117,7 @@ class LogsCommand extends BaseCommand {
 
   /**
    * Poll for live logs by repeatedly running gcloud logging read.
-   * Usage: npx bm logs:tail [--fn bm_api] [--severity ERROR] [--interval 5]
+   * Usage: npx bm logs:tail [--fn omega_api] [--severity ERROR] [--interval 5]
    */
   async tail(projectId, argv) {
     const interval = (parseInt(argv.interval, 10) || 5) * 1000;

@@ -164,13 +164,13 @@ class EmulatorCommand extends BaseCommand {
 
     this.log(chalk.gray(`  Logs saving to: ${logPath}`));
 
-    // BEM_TESTING=true is passed so Functions skip external API calls (emails, SendGrid)
-    // hosting is included so localhost:5002 rewrites work (e.g., /backend-manager -> bm_api)
-    // pubsub is included so scheduled functions (bm_cronDaily) can be triggered in tests
+    // OMEGA_TEST_MODE=true is passed so Functions skip external API calls (emails, SendGrid)
+    // hosting is included so localhost:5002 rewrites work (e.g., /omega -> omega_api)
+    // pubsub is included so scheduled functions (omega_cronDaily) can be triggered in tests
     const env = {
       ...process.env,
       FORCE_COLOR: '1',
-      BEM_TESTING: 'true',
+      OMEGA_TEST_MODE: 'true',
     };
 
     // Spawn `firebase emulators:start` as a background child. Use `sh -c` so the

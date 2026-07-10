@@ -59,10 +59,10 @@ The `inspect` function receives:
 2. Aggregates each test's `inspect` source body into a JSON spec file.
 3. Spawns a real Electron process: `electron <projectRoot>` — same as `npm start` does.
 4. Sets three env vars before spawn:
-   - `EM_TEST_BOOT=1` — gate
-   - `EM_TEST_BOOT_HARNESS=<absolute path to dist/test/harness/boot-entry.js>`
-   - `EM_TEST_BOOT_SPEC=<temp file with test definitions>`
-5. @omega.js/desktop's `main.js` boots normally; after `manager.initialize()` resolves, detects `EM_TEST_BOOT=1`, reconstitutes each `inspect` from its serialized body string, runs them sequentially, and emits `__EM_TEST__` JSON lines on stdout.
+   - `OMEGA_TEST_BOOT=1` — gate
+   - `OMEGA_TEST_BOOT_HARNESS=<absolute path to dist/test/harness/boot-entry.js>`
+   - `OMEGA_TEST_BOOT_SPEC=<temp file with test definitions>`
+5. @omega.js/desktop's `main.js` boots normally; after `manager.initialize()` resolves, detects `OMEGA_TEST_BOOT=1`, reconstitutes each `inspect` from its serialized body string, runs them sequentially, and emits `__EM_TEST__` JSON lines on stdout.
 6. Test runner parses results, calls `app.exit()`. **No sleep, no kill.**
 
 ## Running
@@ -75,7 +75,7 @@ npx omega test
 npx omega test --layer boot
 
 # With debug output (shows electron's stderr + harness internals)
-EM_TEST_DEBUG=1 npx omega test --layer boot
+OMEGA_TEST_DEBUG=1 npx omega test --layer boot
 ```
 
 ## Prerequisites
@@ -85,10 +85,10 @@ Boot tests run against `dist/main.bundle.js`. **The runner always rebuilds it fi
 Opt out for CI scenarios where build already ran in a separate step:
 
 ```bash
-EM_TEST_SKIP_BUILD=1 npx omega test --layer boot
+OMEGA_TEST_SKIP_BUILD=1 npx omega test --layer boot
 ```
 
-When `EM_TEST_SKIP_BUILD=1` is set and the bundle is missing, boot tests are skipped with a warning instead of running against nothing.
+When `OMEGA_TEST_SKIP_BUILD=1` is set and the bundle is missing, boot tests are skipped with a warning instead of running against nothing.
 
 ## Self-test from the framework repo (the bundled fixture)
 
@@ -97,9 +97,9 @@ Everything above describes a **consumer** running boot tests against their own `
 When `npx omega test` runs from the @omega.js/desktop repo (the cwd's `package.json` name is `@omega.js/desktop`), two complementary mechanisms engage:
 
 - **`isFrameworkSelfTest`** (in [src/test/runner.js](../src/test/runner.js)) — test discovery includes the framework's own `boot/**` suites. For a real consumer this flag is false and framework `boot/**` suites are **excluded** (they target @omega.js/desktop's fixture, not the consumer's app), so they never run in a consumer's `npx omega test`.
-- **`EM_TEST_BOOT_PROJECT`** — [src/commands/test.js](../src/commands/test.js) points the boot runner at the bundled fixture under `src/test/fixtures/consumer-app/` instead of the cwd.
+- **`OMEGA_TEST_BOOT_PROJECT`** — [src/commands/test.js](../src/commands/test.js) points the boot runner at the bundled fixture under `src/test/fixtures/consumer-app/` instead of the cwd.
 
-The gate decides *whether* the framework boot suite runs; the env var decides *which project* gets booted. (@omega.js/backend's `BEM_TEST_BOOT_PROJECT`, BXM's `BXM_TEST_BOOT_PROJECT`, and UJM's `UJ_TEST_BOOT_PROJECT` are the exact analogs.)
+The gate decides *whether* the framework boot suite runs; the env var decides *which project* gets booted. (@omega.js/backend's `OMEGA_TEST_BOOT_PROJECT`, BXM's `OMEGA_TEST_BOOT_PROJECT`, and UJM's `UJ_TEST_BOOT_PROJECT` are the exact analogs.)
 
 ### The bundled fixture
 
@@ -113,11 +113,11 @@ The gate decides *whether* the framework boot suite runs; the env var decides *w
 
 The fixture is then **webpack-built into a real `dist/main.bundle.js`** and booted — the same production path a consumer's boot test exercises (bundled, not the unbundled lib code the `main` layer covers). The boot smoke lives at [src/test/suites/boot/consumer-app-boots.test.js](../src/test/suites/boot/consumer-app-boots.test.js).
 
-### `EM_TEST_BOOT_PROJECT`
+### `OMEGA_TEST_BOOT_PROJECT`
 
 | Env | Purpose |
 |---|---|
-| `EM_TEST_BOOT_PROJECT` | Root of a project to boot instead of the cwd. Auto-set to `src/test/fixtures/consumer-app` when @omega.js/desktop tests itself; set it explicitly to boot a **real consumer** (e.g. `deployment-playground-desktop`) without `cd`-ing into it. |
+| `OMEGA_TEST_BOOT_PROJECT` | Root of a project to boot instead of the cwd. Auto-set to `src/test/fixtures/consumer-app` when @omega.js/desktop tests itself; set it explicitly to boot a **real consumer** (e.g. `deployment-playground-desktop`) without `cd`-ing into it. |
 
 ### Why this exists
 

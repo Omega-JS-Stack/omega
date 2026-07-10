@@ -40,12 +40,12 @@ module.exports = {
       },
     },
     {
-      name: 'isTesting() reads BXM_TEST_MODE env var',
+      name: 'isTesting() reads OMEGA_TEST_MODE env var',
       run: (ctx) => {
-        withEnv({ BXM_TEST_MODE: 'true' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
           ctx.expect(helpers.isTesting()).toBe(true);
         });
-        withEnv({ BXM_TEST_MODE: null }, () => {
+        withEnv({ OMEGA_TEST_MODE: null }, () => {
           ctx.expect(helpers.isTesting()).toBe(false);
         });
       },
@@ -53,15 +53,15 @@ module.exports = {
     {
       name: 'isDevelopment() is true under NODE_ENV=development (and not testing)',
       run: (ctx) => {
-        withEnv({ NODE_ENV: 'development', BXM_BUILD_MODE: null, BXM_TEST_MODE: null }, () => {
+        withEnv({ NODE_ENV: 'development', OMEGA_BUILD_MODE: null, OMEGA_TEST_MODE: null }, () => {
           ctx.expect(helpers.isDevelopment()).toBe(true);
         });
       },
     },
     {
-      name: 'isDevelopment() is false / isProduction() true when BXM_BUILD_MODE=true (and not testing)',
+      name: 'isDevelopment() is false / isProduction() true when OMEGA_BUILD_MODE=true (and not testing)',
       run: (ctx) => {
-        withEnv({ NODE_ENV: null, BXM_BUILD_MODE: 'true', BXM_TEST_MODE: null }, () => {
+        withEnv({ NODE_ENV: null, OMEGA_BUILD_MODE: 'true', OMEGA_TEST_MODE: null }, () => {
           ctx.expect(helpers.isDevelopment()).toBe(false);
           ctx.expect(helpers.isProduction()).toBe(true);
         });
@@ -70,7 +70,7 @@ module.exports = {
     {
       name: 'testing takes precedence — is* are mutually exclusive (exactly one true)',
       run: (ctx) => {
-        withEnv({ BXM_TEST_MODE: 'true', BXM_BUILD_MODE: 'true' }, () => {
+        withEnv({ OMEGA_TEST_MODE: 'true', OMEGA_BUILD_MODE: 'true' }, () => {
           ctx.expect(helpers.isTesting()).toBe(true);
           ctx.expect(helpers.isDevelopment()).toBe(false);
           ctx.expect(helpers.isProduction()).toBe(false);
@@ -98,10 +98,10 @@ module.exports = {
       name: 'invariant: is*() exactly matches getEnvironment() + mutually exclusive (every scenario)',
       run: (ctx) => {
         const scenarios = [
-          { env: { BXM_TEST_MODE: 'true', BXM_BUILD_MODE: 'true', NODE_ENV: null }, expect: 'testing' },
-          { env: { BXM_TEST_MODE: null, BXM_BUILD_MODE: 'true', NODE_ENV: null },    expect: 'production' },
-          { env: { BXM_TEST_MODE: null, BXM_BUILD_MODE: null, NODE_ENV: 'development' }, expect: 'development' },
-          { env: { BXM_TEST_MODE: null, BXM_BUILD_MODE: null, NODE_ENV: null },       expect: 'development' }, // BXM defaults dev (unpacked)
+          { env: { OMEGA_TEST_MODE: 'true', OMEGA_BUILD_MODE: 'true', NODE_ENV: null }, expect: 'testing' },
+          { env: { OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: 'true', NODE_ENV: null },    expect: 'production' },
+          { env: { OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: null, NODE_ENV: 'development' }, expect: 'development' },
+          { env: { OMEGA_TEST_MODE: null, OMEGA_BUILD_MODE: null, NODE_ENV: null },       expect: 'development' }, // BXM defaults dev (unpacked)
         ];
         for (const s of scenarios) {
           withEnv(s.env, () => {

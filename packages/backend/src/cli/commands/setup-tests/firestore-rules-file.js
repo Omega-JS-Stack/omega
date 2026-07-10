@@ -2,7 +2,7 @@ const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
-const bem_allRulesRegex = /(\/\/\/---backend-manager---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
+const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
 const bem_allRulesBackupRegex = /({{\s*?@omega.js/backend\s*?}})/sgm;
 
 class FirestoreRulesFileTest extends BaseTest {
@@ -14,7 +14,7 @@ class FirestoreRulesFileTest extends BaseTest {
     const self = this.self;
     const exists = jetpack.exists(`${self.firebaseProjectPath}/firestore.rules`);
     const contents = jetpack.read(`${self.firebaseProjectPath}/firestore.rules`) || '';
-    const containsCore = contents.match(bem_allRulesRegex);
+    const containsCore = contents.match(omegaAllRulesRegex);
     const matchesVersion = contents.match(self.default.rulesVersionRegex);
 
     // Always run fix() to ensure rules are synced, even if version matches
@@ -37,7 +37,7 @@ class FirestoreRulesFileTest extends BaseTest {
       contents = jetpack.read(path) || '';
     }
 
-    const hasTemplate = contents.match(bem_allRulesRegex) || contents.match(bem_allRulesBackupRegex);
+    const hasTemplate = contents.match(omegaAllRulesRegex) || contents.match(bem_allRulesBackupRegex);
     if (!hasTemplate) {
       console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{@omega.js/backend}}`), chalk.red(`to it.`));
       return;
@@ -46,7 +46,7 @@ class FirestoreRulesFileTest extends BaseTest {
     // Always replace rules to ensure they're in sync with @omega.js/backend template
     const originalContents = contents;
     contents = contents.replace(bem_allRulesBackupRegex, self.default.firestoreRulesCore);
-    contents = contents.replace(bem_allRulesRegex, self.default.firestoreRulesCore);
+    contents = contents.replace(omegaAllRulesRegex, self.default.firestoreRulesCore);
 
     if (contents !== originalContents) {
       jetpack.write(path, contents);

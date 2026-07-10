@@ -11,7 +11,7 @@ async function reinit(ctx, env) {
   ctx.manager.storage.set(STORAGE_KEY, null);
 
   // Snapshot + override env for this run.
-  const saved = { EM_DEV_UPDATE: process.env.EM_DEV_UPDATE };
+  const saved = { OMEGA_DEV_UPDATE: process.env.OMEGA_DEV_UPDATE };
   for (const [k, v] of Object.entries(env || {})) {
     if (v == null) delete process.env[k];
     else process.env[k] = v;
@@ -49,7 +49,7 @@ module.exports = {
   cleanup: async (ctx) => {
     ctx.manager.autoUpdater.shutdown();
     ctx.manager.storage.set(STORAGE_KEY, null);
-    delete process.env.EM_DEV_UPDATE;
+    delete process.env.OMEGA_DEV_UPDATE;
     await ctx.manager.autoUpdater.initialize(ctx.manager);
   },
   tests: [
@@ -65,7 +65,7 @@ module.exports = {
     {
       name: 'dev simulation: available scenario walks state through downloaded',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
           await ctx.manager.autoUpdater.checkNow({ userInitiated: true });
           await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
@@ -81,7 +81,7 @@ module.exports = {
     {
       name: 'dev simulation: unavailable scenario lands in not-available',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'unavailable' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'unavailable' });
         try {
           await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
           await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'not-available');
@@ -95,7 +95,7 @@ module.exports = {
     {
       name: 'dev simulation: error scenario lands in error',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'error' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'error' });
         try {
           await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
           await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'error');
@@ -110,7 +110,7 @@ module.exports = {
     {
       name: 'first download persists pendingUpdate to storage',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
           await ctx.manager.autoUpdater.checkNow({ userInitiated: false });
           await waitFor(() => ctx.manager.autoUpdater.getStatus().code === 'downloaded', { timeout: 5000 });
@@ -125,7 +125,7 @@ module.exports = {
     {
       name: 'subsequent download does NOT reset downloadedAt — first download wins',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
           // Plant an older pending-update record manually.
           const oldTs = Date.now() - (10 * 24 * 60 * 60 * 1000);  // 10 days ago
@@ -202,7 +202,7 @@ module.exports = {
     {
       name: 'checkNow returns current status object',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'unavailable' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'unavailable' });
         try {
           const result = await ctx.manager.autoUpdater.checkNow();
           ctx.expect(typeof result.code).toBe('string');
@@ -430,7 +430,7 @@ module.exports = {
           u._userInitiated = false;
           u._lastActivityAt = Date.now() - (16 * 60 * 1000);
           const origIsSimulating = u._isSimulating;
-          u._isSimulating = () => true;   // simulate EM_DEV_UPDATE set
+          u._isSimulating = () => true;   // simulate OMEGA_DEV_UPDATE set
           try { u._evaluateIdleInstall(); } finally { u._isSimulating = origIsSimulating; }
           ctx.expect(installCalled).toBe(false);
           ctx.expect(promptCalls).toBe(0);
@@ -612,7 +612,7 @@ module.exports = {
       run: async (ctx) => {
         // The whole point of the new system: drive a real update through the dev simulator,
         // then exercise the post-download decision path with stubbed installNow.
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         const u = ctx.manager.autoUpdater;
         const origInstall = u.installNow;
         const origIsSimulating = u._isSimulating;
@@ -638,7 +638,7 @@ module.exports = {
     {
       name: 'full update sequence: download → user-active → prompt fires (no install)',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         const u = ctx.manager.autoUpdater;
         const origInstall = u.installNow;
         const origPrompt  = u._promptToInstall;
@@ -683,7 +683,7 @@ module.exports = {
     {
       name: 'real-time end-to-end: download fires, threshold elapses, install triggers via periodic tick',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         const u = ctx.manager.autoUpdater;
         const origInstall   = u.installNow;
         const origIsSimulating = u._isSimulating;
@@ -713,7 +713,7 @@ module.exports = {
     {
       name: 'real-time end-to-end: download fires while user-active → prompt fires, install does NOT',
       run: async (ctx) => {
-        const restore = await reinit(ctx, { EM_DEV_UPDATE: 'available' });
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         const u = ctx.manager.autoUpdater;
         const origInstall   = u.installNow;
         const origPrompt    = u._promptToInstall;
@@ -755,7 +755,7 @@ module.exports = {
     // ─── Mode helpers (@omega.js/backend-pattern: isDevelopment / isProduction / isTesting) ────
 
     {
-      name: 'manager.isTesting() returns true under EM_TEST_MODE (set by test runner)',
+      name: 'manager.isTesting() returns true under OMEGA_TEST_MODE (set by test runner)',
       run: (ctx) => {
         ctx.expect(typeof ctx.manager.isTesting).toBe('function');
         ctx.expect(ctx.manager.isTesting()).toBe(true);
@@ -764,7 +764,7 @@ module.exports = {
     {
       name: 'manager.isDevelopment() is false during tests (testing takes precedence)',
       run: (ctx) => {
-        // The test runs unpackaged, but EM_TEST_MODE=true → testing wins, so this is a
+        // The test runs unpackaged, but OMEGA_TEST_MODE=true → testing wins, so this is a
         // TEST environment, not development. isDevelopment() is therefore false.
         ctx.expect(typeof ctx.manager.isDevelopment).toBe('function');
         ctx.expect(ctx.manager.isDevelopment()).toBe(false);

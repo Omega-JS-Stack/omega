@@ -4,7 +4,7 @@
 
 The core `Manager` class (in `src/manager/index.js`) extends EventEmitter and orchestrates all functionality:
 - Initializes Firebase Admin SDK
-- Sets up built-in Cloud Functions (`bm_api`, auth events, cron)
+- Sets up built-in Cloud Functions (`omega_api`, auth events, cron)
 - Provides factory methods for helper classes
 - Manages configuration from multiple sources
 

@@ -35,17 +35,17 @@ module.exports = async function (options) {
   }
 
   // Canonical signal — every Manager picks this up via isTesting().
-  process.env.BXM_TEST_MODE = 'true';
+  process.env.OMEGA_TEST_MODE = 'true';
 
   // When BXM itself runs its own boot-layer tests (the cwd's package.json is
   // BXM's package.json), there's no real consumer extension to target. Point
   // the boot runner at the fixture under dist/test/fixtures/consumer-extension
-  // unless the caller has already set BXM_TEST_BOOT_PROJECT explicitly.
-  if (!process.env.BXM_TEST_BOOT_PROJECT) {
+  // unless the caller has already set OMEGA_TEST_BOOT_PROJECT explicitly.
+  if (!process.env.OMEGA_TEST_BOOT_PROJECT) {
     try {
       const cwdPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
       if (cwdPkg.name === '@omega.js/extension') {
-        process.env.BXM_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-extension');
+        process.env.OMEGA_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-extension');
       }
     } catch (_) { /* no package.json — leave unset */ }
   }

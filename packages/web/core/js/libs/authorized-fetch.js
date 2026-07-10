@@ -4,7 +4,7 @@ import omega from '@omega.js/client';
 
 /**
  * Makes an authorized API request with Firebase token.
- * Automatically extracts usage data from bm-properties response header
+ * Automatically extracts usage data from omega-properties response header
  * and updates omega bindings so data-wm-bind elements stay in sync.
  *
  * @param {string} url - The API endpoint URL
@@ -42,7 +42,7 @@ export async function authorizedFetch(url, options = {}) {
   // Make the request using wonderful-fetch
   const response = await fetch(url, requestOptions);
 
-  // Sync usage from bm-properties header into bindings
+  // Sync usage from omega-properties header into bindings
   _syncUsageFromHeaders(response.headers);
 
   // Return full response if caller requested it, otherwise just the body
@@ -50,19 +50,19 @@ export async function authorizedFetch(url, options = {}) {
 }
 
 /**
- * Sync usage data from bm-properties response header into the top-level
+ * Sync usage data from omega-properties response header into the top-level
  * `usage` bindings key (same key @omega.js/client seeds on auth settle).
  *
  * Merges fresh usage counters + limits so the structure becomes:
  *   { credits: { monthly: 5, daily: 2, limit: 100 } }
  */
 function _syncUsageFromHeaders(headers) {
-  const bmProps = headers?.['bm-properties'];
-  if (!bmProps?.usage) {
+  const omegaProps = headers?.['omega-properties'];
+  if (!omegaProps?.usage) {
     return;
   }
 
-  const { current, limits } = bmProps.usage;
+  const { current, limits } = omegaProps.usage;
   if (!current) {
     return;
   }

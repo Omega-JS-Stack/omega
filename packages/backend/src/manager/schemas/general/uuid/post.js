@@ -16,7 +16,7 @@ module.exports = () => ({
   },
   namespace: {
     types: ['string'],
-    default: process.env.BACKEND_MANAGER_NAMESPACE,
+    default: process.env.OMEGA_NAMESPACE,
     required: false,
   },
 });

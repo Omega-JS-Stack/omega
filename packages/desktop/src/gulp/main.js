@@ -27,10 +27,10 @@ if (sanitizedSigningKeys.length) {
 }
 
 // Tee all stdout/stderr to <projectRoot>/logs/<dev|build>.log for easy `tail -f` / grep / Claude
-// inspection. build.log for production builds/packages (EM_BUILD_MODE=true), dev.log for `npm start`.
-// Disable via EM_LOG_FILE=false. Override path via EM_LOG_FILE=<path>.
+// inspection. build.log for production builds/packages (OMEGA_BUILD_MODE=true), dev.log for `npm start`.
+// Disable via OMEGA_LOG_FILE=false. Override path via OMEGA_LOG_FILE=<path>.
 const attachLogFile = require('../utils/attach-log-file.js');
-const logFileEnv = process.env.EM_LOG_FILE;
+const logFileEnv = process.env.OMEGA_LOG_FILE;
 if (logFileEnv !== 'false' && logFileEnv !== '0') {
   const defaultName = Manager.isBuildMode() ? 'build.log' : 'dev.log';
   const logPath = (logFileEnv && logFileEnv !== 'true') ? logFileEnv : path.join(projectRoot, 'logs', defaultName);
@@ -62,7 +62,7 @@ const runConsumerHook = require('../utils/run-consumer-hook.js');
 function makeHookTask(name) {
   const fn = async () => {
     const Manager = new (require('../build.js'));
-    await runConsumerHook(name, { manager: Manager, projectRoot: process.cwd(), mode: process.env.EM_BUILD_MODE === 'true' ? 'production' : 'development' });
+    await runConsumerHook(name, { manager: Manager, projectRoot: process.cwd(), mode: process.env.OMEGA_BUILD_MODE === 'true' ? 'production' : 'development' });
   };
   // Set displayName for nicer gulp logs.
   Object.defineProperty(fn, 'name', { value: `hook:${name.replace('/', ':')}` });

@@ -21,7 +21,7 @@ module.exports = {
       },
     },
     {
-      name: 'isTesting() returns true (we are running under EM_TEST_MODE=true)',
+      name: 'isTesting() returns true (we are running under OMEGA_TEST_MODE=true)',
       run: (ctx) => {
         ctx.expect(window.__emTestManager.isTesting()).toBe(true);
       },
@@ -42,7 +42,7 @@ module.exports = {
         const dev  = window.__emTestManager.isDevelopment();
         const test = window.__emTestManager.isTesting();
         const prod = window.__emTestManager.isProduction();
-        // We run under EM_TEST_MODE=true → testing wins; dev and prod are both false.
+        // We run under OMEGA_TEST_MODE=true → testing wins; dev and prod are both false.
         ctx.expect(test).toBe(true);
         ctx.expect(dev).toBe(false);
         ctx.expect(prod).toBe(false);
@@ -60,9 +60,9 @@ module.exports = {
       },
     },
     {
-      name: 'getEnvironment(): testing (EM_TEST_MODE) takes precedence over config.em.environment',
+      name: 'getEnvironment(): testing (OMEGA_TEST_MODE) takes precedence over config.em.environment',
       run: (ctx) => {
-        // The test runner sets EM_TEST_MODE=true, which wins over any config override —
+        // The test runner sets OMEGA_TEST_MODE=true, which wins over any config override —
         // getEnvironment() always reports 'testing' here regardless of em.environment.
         window.__emTestManager.setConfig('em.environment', 'production');
         ctx.expect(window.__emTestManager.getEnvironment()).toBe('testing');
@@ -114,7 +114,7 @@ module.exports = {
     {
       name: 'getWebsiteUrl: no-arg resolves local under testing; explicit arg overrides',
       run: (ctx) => {
-        // The renderer always runs under EM_TEST_MODE (testing wins), so the no-arg form
+        // The renderer always runs under OMEGA_TEST_MODE (testing wins), so the no-arg form
         // correctly resolves LOCAL regardless of config — that's the safety guarantee.
         window.__emTestManager.setConfig('em.environment', 'production');
         ctx.expect(window.__emTestManager.getWebsiteUrl()).toBe('https://localhost:4000');

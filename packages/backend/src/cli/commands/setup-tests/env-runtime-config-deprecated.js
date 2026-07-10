@@ -34,8 +34,8 @@ class EnvRuntimeConfigDeprecatedTest extends BaseTest {
     throw new Error(
       'RUNTIME_CONFIG is deprecated and must be manually migrated.\n' +
       '  The new format uses individual environment variables:\n' +
-      '    BACKEND_MANAGER_KEY=\n' +
-      '    BACKEND_MANAGER_NAMESPACE=\n' +
+      '    OMEGA_ADMIN_KEY=\n' +
+      '    OMEGA_NAMESPACE=\n' +
       '    GH_TOKEN=\n' +
       '  Please update your .env file manually and remove RUNTIME_CONFIG.'
     );

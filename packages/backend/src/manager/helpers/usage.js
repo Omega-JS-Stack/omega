@@ -50,7 +50,7 @@ Usage.prototype.init = function (assistant, options) {
     }
 
     // Add @omega.js/backend to whitelist keys
-    options.whitelistKeys.push(process.env.BACKEND_MANAGER_KEY);
+    options.whitelistKeys.push(process.env.OMEGA_ADMIN_KEY);
 
     // Set options
     self.options = options;

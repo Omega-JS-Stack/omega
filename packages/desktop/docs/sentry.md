@@ -8,7 +8,7 @@ Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry
 sentry: {
   enabled:          true,                    // default true
   dsn:              'https://...@sentry.io/0',
-  environment:      null,                    // null = auto-detect ('production' if EM_BUILD_MODE=true, else 'development')
+  environment:      null,                    // null = auto-detect ('production' if OMEGA_BUILD_MODE=true, else 'development')
   tracesSampleRate: 0.1,
   attachScreenshot: false,
 }
@@ -19,10 +19,10 @@ sentry: {
 Sentry is **disabled** in any of these cases:
 - `config.sentry.enabled === false`
 - `config.sentry.dsn` is empty
-- `EM_SENTRY_ENABLED=false` env var
-- Running in development mode (`EM_BUILD_MODE` is not `'true'`) **AND** `EM_SENTRY_FORCE` is not `'true'`
+- `OMEGA_SENTRY_ENABLED=false` env var
+- Running in development mode (`OMEGA_BUILD_MODE` is not `'true'`) **AND** `OMEGA_SENTRY_FORCE` is not `'true'`
 
-This means dev builds don't pollute your Sentry project with spurious errors. Override with `EM_SENTRY_FORCE=true npm start` if you want to test sentry locally.
+This means dev builds don't pollute your Sentry project with spurious errors. Override with `OMEGA_SENTRY_FORCE=true npm start` if you want to test sentry locally.
 
 ## Per-context architecture
 

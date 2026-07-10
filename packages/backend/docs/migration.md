@@ -10,8 +10,8 @@ Convert old config formats (runtime config / nested JSON) into individual top-le
 
 | Old Path | New ENV Key |
 |----------|-------------|
-| `backend_manager.key` or `backendmanager.key` | `BACKEND_MANAGER_KEY` |
-| `backend_manager.namespace` or `backendmanager.namespace` | `BACKEND_MANAGER_NAMESPACE` |
+| `backend_manager.key` or `backendmanager.key` | `OMEGA_ADMIN_KEY` |
+| `backend_manager.namespace` or `backendmanager.namespace` | `OMEGA_NAMESPACE` |
 | `github.key` or `github.token` | `GITHUB_TOKEN` |
 | `openai.key` or `openai.api_key` | `OPENAI_API_KEY` |
 | `paypal.client_id` | `PAYPAL_CLIENT_ID` |
@@ -61,8 +61,8 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | `Manager.config.recaptcha.secret_key` | `process.env.RECAPTCHA_SECRET_KEY` |
 | `Manager.config.beehiiv.api_key` | `process.env.BEEHIIV_API_KEY` |
 | `Manager.config.zerobounce.api_key` | `process.env.ZEROBOUNCE_API_KEY` |
-| `Manager.config.backend_manager.key` | `process.env.BACKEND_MANAGER_KEY` |
-| `Manager.config.backend_manager.namespace` | `process.env.BACKEND_MANAGER_NAMESPACE` |
+| `Manager.config.backend_manager.key` | `process.env.OMEGA_ADMIN_KEY` |
+| `Manager.config.backend_manager.namespace` | `process.env.OMEGA_NAMESPACE` |
 
 ## Part 3: Route/Schema Migration
 

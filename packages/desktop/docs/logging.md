@@ -175,8 +175,8 @@ To dial down via env vars (useful in CI to silence verbose framework noise):
 
 | Var | Effect |
 |---|---|
-| `EM_LOG_LEVEL_FILE=warn` | Only `warn` + `error` reach the file |
-| `EM_LOG_LEVEL_CONSOLE=error` | Only `error` reaches stdout/stderr |
+| `OMEGA_LOG_LEVEL_FILE=warn` | Only `warn` + `error` reach the file |
+| `OMEGA_LOG_LEVEL_CONSOLE=error` | Only `error` reaches stdout/stderr |
 
 Default is `silly` (everything) on both.
 
@@ -205,12 +205,12 @@ Five separate logs in `<projectRoot>/logs/`:
 |---|---|---|
 | `runtime.log` | Packaged-app runtime in dev mode | Truncated each boot |
 | `dev.log` | Gulp pipeline + spawned Electron child stdout (`npm start`) | Truncated each `npm start` |
-| `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `EM_BUILD_MODE=true`) | Truncated each build |
+| `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
 | `ci.log` | GH Actions release run output (streamed locally during `npm run release`) | Truncated each release run |
 | `signing.log` | JSONL signing events from Windows code-signing (local dev fallback; on CI this writes to the runner home as `em-signing.log` instead) | Appended (not truncated) |
 
-`dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `EM_BUILD_MODE`, so they never both fill up in one run. (Disable the tee with `EM_LOG_FILE=false`; override its path with `EM_LOG_FILE=<path>`.)
+`dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `OMEGA_BUILD_MODE`, so they never both fill up in one run. (Disable the tee with `OMEGA_LOG_FILE=false`; override its path with `OMEGA_LOG_FILE=<path>`.)
 
 They serve different purposes and don't overlap — `dev.log`/`build.log` show you "is webpack still bundling?", `test.log` shows you "which test failed on the last run?", `ci.log` shows you "did the release workflow pass?", `runtime.log` shows you "is my app's auto-updater finding the right release feed?". All useful.
 

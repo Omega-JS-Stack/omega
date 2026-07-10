@@ -8,7 +8,7 @@ const powertools = require('node-powertools');
  *
  * Query params:
  *   - provider: alert provider name (default: 'chargeblast')
- *   - key: must match BACKEND_MANAGER_WEBHOOK_KEY
+ *   - key: must match OMEGA_WEBHOOK_KEY
  */
 module.exports = async ({ assistant, Manager, libraries }) => {
   const { admin } = libraries;
@@ -17,7 +17,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
 
   // Validate key
   const key = query.key;
-  if (!key || key !== process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
+  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 

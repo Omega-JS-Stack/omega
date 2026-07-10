@@ -50,7 +50,7 @@ async function handleMcpRoute(req, res, options) {
   // issuer = root (no path) so RFC 8414 discovery resolves to /.well-known/oauth-authorization-server
   if (routePath === '.well-known/oauth-protected-resource') {
     return sendJson(res, 200, {
-      resource: `${baseUrl}/backend-manager/mcp`,
+      resource: `${baseUrl}/omega/mcp`,
       authorization_servers: [baseUrl],
     });
   }
@@ -58,9 +58,9 @@ async function handleMcpRoute(req, res, options) {
   if (routePath === '.well-known/oauth-authorization-server') {
     return sendJson(res, 200, {
       issuer: baseUrl,
-      authorization_endpoint: `${baseUrl}/backend-manager/mcp/authorize`,
-      token_endpoint: `${baseUrl}/backend-manager/mcp/token`,
-      registration_endpoint: `${baseUrl}/backend-manager/mcp/register`,
+      authorization_endpoint: `${baseUrl}/omega/mcp/authorize`,
+      token_endpoint: `${baseUrl}/omega/mcp/token`,
+      registration_endpoint: `${baseUrl}/omega/mcp/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
@@ -473,7 +473,7 @@ async function handleMcpProtocol(req, res, options) {
 // --- Helpers ---
 
 function isAdminKey(key) {
-  const configKey = process.env.BACKEND_MANAGER_KEY || '';
+  const configKey = process.env.OMEGA_ADMIN_KEY || '';
   return !!key && !!configKey && key === configKey;
 }
 

@@ -121,7 +121,7 @@ export default function () {
 
   // Generate custom token via @omega.js/backend API
   async function generateCustomToken() {
-    const serverApiURL = `${omega.getApiUrl()}/backend-manager/user/token`;
+    const serverApiURL = `${omega.getApiUrl()}/omega/user/token`;
 
     const response = await authorizedFetch(serverApiURL, {
       method: 'POST',

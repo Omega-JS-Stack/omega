@@ -41,7 +41,7 @@ async function writeArticle({ brand, description, links, sourceContent, override
   const o = overrides || {};
 
   const body = {
-    backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+    backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     keywords: o.keywords || [],
     description: description,
     insertLinks: o.insertLinks ?? true,
@@ -142,7 +142,7 @@ async function publishArticle(assistant, { brand, article, id, author, postPath,
   const body = article.json ? post.body : article.body;
 
   const postBody = {
-    backendManagerKey: process.env.BACKEND_MANAGER_KEY,
+    backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     title: title,
     url: title,
     description: article.description,
@@ -160,7 +160,7 @@ async function publishArticle(assistant, { brand, article, id, author, postPath,
 
   console.log(`[ghostii] publishArticle() source=${postBody.source}`);
 
-  const result = await fetch(`${apiUrl}/backend-manager/admin/post`, {
+  const result = await fetch(`${apiUrl}/omega/admin/post`, {
     method: 'POST',
     timeout: 90000,
     tries: 1,

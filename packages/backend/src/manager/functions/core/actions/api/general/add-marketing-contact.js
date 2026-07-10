@@ -115,7 +115,7 @@ Module.prototype.main = function () {
     let providerResults = {};
 
     if (!shouldCallExternalAPIs) {
-      assistant.log('add-marketing-contact: Skipping providers (BEM_TESTING=true, TEST_EXTENDED_MODE not set)');
+      assistant.log('add-marketing-contact: Skipping providers (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)');
     } else {
       const mailer = Manager.Email(assistant);
       providerResults = await mailer.add({

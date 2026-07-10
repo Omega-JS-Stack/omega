@@ -1,6 +1,6 @@
 // Renderer-process Manager singleton.
 // Consumer entry (per view): `new (require('@omega.js/desktop/renderer'))().initialize()`.
-// Reads window.EM_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps @omega.js/client + auth.
+// Reads window.OMEGA_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps @omega.js/client + auth.
 //
 // Auth bridge:
 //   - On init, asks main "I'm at UID X (or null), are we in sync?" via desktop:auth:sync-request.
@@ -32,9 +32,9 @@ Manager.prototype.initialize = async function (overrides) {
   const self = this;
 
   // Merge runtime overrides on top of build-time config.
-  // EM_BUILD_JSON is injected by webpack DefinePlugin; the BannerPlugin also makes it
-  // available on globalThis.EM_BUILD_JSON for DevTools introspection.
-  const buildJson = (typeof EM_BUILD_JSON !== 'undefined' && EM_BUILD_JSON) || {};
+  // OMEGA_BUILD_JSON is injected by webpack DefinePlugin; the BannerPlugin also makes it
+  // available on globalThis.OMEGA_BUILD_JSON for DevTools introspection.
+  const buildJson = (typeof OMEGA_BUILD_JSON !== 'undefined' && OMEGA_BUILD_JSON) || {};
   self.config = Object.assign({}, buildJson.config || {}, overrides || {});
 
   self.logger.log('Initializing @omega.js/desktop (renderer)...');

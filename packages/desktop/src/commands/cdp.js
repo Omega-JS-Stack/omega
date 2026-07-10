@@ -10,9 +10,9 @@
 //   npx omega cdp relaunch                        # quit → npm start → wait for boot
 //   npx omega cdp quit                            # quit + wait for the process tree to drain
 //
-// All subcommands read EM_CDP_PORT (default 9222) — the same env var `npm
+// All subcommands read OMEGA_CDP_PORT (default 9222) — the same env var `npm
 // start` uses to open the endpoint — or take `--port <n>` (which wins).
-// `--port` exists for npm scripts: prefixing `npx cross-env EM_CDP_PORT=…`
+// `--port` exists for npm scripts: prefixing `npx cross-env OMEGA_CDP_PORT=…`
 // MANGLES quoted eval expressions (cross-env strips inner quotes), so a
 // pinned-port script must pass the port as a flag instead. Targets are
 // matched by URL substring (the main window is always `/views/main/`).
@@ -23,7 +23,7 @@ const path = require('path');
 const SUBCOMMANDS = ['status', 'eval', 'shot', 'capture', 'theme', 'relaunch', 'quit'];
 
 const USAGE = [
-  'Usage: npx omega cdp <subcommand> [--port <n>]   (port default: EM_CDP_PORT or 9222)',
+  'Usage: npx omega cdp <subcommand> [--port <n>]   (port default: OMEGA_CDP_PORT or 9222)',
   '  status                       app up? targets, window rect, theme',
   "  eval <match> '<expr>'        evaluate JS in the matched webContents",
   '  shot <match> <out.png>       per-renderer screenshot',
@@ -43,9 +43,9 @@ module.exports = async function (options) {
     throw new Error(sub ? `Unknown cdp subcommand "${sub}"` : 'Missing cdp subcommand');
   }
 
-  // --port overrides EM_CDP_PORT for this invocation (client.js reads the env).
+  // --port overrides OMEGA_CDP_PORT for this invocation (client.js reads the env).
   if (options.port) {
-    process.env.EM_CDP_PORT = String(options.port);
+    process.env.OMEGA_CDP_PORT = String(options.port);
   }
 
   const handler = require(path.join(__dirname, 'cdp', `${sub}.js`));

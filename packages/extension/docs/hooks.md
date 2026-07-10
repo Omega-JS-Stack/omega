@@ -75,7 +75,7 @@ module.exports = async function (index) {
 ```js
 // hooks/build:post.js
 module.exports = async function (index) {
-  if (process.env.BXM_IS_PUBLISH !== 'true') return;   // only after real publish
+  if (process.env.OMEGA_IS_PUBLISH !== 'true') return;   // only after real publish
   await fetch('https://api.myservice.com/extension-released', {
     method: 'POST',
     body: JSON.stringify({ version: index.manifest.version }),

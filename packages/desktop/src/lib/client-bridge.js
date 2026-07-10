@@ -8,7 +8,7 @@
 //      instances can sign in with the SAME token.
 //   3. On every renderer load, the renderer asks main "I'm at UID X (or null)" via the
 //      desktop:auth:sync-request IPC. Main compares with its own UID and either does nothing,
-//      tells the renderer to sign out, or fetches a fresh custom token from /backend-manager
+//      tells the renderer to sign out, or fetches a fresh custom token from /omega
 //      and sends it to the renderer.
 //   4. Sign-out: any renderer can request sign-out via desktop:auth:sign-out. Main signs out
 //      its own Firebase + broadcasts desktop:auth:sign-out to all renderers.
@@ -315,13 +315,13 @@ const bridge = {
   },
 
   // Fetch a fresh custom token for the currently-signed-in user.
-  // Mirrors BXM: POST <apiUrl>/backend-manager with command 'user:create-custom-token'.
+  // Mirrors BXM: POST <apiUrl>/omega with command 'user:create-custom-token'.
   async _fetchCustomToken(user) {
     const apiUrl = bridge._manager.getApiUrl();
 
     const idToken = await user.getIdToken(true);
 
-    const res = await fetch(`${apiUrl}/backend-manager`, {
+    const res = await fetch(`${apiUrl}/omega`, {
       method: 'POST',
       headers: {
         'Content-Type':  'application/json',

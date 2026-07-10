@@ -67,7 +67,7 @@ class TestRunner {
     }
 
     // Set testing flag to skip external API calls (emails, SendGrid)
-    process.env.BEM_TESTING = 'true';
+    process.env.OMEGA_TEST_MODE = 'true';
 
     this.results.startTime = Date.now();
 
@@ -87,7 +87,7 @@ class TestRunner {
     }
 
     // Health check (use basic http client without accounts)
-    // Use hosting URL for all requests (rewrites to bm_api function)
+    // Use hosting URL for all requests (rewrites to omega_api function)
     const healthHttp = new HttpClient({
       apiUrl: this.options.apiUrl,
       timeout: this.options.timeout,
@@ -141,19 +141,19 @@ class TestRunner {
   validateConfig() {
     if (!this.options.apiUrl) {
       console.log(chalk.red('  ✗ Missing apiUrl'));
-      console.log(chalk.gray('    Set BEM_API_URL environment variable or pass --url flag'));
+      console.log(chalk.gray('    Set OMEGA_API_URL environment variable or pass --url flag'));
       return false;
     }
 
     if (!this.options.backendManagerKey) {
       console.log(chalk.red('  ✗ Missing backendManagerKey'));
-      console.log(chalk.gray('    Set BEM_BACKEND_MANAGER_KEY environment variable or pass --key flag'));
+      console.log(chalk.gray('    Set OMEGA_ADMIN_KEY environment variable or pass --key flag'));
       return false;
     }
 
     if (!this.options.backendManagerWebhookKey) {
       console.log(chalk.red('  ✗ Missing backendManagerWebhookKey'));
-      console.log(chalk.gray('    Set BEM_BACKEND_MANAGER_WEBHOOK_KEY environment variable or pass --webhook-key flag'));
+      console.log(chalk.gray('    Set OMEGA_WEBHOOK_KEY environment variable or pass --webhook-key flag'));
       return false;
     }
 
@@ -179,7 +179,7 @@ class TestRunner {
     process.stdout.write(chalk.gray('  Checking server health... '));
 
     try {
-      const response = await http.get('backend-manager/test/health');
+      const response = await http.get('omega/test/health');
 
       if (response.success) {
         console.log(chalk.green('✓'));
@@ -854,7 +854,7 @@ class TestRunner {
    */
   createContext(auth, state) {
     // Create HTTP client with accounts for as() method
-    // Use hosting URL for all requests (rewrites to bm_api function)
+    // Use hosting URL for all requests (rewrites to omega_api function)
     const http = new HttpClient({
       apiUrl: this.options.apiUrl,
       timeout: this.options.timeout,
@@ -930,7 +930,7 @@ class TestRunner {
       pubsub,
       skip,
       admin: this.config.admin,
-      // Real @omega.js/backend Manager + assistant, booted by run-tests.js with BEM_TEST_RUNNER=1.
+      // Real @omega.js/backend Manager + assistant, booted by run-tests.js with OMEGA_TEST_RUNNER=1.
       // Tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
       // like production code — no stubs.
       Manager: this.config.Manager,
@@ -1040,7 +1040,7 @@ class TestRunner {
     return {
       /**
        * Trigger a Firebase scheduled function via PubSub
-       * @param {string} functionName - The function name (e.g., 'bm_cronDaily')
+       * @param {string} functionName - The function name (e.g., 'omega_cronDaily')
        * @returns {Promise<string>} The message ID
        */
       async trigger(functionName) {

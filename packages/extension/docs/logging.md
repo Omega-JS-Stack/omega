@@ -9,10 +9,10 @@ All in `<projectRoot>/logs/`:
 | File | Source | Lifetime |
 |---|---|---|
 | `dev.log` | Gulp pipeline output on `npm start` | Truncated each run |
-| `build.log` | Gulp pipeline output on `npm run build` (`BXM_BUILD_MODE=true`) | Truncated each run |
+| `build.log` | Gulp pipeline output on `npm run build` (`OMEGA_BUILD_MODE=true`) | Truncated each run |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, timings) | Truncated each run |
 
-`dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `BXM_BUILD_MODE`, so they never both fill up in one run.
+`dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `OMEGA_BUILD_MODE`, so they never both fill up in one run.
 
 ## What gets captured
 
@@ -22,8 +22,8 @@ Everything that flows through stdout/stderr: `Manager.logger(...)` output, raw `
 
 | Var | Effect |
 |---|---|
-| `BXM_LOG_FILE=false` | Disable the tee entirely |
-| `BXM_LOG_FILE=<path>` | Override the log file path |
+| `OMEGA_LOG_FILE=false` | Disable the tee entirely |
+| `OMEGA_LOG_FILE=<path>` | Override the log file path |
 
 Implementation: [src/utils/attach-log-file.js](../src/utils/attach-log-file.js), attached at the top of [src/gulp/main.js](../src/gulp/main.js) — same pattern as EM's `dev.log`/`build.log` and UJM's.
 

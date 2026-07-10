@@ -342,7 +342,7 @@ function OpenAI(assistant, key) {
     || self.Manager?.config?.openai?.global
     || self.Manager?.config?.openai?.main
     || process.env.OPENAI_API_KEY
-    || process.env.BACKEND_MANAGER_OPENAI_API_KEY
+    || process.env.OMEGA_OPENAI_API_KEY
 
   self.tokens = {
     total: {

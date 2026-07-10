@@ -104,7 +104,7 @@ Upload the `.zip` files under `packaged/<browser>/` to each browser's extension 
 ### Automatic publishing
 
 ```bash
-BXM_IS_PUBLISH=true npm run build
+OMEGA_IS_PUBLISH=true npm run build
 ```
 
 Add store credentials to your `.env`:

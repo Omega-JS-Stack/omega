@@ -81,13 +81,13 @@ Manager.prototype.reportBuildError = Manager.reportBuildError;
 
 // isBuildMode: checks if the build mode is enabled
 Manager.isBuildMode = function () {
-  return process.env.BXM_BUILD_MODE === 'true';
+  return process.env.OMEGA_BUILD_MODE === 'true';
 }
 Manager.prototype.isBuildMode = Manager.isBuildMode;
 
 // actLikeProduction - determines if we should act like production mode
 Manager.actLikeProduction = function () {
-  return Boolean(Manager.isBuildMode() || process.env.UJ_AUDIT_FORCE === 'true');
+  return Boolean(Manager.isBuildMode() || process.env.OMEGA_AUDIT_FORCE === 'true');
 }
 Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 
@@ -149,10 +149,10 @@ Manager.prototype.getRootPath = Manager.getRootPath;
 // getLiveReloadPort: (35729)
 Manager.getLiveReloadPort = function () {
   // Check if the port is set in the environment
-  process.env.BXM_LIVERELOAD_PORT = process.env.BXM_LIVERELOAD_PORT || 35729;
+  process.env.OMEGA_LIVERELOAD_PORT = process.env.OMEGA_LIVERELOAD_PORT || 35729;
 
   // Return the port
-  return parseInt(process.env.BXM_LIVERELOAD_PORT);
+  return parseInt(process.env.OMEGA_LIVERELOAD_PORT);
 }
 Manager.prototype.getLiveReloadPort = Manager.getLiveReloadPort;
 

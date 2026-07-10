@@ -352,7 +352,7 @@ function setupMobileEmailForms() {
       console.log('Mobile email form submitted:', { platform, email: data.email });
 
       // Get API endpoint
-      const apiEndpoint = `${omega.getApiUrl()}/backend-manager/general/email`;
+      const apiEndpoint = `${omega.getApiUrl()}/omega/general/email`;
 
       // Send request using wonderful-fetch
       await fetch(apiEndpoint, {

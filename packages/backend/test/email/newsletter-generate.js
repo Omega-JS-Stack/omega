@@ -71,9 +71,9 @@
  *   NEWSLETTER_BEEHIIV_UPLOAD=1        After re-rendering, upload as a new Beehiiv draft (rare).
  *
  * AI mode requires:
- *   BACKEND_MANAGER_KEY   — authenticates with parent as admin
- *   OPENAI_API_KEY        — structure provider (or BACKEND_MANAGER_OPENAI_API_KEY)
- *   ANTHROPIC_API_KEY     — SVG provider (or BACKEND_MANAGER_ANTHROPIC_API_KEY)
+ *   OMEGA_ADMIN_KEY   — authenticates with parent as admin
+ *   OPENAI_API_KEY        — structure provider (or OMEGA_OPENAI_API_KEY)
+ *   ANTHROPIC_API_KEY     — SVG provider (or OMEGA_ANTHROPIC_API_KEY)
  *   PARENT_API_URL        — or set `parent` in config/omega.json5
  *
  * Fixture mode requires: nothing.
@@ -346,7 +346,7 @@ module.exports = {
           parentUrl,
           categories: newsletterConfig.categories || [],
           limit: parseInt(env.NEWSLETTER_LIMIT, 10) || 10,
-          key: env.BACKEND_MANAGER_KEY,
+          key: env.OMEGA_ADMIN_KEY,
         });
 
         console.log(`\nPeek mode — ${peeked.length} ready source(s):\n`);
@@ -372,7 +372,7 @@ module.exports = {
         newsletterConfig,
         brandId: config.brand?.id,
         sourceId: env.NEWSLETTER_SOURCE_ID,
-        key: env.BACKEND_MANAGER_KEY,
+        key: env.OMEGA_ADMIN_KEY,
         claim,
       });
 

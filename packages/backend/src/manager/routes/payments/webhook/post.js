@@ -25,7 +25,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   }
 
   // Validate key
-  if (!key || key !== process.env.BACKEND_MANAGER_WEBHOOK_KEY) {
+  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 

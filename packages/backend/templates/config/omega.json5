@@ -162,7 +162,7 @@
       parent: '',
       github: {
         user: 'username',
-        repo_website: 'https://github.com/username/backend-manager',
+        repo_website: 'https://github.com/username/omega',
       },
       marketing: {
         campaigns: {

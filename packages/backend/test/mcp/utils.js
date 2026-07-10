@@ -17,17 +17,17 @@ module.exports = {
       name: 'resolveAuthInfo: admin key returns admin role',
       async run({ assert }) {
         const { resolveAuthInfo } = require('../../src/mcp/utils.js');
-        const saved = process.env.BACKEND_MANAGER_KEY;
+        const saved = process.env.OMEGA_ADMIN_KEY;
 
         try {
-          process.env.BACKEND_MANAGER_KEY = 'test-admin-key';
+          process.env.OMEGA_ADMIN_KEY = 'test-admin-key';
           const result = resolveAuthInfo('test-admin-key');
 
           assert.equal(result.role, 'admin', 'Should be admin');
           assert.equal(result.authType, 'adminKey', 'Should be adminKey type');
           assert.equal(result.token, 'test-admin-key', 'Token should match');
         } finally {
-          process.env.BACKEND_MANAGER_KEY = saved;
+          process.env.OMEGA_ADMIN_KEY = saved;
         }
       },
     },
@@ -66,18 +66,18 @@ module.exports = {
     },
 
     {
-      name: 'resolveAuthInfo: returns public when BACKEND_MANAGER_KEY is not set',
+      name: 'resolveAuthInfo: returns public when OMEGA_ADMIN_KEY is not set',
       async run({ assert }) {
         const { resolveAuthInfo } = require('../../src/mcp/utils.js');
-        const saved = process.env.BACKEND_MANAGER_KEY;
+        const saved = process.env.OMEGA_ADMIN_KEY;
 
         try {
-          delete process.env.BACKEND_MANAGER_KEY;
+          delete process.env.OMEGA_ADMIN_KEY;
           const result = resolveAuthInfo('any-token');
 
           assert.equal(result.role, 'user', 'Non-empty token with no config key should be user');
         } finally {
-          process.env.BACKEND_MANAGER_KEY = saved;
+          process.env.OMEGA_ADMIN_KEY = saved;
         }
       },
     },

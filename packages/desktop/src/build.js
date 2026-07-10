@@ -73,31 +73,31 @@ Manager.prototype.reportBuildError = Manager.reportBuildError;
 
 // Mode flags
 Manager.isBuildMode = function () {
-  return process.env.EM_BUILD_MODE === 'true';
+  return process.env.OMEGA_BUILD_MODE === 'true';
 };
 Manager.prototype.isBuildMode = Manager.isBuildMode;
 
 Manager.isPublishMode = function () {
-  return process.env.EM_IS_PUBLISH === 'true';
+  return process.env.OMEGA_IS_PUBLISH === 'true';
 };
 Manager.prototype.isPublishMode = Manager.isPublishMode;
 
 Manager.isServerMode = function () {
-  return process.env.EM_IS_SERVER === 'true';
+  return process.env.OMEGA_IS_SERVER === 'true';
 };
 Manager.prototype.isServerMode = Manager.isServerMode;
 
 // Quick mode: skips slow / network-bound operations during setup, clean, and gulp tasks.
-// Mirrors UJM's UJ_QUICK pattern. Triggered by `--quick` / `-q` CLI flag OR `EM_QUICK=true` env.
+// Mirrors UJM's UJ_QUICK pattern. Triggered by `--quick` / `-q` CLI flag OR `OMEGA_QUICK=true` env.
 // CLI flag is preferred ergonomically; env var lets nested tools (gulp tasks, child processes)
 // still see the signal without re-parsing argv.
 Manager.isQuickMode = function () {
-  if (process.env.EM_QUICK === 'true') return true;
+  if (process.env.OMEGA_QUICK === 'true') return true;
   try {
     const argv = getArgv() || {};
     if (argv.quick === true || argv.q === true) {
       // Propagate so child processes (gulp, electron, npm install shell-outs) inherit it.
-      process.env.EM_QUICK = 'true';
+      process.env.OMEGA_QUICK = 'true';
       return true;
     }
   } catch (_) { /* yargs not available — fall through */ }
@@ -106,7 +106,7 @@ Manager.isQuickMode = function () {
 Manager.prototype.isQuickMode = Manager.isQuickMode;
 
 Manager.actLikeProduction = function () {
-  return Boolean(Manager.isBuildMode() || process.env.EM_AUDIT_FORCE === 'true');
+  return Boolean(Manager.isBuildMode() || process.env.OMEGA_AUDIT_FORCE === 'true');
 };
 Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 
@@ -182,8 +182,8 @@ Manager.prototype.getRootPath = Manager.getRootPath;
 
 // Live reload port
 Manager.getLiveReloadPort = function () {
-  process.env.EM_LIVERELOAD_PORT = process.env.EM_LIVERELOAD_PORT || 35729;
-  return parseInt(process.env.EM_LIVERELOAD_PORT, 10);
+  process.env.OMEGA_LIVERELOAD_PORT = process.env.OMEGA_LIVERELOAD_PORT || 35729;
+  return parseInt(process.env.OMEGA_LIVERELOAD_PORT, 10);
 };
 Manager.prototype.getLiveReloadPort = Manager.getLiveReloadPort;
 

@@ -4,7 +4,7 @@
 // it (the actual production boot path — bundled, not the unbundled lib code that the
 // `main` layer exercises), then runs these inspects against the live manager.
 //
-// In @omega.js/desktop's own test run, EM_TEST_BOOT_PROJECT points at the fixture (auto-set in
+// In @omega.js/desktop's own test run, OMEGA_TEST_BOOT_PROJECT points at the fixture (auto-set in
 // src/commands/test.js when the cwd is the @omega.js/desktop repo). In a real consumer's
 // `npx omega test` run, the framework boot/ suites are excluded entirely (runner.js
 // discovery skips boot/** unless isFrameworkSelfTest) — consumers write their own

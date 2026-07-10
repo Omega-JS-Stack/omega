@@ -85,7 +85,7 @@ function setupRefundForm() {
 
     trackRefund('submit');
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/backend-manager/payments/refund`, {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/refund`, {
       method: 'POST',
       timeout: 30000,
       response: 'json',

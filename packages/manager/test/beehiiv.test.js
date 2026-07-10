@@ -22,13 +22,13 @@ const service = require('../src/services/beehiiv/index.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.BEEHIIV_API_KEY;
-delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+delete process.env.OMEGA_WEBHOOK_KEY;
 
 const DOMAIN = 'fixture-brand.test';
 const BRAND_NAME = 'Fixture Brand';
 const PUB_ID = 'pub_fixture123';
 const WEBHOOK_KEY = 'fixture-webhook-key';
-const WEBHOOK_URL = `https://api.${DOMAIN}/backend-manager/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`;
+const WEBHOOK_URL = `https://api.${DOMAIN}/omega/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`;
 const WEBHOOK_DESCRIPTION = '@omega.js/backend consent pipeline (managed by OMEGA — do not edit manually)';
 const EVENT_TYPES = ['subscription.unsubscribed', 'subscription.deleted', 'subscription.paused'];
 
@@ -97,9 +97,9 @@ const WRITEBACK_CONFIG = `// Fixture Brand — hand-edited writeback target
 
 function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKey = true, brandRoot } = {}) {
   if (webhookKey) {
-    process.env.BACKEND_MANAGER_WEBHOOK_KEY = WEBHOOK_KEY;
+    process.env.OMEGA_WEBHOOK_KEY = WEBHOOK_KEY;
   } else {
-    delete process.env.BACKEND_MANAGER_WEBHOOK_KEY;
+    delete process.env.OMEGA_WEBHOOK_KEY;
   }
 
   return service.run({
@@ -414,14 +414,14 @@ test('beehiiv: no webhook yet → created with the exact consent-pipeline payloa
 
   assert.equal(result.status, 'success');
   assert.deepEqual(api.callsTo('createWebhook')[0].args, [PUB_ID, {
-    url: `https://api.parent-brand.test/backend-manager/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`,
+    url: `https://api.parent-brand.test/omega/marketing/webhook/forward?provider=beehiiv&key=${WEBHOOK_KEY}`,
     event_types: EVENT_TYPES,
     description: WEBHOOK_DESCRIPTION,
   }]);
   assert.equal(result.output.webhook.created, true);
 });
 
-test('beehiiv: missing BACKEND_MANAGER_WEBHOOK_KEY warns', async () => {
+test('beehiiv: missing OMEGA_WEBHOOK_KEY warns', async () => {
   const api = fakeBeehiiv(convergedResponses());
 
   const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, webhookKey: false });
