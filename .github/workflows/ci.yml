@@ -71,6 +71,18 @@ jobs:
       - name: desktop suite (xvfb for Electron)
         run: xvfb-run --auto-servernum npm test --workspace=packages/desktop
 
+      # The emulator jobs keep dying runner-level ("operation was canceled" with
+      # no superseding push; "runner received a shutdown signal") — leading theory
+      # is resource exhaustion from leaked java/Chrome of earlier suites. Kill
+      # leftovers and print headroom so the next failure is diagnosable.
+      - name: Preflight for backend suite (kill leaked emulators, show headroom)
+        run: |
+          pkill -f 'firebase|cloud-firestore-emulator|pubsub-emulator|cloud-database-emulator' || true
+          pkill -f 'java.*emulator' || true
+          sleep 2
+          free -m
+          ps aux --sort=-rss | head -12
+
       - name: backend suite
         run: npm test --workspace=packages/backend
 
@@ -110,6 +122,13 @@ jobs:
       - name: Sandbox backend deps
         working-directory: apps/sandbox-brand/apps/backend/functions
         run: npm ci
+
+      # Runner headroom snapshot — the corpus keeps dying runner-level on CI
+      # (suspected memory exhaustion); this makes the next death diagnosable.
+      - name: Show runner headroom
+        run: |
+          free -m
+          nproc
 
       # Full @omega.js/backend corpus (routes/events/rules/email/mcp) against the fresh consumer
       - name: Sandbox backend corpus

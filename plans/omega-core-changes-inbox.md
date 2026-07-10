@@ -55,9 +55,11 @@
 11. ✅ **Assets root-first**: brand-root `assets/` = SSOT (logos, icons, og images, fonts); manager derives per-target outputs into each app; app-local assets only for genuinely app-specific extras. Principle: shared-by-default at root, local only when truly local. **Addendum (Ian 2026-07-10):** the assets are SCAFFOLDED at onboarding (placeholders/templates at brand root) and stay MANAGED by the omega system — the manager's assets service re-derives per-target outputs idempotently on every run, not a one-time copy.
 
 12. ✅ **Provider-discriminated config keys** (added post-decide — Ian 2026-07-10, `# more`): keys that name a ROLE with a `provider` discriminator instead of provider-named top-levels — e.g. `firebaseConfig` becomes `<role>: { provider: 'firebase', … }` — so a consumer could someday switch (supabase etc.) without a config-shape break. NO alternative providers actually built now; shape-only future-proofing. Exact key names land in N4's config review (cheap pre-dogfood, expensive after brands migrate).
-    **D5 addendum (Ian 2026-07-10):** the legacy `/backend-manager` route prefix stays accepted as an ALIAS to the new `omega_api` function (hosting-rewrite glob + router strip + cloudflare proxy worker) so migrating brands' in-the-wild clients keep working; everything else (docs, callers, function names, env) speaks `/omega` only. Shipped in cp72.
+    **D5 addendum (Ian 2026-07-10):** the legacy `/backend-manager` route prefix stays accepted as an ALIAS to the new `omega_api` function (hosting-rewrite glob + router strip) so migrating brands' in-the-wild clients keep working; everything else (docs, callers, function names, env) speaks `/omega` only. Shipped in cp72.
+    **D5 addendum 2 (Ian 2026-07-10):** the Cloudflare `omega-api-proxy` worker is DEPRECATED — Firebase Hosting rewrites are sufficient for the api domain. Marked now (worker header + live warning when a brand still configures it), removed eventually; new brands never get it.
 13. ✅ **Deliberate deploys — commits never auto-publish** (Ian 2026-07-10): the old UJM autopublish-on-push dies. Save = commit; publish = an explicit deploy action — from the CLI, an HTTP command, or the CMS — all converging on the ONE executor from D9's addendum, and uniform across every target. Subtle consequences to implement with it: content-publish actions imply deploy (the admin post route gains a `deploy` option defaulting TRUE — posting an article means publishing it), while code/config commits deploy nothing. Lands with C1 (template workflows) + the D9 executor; the admin-post tweak rides the backend work then.
 14. ✅ **Crypto-strong key provisioning at setup** (Ian 2026-07-10): omega-owned secrets are GENERATED, never left blank — `OMEGA_ADMIN_KEY`/`OMEGA_WEBHOOK_KEY` = `randomBytes(32)` base64url, `OMEGA_NAMESPACE` = `randomUUID()` (uuidv5 namespace must be UUID-shaped). Shipped in cp72: the onboarding .env stub provisions them; external API keys stay user-filled placeholders.
+15. ✅ **.env cascade mirrors the config cascade** (Ian 2026-07-10): `framework defaults (≈ empty) ← company .env ← brand .env ← app .env`, with the SHELL environment always winning over files — defined at the source files, resolved at runtime/build by a shared devkit env module (one mental model with omega.json5). The manager already proves company←brand precedence (company.test.js); formalize into devkit, adopt across manager + framework dev/test boots. Materialized app `.env` files remain ONLY where a deploy target physically requires one (firebase functions deploy uploads `functions/.env`) and are COMPOSED from the same cascade at build/deploy time (disperse becomes a composer, not a hand-maintained copy). Lands with N4 (cp73).
 
 ### E. LATER (post-dogfood backlog, roughly ordered)
 
@@ -207,7 +209,7 @@ Basically, we want ALL OF THE BS PARTS OF A SAAS PLATFORM TO BE HABDLED BY OMEGA
 
 
 # more
-> (triaged 2026-07-10 → per-target answer in A, provider keys = D12, churn retention = L11; second batch: route alias = D5 addendum, deliberate deploys = D13, key provisioning = D14)
+> (triaged 2026-07-10 → per-target answer in A, provider keys = D12, churn retention = L11; second batch: route alias = D5 addendum, deliberate deploys = D13, key provisioning = D14; third batch: proxy worker deprecated = D5 addendum 2, .env cascade = D15)
 
 better churn retention
 * popup if cancelling during free trial (trial will be canceld)
@@ -223,3 +225,8 @@ on the renames.. yes lets move towards getting rid of "backend-manager", BACKEND
 just an idea,.. in old omega, the website repo would autopublish on commits.. i feel liek htis is bad design esp since its a monorepo now... what do you rthink about switching it to deliberate deploy commands? which can be done in cli, https, or cms? so like save-->commit, publiush-->deploy? then evey target is the same. only deliberate deploy/publish does something, not just simpel commits. we will ahe to change some subtle things such as the admin post route which now needs to probably have an option to deploy it, defaulting to true??
 
 other small things... thge omega setup prcesss should use uuid or a more secure random string to provision the keys like OMEGA_MANAGER_KEY, etc.
+
+we dont need the cloudflare proxy, just hosting rewrites in firebase is fine for nopw, you can makr it to be deprecated now and removed eventually.
+
+and for the .env, it should ahve a similar hierarchy as thhe config. in that there are defaults (basically nothing though), then company, then brand, then target. defined at the soruce, resovled at runtime/build right?
+

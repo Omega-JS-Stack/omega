@@ -1,13 +1,13 @@
 /**
- * Omega API Proxy Worker
+ * Omega API Proxy Worker — DEPRECATED (Ian 2026-07-10, removal planned)
  *
- * This worker proxies requests from api.{domain}/omega to Firebase Functions.
- * The legacy /backend-manager prefix is accepted as an alias so migrating
- * brands' in-the-wild clients keep working.
+ * Firebase Hosting rewrites serve /omega directly on the api domain, so this
+ * Cloudflare hop is unnecessary. Kept only for legacy brands whose
+ * cloudflare.workers config still routes through it — drop the entry there
+ * and let hosting rewrites take over. Do not add this worker to new brands.
  *
- * Configuration:
- * - Route: api.{domain}/omega* (+ api.{domain}/backend-manager* for the alias)
- * - Firebase Function: us-central1-{project-id}.cloudfunctions.net/omega_api
+ * What it did: proxies api.{domain}/omega (and the legacy /backend-manager
+ * alias) to us-central1-{project-id}.cloudfunctions.net/omega_api.
  */
 
 export default {

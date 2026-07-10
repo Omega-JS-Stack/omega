@@ -44,6 +44,12 @@ module.exports = async function ensureWorkers(context) {
     return;
   }
 
+  // omega-api-proxy is deprecated — Firebase Hosting rewrites serve /omega
+  // directly (removal planned; see the worker file header)
+  if (workersConfig.some((w) => w.script === 'omega-api-proxy.js')) {
+    console.log(`      ${chalk.yellow('⚠ omega-api-proxy is DEPRECATED — hosting rewrites serve /omega directly; drop it from cloudflare.workers')}`);
+  }
+
   // === READ ===
   const accountId = await getAccountId(api, zoneId);
   const workersResponse = await api.makeRequest(`/accounts/${accountId}/workers/scripts`);

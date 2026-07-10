@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys; CI run 5 verifying the emulator-hang fix in background
+- N4 architecture sweep (cp73) — FIRST: D15 .env cascade (devkit env module: company←brand←app, shell wins; disperse becomes a composer); then DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys; CI emulator-hang still open (run 5: sandbox failed labeled, suites hung past pin — dig with run-6 logs)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -34,6 +34,7 @@
 ## ⚠ Parked findings (detail: the named task's CHANGELOG entry)
 - ~~Env prefixes + backend wire format~~ SHIPPED (72); ~~BEM hardcoded emulator ports~~ GRADUATED to queue N7 (70)
 - Ghostii devlog auth still sends the `backendManagerKey` payload field — live external API contract; rename when Ghostii itself migrates to the new stack (72)
+- `omega-api-proxy` worker DEPRECATED (D5 addendum 2) — hosting rewrites suffice; delete the worker + its ensure warning once no brand config references it (72)
 - CI watch: 'Failed to load function' flurries in the sandbox onDelete storm on runners (run 4 log) — corpus green locally + labeled failures now; if run 5+ sandbox jobs flake, start here (72)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
