@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — D15 .env cascade SHIPPED (73a); remaining: DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys, parked verifies (line below); CI investigation PARKED (run-7 verdict in the parked finding) — all CI opt-in per Ian, no runs until he says
+- N4 architecture sweep (cp73) — 73a + 73c SHIPPED; remaining: zod route schemas (full route inventory + powertools preservation checklist in hand — slot into Settings.resolve, coerce/strip/clamp semantics must survive) + D12 provider-key proposal (inventory in hand; single-provider roles fit a `provider` field, multi-provider roles — analytics/payment/oauth2 — need a keep-the-map call; 4 keys cross live surfaces via GET /brand → flag for Ian), parked verifies (line below); CI opt-in, investigation parked
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -41,9 +41,11 @@
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
 - N4 verifies from the cp70 sweep: web's site-wide defaults-style override intent achievable via the data cascade? (powertools 1.8.1 equivalent); packages/config schema needs `devlog`/`seo` keys if ever made strict (70)
+- N4 deferred consolidations (73c's CHANGELOG entry is the record): ext⇄desktop build.js harness + mode-helpers skeleton, backend runner onto devkit runner-core; micro-dupes (sleep/capitalize/temp-dir scaffolds) rejected — not worth cross-package coupling (73c)
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 73c N4 DRY round 1 — cp71 regex casualties fixed (3 backend setup-tests SyntaxErrors, legacy-matching literals restored) + devkit parse-audit as backend pre-flight (413 files) + clean-dirs; resolveBrandRoot→config, desktop deepMerge→config, web slugify→template-kit, SkipError→devkit, waitForTarget hoist; 5 verified-not-dupes documented; full matrix + pack-smoke ×4 green (this commit) → CHANGELOG
 - [x] 73a D15 .env cascade — @omega.js/config env module (company←brand←app, shell wins; findBrandRoot = THE hierarchy walk; company-marker read shared), adopted at every boot surface (web/desktop/extension CLIs + gulp, backend CLI + runtime, manager manage/devlog); disperse narrowed to composer (backend functions/.env keeps full pass-through; brand values never copied); dotenv dep consolidated into config; full matrix + corpus + e2e green (this commit) → CHANGELOG
 - [x] 72 N3 wire/env harmonization — `/omega` routes (legacy `/backend-manager` alias kept per Ian), `omega_*` functions, `omega` config section, `///---omega---///` markers, `omega-properties` header, `omega-api-proxy` worker; ~60 env vars → unified `OMEGA_*` (BUILD_JSON/TEST_MODE/AUDIT_FORCE unified cross-framework; UJ_AUDIT_FORCE extension leak fixed); D14 crypto-provisioned keys at onboarding; 10 suites + sandbox corpus + cross-stack e2e + pack-smoke ×4 (this commit) → CHANGELOG
 - [x] 71 Great Rename — `@omega.js` scope everywhere (650 files; lockfiles regenerated, dists re-vendored, regex gates escaped); universal `omega`/`omg`/`mgr` dispatcher bins (devkit 1.2.0, hoist-winner-proof, bootstrap fallback, live cross-dispatch proof); `window.webManager` → `window.omega` sweep (127 files; migrate-codemod collision caught + repaired by fixture tests); docs flip to `npx omega`; 10 suites + pack-smoke ×4 green (this commit) → CHANGELOG
@@ -69,4 +71,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 4:20 PM (73a done; omega-api-proxy un-deprecated per Ian; ALL CI now opt-in — no push/PR triggers, dispatches paused)*
+*Last updated: 2026-07-10 5:00 PM (73c shipped — DRY round 1 + parse-audit guard + cp71 regex-casualty fix; next: zod design + D12 proposal)*

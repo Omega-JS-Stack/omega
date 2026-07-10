@@ -9,16 +9,7 @@ const assertions = require('./utils/assertions.js');
 const testAccounts = require('./test-accounts.js');
 const rulesClient = require('./utils/firestore-rules-client.js');
 const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
-
-/**
- * Error class for runtime test skipping
- */
-class SkipError extends Error {
-  constructor(reason) {
-    super(reason);
-    this.name = 'SkipError';
-  }
-}
+const { SkipError } = require('@omega.js/devkit/test/runner-core');
 
 /**
  * @omega.js/backend Integration Test Runner

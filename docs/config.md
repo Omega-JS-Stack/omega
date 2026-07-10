@@ -237,7 +237,8 @@ const {
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
   getEnabledTargets,   // (config) → ['web', 'backend', …]
-  findBrandRoot,       // (projectDir) → brand root | null — THE hierarchy walk
+  findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one app dir (THE hierarchy rule)
+  resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself)
   loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
   resolveEnvChain,     // (startDir) → { app, brand, company } .env paths (no loading)
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip

@@ -23,6 +23,7 @@
 
 const path  = require('path');
 const fs    = require('fs');
+const { waitForTarget } = require('./helpers.js');
 const chalk = require('chalk').default;
 
 async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
@@ -185,17 +186,6 @@ async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
   }
 
   return counts;
-}
-
-async function waitForTarget(browser, predicate, timeoutMs) {
-  const found = browser.targets().find(predicate);
-  if (found) return found;
-  return new Promise((resolve) => {
-    const done = (t) => { browser.off('targetcreated', handle); resolve(t); };
-    const handle = (t) => { if (predicate(t)) done(t); };
-    browser.on('targetcreated', handle);
-    setTimeout(() => done(null), timeoutMs);
-  });
 }
 
 module.exports = { runBootTests };

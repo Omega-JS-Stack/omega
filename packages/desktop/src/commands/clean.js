@@ -1,8 +1,8 @@
 // Libraries
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('clean');
-const { execSync } = require('child_process');
 const jetpack = require('fs-jetpack');
+const { cleanDirs } = require('@omega.js/devkit/clean-dirs');
 
 // Dirs to clean
 const dirs = [
@@ -26,14 +26,7 @@ module.exports = async function (options) {
   logger.log('Cleaning .temp, .cache, dist, release...');
 
   try {
-    dirs.forEach((dir) => {
-      if (process.platform !== 'win32') {
-        execSync(`rm -rf ${dir}`, { stdio: 'ignore' });
-      } else {
-        jetpack.remove(dir);
-      }
-      jetpack.dir(dir);
-    });
+    cleanDirs(dirs);
   } catch (e) {
     logger.error(`Error clearing directories: ${e}`);
   }

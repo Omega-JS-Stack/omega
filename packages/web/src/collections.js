@@ -6,6 +6,10 @@
  * (uj_member) can read it mid-render.
  */
 
+// Jekyll-default slugify — taxonomy slugs must match what templates' slugify
+// filter produces, so both come from the same template-kit implementation.
+const { slugify } = require('@omega.js/template-kit/jekyll-compat');
+
 // Deterministic post order shared by the posts collection AND taxonomy
 // aggregation: date desc, slug asc tie-break — same-date posts must order
 // identically across builds (proven engine-identical in the bake-off).
@@ -82,15 +86,6 @@ function aggregateTaxonomy(api, field) {
       name: [...spellings.entries()].sort((a, b) => b[1] - a[1])[0][0],
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Minimal slug helper (mirrors the corpus generator's slugify).
- * @param {string} text
- * @returns {string}
- */
-function slugify(text) {
-  return String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 module.exports = { registerCollections };

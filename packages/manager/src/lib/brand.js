@@ -21,42 +21,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
 
-const { loadConfig, resolveConfigPath, getEnabledTargets, deepMerge } = require('@omega.js/config');
+// resolveBrandRoot moved into @omega.js/config (cp73c) — the hierarchy walk
+// has ONE home there, alongside findBrandRoot and the env cascade.
+const { loadConfig, resolveConfigPath, getEnabledTargets, deepMerge, resolveBrandRoot } = require('@omega.js/config');
 const { DEFAULTS, APP_DIR_TARGETS, templateObject } = require('../config.js');
-
-/**
- * Walk up from startDir to the brand-monorepo root: the nearest ancestor with
- * an omega.json5 that is not an APP of a brand above it. "App" uses the exact
- * rule @omega.js/config's brand walk-up uses: directly under an apps/ dir AND
- * a brand-level config/omega.json5 exists one level above that — so a brand
- * that itself lives inside some larger workspace's apps/ folder (the
- * monorepo's sandbox brand) still resolves as a brand root. Works from the
- * brand root, from inside apps/{app}, and from inside apps/{app}/functions.
- *
- * @param {string} startDir - Any directory inside the brand monorepo
- * @returns {string|null} - Absolute brand root, or null when none found
- */
-function resolveBrandRoot(startDir) {
-  let dir = path.resolve(startDir);
-
-  while (true) {
-    // A backend's functions/ dir carries the app's config (functions/config/)
-    // but is never a root itself — its app dir one level up is.
-    if (path.basename(dir) !== 'functions' && resolveConfigPath(dir)) {
-      const grandparent = path.dirname(path.dirname(dir));
-      const isAppOfBrand = path.basename(path.dirname(dir)) === 'apps'
-        && fs.existsSync(path.join(grandparent, 'config', 'omega.json5'));
-
-      if (!isAppOfBrand) {
-        return dir;
-      }
-    }
-
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-}
 
 /**
  * Read an app's raw omega.json5 (no merge, no validation) purely to see which

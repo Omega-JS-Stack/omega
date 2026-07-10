@@ -7,8 +7,8 @@ const fetch = require('wonderful-fetch');
 // Namespaced: this class has its own loadConfig() method (CLI flags), which is unrelated
 const omegaConfig = require('@omega.js/config');
 
-// Regex patterns (used by getRulesFile)
-const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
+// Rules-marker regex shared with the rules setup tests (used by getRulesFile)
+const { omegaAllRulesRegex } = require('./setup-tests/helpers.js');
 
 class SetupCommand extends BaseCommand {
   async execute() {

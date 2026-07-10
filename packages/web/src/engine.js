@@ -36,6 +36,10 @@ const RESOLVED_OMIT = new Set([
 const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'updates', 'alternatives']);
 
 // Plain-object deep merge (b wins) — fresh containers, never mutates either side.
+// Deliberately NOT @omega.js/config's deepMerge: the resolved-data cascade
+// merges VALUES pairwise (deepMerge(out[key], data[key])), so an explicit null
+// in later data must REPLACE — config's variadic merge would skip it as a
+// falsy layer.
 function deepMerge(a, b) {
   if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
     const out = { ...a };

@@ -102,6 +102,44 @@ function findBrandConfigPath(projectDir) {
   return brandRoot ? path.join(brandRoot, 'config', FILE_NAME) : null;
 }
 
+/**
+ * SEARCH upward from any directory to the nearest brand-monorepo root: the
+ * first ancestor carrying an omega.json5 that is not itself an APP of a brand
+ * above it (app rule = findBrandRoot's: directly under an apps/ dir with a
+ * brand-level config/omega.json5 one level above — so a brand living inside
+ * some larger workspace's apps/ folder still resolves as a brand root).
+ *
+ * Complements findBrandRoot, which CLASSIFIES one app dir (app → its brand,
+ * else null): resolveBrandRoot works from anywhere in the tree — the brand
+ * root itself, apps/{app}, apps/{app}/functions, or any subdirectory — and a
+ * standalone config-carrying project resolves to itself.
+ *
+ * @param {string} startDir - Any directory inside the project tree
+ * @returns {string|null} Absolute brand (or standalone-project) root, or null
+ *   when no omega.json5 exists anywhere up the tree.
+ */
+function resolveBrandRoot(startDir) {
+  let dir = path.resolve(startDir);
+
+  while (true) {
+    // A backend's functions/ dir carries the app's config (functions/config/)
+    // but is never a root itself — its app dir one level up is.
+    if (path.basename(dir) !== 'functions' && resolveConfigPath(dir)) {
+      const grandparent = path.dirname(path.dirname(dir));
+      const isAppOfBrand = path.basename(path.dirname(dir)) === 'apps'
+        && fs.existsSync(path.join(grandparent, 'config', FILE_NAME));
+
+      if (!isAppOfBrand) {
+        return dir;
+      }
+    }
+
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
 function stripTargets(config) {
   if (!config) return null;
   const { targets, ...shared } = config;
@@ -193,4 +231,4 @@ function loadConfig(projectDir, target, options) {
   return { config, errors, enabled, files: { app: appPath, brand: brandPath } };
 }
 
-module.exports = { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, FILE_NAME, CONFIG_LOCATIONS };
+module.exports = { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS };

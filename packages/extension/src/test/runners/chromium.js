@@ -18,6 +18,7 @@
 const path = require('path');
 const fs   = require('fs');
 const chalk = require('chalk').default;
+const { waitForTarget } = require('./helpers.js');
 
 // Inline the source of assert.js so we can build it into the injected harness
 // payload. The runner reads it from disk once at module-load time. Resolved through
@@ -364,17 +365,6 @@ function handleConsoleLine(text, counts) {
   } else if (evt.event === 'suite-end' || evt.event === 'suite-start') {
     // No-op — suite framing already printed by the parent before evaluate().
   }
-}
-
-async function waitForTarget(browser, predicate, timeoutMs) {
-  const found = browser.targets().find(predicate);
-  if (found) return found;
-  return new Promise((resolve) => {
-    const done = (t) => { browser.off('targetcreated', handle); resolve(t); };
-    const handle = (t) => { if (predicate(t)) done(t); };
-    browser.on('targetcreated', handle);
-    setTimeout(() => done(null), timeoutMs);
-  });
 }
 
 // Extract the body of a function as a string. Handles arrow / async arrow /

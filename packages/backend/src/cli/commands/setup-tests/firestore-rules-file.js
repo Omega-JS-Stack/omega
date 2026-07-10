@@ -1,9 +1,7 @@
 const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
-
-const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
-const bem_allRulesBackupRegex = /({{\s*?@omega.js/backend\s*?}})/sgm;
+const { omegaAllRulesRegex, legacyRulesPlaceholderRegex } = require('./helpers.js');
 
 class FirestoreRulesFileTest extends BaseTest {
   getName() {
@@ -37,15 +35,15 @@ class FirestoreRulesFileTest extends BaseTest {
       contents = jetpack.read(path) || '';
     }
 
-    const hasTemplate = contents.match(omegaAllRulesRegex) || contents.match(bem_allRulesBackupRegex);
+    const hasTemplate = contents.match(omegaAllRulesRegex) || contents.match(legacyRulesPlaceholderRegex);
     if (!hasTemplate) {
-      console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{@omega.js/backend}}`), chalk.red(`to it.`));
+      console.log(chalk.red(`Could not find rules template. Please edit ${name} and add the ///---omega---/// ... ///---------end---------/// marker block to it.`));
       return;
     }
 
     // Always replace rules to ensure they're in sync with @omega.js/backend template
     const originalContents = contents;
-    contents = contents.replace(bem_allRulesBackupRegex, self.default.firestoreRulesCore);
+    contents = contents.replace(legacyRulesPlaceholderRegex, self.default.firestoreRulesCore);
     contents = contents.replace(omegaAllRulesRegex, self.default.firestoreRulesCore);
 
     if (contents !== originalContents) {

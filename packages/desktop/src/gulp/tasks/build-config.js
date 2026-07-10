@@ -14,6 +14,7 @@
 const path    = require('path');
 const jetpack = require('fs-jetpack');
 const yaml    = require('js-yaml');
+const { deepMerge } = require('@omega.js/config');
 const Manager = new (require('../../build.js'));
 
 const { writeMacEntitlements } = require('../../lib/sign-helpers/entitlements.js');
@@ -348,21 +349,9 @@ function shouldInjectLSUIElement(config) {
     || config?.startup?.openAtLogin?.mode === 'hidden';
 }
 
-// Shallow object merge with arrays replaced (not concatenated) so consumer overrides like
-// `mac.target: [...]` fully replace ours rather than appending to defaults.
-function deepMerge(a, b) {
-  if (Array.isArray(b)) return b;
-  if (b && typeof b === 'object' && !Array.isArray(a)) {
-    const out = { ...a };
-    for (const k of Object.keys(b)) {
-      out[k] = (a && k in a) ? deepMerge(a[k], b[k]) : b[k];
-    }
-    return out;
-  }
-  return b;
-}
-
-// Exported for tests.
+// Exported for tests. deepMerge is @omega.js/config's (cp73c consolidation) —
+// same contract the local copy had: objects merge per-key, arrays REPLACE
+// (consumer `mac.target: [...]` fully replaces ours, never concatenates).
 module.exports.baseConfig    = baseConfig;
 module.exports.deepMerge     = deepMerge;
 module.exports.shouldInjectLSUIElement = shouldInjectLSUIElement;

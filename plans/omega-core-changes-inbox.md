@@ -230,3 +230,4 @@ we dont need the cloudflare proxy, just hosting rewrites in firebase is fine for
 
 and for the .env, it should ahve a similar hierarchy as thhe config. in that there are defaults (basically nothing though), then company, then brand, then target. defined at the soruce, resovled at runtime/build right?
 
+random interjection: and now that im ht8nking about it, maybe a comapny using omega shouldnt have copies of the data/assets/config in a separate folder but instead should have the actual monorepo be the ssot? im not sure if its designed like that already but what do you think?

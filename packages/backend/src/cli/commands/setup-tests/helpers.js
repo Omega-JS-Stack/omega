@@ -1,6 +1,14 @@
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 
+// Rules-file markers (shared by setup.js + the firestore/realtime rules tests):
+// the current ///---omega---/// block, and the legacy mustache placeholder
+// ({{ backend-manager }}) still present in un-migrated consumers' rules files —
+// both mark where the core rules block belongs. The legacy literal must stay
+// `backend-manager`: it matches bytes that exist in the wild, not our name.
+const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
+const legacyRulesPlaceholderRegex = /({{\s*?backend-manager\s*?}})/sgm;
+
 function loadJSON(path) {
   const contents = jetpack.read(path);
   if (!contents) {
@@ -22,6 +30,8 @@ function isLocal(name) {
 }
 
 module.exports = {
+  omegaAllRulesRegex,
+  legacyRulesPlaceholderRegex,
   loadJSON,
   saveJSON5,
   hasContent,

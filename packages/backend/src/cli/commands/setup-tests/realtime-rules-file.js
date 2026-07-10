@@ -1,9 +1,7 @@
 const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
-
-const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
-const bem_allRulesBackupRegex = /({{\s*?@omega.js/backend\s*?}})/sgm;
+const { omegaAllRulesRegex, legacyRulesPlaceholderRegex } = require('./helpers.js');
 
 class RealtimeRulesFileTest extends BaseTest {
   getName() {
@@ -33,15 +31,15 @@ class RealtimeRulesFileTest extends BaseTest {
       contents = jetpack.read(path) || '';
     }
 
-    const hasTemplate = contents.match(omegaAllRulesRegex) || contents.match(bem_allRulesBackupRegex);
+    const hasTemplate = contents.match(omegaAllRulesRegex) || contents.match(legacyRulesPlaceholderRegex);
     if (!hasTemplate) {
-      console.log(chalk.red(`Could not find rules template. Please edit ${name} file and add`), chalk.red(`{{@omega.js/backend}}`), chalk.red(`to it.`));
+      console.log(chalk.red(`Could not find rules template. Please edit ${name} and add the ///---omega---/// ... ///---------end---------/// marker block to it.`));
       return;
     }
 
     const matchesVersion = contents.match(self.default.rulesVersionRegex);
     if (!matchesVersion) {
-      contents = contents.replace(bem_allRulesBackupRegex, self.default.databaseRulesCore);
+      contents = contents.replace(legacyRulesPlaceholderRegex, self.default.databaseRulesCore);
       contents = contents.replace(omegaAllRulesRegex, self.default.databaseRulesCore);
       jetpack.write(path, contents);
       console.log(chalk.yellow(`Writing core rules to ${name} file...`));

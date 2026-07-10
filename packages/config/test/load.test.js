@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets } = require('../src/index.js');
+const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -263,4 +263,58 @@ test('schema findings come back as errors, never thrown — callers pick their s
   assert.ok(errors.some((e) => e.includes('config.brand.name is required')));
   assert.ok(errors.some((e) => e.includes('config.brand.id') && e.includes('does not match')));
   assert.ok(errors.some((e) => e.includes('config.theme.appearance')));
+});
+
+// ─── resolveBrandRoot (the upward SEARCH — moved here from the manager, cp73c) ───
+
+test('resolveBrandRoot: finds the brand root from anywhere in the tree', (t) => {
+  const root = makeFixture('walk-brand', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' } }`,
+    'apps/website/config/omega.json5': `{ targets: { web: {} } }`,
+    'apps/website/src/lib/deep.js': `// depth fixture`,
+    'apps/api/functions/config/omega.json5': `{ targets: { backend: {} } }`,
+  });
+  cleanup(t, root);
+
+  // From the brand root itself
+  assert.equal(resolveBrandRoot(root), root);
+  // From an app dir (an app of this brand is never itself the root)
+  assert.equal(resolveBrandRoot(path.join(root, 'apps', 'website')), root);
+  // From deep inside an app
+  assert.equal(resolveBrandRoot(path.join(root, 'apps', 'website', 'src', 'lib')), root);
+  // From a backend app's functions/ dir (carries config, never a root)
+  assert.equal(resolveBrandRoot(path.join(root, 'apps', 'api', 'functions')), root);
+});
+
+test('resolveBrandRoot: a standalone config-carrying project resolves to itself', (t) => {
+  const root = makeFixture('walk-standalone', {
+    'config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { web: {} } }`,
+    'src/pages/index.js': `// depth fixture`,
+  });
+  cleanup(t, root);
+
+  assert.equal(resolveBrandRoot(root), root);
+  assert.equal(resolveBrandRoot(path.join(root, 'src', 'pages')), root);
+});
+
+test('resolveBrandRoot: a brand nested inside a larger workspace apps/ dir still resolves as a brand root (sandbox shape)', (t) => {
+  const workspace = makeFixture('walk-nested', {
+    // No workspace-level config — apps/ here is NOT a brand's apps dir
+    'apps/sandbox-brand/config/omega.json5': `{ brand: { id: 'sandbox', name: 'Sandbox' } }`,
+    'apps/sandbox-brand/apps/website/config/omega.json5': `{ targets: { web: {} } }`,
+  });
+  cleanup(t, workspace);
+
+  const brandRoot = path.join(workspace, 'apps', 'sandbox-brand');
+  assert.equal(resolveBrandRoot(brandRoot), brandRoot);
+  assert.equal(resolveBrandRoot(path.join(brandRoot, 'apps', 'website')), brandRoot);
+});
+
+test('resolveBrandRoot: null when no omega.json5 exists up the tree', (t) => {
+  const root = makeFixture('walk-nothing', {
+    'src/anything.js': `// no config anywhere`,
+  });
+  cleanup(t, root);
+
+  assert.equal(resolveBrandRoot(path.join(root, 'src')), null);
 });
