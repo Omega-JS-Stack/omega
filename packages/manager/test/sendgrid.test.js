@@ -528,3 +528,32 @@ test('sendgrid: dry-run on a fully drifted brand performs zero mutations', async
   assert.equal(result.output.segments.planned.sweepOrphans, 1);
   assert.ok(result.output.eventWebhook.planned.includes('url'));
 });
+
+// ─── domain-auth: interactive validation poll ────────────────────────────────
+
+const { openTtyPrompt } = require('./lib/interactive.js');
+
+test('sendgrid: interactive run polls validation until DNS propagates', async () => {
+  let validations = 0;
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getAuthenticatedDomains: [],
+    authenticateDomain: { id: 111, domain: DOMAIN, dns: DNS_FIXTURE },
+    validateDomain: () => {
+      validations++;
+      return structuredClone(validations === 1 ? VALIDATION_PENDING : VALIDATION_OK);
+    },
+  });
+  const cf = fakeCf();
+  const tty = openTtyPrompt();
+
+  try {
+    const result = await runService(brandConfig(), { sendgrid: api, cloudflare: cf, serviceData: { listId: 'lst_1' } });
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.output.domainAuth.valid, true);
+    assert.equal(validations, 2); // initial attempt + the poll's first re-check
+  } finally {
+    tty.close();
+  }
+});

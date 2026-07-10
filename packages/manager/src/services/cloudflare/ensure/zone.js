@@ -3,22 +3,77 @@
  *
  * Creates the zone when missing (apex domains only — subdomain projects
  * require the parent zone to exist already). A pending zone reports its
- * nameservers and moves on: the domain service configures them at the
- * registrar when it ports (API providers), or a later run picks the zone up
- * once it activates. omega-manager's interactive browser-open + poll is next
- * up as a verification-poll adoption.
+ * nameservers; when the registrar is a manual one, interactive runs open its
+ * nameserver page and poll until the zone activates. API registrars are left
+ * to the domain service (it sets the nameservers right after this service),
+ * and non-interactive/dry runs just report — a later run picks the zone up
+ * once it activates.
  *
  * State: { zoneId } — later operations in THIS run read it via getZoneId.
  */
 const chalk = require('chalk').default;
+const { isInteractive } = require('@omegajs/devkit/prompt');
+const { openBrowserAndPoll, pollWithSpinner } = require('@omegajs/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
+const { API_PROVIDERS, REGISTRAR_NAMESERVER_URLS } = require('../../domain/lib/registrars.js');
 
 function reportPending(zone) {
   console.log(`      ${chalk.yellow('⚠')} Zone pending — set these nameservers at your domain registrar:`);
   for (const ns of zone.name_servers || []) {
     console.log(`        ${chalk.cyan(ns)}`);
   }
-  console.log(`      ${chalk.dim('Rerun after the nameservers propagate (the domain service automates this for API registrars).')}`);
+}
+
+/**
+ * Interactive wait for a pending zone: opens the registrar's nameserver page
+ * (when domain.provider names one with a known dashboard) and re-reads the
+ * zone until Cloudflare reports it active.
+ *
+ * @returns {Object|null} - The active zone, or null (deferred/skipped —
+ *   the caller returns its pending shape)
+ */
+async function waitForActiveZone(context, zone) {
+  const { cloudflareApi: api, brandConfig, zoneDomain, options = {} } = context;
+  const provider = brandConfig.domain?.provider;
+
+  // API registrars: the domain service sets the nameservers right after this
+  // service. No provider yet: nothing to open (fresh brand). Non-interactive
+  // and dry runs never sit in a poll.
+  if (!isInteractive() || options.dryRun || !provider || API_PROVIDERS.has(provider)) {
+    console.log(`      ${chalk.dim('Rerun after the nameservers propagate (the domain service automates this for API registrars).')}`);
+    return null;
+  }
+
+  const check = async () => {
+    const fresh = (await api.makeRequest(`/zones/${zone.id}`)).result;
+    return fresh.status === 'active' ? { done: true, result: fresh } : { done: false };
+  };
+
+  // provider is user config — unknown registrars poll without a browser step
+  const registrarUrl = REGISTRAR_NAMESERVER_URLS[provider]?.(zoneDomain);
+  const result = registrarUrl
+    ? await openBrowserAndPoll({
+      url: registrarUrl,
+      promptMessage: `Set the nameservers above at ${provider}.`,
+      waitMessage: 'Checking nameservers',
+      check,
+      intervalMs: 10000,
+      indent: '      ',
+    })
+    : await pollWithSpinner({
+      check,
+      intervalMs: 10000,
+      message: 'Checking nameservers',
+      indent: '      ',
+    });
+
+  if (result.success) {
+    console.log(`      ${chalk.green('✓')} Nameservers configured — zone is active`);
+    return result.result;
+  }
+
+  console.log(`      ${chalk.dim('⊘ Zone still pending — rerun to check again later')}`);
+  return null;
 }
 
 module.exports = async function ensureZone(context) {
@@ -41,10 +96,14 @@ module.exports = async function ensureZone(context) {
 
     if (zone.status === 'pending' && !isSubdomainProject) {
       reportPending(zone);
-      return {
-        state: { zoneId: zone.id },
-        output: { zone: { status: 'pending', nameservers: zone.name_servers } },
-      };
+      const activeZone = await waitForActiveZone(context, zone);
+      if (!activeZone) {
+        return {
+          state: { zoneId: zone.id },
+          output: { zone: { status: 'pending', nameservers: zone.name_servers } },
+        };
+      }
+      zone = activeZone;
     }
 
     return {
@@ -81,10 +140,14 @@ module.exports = async function ensureZone(context) {
 
   if (zone.status === 'pending') {
     reportPending(zone);
-    return {
-      state: { zoneId: zone.id },
-      output: { zone: { created: true, status: 'pending', nameservers: zone.name_servers } },
-    };
+    const activeZone = await waitForActiveZone(context, zone);
+    if (!activeZone) {
+      return {
+        state: { zoneId: zone.id },
+        output: { zone: { created: true, status: 'pending', nameservers: zone.name_servers } },
+      };
+    }
+    zone = activeZone;
   }
 
   return {

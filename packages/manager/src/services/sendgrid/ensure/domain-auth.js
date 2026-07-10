@@ -4,13 +4,15 @@
  * A valid authentication is converged proof. A missing one is created in one
  * pass: authenticate in SendGrid (automatic_security → 3 CNAMEs), diff-sync
  * the records into the Cloudflare apex zone (exact-match = untouched, wrong
- * content = patched, missing = created), then validate ONCE — DNS still
- * propagating reports warned and the rerun converges (omega-manager span an
- * interactive poll-with-spinner here). No Cloudflare token → the records to
- * add manually, and validation is still attempted so a manual fix converges
- * on rerun.
+ * content = patched, missing = created), then validate — interactive runs
+ * poll until DNS propagates and SendGrid confirms; non-interactive/dry runs
+ * validate ONCE, report warned, and the rerun converges. No Cloudflare token
+ * → the records to add manually, and validation is still attempted so a
+ * manual fix converges on rerun.
  */
 const chalk = require('chalk').default;
+const { isInteractive } = require('@omegajs/devkit/prompt');
+const { pollWithSpinner } = require('@omegajs/devkit/flows');
 
 const SUBDOMAIN = 'emailauth';
 
@@ -54,12 +56,29 @@ module.exports = async function ensureDomainAuth(context) {
   // === DNS via Cloudflare (or manual guidance) ===
   const synced = await syncDnsRecords(cloudflareApi, apexDomain, records);
 
-  // === Validate once — DNS may need a minute; the rerun converges ===
-  const validation = await api.validateDomain(domainAuth.id);
-  const allValid = validation?.validation_results
-    && Object.values(validation.validation_results).every((r) => r.valid);
+  // === Validate — DNS may need a minute; interactive runs wait it out ===
+  const isValid = (validation) => Boolean(validation?.validation_results
+    && Object.values(validation.validation_results).every((r) => r.valid));
 
-  if (allValid) {
+  let valid = isValid(await api.validateDomain(domainAuth.id));
+
+  if (!valid && isInteractive() && !options.dryRun) {
+    const result = await pollWithSpinner({
+      check: async () => {
+        try {
+          return isValid(await api.validateDomain(domainAuth.id)) ? { done: true } : { done: false };
+        } catch {
+          return { done: false };
+        }
+      },
+      intervalMs: 10000,
+      message: 'Validating domain authentication (waiting for DNS propagation)',
+      indent: '      ',
+    });
+    valid = result.success;
+  }
+
+  if (valid) {
     console.log(`      ${chalk.green('✓')} Domain ${chalk.cyan(domain)} validated`);
     return { output: { domainAuth: { id: domainAuth.id, valid: true } } };
   }

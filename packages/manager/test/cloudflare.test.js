@@ -582,3 +582,105 @@ test('workers: no workers configured → no API traffic', async () => {
   assert.equal(result, undefined);
   assert.equal(api.calls.length, 0);
 });
+
+// ─── Interactive verification polls (fake TTY + stubbed browser) ─────────────
+
+const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { openTtyPrompt } = require('./lib/interactive.js');
+
+test('zone: pending zone with a manual registrar opens its nameserver page and polls until active', async () => {
+  const ensureZone = require('../src/services/cloudflare/ensure/zone.js');
+  const api = fakeApi({
+    zones: [{ id: 'zone-p', name: DOMAIN, status: 'pending', name_servers: ['a.ns.cloudflare.com'] }],
+    responses: {
+      'GET /accounts': [{ id: 'acct-1' }],
+      // The poll's first re-read already sees the activated zone
+      'GET /zones/zone-p': { id: 'zone-p', name: DOMAIN, status: 'active' },
+    },
+  });
+  const config = brandConfig();
+  config.domain.provider = 'squarespace';
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = ensureZone(handlerContext(config, api));
+    await tty.answer('Open browser now?', '\r');
+    const result = await run;
+
+    assert.equal(result.state.zoneId, 'zone-p');
+    assert.equal(result.output.zone.status, 'active');
+    assert.deepEqual(opened, [`https://account.squarespace.com/domains/managed/${DOMAIN}/dns/domain-nameservers`]);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('zone: pending zone with an API registrar defers to the domain service even interactively', async () => {
+  const ensureZone = require('../src/services/cloudflare/ensure/zone.js');
+  // No GET /zones/zone-p responder — a poll attempt would fail loudly
+  const api = fakeApi({
+    zones: [{ id: 'zone-p', name: DOMAIN, status: 'pending', name_servers: ['a.ns.cloudflare.com'] }],
+    responses: { 'GET /accounts': [{ id: 'acct-1' }] },
+  });
+  const config = brandConfig();
+  config.domain.provider = 'namecheap';
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const result = await ensureZone(handlerContext(config, api));
+
+    assert.equal(result.output.zone.status, 'pending');
+    assert.deepEqual(opened, []);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('email-routing: interactive run opens the dashboard and retries the write once verified', async () => {
+  const ensureEmailRouting = require('../src/services/cloudflare/ensure/email-routing.js');
+  const config = brandConfig();
+  config.domain.email.provider = 'cloudflare';
+  config.domain.email.forwarding = [{ from: 'support', to: 'new@corp.test' }];
+
+  let attempts = 0;
+  const api = fakeApi({
+    responses: {
+      'GET /zones/zone-1/email/routing': { enabled: true },
+      'GET /zones/zone-1/email/routing/rules': [],
+      'POST /zones/zone-1/email/routing/rules': () => {
+        attempts++;
+        if (attempts === 1) {
+          throw new Error('Cloudflare API Error: [{"code":2054,"message":"destination address not verified"}]');
+        }
+        return {};
+      },
+      'GET /zones/zone-1': { account: { id: 'acct-1' } },
+      'POST /accounts/acct-1/email/routing/addresses': {},
+      'GET /zones/zone-1/email/routing/rules/catch_all': { enabled: false },
+    },
+  });
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = ensureEmailRouting(handlerContext(config, api));
+    await tty.answer('Open browser now?', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.output.emailRouting.created, 1);
+    assert.equal(result.output.emailRouting.unverified, 0);
+    assert.deepEqual(opened, ['https://dash.cloudflare.com/acct-1/email-routing/destination-addresses']);
+    assert.equal(attempts, 2); // initial write + the poll's retry after verification
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});

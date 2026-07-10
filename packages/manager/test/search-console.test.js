@@ -396,3 +396,37 @@ test('search-console: dry-run on a fully drifted brand performs zero mutations',
   assert.equal(cf.calls.length, 0);
   assert.equal(result.output.property.planned, 'verify-and-add');
 });
+
+test('search-console: interactive run polls verification until DNS propagates, then adds the property', async () => {
+  let verifies = 0;
+  const gsc = fakeGsc({
+    listSites: [],
+    getVerificationToken: { token: TOKEN },
+    verifySite: () => {
+      verifies++;
+      if (verifies === 1) {
+        throw new Error('HTTP 400: The necessary verification token could not be found on your site.');
+      }
+      return { site: { identifier: DOMAIN } };
+    },
+    addSite: { added: true },
+    listSitemaps: [{ path: SITEMAP_URL }],
+  });
+  const cf = fakeCf();
+  const tty = openTtyPrompt();
+
+  try {
+    const result = await runService(brandConfig(), {
+      gsc,
+      cloudflare: cf,
+      brandState: { 'search-console': { gaLinked: true } },
+    });
+
+    assert.equal(result.status, 'success');
+    assert.equal(verifies, 2); // initial attempt + the poll's first re-check
+    assert.deepEqual(gsc.callsTo('addSite')[0].args, [PROPERTY_URL]);
+    assert.equal(result.state.propertyUrl, PROPERTY_URL);
+  } finally {
+    tty.close();
+  }
+});

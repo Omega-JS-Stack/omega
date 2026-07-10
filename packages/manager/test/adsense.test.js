@@ -200,3 +200,30 @@ test('setup: interactive run offers account selection and lands adsense.accountI
     setBrowserOpener(null);
   }
 });
+
+test('sites: interactive run opens the add-site page and polls until the site appears', async () => {
+  let listCalls = 0;
+  const api = fakeAdsense();
+  api.listSites = async (accountId) => {
+    api.calls.push({ method: 'listSites', accountId });
+    listCalls++;
+    return listCalls === 1 ? [] : [{ domain: DOMAIN, state: 'READY' }];
+  };
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig(), { adsense: api });
+    await tty.answer('Open browser now?', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.output.sites.state, 'READY');
+    assert.deepEqual(opened, [SITES_URL]);
+    assert.equal(listCalls, 2); // initial read + the poll's first re-check
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});

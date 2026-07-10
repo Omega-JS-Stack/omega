@@ -18,9 +18,7 @@ const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { NamecheapAPI } = require('./lib/namecheap-api.js');
-
-// Registrars reconciled via API; everything else gets manual instructions
-const API_PROVIDERS = new Set(['namecheap']);
+const { API_PROVIDERS } = require('./lib/registrars.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,

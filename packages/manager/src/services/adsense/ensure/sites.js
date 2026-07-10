@@ -3,11 +3,14 @@
  * state.
  *
  * The Management API v2 has no writes, so presence with a READY state is the
- * converged proof and everything else is guidance: missing → warned with the
- * add-site console deep-link (no API exists to add a site — rerun converges
- * once it appears), non-READY → warned with what Google is waiting on.
+ * converged proof and everything else is guidance: missing → interactive runs
+ * open the add-site console page and poll until the site appears,
+ * non-interactive/dry runs warn with the deep-link (rerun converges once it
+ * appears); non-READY → warned with what Google is waiting on.
  */
 const chalk = require('chalk').default;
+const { isInteractive } = require('@omegajs/devkit/prompt');
+const { openBrowserAndPoll } = require('@omegajs/devkit/flows');
 
 // AdSense site approval states → run status + operator guidance
 const STATES = {
@@ -18,20 +21,49 @@ const STATES = {
 };
 
 module.exports = async function ensureSites(context) {
-  const { adsenseApi, accountId, domain } = context;
+  const { adsenseApi, accountId, domain, options = {} } = context;
 
   const sitesUrl = `https://adsense.google.com/adsense/u/0/${accountId}/sites/list?url=${domain}`;
+  const matchesDomain = (entry) => entry.domain === domain || entry.domain === `www.${domain}`;
 
   const sites = await adsenseApi.listSites(accountId);
-  const site = sites.find((entry) => entry.domain === domain || entry.domain === `www.${domain}`);
+  const site = sites.find(matchesDomain);
 
-  if (!site) {
-    console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(domain)} is not added to AdSense`);
-    console.log(`      ${chalk.dim('→')} No API exists to add it — add the site at: ${chalk.cyan(sitesUrl)}`);
-    console.log(`      ${chalk.dim('→')} (rerun converges once it appears)`);
-    return { status: 'warned', output: { sites: { domain, state: null, addUrl: sitesUrl } } };
+  if (site) {
+    return reportSite(site, sitesUrl);
   }
 
+  console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(domain)} is not added to AdSense ${chalk.dim('(no API exists to add it)')}`);
+
+  // Interactive runs open the add-site page and poll until it appears
+  if (isInteractive() && !options.dryRun) {
+    const result = await openBrowserAndPoll({
+      url: sitesUrl,
+      promptMessage: `Add ${chalk.cyan(domain)} as a site in the AdSense console.`,
+      waitMessage: 'Waiting for the site to appear',
+      check: async () => {
+        const fresh = (await adsenseApi.listSites(accountId)).find(matchesDomain);
+        return fresh ? { done: true, result: fresh } : { done: false };
+      },
+      intervalMs: 5000,
+      indent: '        ',
+    });
+
+    if (result.success && result.result) {
+      return reportSite(result.result, sitesUrl);
+    }
+  }
+
+  console.log(`      ${chalk.dim('→')} Add the site at: ${chalk.cyan(sitesUrl)}`);
+  console.log(`      ${chalk.dim('→')} (rerun converges once it appears)`);
+  return { status: 'warned', output: { sites: { domain, state: null, addUrl: sitesUrl } } };
+};
+
+/**
+ * Report a present site's approval state (READY = success, anything else =
+ * warned with the console deep-link).
+ */
+function reportSite(site, sitesUrl) {
   const state = site.state || 'STATE_UNSPECIFIED';
   const display = STATES[state] || { status: 'warned', label: state };
 
@@ -56,4 +88,4 @@ module.exports = async function ensureSites(context) {
       },
     },
   };
-};
+}

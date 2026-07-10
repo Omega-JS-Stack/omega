@@ -6,11 +6,14 @@
  * api.{sub}.{domain} for each brand.subdomains entry. The main domain is NOT
  * added — the website hosts elsewhere (GitHub Pages).
  *
- * Per domain, ONE reconciliation pass (omega-manager's interactive
- * verification poll is next up as a verification-poll adoption):
+ * Per domain, one reconciliation pass:
  *   verified  → ensure the Cloudflare CNAME is proxied
  *   pending   → write Firebase's required DNS records (TXT ownership/ACME +
- *               unproxied CNAME), report state, warned — rerun converges
+ *               unproxied CNAME); interactive runs then poll until Firebase
+ *               verifies (writing any NEW records it demands mid-poll — the
+ *               ACME challenge appears once ownership passes) and finish by
+ *               proxying the CNAME; non-interactive/dry runs report state,
+ *               warned — rerun converges
  *   deleted   → undelete, then treat as pending
  *   missing   → create, then treat as pending
  *
@@ -18,6 +21,8 @@
  * required records are printed instead and the operation warns.
  */
 const chalk = require('chalk').default;
+const { isInteractive } = require('@omegajs/devkit/prompt');
+const { pollWithSpinner } = require('@omegajs/devkit/flows');
 
 module.exports = async function ensureHosting(context) {
   const { firebaseApi: api, cloudflareApi, brandConfig, projectId, domain, apexDomain, isSubdomainProject, options = {} } = context;
@@ -137,8 +142,61 @@ async function ensureApiDomain(context, zone, apiDomain) {
   await ensureFirebaseDnsRecords(context, zone, status.requiredDnsUpdates, recordName);
   await ensureCname(context, zone, recordName, { proxied: false });
 
+  // Interactive runs wait for Firebase to verify (DNS propagation)
+  if (isInteractive() && !options.dryRun) {
+    const verified = await waitForVerification(context, zone, fullDomain, recordName, status);
+    if (verified) {
+      console.log(`      ${chalk.green('✓')} Domain verified: ${chalk.cyan(fullDomain)}`);
+      await ensureCname(context, zone, recordName, { proxied: true });
+      return { domain: fullDomain, status: 'verified' };
+    }
+  }
+
   console.log(`      ${chalk.dim('→')} Rerun after DNS propagates — verification converges on a later pass`);
   return { domain: fullDomain, status: 'pending' };
+}
+
+/**
+ * Poll Firebase until the domain verifies. Firebase can demand NEW DNS
+ * records mid-verification (the ACME challenge appears once ownership
+ * passes) — those are written as they show up.
+ *
+ * @returns {boolean} - Whether the domain reached verified
+ */
+async function waitForVerification(context, zone, fullDomain, recordName, initialStatus) {
+  const { firebaseApi: api, projectId } = context;
+  let lastStates = '';
+  let lastDnsUpdateCount = (initialStatus.requiredDnsUpdates || []).length;
+
+  const result = await pollWithSpinner({
+    check: async () => {
+      const status = await api.checkDomainStatus(projectId, projectId, fullDomain);
+
+      if (status.verified) {
+        return { done: true };
+      }
+
+      const dnsUpdates = status.requiredDnsUpdates || [];
+      if (dnsUpdates.length > 0 && dnsUpdates.length !== lastDnsUpdateCount) {
+        console.log(`        ${chalk.dim('→')} Firebase requires new DNS records — writing...`);
+        await ensureFirebaseDnsRecords(context, zone, dnsUpdates, recordName);
+        lastDnsUpdateCount = dnsUpdates.length;
+      }
+
+      const states = `${status.ownershipState || 'ownership pending'}, ${status.hostState || 'host pending'}${status.certState ? `, ${status.certState}` : ''}`;
+      if (states !== lastStates) {
+        console.log(`        ${chalk.dim(`→ ${states}`)}`);
+        lastStates = states;
+      }
+
+      return { done: false };
+    },
+    intervalMs: 5000,
+    message: 'Waiting for DNS propagation',
+    indent: '        ',
+  });
+
+  return result.success;
 }
 
 // ─── Cloudflare DNS helpers (via the zone-scoped REST endpoints) ─────────────

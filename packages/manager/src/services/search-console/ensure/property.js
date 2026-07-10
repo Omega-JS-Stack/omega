@@ -5,11 +5,17 @@
  * one is created in one pass: fetch the DNS_TXT verification token (idempotent
  * — Google returns the same token until it's used), write the TXT record via
  * Cloudflare (stale google-site-verification records at the same name are
- * replaced), then attempt verification ONCE — DNS still propagating reports
- * warned and the rerun converges (omega-manager span an interactive
- * poll-with-spinner here).
+ * replaced), then verify — interactive runs poll until DNS propagates;
+ * non-interactive/dry runs attempt verification ONCE, report warned, and the
+ * rerun converges.
  */
 const chalk = require('chalk').default;
+const { isInteractive } = require('@omegajs/devkit/prompt');
+const { pollWithSpinner } = require('@omegajs/devkit/flows');
+
+// Google answers this when the domain was verified by an earlier attempt
+const isAlreadyVerified = (error) => error.message.includes('already verified')
+  || error.message.includes('already been verified');
 
 module.exports = async function ensureProperty(context) {
   const { searchConsoleApi: api, cloudflareApi, domain, apexDomain, propertyUrl, options = {} } = context;
@@ -82,16 +88,40 @@ module.exports = async function ensureProperty(context) {
     console.log(`      ${chalk.green('✓')} Verification TXT record added`);
   }
 
-  // === Verify once — DNS may need a minute; the rerun converges ===
+  // === Verify — DNS may need a minute; interactive runs wait it out ===
+  let verified = false;
+  let lastError = null;
   try {
     await api.verifySite(domain, 'DNS_TXT', 'INET_DOMAIN');
-    console.log(`      ${chalk.green('✓')} Domain verified`);
+    verified = true;
   } catch (error) {
-    if (!error.message.includes('already verified') && !error.message.includes('already been verified')) {
-      console.log(`      ${chalk.yellow('⚠')} Verification pending${chalk.dim(` (${error.message})`)} — DNS is likely still propagating, rerun in a few minutes`);
-      return { status: 'warned', output: { property: { pendingVerification: true } } };
-    }
+    verified = isAlreadyVerified(error);
+    lastError = error.message;
   }
+
+  if (!verified && isInteractive() && !options.dryRun) {
+    const result = await pollWithSpinner({
+      check: async () => {
+        try {
+          await api.verifySite(domain, 'DNS_TXT', 'INET_DOMAIN');
+          return { done: true };
+        } catch (error) {
+          // Anything else = DNS still propagating; keep polling
+          return isAlreadyVerified(error) ? { done: true } : { done: false };
+        }
+      },
+      intervalMs: 5000,
+      message: 'Waiting for DNS propagation',
+      indent: '        ',
+    });
+    verified = result.success;
+  }
+
+  if (!verified) {
+    console.log(`      ${chalk.yellow('⚠')} Verification pending${lastError ? chalk.dim(` (${lastError})`) : ''} — DNS is likely still propagating, rerun in a few minutes`);
+    return { status: 'warned', output: { property: { pendingVerification: true } } };
+  }
+  console.log(`      ${chalk.green('✓')} Domain verified`);
 
   // === Add the property ===
   try {

@@ -4,9 +4,9 @@
  *
  * The Management API v2 is read-only (sites can't be added or configured
  * programmatically), so this service proves presence + state and deep-links
- * the console for the manual half; the add-site browser poll loop is next up as a
- * verification-poll adoption. Never mutates AdSense — dry-run is identical to a normal
- * run.
+ * the console for the manual half; interactive runs open the add-site page
+ * and poll until the site appears. Never mutates AdSense — dry-run is
+ * identical to a normal run.
  *
  * accountId (pub-…) is required config — omega-manager defaulted it to the
  * company's shared account (company-level config supplies that now).

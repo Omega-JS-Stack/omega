@@ -4,11 +4,14 @@
  * Only runs when domain.email.provider === 'cloudflare'; rules come from
  * domain.email.forwarding [{ from: 'support' | '*', to: 'inbox@…' }].
  *
- * Unverified destination addresses: a verification email is sent and the
- * operation returns warned with the dashboard URL — rerun after verifying
- * (omega-manager's browser-open + poll is next up as a verification-poll adoption).
+ * Unverified destination addresses: a verification email is sent; interactive
+ * runs open the dashboard and retry the rule write until the address verifies,
+ * non-interactive/dry runs return warned with the dashboard URL — rerun after
+ * verifying.
  */
 const chalk = require('chalk').default;
+const { isInteractive } = require('@omegajs/devkit/prompt');
+const { openBrowserAndPoll } = require('@omegajs/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
 
@@ -21,8 +24,13 @@ async function getAccountId(api, zoneId) {
   return zone.result.account.id;
 }
 
-// Send a verification email for the destination; warn with the dashboard URL
-async function handleUnverified(api, zoneId, destination) {
+/**
+ * Send a verification email for the destination; interactive runs then open
+ * the dashboard and retry the rule write until the address verifies.
+ *
+ * @returns {boolean} - true when the rule landed after verification
+ */
+async function handleUnverified(api, zoneId, destination, retryWrite, options = {}) {
   console.log(`      ${chalk.yellow('⚠')} Destination ${chalk.cyan(destination)} is not verified in Cloudflare`);
 
   const accountId = await getAccountId(api, zoneId);
@@ -40,7 +48,38 @@ async function handleUnverified(api, zoneId, destination) {
     }
   }
 
-  console.log(`      ${chalk.dim(`Verify at: https://dash.cloudflare.com/${accountId}/email-routing/destination-addresses — then rerun`)}`);
+  const dashboardUrl = `https://dash.cloudflare.com/${accountId}/email-routing/destination-addresses`;
+
+  if (isInteractive() && !options.dryRun) {
+    const result = await openBrowserAndPoll({
+      url: dashboardUrl,
+      promptMessage: `Verify ${chalk.cyan(destination)} in Cloudflare Email Routing (check the inbox).`,
+      waitMessage: 'Checking verification',
+      indent: '      ',
+      check: async () => {
+        try {
+          await retryWrite();
+          return { done: true };
+        } catch (error) {
+          if (isUnverifiedError(error)) {
+            return { done: false };
+          }
+          return { done: true, error: error.message };
+        }
+      },
+    });
+
+    if (result.success) {
+      console.log(`      ${chalk.green('✓')} Verified — rule created`);
+      return true;
+    }
+    if (result.error) {
+      console.log(`      ${chalk.yellow('⚠')} Rule write failed${chalk.dim(`: ${result.error}`)}`);
+    }
+  }
+
+  console.log(`      ${chalk.dim(`Verify at: ${dashboardUrl} — then rerun`)}`);
+  return false;
 }
 
 module.exports = async function ensureEmailRouting(context) {
@@ -113,22 +152,27 @@ module.exports = async function ensureEmailRouting(context) {
       planned++;
     } else {
       console.log(`      ${chalk.dim('→')} Updating catch-all: ${chalk.cyan('*')} → ${chalk.dim(desiredCatchAll.to)}`);
+      const putCatchAll = () => api.makeRequest(`/zones/${zoneId}/email/routing/rules/catch_all`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          matchers: [{ type: 'all' }],
+          actions: [{ type: 'forward', value: [desiredCatchAll.to] }],
+          enabled: true,
+          name: 'Catch-all',
+        }),
+      });
       try {
-        await api.makeRequest(`/zones/${zoneId}/email/routing/rules/catch_all`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            matchers: [{ type: 'all' }],
-            actions: [{ type: 'forward', value: [desiredCatchAll.to] }],
-            enabled: true,
-            name: 'Catch-all',
-          }),
-        });
+        await putCatchAll();
         console.log(`      ${chalk.green('✓')} Updated`);
         updated++;
       } catch (error) {
         if (!isUnverifiedError(error)) throw error;
-        await handleUnverified(api, zoneId, desiredCatchAll.to);
-        unverified++;
+        const resolved = await handleUnverified(api, zoneId, desiredCatchAll.to, putCatchAll, options);
+        if (resolved) {
+          updated++;
+        } else {
+          unverified++;
+        }
       }
     }
   }
@@ -160,22 +204,28 @@ module.exports = async function ensureEmailRouting(context) {
 
     console.log(`      ${chalk.dim('→')} Creating rule: ${chalk.cyan(matcherValue)} → ${chalk.dim(desired.to)}`);
 
+    const postRule = () => api.makeRequest(`/zones/${zoneId}/email/routing/rules`, {
+      method: 'POST',
+      body: JSON.stringify({
+        matchers: [{ type: 'literal', field: 'to', value: matcherValue }],
+        actions: [{ type: 'forward', value: [desired.to] }],
+        enabled: true,
+        name: `Forward ${matcherValue}`,
+      }),
+    });
+
     try {
-      await api.makeRequest(`/zones/${zoneId}/email/routing/rules`, {
-        method: 'POST',
-        body: JSON.stringify({
-          matchers: [{ type: 'literal', field: 'to', value: matcherValue }],
-          actions: [{ type: 'forward', value: [desired.to] }],
-          enabled: true,
-          name: `Forward ${matcherValue}`,
-        }),
-      });
+      await postRule();
       console.log(`      ${chalk.green('✓')} Created`);
       created++;
     } catch (error) {
       if (!isUnverifiedError(error)) throw error;
-      await handleUnverified(api, zoneId, desired.to);
-      unverified++;
+      const resolved = await handleUnverified(api, zoneId, desired.to, postRule, options);
+      if (resolved) {
+        created++;
+      } else {
+        unverified++;
+      }
     }
   }
 

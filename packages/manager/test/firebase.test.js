@@ -679,3 +679,52 @@ test('project-flow: create-new prompts id + name and creates inside the configur
     tty.close();
   }
 });
+
+// ─── Hosting: interactive verification poll ──────────────────────────────────
+
+test('hosting: interactive run polls until verified, writing the mid-poll ACME record and proxying the CNAME', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const OWNERSHIP = { type: 'TXT', rdata: `hosting-site=${PROJECT}` };
+  const ACME = { type: 'TXT', rdata: 'acme-validation-token' };
+  const updates = (records, domainName = `api.${DOMAIN}`) => [{ domainName, desired: { records } }];
+
+  // missing → created-pending (1 required record) → still-pending with the
+  // ACME challenge added (2 records — must be written mid-poll) → verified
+  let checks = 0;
+  const api = fakeFirebase({
+    ...convergedResponses(),
+    createCustomDomain: {},
+    checkDomainStatus: () => {
+      checks++;
+      if (checks === 1) return { verified: false, exists: false };
+      if (checks === 2) return { verified: false, exists: true, ownershipState: 'OWNERSHIP_PENDING', hostState: 'HOST_UNHOSTED', requiredDnsUpdates: updates([OWNERSHIP]) };
+      if (checks === 3) return { verified: false, exists: true, ownershipState: 'OWNERSHIP_ACTIVE', hostState: 'HOST_UNHOSTED', requiredDnsUpdates: [...updates([OWNERSHIP]), ...updates([ACME], `_acme-challenge.api.${DOMAIN}`)] };
+      return { verified: true };
+    },
+  });
+  const cf = fakeCf();
+  const tty = openTtyPrompt();
+
+  try {
+    const run = handler(handlerContext(brandConfig(), api, { cloudflareApi: cf }));
+    // ENTER = "check now" — keep nudging so the poll never waits an interval
+    await tty.answer('check now', '\r');
+    const nudge = setInterval(() => { tty.answer('check now', '\r').catch(() => {}); }, 80);
+    let result;
+    try {
+      result = await run;
+    } finally {
+      clearInterval(nudge);
+    }
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.state.hosting.domains[0].status, 'verified');
+    assert.ok(checks >= 4);
+
+    const writes = cf.mutations();
+    assert.ok(writes.some((w) => w.body?.content === ACME.rdata)); // ACME TXT written mid-poll
+    assert.ok(writes.some((w) => w.body?.type === 'CNAME' && w.body?.proxied === true)); // proxied after verify
+  } finally {
+    tty.close();
+  }
+});

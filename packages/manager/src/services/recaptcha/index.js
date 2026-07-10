@@ -4,8 +4,8 @@
  * Classic reCAPTCHA has no key-management API, so the shared key's domain
  * list can't be reconciled; this service proves what it can (the secret key
  * in .env is valid, via the documented siteverify endpoint) and prints the
- * console link + domains for the manual half. The add-domain
- * browser flow is next up as a verification-poll adoption.
+ * console link + domains for the manual half. Interactive runs open the
+ * console and confirm the domain list once, stamping state.
  *
  * Auth: RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY in the brand .env.
  * Missing keys → the service skips with guidance.

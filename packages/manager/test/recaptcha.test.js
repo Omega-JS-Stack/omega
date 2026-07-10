@@ -40,7 +40,7 @@ function fakeRecaptcha({ errorCodes = ['invalid-input-response'] } = {}) {
   return api;
 }
 
-function runService(config, { recaptcha, options = {}, env = true } = {}) {
+function runService(config, { recaptcha, options = {}, env = true, serviceData = {} } = {}) {
   if (env) {
     process.env.RECAPTCHA_SITE_KEY = SITE_KEY;
     process.env.RECAPTCHA_SECRET_KEY = 'fixture-secret-key';
@@ -58,7 +58,7 @@ function runService(config, { recaptcha, options = {}, env = true } = {}) {
     apps: [],
     operations: OPERATIONS.recaptcha,
     options,
-    serviceData: {},
+    serviceData,
     recaptchaApi: recaptcha,
   });
 }
@@ -161,4 +161,57 @@ test('recaptcha: dry-run behaves identically — the probe is a pure read', asyn
   assert.equal(result.status, 'success');
   assert.equal(result.output.siteKey.secretValid, true);
   assert.equal(api.calls.length, 1);
+});
+
+// ─── Interactive add-domain confirm (manual-only poll + state stamp) ─────────
+
+const { setBrowserOpener } = require('@omegajs/devkit/flows');
+const { openTtyPrompt } = require('./lib/interactive.js');
+
+test('site-key: interactive run opens the console and stamps the confirmed domain list', async () => {
+  const api = fakeRecaptcha(); // invalid-input-response = valid secret
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig(), { recaptcha: api });
+    await tty.answer('Open browser now?', '\r');
+    // ENTER = "domains saved" — nudge until the manual-only poll picks it up
+    await tty.answer('(enter)=done', '\r');
+    const nudge = setInterval(() => { tty.answer('(enter)=done', '\r').catch(() => {}); }, 80);
+    let result;
+    try {
+      result = await run;
+    } finally {
+      clearInterval(nudge);
+    }
+
+    assert.equal(result.status, 'success');
+    assert.deepEqual(result.state.domainsConfirmed, [DOMAIN, `www.${DOMAIN}`]);
+    assert.deepEqual(opened, ['https://www.google.com/recaptcha/admin']);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('site-key: a stamped domain list never re-prompts, even interactively', async () => {
+  const api = fakeRecaptcha();
+  const opened = [];
+  setBrowserOpener(async (url) => { opened.push(url); return true; });
+  const tty = openTtyPrompt(); // interactive — without the stamp the flow WOULD prompt
+
+  try {
+    const result = await runService(brandConfig(), {
+      recaptcha: api,
+      serviceData: { domainsConfirmed: [DOMAIN, `www.${DOMAIN}`] },
+    });
+
+    assert.equal(result.status, 'success');
+    assert.deepEqual(opened, []); // no browser, no prompt — the run resolved unattended
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
 });
