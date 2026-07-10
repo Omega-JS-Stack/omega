@@ -4,7 +4,7 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layers
 
-Match the framework's four layers — Browser Extension Manager's test runner discovers files by the directory they sit in:
+Match the framework's four layers — OMEGA Extension's test runner discovers files by the directory they sit in:
 
 | Directory | Runtime | Use for |
 |---|---|---|
@@ -23,7 +23,7 @@ Tests that hit REAL external services (Firebase, push, network) are skipped by d
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('browser-extension-manager/test/assert');
+const assert = require('@omegajs/extension/test/assert');
 
 module.exports = {
   'my feature does the thing': async () => {
@@ -35,4 +35,4 @@ module.exports = {
 
 ## See also
 
-`node_modules/browser-extension-manager/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omegajs/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).

@@ -6,14 +6,14 @@ Each component context has its own Manager class — a one-line import + `initia
 
 | Context | Import | Source |
 |---|---|---|
-| Build-time (Node) | `require('browser-extension-manager/build')` | [src/build.js](../src/build.js) |
-| Background SW | `require('browser-extension-manager/background')` | [src/background.js](../src/background.js) |
-| Popup | `require('browser-extension-manager/popup')` | [src/popup.js](../src/popup.js) |
-| Options | `require('browser-extension-manager/options')` | [src/options.js](../src/options.js) |
-| Sidepanel | `require('browser-extension-manager/sidepanel')` | [src/sidepanel.js](../src/sidepanel.js) |
-| Pages (custom) | `require('browser-extension-manager/page')` | [src/page.js](../src/page.js) |
-| Content script | `require('browser-extension-manager/content')` | [src/content.js](../src/content.js) |
-| Offscreen | `require('browser-extension-manager/offscreen')` | [src/offscreen.js](../src/offscreen.js) |
+| Build-time (Node) | `require('@omegajs/extension/build')` | [src/build.js](../src/build.js) |
+| Background SW | `require('@omegajs/extension/background')` | [src/background.js](../src/background.js) |
+| Popup | `require('@omegajs/extension/popup')` | [src/popup.js](../src/popup.js) |
+| Options | `require('@omegajs/extension/options')` | [src/options.js](../src/options.js) |
+| Sidepanel | `require('@omegajs/extension/sidepanel')` | [src/sidepanel.js](../src/sidepanel.js) |
+| Pages (custom) | `require('@omegajs/extension/page')` | [src/page.js](../src/page.js) |
+| Content script | `require('@omegajs/extension/content')` | [src/content.js](../src/content.js) |
+| Offscreen | `require('@omegajs/extension/offscreen')` | [src/offscreen.js](../src/offscreen.js) |
 
 ## One-line bootstrap
 
@@ -21,7 +21,7 @@ Every consumer-side context entry is the same shape:
 
 ```js
 // src/assets/js/components/popup/index.js
-import Manager from 'browser-extension-manager/popup';
+import Manager from '@omegajs/extension/popup';
 
 const manager = new Manager();
 await manager.initialize();
@@ -38,22 +38,22 @@ The contexts that include `web-manager` (popup / options / sidepanel / page) als
 
 ## Build-time Manager
 
-`browser-extension-manager/build` is the build-time Manager — used in gulp tasks, CLI commands, and tests. Different surface from the runtime Managers:
+`@omegajs/extension/build` is the build-time Manager — used in gulp tasks, CLI commands, and tests. Different surface from the runtime Managers:
 
 ```js
-const Manager = require('browser-extension-manager/build');
+const Manager = require('@omegajs/extension/build');
 
 Manager.getConfig();         // → RESOLVED config/omega.json5 (targets.extension overlaid; via @omegajs/config)
 Manager.getManifest();       // → parsed src/manifest.json (JSON5)
 Manager.getPackage('project');   // → cwd's package.json
-Manager.getPackage('main');      // → BXM's own package.json
+Manager.getPackage('main');      // → @omegajs/extension's own package.json
 Manager.getRootPath('project');  // → process.cwd()
-Manager.getRootPath('main');     // → path to BXM's dist
+Manager.getRootPath('main');     // → path to @omegajs/extension's dist
 Manager.getEnvironment();    // → 'production' if BXM_BUILD_MODE=true else 'development'
 Manager.getLiveReloadPort(); // → 35729 by default
 Manager.isBuildMode();       // → boolean
 Manager.actLikeProduction(); // → buildMode || UJ_AUDIT_FORCE
-Manager.require(name);       // → borrow any of BXM's bundled deps (json5, fs-jetpack, etc.)
+Manager.require(name);       // → borrow any of @omegajs/extension's bundled deps (json5, fs-jetpack, etc.)
 Manager.logger(name);        // → new logger('name') instance
 Manager.reportBuildError(e); // → notifly + log
 ```
@@ -73,7 +73,7 @@ Each Manager's `initialize()`:
 7. **Install broadcast / sign-out / event listeners** — handles signin-from-other-context, signout propagation
 8. **Return the manager instance**
 
-Background.js is more involved — it owns the auth source of truth, listens for `bxm:syncAuth` from other contexts, handles the website token flow. See [auth.md](auth.md).
+Background.js is more involved — it owns the auth source of truth, listens for `omega:syncAuth` from other contexts, handles the website token flow. See [auth.md](auth.md).
 
 ## Auth-related shortcuts (popup / options / sidepanel / page)
 

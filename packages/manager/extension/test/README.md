@@ -17,7 +17,7 @@ Match the framework's four layers — Browser Extension Manager's test runner di
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('browser-extension-manager/test/assert');
+const assert = require('@omegajs/extension/test/assert');
 
 module.exports = {
   'my feature does the thing': async () => {
@@ -29,4 +29,4 @@ module.exports = {
 
 ## See also
 
-`node_modules/browser-extension-manager/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omegajs/extension/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).

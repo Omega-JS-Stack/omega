@@ -1,10 +1,10 @@
 {
-  "name": "browser-extension-manager-template",
+  "name": "omega-manager-extension",
   "version": "1.0.0",
-  "description": "Browser extension template that builds for Chrome, Firefox, & Opera.",
+  "description": "OMEGA Manager companion extension — bookmark filing + trusted browser automation.",
   "scripts": {
     "start": "npx mgr clean && npx mgr setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/browser-extension-manager/dist/gulp/main.js",
+    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omegajs/extension/dist/gulp/main.js",
     "build": "npx mgr clean && npx mgr setup && BXM_BUILD_MODE=true npm run gulp -- build",
     "publish": "BXM_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",
@@ -17,8 +17,8 @@
   },
   "license": "ISC",
   "devDependencies": {
-    "browser-extension-manager": "^1.5.0",
-    "gulp": "^5.0.1"
+    "gulp": "^5.0.1",
+    "@omegajs/extension": "file:../../extension"
   },
   "dependencies": {},
   "private": true

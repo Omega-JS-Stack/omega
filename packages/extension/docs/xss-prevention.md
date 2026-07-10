@@ -37,7 +37,7 @@ Do NOT:
 - Wrap: `const escape = (s) => webManager.utilities().escapeHTML(s);`
 - Destructure: `const { escapeHTML } = webManager.utilities();`
 - `.bind()` it
-- Define a local `escapeHtml`/`escapeHTML` helper in a `utils.js` and import it across files — this is the most common violation in BXM extensions. Delete the helper, add `import webManager from 'web-manager'`, inline the canonical form at every call site.
+- Define a local `escapeHtml`/`escapeHTML` helper in a `utils.js` and import it across files — this is the most common violation in @omegajs/extension extensions. Delete the helper, add `import webManager from 'web-manager'`, inline the canonical form at every call site.
 
 ## URLs Must Also Be Sanitized
 

@@ -3,7 +3,7 @@
 // ============================================
 
 // Import Browser Extension Manager
-import Manager from 'browser-extension-manager/options';
+import Manager from '@omegajs/extension/options';
 
 // Create instance
 const manager = new Manager();

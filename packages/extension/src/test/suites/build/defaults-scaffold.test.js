@@ -66,6 +66,25 @@ module.exports = {
       },
     },
     {
+      // The legacy-1.7.4 regression: no FILE_MAP rule matched test/**, so shipped
+      // test files fell through to the engine's overwrite: true default and every
+      // setup rerun reset the consumer's fixture hook to the stub.
+      name: 'test/** is copy-once: consumer test/_init.js survives re-scaffold',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        scaffoldDefaults({ outputDir: tmp });
+
+        // Seeded on first run
+        ctx.expect(jetpack.exists(path.join(tmp, 'test', '_init.js'))).toBeTruthy();
+
+        // Consumer customizes the fixture hook; a rerun must not clobber it
+        jetpack.write(path.join(tmp, 'test', '_init.js'), '// consumer fixture hook\n');
+        scaffoldDefaults({ outputDir: tmp });
+
+        ctx.expect(jetpack.read(path.join(tmp, 'test', '_init.js'))).toBe('// consumer fixture hook\n');
+      },
+    },
+    {
       name: 'converges: after the first re-run the tree is stable',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));

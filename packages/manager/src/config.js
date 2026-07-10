@@ -46,7 +46,7 @@ const TARGET_APP_DIRS = Object.fromEntries(
 const TARGET_FRAMEWORKS = {
   web: '@omegajs/web',
   backend: 'backend-manager',
-  extension: 'browser-extension-manager',
+  extension: '@omegajs/extension',
   desktop: 'electron-manager',
 };
 

@@ -4,7 +4,7 @@
 // ============================================
 
 // Import Browser Extension Manager
-import Manager from 'browser-extension-manager/offscreen';
+import Manager from '@omegajs/extension/offscreen';
 
 // Constants
 const WS_URL = 'ws://localhost:9876';

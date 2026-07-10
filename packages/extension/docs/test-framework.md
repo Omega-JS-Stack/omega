@@ -1,23 +1,23 @@
 # Test Framework
 
-Built-in test framework for both BXM itself and consumer projects. Jest-like assertion syntax (`expect(actual).toBe(expected)`), four layers, BEM/EM-style output.
+Built-in test framework for both @omegajs/extension itself and consumer projects. Jest-like assertion syntax (`expect(actual).toBe(expected)`), four layers, BEM/EM-style output.
 
 ## Running tests
 
 ```bash
-npx bxm test                          # runs framework + project suites
-npx bxm test --layer build            # only build-layer suites (plain Node, fast)
-npx bxm test --layer background       # only background-layer suites (real MV3 SW)
-npx bxm test --layer view             # only view-layer suites (popup/options/sidepanel)
-npx bxm test --layer boot             # only boot-layer suites (real consumer extension)
-npx bxm test --filter "messaging"     # only suites/tests whose name contains "messaging"
-npx bxm test --extended               # run extended suites against REAL external services (Firebase, etc.) — normal mode skips them in-source, never mocks them
-TEST_EXTENDED_MODE=true npx bxm test  # same as --extended (the shared, unprefixed env var across BEM/BXM/UJM/EM)
-npx bxm test --reporter json          # pretty output + machine-readable {"event":"summary",...} line
-BXM_TEST_DEBUG=1 npx bxm test         # see Chromium/SW stderr (otherwise drained silently)
+npx mgr test                          # runs framework + project suites
+npx mgr test --layer build            # only build-layer suites (plain Node, fast)
+npx mgr test --layer background       # only background-layer suites (real MV3 SW)
+npx mgr test --layer view             # only view-layer suites (popup/options/sidepanel)
+npx mgr test --layer boot             # only boot-layer suites (real consumer extension)
+npx mgr test --filter "messaging"     # only suites/tests whose name contains "messaging"
+npx mgr test --extended               # run extended suites against REAL external services (Firebase, etc.) — normal mode skips them in-source, never mocks them
+TEST_EXTENDED_MODE=true npx mgr test  # same as --extended (the shared, unprefixed env var across all OMEGA frameworks)
+npx mgr test --reporter json          # pretty output + machine-readable {"event":"summary",...} line
+BXM_TEST_DEBUG=1 npx mgr test         # see Chromium/SW stderr (otherwise drained silently)
 ```
 
-In BXM itself, `npm test` does the same.
+In @omegajs/extension itself, `npm test` does the same.
 
 All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh on each run — same pattern as EM's `test.log` and BEM's `test.log`. Grep it after a run instead of scrolling terminal output.
 
@@ -43,13 +43,13 @@ npx mgr test project:custom-test
 # ONLY framework tests (mgr: is the universal cross-framework alias)
 npx mgr test mgr:
 
-# ONLY framework tests (BXM-specific aliases — equivalent to mgr:)
-npx mgr test bxm:
+# ONLY framework tests (extension-specific aliases — equivalent to mgr:)
+npx mgr test extension:
 npx mgr test framework:
 
 # Framework tests matching a path
 npx mgr test mgr:build/config
-npx mgr test bxm:build/config
+npx mgr test extension:build/config
 
 # Bare path (no prefix) — BOTH sources, matched by path
 npx mgr test build/config
@@ -63,8 +63,8 @@ The source prefix is standardized across all four OMEGA frameworks:
 | `project:` | ONLY project tests (all of them) |
 | `project:<path>` | Only project tests matching `<path>` |
 | `mgr:` | ONLY framework tests (`mgr:` is the universal alias for "the manager's own tests") |
-| `bxm:` / `framework:` | ONLY framework tests (BXM-specific aliases, equivalent to `mgr:`) |
-| `mgr:<path>` / `bxm:<path>` | Framework tests matching `<path>` |
+| `extension:` / `framework:` | ONLY framework tests (extension-specific aliases, equivalent to `mgr:`) |
+| `mgr:<path>` / `extension:<path>` | Framework tests matching `<path>` |
 | `<path>` (bare) | BOTH sources, matched by `<path>` |
 
 A source-prefixed target excludes the other source entirely; the path part (if any) matches by relative path prefix (relative to each source's `test/` root).
@@ -104,19 +104,19 @@ Every layer hands your test the **real** runtime, never a hand-rolled fake:
 
 ### Real external APIs are GATED, NOT mocked
 
-Tests that hit a real external service (Firebase, push, any network call) live in **extended suites** and are gated behind extended mode (`npx bxm test --extended` or `TEST_EXTENDED_MODE=true`):
+Tests that hit a real external service (Firebase, push, any network call) live in **extended suites** and are gated behind extended mode (`npx mgr test --extended` or `TEST_EXTENDED_MODE=true`):
 
-- **Normal mode** (`npx bxm test`) **SKIPS** these calls **in-source** — guard them with `ctx.skip(reason)` (or an early return) so the test no-ops when extended mode is off. The external API is **skipped in-source, NOT mocked.** Never stand up a fake Firebase / fake fetch to make a normal-mode run go green.
-- **Extended mode** (`npx bxm test --extended`) runs the same code against the **real** service.
+- **Normal mode** (`npx mgr test`) **SKIPS** these calls **in-source** — guard them with `ctx.skip(reason)` (or an early return) so the test no-ops when extended mode is off. The external API is **skipped in-source, NOT mocked.** Never stand up a fake Firebase / fake fetch to make a normal-mode run go green.
+- **Extended mode** (`npx mgr test --extended`) runs the same code against the **real** service.
 - **Anything an extended test creates externally MUST be cleaned up by the test** — delete the doc/user/record it created (use the suite/group `cleanup: async (ctx) => { ... }` hook, which runs after the last test). Leave no residue in the real backend.
 
 ### Extended mode (`TEST_EXTENDED_MODE`)
 
 Extended mode is the opt-in for tests that hit REAL external services (Firebase via web-manager, push, any network call from the background SW / popup / content scripts) instead of skipping them.
 
-- **Skipped by default.** `npx bxm test` runs fast and offline-safe — external calls no-op in-source.
+- **Skipped by default.** `npx mgr test` runs fast and offline-safe — external calls no-op in-source.
 - **Opt in** with `npx mgr test --extended` (CLI shorthand) or `TEST_EXTENDED_MODE=true npx mgr test` (env var). `TEST_EXTENDED_MODE=1` is also accepted.
-- **Shared, unprefixed name across BEM/BXM/UJM/EM.** All four OMEGA frameworks read the SAME `TEST_EXTENDED_MODE` env var (the canonical name is BEM's) — no `BXM_`-prefixed variant.
+- **Shared, unprefixed name across all OMEGA frameworks.** All four OMEGA frameworks read the SAME `TEST_EXTENDED_MODE` env var (the canonical name is BEM's) — no `BXM_`-prefixed variant.
 - **Propagates to every spawned test environment.** The command sets `process.env.TEST_EXTENDED_MODE = 'true'`, which is visible to the in-process Node runner and inherited by Puppeteer's Chromium (background / view / boot layers) since `puppeteer.launch()` inherits `process.env`.
 - **The warning prints.** When on, the command logs `Test mode: extended (real external APIs)` plus a `⚠️` banner (teed to `logs/test.log`); when off it logs `normal (external APIs skipped)`.
 - **Tests gate on `process.env.TEST_EXTENDED_MODE`.** Guard external-service tests with `if (process.env.TEST_EXTENDED_MODE !== 'true') ctx.skip('extended mode off');` (or an early return) so they no-op in normal mode.
@@ -144,9 +144,9 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 ## `BXM_TEST_MODE=true` — the canonical "we're in tests" signal
 
-Both BXM test runners set `BXM_TEST_MODE=true` in spawned child envs. That powers `manager.isTesting()` (and `Manager.isTesting()` static) — the cross-context helper anything in BXM/consumer code should check when behavior needs to differ in tests. See [environment-detection.md](environment-detection.md).
+Both @omegajs/extension test runners set `BXM_TEST_MODE=true` in spawned child envs. That powers `manager.isTesting()` (and `Manager.isTesting()` static) — the cross-context helper anything in @omegajs/extension/consumer code should check when behavior needs to differ in tests. See [environment-detection.md](environment-detection.md).
 
-Consumers writing their own tests get this automatically when running through `npx bxm test`. To set it manually in another runner:
+Consumers writing their own tests get this automatically when running through `npx mgr test`. To set it manually in another runner:
 
 ```json
 "test": "BXM_TEST_MODE=true vitest"
@@ -154,16 +154,16 @@ Consumers writing their own tests get this automatically when running through `n
 
 ## Test discovery
 
-- **Framework defaults**: `<BXM>/dist/test/suites/**/*.js`
+- **Framework defaults**: `<@omegajs/extension>/dist/test/suites/**/*.js`
 - **Consumer suites**: `<cwd>/test/**/*.js`
 
 **The underscore convention** (`DISCOVERY_IGNORE` in `src/test/runner.js`): `_`-prefixed FILES (`test/_init.js`, `test/page/_helper.js`) and everything under a `_`-prefixed DIRECTORY at **any depth** (`test/_fixtures/**`, `test/boot/_private/**`) are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in BEM/EM/UJM. Files load alphabetically.
 
-**Framework's boot suites are scoped to BXM self-test runs only.** When a consumer runs `npx bxm test`, the framework's `dist/test/suites/boot/**` is excluded from discovery (those tests assert on BXM's internal fixture extension). Consumers write their own boot tests under `<cwd>/test/boot/`. See [test-boot-layer.md](test-boot-layer.md).
+**Framework's boot suites are scoped to @omegajs/extension self-test runs only.** When a consumer runs `npx mgr test`, the framework's `dist/test/suites/boot/**` is excluded from discovery (those tests assert on @omegajs/extension's internal fixture extension). Consumers write their own boot tests under `<cwd>/test/boot/`. See [test-boot-layer.md](test-boot-layer.md).
 
 ## `test/_init.js` — pre-test lifecycle hook
 
-The runner loads an optional `test/_init.js` from **both** test roots — the framework (`<BXM>/test/_init.js`) and the consumer project (`<cwd>/test/_init.js`) — and runs it **once, before any suite** (it is NOT itself run as a test; the `_`-prefix keeps it out of discovery). Mirrors the same hook in BEM/EM/UJM so all four frameworks share one shape.
+The runner loads an optional `test/_init.js` from **both** test roots — the framework (`<@omegajs/extension>/test/_init.js`) and the consumer project (`<cwd>/test/_init.js`) — and runs it **once, before any suite** (it is NOT itself run as a test; the `_`-prefix keeps it out of discovery). Mirrors the same hook in BEM/EM/UJM so all four frameworks share one shape.
 
 The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ projectRoot }` and returning the hook object. It may declare:
 
@@ -284,16 +284,16 @@ ctx.expect(actual).not.toBe(expected)                  // negation: every matche
 
 ## Consumer pattern — use the public Manager API
 
-Don't `require('json5')` or other transitive BXM deps directly from consumer tests — they're not in your `package.json` and the resolution path is fragile. Instead use BXM's public API:
+Don't `require('json5')` or other transitive @omegajs/extension deps directly from consumer tests — they're not in your `package.json` and the resolution path is fragile. Instead use @omegajs/extension's public API:
 
 ```js
-const Manager = require('browser-extension-manager/build');
+const Manager = require('@omegajs/extension/build');
 
 // Parsed JSON5 — same logic the framework uses internally
 const config   = Manager.getConfig();
 const manifest = Manager.getManifest();
 
-// Borrow any of BXM's bundled deps without listing them yourself
+// Borrow any of @omegajs/extension's bundled deps without listing them yourself
 const JSON5 = Manager.require('json5');
 ```
 
@@ -303,7 +303,7 @@ This is the same pattern EM and BEM consumers use — assert on framework API ou
 
 ```js
 // test/build/config.test.js
-const Manager = require('browser-extension-manager/build');
+const Manager = require('@omegajs/extension/build');
 
 module.exports = {
   type: 'suite',
@@ -394,7 +394,7 @@ You don't have to think about this — write tests in normal JS — but it's why
 
 ## Why a custom harness instead of Jest / Vitest?
 
-Browser-context code (background SW, popup DOM, content script) only runs inside Chromium. This is exactly why BXM does not let you mock: a faked `chrome.runtime` (Jest's jsdom can't reproduce it faithfully) or a stubbed API (`webextension-polyfill` provides one, but it doesn't catch real SW lifecycle bugs) passes tests while shipping broken extensions. Puppeteer gives a real Chromium with real `chrome.*` APIs, so the harness is the real thing — not a substitute you assert against. See [NEVER mock](#never-mock--test-against-the-real-harness).
+Browser-context code (background SW, popup DOM, content script) only runs inside Chromium. This is exactly why @omegajs/extension does not let you mock: a faked `chrome.runtime` (Jest's jsdom can't reproduce it faithfully) or a stubbed API (`webextension-polyfill` provides one, but it doesn't catch real SW lifecycle bugs) passes tests while shipping broken extensions. Puppeteer gives a real Chromium with real `chrome.*` APIs, so the harness is the real thing — not a substitute you assert against. See [NEVER mock](#never-mock--test-against-the-real-harness).
 
 Same trade-off EM ran into with Electron — tests must run inside the real runtime, so the framework owns the runner.
 

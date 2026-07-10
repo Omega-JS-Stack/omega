@@ -75,7 +75,7 @@ function sass(complete) {
     // Compile SASS
     .pipe(compiler({
       loadPaths: [
-        // So we can use "@use 'browser-extension-manager' as *;"
+        // So we can use "@use 'omega-extension' as *;"
         path.resolve(rootPathPackage, 'dist/assets/css'),
 
         // So we can use "@use 'theme' as *;" which resolves to the active theme

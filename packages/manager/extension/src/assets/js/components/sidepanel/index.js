@@ -4,7 +4,7 @@
 // Default functionality for the sidepanel view
 
 // Import Browser Extension Manager
-import Manager from 'browser-extension-manager/sidepanel';
+import Manager from '@omegajs/extension/sidepanel';
 
 // Create instance
 const manager = new Manager();

@@ -1,6 +1,6 @@
 # Logging
 
-BXM tees every line of CLI/pipeline output to log files in the consumer project root, so you can `tail -f` or `grep` a run instead of scrolling terminal scrollback. Runtime extension logs live in the browser's own consoles (service-worker console, popup/options DevTools) — this doc covers the file logs BXM itself writes.
+@omegajs/extension tees every line of CLI/pipeline output to log files in the consumer project root, so you can `tail -f` or `grep` a run instead of scrolling terminal scrollback. Runtime extension logs live in the browser's own consoles (service-worker console, popup/options DevTools) — this doc covers the file logs @omegajs/extension itself writes.
 
 ## Log files
 

@@ -70,6 +70,46 @@ test('copies devkit into dist/vendor, rewrites requires, and the result loads + 
   assert.equal(thing.devkit.Logger, thing.Logger);
 });
 
+test('dist/defaults is consumer-template content: never scanned, rewritten, or vendored', (t) => {
+  const root = makeFixture('vendor-defaults', {
+    packageJSON: { name: '@omegajs/fixture-fw', version: '2.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/lib/thing.js': `const Logger = require('@omegajs/devkit/logger');\nmodule.exports = Logger;`,
+      // A framework's defaults reference the framework itself — scanning them
+      // would try to vendor the host into itself (unresolvable and wrong)
+      'dist/defaults/src/component.js': `import Manager from '@omegajs/fixture-fw/background';\nexport default Manager;`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root }); // must NOT throw about @omegajs/fixture-fw
+
+  // The consumer template keeps its package specifier verbatim
+  const template = fs.readFileSync(path.join(root, 'dist', 'defaults', 'src', 'component.js'), 'utf8');
+  assert.ok(template.includes(`'@omegajs/fixture-fw/background'`));
+  assert.ok(!fs.existsSync(path.join(root, 'dist', 'vendor', 'fixture-fw')));
+
+  // Host code is still vendored + rewritten as usual
+  assert.equal(result.rewritten, 1);
+  assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'logger.js')));
+});
+
+test('dep-guard ignores comment prose that reads like an ESM from-clause', (t) => {
+  // The real case: @omegajs/config's edit.js has JSDoc prose "('brand' from
+  // brand, 'a b' from 'a b')" — the guard reported a phantom host dep 'a b'.
+  const root = makeFixture('vendor-prose', {
+    packageJSON: { name: 'fixture-prose', version: '1.0.0', dependencies: { json5: '*' } },
+    files: {
+      'dist/lib/uses-config.js': `const config = require('@omegajs/config');\nmodule.exports = config;`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  vendorDevkit({ cwd: root }); // must NOT throw about a phantom 'a b' dep
+
+  assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'config', 'edit.js')));
+});
+
 test('is idempotent: running twice leaves dist identical', (t) => {
   const root = makeFixture('vendor-idem', {
     packageJSON: { name: 'fixture-idem', version: '1.0.0', dependencies: HOST_DEPS, preparePackage: { output: './dist' } },

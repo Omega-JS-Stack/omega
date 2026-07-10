@@ -25,7 +25,7 @@ const chalk = require('chalk').default;
 // leave a bare `module.exports = require(...)` in the browser context).
 const ASSERT_SRC = fs.readFileSync(require.resolve('@omegajs/devkit/test/assert'), 'utf8');
 
-async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, projectRoot, bxmDistRoot }) {
+async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, projectRoot, frameworkDistRoot }) {
   let puppeteer;
   try {
     puppeteer = require('puppeteer');
@@ -35,7 +35,7 @@ async function runChromiumTests({ backgroundSuiteFiles, viewSuiteFiles, filter, 
     return { passed: 0, failed: 0, skipped };
   }
 
-  const harnessExt = path.join(bxmDistRoot, 'test', 'harness', 'extension');
+  const harnessExt = path.join(frameworkDistRoot, 'test', 'harness', 'extension');
   if (!fs.existsSync(path.join(harnessExt, 'manifest.json'))) {
     console.log(chalk.yellow(`    ○ background + view tests skipped (harness extension not built at ${harnessExt})`));
     return { passed: 0, failed: 0, skipped: backgroundSuiteFiles.length + viewSuiteFiles.length };

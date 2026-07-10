@@ -5,7 +5,7 @@
 // Shared panel UI and helpers are reused across all sites.
 
 // Import Browser Extension Manager
-import Manager from 'browser-extension-manager/content';
+import Manager from '@omegajs/extension/content';
 
 // Site modules (statically imported — webpack doesn't support code splitting in content scripts)
 import * as stripe from './sites/stripe.js';

@@ -72,6 +72,17 @@ const BARE_PATTERNS = [
   /import\s+(['"])([^'"./][^'"]*)\1/g,
 ];
 
+// Strip JS comments before dep-guard scanning — JSDoc prose can look exactly
+// like an ESM from-clause (config/edit.js: "('brand' from brand, 'a b' from
+// 'a b')" reported a phantom host dep named 'a b'). Conservative: block
+// comments and // line tails (the [^:'"\`] guard keeps 'http://...' in string
+// literals intact). Detection-only — never used for rewriting.
+function stripComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+}
+
 // Map a package subpath ('' | 'logger' | 'test/assert' | 'logger.js') to its module-root-relative file.
 function subpathToFile(subpath) {
   const name = subpath || 'index';
@@ -87,11 +98,15 @@ function specifierToPackageName(specifier) {
 // Collect the .js files under dir that are host code: never follows symlinks
 // (BEM's self-test fixture ships a circular self-link inside a dist
 // node_modules — jetpack.find follows it until ENAMETOOLONG) and never
-// descends into node_modules or the vendor output (neither is host code to
-// scan or rewrite).
+// descends into node_modules, the vendor output, or dist/defaults (none is
+// host code to scan or rewrite — defaults are consumer templates scaffolded
+// into consumer projects, where @omegajs/* specifiers must survive as package
+// requires; a framework's own defaults reference the framework itself, which
+// would otherwise vendor the host into itself).
 function findHostJsFiles(dir, vendorRoot) {
   const files = [];
   const queue = [dir];
+  const defaultsRoot = path.join(dir, 'defaults');
 
   while (queue.length > 0) {
     const current = queue.pop();
@@ -101,7 +116,7 @@ function findHostJsFiles(dir, vendorRoot) {
         continue;
       }
       if (entry.isDirectory()) {
-        if (entry.name !== 'node_modules' && abs !== vendorRoot) {
+        if (entry.name !== 'node_modules' && abs !== vendorRoot && abs !== defaultsRoot) {
           queue.push(abs);
         }
         continue;
@@ -251,7 +266,7 @@ function vendorPackages(options) {
   };
   const missing = new Set();
   jetpack.find(vendorRoot, { matching: '**/*.js' }).forEach((file) => {
-    const contents = jetpack.read(path.resolve(file)) || '';
+    const contents = stripComments(jetpack.read(path.resolve(file)) || '');
     for (const pattern of BARE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         const name = specifierToPackageName(match[2]);

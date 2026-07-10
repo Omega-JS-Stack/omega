@@ -120,7 +120,7 @@ Manager.getConfig = function () {
   // Warn ONCE per process — gulp tasks each call getConfig() at require time.
   if (errors.length && !warnedConfigSchema) {
     warnedConfigSchema = true;
-    console.warn(`[browser-extension-manager] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
+    console.warn(`[@omegajs/extension] config/omega.json5 schema warnings:\n${formatErrors(errors)}`);
   }
 
   return config;

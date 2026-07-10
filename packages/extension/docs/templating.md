@@ -49,7 +49,7 @@ HTML views go through a two-step `{{ }}` token replacement during the `gulp/html
 - `<script>` for the component's `.bundle.js`
 - Cache-busting query params via `{{ cacheBust }}`
 
-Consumers don't author this — BXM owns it. If you need to customize per-view, override directly in `src/views/<component>/index.html` (BXM detects when a view provides its own full `<html>` and skips wrapping).
+Consumers don't author this — @omegajs/extension owns it. If you need to customize per-view, override directly in `src/views/<component>/index.html` (@omegajs/extension detects when a view provides its own full `<html>` and skips wrapping).
 
 ## Customizing page vars
 
@@ -57,7 +57,7 @@ The page-vars object is built by [src/gulp/tasks/html.js](../src/gulp/tasks/html
 
 ## Why two passes?
 
-Pass 1 lets a view interpolate something into the outer template. For example, a view can do `<!-- bxm:page-title --> Custom Title <!-- /bxm:page-title -->` (a future feature) and have the value flow into `{{ page.title }}` for the outer template's `<title>`. The pattern keeps simple cases simple (`{{ brand.name }}` Just Works) while leaving room for view → shell metadata flow.
+Pass 1 lets a view interpolate something into the outer template. For example, a view can do `<!-- omega:page-title --> Custom Title <!-- /omega:page-title -->` (a future feature) and have the value flow into `{{ page.title }}` for the outer template's `<title>`. The pattern keeps simple cases simple (`{{ brand.name }}` Just Works) while leaving room for view → shell metadata flow.
 
 ## See also
 

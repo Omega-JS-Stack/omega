@@ -1,6 +1,6 @@
 # Build System
 
-BXM uses **gulp + webpack + sass + custom HTML templating + an electron-builder-style packaging step** to compile extension source into a Chrome-loadable, multi-browser-ready build.
+@omegajs/extension uses **gulp + webpack + sass + custom HTML templating + an electron-builder-style packaging step** to compile extension source into a Chrome-loadable, multi-browser-ready build.
 
 ## Pipeline overview
 
@@ -80,7 +80,7 @@ resolve: {
 
 ## Sass
 
-[src/gulp/tasks/sass.js](../src/gulp/tasks/sass.js) compiles per-component SCSS bundles. Load-path resolution lets consumer SCSS `@use 'browser-extension-manager'`, `@use 'theme'`, and `@use 'components/popup'` resolve through a search chain. Full details in [css.md](css.md).
+[src/gulp/tasks/sass.js](../src/gulp/tasks/sass.js) compiles per-component SCSS bundles. Load-path resolution lets consumer SCSS `@use 'omega-extension'`, `@use 'theme'`, and `@use 'components/popup'` resolve through a search chain. Full details in [css.md](css.md).
 
 ## HTML templating
 
@@ -104,7 +104,7 @@ Env vars that drive the pipeline:
 - `BXM_BUILD_MODE=true` — production build (minified, no sourcemaps, dev-blocks stripped)
 - `BXM_IS_PUBLISH=true` — also publish to extension stores after packaging
 - `BXM_LIVERELOAD_PORT=35729` — WebSocket port for `serve` task (override if 35729 collides)
-- `BXM_TEST_MODE=true` — running in BXM's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
+- `BXM_TEST_MODE=true` — running in @omegajs/extension's test framework. Powers `Manager.isTesting()` (see [test-framework.md](test-framework.md)).
 - `BXM_LOG_FILE` — override the stdout/stderr tee path, or set to `false` to disable it (see [Log files](#log-files)).
 
 ## Live reload

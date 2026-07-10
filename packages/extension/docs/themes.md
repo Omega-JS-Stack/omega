@@ -1,6 +1,6 @@
 # Themes
 
-BXM ships two themes plus a template for new ones. Themes vendor their own SCSS + JS + Bootstrap-compatible variable system.
+@omegajs/extension ships two themes plus a template for new ones. Themes vendor their own SCSS + JS + Bootstrap-compatible variable system.
 
 ## Available themes
 
@@ -51,7 +51,7 @@ In a consumer's `src/assets/css/main.scss`:
 
 ```scss
 // Override before @use to take effect
-@use 'browser-extension-manager' as * with (
+@use 'omega-extension' as * with (
   $primary: #5B47FB,
   $secondary: #FFA500,
 );
@@ -68,7 +68,7 @@ Consumer views can use `{{ theme.appearance }}` in their HTML to apply per-page 
 
 ## Why not Tailwind?
 
-Themes are SCSS-first because BXM's roots are Bootstrap-based and most BXM consumers already use Bootstrap-style class names (`.btn`, `.card`, `.modal`). Tailwind requires a build step (PostCSS + content scanning) that would complicate the lean gulp pipeline. If a future theme wants Tailwind, drop it under `src/assets/themes/tailwind/` and wire its own build hook.
+Themes are SCSS-first because @omegajs/extension's roots are Bootstrap-based and most @omegajs/extension consumers already use Bootstrap-style class names (`.btn`, `.card`, `.modal`). Tailwind requires a build step (PostCSS + content scanning) that would complicate the lean gulp pipeline. If a future theme wants Tailwind, drop it under `src/assets/themes/tailwind/` and wire its own build hook.
 
 ## See also
 

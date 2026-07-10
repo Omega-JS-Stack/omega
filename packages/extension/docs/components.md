@@ -28,7 +28,7 @@ The build pipeline wires these together — `views/<component>/index.html` autom
 
 ## Manifest wiring per component
 
-`src/manifest.json` (JSON5, merged with BXM's default manifest at build — see [build-system.md](build-system.md)) registers each component with the browser:
+`src/manifest.json` (JSON5, merged with @omegajs/extension's default manifest at build — see [build-system.md](build-system.md)) registers each component with the browser:
 
 | Component | Manifest field |
 |---|---|
@@ -49,7 +49,7 @@ Each component context gets its own Manager class with a one-line bootstrap. See
 There is no global "boot order" — each context boots independently when the browser instantiates it. BUT they coordinate via messaging:
 
 1. **Background SW** boots first when the extension is installed/reloaded — it's the source of truth.
-2. **Popup / options / sidepanel / pages** boot lazily when the user opens them. On boot they `bxm:syncAuth` to background to align with the canonical auth state.
+2. **Popup / options / sidepanel / pages** boot lazily when the user opens them. On boot they `omega:syncAuth` to background to align with the canonical auth state.
 3. **Content scripts** boot per-page-load (or per-tab navigation, depending on `run_at`).
 4. **Offscreen** is created on demand by background (e.g. when it needs DOM parsing or a long-lived WebSocket).
 
@@ -57,7 +57,7 @@ See [auth.md](auth.md) for the detailed sign-in / sign-out / context-load flows.
 
 ## Adding a new component type to the framework
 
-This is rare — only needed if you're adding a brand new context kind to BXM (e.g. devtools panel). For most consumer needs, "add a new page" means creating a new entry under `src/views/pages/<name>/` (one component, many pages).
+This is rare — only needed if you're adding a brand new context kind to @omegajs/extension (e.g. devtools panel). For most consumer needs, "add a new page" means creating a new entry under `src/views/pages/<name>/` (one component, many pages).
 
 If you DO need to add a new top-level component type:
 

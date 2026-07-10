@@ -2,8 +2,8 @@
 // Index Page (Main Extension Page)
 // ============================================
 
-// Import Browser Extension Manager
-import Manager from 'browser-extension-manager/page';
+// Import OMEGA Extension
+import Manager from '@omegajs/extension/page';
 
 // Create instance
 const manager = new Manager();

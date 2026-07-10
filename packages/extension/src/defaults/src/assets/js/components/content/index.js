@@ -2,8 +2,8 @@
 // Content Script Component
 // ============================================
 
-// Import Browser Extension Manager
-import Manager from 'browser-extension-manager/content';
+// Import OMEGA Extension
+import Manager from '@omegajs/extension/content';
 
 // Create instance
 const manager = new Manager();

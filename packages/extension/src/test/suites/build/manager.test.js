@@ -145,7 +145,7 @@ module.exports = {
       run: (ctx) => {
         const Manager = require(path.join(__dirname, '..', '..', '..', 'build.js'));
         const pkg = Manager.getPackage('main');
-        ctx.expect(pkg.name).toBe('browser-extension-manager');
+        ctx.expect(pkg.name).toBe('@omegajs/extension');
       },
     },
     {

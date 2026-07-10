@@ -151,7 +151,7 @@ test('testing: TARGET_FRAMEWORKS maps every checkable target, mobile reserved', 
   assert.deepEqual(TARGET_FRAMEWORKS, {
     web: '@omegajs/web',
     backend: 'backend-manager',
-    extension: 'browser-extension-manager',
+    extension: '@omegajs/extension',
     desktop: 'electron-manager',
   });
 });

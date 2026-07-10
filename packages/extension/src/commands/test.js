@@ -14,7 +14,7 @@ module.exports = async function (options) {
 
   const layer       = options.layer    || 'all';
   // Positional target: `npx mgr test <target>` where target supports source
-  // prefixes — `project:`, `project:<path>`, `mgr:`, `bxm:`, or a bare `<path>`.
+  // prefixes — `project:`, `project:<path>`, `mgr:`, `extension:`, or a bare `<path>`.
   const target      = (options._ && options._[1]) || null;
   // `--filter` flag: substring match on test NAMES/descriptions (orthogonal to target).
   const filter      = options.filter   || null;
@@ -44,7 +44,7 @@ module.exports = async function (options) {
   if (!process.env.BXM_TEST_BOOT_PROJECT) {
     try {
       const cwdPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-      if (cwdPkg.name === 'browser-extension-manager') {
+      if (cwdPkg.name === '@omegajs/extension') {
         process.env.BXM_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-extension');
       }
     } catch (_) { /* no package.json — leave unset */ }

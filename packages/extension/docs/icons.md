@@ -1,6 +1,6 @@
 # Icons
 
-BXM generates every extension icon size from ONE consumer-supplied source image — drop a single file, the build derives the rest.
+@omegajs/extension generates every extension icon size from ONE consumer-supplied source image — drop a single file, the build derives the rest.
 
 ## Layout
 
@@ -25,7 +25,7 @@ dist/assets/images/icons/icon-16x.png
 
 ## Where the sizes are used
 
-- **Manifest** — BXM's manifest template wires the `icons` map to the generated paths (`assets/images/icons/icon-<size>x.png`), covering Chrome's required 16/32/48/128 plus the larger store sizes.
+- **Manifest** — @omegajs/extension's manifest template wires the `icons` map to the generated paths (`assets/images/icons/icon-<size>x.png`), covering Chrome's required 16/32/48/128 plus the larger store sizes.
 - **Store packaging** — the `package` task copies `icon-128x.png` into the store-assets directory for listing uploads.
 
 ## Sizes — ship ONE large source

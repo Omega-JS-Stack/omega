@@ -1,6 +1,6 @@
 # Cross-Context Auth
 
-Browser extensions have multiple isolated JavaScript contexts (background SW, popup, options, sidepanel, pages) — each runs its own Firebase instance. BXM syncs them via messaging so a sign-in in one context is reflected in all of them without using `chrome.storage`.
+Browser extensions have multiple isolated JavaScript contexts (background SW, popup, options, sidepanel, pages) — each runs its own Firebase instance. @omegajs/extension syncs them via messaging so a sign-in in one context is reflected in all of them without using `chrome.storage`.
 
 ## The core idea
 
@@ -37,7 +37,7 @@ Context loads
   ↓
 Web Manager initializes, waits for auth to settle (auth.listen({ once: true }))
   ↓
-Sends `bxm:syncAuth` message to background, including local UID
+Sends `omega:syncAuth` message to background, including local UID
   ↓
 Background compares UIDs:
   - Same UID (including both null) → in sync, no action
@@ -53,11 +53,11 @@ User clicks .auth-signout-btn
   ↓
 Web Manager signs out that context's Firebase
   ↓
-setupSignOutListener() detects sign-out, sends `bxm:signOut` to background
+setupSignOutListener() detects sign-out, sends `omega:signOut` to background
   ↓
 background.js signs out its Firebase
   ↓
-background.js broadcasts `bxm:signOut` to all other contexts
+background.js broadcasts `omega:signOut` to all other contexts
   ↓
 All contexts sign out
 ```
@@ -128,13 +128,13 @@ Web Manager exposes `data-wm-bind` attributes for show/hide/text/attr based on a
 | `@text auth.user.email` | Same — any path under `auth.user.*` |
 | `@attr src auth.user.photoURL` | Set element attribute from path |
 
-These bindings live in Web Manager, not BXM — but they're how every BXM extension surfaces auth state in views.
+These bindings live in Web Manager, not @omegajs/extension — but they're how every @omegajs/extension extension surfaces auth state in views.
 
 ## Important implementation details
 
 1. **No storage.** Auth state is NOT in `chrome.storage`. Firebase persists sessions in IndexedDB per-context. Web Manager handles UI bindings off those persisted sessions.
 
-2. **Firebase in service workers requires static imports.** Dynamic `import()` fails with webpack chunking inside SWs. BXM's background.js uses static `import { initializeApp } from 'firebase/app'`.
+2. **Firebase in service workers requires static imports.** Dynamic `import()` fails with webpack chunking inside SWs. @omegajs/extension's background.js uses static `import { initializeApp } from 'firebase/app'`.
 
 3. **Config path is fixed.** `authDomain` lives at `config.firebaseConfig.authDomain` (loaded via the `BXM_BUILD_JSON` webpack DefinePlugin replacement).
 

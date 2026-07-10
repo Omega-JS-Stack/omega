@@ -1,8 +1,8 @@
-// Test runner — discovers + runs suites, reports BXM-style.
+// Test runner — discovers + runs suites, reports OMEGA-Extension-style.
 //
 // The runner CORE (discovery, suite/group/standalone execution, filtering, skip
 // semantics, init hooks, reporting) is the shared @omegajs/devkit runner-core,
-// vendored into dist/vendor/devkit at prepare time. This file is BXM's config:
+// vendored into dist/vendor/devkit at prepare time. This file is the extension framework's config:
 // title, target alias, and the framework-specific layer glue.
 //
 // Layers:
@@ -20,9 +20,9 @@ const chalk = require('chalk').default;
 const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omegajs/devkit/test/runner-core');
 
 const runner = createRunner({
-  title: 'Browser Extension Manager Tests',
-  packageName: 'browser-extension-manager',
-  targetAlias: 'bxm',
+  title: 'OMEGA Extension Tests',
+  packageName: '@omegajs/extension',
+  targetAlias: 'extension',
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 20000,
@@ -48,7 +48,7 @@ const runner = createRunner({
             viewSuiteFiles:       wants.view       ? byLayer.view       : [],
             filter: options.filter,
             projectRoot,
-            bxmDistRoot: path.resolve(__dirname, '..'),
+            frameworkDistRoot: path.resolve(__dirname, '..'),
           });
           results.passed  += counts.passed;
           results.failed  += counts.failed;
@@ -76,7 +76,7 @@ const runner = createRunner({
       const counts = await runBootTests({
         tests,
         projectRoot,
-        bxmDistRoot: path.resolve(__dirname, '..'),
+        frameworkDistRoot: path.resolve(__dirname, '..'),
       });
       results.passed  += counts.passed;
       results.failed  += counts.failed;

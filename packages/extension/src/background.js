@@ -34,7 +34,7 @@ class Manager {
     this.version = this.config?.version || 'unknown';
     this.brand = this.config?.brand || { name: 'unknown' };
     this.brand.id = this.config?.brand?.id || 'extension';
-    this.environment = this.config?.bxm?.environment || 'production';
+    this.environment = this.config?.omega?.environment || 'production';
     this.libraries = {
       firebase: null,
       firebaseAuth: null,
@@ -42,7 +42,7 @@ class Manager {
       promoServer: false,
     };
     this.cache = {
-      breaker: this.config?.bxm?.cache_breaker || new Date().getTime(),
+      breaker: this.config?.omega?.cache_breaker || new Date().getTime(),
       name: ''
     };
   }
@@ -124,13 +124,13 @@ class Manager {
     // Listen for runtime messages (from popup, options, pages, etc.)
     this.extension.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // Handle auth sync requests - contexts ask background for auth state on load
-      if (message.command === 'bxm:syncAuth') {
+      if (message.command === 'omega:syncAuth') {
         this.handleSyncAuth(message, sendResponse);
         return true; // Keep channel open for async response
       }
 
       // Handle sign-out requests from contexts
-      if (message.command === 'bxm:signOut') {
+      if (message.command === 'omega:signOut') {
         this.handleSignOut(sendResponse);
         return true; // Keep channel open for async response
       }
@@ -253,7 +253,7 @@ class Manager {
       this.logger.log(`[AUTH] Broadcasting sign-out to ${clients.length} clients...`);
 
       for (const client of clients) {
-        client.postMessage({ command: 'bxm:signOut' });
+        client.postMessage({ command: 'omega:signOut' });
       }
 
       this.logger.log('[AUTH] Sign-out broadcast complete');
@@ -421,9 +421,9 @@ class Manager {
 
     // Try to get existing app or create new one
     try {
-      this.libraries.firebase = getApp('bxm-auth');
+      this.libraries.firebase = getApp('omega-auth');
     } catch (e) {
-      this.libraries.firebase = initializeApp(firebaseConfig, 'bxm-auth');
+      this.libraries.firebase = initializeApp(firebaseConfig, 'omega-auth');
     }
 
     // Get auth and set up state listener (only once)
@@ -500,7 +500,7 @@ class Manager {
       // Send token to each client
       for (const client of clients) {
         client.postMessage({
-          command: 'bxm:signInWithToken',
+          command: 'omega:signInWithToken',
           token: token,
         });
       }
@@ -518,7 +518,7 @@ class Manager {
     if (this.environment !== 'development') return;
 
     // Get port from config or use default
-    const port = this.config?.bxm?.liveReloadPort || 35729;
+    const port = this.config?.omega?.liveReloadPort || 35729;
 
     // Setup livereload
     const address = `ws://localhost:${port}/livereload`;

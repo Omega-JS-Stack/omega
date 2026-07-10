@@ -100,7 +100,7 @@ Same pattern EM uses for its desktop apps. Each store does its own review afterw
 
 ## What about Safari?
 
-Safari (Apple) uses a different extension model and requires Xcode-based packaging via `safari-web-extension-converter`. Not currently in scope for BXM's auto-publish. Manual conversion + App Store Connect upload is the route.
+Safari (Apple) uses a different extension model and requires Xcode-based packaging via `safari-web-extension-converter`. Not currently in scope for @omegajs/extension's auto-publish. Manual conversion + App Store Connect upload is the route.
 
 ## Store listing description (`config/description.md`)
 

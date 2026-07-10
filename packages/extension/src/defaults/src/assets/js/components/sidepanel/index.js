@@ -3,8 +3,8 @@
 // ============================================
 // Default functionality for the sidepanel view
 
-// Import Browser Extension Manager
-import Manager from 'browser-extension-manager/sidepanel';
+// Import OMEGA Extension
+import Manager from '@omegajs/extension/sidepanel';
 
 // Create instance
 const manager = new Manager();

@@ -53,7 +53,7 @@ async function generateBuildJs(outputDir) {
       repo: gitInfo,
       environment: Manager.getEnvironment(),
       packages: {
-        'browser-extension-manager': package.version,
+        [package.name]: package.version,
         'web-manager': getPackageVersion('web-manager'),
       },
       config: {
@@ -66,8 +66,8 @@ async function generateBuildJs(outputDir) {
         // Brand configuration (from config/omega.json5 or manifest)
         brand: config.brand || {},
 
-        // BXM-specific config
-        bxm: {
+        // OMEGA build metadata
+        omega: {
           environment: Manager.getEnvironment(),
           cache_breaker: Math.round(new Date().getTime() / 1000),
           liveReloadPort: config.liveReloadPort || 35729,

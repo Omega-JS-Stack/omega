@@ -1,5 +1,5 @@
 // Libraries
-const Manager = new (require('browser-extension-manager/build'));
+const Manager = new (require('@omegajs/extension/build'));
 const logger = Manager.logger('build:post');
 
 // Hook

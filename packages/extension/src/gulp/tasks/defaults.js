@@ -30,6 +30,12 @@ const FILE_MAP = {
   'src/**/*': {
     overwrite: false,
   },
+  // Consumer-owned after seeding (e.g. test/_init.js fixture hooks) — copy when
+  // missing, never clobber the consumer's version on setup reruns (the engine
+  // fall-through default is overwrite: true)
+  'test/**/*': {
+    overwrite: false,
+  },
   'src/**/*.{html,md}': {
     skip: (file) => {
       // Get the name

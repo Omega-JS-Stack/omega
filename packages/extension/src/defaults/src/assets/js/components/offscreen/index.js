@@ -4,8 +4,8 @@
 // Persistent offscreen document for background operations
 // (WebSocket connections, long-running tasks, etc.)
 
-// Import Browser Extension Manager
-import Manager from 'browser-extension-manager/offscreen';
+// Import OMEGA Extension
+import Manager from '@omegajs/extension/offscreen';
 
 // Create instance
 const manager = new Manager();

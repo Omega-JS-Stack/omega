@@ -27,7 +27,7 @@ export async function syncWithBackground(context) {
     // Ask background for auth state comparison
     const response = await new Promise((resolve) => {
       extension.runtime.sendMessage(
-        { command: 'bxm:syncAuth', contextUid: localUid },
+        { command: 'omega:syncAuth', contextUid: localUid },
         (res) => {
           if (extension.runtime.lastError) {
             logger.log('[AUTH-SYNC] Background not ready:', extension.runtime.lastError.message);
@@ -77,7 +77,7 @@ export function setupAuthBroadcastListener(context) {
     const { command, token } = event.data || {};
 
     // Handle sign-in broadcast
-    if (command === 'bxm:signInWithToken' && token) {
+    if (command === 'omega:signInWithToken' && token) {
       logger.log('[AUTH-BROADCAST] Received sign-in broadcast');
       try {
         await webManager.auth().signInWithCustomToken(token);
@@ -89,7 +89,7 @@ export function setupAuthBroadcastListener(context) {
     }
 
     // Handle sign-out broadcast
-    if (command === 'bxm:signOut') {
+    if (command === 'omega:signOut') {
       // Skip if already signed out (prevents loops)
       if (!webManager.auth().getUser()) {
         logger.log('[AUTH-BROADCAST] Already signed out, ignoring broadcast');
@@ -124,7 +124,7 @@ export function setupSignOutListener(context) {
     // Detect sign-out (had user, now don't)
     if (previousUid && !currentUid) {
       logger.log('[AUTH-SYNC] Detected sign-out, notifying background...');
-      extension.runtime.sendMessage({ command: 'bxm:signOut' });
+      extension.runtime.sendMessage({ command: 'omega:signOut' });
     }
 
     previousUid = currentUid;

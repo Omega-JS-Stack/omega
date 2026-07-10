@@ -2,8 +2,8 @@
 // Popup Component
 // ============================================
 
-// Import Browser Extension Manager
-import Manager from 'browser-extension-manager/popup';
+// Import OMEGA Extension
+import Manager from '@omegajs/extension/popup';
 
 // Create instance
 const manager = new Manager();

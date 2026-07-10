@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **@omegajs/extension cutover, local half (checkpoint 64) — the first Phase-3 rename is live in the monorepo.** `packages/extension` is `@omegajs/extension@2.0.0` (was `browser-extension-manager@1.7.3`): bins `omega-extension` + `mgr`, SCSS entry `@use 'omega-extension'`, test prefix `extension:`, build-config key `omega`, auth protocol `omega:*`; consumer defaults + all 25 framework docs speak the new name (`BXM_*` env vars parked as a cross-framework harmonization; `omega:bxm` skill refs stay until the Phase-5 skills rewrite). Publishing waits on Ian's @omegajs org claim — everything installs locally (workspace + `file:`).
+- Legacy-1.7.4 divergence folded in during the pre-rename check: `test/**` defaults are copy-once (consumer `test/_init.js` survives setup reruns; the missing-config `getConfig` half was already covered) — desktop + backend have the same latent gap, queued for their flips.
+- Manager: `TARGET_FRAMEWORKS.extension` → `@omegajs/extension`; the manager's companion extension (`packages/manager/extension`, now `omega-manager-extension`) consumes the renamed framework via `file:../../extension` — the full consumer canary (`mgr clean && mgr setup && gulp build`) passes: MV3 manifest, 9 icon sizes, chromium/firefox/opera zips.
+
+### Fixed
+- devkit vendor tool ×2 (exposed by the rename): `dist/defaults` is consumer-template content and is no longer scanned/rewritten/vendored (a framework's own defaults reference the framework itself — it tried to vendor the host into itself); the dep-guard strips comments before specifier-scanning (JSDoc prose in config's edit.js — "'a b' from 'a b'" — reported a phantom host dep). Locked by 2 new vendor tests (devkit 99 → 101).
+- Extension icons task corrupted binaries under gulp 5 (`src()` defaults to UTF-8 decoding; sharp got mangled buffers) — now `encoding: false` both ways, matching distribute.js. Found by the consumer canary; pack-smoke of the 2.0.0 tarball (scratch install, entrypoints, bins) also green.
+
 ### Added
 - **Extension port + assets PSD templates + AI brandmark (checkpoint 63) — omega-manager is now FULLY ported; nothing remains parked.** The companion Chrome extension (MV3 — bookmark filing + trusted-CDP browser automation via `chrome.debugger`, plus its MCP bridge) copied to `packages/manager/extension/` as a standalone BXM consumer project (excluded from the npm tarball via `.npmignore`); the manager speaks its WebSocket protocol through `src/lib/automation-client.js` (env-overridable port, correlation-id envelopes, injectable timeouts).
 - The `bookmark` service (between `migrations` and `testing`): brand console/dashboard bookmarks pushed to the extension and filed under `Ω / {Brand} / {Category}` — links reshaped to new-world config (the ONE monorepo repo + Actions instead of per-target repos; unslugged Stripe dashboard links instead of the ITW platform-account deep links; per-app backend API link). Interactive-only: headless runs skip cleanly, dry runs print the planned groups without a server or the gcloud function-log read.

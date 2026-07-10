@@ -38,6 +38,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - **`bxm setup` config merge no longer drops consumer-only keys.** The defaults merge started from the framework template and only walked template keys, so any consumer key absent from the template (e.g. `liveReloadPort`, or anything under `targets.extension`) was silently deleted on every setup. Consumer-only keys now survive at every nesting level.
 
+## [2.0.0] - 2026-07-09
+
+### BREAKING
+- **Renamed to `@omegajs/extension`** (from `browser-extension-manager`) — the OMEGA cutover, local half (npm publish waits on the @omegajs org claim). Bins are `omega-extension` + `mgr` (legacy `xm`/`bxm`/`ext`/`browser-extension-manager` aliases dropped); the consumer SCSS entry is `@use 'omega-extension' as *` (a scoped name can't be a bare load-path filename); the CLI framework-test prefix is `extension:` (was `bxm:`); the embedded build-config key is `omega` (was `bxm`); the cross-context auth protocol is `omega:syncAuth`/`omega:signOut`/`omega:signInWithToken`; the packaged version map keys by `package.name`. `BXM_*` env vars are intentionally unchanged (parked as a later cross-framework harmonization). Consumer defaults, docs, and the scaffolded CLAUDE.md speak the new name — `mgr setup` regenerates them in existing consumers.
+
+### Fixed
+- **icons task no longer corrupts binaries under gulp 5** — `src()`/`dest()` now pass `encoding: false` (gulp 5 decodes files as UTF-8 by default, so sharp received mangled buffers and failed with "Input buffer contains unsupported image format"). Same guard distribute.js already carried.
+- **`test/**` defaults are copy-once** (port of legacy 1.7.4): no FILE_MAP rule matched `test/**`, so the engine's `overwrite: true` fall-through reset the consumer's `test/_init.js` fixture hook on every setup rerun. Locked by a scaffold-test case.
+
+### Removed
+- `wm:prod`/`wm:local` package scripts — npm workspace resolution links the local web-manager copy automatically in the monorepo.
+
 ## [1.7.3] - 2026-07-02
 
 ### Fixed

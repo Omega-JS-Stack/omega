@@ -71,17 +71,17 @@ inspect: async ({ extension, page, expect, projectRoot }) => { /* ... */ }
 | `expect` | function | Jest-compatible matcher (same surface as other layers) |
 | `projectRoot` | string | Absolute path to the consumer project |
 
-Each boot test gets a **fresh** `page` (closed at the end of the test). The browser + extension load are shared across all boot tests in a single `npx bxm test` invocation (one Chromium boot per run, amortized across tests).
+Each boot test gets a **fresh** `page` (closed at the end of the test). The browser + extension load are shared across all boot tests in a single `npx mgr test` invocation (one Chromium boot per run, amortized across tests).
 
 ## Extension-directory discovery
 
 The runner looks for the consumer's Chrome-loadable build in this order:
 
 1. `BXM_TEST_BOOT_DIR` env var (absolute path) — full override
-2. `<consumer>/packaged/chromium/raw/` — default. This is what BXM's gulp pipeline produces. Strict JSON manifest, all bundles compiled, locale files in place. Same dir a developer points "Load unpacked" at.
+2. `<consumer>/packaged/chromium/raw/` — default. This is what @omegajs/extension's gulp pipeline produces. Strict JSON manifest, all bundles compiled, locale files in place. Same dir a developer points "Load unpacked" at.
 3. `<consumer>/dist/` — fallback for non-standard pipelines
 
-The intermediate `<consumer>/dist/` typically has a JSON5 manifest (BXM-authored source style) which Chrome can't parse. If the runner picks `dist/` and finds JSON5, you get an actionable error:
+The intermediate `<consumer>/dist/` typically has a JSON5 manifest (framework-authored source style) which Chrome can't parse. If the runner picks `dist/` and finds JSON5, you get an actionable error:
 
 ```
 ✗ boot tests aborted: dist/manifest.json is not strict JSON.
@@ -92,13 +92,13 @@ The intermediate `<consumer>/dist/` typically has a JSON5 manifest (BXM-authored
   or set BXM_TEST_BOOT_DIR to the directory that has strict-JSON manifest.json.
 ```
 
-Most consumers don't need to think about this — `npm run build && npx bxm test` works.
+Most consumers don't need to think about this — `npm run build && npx mgr test` works.
 
 ## BXM_TEST_BOOT_PROJECT vs BXM_TEST_BOOT_DIR
 
 | Env | Purpose |
 |---|---|
-| `BXM_TEST_BOOT_PROJECT` | Root of a different project to use instead of cwd. Auto-set when BXM tests itself (points at the in-tree fixture under `src/test/fixtures/consumer-extension`). |
+| `BXM_TEST_BOOT_PROJECT` | Root of a different project to use instead of cwd. Auto-set when @omegajs/extension tests itself (points at the in-tree fixture under `src/test/fixtures/consumer-extension`). |
 | `BXM_TEST_BOOT_DIR` | Absolute path of the directory holding `manifest.json` — short-circuits the discovery order entirely. Use for monorepo layouts or custom output dirs. |
 
 ## What happens when the extension can't load
@@ -131,9 +131,9 @@ In CI, run build then test in separate steps so failures are isolated.
 
 ## Why this exists
 
-Build-layer tests can verify "the manifest source is well-formed." Background-layer tests can verify "BXM's framework code works inside a SW." But neither catches "the consumer's actual pipeline assembles into a Chrome-loadable extension." Boot tests do.
+Build-layer tests can verify "the manifest source is well-formed." Background-layer tests can verify "@omegajs/extension's framework code works inside a SW." But neither catches "the consumer's actual pipeline assembles into a Chrome-loadable extension." Boot tests do.
 
-In BXM's own self-tests, the boot layer points at a hand-authored fixture extension (`src/test/fixtures/consumer-extension/`) — a known-good minimal MV3 extension. That validates the framework's boot runner is working; consumer projects then point it at their own packaged output to validate THEIR pipeline.
+In @omegajs/extension's own self-tests, the boot layer points at a hand-authored fixture extension (`src/test/fixtures/consumer-extension/`) — a known-good minimal MV3 extension. That validates the framework's boot runner is working; consumer projects then point it at their own packaged output to validate THEIR pipeline.
 
 ## See also
 

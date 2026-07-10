@@ -3,7 +3,7 @@
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH: it is the ONLY function that reads the
 // raw signals (BXM_TEST_MODE / manifest.update_url / BXM_BUILD_MODE / NODE_ENV /
-// config.bxm.environment) and resolves them to exactly ONE of three mutually-exclusive
+// config.omega.environment) and resolves them to exactly ONE of three mutually-exclusive
 // values. The three is*() checks DERIVE from it — they never read raw signals themselves,
 // so they can never disagree with getEnvironment().
 //
@@ -30,10 +30,10 @@
 function getEnvironment() {
   // 1. Testing wins — set by BXM's test runners / harness, or a testing-baked build.
   //    Works in Node (process.env), extension contexts (globalThis set before consumer JS),
-  //    and config-baked builds (config.bxm.environment === 'testing').
+  //    and config-baked builds (config.omega.environment === 'testing').
   if (typeof process !== 'undefined' && process.env && process.env.BXM_TEST_MODE === 'true') return 'testing';
   if (typeof globalThis !== 'undefined' && globalThis.BXM_TEST_MODE === true) return 'testing';
-  if (this && this.config && this.config.bxm && this.config.bxm.environment === 'testing') return 'testing';
+  if (this && this.config && this.config.omega && this.config.omega.environment === 'testing') return 'testing';
 
   // 2. Browser-side: packed/store extensions have `update_url`; unpacked ones do not.
   //    This is the authoritative runtime signal in an extension context.
@@ -46,8 +46,8 @@ function getEnvironment() {
   // 3. Node / build-time + config signals.
   if (process.env.BXM_BUILD_MODE === 'true') return 'production';
   if (process.env.NODE_ENV === 'development') return 'development';
-  if (this && this.config && this.config.bxm && this.config.bxm.environment === 'development') return 'development';
-  if (this && this.config && this.config.bxm && this.config.bxm.environment === 'production') return 'production';
+  if (this && this.config && this.config.omega && this.config.omega.environment === 'development') return 'development';
+  if (this && this.config && this.config.omega && this.config.omega.environment === 'production') return 'production';
 
   // 4. Default: development. BXM's deployed artifacts ALWAYS carry their signal — a packed /
   //    store extension has `manifest.update_url`, and build-time Node sets BXM_BUILD_MODE. So

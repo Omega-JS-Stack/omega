@@ -2,8 +2,8 @@
 // Background Component (Service Worker)
 // ============================================
 
-// Import Browser Extension Manager
-import Manager from 'browser-extension-manager/background';
+// Import OMEGA Extension
+import Manager from '@omegajs/extension/background';
 
 // Create instance
 const manager = new Manager();

@@ -12,7 +12,7 @@ Manager.isProduction()      // true ONLY in production
 
 **The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`BXM_TEST_MODE` / `chrome.runtime.getManifest().update_url` / `BXM_BUILD_MODE` / `NODE_ENV` / `config.bxm.environment`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
 
-**One implementation, mixed into all eight Managers.** BXM has eight Manager entry points (build / background / popup / options / content / sidepanel / page / offscreen). The helpers are defined once in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) and mixed into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
+**One implementation, mixed into all eight Managers.** @omegajs/extension has eight Manager entry points (build / background / popup / options / content / sidepanel / page / offscreen). The helpers are defined once in [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) and mixed into each via `attachTo(Manager)`, available as both prototype methods (`manager.isTesting()`) and statics (`Manager.isTesting()`).
 
 ```javascript
 manager.getEnvironment()    // same answer in every extension context
@@ -47,7 +47,7 @@ if (isDevelopment() || isTesting()) { /* DevTools menu items, verbose logging */
 
 ## URL helpers
 
-BXM does **not** own backend URL helpers (`getApiUrl` / `getFunctionsUrl` / `getWebsiteUrl`). Extension code that needs a backend URL reads it from the `web-manager` runtime singleton in the runtime contexts (popup / options / sidepanel / background), which follows the same local-in-dev/testing, production-otherwise convention. The rule "call the getter, never hardcode" still applies; the implementation lives in `web-manager`.
+@omegajs/extension does **not** own backend URL helpers (`getApiUrl` / `getFunctionsUrl` / `getWebsiteUrl`). Extension code that needs a backend URL reads it from the `web-manager` runtime singleton in the runtime contexts (popup / options / sidepanel / background), which follows the same local-in-dev/testing, production-otherwise convention. The rule "call the getter, never hardcode" still applies; the implementation lives in `web-manager`.
 
 ## Where they live
 
@@ -60,7 +60,7 @@ Source: [src/utils/mode-helpers.js](../src/utils/mode-helpers.js) for `getEnviro
 1. **Testing** — `process.env.BXM_TEST_MODE === 'true'`, `globalThis.BXM_TEST_MODE === true`, or a build baked with `config.bxm.environment === 'testing'` (set by the harness before any consumer JS runs). A test run is a test run regardless of any other signal.
 2. **Production / Development (runtime)** — `chrome.runtime.getManifest().update_url`: present → production (packed / store-installed), absent → development (unpacked). This is the authoritative runtime signal in an extension context. In build-time Node, `chrome` is undefined, so it falls through.
 3. **Build-time + config signals** — `BXM_BUILD_MODE === 'true'` → production; `NODE_ENV === 'development'` → development; `config.bxm.environment` (`'development'` / `'production'`) override.
-4. **Default** — development. BXM's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `BXM_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast BEM/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
+4. **Default** — development. @omegajs/extension's deployed artifacts always carry their signal (a packed / store extension has `manifest.update_url`; build-time Node sets `BXM_BUILD_MODE`), so reaching here means a bare tooling / unpacked context where development is correct. (Contrast BEM/EM, whose deployed *runtime* can legitimately lack a signal, so they default to **production**.)
 
 ## Adding a new helper
 

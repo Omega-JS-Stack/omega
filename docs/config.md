@@ -86,7 +86,7 @@ slug) and `brand.name` are the only universally required fields.
 ## Consumer access
 
 Each framework exposes the vendored loader — EM: `require('electron-manager/config')`,
-BXM: `require('browser-extension-manager/config')` → `{ loadConfig, validateConfig, … }`.
+extension: `require('@omegajs/extension/config')` → `{ loadConfig, validateConfig, … }`.
 Consumer workflows use this instead of raw JSON5 reads so brand-monorepo resolution
 always applies.
 

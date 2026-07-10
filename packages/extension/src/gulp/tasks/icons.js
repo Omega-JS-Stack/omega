@@ -66,7 +66,9 @@ function icons(complete) {
   // logger.log(`Processing ${filesToProcess.length} images`, filesToProcess);
 
   // Process images: resize and convert to webp
-  return src(files)
+  // encoding: false — gulp 5 decodes as UTF-8 by default, which corrupts binary
+  // buffers before sharp reads them (same guard distribute.js uses)
+  return src(files, { encoding: false })
     .pipe(
       responsive({
         '**/*.{jpg,jpeg,png,svg}': [
@@ -88,7 +90,7 @@ function icons(complete) {
         skipOnEnlargement: false,
       })
     )
-    .pipe(dest(output))
+    .pipe(dest(output, { encoding: false }))
     .on('end', () => {
       // Log
       logger.log('Finished!');

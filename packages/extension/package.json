@@ -1,7 +1,7 @@
 {
-  "name": "browser-extension-manager",
-  "version": "1.7.3",
-  "description": "Browser Extension Manager dependency manager",
+  "name": "@omegajs/extension",
+  "version": "2.0.0",
+  "description": "OMEGA extension framework — build, test, and package Chrome/Firefox extensions (MV3)",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -23,16 +23,11 @@
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "test": "node ./bin/browser-extension-manager test",
-    "wm:prod": "npm uninstall web-manager && npm i web-manager@latest",
-    "wm:local": "npm uninstall web-manager && npm i ../web-manager"
+    "test": "node ./bin/omega-extension test"
   },
   "bin": {
-    "xm": "bin/browser-extension-manager",
-    "bxm": "bin/browser-extension-manager",
-    "browser-extension-manager": "bin/browser-extension-manager",
-    "ext": "bin/browser-extension-manager",
-    "mgr": "bin/browser-extension-manager"
+    "omega-extension": "bin/omega-extension",
+    "mgr": "bin/omega-extension"
   },
   "files": [
     "bin/",
@@ -51,7 +46,7 @@
   },
   "projectScripts": {
     "start": "npx mgr clean && npx mgr setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/browser-extension-manager/dist/gulp/main.js",
+    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omegajs/extension/dist/gulp/main.js",
     "build": "npx mgr clean && npx mgr setup && BXM_BUILD_MODE=true npm run gulp -- build",
     "publish": "BXM_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",
@@ -60,11 +55,8 @@
   "engines": {
     "node": "22"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/itw-creative-works/browser-extension-manager.git"
-  },
   "keywords": [
+    "omega",
     "browser-extension",
     "chrome-extension",
     "firefox-extension",
@@ -77,10 +69,6 @@
   ],
   "author": "ITW Creative Works",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/itw-creative-works/browser-extension-manager/issues"
-  },
-  "homepage": "https://template.itwcreativeworks.com",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",
     "@babel/core": "^7.29.7",

@@ -25,7 +25,7 @@ const path  = require('path');
 const fs    = require('fs');
 const chalk = require('chalk').default;
 
-async function runBootTests({ tests, projectRoot, bxmDistRoot }) {
+async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
   if (tests.length === 0) return { passed: 0, failed: 0, skipped: 0 };
 
   let puppeteer;
