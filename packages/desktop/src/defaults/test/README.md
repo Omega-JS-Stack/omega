@@ -4,7 +4,7 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layers
 
-Match the framework's four layers — Electron Manager's test runner discovers files by the directory they sit in:
+Match the framework's four layers — OMEGA Desktop's test runner discovers files by the directory they sit in:
 
 | Directory | Runtime | Use for |
 |---|---|---|
@@ -21,7 +21,7 @@ Every feature ships with tests at every layer it has a surface in — logic (`bu
 
 ```js
 // test/build/my-feature.test.js
-const assert = require('electron-manager/test/assert');
+const assert = require('@omegajs/desktop/test/assert');
 
 module.exports = {
   'my feature does the thing': async () => {
@@ -33,4 +33,4 @@ module.exports = {
 
 ## See also
 
-`node_modules/electron-manager/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).
+`node_modules/@omegajs/desktop/docs/test-framework.md` — full reference for the test framework (layers, assert API, fixtures, runner internals).

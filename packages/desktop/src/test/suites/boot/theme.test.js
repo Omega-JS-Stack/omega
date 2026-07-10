@@ -1,5 +1,5 @@
 // Boot-layer theme test — the REAL pipeline end-to-end: bundled fixture consumer,
-// production preload, EM-templated page. Verifies the preload's theme applier stamps
+// production preload, framework-templated page. Verifies the preload's theme applier stamps
 // `<html data-bs-theme>` with the RESOLVED appearance and updates it LIVE when main
 // flips the source (nativeTheme.themeSource → prefers-color-scheme → applier).
 //

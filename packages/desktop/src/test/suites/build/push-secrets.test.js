@@ -127,11 +127,11 @@ KEY2=v2
         try {
           fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
             name: 'fake',
-            repository: { type: 'git', url: 'https://github.com/itw-creative-works/electron-manager.git' },
+            repository: { type: 'git', url: 'https://github.com/fixture-org/fixture-app' },
           }));
           const result = await pushSecrets.discoverRepo(tmpDir);
-          ctx.expect(result.owner).toBe('itw-creative-works');
-          ctx.expect(result.repo).toBe('electron-manager');
+          ctx.expect(result.owner).toBe('fixture-org');
+          ctx.expect(result.repo).toBe('fixture-app');
         } finally {
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }
@@ -144,11 +144,11 @@ KEY2=v2
         try {
           fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
             name: 'fake',
-            repository: 'git@github.com:itw-creative-works/electron-manager.git',
+            repository: 'git@github.com:fixture-org/fixture-app.git',
           }));
           const result = await pushSecrets.discoverRepo(tmpDir);
-          ctx.expect(result.owner).toBe('itw-creative-works');
-          ctx.expect(result.repo).toBe('electron-manager');
+          ctx.expect(result.owner).toBe('fixture-org');
+          ctx.expect(result.repo).toBe('fixture-app');
         } finally {
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }

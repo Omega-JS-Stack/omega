@@ -1,5 +1,5 @@
 // Preload entry. Exposes window.em to the renderer via contextBridge.
-const Manager = require('electron-manager/preload');
+const Manager = require('@omegajs/desktop/preload');
 
 const manager = new Manager();
 

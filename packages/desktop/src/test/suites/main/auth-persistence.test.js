@@ -1,5 +1,5 @@
 // Main-process tests for lib/auth-persistence.js (pluggable session vault) and the
-// bridge's em:auth:account-resolved intake (renderer → main plan resolution cache).
+// bridge's desktop:auth:account-resolved intake (renderer → main plan resolution cache).
 // The safeStorage strategy runs REAL (OS keychain + real file under userData) when
 // encryption is available in the test environment; adapter logic is covered against
 // a real in-memory strategy either way.
@@ -125,28 +125,28 @@ module.exports = {
         const origAuth = bridge._firebaseAuth;
         const origBroadcast = m.ipc.broadcast;
         const broadcasts = [];
-        m.ipc.broadcast = (ch, payload) => { if (ch === 'em:auth:plan-changed') broadcasts.push(payload); };
+        m.ipc.broadcast = (ch, payload) => { if (ch === 'desktop:auth:plan-changed') broadcasts.push(payload); };
         try {
           // Main signed out → any push is rejected.
           bridge._firebaseAuth = { currentUser: null };
-          let res = await m.ipc.invoke('em:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true } });
+          let res = await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true } });
           ctx.expect(res.accepted).toBe(false);
           ctx.expect(bridge.getResolvedPlan()).toBeNull();
 
           // Matching uid → cached + broadcast.
           bridge._firebaseAuth = { currentUser: { uid: 'u1', email: 'x@y.z' } };
-          res = await m.ipc.invoke('em:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true }, roles: { betaTester: true } });
+          res = await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true }, roles: { betaTester: true } });
           ctx.expect(res.accepted).toBe(true);
           ctx.expect(bridge.getResolvedPlan()).toEqual({ plan: 'pro', active: true });
           ctx.expect(bridge.getResolvedRoles()).toEqual({ betaTester: true });
           ctx.expect(broadcasts.length).toBe(1);
 
           // Identical push → accepted but NO second broadcast.
-          await m.ipc.invoke('em:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true }, roles: { betaTester: true } });
+          await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'u1', resolved: { plan: 'pro', active: true }, roles: { betaTester: true } });
           ctx.expect(broadcasts.length).toBe(1);
 
           // Mismatched uid (stale renderer) → dropped, cache intact.
-          res = await m.ipc.invoke('em:auth:account-resolved', { uid: 'other', resolved: { plan: 'max', active: true } });
+          res = await m.ipc.invoke('desktop:auth:account-resolved', { uid: 'other', resolved: { plan: 'max', active: true } });
           ctx.expect(res.accepted).toBe(false);
           ctx.expect(bridge.getResolvedPlan()).toEqual({ plan: 'pro', active: true });
 

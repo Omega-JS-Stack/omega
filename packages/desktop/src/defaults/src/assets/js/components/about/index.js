@@ -1,5 +1,5 @@
 // About window renderer entry.
-const Manager = require('electron-manager/renderer');
+const Manager = require('@omegajs/desktop/renderer');
 
 const manager = new Manager();
 

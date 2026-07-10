@@ -1,14 +1,14 @@
 // Renderer-process Manager singleton.
-// Consumer entry (per view): `new (require('electron-manager/renderer'))().initialize()`.
+// Consumer entry (per view): `new (require('@omegajs/desktop/renderer'))().initialize()`.
 // Reads window.EM_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps web-manager + auth.
 //
 // Auth bridge:
-//   - On init, asks main "I'm at UID X (or null), are we in sync?" via em:auth:sync-request.
+//   - On init, asks main "I'm at UID X (or null), are we in sync?" via desktop:auth:sync-request.
 //     If main returns a custom token, this renderer calls webManager.auth().signInWithCustomToken(token).
 //     If main says "sign out," this renderer signs out.
-//   - Listens for em:auth:sign-in-with-token broadcasts (fired when ANY renderer or main signs in)
+//   - Listens for desktop:auth:sign-in-with-token broadcasts (fired when ANY renderer or main signs in)
 //     and signs in with the provided token.
-//   - Listens for em:auth:sign-out broadcasts and signs out.
+//   - Listens for desktop:auth:sign-out broadcasts and signs out.
 //
 // Pattern mirrors BXM: main is the source of truth, renderers reflect.
 
@@ -37,7 +37,7 @@ Manager.prototype.initialize = async function (overrides) {
   const buildJson = (typeof EM_BUILD_JSON !== 'undefined' && EM_BUILD_JSON) || {};
   self.config = Object.assign({}, buildJson.config || {}, overrides || {});
 
-  self.logger.log('Initializing electron-manager (renderer)...');
+  self.logger.log('Initializing @omegajs/desktop (renderer)...');
 
   // Boot web-manager so Firebase Auth is available in this renderer.
   try {
@@ -62,7 +62,7 @@ Manager.prototype.initialize = async function (overrides) {
   self._wireFontAwesome();
   self._wireTooltips();
 
-  self.logger.log('electron-manager (renderer) initialized.');
+  self.logger.log('@omegajs/desktop (renderer) initialized.');
 
   return self;
 };
@@ -116,7 +116,7 @@ Manager.prototype._wireFontAwesome = function () {
   const resolve = (name, style) => {
     const key = `${style}/${name}`;
     if (!cache.has(key)) {
-      cache.set(key, self.ipc.invoke('em:fontawesome:get', { name, style })
+      cache.set(key, self.ipc.invoke('desktop:fontawesome:get', { name, style })
         .then((r) => r?.svg ?? null)
         .catch(() => null));
     }
@@ -160,7 +160,7 @@ Manager.prototype._wireFontAwesome = function () {
   };
 
   // Observe + initial scan. Deferred until the document exists — when this
-  // runs from a preload (the EM test harness does), documentElement isn't
+  // runs from a preload (the @omegajs/desktop test harness does), documentElement isn't
   // built yet.
   const start = () => {
     new MutationObserver((mutations) => {
@@ -185,11 +185,11 @@ Manager.prototype._wireFontAwesome = function () {
 
 // Public alias — minimal surfaces that skip the full initialize() (no
 // web-manager / auth bridge) can still enable the FontAwesome auto-render:
-//   new (require('electron-manager/renderer'))().enableFontAwesome();
+//   new (require('@omegajs/desktop/renderer'))().enableFontAwesome();
 Manager.prototype.enableFontAwesome = Manager.prototype._wireFontAwesome;
 
 // Bootstrap tooltips — auto-initialize every `[data-bs-toggle="tooltip"]`
-// element (Bootstrap's JS + Popper ship inside EM as a prebuilt bundle —
+// element (Bootstrap's JS + Popper ship inside @omegajs/desktop as a prebuilt bundle —
 // assets/themes/bootstrap/js/bootstrap.bundle.js; consumers add ZERO setup).
 // Live-managed via MutationObserver:
 //   - elements inserted later get their tooltip on arrival
@@ -212,7 +212,7 @@ Manager.prototype._wireTooltips = function () {
 
   // Everything — including the require — is deferred until the document
   // exists: the Bootstrap bundle reads document.documentElement at import
-  // time, which is null when this runs from a preload (the EM test harness
+  // time, which is null when this runs from a preload (the @omegajs/desktop test harness
   // does) before the DOM is built.
   const start = () => {
     let Tooltip;
@@ -275,7 +275,15 @@ Manager.prototype._wireTooltips = function () {
           continue;
         }
         if (mutation.attributeName !== 'data-bs-toggle') {
-          const title = el.getAttribute('data-bs-title') || el.getAttribute('title');
+          // data-bs-original-title is Bootstrap's OWN bookkeeping: the
+          // Tooltip constructor MOVES a plain `title` attribute there.
+          // Without reading it, a title-only host infinite-loops the
+          // renderer: init removes `title` → this handler sees no title →
+          // dispose → dispose RESTORES `title` → re-init → … — a pure
+          // MutationObserver microtask storm that starves the main thread
+          // (found by Somiibo's session-limits boot suite: the settings
+          // page froze solid on one badge).
+          const title = el.getAttribute('data-bs-title') || el.getAttribute('title') || el.getAttribute('data-bs-original-title');
           if (title) {
             instance.setContent({ '.tooltip-inner': title });
           } else {
@@ -313,7 +321,7 @@ Manager.prototype._wireAuthBridge = async function () {
   };
 
   // Listen for sign-in-with-token broadcasts (main signed in via deep link, or another renderer signed in).
-  self.ipc.on('em:auth:sign-in-with-token', async ({ token }) => {
+  self.ipc.on('desktop:auth:sign-in-with-token', async ({ token }) => {
     if (!token || !auth?.signInWithCustomToken) return;
     try {
       await auth.signInWithCustomToken(token);
@@ -324,7 +332,7 @@ Manager.prototype._wireAuthBridge = async function () {
   });
 
   // Listen for sign-out broadcasts.
-  self.ipc.on('em:auth:sign-out', async () => {
+  self.ipc.on('desktop:auth:sign-out', async () => {
     if (!auth?.signOut) return;
     try {
       await auth.signOut();
@@ -336,11 +344,11 @@ Manager.prototype._wireAuthBridge = async function () {
 
   // Run web-manager's FULL auth cycle (UJM/BXM parity): listen() waits for auth to
   // settle, fetches the Firestore account, resolves the subscription, and auto-populates
-  // the data-wm-bind bindings — so any EM app can write UJM-style reactive HTML
+  // the data-wm-bind bindings — so any @omegajs/desktop app can write UJM-style reactive HTML
   // (`@show auth.user`, `@text auth.account.plan.id`, ...). Persistent listener: fires
   // again on every subsequent sign-in/out (broadcast tokens included).
   //
-  // Each settle pushes the resolution to main (em:auth:account-resolved) — main can't
+  // Each settle pushes the resolution to main (desktop:auth:account-resolved) — main can't
   // run Firestore, so this is how main-side plan gates learn the REAL plan (BXM's
   // "browser contexts resolve, the authority caches" split). Main uid-guards the push.
   if (auth?.listen) {
@@ -350,7 +358,7 @@ Manager.prototype._wireAuthBridge = async function () {
       const uid = state?.user?.uid || null;
       if (!uid) return;
       try {
-        await self.ipc.invoke('em:auth:account-resolved', {
+        await self.ipc.invoke('desktop:auth:account-resolved', {
           uid,
           resolved: state?.resolved || null,
           roles:    state?.account?.roles || null,
@@ -372,7 +380,7 @@ Manager.prototype._wireAuthBridge = async function () {
     // Re-push when MAIN's auth state changes: a renderer that resolved BEFORE main
     // signed in had its push uid-rejected (correctly — main was signed out). When
     // main comes up on the same user, offer the resolution again.
-    self.ipc.on('em:auth:state-changed', (snap) => {
+    self.ipc.on('desktop:auth:state-changed', (snap) => {
       if (snap?.uid && lastState?.user?.uid === snap.uid) {
         pushResolved(lastState);
       }
@@ -381,7 +389,7 @@ Manager.prototype._wireAuthBridge = async function () {
 
   // Sync with main on load. If main has a different state, it'll send back instructions.
   try {
-    const result = await self.ipc.invoke('em:auth:sync-request', {
+    const result = await self.ipc.invoke('desktop:auth:sync-request', {
       contextUid: getCurrentUid(),
     });
 
@@ -403,13 +411,13 @@ Manager.prototype._wireAuthBridge = async function () {
 // renderers + main stay in sync via the broadcast.
 Manager.prototype.signOut = async function () {
   if (!this.ipc) return { success: false, error: 'no-ipc' };
-  return this.ipc.invoke('em:auth:sign-out');
+  return this.ipc.invoke('desktop:auth:sign-out');
 };
 
 // Read main's current user (sync answer from main, not the renderer's local Firebase).
 Manager.prototype.getMainUser = async function () {
   if (!this.ipc) return null;
-  return this.ipc.invoke('em:auth:get-user');
+  return this.ipc.invoke('desktop:auth:get-user');
 };
 
 // Mix in shared cross-context helpers — same code path used in main, preload, build.

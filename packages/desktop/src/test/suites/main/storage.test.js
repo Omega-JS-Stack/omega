@@ -1,6 +1,6 @@
 // Main-process tests for lib/storage.js — round-trip, dot-notation, persistence, broadcast.
 //
-// ctx.manager is a fully-initialized EM Manager (skipWindowCreation: true).
+// ctx.manager is a fully-initialized @omegajs/desktop Manager (skipWindowCreation: true).
 
 module.exports = {
   type: 'suite',

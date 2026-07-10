@@ -1,7 +1,7 @@
 // Main-process tests for lib/window-manager.js — createNamed, dedup, hide/show/close lifecycle.
 //
 // Note: createNamed requires src/views/<view>/index.html to exist on disk in the test cwd.
-// The harness uses EM's defaults config but runs from EM's repo root, where there are no built views.
+// The harness uses @omegajs/desktop's defaults config but runs from @omegajs/desktop's repo root, where there are no built views.
 // So we test the API surface and dedup behavior using the manager's electron handle but skip
 // actual file-loading in createNamed (it logs an error and returns the BrowserWindow anyway,
 // which is enough to verify the registry behavior).
@@ -34,7 +34,7 @@ module.exports = {
     {
       name: 'createNamed registers a window in the registry (uses about view)',
       run: async (ctx) => {
-        // We need a view file. Use EM's own defaults dir as the cwd-equivalent by setting a custom html path.
+        // We need a view file. Use @omegajs/desktop's own defaults dir as the cwd-equivalent by setting a custom html path.
         // For simplicity, just verify createNamed creates a BrowserWindow even when the html file is missing
         // (loadFile catches the error; the window object still exists in the registry).
         const win = await ctx.manager.windows.createNamed('about');

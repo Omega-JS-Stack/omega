@@ -64,7 +64,7 @@ module.exports = async function (options) {
   }
 
   // Resolve the required Node major from the consumer's electron version (via the electron
-  // releases feed). Falls back to EM's package.json engines.node if the lookup fails.
+  // releases feed). Falls back to @omegajs/desktop's package.json engines.node if the lookup fails.
   // Write .nvmrc FIRST so the pin is correct even if the user's current Node is stale.
   if (options.checkNode !== false) {
     const requiredMajor = await resolveRequiredNodeMajor();
@@ -175,10 +175,10 @@ async function updateManager() {
 }
 
 // Resolve the required Node major for the consumer's installed electron version by hitting
-// the official electron releases feed. Falls back to EM's own engines.node if the network is
+// the official electron releases feed. Falls back to @omegajs/desktop's own engines.node if the network is
 // down or the electron version can't be resolved.
 async function resolveRequiredNodeMajor() {
-  // Look at the consumer's electron version FIRST (peer dep), then fall back to EM's pin.
+  // Look at the consumer's electron version FIRST (peer dep), then fall back to @omegajs/desktop's pin.
   const consumerElectron = project?.devDependencies?.electron || project?.dependencies?.electron || package?.peerDependencies?.electron;
   if (consumerElectron) {
     try {
@@ -187,7 +187,7 @@ async function resolveRequiredNodeMajor() {
       if (node) return node;
     } catch (e) { /* fall through to static value */ }
   }
-  // Fallback: EM's package.json engines.node (last-known-good).
+  // Fallback: @omegajs/desktop's package.json engines.node (last-known-good).
   return version.clean(package.engines.node).split('.')[0];
 }
 
@@ -268,13 +268,13 @@ async function copyDefaults(targetDir) {
   }
 
   // Template substitution context — `{{ versions.node }}` etc. resolved at scaffold time.
-  // Source of truth is EM's own package.json `engines` block. EM auto-syncs `engines.node`
+  // Source of truth is @omegajs/desktop's own package.json `engines` block. @omegajs/desktop auto-syncs `engines.node`
   // to whatever Electron's bundled Node version is via scripts/sync-nvmrc.js, so consumers'
   // workflows track Electron-Node automatically without manual bumps.
   const templateContext = { versions: package.engines || {} };
 
   // Scaffolding runs through the shared devkit engine (vendored at prepare time).
-  // Engine built-ins cover EM's structural rules: `_.` renames (`_.env` → `.env`),
+  // Engine built-ins cover @omegajs/desktop's structural rules: `_.` renames (`_.env` → `.env`),
   // archive-dir skips (`_mas/` reference plists ship in the package, never to
   // consumers — `_`-prefixed FILENAMES like `test/_init.js` still copy), and
   // write-only-if-changed.
@@ -292,8 +292,8 @@ async function copyDefaults(targetDir) {
       '_.env': { mergeLines: true, template: templateContext },
       '_.gitignore': { mergeLines: true, template: templateContext },
       'CLAUDE.md': { mergeLines: true, template: templateContext },
-      // Workflow YAMLs are EM-owned: always re-rendered so they track changes in
-      // EM's defaults (e.g. engines.node bumping when Electron updates). The
+      // Workflow YAMLs are framework-owned: always re-rendered so they track changes in
+      // @omegajs/desktop's defaults (e.g. engines.node bumping when Electron updates). The
       // renderer is tolerant — GitHub Actions' `${{ secrets.X }}` survives — and
       // the engine skips the write when the rendered content is byte-identical.
       '**/*.{yml,yaml}': { overwrite: true, template: templateContext },
@@ -353,7 +353,7 @@ async function provisionReleaseRepos() {
       name:        'releases (auto-update feed)',
       owner:       config.releases?.owner || appOwner,
       repo:        config.releases?.repo || 'update-server',
-      description: `Public release artifacts + auto-update feed for ${appOwner}'s electron-manager apps. Managed by electron-manager.`,
+      description: `Public release artifacts + auto-update feed for ${appOwner}'s @omegajs/desktop apps. Managed by @omegajs/desktop.`,
     });
   }
   if (config.downloads?.enabled !== false) {
@@ -361,7 +361,7 @@ async function provisionReleaseRepos() {
       name:        'downloads (fixed-name mirror)',
       owner:       config.downloads?.owner || appOwner,
       repo:        config.downloads?.repo || 'download-server',
-      description: `Fixed-name download mirror for ${appOwner}'s electron-manager apps. Managed by electron-manager.`,
+      description: `Fixed-name download mirror for ${appOwner}'s @omegajs/desktop apps. Managed by @omegajs/desktop.`,
     });
   }
 

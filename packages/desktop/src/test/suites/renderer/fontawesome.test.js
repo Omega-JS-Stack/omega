@@ -52,6 +52,30 @@ module.exports = {
       },
     },
     {
+      name: 'injected SVGs render with overflow visible (FA Pro 7 glyphs overshoot their viewBox)',
+      run: async (ctx) => {
+        const until = async (fn) => {
+          const t0 = Date.now();
+          while (!fn()) {
+            if (Date.now() - t0 > 3000) throw new Error('timed out waiting for icon injection');
+            await new Promise((r) => setTimeout(r, 25));
+          }
+        };
+
+        // fa-lock draws its shackle above the viewBox top (y=-32 in
+        // 0 0 384 512) — with the SVG-root default (overflow: hidden) the
+        // shackle clips flat. The COMPUTED style is the proof the fix
+        // reaches the paint, not just the markup.
+        const el = document.createElement('i');
+        el.className = 'fa-solid fa-lock';
+        document.body.appendChild(el);
+
+        await until(() => el.querySelector('svg'));
+        ctx.expect(getComputedStyle(el.querySelector('svg')).overflow).toBe('visible');
+        el.remove();
+      },
+    },
+    {
       name: 'fa-brands picks the brands style; modifier classes are not names',
       run: async (ctx) => {
         const until = async (fn) => {

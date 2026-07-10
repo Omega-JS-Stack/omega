@@ -1,7 +1,7 @@
 // html — read each consumer view at src/views/<name>/index.html, treat it as the BODY of the
 // outer page-template, render with templating vars, write to dist/views/<name>/index.html.
 //
-// Page template is EM-INTERNAL (`<em>/dist/config/page-template.html`). Consumers don't ship
+// Page template is FRAMEWORK-INTERNAL (`<framework>/dist/config/page-template.html`). Consumers don't ship
 // their own — every view goes through the same shell so the inset titlebar / draggable region /
 // css/js wiring stay consistent. If a consumer needs a different template they can fork via
 // `manager.windows` config, but we no longer look at `<consumer>/config/page-template.html`.
@@ -41,13 +41,13 @@ module.exports = function htmlTask(done) {
     return done();
   }
 
-  // EM-internal page template — single source of truth. Lives at
+  // framework-internal page template — single source of truth. Lives at
   // <em>/dist/config/page-template.html (copied from src/config/page-template.html
   // by prepare-package). Consumers do not override this anymore.
   const templatePath = path.join(packageRoot, 'dist', 'config', 'page-template.html');
 
   if (!jetpack.exists(templatePath)) {
-    logger.warn(`No EM page template at ${templatePath}. Falling back to raw view copy.`);
+    logger.warn(`No @omegajs/desktop page template at ${templatePath}. Falling back to raw view copy.`);
     files.forEach((src) => {
       const rel = path.relative(viewsDir, src);
       const dest = path.join(projectRoot, 'dist', 'views', rel);

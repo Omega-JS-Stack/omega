@@ -38,7 +38,7 @@ Defaults (exported as `manager.remoteConfig.DEFAULTS`):
 }
 ```
 
-Consumers should add their own fields freely (`limits`, `popupTriggers`, etc. — like the legacy somiibo config). Anything missing from the server response falls back to the EM-side `DEFAULTS` constant.
+Consumers should add their own fields freely (`limits`, `popupTriggers`, etc. — like the legacy somiibo config). Anything missing from the server response falls back to the framework-side `DEFAULTS` constant.
 
 ## The "re-run gates on update" pattern
 

@@ -1,6 +1,6 @@
 # Sentry
 
-Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with EM-specific config gating, dev-mode protection, and automatic user attribution from web-manager auth state.
+Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with desktop-specific config gating, dev-mode protection, and automatic user attribution from web-manager auth state.
 
 ## Config (`config/omega.json5`)
 
@@ -51,7 +51,7 @@ In renderer (via preload bridge): `window.em.sentry` would expose the same surfa
 
 ## Auth attribution
 
-When the user signs in via `web-manager-bridge`, EM automatically calls `manager.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
+When the user signs in via `web-manager-bridge`, @omegajs/desktop automatically calls `manager.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
 
 The user object is **normalized** before being sent — only `uid`/`id` and `email` are kept; everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
 
@@ -65,7 +65,7 @@ Every event is tagged with `release: app.getVersion()` automatically. So you can
 
 - `@sentry/electron` not installed → silent no-op with one log line. Sentry isn't a hard dep, so dev environments without it work fine.
 - DSN is wrong → SDK retries internally; events dropped silently. Check Sentry project's "Settings → Client Keys" if you're not seeing events.
-- Sentry SDK throws during init → caught + logged; the rest of EM continues to boot.
+- Sentry SDK throws during init → caught + logged; the rest of @omegajs/desktop continues to boot.
 
 ## Tests
 

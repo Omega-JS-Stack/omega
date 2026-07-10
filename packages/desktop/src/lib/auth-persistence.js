@@ -27,7 +27,7 @@
 //
 // Select via config `webManager.authPersistence` ('safeStorage' | 'none' | a custom
 // registered name). Register custom strategies BEFORE manager.initialize():
-//   require('electron-manager/lib/auth-persistence').register('keytar', {...})
+//   require('@omegajs/desktop/lib/auth-persistence').register('keytar', {...})
 //
 // The firebase adapter mirrors firebase's own getReactNativePersistence(): a class
 // implementing the internal Persistence surface (_set/_get/_remove) over an

@@ -41,7 +41,7 @@ function startAutoUnlock({ password, logger }) {
   if (process.platform !== 'win32') return { stop: () => {} };
   if (!password) return { stop: () => {} };
   if (!automately) {
-    if (logger) logger.warn('automately not installed — SafeNet password prompt will need manual entry. Run `npm install` in the EM repo to enable auto-unlock.');
+    if (logger) logger.warn('automately not installed — SafeNet password prompt will need manual entry. Run `npm install` in the @omegajs/desktop repo to enable auto-unlock.');
     return { stop: () => {} };
   }
 

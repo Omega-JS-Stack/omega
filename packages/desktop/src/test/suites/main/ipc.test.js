@@ -4,8 +4,8 @@
 // We test the main-side surface directly. Renderer-side wiring (preload contextBridge,
 // ipcRenderer.invoke) is exercised in pass 2.3c when the renderer harness lands.
 
-const TEST_CHANNEL = 'em:test:echo';
-const TEST_LISTEN  = 'em:test:event';
+const TEST_CHANNEL = 'desktop:test:echo';
+const TEST_LISTEN  = 'desktop:test:event';
 
 module.exports = {
   type: 'suite',
@@ -33,11 +33,11 @@ module.exports = {
     {
       name: 'storage handlers are registered on the ipc bus',
       run: (ctx) => {
-        ctx.expect(ctx.manager.ipc.hasHandler('em:storage:get')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('em:storage:set')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('em:storage:delete')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('em:storage:has')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('em:storage:clear')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:get')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:set')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:delete')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:has')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:storage:clear')).toBe(true);
       },
     },
     {
@@ -125,15 +125,15 @@ module.exports = {
       run: (ctx) => {
         // Test harness runs with skipWindowCreation: true — no BrowserWindows exist.
         // This must not throw.
-        ctx.manager.ipc.broadcast('em:test:broadcast', { hello: 'world' });
+        ctx.manager.ipc.broadcast('desktop:test:broadcast', { hello: 'world' });
         ctx.expect(true).toBe(true);
       },
     },
     {
       name: 'send to a destroyed/null webContents is a safe no-op',
       run: (ctx) => {
-        ctx.manager.ipc.send(null, 'em:test:send', {});
-        ctx.manager.ipc.send({ isDestroyed: () => true }, 'em:test:send', {});
+        ctx.manager.ipc.send(null, 'desktop:test:send', {});
+        ctx.manager.ipc.send({ isDestroyed: () => true }, 'desktop:test:send', {});
         ctx.expect(true).toBe(true);
       },
     },
@@ -156,7 +156,7 @@ module.exports = {
     {
       name: 'handle rejects non-function handler',
       run: (ctx) => {
-        ctx.expect(() => ctx.manager.ipc.handle('em:test:bad', null)).toThrow(/handler must be a function/);
+        ctx.expect(() => ctx.manager.ipc.handle('desktop:test:bad', null)).toThrow(/handler must be a function/);
       },
     },
   ],

@@ -1,26 +1,26 @@
-// Tray definition. Called by electron-manager during boot.
+// Tray definition. Called by @omegajs/desktop during boot.
 //
-// `manager` — the running EM Manager.
+// `manager` — the running @omegajs/desktop Manager.
 // `tray`    — builder API + id-path API (find/update/remove/insertAfter/etc.).
 //
-// EM auto-resolves the tray icon by convention (most specific wins):
+// @omegajs/desktop auto-resolves the tray icon by convention (most specific wins):
 //   1. config/icons/<platform>/tray.png   (platform-specific override)
 //   2. config/icons/global/tray.png       (universal fallback for all platforms)
 //   3. config/icons/<platform>/icon.png   (slot fallback: tray → app icon)
-//   4. EM bundled default
+//   4. @omegajs/desktop bundled default
 // And auto-sets the tooltip to config.app.productName.
 //
-// Default items shipped by EM (flat ids — no `tray/` prefix needed):
+// Default items shipped by @omegajs/desktop (flat ids — no `tray/` prefix needed):
 //   title              — disabled label showing the app name
 //   open               — "Open <app>"
 //   check-for-updates  — wired to autoUpdater (label/enabled auto-updated)
 //   website            — opens brand.url in external browser (only if configured)
 //   quit               — quits the app
 //
-// This file is OPTIONAL — delete it and EM still ships a working tray.
+// This file is OPTIONAL — delete it and @omegajs/desktop still ships a working tray.
 
 module.exports = ({ manager, tray }) => {
-  // Use EM's default template + auto-resolved icon + auto-resolved tooltip.
+  // Use @omegajs/desktop's default template + auto-resolved icon + auto-resolved tooltip.
   tray.useDefaults();
 
   // ───────── Examples (uncomment to use) ─────────

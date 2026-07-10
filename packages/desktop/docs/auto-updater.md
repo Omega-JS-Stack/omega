@@ -44,22 +44,22 @@ The problem: if a user keeps their app open for weeks, an update may download bu
 
 The gate:
 
-1. **First download wins.** When `update-downloaded` fires, EM stores `pendingUpdate = { version, downloadedAt: Date.now() }` to `storage.autoUpdater.pendingUpdate`.
+1. **First download wins.** When `update-downloaded` fires, @omegajs/desktop stores `pendingUpdate = { version, downloadedAt: Date.now() }` to `storage.autoUpdater.pendingUpdate`.
 2. **Subsequent downloads do NOT reset the timer.** If a newer update downloads later, `downloadedAt` stays at the original time. (Otherwise the user could keep dodging by triggering re-checks.)
-3. **Every poll tick + at init**, EM checks if `Date.now() - downloadedAt >= maxAgeMs`. If yes → `quitAndInstall()`. Force.
+3. **Every poll tick + at init**, @omegajs/desktop checks if `Date.now() - downloadedAt >= maxAgeMs`. If yes → `quitAndInstall()`. Force.
 4. **Cleared on apply.** When the app next launches and `app.getVersion() === pendingUpdate.version`, the flag is cleared automatically (the user successfully restarted into the new version).
 
-This guarantees no app on EM stays > maxAgeMs days behind a downloaded update.
+This guarantees no app on @omegajs/desktop stays > maxAgeMs days behind a downloaded update.
 
 ## Idle-aware install (15-min default)
 
-When an update finishes downloading via a background poll (NOT a user-initiated check), EM does NOT immediately quit-and-install. Instead, the install decision is folded into the existing periodic tick (`_periodicTick`, fires every `intervalMs`, default 60s) which runs three steps in order: re-check the feed → enforce the 30-day max-age gate → evaluate idle install. Single timer, single decision flow.
+When an update finishes downloading via a background poll (NOT a user-initiated check), @omegajs/desktop does NOT immediately quit-and-install. Instead, the install decision is folded into the existing periodic tick (`_periodicTick`, fires every `intervalMs`, default 60s) which runs three steps in order: re-check the feed → enforce the 30-day max-age gate → evaluate idle install. Single timer, single decision flow.
 
 ### Activity signals
 
 Any UI activity bumps `_lastActivityAt = Date.now()`. Built-in signals:
 
-- **Renderer-side** — `mousedown`, `keydown`, `wheel`, `touchstart`, `focus` on `window` (capture phase, debounced to once per 5s in preload; sent to main as IPC `em:auto-updater:activity` which routes through `_onActivityIpc → markActive`).
+- **Renderer-side** — `mousedown`, `keydown`, `wheel`, `touchstart`, `focus` on `window` (capture phase, debounced to once per 5s in preload; sent to main as IPC `desktop:auto-updater:activity` which routes through `_onActivityIpc → markActive`).
 - **Main-side** — `app.on('browser-window-focus')` (covers tray-click-to-show, dock click, alt-tab back, etc.) wired during `_wireActivityHooks()` (idempotent, one-shot per process).
 
 ### Decision flow (`_evaluateIdleInstall`)
@@ -118,7 +118,7 @@ This lets the framework's own integration tests drive the full sequence (`EM_DEV
 
 ## Menu integration
 
-EM's default menu template includes a "Check for Updates..." item with id `em:check-for-updates`. The auto-updater listens to its own status changes and updates the item's label + enabled state, VS Code-style:
+@omegajs/desktop's default menu template includes a "Check for Updates..." item with id `desktop:check-for-updates`. The auto-updater listens to its own status changes and updates the item's label + enabled state, VS Code-style:
 
 | State | Label | Enabled |
 |---|---|---|
@@ -131,7 +131,7 @@ EM's default menu template includes a "Check for Updates..." item with id `em:ch
 
 Click handler defaults to `checkNow()` when not yet downloaded; `installNow()` when downloaded.
 
-Consumers can find / move / remove the item via `manager.menu.findItem('em:check-for-updates')` etc. — see [docs/menu.md](menu.md).
+Consumers can find / move / remove the item via `manager.menu.findItem('desktop:check-for-updates')` etc. — see [docs/menu.md](menu.md).
 
 ## Renderer surface
 
@@ -154,7 +154,7 @@ await window.em.autoUpdater.checkNow();
 await window.em.autoUpdater.installNow();
 ```
 
-Status is also broadcast on the IPC channel `em:auto-updater:status` after every state transition.
+Status is also broadcast on the IPC channel `desktop:auto-updater:status` after every state transition.
 
 ## Dev simulation
 
@@ -175,7 +175,7 @@ In dev simulation mode, `quitAndInstall()` is a no-op (no actual restart) so you
 
 ## Production: how electron-updater finds the feed
 
-`electron-updater` reads the `publish` block from the embedded `app-update.yml` (baked into the `.app` / `.exe` at build time by electron-builder). EM's `gulp/build-config` injects `publish` from `config.releases.{owner,repo}` into `dist/electron-builder.yml` before packaging, so the published `app-update.yml` points at:
+`electron-updater` reads the `publish` block from the embedded `app-update.yml` (baked into the `.app` / `.exe` at build time by electron-builder). @omegajs/desktop's `gulp/build-config` injects `publish` from `config.releases.{owner,repo}` into `dist/electron-builder.yml` before packaging, so the published `app-update.yml` points at:
 
 ```
 provider: github

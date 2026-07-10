@@ -114,13 +114,13 @@ const remoteConfig = {
 
     // IPC: renderer reads via invoke. Subscribe-to-update is an IPC broadcast,
     // wired into the in-process listener below.
-    manager.ipc.unhandle('em:remote-config:get');
-    manager.ipc.handle('em:remote-config:get',         (path) => remoteConfig.get(path));
-    manager.ipc.unhandle('em:remote-config:refresh-now');
-    manager.ipc.handle('em:remote-config:refresh-now', () => remoteConfig.refreshNow());
+    manager.ipc.unhandle('desktop:remote-config:get');
+    manager.ipc.handle('desktop:remote-config:get',         (path) => remoteConfig.get(path));
+    manager.ipc.unhandle('desktop:remote-config:refresh-now');
+    manager.ipc.handle('desktop:remote-config:refresh-now', () => remoteConfig.refreshNow());
     // Broadcast updates to renderers.
     remoteConfig.on('update', (data) => {
-      manager.ipc.broadcast('em:remote-config:update', data);
+      manager.ipc.broadcast('desktop:remote-config:update', data);
     });
 
     logger.log(`remote-config initialized — url=${remoteConfig._url} interval=${interval}ms (using defaults until first fetch)`);
@@ -177,7 +177,7 @@ const remoteConfig = {
     if (!data || typeof data !== 'object') return null;
 
     // Layer fresh fetch on top of defaults so consumers can omit fields from
-    // their hosted JSON and EM still has sensible values.
+    // their hosted JSON and @omegajs/desktop still has sensible values.
     remoteConfig._data = { ...DEFAULTS, ...data };
     remoteConfig._manager.storage.set(STORAGE_KEY, data);
     remoteConfig._emit('update', remoteConfig._data);

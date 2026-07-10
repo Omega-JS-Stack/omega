@@ -1,6 +1,6 @@
 // Window manager — named-window registry over BrowserWindow.
 //
-// **Lazy creation.** EM does NOT auto-create any windows. Consumers call
+// **Lazy creation.** @omegajs/desktop does NOT auto-create any windows. Consumers call
 // `manager.windows.create('main', opts?)` from their main.js when they want UI
 // to surface — typically right after `manager.initialize()` resolves, but may
 // be deferred (e.g. agent apps that only show UI when the user clicks the tray).
@@ -21,7 +21,7 @@
 //
 // macOS dock auto-show: when `LSUIElement: true` is baked at build time
 // (`startup.mode = 'hidden'`), the app launches with NO dock icon. The first
-// time `create()` or `show()` runs, EM calls `app.dock.show()` so the icon
+// time `create()` or `show()` runs, @omegajs/desktop calls `app.dock.show()` so the icon
 // appears alongside the window.
 //
 // Bounds persistence: every named window's position + size is saved to storage
@@ -57,7 +57,7 @@ const windowManager = {
 
     // macOS: when the user clicks the dock icon or double-clicks the running app
     // (e.g. CleanMyMac-style: launches hidden at login as tray-only, but double-clicking
-    // opens the main window), surface `main`. We only show — never create — so EM's "no
+    // opens the main window), surface `main`. We only show — never create — so @omegajs/desktop's "no
     // auto-create" contract holds. The consumer is expected to have called
     // `windows.create('main', { show: !startup.isLaunchHidden() })` at boot, which puts
     // the window in the registry but invisible in hidden-mode launches.

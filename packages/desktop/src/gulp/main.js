@@ -1,4 +1,4 @@
-// Strip ELECTRON_RUN_AS_NODE — see bin/electron-manager for the full story. Belt-and-suspenders
+// Strip ELECTRON_RUN_AS_NODE — see bin/omega-desktop for the full story. Belt-and-suspenders
 // at the gulp boundary too because gulp can be invoked outside of mgr (e.g. `npx gulp build`).
 delete process.env.ELECTRON_RUN_AS_NODE;
 
@@ -75,7 +75,7 @@ exports['hook:release:post'] = makeHookTask('release/post');
 
 // Build pipeline: hook:build:pre → defaults → distribute → (sass | webpack | html in parallel)
 // → audit → build-config → hook:build:post.
-// build-config generates dist/electron-builder.yml entirely from EM defaults +
+// build-config generates dist/electron-builder.yml entirely from @omegajs/desktop defaults +
 // config/omega.json5 (no consumer-shipped electron-builder.yml). Mode-dependent
 // injections (e.g. LSUIElement for tray-only) happen here. Must run BEFORE package/release.
 exports.build = series(

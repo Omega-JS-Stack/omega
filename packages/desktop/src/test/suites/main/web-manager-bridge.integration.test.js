@@ -5,7 +5,7 @@
 // offline / on machines without backend creds.
 //
 // To run:
-//   1. Install firebase-admin: `npm i -D firebase-admin` (already in EM's devDeps)
+//   1. Install firebase-admin: `npm i -D firebase-admin` (already in @omegajs/desktop's devDeps)
 //   2. Drop a service-account JSON in a safe place
 //   3. Set EM_TEST_FIREBASE_ADMIN_KEY=/path/to/file.json (or use GOOGLE_APPLICATION_CREDENTIALS)
 //   4. Optionally EM_TEST_USER_UID=your-test-uid (defaults to 'em-test-user')

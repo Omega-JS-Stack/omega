@@ -165,9 +165,9 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
           # (a) Config check — explicit `enabled: false` opts out; missing/true opts in.
-          # `electron-manager/config` is the vendored @omegajs/config loader — resolves
+          # `@omegajs/desktop/config` is the vendored @omegajs/config loader — resolves
           # config/omega.json5 for the desktop target (brand-monorepo aware).
-          if node -e 'const c = require("electron-manager/config").loadConfig(process.cwd(), "desktop").config; process.exit(c.platforms?.linux?.snap?.enabled === false ? 1 : 0);'; then
+          if node -e 'const c = require("@omegajs/desktop/config").loadConfig(process.cwd(), "desktop").config; process.exit(c.platforms?.linux?.snap?.enabled === false ? 1 : 0);'; then
             CONFIG_OK=1
           else
             CONFIG_OK=0
@@ -231,7 +231,7 @@ jobs:
       - run: sfw npm ci
       - id: resolve
         run: |
-          STRATEGY=$(node -e "const c=require('electron-manager/config').loadConfig(process.cwd(),'desktop').config;console.log(c.platforms?.win?.signing?.strategy || 'self-hosted');")
+          STRATEGY=$(node -e "const c=require('@omegajs/desktop/config').loadConfig(process.cwd(),'desktop').config;console.log(c.platforms?.win?.signing?.strategy || 'self-hosted');")
           echo "strategy=$STRATEGY" >> "$GITHUB_OUTPUT"
           echo "Resolved Windows signing strategy: $STRATEGY"
 

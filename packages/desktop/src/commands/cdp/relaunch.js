@@ -1,4 +1,4 @@
-// `npx mgr cdp relaunch` — the dev iterate loop in one command. EM's
+// `npx mgr cdp relaunch` — the dev iterate loop in one command. @omegajs/desktop's
 // `npm start` has NO watch (build once, then run), so every src/ edit needs
 // quit → rebuild → boot.
 //

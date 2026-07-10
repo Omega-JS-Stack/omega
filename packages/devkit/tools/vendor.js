@@ -195,6 +195,15 @@ function vendorPackages(options) {
 
   const vendorRoot = path.join(distPath, 'vendor');
 
+  // The host's OWN name is never a vendor candidate: files that reference the
+  // host by name (boot harnesses, consumer fixtures under src/test/) run in a
+  // CONSUMER context where the name resolves via the consumer's node_modules —
+  // vendoring would fold the host into itself, and rewriting would break that
+  // runtime resolution. Those references survive verbatim.
+  const hostSelfName = (hostPackage.name || '').startsWith('@omegajs/')
+    ? hostPackage.name.slice('@omegajs/'.length)
+    : null;
+
   // 1. Scan dist for @omegajs references: which files need rewriting, which
   // modules of which packages are used.
   const seedsByPackage = new Map();
@@ -208,6 +217,7 @@ function vendorPackages(options) {
     for (const pattern of REFERENCE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         const name = match[3];
+        if (name === hostSelfName) continue;
         if (!seedsByPackage.has(name)) seedsByPackage.set(name, new Set());
         seedsByPackage.get(name).add(subpathToFile(match[4]));
         uses = true;
@@ -242,6 +252,7 @@ function vendorPackages(options) {
     let updated = contents;
     for (const pattern of REFERENCE_PATTERNS) {
       updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
+        if (name === hostSelfName) return match;
         const target = path.join(vendorRoot, name, subpathToFile(subpath));
         let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
         if (!relative.startsWith('.')) {

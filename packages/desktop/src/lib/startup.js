@@ -16,7 +16,7 @@
 //      mode    (default 'hidden') — what mode the app launches in WHEN OS-launched.
 //                                   Independent from the user-launch mode above.
 //
-// EM does NOT auto-create any windows anymore — the consumer's main.js drives that.
+// @omegajs/desktop does NOT auto-create any windows anymore — the consumer's main.js drives that.
 // So "isLaunchHidden" no longer needs to gate window creation; we just expose the
 // raw mode and let the consumer decide whether to call `manager.windows.create()`.
 //
@@ -71,10 +71,10 @@ const startup = {
       });
     }
 
-    // Boot summary — RAW inputs (what the OS/shell gave us) + RESOLVED values (what EM
+    // Boot summary — RAW inputs (what the OS/shell gave us) + RESOLVED values (what @omegajs/desktop
     // decided to act on). Two parallel blocks so you can debug in either direction:
-    //   "Why is EM behaving like X?" → check resolved values
-    //   "Why did EM decide X?" → check raw inputs
+    //   "Why is @omegajs/desktop behaving like X?" → check resolved values
+    //   "Why did @omegajs/desktop decide X?" → check raw inputs
     const macLogin = process.platform === 'darwin' ? startup._electron.app.getLoginItemSettings() : null;
     const emEnv = Object.fromEntries(
       Object.entries(process.env).filter(([k]) => k.startsWith('EM_') || k === 'ELECTRON_RUN_AS_NODE' || k === 'NODE_ENV')

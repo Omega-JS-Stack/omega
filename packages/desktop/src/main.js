@@ -1,5 +1,5 @@
 // Main-process Manager singleton.
-// Consumer entry: `new (require('electron-manager/main'))().initialize()` — config auto-loads (config/omega.json5).
+// Consumer entry: `new (require('@omegajs/desktop/main'))().initialize()` — config auto-loads (config/omega.json5).
 // Boot sequence below — each step delegates to a `lib/*.js` module. Stubs today, real impls land in pass 2.
 
 const LoggerLite = require('./lib/logger-lite.js');
@@ -70,7 +70,7 @@ function Manager() {
 
 // Open the sign-in round trip in the user's default browser (lib/auth-flow.js).
 // Resolves once launched; completion arrives via the auth/token deep-link route →
-// webManager.handleAuthToken → the em:auth:sign-in-with-token broadcast.
+// webManager.handleAuthToken → the desktop:auth:sign-in-with-token broadcast.
 Manager.prototype.openAuthFlow = function (options) {
   return authFlow.open(options);
 };
@@ -127,7 +127,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   //      not loadable from disk. It's the RESOLVED config (Manager.getConfig() output —
   //      shared sections + targets.desktop overlaid) snapshotted at build time.
   //   2. <appRoot>/config/omega.json5 — resolved via @omegajs/config for dev mode where
-  //      EM is loaded directly (no webpack bundling). appRoot = the consumer project dir.
+  //      @omegajs/desktop is loaded directly (no webpack bundling). appRoot = the consumer project dir.
   if (typeof consumerConfig === 'string') {
     consumerConfig = loadResolvedConfig(consumerConfig);
   } else if (!consumerConfig) {
@@ -158,7 +158,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     try { fs.writeFileSync(_logPath, ''); } catch (e) {}
   }
 
-  self.logger.log(`Initializing electron-manager (main)... pid=${process.pid} platform=${process.platform} arch=${process.arch} packaged=${require('electron').app.isPackaged} argv=${JSON.stringify(process.argv.slice(1))}`);
+  self.logger.log(`Initializing @omegajs/desktop (main)... pid=${process.pid} platform=${process.platform} arch=${process.arch} packaged=${require('electron').app.isPackaged} argv=${JSON.stringify(process.argv.slice(1))}`);
 
   try { if (require('electron').app.isPackaged) {
     const { execFile } = require('child_process');
@@ -200,7 +200,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     const { validateConfig, formatErrors } = require('@omegajs/config');
     const { errors } = validateConfig(self.config, { target: 'desktop' });
     if (errors.length > 0) {
-      throw new Error(`electron-manager: config validation failed — fix the following in config/omega.json5:\n${formatErrors(errors)}`);
+      throw new Error(`@omegajs/desktop: config validation failed — fix the following in config/omega.json5:\n${formatErrors(errors)}`);
     }
   }
 
@@ -322,10 +322,10 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     self.logger.log(`userData path: ${app.getPath('userData')} (production)`);
   }
 
-  // 1c. Set the global user agent fallback. Default template applied to every EM app so
+  // 1c. Set the global user agent fallback. Default template applied to every @omegajs/desktop app so
   //     web requests (BrowserWindow loads, fetch, electron-updater downloads) carry a
   //     branded UA — Mozilla parsers see a normal Chrome UA + we tag with the app's
-  //     name/version for our own server-side telemetry. Legacy electron-manager did the
+  //     name/version for our own server-side telemetry. Legacy @omegajs/desktop did the
   //     same; merge tags now use node-powertools.template (single-curly syntax).
   {
     const { template } = require('node-powertools');
@@ -366,7 +366,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   self.theme.initialize(self);
 
   // 3c. FontAwesome — serves the bundled icon SVGs to renderers over IPC
-  //     (em:fontawesome:get). Needs ipc only.
+  //     (desktop:fontawesome:get). Needs ipc only.
   self.fontawesome.initialize(self);
 
   // 4. Sentry (earliest catchable global handler)
@@ -440,7 +440,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // Registers over RM's loopback HTTP protocol (runtime.json advertises the port),
   // heartbeats every 60s, deregisters on graceful quit, and silently installs RM
   // when missing (mac zip / win silent NSIS / linux AppImage — RM then self-updates
-  // via its own EM autoUpdater). Skips itself when this app IS restart-manager, in
+  // via its own @omegajs/desktop autoUpdater). Skips itself when this app IS restart-manager, in
   // dev (unless EM_RESTART_MANAGER_DEV=1), or when restartManager.enabled=false.
   // See docs/restart-manager.md.
   self.restartManager.initialize(self);
@@ -453,7 +453,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   self.windows.initialize(self);
 
   self._initialized = true;
-  self.logger.log('electron-manager (main) initialized.');
+  self.logger.log('@omegajs/desktop (main) initialized.');
 
   // Boot test harness — runs against the live manager AFTER all libs are up. Test runner
   // sets EM_TEST_BOOT=1 + EM_TEST_BOOT_HARNESS=<absolute path> + EM_TEST_BOOT_SPEC=<path>
@@ -461,7 +461,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // by runners/boot.js) then app.exit()s.
   //
   // We use a runtime env-var path (not a static `require('./test/harness/...')`) because
-  // EM is webpacked into the consumer's bundle, and a static require would either get
+  // @omegajs/desktop is webpacked into the consumer's bundle, and a static require would either get
   // inlined (bundling test code into production) or dead-code-eliminated. An env-var
   // path stays external and can only resolve when the runner sets it.
   if (process.env.EM_TEST_BOOT === '1') {
@@ -469,7 +469,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
     const harnessPath = process.env.EM_TEST_BOOT_HARNESS;
     if (harnessPath) {
       // Defer the harness so the consumer's `manager.initialize().then(() => { ... })`
-      // callback gets a chance to run first. EM doesn't auto-create any windows; the
+      // callback gets a chance to run first. @omegajs/desktop doesn't auto-create any windows; the
       // consumer's main.js does it inside .then(). If we ran the harness synchronously
       // here, that callback wouldn't have fired yet and `manager.windows.get('main')`
       // would be null. setImmediate flushes the microtask queue (where promise callbacks
@@ -517,8 +517,8 @@ function loadResolvedConfig(projectDir) {
 // src/build.js. All four Manager constructors mix them in via their respective
 // `attachTo(Manager)` calls — see the bottom of this file.
 
-// Require — lets consumer main-process code load EM's bundled dependencies at runtime
-// (e.g. `manager.require('fs-jetpack')`). Resolves from EM's module context, not the
+// Require — lets consumer main-process code load @omegajs/desktop's bundled dependencies at runtime
+// (e.g. `manager.require('fs-jetpack')`). Resolves from @omegajs/desktop's module context, not the
 // consumer's. Mirrors BEM's Manager.require(). For build-time (webpack) resolution,
 // the webpack config's resolve.modules handles this automatically.
 Manager.prototype.require = function (name) {

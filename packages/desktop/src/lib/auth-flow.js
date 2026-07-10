@@ -1,4 +1,4 @@
-// Auth Flow — the EM-owned sign-in round trip: `manager.openAuthFlow()`.
+// Auth Flow — the framework-owned sign-in round trip: `manager.openAuthFlow()`.
 //
 // Opens the user's REAL default browser on manager.getAuthUrl()'s /signin → /token
 // chain — never an embedded window, so sign-in rides the user's own browser session
@@ -29,7 +29,7 @@
 //   manager.openAuthFlow(options?)  → Promise<{ url, port? }> — resolves once the flow
 //                                     is LAUNCHED; completion arrives later through
 //                                     auth/token → webManager.handleAuthToken →
-//                                     the em:auth:sign-in-with-token broadcast.
+//                                     the desktop:auth:sign-in-with-token broadcast.
 //   manager.authFlow.cancel()       → tear down a pending dev listener (idempotent).
 
 const crypto = require('crypto');

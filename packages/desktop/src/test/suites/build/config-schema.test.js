@@ -105,7 +105,7 @@ module.exports = {
     {
       name: 'has NO `windows` block — windows are created from main.js (lazy)',
       run: (ctx) => {
-        // EM no longer auto-creates windows. The `windows` config block is optional —
+        // @omegajs/desktop no longer auto-creates windows. The `windows` config block is optional —
         // consumer adds it only when overriding defaults persistently. Default config
         // ships without one.
         ctx.expect(ctx.state.cfg.windows).toBeFalsy();

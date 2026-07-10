@@ -16,7 +16,7 @@
 //   uninstall            Remove everything.
 //   set-credentials      Save Windows account credentials for the runner service.
 //                        Encrypted via DPAPI, only the current user can decrypt.
-//   self-update          Force an immediate self-update of EM (npm i -g electron-manager@latest).
+//   self-update          Force an immediate self-update of @omegajs/desktop (npm i -g @omegajs/desktop@latest).
 //
 // All commands except `install` and `register-org` are no-ops on non-Windows platforms.
 
@@ -523,7 +523,7 @@ async function statusServices() {
   }
 
   // Surface a leftover watcher service if one is still installed from older
-  // EM versions — v1.2.35+ doesn't install it, but upgraders may have one.
+  // @omegajs/desktop versions — v1.2.35+ doesn't install it, but upgraders may have one.
   const watcherState = scState(WATCHER_SERVICE_NAME);
   if (watcherState !== 'NOT_INSTALLED') {
     logger.log('');
@@ -558,7 +558,7 @@ async function uninstall(options) {
   // don't keep spawning Session 0 zombies after upgrade.
   await uninstallLegacyLogonTasks();
 
-  // Stop + delete any leftover legacy actions.runner.* services from old EM
+  // Stop + delete any leftover legacy actions.runner.* services from old @omegajs/desktop
   // versions that registered runners as Windows services. Idempotent — no-op
   // if there are none.
   await uninstallActionsRunnerServices();
@@ -786,11 +786,11 @@ function identifyHandleHolders(targetPath) {
 // ─── self-update ────────────────────────────────────────────────────────────────
 async function selfUpdate() {
   const { execute } = require('node-powertools');
-  logger.log('Updating electron-manager to latest…');
+  logger.log('Updating @omegajs/desktop to latest…');
   try {
-    const out = await safeInstall('npm i -g electron-manager@latest');
+    const out = await safeInstall('npm i -g @omegajs/desktop@latest');
     logger.log(out);
-    logger.log('✓ electron-manager updated.');
+    logger.log('✓ @omegajs/desktop updated.');
   } catch (e) {
     logger.warn(`Self-update failed: ${e.message}`);
   }
@@ -846,7 +846,7 @@ function relaunchElevated() {
   const cwd = process.cwd();
 
   // Reconstruct the original argv. process.argv[0] is the node binary, [1] is the
-  // entry script (bin/electron-manager), the rest are user args. We re-invoke via
+  // entry script (bin/omega-desktop), the rest are user args. We re-invoke via
   // `npx mgr ...` so the elevated cmd doesn't need to know about node-version
   // managers (nvm-windows etc.) — npx handles resolution.
   const userArgs = process.argv.slice(2);   // strip node + entry
@@ -952,8 +952,8 @@ async function installWatcherService() {
   const watcherDir  = path.join(RUNNER_HOME, 'watcher');
   jetpack.dir(watcherDir);
 
-  // Copy our own watcher.js into the watcher dir so it's stable across `npm i -g electron-manager` upgrades.
-  // Each tick, the watcher re-resolves the latest EM and runs it — gives self-update for free.
+  // Copy our own watcher.js into the watcher dir so it's stable across `npm i -g @omegajs/desktop` upgrades.
+  // Each tick, the watcher re-resolves the latest @omegajs/desktop and runs it — gives self-update for free.
   const sourceWatcher = path.join(__dirname, '..', 'runner', 'watcher.js');
   jetpack.copy(sourceWatcher, path.join(watcherDir, 'watcher.js'), { overwrite: true });
 
@@ -969,7 +969,7 @@ async function installWatcherService() {
   // install used, regardless of what its cwd ends up being once Windows starts the service.
   const svc = new Service({
     name:        WATCHER_SERVICE_NAME,
-    description: 'electron-manager runner watcher (auto-registers new GitHub orgs to the EV-token runner)',
+    description: '@omegajs/desktop runner watcher (auto-registers new GitHub orgs to the EV-token runner)',
     script:      path.join(watcherDir, 'watcher.js'),
     nodeOptions: [],
     workingDirectory: watcherDir,
@@ -1142,7 +1142,7 @@ function listRunnerStartupShortcuts() {
 // a long-lived cmd.exe holding cwd inside RUNNER_HOME blocks every later
 // uninstall with EPERM. Bypassing run.cmd loses its self-update relaunch
 // path, but `mgr runner install` refreshing the runner binary is the
-// preferred update mechanism in EM anyway.
+// preferred update mechanism in @omegajs/desktop anyway.
 //
 // Detached + windowsHide + ignored stdio = no console window flashes during
 // install and the listener survives the install command's exit. UAC-
@@ -1251,21 +1251,21 @@ async function uninstallLegacyLogonTasks() {
 // service to run AS the user instead. config.cmd accepts:
 //   --windowslogonaccount <user> --windowslogonpassword <pass>
 //
-// To avoid making the user re-enter their password every install, EM stores
+// To avoid making the user re-enter their password every install, @omegajs/desktop stores
 // the password encrypted via Windows DPAPI (only the current user can decrypt
 // it; even another admin on the same box can't). Stored at
-// %APPDATA%\electron-manager\runner-logon.json
+// %APPDATA%\@omegajs/desktop\runner-logon.json
 //
 // Three ways to supply credentials, in priority order:
 //   1. WIN_RUNNER_LOGON_ACCOUNT + WIN_RUNNER_LOGON_PASSWORD env vars (CI/.env)
-//   2. The DPAPI-encrypted file at %APPDATA%\electron-manager\runner-logon.json
+//   2. The DPAPI-encrypted file at %APPDATA%\@omegajs/desktop\runner-logon.json
 //   3. Interactive prompt (only when neither of the above exist + stdin is a TTY)
 //
 // If we end up with nothing, fall back to NETWORK SERVICE (current behavior).
 
 const LOGON_FILE = process.platform === 'win32'
-  ? path.join(process.env.APPDATA || os.homedir(), 'electron-manager', 'runner-logon.json')
-  : path.join(os.homedir(), '.electron-manager', 'runner-logon.json');
+  ? path.join(process.env.APPDATA || os.homedir(), '@omegajs/desktop', 'runner-logon.json')
+  : path.join(os.homedir(), '.@omegajs/desktop', 'runner-logon.json');
 
 async function getLogonCredentials() {
   // 1. Env vars take precedence (CI / .env-driven automation).

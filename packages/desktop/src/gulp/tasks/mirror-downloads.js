@@ -77,7 +77,7 @@ module.exports = function mirrorDownloads(done) {
         owner, repo,
         tag_name: tag,
         name: tag,
-        body: `Latest installers (auto-mirrored by electron-manager). Stable filenames — direct links never change across versions.`,
+        body: `Latest installers (auto-mirrored by @omegajs/desktop). Stable filenames — direct links never change across versions.`,
         draft: false,
         prerelease: false,
       });
@@ -130,7 +130,7 @@ function isUploadable(filename) {
 }
 
 // Map a versioned electron-builder artifact name to a stable, versionless one.
-// Naming convention preserves legacy URLs from before the v1 EM rewrite — x64 builds
+// Naming convention preserves legacy URLs from before the v1 @omegajs/desktop rewrite — x64 builds
 // keep their original "default arch" filename, and only non-default archs get a suffix.
 //
 // Examples (productName=Somiibo, app name=somiibo):

@@ -1,4 +1,4 @@
-// STUB — stage consumer src/ + EM dist/ into .em-build/ for webpack to consume.
+// STUB — stage consumer src/ + @omegajs/desktop dist/ into .em-build/ for webpack to consume.
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('distribute');
 

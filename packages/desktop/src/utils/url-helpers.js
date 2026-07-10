@@ -1,5 +1,5 @@
 // Backend URL helpers, shared across all Manager contexts (main / renderer / preload /
-// build). Mirror web-manager's contract so EM apps can hit the same dev/prod backends as
+// build). Mirror web-manager's contract so @omegajs/desktop apps can hit the same dev/prod backends as
 // UJM and BXM consumers.
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
@@ -69,7 +69,7 @@ function getWebsiteUrl(environment) {
 // deep-link built-in that hands the token to web-manager-bridge (signInWithCustomToken).
 // Same env split as getWebsiteUrl: dev/test → the local website, prod → brand.url.
 // The token page redirects with ?authToken=<token> — the ONE modern shape the
-// auth/token route reads (legacy-app formats are UJM's concern, not EM's).
+// auth/token route reads (legacy-app formats are UJM's concern, not @omegajs/desktop's).
 //
 // `returnUrl` overrides the final hop (default: `<brand.id>://auth/token`). Used by
 // lib/auth-flow.js in dev, where the custom scheme isn't OS-registered — the flow

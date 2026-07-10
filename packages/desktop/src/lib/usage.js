@@ -1,5 +1,5 @@
 // Usage tracking — opens (= launchCount) + hours-of-use accumulation.
-// Sister of legacy electron-manager's Usage library, but without the
+// Sister of legacy @omegajs/desktop's Usage library, but without the
 // electron-store-cwd hack (uses our manager.storage instead).
 //
 // Persisted shape (storage.usage):
@@ -76,8 +76,8 @@ const usage = {
     usage._wireQuitHandler();
 
     // IPC for renderer access to usage stats.
-    manager.ipc.unhandle('em:usage:get');
-    manager.ipc.handle('em:usage:get', () => usage.toJSON());
+    manager.ipc.unhandle('desktop:usage:get');
+    manager.ipc.handle('desktop:usage:get', () => usage.toJSON());
 
     logger.log(`usage initialized — opens=${next.opens} hoursTotal=${next.hoursTotal.toFixed(2)} installedAt=${next.installedAt}`);
   },

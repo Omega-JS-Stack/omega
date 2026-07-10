@@ -44,7 +44,7 @@ module.exports = {
       run: (ctx) => {
         delete require.cache[require.resolve(MOD_PATH)];
         const Logger = require(MOD_PATH);
-        ctx.expect(Logger.FORWARD_CHANNEL).toBe('em:log:forward');
+        ctx.expect(Logger.FORWARD_CHANNEL).toBe('desktop:log:forward');
       },
     },
     {

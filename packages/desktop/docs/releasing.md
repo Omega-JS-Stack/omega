@@ -1,10 +1,10 @@
 # Releasing — From `.env` to GitHub Release
 
-End-to-end walkthrough for cutting a signed + notarized + published release of an Electron Manager app.
+End-to-end walkthrough for cutting a signed + notarized + published release of an OMEGA Desktop app.
 
 ## Repo layout (private app, public releases)
 
-EM separates **three** GitHub repos for a typical app:
+@omegajs/desktop separates **three** GitHub repos for a typical app:
 
 | Repo | Visibility | Purpose |
 |---|---|---|
@@ -47,13 +47,13 @@ See [`docs/signing.md`](signing.md) for full cert setup details.
 
 ```bash
 cd <your-app>
-npm i electron-manager --save-dev
+npm i @omegajs/desktop --save-dev
 npx mgr setup
 ```
 
 `setup`:
 1. Ensures peer deps (`gulp`, `electron`, `electron-builder`) are installed.
-2. Writes EM's `projectScripts` into your `package.json` (`start`, `build`, `release`, `test`).
+2. Writes @omegajs/desktop's `projectScripts` into your `package.json` (`start`, `build`, `release`, `test`).
 3. Copies framework defaults (config, builder yml, hooks, scaffold src/, build/) — merging `.env` and `.gitignore` so user customizations are preserved.
 4. Validates signing prereqs (warns if missing — non-fatal).
 5. Pushes secrets from `.env` → GitHub Actions if `GH_TOKEN` is present.
@@ -100,7 +100,7 @@ This runs as a **single gulp invocation** (`gulp publish` with `EM_BUILD_MODE=tr
 1. **build** — defaults → distribute → webpack/sass/html → audit → build-config (materializes `dist/electron-builder.yml` with mode-dependent injections like `LSUIElement` for tray-only)
 2. **release** — `electron-builder build --publish always`
    - Signs the `.app` with your Developer ID Application cert
-   - Calls EM's built-in `afterSign` hook which submits to Apple notarytool via the API key (consumer can extend via `hooks/notarize/post.js`)
+   - Calls @omegajs/desktop's built-in `afterSign` hook which submits to Apple notarytool via the API key (consumer can extend via `hooks/notarize/post.js`)
    - Stapling + final `.dmg` / `.zip` packaging
    - Uploads to GitHub Releases (using `GH_TOKEN`)
 
@@ -174,7 +174,7 @@ For details see [`docs/signing.md`](signing.md#windows-setup).
 - Check the App Store Connect notarization history at https://appstoreconnect.apple.com/apps for status / errors.
 
 ### "Hardened runtime requires entitlements"
-- EM generates `dist/config/entitlements.mac.plist` at build time from defaults + your `entitlements.mac` overrides in `config/omega.json5`.
+- @omegajs/desktop generates `dist/config/entitlements.mac.plist` at build time from defaults + your `entitlements.mac` overrides in `config/omega.json5`.
 - For extra capabilities (camera, mic, etc.), add keys to `entitlements.mac`. See `docs/signing.md` for the override syntax.
 
 ### CI: GitHub Releases upload fails

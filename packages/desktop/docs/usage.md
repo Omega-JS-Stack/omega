@@ -1,6 +1,6 @@
 # Usage
 
-Tracks app-launch + hours-of-use stats. Sister of legacy electron-manager's Usage library, but uses `manager.storage` instead of a separate electron-store.
+Tracks app-launch + hours-of-use stats. Sister of legacy @omegajs/desktop's Usage library, but uses `manager.storage` instead of a separate electron-store.
 
 ## What's tracked
 

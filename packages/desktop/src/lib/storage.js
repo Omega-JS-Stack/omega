@@ -43,8 +43,8 @@ const storage = {
     try {
       // electron-store is ESM-only. The static specifier + eager mode makes webpack
       // bundle it INTO main.bundle.js (no split chunk, no runtime resolution) — packaged
-      // consumers need nothing installed. Outside webpack (EM's own unbundled harness),
-      // Node ignores the magic comment and resolves it from EM's node_modules.
+      // consumers need nothing installed. Outside webpack (@omegajs/desktop's own unbundled harness),
+      // Node ignores the magic comment and resolves it from @omegajs/desktop's node_modules.
       const mod = await import(/* webpackMode: "eager" */ 'electron-store');
       ElectronStore = mod.default || mod;
     } catch (e) {
@@ -82,11 +82,11 @@ const storage = {
       return;
     }
 
-    ipc.handle('em:storage:get',    ({ key, def }) => storage.get(key, def));
-    ipc.handle('em:storage:set',    ({ key, val }) => { storage.set(key, val); return true; });
-    ipc.handle('em:storage:delete', ({ key })      => { storage.delete(key); return true; });
-    ipc.handle('em:storage:has',    ({ key })      => storage.has(key));
-    ipc.handle('em:storage:clear',  ()             => { storage.clear(); return true; });
+    ipc.handle('desktop:storage:get',    ({ key, def }) => storage.get(key, def));
+    ipc.handle('desktop:storage:set',    ({ key, val }) => { storage.set(key, val); return true; });
+    ipc.handle('desktop:storage:delete', ({ key })      => { storage.delete(key); return true; });
+    ipc.handle('desktop:storage:has',    ({ key })      => storage.has(key));
+    ipc.handle('desktop:storage:clear',  ()             => { storage.clear(); return true; });
 
     storage._ipcRegistered = true;
   },
@@ -179,7 +179,7 @@ const storage = {
 
   _broadcast(key, value, previous) {
     if (!ipc._initialized) return;
-    ipc.broadcast('em:storage:change', { key, value, previous });
+    ipc.broadcast('desktop:storage:change', { key, value, previous });
   },
 
   // Expose the on-disk path (handy for debugging)

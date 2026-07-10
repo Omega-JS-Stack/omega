@@ -1,6 +1,6 @@
 // Templating — light token-replacement engine for HTML/CSS/JS at build time.
 //
-// Wraps node-powertools' template() with EM-friendly defaults:
+// Wraps node-powertools' template() with framework-friendly defaults:
 //   - Brackets are `{{ }}` (matches BXM/UJM convention).
 //   - Standard variable scope built from manager.config + page metadata.
 //

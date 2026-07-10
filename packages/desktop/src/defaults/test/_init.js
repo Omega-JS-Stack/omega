@@ -1,6 +1,6 @@
 /**
  * Test lifecycle hook for this project. Runs once before any suite (not a test itself).
- * See electron-manager/docs/test-framework.md → "test/_init.js".
+ * See @omegajs/desktop/docs/test-framework.md → "test/_init.js".
  */
 
 module.exports = ({ projectRoot }) => ({

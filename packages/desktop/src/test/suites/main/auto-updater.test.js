@@ -211,9 +211,9 @@ module.exports = {
       },
     },
     {
-      name: 'IPC handler registered: em:auto-updater:status returns status',
+      name: 'IPC handler registered: desktop:auto-updater:status returns status',
       run: async (ctx) => {
-        const result = await ctx.manager.ipc.invoke('em:auto-updater:status');
+        const result = await ctx.manager.ipc.invoke('desktop:auto-updater:status');
         ctx.expect(typeof result.code).toBe('string');
       },
     },
@@ -265,13 +265,13 @@ module.exports = {
       },
     },
     {
-      name: 'IPC channel em:auto-updater:activity is registered + bumps activity timestamp',
+      name: 'IPC channel desktop:auto-updater:activity is registered + bumps activity timestamp',
       run: async (ctx) => {
         const u = ctx.manager.autoUpdater;
         // initialize() registered the listener — verify presence + simulate an inbound
         // renderer message by invoking each registered listener directly. In-process
         // this matches what `ipcMain.on(channel, ...)` does on a real `ipcRenderer.send`.
-        const listeners = ctx.manager.ipc._listeners['em:auto-updater:activity'];
+        const listeners = ctx.manager.ipc._listeners['desktop:auto-updater:activity'];
         ctx.expect(listeners).toBeDefined();
         ctx.expect(listeners.size > 0).toBe(true);
         u._lastActivityAt = 0;
@@ -848,28 +848,28 @@ module.exports = {
       },
     },
     {
-      name: 'IPC: em:auto-updater:check-now invokes checkNow with userInitiated=true',
+      name: 'IPC: desktop:auto-updater:check-now invokes checkNow with userInitiated=true',
       run: async (ctx) => {
         const u = ctx.manager.autoUpdater;
         const origCheck = u.checkNow;
         let receivedOpts = null;
         u.checkNow = async (opts) => { receivedOpts = opts; return u.getStatus(); };
         try {
-          await ctx.manager.ipc.invoke('em:auto-updater:check-now');
+          await ctx.manager.ipc.invoke('desktop:auto-updater:check-now');
           ctx.expect(receivedOpts).toBeDefined();
           ctx.expect(receivedOpts.userInitiated).toBe(true);
         } finally { u.checkNow = origCheck; }
       },
     },
     {
-      name: 'IPC: em:auto-updater:install-now invokes installNow',
+      name: 'IPC: desktop:auto-updater:install-now invokes installNow',
       run: async (ctx) => {
         const u = ctx.manager.autoUpdater;
         const origInstall = u.installNow;
         let installCalled = false;
         u.installNow = async () => { installCalled = true; return false; };
         try {
-          await ctx.manager.ipc.invoke('em:auto-updater:install-now');
+          await ctx.manager.ipc.invoke('desktop:auto-updater:install-now');
           ctx.expect(installCalled).toBe(true);
         } finally { u.installNow = origInstall; }
       },

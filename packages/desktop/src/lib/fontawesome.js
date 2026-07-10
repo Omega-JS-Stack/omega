@@ -1,5 +1,5 @@
 // FontAwesome — the bundled Font Awesome Pro icon library (solid + brands SVGs
-// shipped inside EM at assets/icons/font-awesome/), served to renderers on
+// shipped inside @omegajs/desktop at assets/icons/font-awesome/), served to renderers on
 // demand so consumers get icons with ZERO setup.
 //
 // Main-side API:
@@ -9,7 +9,7 @@
 // Renderer-side (preload contextBridge):
 //   window.em.fontawesome.get(name, style) → Promise<svg string | null>
 //
-// Renderers normally never call this directly — EM's renderer bootstrap
+// Renderers normally never call this directly — @omegajs/desktop's renderer bootstrap
 // auto-renders any `<i class="fa-solid fa-play">` element by injecting the SVG
 // inline (see src/renderer.js _wireFontAwesome). The SVGs ship with
 // fill="currentColor" and are served with width/height="1em", so icons inherit
@@ -38,8 +38,11 @@ const STYLES = ['solid', 'brands'];
 const NAME_REGEX = /^[a-z0-9-]+$/;
 
 // Attributes injected on the <svg> root at serve time (UJM parity): icons size
-// to the surrounding font and inherit its color.
-const SVG_ATTRIBUTES = 'width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"';
+// to the surrounding font and inherit its color. overflow="visible" mirrors
+// FA's own kit CSS (.svg-inline--fa { overflow: visible }) — FA Pro 7 glyphs
+// may draw OUTSIDE their viewBox (fa-lock's shackle peaks at y=-32 in a
+// 0 0 384 512 box) and the SVG-root default of overflow:hidden clips them.
+const SVG_ATTRIBUTES = 'width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false" overflow="visible"';
 
 const fontawesome = {
   _initialized: false,
@@ -60,7 +63,7 @@ const fontawesome = {
     fontawesome._initialized = true;
   },
 
-  // The SVGs ship inside EM's dist/. When main runs UNBUNDLED (EM's own test
+  // The SVGs ship inside @omegajs/desktop's dist/. When main runs UNBUNDLED (@omegajs/desktop's own test
   // harness, plain node) __dirname points there directly; a consumer's
   // webpack-bundled main loses the module's real __dirname, so fall back to
   // the installed package under the app root — valid in dev AND inside a
@@ -70,7 +73,7 @@ const fontawesome = {
     try {
       const { app } = require('electron');
       if (app) {
-        candidates.push(path.join(app.getAppPath(), 'node_modules', 'electron-manager', 'dist', 'assets', 'icons', 'font-awesome'));
+        candidates.push(path.join(app.getAppPath(), 'node_modules', '@omegajs/desktop', 'dist', 'assets', 'icons', 'font-awesome'));
       }
     } catch (e) {
       // Not running under Electron — the unbundled candidate is the only one.
@@ -87,7 +90,7 @@ const fontawesome = {
       return;
     }
 
-    ipc.handle('em:fontawesome:get', ({ name, style } = {}) => ({
+    ipc.handle('desktop:fontawesome:get', ({ name, style } = {}) => ({
       svg: fontawesome.get(name, style),
     }));
   },
@@ -122,7 +125,7 @@ const fontawesome = {
   // Tear down IPC + cache (idempotent).
   disable() {
     if (ipc._initialized) {
-      ipc.unhandle('em:fontawesome:get');
+      ipc.unhandle('desktop:fontawesome:get');
     }
     fontawesome._cache.clear();
     fontawesome._initialized = false;

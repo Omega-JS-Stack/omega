@@ -1,11 +1,11 @@
-// Real macOS notarization implementation. Lives inside EM — consumers can extend it via
+// Real macOS notarization implementation. Lives inside @omegajs/desktop — consumers can extend it via
 // hooks/notarize/post.js (called after this completes successfully).
 //
 // Uses Apple's notarytool with the App Store Connect API key. Legacy Apple ID + app-specific
 // password flow is deliberately NOT supported.
 //
 // Required env vars:
-//   APPLE_API_KEY     — path to AuthKey_XXXXXXXXXX.p8 (set by EM CI workflow from base64-encoded secret)
+//   APPLE_API_KEY     — path to AuthKey_XXXXXXXXXX.p8 (set by @omegajs/desktop CI workflow from base64-encoded secret)
 //   APPLE_API_KEY_ID  — 10-char Key ID (matches the XXXXXXXXXX in the filename)
 //   APPLE_API_ISSUER  — issuer UUID from App Store Connect → Users and Access → Keys
 //
@@ -58,9 +58,9 @@ module.exports = async function notarize(context) {
   const duration = Math.round((Date.now() - start) / 1000);
   console.log(`[notarize] Done in ${duration}s.`);
 
-  // After EM's real notarization, optionally invoke the consumer's hooks/notarize/post.js as
+  // After @omegajs/desktop's real notarization, optionally invoke the consumer's hooks/notarize/post.js as
   // an extension point. The consumer hook can do post-notarize work (custom stapling,
-  // archiving, notifications, etc.). It is purely additive — EM's real notarize always runs
+  // archiving, notifications, etc.). It is purely additive — @omegajs/desktop's real notarize always runs
   // first.
   const runConsumerHook = require('../utils/run-consumer-hook.js');
   await runConsumerHook('notarize/post', context);

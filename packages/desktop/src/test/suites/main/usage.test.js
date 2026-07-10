@@ -115,9 +115,9 @@ module.exports = {
       },
     },
     {
-      name: 'IPC handler em:usage:get returns the snapshot',
+      name: 'IPC handler desktop:usage:get returns the snapshot',
       run: async (ctx) => {
-        const snap = await ctx.manager.ipc.invoke('em:usage:get');
+        const snap = await ctx.manager.ipc.invoke('desktop:usage:get');
         ctx.expect(snap.opens).toBe(ctx.manager.usage.opens());
       },
     },

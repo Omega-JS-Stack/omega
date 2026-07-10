@@ -1,11 +1,11 @@
 // scripts/sync-nvmrc.js — auto-sync the project's .nvmrc to match the Node version that the
 // installed electron version bundles. Runs as `postinstall`.
 //
-// Works for both EM itself AND any consumer that wires this script into their postinstall.
+// Works for both @omegajs/desktop itself AND any consumer that wires this script into their postinstall.
 // Resolves the project root via:
 //   1. INIT_CWD (npm sets this to the directory `npm install` was invoked from) — present when
 //      this is the consumer's postinstall.
-//   2. Falls back to walking up from this script (catches EM's own postinstall path).
+//   2. Falls back to walking up from this script (catches @omegajs/desktop's own postinstall path).
 //
 // Why: when electron is bumped (peer dep change, fresh install, etc.), the project's .nvmrc
 // stays in sync with no manual step. Same logic as `npx mgr setup`'s ensureNvmrc().
@@ -26,7 +26,7 @@ const path = require('path');
     const electronPkgPath = path.join(repoRoot, 'node_modules', 'electron', 'package.json');
 
     if (!fs.existsSync(electronPkgPath)) {
-      // Electron not installed yet (e.g. this is the postinstall fired by EM's own `npm install`
+      // Electron not installed yet (e.g. this is the postinstall fired by @omegajs/desktop's own `npm install`
       // but electron itself is a peerDep). Nothing to do.
       return;
     }
@@ -36,7 +36,7 @@ const path = require('path');
     if (!electronVersion) return;
 
     // Inline the logic from src/utils/electron-node-version.js so this script doesn't depend on
-    // the dist/ build (postinstall runs before EM has been built).
+    // the dist/ build (postinstall runs before @omegajs/desktop has been built).
     const electronMajor = electronVersion.split('.')[0];
     const releases = await fetchReleases();
     if (!releases) return;
@@ -52,27 +52,27 @@ const path = require('path');
     if (existing === desired) return;   // already in sync
 
     fs.writeFileSync(nvmrcPath, `${desired}\n`);
-    console.log(`[em:sync-nvmrc] .nvmrc ${existing ? `${existing} → ${desired}` : `created ${desired}`} (electron ${electronVersion} ships Node ${match.node})`);
+    console.log(`[desktop:sync-nvmrc] .nvmrc ${existing ? `${existing} → ${desired}` : `created ${desired}`} (electron ${electronVersion} ships Node ${match.node})`);
   } catch (e) {
-    console.warn(`[em:sync-nvmrc] skipped: ${e.message}`);
+    console.warn(`[desktop:sync-nvmrc] skipped: ${e.message}`);
   }
 })();
 
 // Find the project root for this postinstall run. INIT_CWD is npm's canonical signal — the
 // directory the user ran `npm install` from. Falls back to two-levels-up from this script
-// (which works when this script is run from <project>/node_modules/electron-manager/scripts/).
+// (which works when this script is run from <project>/node_modules/@omegajs/desktop/scripts/).
 function resolveProjectRoot() {
   if (process.env.INIT_CWD && fs.existsSync(path.join(process.env.INIT_CWD, 'package.json'))) {
     return process.env.INIT_CWD;
   }
-  // Walk up from this script: scripts/ → EM root, OR scripts/ → electron-manager → node_modules → consumer root.
+  // Walk up from this script: scripts/ → @omegajs/desktop root, OR scripts/ → @omegajs/desktop → node_modules → consumer root.
   // Try the latter first (consumer install scenario).
   const consumerCandidate = path.resolve(__dirname, '..', '..', '..');
   if (fs.existsSync(path.join(consumerCandidate, 'package.json'))
       && consumerCandidate.includes(`${path.sep}node_modules${path.sep}`) === false) {
     return consumerCandidate;
   }
-  // EM-itself scenario: scripts/ → EM root.
+  // EM-itself scenario: scripts/ → @omegajs/desktop root.
   const emCandidate = path.resolve(__dirname, '..');
   if (fs.existsSync(path.join(emCandidate, 'package.json'))) {
     return emCandidate;

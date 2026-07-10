@@ -36,7 +36,7 @@
 // Multiple handlers per pattern run in registration order. Setting ctx.handled = true stops
 // the fall-through to wildcard handlers (concrete-pattern handlers always run).
 //
-// Built-in routes (registered by EM, can be overridden by registering your own handler):
+// Built-in routes (registered by @omegajs/desktop, can be overridden by registering your own handler):
 //   auth/token   → manager.webManager.handleAuthToken(query.token)  [Pass 2.12 wires this up]
 //   app/show     → manager.windows.show(query.window || 'main')
 //   app/quit     → app.quit()
@@ -142,7 +142,7 @@ const deepLink = {
     // auth/token — hand off to web-manager-bridge. The receiving end of
     // manager.getAuthUrl()'s sign-in round-trip: the website's token page redirects
     // here with ?authToken=<custom-token>. MODERN shape only — legacy-app formats
-    // (?payload=, ?token=) are UJM's concern, not EM's.
+    // (?payload=, ?token=) are UJM's concern, not @omegajs/desktop's.
     deepLink._handlers.push({
       pattern: 'auth/token',
       builtin: true,
@@ -244,9 +244,9 @@ const deepLink = {
     logger.log(`dispatch — source=${source} scheme=${parsed.scheme} route=${parsed.route}`);
 
     // Concrete (non-wildcard) handlers first, in registration order. Consumer concrete handlers
-    // are appended in registration order; built-in handlers were registered first by EM, so
+    // are appended in registration order; built-in handlers were registered first by @omegajs/desktop, so
     // they run last among concrete handlers — meaning a consumer concrete handler runs BEFORE
-    // EM's built-in for the same route. To shadow a built-in entirely, the consumer sets
+    // @omegajs/desktop's built-in for the same route. To shadow a built-in entirely, the consumer sets
     // ctx.handled = true.
     //
     // We split into concrete + wildcard so wildcards never run if any concrete handler matched.

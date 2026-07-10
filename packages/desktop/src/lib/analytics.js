@@ -1,6 +1,6 @@
 // Analytics — GA4 via Measurement Protocol. Mirrors BEM's
 // `Manager.config.analytics.providers.google.id` shape so the same person can be
-// tracked across desktop (EM) + web (UJM/web-manager) + backend (BEM) by
+// tracked across desktop (@omegajs/desktop) + web (UJM/web-manager) + backend (BEM) by
 // referencing a single namespaced UUIDv5 identity.
 //
 // Cross-platform identity (the key feature):
@@ -8,7 +8,7 @@
 //   user_id   = uuidv5(firebaseUid, namespace) // same human across all surfaces
 //
 // `namespace` is the consumer's `firebaseConfig.projectId` re-encoded as a UUIDv5
-// namespace via uuidv5.URL of the projectId string. Same projectId in BEM/web-manager/EM
+// namespace via uuidv5.URL of the projectId string. Same projectId in BEM/web-manager/@omegajs/desktop
 // → identical uuidv5 outputs everywhere → unified analytics.
 //
 // Anonymous (web-manager-bridge hasn't reported auth yet) → user_id stays null.
@@ -92,7 +92,7 @@ const analytics = {
     analytics._enabled = true;
 
     // Namespace = uuidv5 of the firebase project ID (or app id as fallback). Same
-    // projectId in BEM/web-manager/EM → same namespace → same per-uid UUIDv5
+    // projectId in BEM/web-manager/@omegajs/desktop → same namespace → same per-uid UUIDv5
     // everywhere. UUIDv5 needs a UUID-shaped namespace — we derive one from the
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
     const projectId = manager.config.firebaseConfig?.projectId
@@ -134,11 +134,11 @@ const analytics = {
 
     // IPC: renderer → main analytics calls. Forward fires-and-forgets via send;
     // status query via invoke.
-    manager.ipc.unhandle('em:analytics:status');
-    manager.ipc.handle('em:analytics:status', () => analytics.toJSON());
+    manager.ipc.unhandle('desktop:analytics:status');
+    manager.ipc.handle('desktop:analytics:status', () => analytics.toJSON());
     // Use Set-deduped listener; named handler so re-init collapses duplicates.
-    manager.ipc.on('em:analytics:event',               analytics._onIpcEvent);
-    manager.ipc.on('em:analytics:set-user-properties', analytics._onIpcSetProps);
+    manager.ipc.on('desktop:analytics:event',               analytics._onIpcEvent);
+    manager.ipc.on('desktop:analytics:set-user-properties', analytics._onIpcSetProps);
   },
 
   _onIpcEvent({ name, params } = {}) {

@@ -1,11 +1,11 @@
-// Boot-layer self-test — EM's analog of "does the extension load?" (BXM) / "does the
+// Boot-layer self-test — @omegajs/desktop's analog of "does the extension load?" (BXM) / "does the
 // site boot?" (UJM). The boot runner webpack-builds the bundled fixture consumer
 // (src/test/fixtures/consumer-app) into a real dist/main.bundle.js, spawns Electron with
 // it (the actual production boot path — bundled, not the unbundled lib code that the
 // `main` layer exercises), then runs these inspects against the live manager.
 //
-// In EM's own test run, EM_TEST_BOOT_PROJECT points at the fixture (auto-set in
-// src/commands/test.js when the cwd is the electron-manager repo). In a real consumer's
+// In @omegajs/desktop's own test run, EM_TEST_BOOT_PROJECT points at the fixture (auto-set in
+// src/commands/test.js when the cwd is the @omegajs/desktop repo). In a real consumer's
 // `npx mgr test` run, the framework boot/ suites are excluded entirely (runner.js
 // discovery skips boot/** unless isFrameworkSelfTest) — consumers write their own
 // boot tests under <cwd>/test/boot/.

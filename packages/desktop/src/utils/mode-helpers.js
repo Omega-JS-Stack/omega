@@ -6,7 +6,7 @@
 //                     gulp dev), and NOT testing. Authoritative signal: `app.isPackaged ===
 //                     false`. Falls back to NODE_ENV when `app` isn't available (preload,
 //                     build-time scripts, renderer).
-//   isTesting()     — app being tested (EM's test framework running this process). Single
+//   isTesting()     — app being tested (@omegajs/desktop's test framework running this process). Single
 //                     canonical env var: `EM_TEST_MODE=true`. TAKES PRECEDENCE over dev:
 //                     a test run is unpackaged, but it's a TEST, not development.
 //   isProduction()  — app packaged & distributed to users (`app.isPackaged === true`),
@@ -43,7 +43,7 @@
 // exactly ONE of 'development' | 'testing' | 'production' (mutually exclusive; testing wins).
 // Precedence: testing → explicit config override → Electron app.isPackaged → build-time signal.
 function getEnvironment() {
-  // 1. Testing wins — set by EM's test runners (EM_TEST_MODE=true), regardless of packaged state.
+  // 1. Testing wins — set by @omegajs/desktop's test runners (EM_TEST_MODE=true), regardless of packaged state.
   if (process.env.EM_TEST_MODE === 'true') return 'testing';
 
   // 2. An explicit config.em.environment override — the consumer's deliberate decision. It beats
@@ -68,7 +68,7 @@ function getEnvironment() {
   if (process.env.EM_BUILD_MODE === 'true') return 'production';
   if (process.env.NODE_ENV === 'development') return 'development';
 
-  // 5. Default: production. EM's deployed RUNTIME can reach here without a dev signal — a
+  // 5. Default: production. @omegajs/desktop's deployed RUNTIME can reach here without a dev signal — a
   //    packaged app whose `app.isPackaged` somehow didn't resolve is still a shipped binary,
   //    so production is the safe assumption for a distributed artifact. (Contrast UJM/BXM,
   //    whose deployed artifacts always carry their signal, so they default to development —

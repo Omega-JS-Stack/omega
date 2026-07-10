@@ -112,9 +112,9 @@ Manager.prototype.actLikeProduction = Manager.actLikeProduction;
 
 // getEnvironment() is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
 // (alongside isDevelopment/isProduction/isTesting — the natural environment-helper family).
-// It's mixed into ALL FOUR EM Manager entry points (main / renderer / preload / build) via
+// It's mixed into ALL FOUR @omegajs/desktop Manager entry points (main / renderer / preload / build) via
 // the mode-helpers attachTo() call at the bottom of each, so every context resolves the
-// environment identically. (EM has four separate Manager constructors that share code only
+// environment identically. (@omegajs/desktop has four separate Manager constructors that share code only
 // through these mixins — unlike UJM/BXM, where one build.js Manager serves every context.)
 
 Manager.getMode = function () {
@@ -131,7 +131,7 @@ Manager.prototype.getMode = Manager.getMode;
 // @omegajs/config: shared sections (brand, firebaseConfig, analytics, payment, sentry,
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
-// config merges underneath the app's. Then EM's derived defaults:
+// config merges underneath the app's. Then @omegajs/desktop's derived defaults:
 //   app.appId       ← `com.itwcreativeworks.${brand.id}` if not set
 //   app.productName ← brand.name if not set
 // These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo' }` is

@@ -1,13 +1,13 @@
 # CSS Architecture
 
-EM styles are SCSS, compiled by the pipeline's `sass` task into per-window bundles on top of a shared base. Bootstrap 5 (via EM's classy theme) is the foundation — consumers restyle Bootstrap, they don't replace it.
+@omegajs/desktop styles are SCSS, compiled by the pipeline's `sass` task into per-window bundles on top of a shared base. Bootstrap 5 (via @omegajs/desktop's classy theme) is the foundation — consumers restyle Bootstrap, they don't replace it.
 
 ## Main entry
 
 `<consumer>/src/assets/scss/main.scss` — loaded by EVERY window. It configures the theme via `@use ... with (...)`:
 
 ```scss
-@use 'electron-manager' as * with (
+@use 'omega-desktop' as * with (
   $primary: #5B47FB,
   $dark: #1a1a2e,
   $classy-bg-dark: #0f0f1a,
@@ -26,7 +26,7 @@ Compiles to `dist/assets/css/main.bundle.css` (Bootstrap + classy theme + your g
 
 ## Theme integration
 
-The `@use 'electron-manager'` entry pulls in Bootstrap 5 + EM's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `manager.theme` (OS-following, runtime-switchable, persisted override — see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block. See [themes.md](themes.md) for the full variable reference.
+The `@use 'omega-desktop'` entry pulls in Bootstrap 5 + @omegajs/desktop's classy theme. Appearance (`system`/`light`/`dark`) defaults from `config.theme.appearance` and is applied + kept live on `<html data-bs-theme>` by `manager.theme` (OS-following, runtime-switchable, persisted override — see [themes.md](themes.md)). Theme variables (`$primary`, `$dark`, `$classy-bg-*`, typography, borders) are overridable via the `with (...)` block. See [themes.md](themes.md) for the full variable reference.
 
 ## Bootstrap-first convention
 

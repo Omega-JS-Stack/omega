@@ -61,7 +61,7 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
         if (line.startsWith('__EM_TEST__')) {
           handleEvent(JSON.parse(line.slice('__EM_TEST__'.length)));
         } else if (line.trim().length > 0) {
-          // Pass-through other electron stdout (logger lines from EM init, etc.)
+          // Pass-through other electron stdout (logger lines from @omegajs/desktop init, etc.)
           // Indent so they don't disrupt the layout.
           process.stdout.write(chalk.gray(`      ${line}\n`));
         }

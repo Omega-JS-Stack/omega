@@ -3,8 +3,8 @@
 //   src/assets/scss/main.scss          -> dist/assets/css/main.bundle.css      (one shared bundle, every page)
 //   src/assets/scss/pages/<name>.scss  -> dist/assets/css/components/<name>.bundle.css   (per-view bundle)
 //
-// loadPaths are configured so the consumer can write `@use 'electron-manager' as *`:
-//   - <em-package-root>/dist/assets/css      → resolves bare 'electron-manager' to electron-manager.scss
+// loadPaths are configured so the consumer can write `@use 'omega-desktop' as *`:
+//   - <em-package-root>/dist/assets/css      → resolves bare 'omega-desktop' to omega-desktop.scss
 //   - <em-package-root>/dist/assets/themes/<active-theme>   → resolves bare 'theme' to <theme>/_theme.scss
 //   - <em-package-root>/dist/assets/themes   → so themes can reference each other via '../<sibling>'
 //   - <consumer>/src/assets/scss             → consumer's own modules
@@ -24,7 +24,7 @@ module.exports = function sassTask(done) {
   const themeId = config.theme?.id || 'classy';
 
   const loadPaths = [
-    path.join(packageRoot, 'dist', 'assets', 'css'),                    // for `@use 'electron-manager'`
+    path.join(packageRoot, 'dist', 'assets', 'css'),                    // for `@use 'omega-desktop'`
     path.join(packageRoot, 'dist', 'assets', 'themes', themeId),        // for `@use 'theme'`
     path.join(packageRoot, 'dist', 'assets', 'themes'),                 // for sibling-theme references
     path.join(projectRoot, 'src', 'assets', 'scss'),                    // consumer's own scss tree

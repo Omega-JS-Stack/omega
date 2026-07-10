@@ -28,6 +28,17 @@ module.exports = {
       },
     },
     {
+      name: 'served SVGs carry overflow="visible" — FA Pro 7 glyphs may draw outside their viewBox',
+      run: (ctx) => {
+        // fa-lock's shackle peaks at y=-32 in a 0 0 384 512 viewBox; the SVG
+        // root default (overflow: hidden) clips it — FA's own kit renders
+        // with overflow visible, so the serve path must too.
+        const svg = ctx.manager.fontawesome.get('lock');
+        ctx.expect(typeof svg).toBe('string');
+        ctx.expect(svg.includes('overflow="visible"')).toBe(true);
+      },
+    },
+    {
       name: 'solid is the default style; brands resolve when named',
       run: (ctx) => {
         ctx.expect(ctx.manager.fontawesome.get('rocket')).toBe(ctx.manager.fontawesome.get('rocket', 'solid'));
@@ -73,16 +84,16 @@ module.exports = {
       },
     },
     {
-      name: 'em:fontawesome:get IPC handler round-trips (and nulls bad input)',
+      name: 'desktop:fontawesome:get IPC handler round-trips (and nulls bad input)',
       run: async (ctx) => {
-        const ok = await ctx.manager.ipc.invoke('em:fontawesome:get', { name: 'play', style: 'solid' });
+        const ok = await ctx.manager.ipc.invoke('desktop:fontawesome:get', { name: 'play', style: 'solid' });
         ctx.expect(typeof ok.svg).toBe('string');
         ctx.expect(ok.svg.startsWith('<svg ')).toBe(true);
 
-        const bad = await ctx.manager.ipc.invoke('em:fontawesome:get', { name: '../../etc/passwd' });
+        const bad = await ctx.manager.ipc.invoke('desktop:fontawesome:get', { name: '../../etc/passwd' });
         ctx.expect(bad.svg).toBe(null);
 
-        const empty = await ctx.manager.ipc.invoke('em:fontawesome:get', {});
+        const empty = await ctx.manager.ipc.invoke('desktop:fontawesome:get', {});
         ctx.expect(empty.svg).toBe(null);
       },
     },

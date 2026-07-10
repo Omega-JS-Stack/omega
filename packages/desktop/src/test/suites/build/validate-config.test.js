@@ -1,4 +1,4 @@
-// Build-layer tests for config validation via @omegajs/config — EM's integration
+// Build-layer tests for config validation via @omegajs/config — @omegajs/desktop's integration
 // surface only. The engine semantics (required/type/match/enum, conditional required,
 // secrets, targets sanity) are deep-tested in the config package's own suite; here we
 // prove the vendored package loads from dist, the desktop refinements apply, and the
@@ -77,7 +77,7 @@ module.exports = {
       },
     },
     {
-      name: 'EM shipped defaults resolve + validate clean for desktop',
+      name: '@omegajs/desktop shipped defaults resolve + validate clean for desktop',
       run: (ctx) => {
         // Anything failing here means our defaults are incompatible with the shared schema.
         const { errors, enabled } = loadConfig(path.join(root, 'dist', 'defaults'), 'desktop');

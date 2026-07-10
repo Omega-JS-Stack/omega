@@ -1,4 +1,4 @@
-// Restart Manager — the EM-side client of the external guardian app that
+// Restart Manager — the framework-side client of the external guardian app that
 // relaunches this app if it crashes.
 //
 // Why an external helper? On all three OSes there are restart edge cases
@@ -8,7 +8,7 @@
 // without saying goodbye.
 //
 // Protocol v1 (SSOT: ./protocol.js — the RM app imports the same file via
-// `require('electron-manager/lib/restart-manager/protocol')`):
+// `require('@omegajs/desktop/lib/restart-manager/protocol')`):
 //   - RM serves loopback HTTP (127.0.0.1, ephemeral port) and advertises it in
 //     `<sharedRoot>/runtime.json` ({ protocolVersion, port, pid, version, ... }).
 //   - We POST /v1/register ({ id, name, pid, path, version, environment }) after
@@ -22,7 +22,7 @@
 // Install ownership: WE install RM when it's missing — silently on every
 // platform (mac: zip → <sharedRoot>/app/; win: NSIS one-click run with /S,
 // per-user, no admin, no UI; linux: AppImage → app/ + chmod). UPDATES are
-// RM's own job: it runs EM's standard autoUpdater like any other EM app
+// RM's own job: it runs @omegajs/desktop's standard autoUpdater like any other @omegajs/desktop app
 // (NSIS on win is exactly what makes that possible), and its registrations
 // are storage-persisted so they survive the update relaunch. Watched apps'
 // 60s heartbeats reconnect through the fresh runtime.json afterwards.
@@ -48,7 +48,7 @@ const install    = require('./install.js');
 
 const logger = new LoggerLite('restart-manager');
 
-// Default release feed — RM publishes through EM's standard pipeline, so the
+// Default release feed — RM publishes through @omegajs/desktop's standard pipeline, so the
 // feed lives on the restart-manager org's update-server releases. Consumers
 // can override via config.restartManager.feed ({ owner, repo } or full { url }).
 const DEFAULT_FEED = Object.freeze({
@@ -521,7 +521,7 @@ const restartManager = {
 
     // Never intercept the auto-updater's quitAndInstall — its quit sequence
     // (especially Squirrel.Mac) must own the exit. The app relaunches via the
-    // updater anyway; RM's deregister-wins grace window + EM's single-instance
+    // updater anyway; RM's deregister-wins grace window + @omegajs/desktop's single-instance
     // lock neutralize the tiny race.
     const updaterStatus = manager.autoUpdater.getStatus();
     if (manager._allowQuit && updaterStatus.code === 'downloaded') {

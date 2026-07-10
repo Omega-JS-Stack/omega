@@ -212,7 +212,7 @@ module.exports = {
     },
     {
       // MODERN shape only: ?authToken= (what the website's token page sends).
-      // Legacy-app formats (?token=, ?payload=) are UJM's concern — EM ignores them.
+      // Legacy-app formats (?token=, ?payload=) are UJM's concern — @omegajs/desktop ignores them.
       name: 'built-in auth/token reads ONLY ?authToken= (legacy ?token=/?payload= ignored)',
       run: (ctx) => {
         let called = false;

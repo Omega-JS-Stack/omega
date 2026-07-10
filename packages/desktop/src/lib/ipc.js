@@ -14,7 +14,8 @@
 //   window.em.ipc.on(channel, fn)                         // returns unsubscribe fn
 //   window.em.ipc.send(channel, payload)                  // fire-and-forget renderer → main
 //
-// All EM-internal channels are prefixed `em:` (e.g. `em:storage:get`).
+// All framework-internal channels are prefixed `desktop:` (e.g. `desktop:storage:get`);
+// the test harness keeps its own `em:__test:*` channels (parked internals, like EM_* env vars).
 // Consumers can register their own channels under any namespace they want.
 
 const LoggerLite = require('./logger-lite.js');

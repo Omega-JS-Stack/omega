@@ -16,7 +16,7 @@
 //                             Cleared only when the app actually launches at the
 //                             pendingUpdate.version (i.e. install applied).
 //
-// State machine (broadcast to renderers as `em:auto-updater:status`):
+// State machine (broadcast to renderers as `desktop:auto-updater:status`):
 //   idle / checking / available / downloading / downloaded / not-available / error
 //
 // Dev simulation: set `EM_DEV_UPDATE=available|unavailable|error` env var. The updater synthesizes
@@ -140,9 +140,9 @@ const autoUpdater = {
     // 3. IPC: renderer status query + actions. Unhandle first so re-init is idempotent.
     if (manager && manager.ipc) {
       const channels = [
-        ['em:auto-updater:status',     async () => autoUpdater.getStatus()],
-        ['em:auto-updater:check-now',  async () => autoUpdater.checkNow({ userInitiated: true })],
-        ['em:auto-updater:install-now', async () => autoUpdater.installNow()],
+        ['desktop:auto-updater:status',     async () => autoUpdater.getStatus()],
+        ['desktop:auto-updater:check-now',  async () => autoUpdater.checkNow({ userInitiated: true })],
+        ['desktop:auto-updater:install-now', async () => autoUpdater.installNow()],
       ];
       for (const [chan, fn] of channels) {
         manager.ipc.unhandle(chan);
@@ -152,7 +152,7 @@ const autoUpdater = {
       // Listener (not handle) — fire-and-forget, no response needed. Set-backed
       // listener registry deduplicates same-fn re-adds, so re-init is safe.
       if (typeof manager.ipc.on === 'function') {
-        manager.ipc.on('em:auto-updater:activity', autoUpdater._onActivityIpc);
+        manager.ipc.on('desktop:auto-updater:activity', autoUpdater._onActivityIpc);
       }
     }
 
@@ -306,7 +306,7 @@ const autoUpdater = {
 
     const m = autoUpdater._manager;
     if (m && m.ipc && typeof m.ipc.unhandle === 'function') {
-      ['em:auto-updater:status', 'em:auto-updater:check-now', 'em:auto-updater:install-now'].forEach((c) => {
+      ['desktop:auto-updater:status', 'desktop:auto-updater:check-now', 'desktop:auto-updater:install-now'].forEach((c) => {
         m.ipc.unhandle(c);
       });
     }
@@ -425,7 +425,7 @@ const autoUpdater = {
   },
 
   // Wire main-process activity hooks. Idempotent — only runs once per process.
-  // Renderer-side activity arrives via the 'em:auto-updater:activity' IPC listener
+  // Renderer-side activity arrives via the 'desktop:auto-updater:activity' IPC listener
   // wired in initialize() (mouse/keyboard/wheel/touch/focus debounced in preload).
   // This method covers main-process signals that don't go through the renderer:
   //   - browser-window-focus: user alt-tabbed back, clicked a window from elsewhere,
@@ -446,7 +446,7 @@ const autoUpdater = {
   _broadcastStatus() {
     const m = autoUpdater._manager;
     if (m && m.ipc && typeof m.ipc.broadcast === 'function') {
-      m.ipc.broadcast('em:auto-updater:status', autoUpdater.getStatus());
+      m.ipc.broadcast('desktop:auto-updater:status', autoUpdater.getStatus());
     }
     autoUpdater._updateMenuItem();
     autoUpdater._updateTrayItem();
@@ -471,7 +471,7 @@ const autoUpdater = {
     return { label, enabled };
   },
 
-  // Reflect updater state into the EM Check-for-Updates item. The item lives under
+  // Reflect updater state into the @omegajs/desktop Check-for-Updates item. The item lives under
   // `main/check-for-updates` on macOS (App menu) and `help/check-for-updates` on win/linux —
   // we just patch whichever one exists. Consumer can remove either via
   // manager.menu.remove('main/check-for-updates') in their integrations/menu/index.js.

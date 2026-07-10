@@ -1,10 +1,10 @@
 # Installer & Distribution Options
 
-Single source of truth for everything that controls how your app is packaged + delivered to end users. EM owns the *target type* choices (NSIS on Windows, DMG+zip on Mac, deb+AppImage on Linux) and lets you configure the per-target UX through a small set of config knobs.
+Single source of truth for everything that controls how your app is packaged + delivered to end users. @omegajs/desktop owns the *target type* choices (NSIS on Windows, DMG+zip on Mac, deb+AppImage on Linux) and lets you configure the per-target UX through a small set of config knobs.
 
-## Why EM owns the target list
+## Why @omegajs/desktop owns the target list
 
-EM picks specific installer types because they're the only ones that play well with the auto-update mechanism + cross-platform release pipeline:
+@omegajs/desktop picks specific installer types because they're the only ones that play well with the auto-update mechanism + cross-platform release pipeline:
 
 | Platform | Target | Why |
 |---|---|---|
@@ -20,7 +20,7 @@ These apply identically on every OS — set them once.
 
 | Field | Default | What it does |
 |---|---|---|
-| `app.category` | `'productivity'` | Generic app category. EM maps to `mac.category` (Apple UTI) and `linux.category` (freedesktop). Allowed: `productivity`, `developer-tools`, `utilities`, `media`, `social`, `network`. |
+| `app.category` | `'productivity'` | Generic app category. @omegajs/desktop maps to `mac.category` (Apple UTI) and `linux.category` (freedesktop). Allowed: `productivity`, `developer-tools`, `utilities`, `media`, `social`, `network`. |
 | `app.copyright` | `'© {YEAR}, ITW Creative Works'` | Copyright string. `{YEAR}` token is expanded to the current year at build time, so the string stays current without consumers ever editing it. |
 | `app.languages` | `['en']` | Locale list. Applied as `mac.electronLanguages` (which strips other locales' `.lproj` dirs from the .app bundle). win/linux currently ignore this. |
 | `app.darkModeSupport` | `true` | macOS honors via `NSRequiresAquaSystemAppearance: false` in Info.plist. Win/linux ignore. |
@@ -61,7 +61,7 @@ If your app needs enterprise deployment, set `oneClick: false` to opt into the w
 
 ### `ia32` (32-bit Windows)
 
-EM ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-bit Windows usage is <3%, but the cost of including it is just ~2x installer size + ~2x signing time — no separate code path. Worth keeping for the long-tail user on an old Win 10 machine. To drop, set `platforms.win.arch: ['x64']`.
+@omegajs/desktop ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-bit Windows usage is <3%, but the cost of including it is just ~2x installer size + ~2x signing time — no separate code path. Worth keeping for the long-tail user on an old Win 10 machine. To drop, set `platforms.win.arch: ['x64']`.
 
 ## macOS (`platforms.mac.*`)
 
@@ -76,7 +76,7 @@ EM ships `ia32` alongside `x64` in a single multi-arch installer. Real-world 32-
 
 ### MAS distribution (stubbed)
 
-Mac App Store config keys exist in EM (`platforms.mac.mas.{enabled, provisioningProfile, entitlements, entitlementsInherit}`) but **are not yet wired up** — setting `enabled: true` triggers an audit warning and is otherwise ignored. The standard DMG+zip targets still build normally.
+Mac App Store config keys exist in @omegajs/desktop (`platforms.mac.mas.{enabled, provisioningProfile, entitlements, entitlementsInherit}`) but **are not yet wired up** — setting `enabled: true` triggers an audit warning and is otherwise ignored. The standard DMG+zip targets still build normally.
 
 When MAS support lands, the work covered will be: separate `mas` target alongside DMG/zip, separate sandbox entitlements (4 plist files instead of 1), provisioning profile copy from `config/embedded.provisionprofile`, application-groups derivation, App Store Connect submission flow (manual via Transporter, not GH Releases).
 
@@ -87,7 +87,7 @@ Reference plists from a working MAS-published Electron app (Slapform) are archiv
 | Field | Default | What it does |
 |---|---|---|
 | `platforms.linux.arch` | `['x64']` | Architectures. ia32 is essentially extinct on modern Linux. |
-| `platforms.linux.snap.enabled` | `true` (in scaffold) | Snap Store publishing. EM scaffold ships this `true`; programmatic callers without the field default to OFF. Auto-skipped if `SNAPCRAFT_STORE_CREDENTIALS` env is unset. |
+| `platforms.linux.snap.enabled` | `true` (in scaffold) | Snap Store publishing. @omegajs/desktop scaffold ships this `true`; programmatic callers without the field default to OFF. Auto-skipped if `SNAPCRAFT_STORE_CREDENTIALS` env is unset. |
 | `platforms.linux.snap.confinement` | `'strict'` | `strict` (sandboxed) or `classic` (unrestricted, requires Snap Store approval). |
 | `platforms.linux.snap.grade` | `'stable'` | `stable` or `devel`. |
 | `platforms.linux.snap.autoStart` | `true` | Register the snap to auto-start on login. |
@@ -129,13 +129,13 @@ Available for the rare app that needs them — both pass through to electron-bui
 }
 ```
 
-`protocols` is **additive** — EM auto-registers `<brand.id>://` for every app (handled by `lib/protocol.js` at runtime). Use this to add EXTRA schemes (e.g., to handle `mailto:` if you're a custom email client).
+`protocols` is **additive** — @omegajs/desktop auto-registers `<brand.id>://` for every app (handled by `lib/protocol.js` at runtime). Use this to add EXTRA schemes (e.g., to handle `mailto:` if you're a custom email client).
 
 99% of apps don't need either of these — leave both unset.
 
 ## Raw `electronBuilder` overrides (escape hatch)
 
-For anything EM doesn't expose, set the value directly on `config.electronBuilder.*` in `omega.json5`. EM merges your overrides on top of its generated config:
+For anything @omegajs/desktop doesn't expose, set the value directly on `config.electronBuilder.*` in `omega.json5`. @omegajs/desktop merges your overrides on top of its generated config:
 
 **Gotcha: the merge REPLACES arrays wholesale** (objects deep-merge, arrays don't). A `target:` override must restate the FULL target list — `target: [{ target: 'mas' }]` alone would silently DROP dmg+zip and break auto-update.
 
@@ -144,7 +144,7 @@ For anything EM doesn't expose, set the value directly on `config.electronBuilde
   electronBuilder: {
     mac: {
       target: [
-        { target: 'dmg', arch: ['universal'] },            // restate EM's defaults…
+        { target: 'dmg', arch: ['universal'] },            // restate @omegajs/desktop's defaults…
         { target: 'zip', arch: ['universal'] },            // …(zip is the auto-update artifact)
         { target: 'mas', arch: ['universal'] },            // …then add MAS
       ],
@@ -159,4 +159,4 @@ For anything EM doesn't expose, set the value directly on `config.electronBuilde
 }
 ```
 
-Use this for: legacy apps migrating from a custom builder config, enterprise deployments needing MSI, MAS apps until first-class support lands. Generally try the EM-native config first.
+Use this for: legacy apps migrating from a custom builder config, enterprise deployments needing MSI, MAS apps until first-class support lands. Generally try the framework-native config first.

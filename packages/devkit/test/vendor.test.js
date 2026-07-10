@@ -94,6 +94,31 @@ test('dist/defaults is consumer-template content: never scanned, rewritten, or v
   assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'logger.js')));
 });
 
+test("the host's own name is never vendored or rewritten (boot harnesses + fixtures reference it at consumer runtime)", (t) => {
+  // The real case: @omegajs/desktop's boot harness requires
+  // '@omegajs/desktop/renderer' and its bundled consumer fixture requires
+  // '@omegajs/desktop/main' — both resolve via the CONSUMER's node_modules
+  // (the boot runner symlinks them). Collecting the host's own name would
+  // fold the host into itself; rewriting would break the consumer-side walk.
+  const root = makeFixture('vendor-self', {
+    packageJSON: { name: '@omegajs/fixture-self', version: '2.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/test/harness/preload.js': `const R = require('@omegajs/fixture-self/renderer');\nconst L = require('@omegajs/devkit/logger');\nmodule.exports = { R, L };`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root }); // must NOT throw about @omegajs/fixture-self
+
+  // Self-reference survives verbatim; the sibling ref is still rewritten
+  const harness = fs.readFileSync(path.join(root, 'dist', 'test', 'harness', 'preload.js'), 'utf8');
+  assert.ok(harness.includes(`'@omegajs/fixture-self/renderer'`));
+  assert.ok(!harness.includes(`'@omegajs/devkit/logger'`));
+  assert.ok(!fs.existsSync(path.join(root, 'dist', 'vendor', 'fixture-self')));
+  assert.ok(fs.existsSync(path.join(root, 'dist', 'vendor', 'devkit', 'logger.js')));
+  assert.equal(result.rewritten, 1);
+});
+
 test('dep-guard ignores comment prose that reads like an ESM from-clause', (t) => {
   // The real case: @omegajs/config's edit.js has JSDoc prose "('brand' from
   // brand, 'a b' from 'a b')" — the guard reported a phantom host dep 'a b'.

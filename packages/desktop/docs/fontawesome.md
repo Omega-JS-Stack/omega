@@ -1,6 +1,6 @@
 # FontAwesome
 
-EM ships the **Font Awesome Pro icon library** (solid + brands, SVG) inside the
+@omegajs/desktop ships the **Font Awesome Pro icon library** (solid + brands, SVG) inside the
 framework — every consumer gets the full icon set with **zero setup**, fully
 offline, no icon font, no CDN.
 
@@ -17,14 +17,14 @@ renderer bootstrap. No `initialize()` options, no imports.
 ## How it works
 
 - **Assets** — `assets/icons/font-awesome/{solid,brands}/*.svg` ship inside the
-  EM package (Font Awesome Pro 7.x — 4,700+ solid, 600+ brand icons, including
+  @omegajs/desktop package (Font Awesome Pro 7.x — 4,700+ solid, 600+ brand icons, including
   the classic alias filenames like `search.svg` → `magnifying-glass`). They ride
-  into packaged apps automatically (EM's `dist/` lives in the consumer's asar).
+  into packaged apps automatically (@omegajs/desktop's `dist/` lives in the consumer's asar).
 - **Main lib** (`lib/fontawesome.js`) — `manager.fontawesome.get(name, style)`
   resolves an icon to its SVG string (`null` for unknown names — never throws).
   Lookups are slug-sanitized (the IPC channel can never read outside the icon
   directories) and cached per app run. Serves renderers over
-  `em:fontawesome:get`.
+  `desktop:fontawesome:get`.
 - **Preload bridge** — `window.em.fontawesome.get(name, style)` →
   `Promise<svg | null>`.
 - **Renderer auto-render** (`renderer.js _wireFontAwesome`) — scans for
@@ -33,7 +33,10 @@ renderer bootstrap. No `initialize()` options, no imports.
   `fa-*` class that isn't a known modifier (`fa-fw`, `fa-2x`, `fa-spin`, …).
   The SVG is injected as a child of the `<i>`, sized `1em`/`currentColor` — it
   inherits text color and scales with font-size (bump it via `font-size` or a
-  `fs-*` utility).
+  `fs-*` utility). Served SVGs also carry `overflow="visible"` (FA-kit parity:
+  `.svg-inline--fa { overflow: visible }`) — FA Pro 7 glyphs may draw OUTSIDE
+  their viewBox (fa-lock's shackle peaks at y=-32 in a `0 0 384 512` box) and
+  the SVG-root default of `overflow: hidden` clips them flat.
 
 ## Minimal surfaces
 
@@ -42,7 +45,7 @@ the full init (no web-manager / auth — e.g. a lightweight popover overlay) can
 enable JUST the icon pipeline:
 
 ```js
-new (require('electron-manager/renderer'))().enableFontAwesome();
+new (require('@omegajs/desktop/renderer'))().enableFontAwesome();
 ```
 
 ## Notes
@@ -63,7 +66,9 @@ new (require('electron-manager/renderer'))().enableFontAwesome();
 ## Testing
 
 - `src/test/suites/main/fontawesome.test.js` — resolution, aliases, sanitization
-  (traversal attempts), caching, IPC round-trip.
+  (traversal attempts), caching, IPC round-trip, the `overflow="visible"` serve
+  attribute.
 - `src/test/suites/renderer/fontawesome.test.js` — the real auto-render
   pipeline: inserted `<i>` elements get SVGs on the live DOM, modifier classes
-  are never mistaken for names, unknown names stay empty.
+  are never mistaken for names, unknown names stay empty, injected SVGs compute
+  `overflow: visible` (out-of-viewBox glyphs must not clip).

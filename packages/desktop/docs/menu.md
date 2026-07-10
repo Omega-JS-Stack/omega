@@ -15,7 +15,7 @@ module.exports = ({ manager, menu, defaults }) => {
   menu.useDefaults();
 
   // Mutate by id-path:
-  menu.show('main/preferences');                // EM ships this hidden by default
+  menu.show('main/preferences');                // @omegajs/desktop ships this hidden by default
   menu.update('main/check-for-updates', { label: 'Get Latest Version' });
   menu.insertAfter('main/check-for-updates', {
     id: 'main/account', label: 'Account...', click: () => manager.windows.show('account'),
@@ -54,11 +54,11 @@ Same shape across menu / tray / context-menu. Available **during definition** (o
 .appendTo(idPath, item)        // push into a submenu (creates submenu if absent)
 ```
 
-Menu ids are **paths** because menus actually nest (`main/check-for-updates`, `view/developer/toggle-devtools`). EM matches by full id field first; if that misses it walks the path treating each segment as the last component of an id.
+Menu ids are **paths** because menus actually nest (`main/check-for-updates`, `view/developer/toggle-devtools`). @omegajs/desktop matches by full id field first; if that misses it walks the path treating each segment as the last component of an id.
 
 ## Default template ids
 
-Every item in EM's default template carries a stable id you can target.
+Every item in @omegajs/desktop's default template carries a stable id you can target.
 
 ### macOS App menu (the one labeled with your app name)
 
@@ -106,7 +106,7 @@ Every item in EM's default template carries a stable id you can target.
 
 ### Development menu (dev mode only)
 
-Top-level, only visible when `manager.isDevelopment()`. Mirrors legacy electron-manager's developer utilities.
+Top-level, only visible when `manager.isDevelopment()`. Mirrors legacy @omegajs/desktop's developer utilities.
 
 | ID | Item | Action |
 |---|---|---|

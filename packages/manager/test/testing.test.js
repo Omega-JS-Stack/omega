@@ -152,7 +152,7 @@ test('testing: TARGET_FRAMEWORKS maps every checkable target, mobile reserved', 
     web: '@omegajs/web',
     backend: 'backend-manager',
     extension: '@omegajs/extension',
-    desktop: 'electron-manager',
+    desktop: '@omegajs/desktop',
   });
 });
 

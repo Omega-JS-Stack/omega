@@ -1,10 +1,10 @@
-// Boot harness — invoked from EM's main.js after manager.initialize() resolves
+// Boot harness — invoked from @omegajs/desktop's main.js after manager.initialize() resolves
 // when EM_TEST_BOOT=1. Reads the spec file pointed to by EM_TEST_BOOT_SPEC,
 // runs each `inspect` against the live manager, emits results, and quits.
 //
 // Why call from main.js instead of preloading via electron's --require?
 // Because Electron rejects unknown CLI flags, we can't sneak args/preload modules in.
-// So EM's main.js opts into the harness when it sees EM_TEST_BOOT=1, after a
+// So @omegajs/desktop's main.js opts into the harness when it sees EM_TEST_BOOT=1, after a
 // fully-completed initialize() guarantees every lib is up.
 //
 // Protocol matches main-entry.js — emit `__EM_TEST__` JSON lines on stdout.
@@ -59,8 +59,8 @@ async function run(manager) {
     ),
   }));
 
-  // Bring in EM's expect (assert.js) — same path conventions as main-entry.js uses.
-  const expect = require(path.join(spec.emDistRoot, 'test', 'assert.js'));
+  // Bring in @omegajs/desktop's expect (assert.js) — same path conventions as main-entry.js uses.
+  const expect = require(path.join(spec.frameworkDistRoot, 'test', 'assert.js'));
 
   let passed = 0, failed = 0, skipped = 0;
 

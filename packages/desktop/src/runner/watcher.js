@@ -1,14 +1,14 @@
 // em-runner-watcher: long-running daemon installed as a Windows service by `npx mgr runner install`.
 //
 // Responsibilities:
-//   1. Self-update: on each tick, run `npm i -g electron-manager@latest`. Always uses the freshest CLI.
+//   1. Self-update: on each tick, run `npm i -g @omegajs/desktop@latest`. Always uses the freshest CLI.
 //   2. Discover orgs: query GH API for orgs the GH_TOKEN has admin on. For each new org not yet in
 //      our local registry, shell out to `mgr runner register-org <org>` to register the runner there.
 //   3. Health log: write a heartbeat line to %PROGRAMDATA%\em-runner\watcher.log every poll.
 //
-// The watcher is fully self-contained — it doesn't `require()` anything from the EM source tree
+// The watcher is fully self-contained — it doesn't `require()` anything from the @omegajs/desktop source tree
 // because that tree might be in the middle of a `npm i -g` update. It only uses Node builtins
-// + a single shell-out to `mgr` (which IS the up-to-date EM after self-update).
+// + a single shell-out to `mgr` (which IS the up-to-date @omegajs/desktop after self-update).
 
 const path        = require('path');
 const fs          = require('fs');
@@ -67,7 +67,7 @@ function ghApi(pathPart) {
 
 async function selfUpdate() {
   return new Promise((resolve) => {
-    const child = spawn('npm', ['i', '-g', 'electron-manager@latest'], {
+    const child = spawn('npm', ['i', '-g', '@omegajs/desktop@latest'], {
       shell: true,
       stdio: 'ignore',
     });

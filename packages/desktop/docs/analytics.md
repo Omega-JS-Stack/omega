@@ -1,6 +1,6 @@
 # Analytics
 
-GA4 Measurement Protocol with cross-platform identity. The same human gets unified events across desktop (EM), web (UJM/web-manager), and backend (BEM) — provided all four reference the same Firebase project ID.
+GA4 Measurement Protocol with cross-platform identity. The same human gets unified events across desktop (@omegajs/desktop), web (UJM/web-manager), and backend (BEM) — provided all four reference the same Firebase project ID.
 
 ## How identity works
 
@@ -9,7 +9,7 @@ Every event ships with two GA4 fields:
 - **`client_id`** — uniquely identifies a *device install*. Stable per-install, anonymous.
 - **`user_id`** — uniquely identifies a *human*. Set when the user is signed in via Firebase Auth.
 
-EM derives both via `uuidv5(input, namespace)` where:
+@omegajs/desktop derives both via `uuidv5(input, namespace)` where:
 
 - `namespace = uuidv5(firebaseConfig.projectId, uuidv5.URL)` — same projectId in BEM/UJM/web-manager → same namespace everywhere.
 - `client_id = uuidv5(deviceId, namespace)` — `deviceId` is the first non-internal MAC from `os.networkInterfaces()`, falling back to a persisted `crypto.randomUUID()`.
@@ -91,7 +91,7 @@ In all three cases, `event()` is a silent no-op (no throws, no warns past init).
 
 ## Event-name normalization
 
-GA4 enforces `[A-Za-z0-9_]` only, max 40 chars, no leading/trailing underscores. EM normalizes:
+GA4 enforces `[A-Za-z0-9_]` only, max 40 chars, no leading/trailing underscores. @omegajs/desktop normalizes:
 
 - `'Hello World!'` → `'Hello_World'`
 - `'__trim__'` → `'trim'`

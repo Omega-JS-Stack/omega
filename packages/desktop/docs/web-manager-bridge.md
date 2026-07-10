@@ -1,6 +1,6 @@
 # Web Manager Bridge — Auth State Sync
 
-EM keeps Firebase auth state in sync across all processes (main + every renderer window). The pattern mirrors BXM's background/foreground architecture: **main is the source of truth**, renderers reflect.
+@omegajs/desktop keeps Firebase auth state in sync across all processes (main + every renderer window). The pattern mirrors BXM's background/foreground architecture: **main is the source of truth**, renderers reflect.
 
 ## Why this exists
 
@@ -19,8 +19,8 @@ The bridge handles all three.
 │  MAIN (web-manager-bridge.js)                               │
 │  - Owns Firebase Auth instance ("em-auth" app)              │
 │  - Source of truth for auth state                           │
-│  - Listens for em:auth:* IPC from renderers                 │
-│  - Broadcasts em:auth:* IPC to all renderers on changes     │
+│  - Listens for desktop:auth:* IPC from renderers                 │
+│  - Broadcasts desktop:auth:* IPC to all renderers on changes     │
 └─────────────────────────────────────────────────────────────┘
               ▲                     │ broadcasts
               │ sync-request        ▼
@@ -33,9 +33,9 @@ The bridge handles all three.
 ### Auth flow: deep-link → all processes signed in
 
 1. User signs in on the website. Web-manager generates a custom token. Website opens `myapp://auth/token?token=XYZ` (deep link).
-2. EM's deep-link `auth/token` built-in fires `manager.webManager.handleAuthToken(token)`.
+2. @omegajs/desktop's deep-link `auth/token` built-in fires `manager.webManager.handleAuthToken(token)`.
 3. Main calls `signInWithCustomToken(auth, token)` against its own Firebase Auth → main is now signed in.
-4. Main broadcasts `em:auth:sign-in-with-token` IPC with the same token to all renderer windows.
+4. Main broadcasts `desktop:auth:sign-in-with-token` IPC with the same token to all renderer windows.
 5. Each renderer receives the broadcast, calls `webManager.auth().signInWithCustomToken(token)` against its own (web-manager-managed) Firebase Auth → all renderers signed in with the same user.
 6. Tokens are NOT stored — they expire in 1 hour. Auth state persists via Firebase's built-in IndexedDB persistence.
 
@@ -43,7 +43,7 @@ The bridge handles all three.
 
 When a renderer window opens (cold or warm), it asks main for the current state:
 
-1. Renderer sends `em:auth:sync-request` IPC with its current UID (or null).
+1. Renderer sends `desktop:auth:sync-request` IPC with its current UID (or null).
 2. Main compares with its own UID:
    - **Same UID** → no sync needed, returns `{ needsSync: false }`.
    - **Main signed out, renderer signed in** → returns `{ needsSync: true, signOut: true }`. Renderer signs out.
@@ -54,7 +54,7 @@ When a renderer window opens (cold or warm), it asks main for the current state:
 Any renderer (or main code) calls `manager.webManager.signOut()`:
 
 1. Main signs out its own Firebase.
-2. Main broadcasts `em:auth:sign-out` IPC to all renderers.
+2. Main broadcasts `desktop:auth:sign-out` IPC to all renderers.
 3. Each renderer signs out its own Firebase.
 
 ## Public API
@@ -85,7 +85,7 @@ await manager.webManager.signOut();
 
 // The renderer-resolved subscription — THE main-side plan source. Renderers run
 // web-manager's full auth cycle (Firestore account fetch → resolveSubscription)
-// and push the result to main (em:auth:account-resolved, uid-guarded); main can't
+// and push the result to main (desktop:auth:account-resolved, uid-guarded); main can't
 // run Firestore itself. null until a renderer has resolved.
 manager.webManager.getResolvedPlan();
 //   → { plan, active, trialing, cancelling } | null
@@ -93,7 +93,7 @@ manager.webManager.getResolvedRoles();
 //   → { admin, betaTester, ... } | null
 ```
 
-### Renderer process (the EM Manager you `initialize()`)
+### Renderer process (the @omegajs/desktop Manager you `initialize()`)
 
 ```js
 // Read the user from main (always returns main's authoritative state).
@@ -105,13 +105,13 @@ await renderer.signOut();
 
 The renderer's `Manager.initialize()` automatically:
 - Boots web-manager (so renderer-side Firebase is available).
-- Wires the auth bridge (`em:auth:sync-request` on load + listens for broadcasts).
+- Wires the auth bridge (`desktop:auth:sync-request` on load + listens for broadcasts).
 - Runs web-manager's **full auth cycle** (`auth().listen()`): waits for auth to settle,
   fetches the Firestore account, resolves the subscription, and auto-populates the
-  **`data-wm-bind` bindings** — so EM app views can use UJM/BXM-style reactive HTML
+  **`data-wm-bind` bindings** — so @omegajs/desktop app views can use UJM/BXM-style reactive HTML
   (`@show auth.user`, `@text auth.account.plan.id`, `@show auth.account.plan.id === 'premium'`,
   see web-manager's docs/bindings.md). Each settle pushes `{ resolved, roles }` to main
-  (`em:auth:account-resolved`) and re-offers it whenever main announces a state change,
+  (`desktop:auth:account-resolved`) and re-offers it whenever main announces a state change,
   so a renderer that resolved before main signed in still delivers.
 
 You don't write any of this — it just works.
@@ -119,7 +119,7 @@ You don't write any of this — it just works.
 ## Session persistence (main)
 
 Renderers persist their Firebase sessions in IndexedDB for free (browser contexts).
-Main is Node — Firebase defaults to in-memory there — so EM plugs in its own vault:
+Main is Node — Firebase defaults to in-memory there — so @omegajs/desktop plugs in its own vault:
 **`lib/auth-persistence.js`**, a PLUGGABLE strategy behind a custom Firebase
 `Persistence` (the `getReactNativePersistence()` shape).
 
@@ -129,7 +129,7 @@ Main is Node — Firebase defaults to in-memory there — so EM plugs in its own
   os_crypt machinery Chromium uses for its cookie jar — stronger than browser
   IndexedDB/localStorage, which are plaintext LevelDB on disk.
 - **`none`** — explicit opt-out (in-memory, pre-1.12 behavior).
-- **Custom** — `require('electron-manager/lib/auth-persistence').register(name, { available, getItem, setItem, removeItem })` before `initialize()`, then select it via config.
+- **Custom** — `require('@omegajs/desktop/lib/auth-persistence').register(name, { available, getItem, setItem, removeItem })` before `initialize()`, then select it via config.
 
 ```jsonc
 {
@@ -160,7 +160,7 @@ If `firebaseConfig` is empty/missing, the bridge logs a warning and runs in no-o
 
 ## Firebase (bundled)
 
-Firebase is **bundled by webpack from EM's module context** (web-manager owns it in EM's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
+Firebase is **bundled by webpack from @omegajs/desktop's module context** (web-manager owns it in @omegajs/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
 
 If you're building a no-auth Electron app, just leave `firebaseConfig` empty — the bridge is a clean no-op.
 
@@ -221,12 +221,12 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 
 | Channel | Direction | Payload | Description |
 |---|---|---|---|
-| `em:auth:sync-request` | renderer → main | `{ contextUid }` | "I'm at this UID, are we in sync?" |
-| `em:auth:sign-out` | renderer → main | (none) | "Sign me (and everyone) out." |
-| `em:auth:get-user` | renderer → main | (none) | Read main's current user. |
-| `em:auth:sign-in-with-token` | main → all renderers | `{ token }` | "Sign in with this custom token now." |
-| `em:auth:sign-out` | main → all renderers | `{}` | "Sign out now." |
-| `em:auth:state-changed` | main → all renderers | `{ uid, email, ... } \| null` | Auth state changed (informational). |
+| `desktop:auth:sync-request` | renderer → main | `{ contextUid }` | "I'm at this UID, are we in sync?" |
+| `desktop:auth:sign-out` | renderer → main | (none) | "Sign me (and everyone) out." |
+| `desktop:auth:get-user` | renderer → main | (none) | Read main's current user. |
+| `desktop:auth:sign-in-with-token` | main → all renderers | `{ token }` | "Sign in with this custom token now." |
+| `desktop:auth:sign-out` | main → all renderers | `{}` | "Sign out now." |
+| `desktop:auth:state-changed` | main → all renderers | `{ uid, email, ... } \| null` | Auth state changed (informational). |
 
 ## Testing
 
@@ -239,7 +239,7 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 `web-manager-bridge.integration.test.js` actually mints custom tokens via `firebase-admin` and signs in — it hits REAL Firebase, so it's gated behind extended mode (the cross-framework `TEST_EXTENDED_MODE` opt-in; see [test-framework.md](test-framework.md#extended-vs-normal-mode)). To run:
 
 ```bash
-npm i -D firebase-admin                                   # already in EM's devDeps
+npm i -D firebase-admin                                   # already in @omegajs/desktop's devDeps
 export EM_TEST_FIREBASE_ADMIN_KEY=/path/to/service-account.json
 export EM_TEST_USER_UID=em-test-user                      # optional, defaults to em-test-user
 npx mgr test --extended                                   # or: TEST_EXTENDED_MODE=true npx mgr test
@@ -250,7 +250,7 @@ Without the extended-mode opt-in the suite skips cleanly with a clear reason; sa
 ## Implementation notes
 
 - Firebase app name in main is `em-auth` (avoids clashes if a consumer's main code also wants its own Firebase instance).
-- The bridge does NOT persist user info to EM storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
+- The bridge does NOT persist user info to @omegajs/desktop storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
 - Custom tokens are NEVER stored. Renderers receive them once via broadcast, sign in, discard. Fresh tokens are minted on demand from `/backend-manager` with command `user:create-custom-token`.
 - `manager.getApiUrl()` returns the dev or prod URL, so the bridge automatically hits the right backend. Available across all four Manager contexts (main / renderer / preload / build) via the shared `src/utils/url-helpers.js` module — same code path everywhere. See CLAUDE.md → "Cross-context helpers."
 - All sensitive Firebase user fields (`stsTokenManager`, `providerData`, etc.) are stripped before sending over IPC. Only `{uid, email, displayName, photoURL, emailVerified}` cross the bridge.

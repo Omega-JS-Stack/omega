@@ -139,19 +139,19 @@ module.exports = {
       },
     },
     {
-      name: 'IPC handler em:remote-config:get returns cached data',
+      name: 'IPC handler desktop:remote-config:get returns cached data',
       run: async (ctx) => {
         ctx.manager.remoteConfig._data = { status: 'online', x: 1 };
-        const result = await ctx.manager.ipc.invoke('em:remote-config:get');
+        const result = await ctx.manager.ipc.invoke('desktop:remote-config:get');
         ctx.expect(result.status).toBe('online');
         ctx.expect(result.x).toBe(1);
       },
     },
     {
-      name: 'IPC handler em:remote-config:get supports dot-path',
+      name: 'IPC handler desktop:remote-config:get supports dot-path',
       run: async (ctx) => {
         ctx.manager.remoteConfig._data = { settings: { versionRequired: '3.1.4' } };
-        const result = await ctx.manager.ipc.invoke('em:remote-config:get', 'settings.versionRequired');
+        const result = await ctx.manager.ipc.invoke('desktop:remote-config:get', 'settings.versionRequired');
         ctx.expect(result).toBe('3.1.4');
       },
     },

@@ -9,7 +9,7 @@ const { EXTENDED_MODE_WARNING } = require('../test/utils/extended-mode-warning.j
 
 module.exports = async function (options) {
   // Tee all test output to <projectRoot>/logs/test.log (ANSI-stripped) — mirrors
-  // BEM's test.log and EM's own dev.log pattern.
+  // BEM's test.log and @omegajs/desktop's own dev.log pattern.
   attachLogFile(path.join(process.cwd(), 'logs', 'test.log'));
 
   const layer       = options.layer    || 'all';
@@ -23,7 +23,7 @@ module.exports = async function (options) {
   // Extended mode — opt into tests that hit REAL external services (Firebase, analytics,
   // update feeds) instead of skipping them. Off by default so `npx mgr test` stays fast and
   // offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var — the
-  // SAME name across BEM/BXM/UJM/EM (cross-framework parity); `--extended` is the CLI
+  // SAME name across BEM/BXM/UJM/@omegajs/desktop (cross-framework parity); `--extended` is the CLI
   // shorthand. Once set on process.env it propagates to every spawned child (electron
   // main/renderer/boot, the gulp boot build) automatically via `{ ...process.env }`.
   const extended    = options.extended === true
@@ -35,14 +35,14 @@ module.exports = async function (options) {
     process.env.TEST_EXTENDED_MODE = 'true';
   }
 
-  // When EM itself runs its own boot-layer tests (the cwd's package.json is EM's), there's
+  // When @omegajs/desktop itself runs its own boot-layer tests (the cwd's package.json is @omegajs/desktop's), there's
   // no real consumer app to boot. Point the boot runner at the fixture under
   // dist/test/fixtures/consumer-app unless the caller has already set EM_TEST_BOOT_PROJECT
   // explicitly. Mirrors BXM's BXM_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
   if (!process.env.EM_TEST_BOOT_PROJECT) {
     try {
       const cwdPkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
-      if (cwdPkg.name === 'electron-manager') {
+      if (cwdPkg.name === '@omegajs/desktop') {
         process.env.EM_TEST_BOOT_PROJECT = path.join(__dirname, '..', 'test', 'fixtures', 'consumer-app');
       }
     } catch (_) { /* no package.json — leave unset */ }

@@ -1,6 +1,6 @@
 // Main-process tests for lib/tray.js — file-based tray definition + builder API.
 //
-// The harness boots in EM's repo root, where there's no consumer `src/tray/index.js`,
+// The harness boots in @omegajs/desktop's repo root, where there's no consumer `src/tray/index.js`,
 // so the tray initializes empty. We test the builder API by calling `tray.define()`
 // at runtime (same code path the consumer's file-based definition uses).
 //
@@ -25,7 +25,7 @@ module.exports = {
       name: 'tray init populates items (consumer file or default template)',
       run: (ctx) => {
         // With or without a consumer file, items is a non-empty array — consumer file
-        // declares what it wants; absent consumer → EM ships its default template
+        // declares what it wants; absent consumer → @omegajs/desktop ships its default template
         // (title, open, check-for-updates, quit, ...).
         const items = ctx.manager.tray.getItems();
         ctx.expect(Array.isArray(items)).toBe(true);
@@ -169,7 +169,7 @@ module.exports = {
       name: 'refresh() does not throw when no icon set',
       run: (ctx) => {
         // Clear the icon. refresh() should be safe (warns + early-returns inside _render).
-        // We don't assert isRendered() because EM auto-resolves an icon at init time, so
+        // We don't assert isRendered() because @omegajs/desktop auto-resolves an icon at init time, so
         // tray._tray may already exist from earlier — refresh() with null _icon just
         // skips the re-render but leaves the existing Tray instance alone.
         ctx.manager.tray._icon = null;

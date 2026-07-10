@@ -1,6 +1,6 @@
 # Context
 
-Runtime info block. Mirrors BEM's `assistant.request.{geolocation,client}` shape so EM apps + sister projects (BEM, UJM, web-manager) all reference the same property paths when reading user info.
+Runtime info block. Mirrors BEM's `assistant.request.{geolocation,client}` shape so @omegajs/desktop apps + sister projects (BEM, UJM, web-manager) all reference the same property paths when reading user info.
 
 Populated asynchronously during `manager.initialize()`.
 
@@ -19,7 +19,7 @@ manager.context.client = {
   locale:    'en-US',            // app.getLocale()
   platform:  'darwin',           // os.platform()
   arch:      'arm64',            // os.arch()
-  mobile:    false,              // always false on EM (desktop framework)
+  mobile:    false,              // always false on @omegajs/desktop (desktop framework)
 };
 
 manager.context.session = {
@@ -68,7 +68,7 @@ console.log(snap.session.deviceId);
 
 ## Why the BEM shape
 
-Sister projects (BEM, web-manager, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. EM matches the leaf names so consumer code can write logic that works across all four runtimes:
+Sister projects (BEM, web-manager, UJM) all reference paths like `assistant.request.geolocation.country` and `assistant.request.client.userAgent`. @omegajs/desktop matches the leaf names so consumer code can write logic that works across all four runtimes:
 
 ```js
 const country = manager.context.geolocation.country

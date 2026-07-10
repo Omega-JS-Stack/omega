@@ -28,7 +28,7 @@ async function runConsumerHook(name, ...args) {
   const exported = loadConsumerFile(absPath);
 
   if (typeof exported !== 'function') {
-    throw new Error(`[em:hooks] hook "${name}" at ${absPath} did not export a function (got ${typeof exported}).`);
+    throw new Error(`[desktop:hooks] hook "${name}" at ${absPath} did not export a function (got ${typeof exported}).`);
   }
 
   logger.log(`running hook "${name}"`);

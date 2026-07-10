@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const install = require('../../../lib/restart-manager/install.js');
 
-// Realistic electron-builder feed fixtures (shapes match what EM's release
+// Realistic electron-builder feed fixtures (shapes match what @omegajs/desktop's release
 // pipeline publishes to update-server).
 const MAC_YML = [
   'version: 1.2.3',

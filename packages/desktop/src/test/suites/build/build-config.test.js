@@ -1,5 +1,5 @@
 // Build-layer tests for gulp/tasks/build-config.js — verify the object generation
-// from EM defaults + consumer config + override merging.
+// from @omegajs/desktop defaults + consumer config + override merging.
 
 const path = require('path');
 
@@ -49,7 +49,7 @@ module.exports = {
       },
     },
     {
-      name: 'baseConfig: ships EM defaults for mac/win/linux targets',
+      name: 'baseConfig: ships @omegajs/desktop defaults for mac/win/linux targets',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const out = baseConfig({});

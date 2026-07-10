@@ -59,7 +59,7 @@ module.exports = function audit(done) {
   // MAS distribution — currently STUBBED. Surface a warning if a consumer tries to
   // turn it on so they know it's not yet wired up.
   if (config.platforms?.mac?.mas?.enabled === true) {
-    warnings.push('platforms.mac.mas.enabled is true but Mac App Store distribution is not yet implemented in EM (the config keys are reserved for a future release). The standard mac DMG/zip targets will still build normally — the MAS variant is silently skipped.');
+    warnings.push('platforms.mac.mas.enabled is true but Mac App Store distribution is not yet implemented in @omegajs/desktop (the config keys are reserved for a future release). The standard mac DMG/zip targets will still build normally — the MAS variant is silently skipped.');
   }
 
   // Snap publishing — warn if enabled but the SNAPCRAFT_STORE_CREDENTIALS secret

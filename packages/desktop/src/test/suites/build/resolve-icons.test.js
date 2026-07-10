@@ -38,7 +38,7 @@ module.exports = {
   description: 'resolve-icons — convention waterfall + retina derivation',
   tests: [
     {
-      name: 'falls back to EM bundled defaults when consumer has nothing',
+      name: 'falls back to @omegajs/desktop bundled defaults when consumer has nothing',
       run: async (ctx) => {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
@@ -200,8 +200,8 @@ module.exports = {
         const { root, projectRoot, distRoot, emDefaultsRoot } = stage();
         try {
           fakePng(path.join(emDefaultsRoot, 'icons', 'macos', 'icon.png'));
-          // Input source files at retina (native) size. EM should emit both @1x + @2x in dist.
-          // Tray input is `tray.png`; EM renames the dist output to `trayTemplate.png` (macOS magic).
+          // Input source files at retina (native) size. @omegajs/desktop should emit both @1x + @2x in dist.
+          // Tray input is `tray.png`; @omegajs/desktop renames the dist output to `trayTemplate.png` (macOS magic).
           await realPng(path.join(emDefaultsRoot, 'icons', 'macos', 'tray.png'), 32, 32);
           await realPng(path.join(emDefaultsRoot, 'icons', 'macos', 'dmg.png'), 1080, 760);
 

@@ -1,6 +1,6 @@
 # Config schema
 
-EM validates `config/omega.json5` against the canonical OMEGA schema in **`@omegajs/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('electron-manager/config')`). The shared schema covers the cross-framework sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
+@omegajs/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omegajs/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omegajs/desktop/config')`). The shared schema covers the cross-framework sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
 
 Validation runs in two places:
 
@@ -22,7 +22,7 @@ Validation runs in two places:
 
 ## The `required` flag
 
-EM keeps validation simple: **`required` is either `true`, `false`, or a function**.
+@omegajs/desktop keeps validation simple: **`required` is either `true`, `false`, or a function**.
 
 ```js
 required: true                    // hard-fail if missing
@@ -60,7 +60,7 @@ A non-empty credential value enables a feature — there is no separate `enabled
 
 ## Adding a new field
 
-When you add a new config knob anywhere in EM:
+When you add a new config knob anywhere in @omegajs/desktop:
 
 1. Add an entry to `TARGET_SCHEMAS.desktop` in `@omegajs/config` (`packages/config/src/schema.js` in the Omega monorepo) — or to `SHARED_SCHEMA` if the field is genuinely cross-framework.
 2. If it has a default, set it in [`src/defaults/config/omega.json5`](../src/defaults/config/omega.json5) (under `targets.desktop` for desktop-scoped fields).
@@ -81,7 +81,7 @@ These are kept in `audit.js` so the schema stays a pure description of the confi
 Required field missing:
 
 ```
-electron-manager: config validation failed — fix the following in config/omega.json5:
+@omegajs/desktop: config validation failed — fix the following in config/omega.json5:
   1. config.brand.id is required — URL-scheme-safe slug. Used as deep-link scheme + default appId. Must be lowercase, start with a letter, alnum/+/-/.
 ```
 
@@ -96,7 +96,7 @@ Errors are numbered so you can fix everything in one pass instead of fix-rebuild
 
 ## Adding payment fields (BEM-shaped)
 
-EM's schema mirrors [BEM's `manager-config.example.json`](https://github.com/itw-creative-works/backend-manager) shape for payment so the same product catalog reads identically on backend, web, and desktop:
+@omegajs/desktop's schema mirrors [BEM's `manager-config.example.json`](https://github.com/itw-creative-works/backend-manager) shape for payment so the same product catalog reads identically on backend, web, and desktop:
 
 ```js
 {
@@ -112,9 +112,9 @@ EM's schema mirrors [BEM's `manager-config.example.json`](https://github.com/itw
 }
 ```
 
-The schema only enforces shape for the few well-defined publishable keys — the product catalog itself is freeform so BEM can extend it without EM caring.
+The schema only enforces shape for the few well-defined publishable keys — the product catalog itself is freeform so BEM can extend it without @omegajs/desktop caring.
 
 ## Source
 
 - Schema definitions + validator engine: `@omegajs/config` (`packages/config/src/{schema,validate}.js` in the Omega monorepo; vendored copy at `dist/vendor/config/`)
-- EM integration tests: [`src/test/suites/build/validate-config.test.js`](../src/test/suites/build/validate-config.test.js)
+- @omegajs/desktop integration tests: [`src/test/suites/build/validate-config.test.js`](../src/test/suites/build/validate-config.test.js)

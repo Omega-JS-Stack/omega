@@ -1,8 +1,8 @@
-// Test runner — discovers + runs suites, reports EM-style.
+// Test runner — discovers + runs suites, reports framework-style.
 //
 // The runner CORE (discovery, suite/group/standalone execution, filtering, skip
 // semantics, init hooks, reporting) is the shared @omegajs/devkit runner-core,
-// vendored into dist/vendor/devkit at prepare time. This file is EM's config:
+// vendored into dist/vendor/devkit at prepare time. This file is @omegajs/desktop's config:
 // title, target alias, and the framework-specific layer glue.
 //
 // Layers:
@@ -20,9 +20,9 @@ const chalk = require('chalk').default;
 const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omegajs/devkit/test/runner-core');
 
 const runner = createRunner({
-  title: 'Electron Manager Tests',
-  packageName: 'electron-manager',
-  targetAlias: 'em',
+  title: 'OMEGA Desktop Tests',
+  packageName: '@omegajs/desktop',
+  targetAlias: 'desktop',
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 15000,
@@ -77,7 +77,7 @@ const runner = createRunner({
       const counts = await runBootTests({
         tests,
         projectRoot,
-        emDistRoot: path.resolve(__dirname, '..'),
+        frameworkDistRoot: path.resolve(__dirname, '..'),
       });
       results.passed  += counts.passed;
       results.failed  += counts.failed;

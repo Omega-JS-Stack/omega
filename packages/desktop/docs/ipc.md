@@ -1,6 +1,6 @@
 # IPC
 
-Typed channel bus for main ↔ renderer communication. All EM features register their channels through this single layer rather than calling `ipcMain.handle` directly, so you have one place to look and one place to instrument.
+Typed channel bus for main ↔ renderer communication. All @omegajs/desktop features register their channels through this single layer rather than calling `ipcMain.handle` directly, so you have one place to look and one place to instrument.
 
 ## Main-process API
 
@@ -26,7 +26,7 @@ window.em.ipc.send(channel, payload);          // fire-and-forget
 
 ## Channel naming
 
-EM-internal channels are prefixed `em:` (e.g. `em:storage:get`, `em:storage:change`). Consumers are free to use any namespace.
+framework-internal channels are prefixed `em:` (e.g. `desktop:storage:get`, `desktop:storage:change`). Consumers are free to use any namespace.
 
 ## Validation
 

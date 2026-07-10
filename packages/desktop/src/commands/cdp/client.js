@@ -2,14 +2,14 @@
 // global fetch + WebSocket). Talks to the RUNNING dev app's DevTools endpoint
 // (launch with `EM_CDP_PORT=9222 npm start`, or `npx mgr cdp relaunch`).
 //
-// EM apps are MULTI-TARGET — one debuggable page per webContents (every
+// @omegajs/desktop apps are MULTI-TARGET — one debuggable page per webContents (every
 // BrowserWindow and WebContentsView). Every helper takes a URL-substring
 // matcher instead of a "selected page"; the main window's document is always
 // at `dist/views/main/` (the MAIN_VIEW default matcher).
 //
 // See docs/cdp-debugging.md for the full toolkit reference.
 
-// The main window's view path — EM's templating convention, so it holds for
+// The main window's view path — @omegajs/desktop's templating convention, so it holds for
 // every consumer. Subcommands that need "the app's main renderer" (status,
 // theme, capture geometry) default to this matcher.
 const MAIN_VIEW = '/views/main/';

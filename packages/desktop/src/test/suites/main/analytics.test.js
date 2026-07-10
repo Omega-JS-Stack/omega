@@ -230,21 +230,21 @@ module.exports = {
       },
     },
     {
-      name: 'IPC handler em:analytics:status returns the JSON snapshot',
+      name: 'IPC handler desktop:analytics:status returns the JSON snapshot',
       run: async (ctx) => {
         const restore = await reinit(ctx, { GOOGLE_ANALYTICS_SECRET: 'fake-secret' }, {
           enabled: true,
           providers: { google: { id: 'G-TESTID12' } },
         });
         try {
-          const snap = await ctx.manager.ipc.invoke('em:analytics:status');
+          const snap = await ctx.manager.ipc.invoke('desktop:analytics:status');
           ctx.expect(snap.enabled).toBe(true);
           ctx.expect(snap.measurementId).toBe('G-TESTID12');
         } finally { await restore(); }
       },
     },
     {
-      name: 'IPC listener em:analytics:event routes to analytics.event',
+      name: 'IPC listener desktop:analytics:event routes to analytics.event',
       run: async (ctx) => {
         const a = ctx.manager.analytics;
         const origEvent = a.event;
@@ -252,7 +252,7 @@ module.exports = {
         a.event = (name, params) => { captured = { name, params }; };
         try {
           // Simulate an inbound IPC call (renderer would do ipcRenderer.send).
-          const listeners = ctx.manager.ipc._listeners?.['em:analytics:event'];
+          const listeners = ctx.manager.ipc._listeners?.['desktop:analytics:event'];
           ctx.expect(listeners).toBeDefined();
           listeners.forEach((fn) => fn({ name: 'rendererEvent', params: { x: 1 } }));
           ctx.expect(captured).toEqual({ name: 'rendererEvent', params: { x: 1 } });

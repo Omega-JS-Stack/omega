@@ -1,11 +1,11 @@
 // Context Menu — file-based right-click menu definition.
 //
-// EM looks for the consumer's `src/integrations/context-menu/index.js` and calls it FOR EACH
+// @omegajs/desktop looks for the consumer's `src/integrations/context-menu/index.js` and calls it FOR EACH
 // context-menu event with a builder API plus the event's `params`:
 //
 //   // src/integrations/context-menu/index.js
 //   module.exports = ({ manager, menu, params, webContents }) => {
-//     // Start from EM's default template (undo/redo, cut/copy/paste, link items,
+//     // Start from @omegajs/desktop's default template (undo/redo, cut/copy/paste, link items,
 //     // reload, dev-only inspect):
 //     menu.useDefaults();
 //
@@ -25,7 +25,7 @@
 //   menu.item(descriptor)
 //   menu.separator()
 //   menu.submenu(label, items)
-//   menu.useDefaults()           — populate with EM's default template based on params
+//   menu.useDefaults()           — populate with @omegajs/desktop's default template based on params
 //   menu.clear()                 — wipe items added so far this event
 //
 // Id-path API (per event, same shape as menu/tray):
@@ -43,7 +43,7 @@
 //
 // Building no items (calling no menu.* methods) suppresses the popup entirely.
 //
-// EM auto-attaches the handler to every BrowserWindow's webContents that
+// @omegajs/desktop auto-attaches the handler to every BrowserWindow's webContents that
 // goes through `manager.windows.createNamed()`. To attach manually:
 //   manager.contextMenu.attach(webContents)
 //
@@ -165,9 +165,9 @@ const contextMenu = {
     return items;
   },
 
-  // Populate `items` with EM's default template based on context-menu params.
+  // Populate `items` with @omegajs/desktop's default template based on context-menu params.
   // Used by both `_defaultFn` (when no consumer file) and `menu.useDefaults()` (consumer opt-in).
-  // Item set + visibility gates mirror the legacy electron-manager context-menu behavior:
+  // Item set + visibility gates mirror the legacy @omegajs/desktop context-menu behavior:
   // undo/redo gated on canUndo/canRedo, edit ops gated on params.isEditable, etc.
   _populateDefaults(items, params) {
     const m = contextMenu._manager;

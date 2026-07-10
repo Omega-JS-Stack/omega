@@ -1,6 +1,6 @@
 # Logging
 
-EM ships a runtime logger that writes to **both the console and a file on disk**, so production issues are inspectable without remoting into the user's machine.
+@omegajs/desktop ships a runtime logger that writes to **both the console and a file on disk**, so production issues are inspectable without remoting into the user's machine.
 
 ## What you get
 
@@ -16,14 +16,14 @@ EM ships a runtime logger that writes to **both the console and a file on disk**
 | Dev (`npm start`, `app.isPackaged === false`) | `<projectRoot>/logs/runtime.log` |
 | Prod (installed `.dmg` / `.exe` / `.deb`, `app.isPackaged === true`) | OS log dir: `~/Library/Logs/<ProductName>/runtime.log` (macOS), `%APPDATA%\<ProductName>\logs\runtime.log` (Windows), `~/.config/<ProductName>/logs/runtime.log` (Linux) |
 
-`<ProductName>` = `config.app.productName` (falls back to `config.brand.name`). EM calls `app.setName(productName)` at boot so `app.getPath('logs')` uses the human-readable brand name, not `package.json#name`.
+`<ProductName>` = `config.app.productName` (falls back to `config.brand.name`). @omegajs/desktop calls `app.setName(productName)` at boot so `app.getPath('logs')` uses the human-readable brand name, not `package.json#name`.
 
 ## How to write logs
 
 In **main process** (uses the same `manager.logger` you've always had):
 
 ```js
-const Manager = require('electron-manager/main');
+const Manager = require('@omegajs/desktop/main');
 const manager = new Manager();
 await manager.initialize();
 
@@ -35,7 +35,7 @@ manager.logger.error(new Error('boom'));
 In **preload**:
 
 ```js
-const Manager = require('electron-manager/preload');
+const Manager = require('@omegajs/desktop/preload');
 const manager = new Manager();
 await manager.initialize();
 manager.logger.log('preload ready');
@@ -82,7 +82,7 @@ For dev-loop convenience. From the consumer project root:
 ## How to find the file path from app code
 
 ```js
-const LoggerLite = require('electron-manager/lib/logger-lite');
+const LoggerLite = require('@omegajs/desktop/lib/logger-lite');
 const filePath = LoggerLite.getLogFilePath();
 // → '/Users/<user>/Library/Logs/MyApp/runtime.log' in production
 ```
@@ -92,14 +92,14 @@ Useful for:
 - Programmatic log shipping (e.g. POSTing the file to your support backend)
 - Crash reporters that want to attach the runtime log
 
-## What EM logs automatically
+## What @omegajs/desktop logs automatically
 
-Beyond what you write yourself, EM emits a fixed set of high-signal lifecycle lines so post-mortem debugging works without redeploying:
+Beyond what you write yourself, @omegajs/desktop emits a fixed set of high-signal lifecycle lines so post-mortem debugging works without redeploying:
 
 **At boot (`manager.initialize()`):**
 
 ```
-(main)     Initializing electron-manager (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--em-launched-at-login"]
+(main)     Initializing @omegajs/desktop (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--em-launched-at-login"]
 (startup)  startup boot summary — RAW inputs:
 (startup)    process.argv:            ["--em-launched-at-login"]
 (startup)    process.platform:        darwin
@@ -116,9 +116,9 @@ Beyond what you write yourself, EM emits a fixed set of high-signal lifecycle li
 (startup)    isLaunchHidden():        true
 ```
 
-The boot summary has two parallel blocks: **RAW inputs** (what the OS / shell gave us) and **RESOLVED values** (what EM decided to act on). Use it to debug both directions:
-- "Why is EM behaving like X?" → check resolved values
-- "Why did EM decide X?" → check raw inputs
+The boot summary has two parallel blocks: **RAW inputs** (what the OS / shell gave us) and **RESOLVED values** (what @omegajs/desktop decided to act on). Use it to debug both directions:
+- "Why is @omegajs/desktop behaving like X?" → check resolved values
+- "Why did @omegajs/desktop decide X?" → check raw inputs
 
 The `via:` annotation on `wasLaunchedAtLogin()` distinguishes a real login launch (`via:macos-wasOpenedAtLogin`) from a flag-based simulation (`via:argv-flag` — i.e. the user passed `--em-launched-at-login`).
 
@@ -182,10 +182,10 @@ Default is `silly` (everything) on both.
 
 ## How it works under the hood
 
-EM's runtime logger (`lib/logger-lite.js`) detects which process it's in:
+@omegajs/desktop's runtime logger (`lib/logger-lite.js`) detects which process it's in:
 
-- **Main**: writes to `runtime.log` directly via [electron-log](https://github.com/megahertz/electron-log)'s file transport. Sets up an IPC listener on channel `em:log:forward` to receive forwarded calls from preload + renderer.
-- **Preload**: writes to console (DevTools) AND forwards each call via `ipcRenderer.send('em:log:forward', ...)` to main.
+- **Main**: writes to `runtime.log` directly via [electron-log](https://github.com/megahertz/electron-log)'s file transport. Sets up an IPC listener on channel `desktop:log:forward` to receive forwarded calls from preload + renderer.
+- **Preload**: writes to console (DevTools) AND forwards each call via `ipcRenderer.send('desktop:log:forward', ...)` to main.
 - **Renderer**: same as preload via `window.em.logger` (contextBridge surface).
 - **Outside Electron** (build/CLI tools that happen to require this module): falls back to console-only.
 

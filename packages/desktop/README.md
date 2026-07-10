@@ -5,22 +5,22 @@
 </p>
 
 <p align="center">
-  <strong>Electron Manager</strong> — all-in-one development framework for Electron apps. Sister project to
-  <a href="https://github.com/itw-creative-works/browser-extension-manager">Browser Extension Manager</a> and
+  <strong>OMEGA Desktop</strong> — all-in-one development framework for Electron apps. Sister project to
+  <a href="../extension/">@omegajs/extension</a> and
   <a href="https://github.com/itw-creative-works/ultimate-jekyll-manager">Ultimate Jekyll Manager</a>.
 </p>
 
 ## What it does
 
-- **One-line bootstrap** per Electron process: `require('electron-manager/main')`, `/preload`, `/renderer`.
+- **One-line bootstrap** per Electron process: `require('@omegajs/desktop/main')`, `/preload`, `/renderer`.
 - **Modular feature library** — storage, IPC, theme, tray, menu, context menu, window manager, startup, app-state, deep-link, auto-updater, web-manager auth, Sentry, **analytics, context, usage, remote-config, restart-manager**. Each feature is its own module with documented API.
-- **System-aware dynamic theme.** `manager.theme` follows the OS light/dark preference **live** by default (`'system'`), with `'light'`/`'dark'` overrides persisted across boots. Every renderer — windows AND embedded views — keeps `<html data-bs-theme>` in sync automatically; consumers drop plain `<button data-em-theme-set="dark">` controls and EM wires them.
-- **Cross-platform analytics identity.** GA4 Measurement Protocol with `client_id = uuidv5(deviceId, projectIdNamespace)` and `user_id = uuidv5(firebaseUid, projectIdNamespace)`. Same Firebase project ID in BEM/UJM/web-manager/EM produces identical `user_id` outputs everywhere → unified events for one human across desktop + web + backend, no manual stitching.
+- **System-aware dynamic theme.** `manager.theme` follows the OS light/dark preference **live** by default (`'system'`), with `'light'`/`'dark'` overrides persisted across boots. Every renderer — windows AND embedded views — keeps `<html data-bs-theme>` in sync automatically; consumers drop plain `<button data-em-theme-set="dark">` controls and @omegajs/desktop wires them.
+- **Cross-platform analytics identity.** GA4 Measurement Protocol with `client_id = uuidv5(deviceId, projectIdNamespace)` and `user_id = uuidv5(firebaseUid, projectIdNamespace)`. Same Firebase project ID in BEM/UJM/web-manager/@omegajs/desktop produces identical `user_id` outputs everywhere → unified events for one human across desktop + web + backend, no manual stitching.
 - **"Hot config"** fetched from your brand site (`<brand.url>/data/resources/main.json`) and polled hourly — flip a force-update version, default user-agent, ad rotation, etc. without re-releasing. `manager.remoteConfig.get('versionRequired')`. Cached to storage so offline boots still have last-known values.
-- **File-based feature definitions** — trays, menus, and context-menus are JS files (full power, no DSL): `src/integrations/{tray,menu,context-menu}/index.js`. All three ship sensible **id-tagged defaults** (legacy-EM-style: about, preferences, check-for-updates, dev menu w/ inspector + log folders, etc.) and share the same **id-path mutation API**: `find`, `update`, `remove`, `enable`, `show`, `hide`, `insertBefore`, `insertAfter`, `appendTo`. Any default item is one line away from removal, customization, or repositioning.
-- **Lazy windows + Discord-style hide-on-close.** EM doesn't auto-create any windows — your `main.js` calls `windows.create('main', { show: !startup.isLaunchHidden() })`. The `main` window's X button hides instead of quitting on every platform; real quit only via Cmd+Q / menu Quit / tray Quit / auto-update install. Inset titlebar by default (mac `hiddenInset` traffic lights / win native overlay buttons / linux native frame) with a draggable topbar in the page template.
-- **Zero-bounce hidden-launch on macOS.** `startup.mode = 'hidden'` bakes `LSUIElement: true` into Info.plist at build time → app launches completely invisible (no dock icon, no Cmd+Tab, no taskbar). Tray + notifications + networking still work. When the user double-clicks the running app's icon, EM's `app.on('activate')` (macOS) / `app.on('second-instance')` (win/linux) handler surfaces the `main` window and the dock icon appears alongside it. CleanMyMac-style "tray-only at login, full window when manually opened" is the default.
-- **Auto-update background install.** When a download finishes from a background poll (not user-initiated), EM auto-relaunches into the new version after 5s — apps update overnight without bothering the user. User-initiated checks skip this so your UI can prompt instead.
+- **File-based feature definitions** — trays, menus, and context-menus are JS files (full power, no DSL): `src/integrations/{tray,menu,context-menu}/index.js`. All three ship sensible **id-tagged defaults** (legacy-framework-style: about, preferences, check-for-updates, dev menu w/ inspector + log folders, etc.) and share the same **id-path mutation API**: `find`, `update`, `remove`, `enable`, `show`, `hide`, `insertBefore`, `insertAfter`, `appendTo`. Any default item is one line away from removal, customization, or repositioning.
+- **Lazy windows + Discord-style hide-on-close.** @omegajs/desktop doesn't auto-create any windows — your `main.js` calls `windows.create('main', { show: !startup.isLaunchHidden() })`. The `main` window's X button hides instead of quitting on every platform; real quit only via Cmd+Q / menu Quit / tray Quit / auto-update install. Inset titlebar by default (mac `hiddenInset` traffic lights / win native overlay buttons / linux native frame) with a draggable topbar in the page template.
+- **Zero-bounce hidden-launch on macOS.** `startup.mode = 'hidden'` bakes `LSUIElement: true` into Info.plist at build time → app launches completely invisible (no dock icon, no Cmd+Tab, no taskbar). Tray + notifications + networking still work. When the user double-clicks the running app's icon, @omegajs/desktop's `app.on('activate')` (macOS) / `app.on('second-instance')` (win/linux) handler surfaces the `main` window and the dock icon appears alongside it. CleanMyMac-style "tray-only at login, full window when manually opened" is the default.
+- **Auto-update background install.** When a download finishes from a background poll (not user-initiated), @omegajs/desktop auto-relaunches into the new version after 5s — apps update overnight without bothering the user. User-initiated checks skip this so your UI can prompt instead.
 - **Webpack-bundled** main / preload / renderer for source protection.
 - **Built-in test framework** — Jest-like syntax, four layers: `build` (plain Node), `main` (spawned Electron), `renderer` (hidden BrowserWindow), and `boot` (spawns the consumer's actual built `dist/main.bundle.js` for end-to-end smoke tests against the live manager — no `npm start && sleep && kill` shell hacks). Boot layer always rebuilds the bundle first so tests never see stale code.
 - **Schema-validated config.** One `config/omega.json5` (the OMEGA-wide format: shared brand/analytics/payment/firebase sections + desktop settings under `targets.desktop`), validated against the canonical schema in the bundled `@omegajs/config`. Validation runs at app boot AND during `gulp audit` — a misconfigured app never reaches the "white window of confusion" stage; it tells you exactly which field is broken with a numbered list. Simple flag model — `required: true | false | (config) => bool` — and `match` / `enum` / `type` only fire on field presence so consumers never see a flood of redundant errors for the same field. Pure-JS validator, no Ajv/Joi/Zod dep. See [config-schema](docs/config-schema.md).
@@ -28,10 +28,10 @@
 
 ## Quick start (consumer)
 
-EM auto-syncs your system Node version to match whatever Node Electron's bundled runtime ships with. `npx mgr setup` queries the official Electron releases feed using your installed Electron version, then writes the corresponding Node major to `.nvmrc`. Run `nvm use` afterward to switch your shell.
+@omegajs/desktop auto-syncs your system Node version to match whatever Node Electron's bundled runtime ships with. `npx mgr setup` queries the official Electron releases feed using your installed Electron version, then writes the corresponding Node major to `.nvmrc`. Run `nvm use` afterward to switch your shell.
 
 ```bash
-npm install electron-manager --save-dev
+npm install @omegajs/desktop --save-dev
 npx mgr setup            # scaffolds project; auto-resolves & writes correct .nvmrc from electron version
 nvm use                  # switch to the Node version Electron uses (one-time per shell)
 npm start                # dev: gulp → webpack → electron .
@@ -57,7 +57,7 @@ config/icons/
     tray.png
   macos/              ← macOS overrides (beats global)
     icon.png
-    tray.png          ← 32×32 — EM renames to trayTemplate.png in dist for OS dark-mode magic
+    tray.png          ← 32×32 — @omegajs/desktop renames to trayTemplate.png in dist for OS dark-mode magic
     dmg.png           ← 1080×760 DMG background
   windows/            ← Windows overrides
     icon.png
@@ -67,9 +67,9 @@ config/icons/
     tray.png
 ```
 
-Resolution per slot/platform (most specific wins): `<platform>/<slot>` → `global/<slot>` → (Linux only) `windows/<slot>` → EM bundled default. Tray missing falls back to app icon.
+Resolution per slot/platform (most specific wins): `<platform>/<slot>` → `global/<slot>` → (Linux only) `windows/<slot>` → @omegajs/desktop bundled default. Tray missing falls back to app icon.
 
-**Ship native (@2x) size only — EM downscales the @1x sibling automatically.** macOS tray must be 32×32; macOS DMG must be 1080×760. EM emits both `<slot>.png` and `<slot>@2x.png` into `dist/config/icons/<platform>/`. No `app.icons` config block — files are the source of truth.
+**Ship native (@2x) size only — @omegajs/desktop downscales the @1x sibling automatically.** macOS tray must be 32×32; macOS DMG must be 1080×760. @omegajs/desktop emits both `<slot>.png` and `<slot>@2x.png` into `dist/config/icons/<platform>/`. No `app.icons` config block — files are the source of truth.
 
 ## Logs
 
@@ -103,13 +103,13 @@ Override gulp's `dev.log` path via `EM_LOG_FILE=<path>`; disable entirely via `E
 
 ```js
 // src/main.js
-new (require('electron-manager/main'))().initialize();
+new (require('@omegajs/desktop/main'))().initialize();
 
 // src/preload.js
-new (require('electron-manager/preload'))().initialize();
+new (require('@omegajs/desktop/preload'))().initialize();
 
 // src/assets/js/components/<view>/index.js
-new (require('electron-manager/renderer'))().initialize();
+new (require('@omegajs/desktop/renderer'))().initialize();
 ```
 
 ## Documentation
@@ -134,7 +134,7 @@ Each subsystem has its own API reference under [`docs/`](docs/):
 - [restart-manager](docs/restart-manager.md) — auxiliary helper app for relaunches; auto-installs via signed mac.zip / NSIS exe / browser-opened .deb
 - [config-schema](docs/config-schema.md) — canonical schema + validator for `config/omega.json5`. Hard-fails boot AND `gulp audit` on missing required fields, regex mismatches, enum violations, type mismatches. Single source of truth in the bundled `@omegajs/config`
 - [templating](docs/templating.md) — `{{ var }}` token replacement, page template, body-only views
-- [themes](docs/themes.md) — classy + bootstrap themes, `@use 'electron-manager' as * with (...)` overrides, per-page CSS bundles, system-aware appearance (`manager.theme`)
+- [themes](docs/themes.md) — classy + bootstrap themes, `@use 'omega-desktop' as * with (...)` overrides, per-page CSS bundles, system-aware appearance (`manager.theme`)
 - [sentry](docs/sentry.md) — error/crash reporting, dev-mode gating, auto auth attribution, release tagging
 - [hooks](docs/hooks.md) — lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize)
 - [installer-options](docs/installer-options.md) — installer/distribution config: NSIS one-click defaults, ia32 inclusion, app.category mapping, `{YEAR}` copyright token, snap publishing (default-on with cred-gated auto-skip), MAS roadmap

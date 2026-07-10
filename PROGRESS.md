@@ -5,14 +5,14 @@
 - (idle — next queue item starts on Ian's "continue")
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. @omegajs/desktop cutover, local half (electron-manager → @omegajs/desktop; incl. test/** copy-once port, old-name 1.12.1 lane note, upstream fold: v1.12.1+v1.13.0 +2 dirty — 65's survey)
-2. @omegajs/backend cutover, local half (backend-manager → @omegajs/backend; upstream fold: v5.12.0 +1 dirty — 65's survey)
-3. @omegajs/client cutover, local half (web-manager → @omegajs/client; freeze 4.x story; upstream fold: v4.3.5–v4.3.6)
-4. Local-linking DX: root `npm start` all-package watch + `omega dev --local` auto-linking (plan §8)
-5. Phase 5 template product + full local dogfood (template → wizard → brand monorepo runs end-to-end on local packages)
+1. @omegajs/backend cutover, local half (backend-manager → @omegajs/backend; upstream fold: v5.12.0 +1 dirty — 65's survey)
+2. @omegajs/client cutover, local half (web-manager → @omegajs/client; freeze 4.x story; upstream fold: v4.3.5–v4.3.6)
+3. Local-linking DX: root `npm start` all-package watch + `omega dev --local` auto-linking (plan §8)
+4. Phase 5 template + **the OMEGA brand dogfood** (Ian 2026-07-10): onboard a brand around omega itself with ALL targets — web + backend + desktop + extension — and make everything work locally
+5. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
-- electron-manager@1.12.1 publish — 1.12.0 on npm breaks fresh installs (files fix sits in the monorepo copy; publish from a pre-rename tag once desktop flips)
+- electron-manager@1.12.1/1.13.0 publish — 1.12.0 on npm breaks fresh installs; the LEGACY repo now carries both commits (the other agent's merge), so Ian publishes straight from it — the monorepo pre-rename tag (`pre-desktop-rename`, cp66) is just backup
 - @omegajs npm org claim (gates publishes ONLY — local work proceeds); GitHub remote creation + first push (ci.yml verification pending)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in @omegajs/web). MAM parked entirely.
 
@@ -35,6 +35,7 @@
 - web-manager tarball ships src/ with bare @omegajs imports — exports-unaware consumers would fail loudly; revisit at the client cutover (1.3b)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 66 @omegajs/desktop cutover (local) — second Phase-3 rename: 2.0.0, EM 1.13.0 folded, suite 758/763 incl. real-Electron boot canary, pack-smoke green; devkit vendor self-name fix + boot scoped-symlink fix (this commit) → CHANGELOG
 - [x] 65 upstream sync sweep + devlog port — legacy merges pinned: BXM/web/manager already covered EXCEPT devlog → ported to @omegajs/manager (564 tests); EM/BEM/WM deltas annotated onto their cutovers (this commit) → CHANGELOG
 - [x] 64 @omegajs/extension cutover (local) — first Phase-3 rename: 2.0.0, consumer canary builds MV3 ×3 browsers, pack-smoke green; devkit vendor ×2 + gulp5 icons fixes (this commit) → CHANGELOG
 - [x] 63 extension port + PSD templates + AI brandmark — omega-manager FULLY ported, nothing parked; company PSD binaries land in ITW's company repo at migration, live MrLogo mint on Ian's go (ec9a223) → CHANGELOG
@@ -52,4 +53,4 @@
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 (checkpoint 65)*
+*Last updated: 2026-07-10 12:45 AM (checkpoint 66)*

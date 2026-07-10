@@ -100,7 +100,7 @@ async function runSuites() {
   const Manager = require('../../main.js');
   const manager = new Manager();
 
-  // Test mode: load default config from EM defaults (since the harness CWD won't have
+  // Test mode: load default config from @omegajs/desktop defaults (since the harness CWD won't have
   // one), resolved for the desktop target via @omegajs/config, and skip window creation
   // so we don't pop a UI during tests.
   const fs = require('fs');
@@ -270,11 +270,11 @@ async function runRendererSuites(files) {
   // unregister first in case a previous renderer suite registered the same channel.
   try { ipcMain.removeHandler('em:__test:echo'); } catch (_) { /* ignore */ }
   ipcMain.handle('em:__test:echo', (_evt, payload) => ({ echoed: payload, ts: Date.now() }));
-  // Forwarded log capture — renderer logger.log(...) sends 'em:log:forward'; we
+  // Forwarded log capture — renderer logger.log(...) sends 'desktop:log:forward'; we
   // accumulate the most recent payload so the renderer test can verify it landed.
   global.__emTestLastForwardedLog = null;
   ipcMain.removeAllListeners('em:__test:forwarded-log-tap');
-  ipcMain.on('em:log:forward', (_evt, payload) => {
+  ipcMain.on('desktop:log:forward', (_evt, payload) => {
     global.__emTestLastForwardedLog = payload;
   });
   // Test-only handler the renderer can call to read back the most recently

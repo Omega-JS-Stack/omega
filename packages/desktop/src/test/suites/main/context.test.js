@@ -90,9 +90,9 @@ module.exports = {
       },
     },
     {
-      name: 'IPC handler em:context:get returns the snapshot',
+      name: 'IPC handler desktop:context:get returns the snapshot',
       run: async (ctx) => {
-        const snap = await ctx.manager.ipc.invoke('em:context:get');
+        const snap = await ctx.manager.ipc.invoke('desktop:context:get');
         ctx.expect(snap.session.id).toBe(ctx.manager.context.session.id);
         ctx.expect(snap.client.platform).toBe(ctx.manager.context.client.platform);
       },

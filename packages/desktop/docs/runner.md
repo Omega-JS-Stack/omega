@@ -1,6 +1,6 @@
 # Windows Code-Signing Runner
 
-EM ships a self-installing Windows runner so you can EV-token sign every consumer app from a single Windows box, with zero per-org setup after the initial install.
+@omegajs/desktop ships a self-installing Windows runner so you can EV-token sign every consumer app from a single Windows box, with zero per-org setup after the initial install.
 
 ## Why a runner?
 
@@ -20,12 +20,12 @@ Hand this section to a fresh Claude session on the Windows box. It's the linear 
 - Visual Studio Build Tools 2022 with the "Desktop development with C++" workload (provides `signtool.exe`) — `winget install Microsoft.VisualStudio.2022.BuildTools` then in the Installer enable that workload
 - A GitHub Personal Access Token (classic) with `repo`, `workflow`, `admin:org` scopes (https://github.com/settings/tokens). The runner-registration-token API requires `admin:org`; `manage_runners:org` alone is insufficient.
 
-**Step 1 — Install EM globally:**
+**Step 1 — Install @omegajs/desktop globally:**
 ```powershell
-npm install -g electron-manager
+npm install -g @omegajs/desktop
 npx mgr version
 ```
-Should print `electron-manager@1.0.0` (or newer).
+Should print `@omegajs/desktop@1.0.0` (or newer).
 
 **Step 2 — Smoke-test signtool against your EV token (no GitHub, no runner — just signing):**
 ```powershell
@@ -77,18 +77,18 @@ If you hit any specific signtool error, jump to the "Debugging signtool errors" 
 
 ```powershell
 # Run on the Windows box. Idempotent — safe to re-run if anything's weird.
-npm install -g electron-manager
+npm install -g @omegajs/desktop
 $env:GH_TOKEN = "ghp_xxx_token_with_admin_org_scope"
 npx mgr runner install
 ```
 
 `install`:
-1. Downloads `actions/runner` (pinned version) into `<EM-clone>\.gh-runners\actions-runner-<org>\`.
+1. Downloads `actions/runner` (pinned version) into `<framework-clone>\.gh-runners\actions-runner-<org>\`.
 2. Discovers every GitHub org you have admin on (via `GH_TOKEN`).
 3. Registers a runner with labels `[self-hosted, windows, ev-token]` against each org.
 4. Installs the `em-runner-watcher` Windows service that:
    - Polls GitHub every 60s for new orgs you've gained admin access to → auto-registers a runner there.
-   - Self-updates EM via `npm i -g electron-manager@latest` on every tick (so the runner box always has the freshest CLI).
+   - Self-updates @omegajs/desktop via `npm i -g @omegajs/desktop@latest` on every tick (so the runner box always has the freshest CLI).
 5. Starts the service. Auto-starts on boot.
 
 Done. You never touch the Windows box again unless you replace the EV token or migrate hardware.
@@ -101,7 +101,7 @@ For full automation (auto-registering against new orgs without prompting), the t
 - `workflow`
 - `admin:org` (full)
 
-**Why not `manage_runners:org`?** GitHub's UI lists it as a minimum-privilege scope under `admin:org`, but the actual REST endpoint EM uses (`POST /orgs/{org}/actions/runners/registration-token`) explicitly requires `admin:org` (full) per their docs. `manage_runners:org` alone returns 403. Fine-grained tokens with "Self-hosted runners: write" do work but must be issued per-org, defeating auto-discovery.
+**Why not `manage_runners:org`?** GitHub's UI lists it as a minimum-privilege scope under `admin:org`, but the actual REST endpoint @omegajs/desktop uses (`POST /orgs/{org}/actions/runners/registration-token`) explicitly requires `admin:org` (full) per their docs. `manage_runners:org` alone returns 403. Fine-grained tokens with "Self-hosted runners: write" do work but must be issued per-org, defeating auto-discovery.
 
 If your token only has `repo` scope, runner registration will fail per-org with a clear message telling you to broaden the scope.
 
@@ -112,7 +112,7 @@ npx mgr runner status         # show service state, registered orgs, last poll
 npx mgr runner start          # start services if stopped
 npx mgr runner stop           # stop services
 npx mgr runner monitor        # tail the live signing event log (see below)
-npx mgr runner self-update    # force an immediate npm i -g electron-manager@latest
+npx mgr runner self-update    # force an immediate npm i -g @omegajs/desktop@latest
 npx mgr runner uninstall      # full removal: deregister from every org, delete services
 ```
 
@@ -209,13 +209,13 @@ npx mgr runner register-org <org-name>
 
 ## EV USB token requirements
 
-These are *physical* / *driver-level* prerequisites EM can't automate:
+These are *physical* / *driver-level* prerequisites @omegajs/desktop can't automate:
 
 1. EV USB token plugged in to the Windows box.
 2. SafeNet (or vendor-equivalent) drivers installed.
 3. Token unlocked once after every boot — there's typically a tray icon prompting for the password the first time `signtool` accesses the token. **For unattended signing, configure SafeNet client to cache the token password** (driver-specific; see SafeNet docs).
 
-EM's `validate-certs` command will warn if it detects a missing token / driver, but can't install drivers for you.
+@omegajs/desktop's `validate-certs` command will warn if it detects a missing token / driver, but can't install drivers for you.
 
 ## Architecture: Mac side ↔ Windows side
 
@@ -244,11 +244,11 @@ EM's `validate-certs` command will warn if it detects a missing token / driver, 
 
 ## Continuing this work in a new chat (start cold from Windows)
 
-Open this repo's `docs/runner.md` in your new chat and ask the assistant to "continue the EM Pass 2.20 Windows runner work — see PROGRESS.md and docs/runner.md." Hand it the output of:
+Open this repo's `docs/runner.md` in your new chat and ask the assistant to "continue the @omegajs/desktop Pass 2.20 Windows runner work — see PROGRESS.md and docs/runner.md." Hand it the output of:
 
 ```powershell
 npx mgr runner status                   # service health
-type <EM-clone>\.gh-runners\watcher\watcher.log  # last 50 lines of watcher log
+type <framework-clone>\.gh-runners\watcher\watcher.log  # last 50 lines of watcher log
 $env:GH_TOKEN = "ghp_..."               # confirm scope: settings/tokens shows admin:org checked
 npx mgr sign-windows --smoke            # smoke test
 ```
@@ -282,10 +282,10 @@ Your `GH_TOKEN` lacks `admin:org` scope for that org. Re-issue the token at <htt
 
 ### `actions.runner` service won't start
 1. Open `eventvwr.msc` → Windows Logs → Application. Look for entries from `actions-runner-svc`.
-2. Common cause: working directory `<EM-clone>\.gh-runners\actions-runner-<org>` isn't writable by the service account. Either fix permissions or change the service's "Log On" user.
+2. Common cause: working directory `<framework-clone>\.gh-runners\actions-runner-<org>` isn't writable by the service account. Either fix permissions or change the service's "Log On" user.
 
 ### Watcher service appears installed but isn't ticking
-Check `<EM-clone>\.gh-runners\watcher\watcher.log`. If it stops after a `tick: error GH API …`, your `GH_TOKEN` rotated or got revoked. Update `.env` with the new token, then run `npx mgr runner install` — it's idempotent and re-bakes the new token into the watcher service.
+Check `<framework-clone>\.gh-runners\watcher\watcher.log`. If it stops after a `tick: error GH API …`, your `GH_TOKEN` rotated or got revoked. Update `.env` with the new token, then run `npx mgr runner install` — it's idempotent and re-bakes the new token into the watcher service.
 
 ### After Windows update, signtool can't find the token
 The SafeNet driver sometimes detaches after major OS updates. Open SafeNet Authentication Client tray app → check token shows up → run `npx mgr runner status` to confirm services are healthy. Then `npx mgr sign-windows --smoke` to validate end-to-end.
@@ -294,13 +294,13 @@ The SafeNet driver sometimes detaches after major OS updates. Open SafeNet Authe
 
 | Path | What's there |
 |---|---|
-| `<EM-clone>\.gh-runners\` | EM-managed runner state |
-| `<EM-clone>\.gh-runners\actions-runner-<org>\` | GitHub's actions/runner binary |
-| `<EM-clone>\.gh-runners\watcher\watcher.js` | The auto-registration daemon |
-| `<EM-clone>\.gh-runners\watcher\watcher.log` | Watcher heartbeats + errors |
-| `<EM-clone>\.gh-runners\config.json` | Bootstrap timestamp, registered orgs, labels |
+| `<framework-clone>\.gh-runners\` | framework-managed runner state |
+| `<framework-clone>\.gh-runners\actions-runner-<org>\` | GitHub's actions/runner binary |
+| `<framework-clone>\.gh-runners\watcher\watcher.js` | The auto-registration daemon |
+| `<framework-clone>\.gh-runners\watcher\watcher.log` | Watcher heartbeats + errors |
+| `<framework-clone>\.gh-runners\config.json` | Bootstrap timestamp, registered orgs, labels |
 | `eventvwr.msc` → Application | Service start/stop events for both services |
 
 ## Pinning + upgrades
 
-EM pins the `actions/runner` version it downloads (look at `ACTIONS_RUNNER_VERSION` in `src/commands/runner.js`). To upgrade the runner binary itself, bump that constant in EM, ship a new release, and the watcher's self-update will pull the new EM. Then re-run `npx mgr runner install` on the Windows box — it tears down the old install and lays down the new actions/runner version cleanly.
+@omegajs/desktop pins the `actions/runner` version it downloads (look at `ACTIONS_RUNNER_VERSION` in `src/commands/runner.js`). To upgrade the runner binary itself, bump that constant in @omegajs/desktop, ship a new release, and the watcher's self-update will pull the new @omegajs/desktop. Then re-run `npx mgr runner install` on the Windows box — it tears down the old install and lays down the new actions/runner version cleanly.

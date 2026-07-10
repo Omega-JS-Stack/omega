@@ -11,7 +11,7 @@ const jetpack = require('fs-jetpack');
 const projectRoot   = Manager.getRootPath('project');
 const frameworkRoot = Manager.getRootPath();
 
-// Shared resolve config — lets consumer code `require()` any of EM's bundled
+// Shared resolve config — lets consumer code `require()` any of @omegajs/desktop's bundled
 // dependencies (fs-jetpack, web-manager, etc.) without installing them directly.
 // Webpack checks the consumer's node_modules first (default), then falls back to
 // the framework's node_modules. Mirrors how UJM/BXM resolve web-manager deps.

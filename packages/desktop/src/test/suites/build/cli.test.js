@@ -46,9 +46,9 @@ module.exports = {
       },
     },
     {
-      name: 'bin/electron-manager exists and is executable',
+      name: 'bin/omega-desktop exists and is executable',
       run: (ctx) => {
-        const binFile = path.join(root, 'bin', 'electron-manager');
+        const binFile = path.join(root, 'bin', 'omega-desktop');
         ctx.expect(fs.existsSync(binFile)).toBeTruthy();
         const stat = fs.statSync(binFile);
         ctx.expect((stat.mode & 0o100) !== 0).toBeTruthy();

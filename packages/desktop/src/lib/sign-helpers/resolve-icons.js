@@ -5,15 +5,15 @@
 //   1. <projectRoot>/config/icons/<platform>/<file>       — platform-specific override
 //   2. <projectRoot>/config/icons/global/<file>           — universal fallback (shared by all platforms)
 //   3. <projectRoot>/config/icons/windows/<file>          — Linux-only extra: legacy Linux→Windows fallback
-//   4. <EM>/dist/config/icons/<platform>/<file>           — EM bundled default
+//   4. <@omegajs/desktop>/dist/config/icons/<platform>/<file>           — @omegajs/desktop bundled default
 //
 // Note the DMG slot is macOS-only by definition. Its lookup chain skips step 3
 // entirely and step 2 only checks `global/` for the DMG file specifically (which
 // almost never exists — a "global DMG background" makes no sense).
 //
 // Retina (@2x) variants are DERIVED. Consumers ship ONE file at the @2x (native) size.
-// EM downscales it to write the @1x sibling. So `tray.png` is the 32x32 native retina
-// source (consumer-facing input name), and EM emits both `trayTemplate.png` (16x16)
+// @omegajs/desktop downscales it to write the @1x sibling. So `tray.png` is the 32x32 native retina
+// source (consumer-facing input name), and @omegajs/desktop emits both `trayTemplate.png` (16x16)
 // and `trayTemplate@2x.png` (32x32) into `dist/config/icons/macos/`. The output name
 // diverges from the input on macOS because the `Template` suffix is a system magic
 // marker that triggers auto-inversion in dark mode. Same retina derivation for
@@ -34,8 +34,8 @@ const sharp   = require('sharp');
 //             Defaults to `file`. Diverges only when the on-disk runtime name
 //             carries magic meaning (e.g. macOS tray icons must end in
 //             `Template.png` for the OS to auto-invert them in dark mode —
-//             EM owns that detail so consumers can just call it `tray.png`).
-//   retina  = if set, the SOURCE file is treated as @2x (native). EM downscales it
+//             @omegajs/desktop owns that detail so consumers can just call it `tray.png`).
+//   retina  = if set, the SOURCE file is treated as @2x (native). @omegajs/desktop downscales it
 //             to produce the @1x sibling. Both files are written into dist/.
 const SLOTS = {
   macos: [
@@ -85,7 +85,7 @@ function findSource({ slot, file }, platform, opts) {
     if (jetpack.exists(winFallback)) return winFallback;
   }
 
-  // 4. EM bundled default.
+  // 4. @omegajs/desktop bundled default.
   const bundled = path.join(emDefaultsRoot, 'icons', platform, file);
   if (jetpack.exists(bundled)) return bundled;
 
@@ -126,7 +126,7 @@ async function resolveAndCopy({ config, projectRoot, distRoot, emDefaultsRoot })
   const resolved = { macos: {}, windows: {}, linux: {} };
 
   // First pass: resolve each platform/slot. For retina slots, source file is treated as
-  // @2x; EM emits both <slot>.png (downscaled) and <slot>@2x.png (the source) into dist.
+  // @2x; @omegajs/desktop emits both <slot>.png (downscaled) and <slot>@2x.png (the source) into dist.
   for (const platform of Object.keys(SLOTS)) {
     for (const def of SLOTS[platform]) {
       const src = findSource(def, platform, { projectRoot, emDefaultsRoot });

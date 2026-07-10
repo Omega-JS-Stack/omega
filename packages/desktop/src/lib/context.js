@@ -1,13 +1,13 @@
 // Runtime context — what we know about the user's machine + their network +
 // the current session. Modeled after BEM's `assistant.request.{geolocation,client}`
-// shape so EM apps + sister projects (BEM, UJM, web-manager) all reference the
+// shape so @omegajs/desktop apps + sister projects (BEM, UJM, web-manager) all reference the
 // same property paths when reading user info.
 //
 // Populated asynchronously during manager.initialize():
 //
 //   manager.context.geolocation = { ip, country, region, city }      // ipify-fetched
 //   manager.context.client      = { userAgent, locale, platform, arch, mobile }
-//   manager.context.session     = { id, startTime, deviceId }        // EM-specific
+//   manager.context.session     = { id, startTime, deviceId }        // desktop-specific
 //   manager.context.app         = { version, environment, isPackaged }
 //
 // Geolocation is fetched from https://api.ipify.org (IP only) and persisted to
@@ -77,8 +77,8 @@ const context = {
     context._fetchGeolocation().catch((e) => logger.warn(`geolocation fetch failed: ${e.message}`));
 
     // IPC: renderer can read the full context block.
-    manager.ipc.unhandle('em:context:get');
-    manager.ipc.handle('em:context:get', () => context.toJSON());
+    manager.ipc.unhandle('desktop:context:get');
+    manager.ipc.handle('desktop:context:get', () => context.toJSON());
 
     logger.log(`context initialized — session=${context.session.id} deviceId=${context.session.deviceId} platform=${context.client.platform}`);
   },

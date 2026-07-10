@@ -1,12 +1,12 @@
-// Application menu definition. Called by electron-manager during boot.
+// Application menu definition. Called by @omegajs/desktop during boot.
 //
-// `manager`  — the running EM Manager.
+// `manager`  — the running @omegajs/desktop Manager.
 // `menu`     — builder API + id-path API (find/update/remove/insertAfter/etc.).
 // `defaults` — the platform-aware default template (an array you can mutate manually if needed).
 //
-// This file is OPTIONAL — delete it and EM still ships a working application menu.
+// This file is OPTIONAL — delete it and @omegajs/desktop still ships a working application menu.
 //
-// EM ships a default menu template with stable id paths. Highlights:
+// @omegajs/desktop ships a default menu template with stable id paths. Highlights:
 //   main/about, main/check-for-updates, main/preferences (hidden), main/services,
 //     main/hide, main/relaunch, main/quit                                          (mac)
 //   file/close (mac), file/preferences, file/relaunch, file/quit                   (win/linux)

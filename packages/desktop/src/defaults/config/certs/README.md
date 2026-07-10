@@ -53,7 +53,7 @@ No file lives in `config/certs/` for Windows — credentials are env-vars-only.
 3. Run `npx mgr validate-certs` to check the OS sees them and notarization creds are wired.
 4. `npm run release` to do a signed + notarized build.
 
-For full details see [`docs/signing.md`](../../docs/signing.md) at the EM repo root.
+For full details see [`docs/signing.md`](../../docs/signing.md) at the @omegajs/desktop repo root.
 
 ## CI
 

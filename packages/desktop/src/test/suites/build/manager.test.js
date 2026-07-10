@@ -56,8 +56,8 @@ module.exports = {
       },
     },
     {
-      // EM defaults to 'production' when no signal is present (no app.isPackaged in plain Node,
-      // no EM_TEST_MODE/EM_BUILD_MODE, no NODE_ENV=development). EM's deployed RUNTIME can
+      // @omegajs/desktop defaults to 'production' when no signal is present (no app.isPackaged in plain Node,
+      // no EM_TEST_MODE/EM_BUILD_MODE, no NODE_ENV=development). @omegajs/desktop's deployed RUNTIME can
       // legitimately reach here without a dev signal (a shipped binary), so production is the
       // safe default. NODE_ENV=development is the explicit dev override (tested separately).
       name: 'getEnvironment defaults to production when no dev/test signal is present',
@@ -93,7 +93,7 @@ module.exports = {
           { env: { EM_TEST_MODE: 'true', EM_BUILD_MODE: 'true' }, expect: 'testing' },
           { env: { EM_BUILD_MODE: 'true' },                       expect: 'production' },
           { env: { NODE_ENV: 'development' },                     expect: 'development' },
-          { env: {},                                              expect: 'production' }, // EM defaults prod (shipped artifact)
+          { env: {},                                              expect: 'production' }, // @omegajs/desktop defaults prod (shipped artifact)
         ];
         try {
           for (const s of scenarios) {
@@ -115,10 +115,10 @@ module.exports = {
       },
     },
     {
-      name: 'getPackage("main") resolves to EM package.json',
+      name: 'getPackage("main") resolves to @omegajs/desktop package.json',
       run: (ctx) => {
         const pkg = Manager.getPackage('main');
-        ctx.expect(pkg.name).toBe('electron-manager');
+        ctx.expect(pkg.name).toBe('@omegajs/desktop');
         ctx.expect(pkg).toHaveProperty('version');
         ctx.expect(pkg).toHaveProperty('exports');
       },

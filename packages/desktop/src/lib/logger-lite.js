@@ -1,6 +1,6 @@
 // Runtime-side logger.
 //
-// Same per-name `new LoggerLite('foo')` API the rest of EM has always used. Adds a
+// Same per-name `new LoggerLite('foo')` API the rest of @omegajs/desktop has always used. Adds a
 // file transport when running inside Electron (main process) so consumers can read
 // runtime logs from disk without remoting into the running app.
 //
@@ -20,7 +20,7 @@
 
 // Channel used by renderer/preload to forward log calls to main. Public for the
 // preload contextBridge to attach to.
-const FORWARD_CHANNEL = 'em:log:forward';
+const FORWARD_CHANNEL = 'desktop:log:forward';
 
 // Detect context. In renderer bundles (target: 'web'), Node modules like 'electron'
 // don't exist — all detection returns false, and the logger becomes console-only +
@@ -113,7 +113,7 @@ function ensureMainFileTransport() {
   log.transports.console.format = '[{h}:{i}:{s}.{ms}] [{level}] {scope} {text}';
 
   // Listen for renderer/preload log forwards. The preload-side LoggerLite sends an
-  // `em:log:forward` message and we replay it through the same transport, so all
+  // `desktop:log:forward` message and we replay it through the same transport, so all
   // logs (main + renderer + preload) end up in one file with one timestamp source.
   if (_electron.ipcMain && typeof _electron.ipcMain.on === 'function') {
     _electron.ipcMain.on(FORWARD_CHANNEL, (event, payload) => {

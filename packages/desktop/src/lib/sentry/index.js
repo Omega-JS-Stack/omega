@@ -7,8 +7,8 @@
 //                (e.g. running outside electron, in tests).
 //   - renderer: `process.type === 'renderer'` AND `typeof window !== 'undefined'`.
 //   - preload:  `process.type === 'renderer'` AND `process.contextIsolated === true` is the canonical signal,
-//                but in practice EM's preload entry calls a different file. The preload module here is exposed
-//                via `require('electron-manager/lib/sentry/preload')` directly when needed.
+//                but in practice @omegajs/desktop's preload entry calls a different file. The preload module here is exposed
+//                via `require('@omegajs/desktop/lib/sentry/preload')` directly when needed.
 
 function detectContext() {
   if (typeof process !== 'undefined' && process.type === 'renderer') return 'renderer';

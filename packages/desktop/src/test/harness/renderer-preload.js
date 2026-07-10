@@ -11,10 +11,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Mirror the production preload's forwarding logger so renderer-layer tests can
-// verify that logger.log/warn/error actually emits 'em:log:forward' to main.
+// verify that logger.log/warn/error actually emits 'desktop:log:forward' to main.
 // Kept minimal — same channel name as production (src/preload.js).
 function makeForwardingLogger() {
-  const FORWARD_CHANNEL = 'em:log:forward';
+  const FORWARD_CHANNEL = 'desktop:log:forward';
   const methods = ['log', 'info', 'warn', 'error', 'debug'];
   const out = {};
   for (const m of methods) {
@@ -62,10 +62,10 @@ let testManager;
 try {
   // The renderer test harness loads the renderer Manager by absolute dist path
   // injected by the boot harness. In its absence, fall back to require-by-name
-  // (works when the harness is run from a consumer with EM in node_modules).
+  // (works when the harness is run from a consumer with @omegajs/desktop in node_modules).
   const RendererManager = process.env.EM_TEST_RENDERER_MANAGER_PATH
     ? require(process.env.EM_TEST_RENDERER_MANAGER_PATH)
-    : require('electron-manager/renderer');
+    : require('@omegajs/desktop/renderer');
   testManager = new RendererManager();
   // Seed config so getApiUrl / getFunctionsUrl / getWebsiteUrl have something to
   // read in their prod branches. Tests can mutate this via __emTestManager.config.set().
@@ -165,26 +165,26 @@ contextBridge.exposeInMainWorld('em', {
     send:   (channel, payload) => ipcRenderer.send(channel, payload),
   },
   storage: {
-    get:    (key, def) => ipcRenderer.invoke('em:storage:get',    { key, def }),
-    set:    (key, val) => ipcRenderer.invoke('em:storage:set',    { key, val }),
-    delete: (key)      => ipcRenderer.invoke('em:storage:delete', { key }),
-    has:    (key)      => ipcRenderer.invoke('em:storage:has',    { key }),
-    clear:  ()         => ipcRenderer.invoke('em:storage:clear'),
+    get:    (key, def) => ipcRenderer.invoke('desktop:storage:get',    { key, def }),
+    set:    (key, val) => ipcRenderer.invoke('desktop:storage:set',    { key, val }),
+    delete: (key)      => ipcRenderer.invoke('desktop:storage:delete', { key }),
+    has:    (key)      => ipcRenderer.invoke('desktop:storage:has',    { key }),
+    clear:  ()         => ipcRenderer.invoke('desktop:storage:clear'),
     // Mirror production preload's onChange so renderer-layer tests can verify
     // change-broadcasts round-trip across IPC.
     onChange: (key, handler) => {
       const wrapped = (_, payload) => {
         if (key === '*' || payload?.key === key) handler(payload);
       };
-      ipcRenderer.on('em:storage:change', wrapped);
-      return () => ipcRenderer.removeListener('em:storage:change', wrapped);
+      ipcRenderer.on('desktop:storage:change', wrapped);
+      return () => ipcRenderer.removeListener('desktop:storage:change', wrapped);
     },
   },
   // Mirror production preload's theme surface (get/set via IPC; onChange via
   // matchMedia — the real mechanism, since themeSource flips prefers-color-scheme).
   theme: {
-    get: ()       => ipcRenderer.invoke('em:theme:get'),
-    set: (source) => ipcRenderer.invoke('em:theme:set', { source }),
+    get: ()       => ipcRenderer.invoke('desktop:theme:get'),
+    set: (source) => ipcRenderer.invoke('desktop:theme:set', { source }),
     onChange: (handler) => {
       const media = window.matchMedia('(prefers-color-scheme: dark)');
       const wrapped = (e) => handler({ resolved: e.matches ? 'dark' : 'light' });
@@ -194,41 +194,41 @@ contextBridge.exposeInMainWorld('em', {
   },
   // Mirror production preload's fontawesome surface (bundled-icon lookup).
   fontawesome: {
-    get: (name, style) => ipcRenderer.invoke('em:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
+    get: (name, style) => ipcRenderer.invoke('desktop:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
   },
   logger: makeForwardingLogger(),
   autoUpdater: {
-    getStatus:  ()  => ipcRenderer.invoke('em:auto-updater:status'),
-    checkNow:   ()  => ipcRenderer.invoke('em:auto-updater:check-now'),
-    installNow: ()  => ipcRenderer.invoke('em:auto-updater:install-now'),
+    getStatus:  ()  => ipcRenderer.invoke('desktop:auto-updater:status'),
+    checkNow:   ()  => ipcRenderer.invoke('desktop:auto-updater:check-now'),
+    installNow: ()  => ipcRenderer.invoke('desktop:auto-updater:install-now'),
     onStatus: (handler) => {
       const wrapped = (_, payload) => handler(payload);
-      ipcRenderer.on('em:auto-updater:status', wrapped);
-      return () => ipcRenderer.removeListener('em:auto-updater:status', wrapped);
+      ipcRenderer.on('desktop:auto-updater:status', wrapped);
+      return () => ipcRenderer.removeListener('desktop:auto-updater:status', wrapped);
     },
   },
   // Mirror production preload's analytics/context/usage/remoteConfig so renderer-layer
   // tests can verify their IPC behavior end-to-end.
   analytics: {
-    event:             (name, params) => ipcRenderer.send('em:analytics:event', { name, params }),
-    pageview:          (path)         => ipcRenderer.send('em:analytics:event', { name: 'page_view',   params: path ? { page_path: path } : {} }),
-    screenview:        (screenName)   => ipcRenderer.send('em:analytics:event', { name: 'screen_view', params: screenName ? { screen_name: screenName } : {} }),
-    setUserProperties: (props)        => ipcRenderer.send('em:analytics:set-user-properties', props),
-    getStatus:         ()             => ipcRenderer.invoke('em:analytics:status'),
+    event:             (name, params) => ipcRenderer.send('desktop:analytics:event', { name, params }),
+    pageview:          (path)         => ipcRenderer.send('desktop:analytics:event', { name: 'page_view',   params: path ? { page_path: path } : {} }),
+    screenview:        (screenName)   => ipcRenderer.send('desktop:analytics:event', { name: 'screen_view', params: screenName ? { screen_name: screenName } : {} }),
+    setUserProperties: (props)        => ipcRenderer.send('desktop:analytics:set-user-properties', props),
+    getStatus:         ()             => ipcRenderer.invoke('desktop:analytics:status'),
   },
   context: {
-    get: () => ipcRenderer.invoke('em:context:get'),
+    get: () => ipcRenderer.invoke('desktop:context:get'),
   },
   usage: {
-    get: () => ipcRenderer.invoke('em:usage:get'),
+    get: () => ipcRenderer.invoke('desktop:usage:get'),
   },
   remoteConfig: {
-    get:        (path) => ipcRenderer.invoke('em:remote-config:get', path),
-    refreshNow: ()     => ipcRenderer.invoke('em:remote-config:refresh-now'),
+    get:        (path) => ipcRenderer.invoke('desktop:remote-config:get', path),
+    refreshNow: ()     => ipcRenderer.invoke('desktop:remote-config:refresh-now'),
     onUpdate: (handler) => {
       const wrapped = (_, payload) => handler(payload);
-      ipcRenderer.on('em:remote-config:update', wrapped);
-      return () => ipcRenderer.removeListener('em:remote-config:update', wrapped);
+      ipcRenderer.on('desktop:remote-config:update', wrapped);
+      return () => ipcRenderer.removeListener('desktop:remote-config:update', wrapped);
     },
   },
 });

@@ -43,7 +43,7 @@ Don't use `EventEmitter` unless the lib genuinely emits multiple event types. Fo
 
 - **Default to flat `src/lib/<name>.js`.**
 - **Split into a directory** (`src/lib/<name>/{index,core,main,renderer,preload}.js`) ONLY when each Electron context has materially different logic that would force ugly runtime branching inside one file. `index.js` becomes a thin context detector that delegates.
-- Currently `lib/sentry/` is split (the SDK has separate main/renderer/preload entry points), and `lib/restart-manager/` is split for a different, also-valid reason — a **shared-SSOT split**: its `protocol.js` (the wire contract) must be importable by the Restart Manager app via the `exports` map with zero Electron/EM baggage, so the contract lives in its own pure-Node file next to the main-only `index.js` + `install.js`. `sign-helpers/` is a helpers directory, not a lib.
+- Currently `lib/sentry/` is split (the SDK has separate main/renderer/preload entry points), and `lib/restart-manager/` is split for a different, also-valid reason — a **shared-SSOT split**: its `protocol.js` (the wire contract) must be importable by the Restart Manager app via the `exports` map with zero Electron/@omegajs/desktop baggage, so the contract lives in its own pure-Node file next to the main-only `index.js` + `install.js`. `sign-helpers/` is a helpers directory, not a lib.
 - Don't split prophylactically; convert when the branching gets ugly.
 
 ## See also

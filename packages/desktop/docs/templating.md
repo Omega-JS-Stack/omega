@@ -5,7 +5,7 @@ Light token-replacement engine for HTML pages. Uses `{{ var }}` syntax, dot-nota
 ## How it works
 
 1. Consumer authors `src/views/<name>/index.html` as the **body** of the page (no `<html>`, `<head>`, `<body>` tags).
-2. EM ships a default page template at `<em>/dist/config/page-template.html`. Consumers can override with their own at `<consumer>/config/page-template.html` if they want to.
+2. @omegajs/desktop ships a default page template at `<em>/dist/config/page-template.html`. Consumers can override with their own at `<consumer>/config/page-template.html` if they want to.
 3. At build time, `gulp/html`:
    - Reads each `src/views/<name>/index.html`
    - Templates its body with the page vars (so the body can use `{{ brand.name }}` etc.)
@@ -56,7 +56,7 @@ This naming lines up with the webpack renderer entry naming so the JS bundle pat
 
 ## Overriding the page template
 
-Drop your own `config/page-template.html` in your project root. EM picks it up before falling back to its own default.
+Drop your own `config/page-template.html` in your project root. @omegajs/desktop picks it up before falling back to its own default.
 
 ```html
 <!-- consumer/config/page-template.html -->

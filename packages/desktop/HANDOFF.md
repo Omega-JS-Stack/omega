@@ -2,11 +2,11 @@
 
 ## Context
 
-Building electron-manager (EM) — multi-platform Electron release framework. Currently testing on a consumer project end-to-end. Mac signing/notarizing/publishing works. Linux works. **Windows EV-token signing is the only blocker.**
+Building @omegajs/desktop (@omegajs/desktop) — multi-platform Electron release framework. Currently testing on a consumer project end-to-end. Mac signing/notarizing/publishing works. Linux works. **Windows EV-token signing is the only blocker.**
 
 ## Latest state
 
-- **EM**: v1.2.15 published (npm + GH). v1.2.16 staged locally (just `.env.example` doc — never pushed yet).
+- **@omegajs/desktop**: v1.2.15 published (npm + GH). v1.2.16 staged locally (just `.env.example` doc — never pushed yet).
 - **Consumer current version**: `1.0.4`. Latest workflow run failed at the sign step.
 - **Self-hosted runner**: registered with consumer's GH org, service installed at `C:\actions-runners\actions-runner-<org>`, configured to run as the local user account (per install log).
 - **EV cert**: stored in `CurrentUser\My`, valid through 2027.
@@ -26,7 +26,7 @@ Building electron-manager (EM) — multi-platform Electron release framework. Cu
 
 `update-server` v1.0.4 release IS published, has all mac+linux assets, **no windows .exe**.
 
-## All EM-side fixes shipped so far (chronological)
+## All framework-side fixes shipped so far (chronological)
 
 | Version | Fix |
 |---|---|
@@ -77,7 +77,7 @@ npx mgr sign-windows --in <dir-with-unsigned-exe> --out <output-dir>
 ```
 
 If that fails the same way, you've reproduced the issue locally — iterate
-without CI. Once it succeeds locally as the service user, push the EM fix and
+without CI. Once it succeeds locally as the service user, push the @omegajs/desktop fix and
 trigger a real release run as the final verification.
 
 To reproduce the **service-context** specifically (vs. interactive shell), use
@@ -93,7 +93,7 @@ sc qc <full-service-name>
 ```
 (Find the service name with `sc query state= all | findstr actions.runner`)
 
-Look for `SERVICE_START_NAME`. If it's `LocalSystem` or `NETWORK SERVICE`, EM didn't apply the creds (despite saying it did) → bug to fix. If it's `.\<user>`, identity is right; problem is elsewhere.
+Look for `SERVICE_START_NAME`. If it's `LocalSystem` or `NETWORK SERVICE`, @omegajs/desktop didn't apply the creds (despite saying it did) → bug to fix. If it's `.\<user>`, identity is right; problem is elsewhere.
 
 **Test 2 — does signtool work interactively for the user**:
 ```cmd
@@ -122,13 +122,13 @@ Logs at `C:\actions-runners\actions-runner-<org>\_diag\Runner_*.log` and `Worker
 
 ## Useful paths
 
-- EM source on Windows: `C:\Users\<user>\Documents\GitHub\ITW-Creative-Works\electron-manager`
+- @omegajs/desktop source on Windows: `C:\Users\<user>\Documents\GitHub\ITW-Creative-Works\@omegajs/desktop`
 - Runner installs: `C:\actions-runners\actions-runner-<org>\`
 - Runner diag logs: `C:\actions-runners\actions-runner-<org>\_diag\Runner_*.log`
-- `.env` on Windows EM: should have `GH_TOKEN`, `EM_RUNNER_ORGS`, `WIN_RUNNER_LOGON_ACCOUNT`, `WIN_RUNNER_LOGON_PASSWORD`
+- `.env` on Windows @omegajs/desktop: should have `GH_TOKEN`, `EM_RUNNER_ORGS`, `WIN_RUNNER_LOGON_ACCOUNT`, `WIN_RUNNER_LOGON_PASSWORD`
 - `.env` on consumer project: should have everything for push-secrets (mac signing creds + windows EV creds)
 
-## EM commands reference
+## @omegajs/desktop commands reference
 
 - `npx mgr runner install` — register + install service
 - `npx mgr runner status` — see service state

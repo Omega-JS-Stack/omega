@@ -1,5 +1,5 @@
 // Preload Manager singleton.
-// Consumer entry: `new (require('electron-manager/preload'))().initialize()`.
+// Consumer entry: `new (require('@omegajs/desktop/preload'))().initialize()`.
 // Wires contextBridge so renderer code can call `window.em.ipc.invoke(...)` without nodeIntegration.
 
 const LoggerLite = require('./lib/logger-lite.js');
@@ -33,11 +33,11 @@ Manager.prototype.initialize = async function () {
       send:   (channel, payload) => ipcRenderer.send(channel, payload),
     },
     storage: {
-      get:    (key, def) => ipcRenderer.invoke('em:storage:get',    { key, def }),
-      set:    (key, val) => ipcRenderer.invoke('em:storage:set',    { key, val }),
-      delete: (key)      => ipcRenderer.invoke('em:storage:delete', { key }),
-      has:    (key)      => ipcRenderer.invoke('em:storage:has',    { key }),
-      clear:  ()         => ipcRenderer.invoke('em:storage:clear'),
+      get:    (key, def) => ipcRenderer.invoke('desktop:storage:get',    { key, def }),
+      set:    (key, val) => ipcRenderer.invoke('desktop:storage:set',    { key, val }),
+      delete: (key)      => ipcRenderer.invoke('desktop:storage:delete', { key }),
+      has:    (key)      => ipcRenderer.invoke('desktop:storage:has',    { key }),
+      clear:  ()         => ipcRenderer.invoke('desktop:storage:clear'),
       // Subscribe to changes broadcast from main. Returns an unsubscribe fn.
       // Pass '*' as key to receive all changes.
       onChange: (key, handler) => {
@@ -46,8 +46,8 @@ Manager.prototype.initialize = async function () {
             handler(payload);
           }
         };
-        ipcRenderer.on('em:storage:change', wrapped);
-        return () => ipcRenderer.removeListener('em:storage:change', wrapped);
+        ipcRenderer.on('desktop:storage:change', wrapped);
+        return () => ipcRenderer.removeListener('desktop:storage:change', wrapped);
       },
     },
     // Theme — system-aware appearance. get/set proxy to main (lib/theme.js owns
@@ -56,8 +56,8 @@ Manager.prototype.initialize = async function () {
     // renderer of the app (including embedded WebContentsViews, which ipc.broadcast
     // can never reach), so each renderer self-resolves. Returns an unsubscribe fn.
     theme: {
-      get: ()       => ipcRenderer.invoke('em:theme:get'),
-      set: (source) => ipcRenderer.invoke('em:theme:set', { source }),
+      get: ()       => ipcRenderer.invoke('desktop:theme:get'),
+      set: (source) => ipcRenderer.invoke('desktop:theme:set', { source }),
       onChange: (handler) => {
         const media = window.matchMedia('(prefers-color-scheme: dark)');
         const wrapped = (e) => handler({ resolved: e.matches ? 'dark' : 'light' });
@@ -66,10 +66,10 @@ Manager.prototype.initialize = async function () {
       },
     },
     // FontAwesome — resolve a bundled icon to its inline-SVG string (or null).
-    // Renderer code rarely needs this directly: EM's renderer bootstrap
+    // Renderer code rarely needs this directly: @omegajs/desktop's renderer bootstrap
     // auto-renders `<i class="fa-solid fa-*">` elements (see src/renderer.js).
     fontawesome: {
-      get: (name, style) => ipcRenderer.invoke('em:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
+      get: (name, style) => ipcRenderer.invoke('desktop:fontawesome:get', { name, style }).then((r) => r?.svg ?? null),
     },
     // Renderer logger — writes to console (visible in DevTools) AND forwards each
     // call to main where it's written through electron-log's file transport. Same
@@ -78,49 +78,49 @@ Manager.prototype.initialize = async function () {
     // grep for renderer-only output.
     logger: makeForwardingLogger('renderer', ipcRenderer),
     autoUpdater: {
-      getStatus:  ()  => ipcRenderer.invoke('em:auto-updater:status'),
-      checkNow:   ()  => ipcRenderer.invoke('em:auto-updater:check-now'),
-      installNow: ()  => ipcRenderer.invoke('em:auto-updater:install-now'),
+      getStatus:  ()  => ipcRenderer.invoke('desktop:auto-updater:status'),
+      checkNow:   ()  => ipcRenderer.invoke('desktop:auto-updater:check-now'),
+      installNow: ()  => ipcRenderer.invoke('desktop:auto-updater:install-now'),
       // Subscribe to status broadcasts. Returns an unsubscribe fn.
       onStatus: (handler) => {
         const wrapped = (_, payload) => handler(payload);
-        ipcRenderer.on('em:auto-updater:status', wrapped);
-        return () => ipcRenderer.removeListener('em:auto-updater:status', wrapped);
+        ipcRenderer.on('desktop:auto-updater:status', wrapped);
+        return () => ipcRenderer.removeListener('desktop:auto-updater:status', wrapped);
       },
     },
     // GA4 analytics — fire-and-forget event sender. Same shape as on main, just
     // routes through IPC so renderer code is identical.
     analytics: {
-      event:             (name, params)  => ipcRenderer.send('em:analytics:event', { name, params }),
-      pageview:          (path)          => ipcRenderer.send('em:analytics:event', { name: 'page_view',   params: path ? { page_path: path } : {} }),
-      screenview:        (screenName)    => ipcRenderer.send('em:analytics:event', { name: 'screen_view', params: screenName ? { screen_name: screenName } : {} }),
-      setUserProperties: (props)         => ipcRenderer.send('em:analytics:set-user-properties', props),
-      getStatus:         ()              => ipcRenderer.invoke('em:analytics:status'),
+      event:             (name, params)  => ipcRenderer.send('desktop:analytics:event', { name, params }),
+      pageview:          (path)          => ipcRenderer.send('desktop:analytics:event', { name: 'page_view',   params: path ? { page_path: path } : {} }),
+      screenview:        (screenName)    => ipcRenderer.send('desktop:analytics:event', { name: 'screen_view', params: screenName ? { screen_name: screenName } : {} }),
+      setUserProperties: (props)         => ipcRenderer.send('desktop:analytics:set-user-properties', props),
+      getStatus:         ()              => ipcRenderer.invoke('desktop:analytics:status'),
     },
     // Runtime context (geolocation / client / session / app). Read once at
     // renderer init or whenever fresh values are needed.
     context: {
-      get: () => ipcRenderer.invoke('em:context:get'),
+      get: () => ipcRenderer.invoke('desktop:context:get'),
     },
     // Usage stats (opens / hoursTotal / hoursThisSession).
     usage: {
-      get: () => ipcRenderer.invoke('em:usage:get'),
+      get: () => ipcRenderer.invoke('desktop:usage:get'),
     },
     // Hot config — same get/refreshNow surface as main, plus an onUpdate
     // subscription that fires whenever main re-fetches successfully.
     remoteConfig: {
-      get:        (path) => ipcRenderer.invoke('em:remote-config:get', path),
-      refreshNow: ()     => ipcRenderer.invoke('em:remote-config:refresh-now'),
+      get:        (path) => ipcRenderer.invoke('desktop:remote-config:get', path),
+      refreshNow: ()     => ipcRenderer.invoke('desktop:remote-config:refresh-now'),
       onUpdate: (handler) => {
         const wrapped = (_, payload) => handler(payload);
-        ipcRenderer.on('em:remote-config:update', wrapped);
-        return () => ipcRenderer.removeListener('em:remote-config:update', wrapped);
+        ipcRenderer.on('desktop:remote-config:update', wrapped);
+        return () => ipcRenderer.removeListener('desktop:remote-config:update', wrapped);
       },
     },
   });
 
   // Auto-updater activity tracking — listen for renderer-side mouse / keyboard / wheel
-  // / focus events and debounce-fire an `em:auto-updater:activity` IPC ping to main.
+  // / focus events and debounce-fire an `desktop:auto-updater:activity` IPC ping to main.
   // Main uses these pings to keep `lastActivityAt` fresh so a downloaded update only
   // auto-installs when the user has been idle for 15+ minutes.
   //
@@ -134,7 +134,7 @@ Manager.prototype.initialize = async function () {
       const now = Date.now();
       if (now - lastPing < ACTIVITY_DEBOUNCE_MS) return;
       lastPing = now;
-      try { ipcRenderer.send('em:auto-updater:activity'); } catch (e) { /* ignore */ }
+      try { ipcRenderer.send('desktop:auto-updater:activity'); } catch (e) { /* ignore */ }
     };
     const events = ['mousedown', 'keydown', 'wheel', 'touchstart', 'focus'];
     for (const ev of events) {
@@ -145,7 +145,7 @@ Manager.prototype.initialize = async function () {
   } catch (e) { /* DOM not available (test mode) — skip */ }
 
   // Theme applier — keeps `<html data-bs-theme>` matched to the RESOLVED appearance
-  // ('light'/'dark'), live, on every EM-templated page. Opt-in by presence: only pages
+  // ('light'/'dark'), live, on every framework-templated page. Opt-in by presence: only pages
   // that already carry the attribute (stamped by the page template at build) are
   // managed — pages without it (e.g. external sites loaded in a consumer's embedded
   // web views, which get this same preload) are never touched.
@@ -172,7 +172,7 @@ Manager.prototype.initialize = async function () {
     media.addEventListener('change', apply);
   } catch (e) { /* DOM not available (test mode) — skip */ }
 
-  self.logger.log('electron-manager (preload) initialized.');
+  self.logger.log('@omegajs/desktop (preload) initialized.');
 
   return self;
 };
@@ -180,13 +180,13 @@ Manager.prototype.initialize = async function () {
 // Build a console+forward logger object suitable for exposing through contextBridge
 // to the renderer. Each method:
 //   1. Writes to the renderer's DevTools console (live debug visibility).
-//   2. Sends an 'em:log:forward' IPC to main, which replays through electron-log's
+//   2. Sends an 'desktop:log:forward' IPC to main, which replays through electron-log's
 //      file transport. Result: every renderer log call lands in runtime.log too.
 //
 // Args are JSON-serialized before sending (IPC requires structured-cloneable values).
 // Errors and other non-cloneable values are flattened to objects with a __error flag.
 function makeForwardingLogger(scope, ipcRenderer) {
-  const FORWARD_CHANNEL = 'em:log:forward';
+  const FORWARD_CHANNEL = 'desktop:log:forward';
   // Mirror the same keyset as LoggerLite for parity (log/info/warn/error/debug).
   // Renderer code typically only uses log/warn/error so the others are forward-compat.
   const methods = ['log', 'info', 'warn', 'error', 'debug'];

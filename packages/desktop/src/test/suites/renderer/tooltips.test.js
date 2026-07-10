@@ -1,4 +1,4 @@
-// Renderer-layer suite — verifies EM's zero-setup Bootstrap tooltips: the
+// Renderer-layer suite — verifies @omegajs/desktop's zero-setup Bootstrap tooltips: the
 // prebuilt Bootstrap bundle (Popper inlined) loads, every
 // `[data-bs-toggle="tooltip"]` element is auto-initialized (including ones
 // inserted after boot), title changes update the live instance, and removal
@@ -44,7 +44,7 @@ module.exports = {
         el.type = 'button';
         el.id = 'tt-show';
         el.setAttribute('data-bs-toggle', 'tooltip');
-        el.setAttribute('data-bs-title', 'Hello from EM');
+        el.setAttribute('data-bs-title', 'Hello from @omegajs/desktop');
         el.textContent = 'hover me';
         document.body.appendChild(el);
 
@@ -54,7 +54,7 @@ module.exports = {
         const shown = window.__emTestTooltip.showDirect('tt-show');
         ctx.expect(shown).toBe(true);
         await until(() => document.querySelector('.tooltip .tooltip-inner'));
-        ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('Hello from EM');
+        ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('Hello from @omegajs/desktop');
 
         // Removing the host while shown must clean up the tip (dispose path).
         el.remove();
@@ -87,6 +87,50 @@ module.exports = {
         ctx.expect(window.__emTestTooltip.showDirect('tt-retitle')).toBe(true);
         await until(() => document.querySelector('.tooltip .tooltip-inner'));
         ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('after');
+
+        el.remove();
+        await until(() => !document.querySelector('.tooltip'));
+      },
+    },
+    {
+      name: 'a title-only host initializes ONCE and the renderer stays responsive (the observer/dispose loop regression)',
+      run: async (ctx) => {
+        const until = async (fn) => {
+          const t0 = Date.now();
+          while (!fn()) {
+            if (Date.now() - t0 > 3000) throw new Error('timed out waiting for tooltip');
+            await new Promise((r) => setTimeout(r, 25));
+          }
+        };
+
+        // A host with a PLAIN `title` (no data-bs-title): Bootstrap's
+        // constructor MOVES title → data-bs-original-title, which the
+        // observer must read as a live title — reading only title/
+        // data-bs-title made it dispose (which RESTORES title) and re-init
+        // forever: a MutationObserver microtask storm that froze the whole
+        // renderer (found by Somiibo's session-limits boot suite).
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.id = 'tt-title-only';
+        el.setAttribute('data-bs-toggle', 'tooltip');
+        el.setAttribute('title', 'plain title');
+        document.body.appendChild(el);
+
+        await until(() => window.__emTestTooltip.hasInstance('tt-title-only'));
+
+        // The loop starved macrotasks — a timer firing IS the proof the
+        // main thread survived the mutation settling.
+        const responsive = await new Promise((resolve) => setTimeout(() => resolve(true), 150));
+        ctx.expect(responsive).toBe(true);
+
+        // Stable end state: title moved into Bootstrap's bookkeeping, the
+        // instance alive, and the tip renders the original text.
+        ctx.expect(el.hasAttribute('title')).toBe(false);
+        ctx.expect(el.getAttribute('data-bs-original-title')).toBe('plain title');
+        ctx.expect(window.__emTestTooltip.hasInstance('tt-title-only')).toBe(true);
+        ctx.expect(window.__emTestTooltip.showDirect('tt-title-only')).toBe(true);
+        await until(() => document.querySelector('.tooltip .tooltip-inner'));
+        ctx.expect(document.querySelector('.tooltip .tooltip-inner').textContent).toBe('plain title');
 
         el.remove();
         await until(() => !document.querySelector('.tooltip'));

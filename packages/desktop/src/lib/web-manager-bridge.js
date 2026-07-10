@@ -1,19 +1,19 @@
 // Web Manager Bridge — main-process Firebase Auth, source of truth for renderers.
 //
-// This is EM's analogue of BXM's background-service-worker auth role. The pattern:
+// This is @omegajs/desktop's analogue of BXM's background-service-worker auth role. The pattern:
 //
 //   1. Main runs its own Firebase Auth instance and is the source of truth.
 //   2. When a deep-link auth/token arrives, main calls signInWithCustomToken with that token,
 //      then BROADCASTS the token to all renderer windows so their web-manager Firebase
 //      instances can sign in with the SAME token.
 //   3. On every renderer load, the renderer asks main "I'm at UID X (or null)" via the
-//      em:auth:sync-request IPC. Main compares with its own UID and either does nothing,
+//      desktop:auth:sync-request IPC. Main compares with its own UID and either does nothing,
 //      tells the renderer to sign out, or fetches a fresh custom token from /backend-manager
 //      and sends it to the renderer.
-//   4. Sign-out: any renderer can request sign-out via em:auth:sign-out. Main signs out
-//      its own Firebase + broadcasts em:auth:sign-out to all renderers.
+//   4. Sign-out: any renderer can request sign-out via desktop:auth:sign-out. Main signs out
+//      its own Firebase + broadcasts desktop:auth:sign-out to all renderers.
 //
-// Firebase is BUNDLED by webpack from EM's module context (web-manager owns it in EM's
+// Firebase is BUNDLED by webpack from @omegajs/desktop's module context (web-manager owns it in @omegajs/desktop's
 // tree). If loading fails, the bridge stays in no-op mode and logs the reason.
 
 const LoggerLite = require('./logger-lite.js');
@@ -69,10 +69,10 @@ const bridge = {
     bridge._initialized = true;
   },
 
-  // Load firebase. Returns true on success. BUNDLED by webpack from EM's module context
-  // (web-manager owns firebase in EM's tree) — same treatment as json5 in main.js. It was
+  // Load firebase. Returns true on success. BUNDLED by webpack from @omegajs/desktop's module context
+  // (web-manager owns firebase in @omegajs/desktop's tree) — same treatment as json5 in main.js. It was
   // previously a webpackIgnore'd runtime import(), which resolves relative to the CONSUMER's
-  // main.bundle.js: that walk never reaches EM's node_modules when EM is symlinked
+  // main.bundle.js: that walk never reaches @omegajs/desktop's node_modules when @omegajs/desktop is symlinked
   // (`mgr install dev`) and depends on npm hoisting when installed — every dev app silently
   // ran the bridge in no-op mode. Interop guards handle both namespace shapes (json5 precedent).
   async _tryLoadFirebase() {
@@ -121,17 +121,17 @@ const bridge = {
     const ipc = bridge._manager.ipc;
 
     // Renderer asks main: "I'm at UID X (or null). Are we in sync?"
-    ipc.handle('em:auth:sync-request', async ({ contextUid }) => {
+    ipc.handle('desktop:auth:sync-request', async ({ contextUid }) => {
       return bridge._handleSyncRequest(contextUid);
     });
 
     // Renderer asks main to sign out.
-    ipc.handle('em:auth:sign-out', async () => {
+    ipc.handle('desktop:auth:sign-out', async () => {
       return bridge._handleSignOut();
     });
 
     // Renderer asks main for the current user (uid + email + displayName, no token).
-    ipc.handle('em:auth:get-user', () => {
+    ipc.handle('desktop:auth:get-user', () => {
       const u = bridge._firebaseAuth?.currentUser;
       return u ? bridge._snapshotUser(u) : null;
     });
@@ -141,7 +141,7 @@ const bridge = {
     // so this is how main-side plan gates learn the REAL plan — BXM's "browser
     // contexts resolve, authority caches" split. UID-guarded: a stale push from a
     // renderer that hasn't synced yet is dropped.
-    ipc.handle('em:auth:account-resolved', ({ uid, resolved, roles } = {}) => {
+    ipc.handle('desktop:auth:account-resolved', ({ uid, resolved, roles } = {}) => {
       const mainUid = bridge._firebaseAuth?.currentUser?.uid || null;
       if (!uid || uid !== mainUid) {
         return { accepted: false };
@@ -154,7 +154,7 @@ const bridge = {
 
       if (changed) {
         logger.log(`account resolved — plan=${resolved?.plan || '(none)'} active=${!!resolved?.active}`);
-        bridge._manager.ipc.broadcast('em:auth:plan-changed', { resolved: bridge._resolvedPlan, roles: bridge._resolvedRoles });
+        bridge._manager.ipc.broadcast('desktop:auth:plan-changed', { resolved: bridge._resolvedPlan, roles: bridge._resolvedRoles });
         // Main-side subscribers see the same user snapshot again with plan now known.
         const u = bridge._firebaseAuth?.currentUser;
         bridge._stateSubs.forEach((fn) => {
@@ -171,7 +171,7 @@ const bridge = {
     logger.log(`auth state → ${user ? user.email : 'signed out'}`);
 
     // Sign-out (or a different user signing in) invalidates the cached resolution —
-    // renderers re-resolve and push fresh via em:auth:account-resolved.
+    // renderers re-resolve and push fresh via desktop:auth:account-resolved.
     if (!user) {
       bridge._resolvedPlan = null;
       bridge._resolvedRoles = null;
@@ -184,7 +184,7 @@ const bridge = {
     });
 
     // Tell renderers about the change so they can update UI / refresh menu items.
-    bridge._manager.ipc.broadcast('em:auth:state-changed', snap);
+    bridge._manager.ipc.broadcast('desktop:auth:state-changed', snap);
 
     // Attribute Sentry events to the signed-in user (or clear on sign-out). When
     // sentry is disabled (no DSN, dev mode, etc.) setUser is a documented no-op.
@@ -229,7 +229,7 @@ const bridge = {
       if (bridge._firebaseAuth?.currentUser) {
         await bridge._firebaseModule.signOut(bridge._firebaseAuth);
       }
-      bridge._manager.ipc.broadcast('em:auth:sign-out', {});
+      bridge._manager.ipc.broadcast('desktop:auth:sign-out', {});
       return { success: true };
     } catch (e) {
       logger.error('sign-out failed:', e.message);
@@ -256,7 +256,7 @@ const bridge = {
 
       // Broadcast the token to renderers so they can sign in with the SAME token.
       // Tokens expire in 1 hour and aren't stored.
-      bridge._manager.ipc.broadcast('em:auth:sign-in-with-token', { token });
+      bridge._manager.ipc.broadcast('desktop:auth:sign-in-with-token', { token });
 
       return { success: true, user: bridge._snapshotUser(cred.user) };
     } catch (e) {
@@ -279,7 +279,7 @@ const bridge = {
 
   // The renderer-resolved subscription ({ plan, active, trialing, cancelling }) or null
   // while no renderer has resolved yet. THE main-side plan source — consumer plan gates
-  // read this (web-manager's resolveSubscription output, pushed via em:auth:account-resolved).
+  // read this (web-manager's resolveSubscription output, pushed via desktop:auth:account-resolved).
   getResolvedPlan() {
     return bridge._resolvedPlan;
   },

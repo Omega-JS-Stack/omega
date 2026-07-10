@@ -1,7 +1,7 @@
 // Main-process tests for lib/theme.js — source/resolved round-trip, nativeTheme
 // wiring, persistence, change events (with dedupe), IPC handlers, validation.
 //
-// ctx.manager is a fully-initialized EM Manager. Every test that mutates the theme
+// ctx.manager is a fully-initialized @omegajs/desktop Manager. Every test that mutates the theme
 // restores it; cleanup() resets to the pre-suite source and clears the persisted
 // override so later suites (and re-runs) start clean.
 
@@ -110,21 +110,21 @@ module.exports = {
       },
     },
     {
-      name: 'em:theme:get / em:theme:set IPC handlers round-trip',
+      name: 'desktop:theme:get / desktop:theme:set IPC handlers round-trip',
       run: async (ctx) => {
-        const set = await ctx.manager.ipc.invoke('em:theme:set', { source: 'dark' });
+        const set = await ctx.manager.ipc.invoke('desktop:theme:set', { source: 'dark' });
         ctx.expect(set).toEqual({ source: 'dark', resolved: 'dark' });
 
-        const got = await ctx.manager.ipc.invoke('em:theme:get');
+        const got = await ctx.manager.ipc.invoke('desktop:theme:get');
         ctx.expect(got).toEqual({ source: 'dark', resolved: 'dark' });
       },
     },
     {
-      name: 'em:theme:set rejects invalid sources',
+      name: 'desktop:theme:set rejects invalid sources',
       run: async (ctx) => {
         let threw = false;
         try {
-          await ctx.manager.ipc.invoke('em:theme:set', { source: 'midnight' });
+          await ctx.manager.ipc.invoke('desktop:theme:set', { source: 'midnight' });
         } catch (e) {
           threw = true;
         }

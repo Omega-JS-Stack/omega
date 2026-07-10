@@ -17,14 +17,14 @@
 // WebContentsViews — firing their matchMedia listeners, and (c) makes native UI (menus,
 // dialogs) follow. Renderers therefore SELF-RESOLVE via matchMedia instead of depending
 // on `ipc.broadcast` (which only reaches BrowserWindows — embedded WebContentsViews
-// would never hear it). The `em:theme:changed` broadcast below is a main-side courtesy
+// would never hear it). The `desktop:theme:changed` broadcast below is a main-side courtesy
 // for windows that want the source+resolved pair pushed; it is not the sync mechanism.
 //
 // Source resolution at boot: storage override (the user's runtime choice) → config
 // `theme.appearance` (the app's default) → 'system'. Invalid values fall through.
 //
 // The `<html data-bs-theme>` attribute is applied/maintained by the preload's theme
-// applier on every EM-templated page (see src/preload.js) — pages that don't carry the
+// applier on every framework-templated page (see src/preload.js) — pages that don't carry the
 // attribute (e.g. external sites loaded in an embedding consumer's web views) are left
 // untouched.
 
@@ -89,8 +89,8 @@ const theme = {
       return;
     }
 
-    ipc.handle('em:theme:get', () => ({ source: theme.get(), resolved: theme.resolved() }));
-    ipc.handle('em:theme:set', ({ source }) => {
+    ipc.handle('desktop:theme:get', () => ({ source: theme.get(), resolved: theme.resolved() }));
+    ipc.handle('desktop:theme:set', ({ source }) => {
       theme.set(source);
       return { source: theme.get(), resolved: theme.resolved() };
     });
@@ -151,7 +151,7 @@ const theme = {
     });
 
     if (ipc._initialized) {
-      ipc.broadcast('em:theme:changed', payload);
+      ipc.broadcast('desktop:theme:changed', payload);
     }
   },
 
@@ -163,8 +163,8 @@ const theme = {
     }
     theme._listeners.clear();
     if (ipc._initialized) {
-      ipc.unhandle('em:theme:get');
-      ipc.unhandle('em:theme:set');
+      ipc.unhandle('desktop:theme:get');
+      ipc.unhandle('desktop:theme:set');
     }
     theme._initialized = false;
   },

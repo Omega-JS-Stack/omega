@@ -20,9 +20,9 @@ module.exports = {
     {
       name: 'IPC handlers are registered',
       run: (ctx) => {
-        ctx.expect(ctx.manager.ipc.hasHandler('em:auth:sync-request')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('em:auth:sign-out')).toBe(true);
-        ctx.expect(ctx.manager.ipc.hasHandler('em:auth:get-user')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:auth:sync-request')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:auth:sign-out')).toBe(true);
+        ctx.expect(ctx.manager.ipc.hasHandler('desktop:auth:get-user')).toBe(true);
       },
     },
     {
@@ -75,7 +75,7 @@ module.exports = {
         const origAuth = ctx.manager.webManager._firebaseAuth;
         ctx.manager.webManager._firebaseAuth = { currentUser: { uid: 'abc' } };
         try {
-          const result = await ctx.manager.ipc.invoke('em:auth:sync-request', { contextUid: 'abc' });
+          const result = await ctx.manager.ipc.invoke('desktop:auth:sync-request', { contextUid: 'abc' });
           ctx.expect(result.needsSync).toBe(false);
         } finally {
           ctx.manager.webManager._firebaseAuth = origAuth;
@@ -88,7 +88,7 @@ module.exports = {
         const origAuth = ctx.manager.webManager._firebaseAuth;
         ctx.manager.webManager._firebaseAuth = { currentUser: null };
         try {
-          const result = await ctx.manager.ipc.invoke('em:auth:sync-request', { contextUid: 'someone' });
+          const result = await ctx.manager.ipc.invoke('desktop:auth:sync-request', { contextUid: 'someone' });
           ctx.expect(result.needsSync).toBe(true);
           ctx.expect(result.signOut).toBe(true);
         } finally {
@@ -102,7 +102,7 @@ module.exports = {
         const origAuth = ctx.manager.webManager._firebaseAuth;
         ctx.manager.webManager._firebaseAuth = null;
         try {
-          const result = await ctx.manager.ipc.invoke('em:auth:sync-request', { contextUid: null });
+          const result = await ctx.manager.ipc.invoke('desktop:auth:sync-request', { contextUid: null });
           ctx.expect(result.needsSync).toBe(false);
           ctx.expect(result.reason).toBe('firebase-not-loaded');
         } finally {
@@ -113,14 +113,14 @@ module.exports = {
     {
       name: 'sign-out IPC succeeds when nothing is signed in',
       run: async (ctx) => {
-        const result = await ctx.manager.ipc.invoke('em:auth:sign-out');
+        const result = await ctx.manager.ipc.invoke('desktop:auth:sign-out');
         ctx.expect(result.success).toBe(true);
       },
     },
     {
       name: 'get-user IPC returns null when no current user',
       run: async (ctx) => {
-        const result = await ctx.manager.ipc.invoke('em:auth:get-user');
+        const result = await ctx.manager.ipc.invoke('desktop:auth:get-user');
         ctx.expect(result).toBeNull();
       },
     },

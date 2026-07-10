@@ -1,13 +1,13 @@
 # Bootstrap JS & Tooltips
 
-EM ships **Bootstrap's JavaScript** (v5.3, Popper inlined) as a prebuilt bundle
+@omegajs/desktop ships **Bootstrap's JavaScript** (v5.3, Popper inlined) as a prebuilt bundle
 — `assets/themes/bootstrap/js/bootstrap.bundle.js` — loaded by the renderer
 bootstrap. Consumers add **zero setup** and never vendor Bootstrap JS
 themselves.
 
 ## Tooltips (auto-initialized)
 
-Bootstrap makes tooltips opt-in (they need a JS instance per element); EM does
+Bootstrap makes tooltips opt-in (they need a JS instance per element); @omegajs/desktop does
 the opt-in for you. Any element carrying the standard Bootstrap markup gets a
 live tooltip:
 
@@ -24,6 +24,16 @@ The renderer bootstrap (`renderer.js _wireTooltips`) initializes every
 - **`data-bs-title` / `title` changes** update the live instance in place
   (emptying the title disposes it — no tooltip is a valid state),
 - **removed elements** have their instance disposed — no orphaned tips.
+
+Plain-`title` hosts work: Bootstrap's constructor MOVES `title` into
+`data-bs-original-title`, and the observer reads that bookkeeping as a live
+title source. (It must — reading only `title`/`data-bs-title` made the
+observer dispose the instance, dispose restored `title`, re-init removed it
+again: an infinite MutationObserver microtask loop that froze the whole
+renderer. Found by Somiibo's session-limits boot suite; regression-tested in
+the tooltips suite.) One knock-on: a title-only host can't be disposed by
+emptying its title — remove `data-bs-toggle` instead (prefer `data-bs-title`
+for dynamic tooltips).
 
 All the standard Bootstrap `data-bs-*` options work (`data-bs-placement`,
 `data-bs-delay`, …).
@@ -55,8 +65,8 @@ collapse.show();
 
 ## Rebuilding the bundle
 
-The bundle is built from EM's vendored Bootstrap source
-(`src/assets/themes/bootstrap/js/src/`, v5.3.x) plus `@popperjs/core` (an EM
+The bundle is built from @omegajs/desktop's vendored Bootstrap source
+(`src/assets/themes/bootstrap/js/src/`, v5.3.x) plus `@popperjs/core` (an @omegajs/desktop
 dependency), webpack production mode, UMD output
 (`library: { name: 'bootstrap', export: 'default' }`). Rebuild only when the
 vendored Bootstrap source is upgraded.

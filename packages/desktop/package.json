@@ -1,7 +1,7 @@
 {
-  "name": "electron-manager",
-  "version": "1.12.0",
-  "description": "Electron Manager — all-in-one development framework for Electron apps",
+  "name": "@omegajs/desktop",
+  "version": "2.0.0",
+  "description": "OMEGA desktop framework — build, test, and package Electron apps for macOS, Windows, and Linux",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -32,9 +32,8 @@
     "./lib/window-manager": "./dist/lib/window-manager.js"
   },
   "bin": {
-    "em": "bin/electron-manager",
-    "mgr": "bin/electron-manager",
-    "electron-manager": "bin/electron-manager"
+    "omega-desktop": "bin/omega-desktop",
+    "mgr": "bin/omega-desktop"
   },
   "files": [
     "bin/",
@@ -57,31 +56,26 @@
     "prepare": "node -e \"require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "postinstall": "node scripts/sync-nvmrc.js",
-    "test": "node ./bin/electron-manager test",
-    "wm:prod": "npm uninstall web-manager && npm i web-manager@latest",
-    "wm:local": "npm uninstall web-manager && npm i ../web-manager"
+    "test": "node ./bin/omega-desktop test"
   },
   "projectScripts": {
     "start": "npx mgr clean && npx mgr setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/electron-manager/dist/gulp/main.js",
+    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omegajs/desktop/dist/gulp/main.js",
     "build": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- build",
     "package": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- packageBuild",
     "package:quick": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true npm run gulp -- packageQuick",
     "publish": "npx cross-env EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npx mgr release",
     "release:local": "npx mgr clean && npx mgr setup && npx cross-env EM_BUILD_MODE=true EM_IS_PUBLISH=true npm run gulp -- publish",
-    "postinstall": "node node_modules/electron-manager/scripts/sync-nvmrc.js",
+    "postinstall": "node node_modules/@omegajs/desktop/scripts/sync-nvmrc.js",
     "test": "npx mgr test",
     "electron": "electron ."
   },
   "engines": {
     "node": "24"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/itw-creative-works/electron-manager.git"
-  },
   "keywords": [
+    "omega",
     "electron",
     "desktop-app",
     "cross-platform",
@@ -94,10 +88,6 @@
   ],
   "author": "ITW Creative Works",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/itw-creative-works/electron-manager/issues"
-  },
-  "homepage": "https://itwcreativeworks.com",
   "peerDependencies": {
     "electron": ">=42",
     "electron-builder": ">=26",
@@ -109,7 +99,6 @@
     "@omegajs/devkit": "*",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
-    "electron-manager": "^1.8.2",
     "firebase-admin": "^13.9.0",
     "prepare-package": "^2.1.0"
   },

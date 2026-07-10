@@ -1,10 +1,10 @@
 # Windows
 
-**Lazy named-window registry.** EM does NOT auto-create any window. Your `main.js` calls `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(() => { ... })`. Always create `main` — its presence in the registry is what lets EM's `app.on('activate')` (macOS dock click) and `app.on('second-instance')` (win/linux re-launch) handlers surface UI when the user double-clicks the running app. In hidden launches, pass `show: false` to keep the window invisible until something explicitly calls `windows.show('main')`. Use the registry for the common case (named, persistent, integrated windows). For one-off windows (a toast, a print preview), use `new BrowserWindow()` directly — `window-manager` doesn't get in the way.
+**Lazy named-window registry.** @omegajs/desktop does NOT auto-create any window. Your `main.js` calls `manager.windows.create('main', { show: !startup.isLaunchHidden() })` from inside `manager.initialize().then(() => { ... })`. Always create `main` — its presence in the registry is what lets @omegajs/desktop's `app.on('activate')` (macOS dock click) and `app.on('second-instance')` (win/linux re-launch) handlers surface UI when the user double-clicks the running app. In hidden launches, pass `show: false` to keep the window invisible until something explicitly calls `windows.show('main')`. Use the registry for the common case (named, persistent, integrated windows). For one-off windows (a toast, a print preview), use `new BrowserWindow()` directly — `window-manager` doesn't get in the way.
 
 ## Re-surface on user re-launch
 
-When the user double-clicks a running app (or clicks its dock icon on macOS), EM transparently shows the main window — no consumer wiring needed.
+When the user double-clicks a running app (or clicks its dock icon on macOS), @omegajs/desktop transparently shows the main window — no consumer wiring needed.
 
 - **macOS** → `app.on('activate')` calls `windows.show('main')` if `main` is in the registry.
 - **Windows / Linux** → `app.on('second-instance')` does the same. (The OS spawns a duplicate process, the single-instance lock kills it, and the original instance receives the activation.)
@@ -27,7 +27,7 @@ manager.windows.list()                                   // string[] of currentl
 
 ## Defaults
 
-No JSON config required. EM bakes in sensible defaults so `manager.windows.create('main')` "just works":
+No JSON config required. @omegajs/desktop bakes in sensible defaults so `manager.windows.create('main')` "just works":
 
 | Window | Defaults |
 |---|---|
@@ -72,7 +72,7 @@ Per-window keys:
 
 ## Inset titlebar (default)
 
-EM ships an inset titlebar by default — the OS draws all the window controls and EM adds a draggable strip in the page template:
+@omegajs/desktop ships an inset titlebar by default — the OS draws all the window controls and @omegajs/desktop adds a draggable strip in the page template:
 
 | Platform | Behavior |
 |---|---|
@@ -80,7 +80,7 @@ EM ships an inset titlebar by default — the OS draws all the window controls a
 | **Windows** | `titleBarStyle: 'hidden'` + `titleBarOverlay: { color, symbolColor, height: 36 }` — native min/max/close buttons drawn by the OS |
 | **Linux** | Native frame (full system title bar) |
 
-The page template (`<em>/src/config/page-template.html`, EM-internal — not consumer-overrideable) ships an `.em-titlebar` div with `-webkit-app-region: drag`. Per-platform spacing is handled by `themes/classy/css/components/_titlebar.scss`, which keys off `html[data-platform]` (set by web-manager during init):
+The page template (`<em>/src/config/page-template.html`, framework-internal — not consumer-overrideable) ships an `.em-titlebar` div with `-webkit-app-region: drag`. Per-platform spacing is handled by `themes/classy/css/components/_titlebar.scss`, which keys off `html[data-platform]` (set by web-manager during init):
 
 - **mac** → `padding-left: 70px` (clear the traffic lights)
 - **windows** → `padding-right: 140px` (clear the native overlay)
@@ -121,9 +121,9 @@ Every named window's position and size persist to storage on resize / move / max
 
 ## macOS dock auto-show
 
-When `LSUIElement: true` is baked at build time (`startup.mode: 'hidden'`), the app launches with **no dock icon, no Cmd+Tab, no taskbar**. The first time `manager.windows.create()` or `manager.windows.show()` runs, EM calls `app.dock.show()` automatically — the dock icon appears alongside the window.
+When `LSUIElement: true` is baked at build time (`startup.mode: 'hidden'`), the app launches with **no dock icon, no Cmd+Tab, no taskbar**. The first time `manager.windows.create()` or `manager.windows.show()` runs, @omegajs/desktop calls `app.dock.show()` automatically — the dock icon appears alongside the window.
 
-**And the inverse**: for `startup.mode: 'hidden'` apps, when the LAST visible named window hides (hide-on-close X, `windows.hide()`, any consumer `win.hide()`), EM calls `app.dock.hide()` again — the app returns to its fully-invisible posture, dock and UI appearing and vanishing together. Normal-mode apps keep their dock icon for life; quit paths are untouched (`manager._isQuitting` guard).
+**And the inverse**: for `startup.mode: 'hidden'` apps, when the LAST visible named window hides (hide-on-close X, `windows.hide()`, any consumer `win.hide()`), @omegajs/desktop calls `app.dock.hide()` again — the app returns to its fully-invisible posture, dock and UI appearing and vanishing together. Normal-mode apps keep their dock icon for life; quit paths are untouched (`manager._isQuitting` guard).
 
 This means agent / menubar apps can stay completely invisible until the user explicitly asks for UI:
 

@@ -25,7 +25,7 @@ Team ID + appId at build time.
 
 When MAS support is implemented (currently stubbed in
 `config.targets.mac.mas` — see `docs/installer-options.md`), this folder will be
-the starting point for the entitlements EM auto-generates into `dist/config/`
+the starting point for the entitlements @omegajs/desktop auto-generates into `dist/config/`
 when `mac.mas.enabled === true`. The structure should be similar to the existing
 `writeMacEntitlements` flow but with separate output files for `mas`, `mas.inherit`,
 and `mas.loginhelper`.
@@ -45,5 +45,5 @@ Store Connect via Transporter or Xcode). It's the right move only for apps that
 genuinely benefit from App Store distribution — most consumer apps ship via DMG
 download from a website, not the Mac App Store.
 
-If you need MAS now, the legacy electron-manager (pre-v1) had support that you
-can adapt; otherwise wait for the EM v1.x implementation.
+If you need MAS now, the legacy @omegajs/desktop (pre-v1) had support that you
+can adapt; otherwise wait for the @omegajs/desktop v1.x implementation.

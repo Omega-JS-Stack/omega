@@ -2,15 +2,15 @@
 // environment (specifically: ELECTRON_RUN_AS_NODE stripped from inherited env).
 //
 // Why this exists:
-//   When EM is running inside a host process that has ELECTRON_RUN_AS_NODE=1 set
+//   When @omegajs/desktop is running inside a host process that has ELECTRON_RUN_AS_NODE=1 set
 //   (e.g., VS Code's Claude Code extension, which lives in a `node.mojom.NodeService`
-//   utility process), every shell EM spawns inherits that variable. Launching a
+//   utility process), every shell @omegajs/desktop spawns inherits that variable. Launching a
 //   packaged Electron app from such a shell — via `open .../MyApp.app` or by running
 //   the binary directly — propagates the variable to the app, which Electron then
 //   honors by running as plain Node: no `app` API, no BrowserWindow, no window. The
 //   app exits cleanly with code 0 and no error. Total invisible silent failure.
 //
-//   `bin/electron-manager` and `src/gulp/main.js` already strip ELECTRON_RUN_AS_NODE
+//   `bin/omega-desktop` and `src/gulp/main.js` already strip ELECTRON_RUN_AS_NODE
 //   at the boundary so anything launched THROUGH mgr or gulp is fine. But the manual
 //   smoke-test flow (`open -n release/mac-arm64/MyApp.app`) bypasses both. This
 //   command is the manual-launch equivalent of those boundary strips.

@@ -2,7 +2,7 @@
 // inspect functions against the live manager, then quits cleanly.
 //
 // Differences from runners/electron.js:
-//   - electron.js spawns electron with `harness/main-entry.js` and tests EM lib code in isolation.
+//   - electron.js spawns electron with `harness/main-entry.js` and tests @omegajs/desktop lib code in isolation.
 //   - boot.js spawns electron with the consumer's `dist/main.bundle.js` (the real production
 //     boot path), then injects `harness/boot-entry.js` via --require to drive inspection.
 //
@@ -17,13 +17,13 @@ const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 const chalk = require('chalk').default;
 
-async function runBootTests({ tests, projectRoot, emDistRoot }) {
+async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
   if (tests.length === 0) {
     return { passed: 0, failed: 0, skipped: 0 };
   }
 
   // EM_TEST_BOOT_PROJECT — boot a different project root than the CWD. Auto-set to the
-  // bundled fixture when EM self-tests (see commands/test.js); set it explicitly to boot a
+  // bundled fixture when @omegajs/desktop self-tests (see commands/test.js); set it explicitly to boot a
   // real consumer (e.g. deployment-playground-desktop) without cd-ing into it. Mirrors
   // BXM's BXM_TEST_BOOT_PROJECT / UJM's UJ_TEST_BOOT_PROJECT.
   const effectiveRoot = process.env.EM_TEST_BOOT_PROJECT
@@ -31,26 +31,26 @@ async function runBootTests({ tests, projectRoot, emDistRoot }) {
     : projectRoot;
 
   // The bundled fixture ships as SOURCE only (no node_modules). Symlink the two deps the
-  // build + boot path resolves by EXPLICIT path: electron-manager (the gulpfile path +
-  // webpack's `require('electron-manager/main')`) and electron (the runner's binary lookup
+  // build + boot path resolves by EXPLICIT path: @omegajs/desktop (the gulpfile path +
+  // webpack's `require('@omegajs/desktop/main')`) and electron (the runner's binary lookup
   // + the spawned bundle's `require('electron')`). Everything else (gulp, webpack,
   // etc.) resolves through the upward node_modules walk because the fixture lives inside the
-  // EM repo. No-op for a real consumer that already has its own node_modules. The links are
-  // tracked and ALWAYS removed in the finally — the electron-manager link points at the EM
+  // @omegajs/desktop repo. No-op for a real consumer that already has its own node_modules. The links are
+  // tracked and ALWAYS removed in the finally — the @omegajs/desktop link points at the @omegajs/desktop
   // repo root, which CONTAINS the fixture, so leaving it behind forms an infinite directory
   // cycle inside dist/ that crashes the next prepare-package tree walk (ENAMETOOLONG) and
   // with it `npm publish`.
-  const createdLinks = ensureFixtureDeps(effectiveRoot, path.resolve(emDistRoot, '..'));
+  const createdLinks = ensureFixtureDeps(effectiveRoot, path.resolve(frameworkDistRoot, '..'));
 
   try {
-    return await bootProject({ tests, effectiveRoot, emDistRoot });
+    return await bootProject({ tests, effectiveRoot, frameworkDistRoot });
   } finally {
     removeFixtureDeps(createdLinks);
   }
 }
 
 // Build + spawn + inspect — the actual boot run against effectiveRoot.
-async function bootProject({ tests, effectiveRoot, emDistRoot }) {
+async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
   // Locate electron. Resolve like Node would from the project root (walks up node_modules
   // chains), so hoisted installs (npm workspaces) are found — not just <root>/node_modules.
   let electronBin;
@@ -86,7 +86,7 @@ async function bootProject({ tests, effectiveRoot, emDistRoot }) {
   // uses for renderer suites.
   const spec = {
     projectRoot: effectiveRoot,
-    emDistRoot,
+    frameworkDistRoot,
     tests: tests.map((t) => ({
       description:    t.description,
       timeout:        t.timeout,
@@ -97,10 +97,10 @@ async function bootProject({ tests, effectiveRoot, emDistRoot }) {
   const specFile = path.join(os.tmpdir(), `em-boot-spec-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(specFile, JSON.stringify(spec));
 
-  const bootEntry = path.join(emDistRoot, 'test', 'harness', 'boot-entry.js');
+  const bootEntry = path.join(frameworkDistRoot, 'test', 'harness', 'boot-entry.js');
 
   // Tell the consumer's main.js to publish the manager + run the boot harness.
-  // Three env vars are picked up by EM's main.js after init completes:
+  // Three env vars are picked up by @omegajs/desktop's main.js after init completes:
   //   EM_TEST_BOOT          — gate; "1" turns on harness loading
   //   EM_TEST_BOOT_HARNESS  — absolute path to harness module (resolved here so it works
   //                           even though main.js is webpacked into the consumer bundle)
@@ -123,7 +123,7 @@ async function bootProject({ tests, effectiveRoot, emDistRoot }) {
   //   effectiveRoot — load the consumer project (package.json#main = dist/main.bundle.js).
   //
   // We don't use `--require <bootEntry>` because Electron rejects unknown CLI flags. Instead,
-  // EM's main.js detects EM_TEST_BOOT and `require()`s the boot harness itself after init.
+  // @omegajs/desktop's main.js detects EM_TEST_BOOT and `require()`s the boot harness itself after init.
   const args = [effectiveRoot];
 
   return new Promise((resolve) => {
@@ -213,7 +213,7 @@ function extractFnBody(fn) {
 // dist/main.bundle.js (+ preload + renderer bundles) using the consumer's current source.
 // Output is streamed inline so the user sees progress for the ~10s build cost.
 function runGulpBuild(projectRoot) {
-  const gulpfile = path.join(projectRoot, 'node_modules', 'electron-manager', 'dist', 'gulp', 'main.js');
+  const gulpfile = path.join(projectRoot, 'node_modules', '@omegajs/desktop', 'dist', 'gulp', 'main.js');
   const result = spawnSync('npx', ['gulp', '--cwd', projectRoot, '--gulpfile', gulpfile, 'build'], {
     cwd:   projectRoot,
     env:   Object.assign({}, process.env, { EM_BUILD_MODE: 'true' }),
@@ -224,9 +224,9 @@ function runGulpBuild(projectRoot) {
 
 // Symlink the deps the bundled fixture's build + boot path resolves by EXPLICIT path
 // (not the upward node_modules walk):
-//   - electron-manager → the EM repo root, so `<root>/node_modules/electron-manager/dist/gulp/main.js`
-//     (the gulpfile path) resolves AND webpack's `require('electron-manager/main')` resolves.
-//   - electron → EM's own electron, so the runner's `require('<root>/node_modules/electron')`
+//   - @omegajs/desktop → the @omegajs/desktop repo root, so `<root>/node_modules/@omegajs/desktop/dist/gulp/main.js`
+//     (the gulpfile path) resolves AND webpack's `require('@omegajs/desktop/main')` resolves.
+//   - electron → @omegajs/desktop's own electron, so the runner's `require('<root>/node_modules/electron')`
 //     binary lookup + the spawned bundle's `require('electron')` resolve.
 // Creates only what's MISSING — a no-op for a real consumer (EM_TEST_BOOT_PROJECT pointed at
 // an installed app already has both). Returns the link paths it created so the caller can
@@ -244,7 +244,7 @@ function ensureFixtureDeps(effectiveRoot, emRoot) {
     // fall through with the legacy path; the existsSync guard below handles absence
   }
   const links = [
-    ['electron-manager', emRoot],
+    ['@omegajs/desktop', emRoot],
     ['electron',         electronDir],
   ];
   const created = [];
@@ -255,7 +255,9 @@ function ensureFixtureDeps(effectiveRoot, emRoot) {
     if (!fs.existsSync(target))  continue;   // can't link what isn't there
 
     try {
-      fs.mkdirSync(nodeModules, { recursive: true });
+      // The link's PARENT, not just node_modules — a scoped name like
+      // @omegajs/desktop needs its node_modules/@omegajs dir to exist first
+      fs.mkdirSync(path.dirname(linkPath), { recursive: true });
       fs.symlinkSync(target, linkPath, linkType);
       created.push(linkPath);
     } catch (e) {
@@ -272,7 +274,7 @@ function ensureFixtureDeps(effectiveRoot, emRoot) {
 
 // Remove the symlinks ensureFixtureDeps created THIS run — never anything else, so a real
 // consumer's node_modules is untouched (nothing was created for it). Removal is required,
-// not just tidy: a leftover electron-manager → repo-root link inside dist/ is an infinite
+// not just tidy: a leftover @omegajs/desktop → repo-root link inside dist/ is an infinite
 // directory cycle that breaks the next prepare-package walk (`npm run prepare`/`npm publish`).
 function removeFixtureDeps(links) {
   for (const linkPath of links) {

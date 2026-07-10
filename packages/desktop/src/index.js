@@ -1,8 +1,8 @@
 // Default export — re-exports per-process Managers + version.
 // Most consumers should use the per-process subpath imports instead:
-//   require('electron-manager/main')
-//   require('electron-manager/renderer')
-//   require('electron-manager/preload')
+//   require('@omegajs/desktop/main')
+//   require('@omegajs/desktop/renderer')
+//   require('@omegajs/desktop/preload')
 const package = require('../package.json');
 
 module.exports = {

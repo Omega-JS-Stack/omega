@@ -1,4 +1,4 @@
-# Runtime-only artifacts. The boot runner symlinks node_modules (electron-manager +
+# Runtime-only artifacts. The boot runner symlinks node_modules (@omegajs/desktop +
 # electron) and webpack-builds dist/ on each self-test run — none of it is committed.
 node_modules/
 dist/

@@ -2,9 +2,9 @@
 //
 // Why this suite exists: electron-store is ESM-only and used to be loaded via a
 // `webpackIgnore`'d dynamic import — a runtime resolution that accidentally worked
-// in this harness (the fixture lives inside the EM repo, so Node's upward
-// node_modules walk finds EM's copy) but FAILED in real packaged consumers, where
-// EM is a devDependency that never ships in the asar. Storage silently became a
+// in this harness (the fixture lives inside the @omegajs/desktop repo, so Node's upward
+// node_modules walk finds @omegajs/desktop's copy) but FAILED in real packaged consumers, where
+// @omegajs/desktop is a devDependency that never ships in the asar. Storage silently became a
 // no-op. The functional round-trip below would therefore pass either way — the
 // regression assertion is the BUNDLE TEXT one: no live `import('electron-store')`
 // call may survive webpack (eager bundling compiles it to __webpack_require__).
@@ -42,15 +42,15 @@ module.exports = {
         const fs = require('fs');
 
         // The no-op fallback leaves _store null → getPath() null and get() always default.
-        manager.storage.set('em:boot:storageProof', 'bundled');
-        expect(manager.storage.get('em:boot:storageProof')).toBe('bundled');
+        manager.storage.set('desktop:boot:storageProof', 'bundled');
+        expect(manager.storage.get('desktop:boot:storageProof')).toBe('bundled');
 
         const storePath = manager.storage.getPath();
         expect(Boolean(storePath)).toBe(true);
         expect(storePath.endsWith('em-storage.json')).toBe(true);
         expect(fs.existsSync(storePath)).toBe(true);
 
-        manager.storage.delete('em:boot:storageProof');
+        manager.storage.delete('desktop:boot:storageProof');
       },
     },
   ],

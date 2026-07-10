@@ -60,7 +60,7 @@ module.exports = async function (options) {
 async function runSignCommand(options) {
   // Smoke test mode: create a 1-byte .exe in a temp dir, sign it, verify it, clean up.
   // This is the fastest possible end-to-end check that the EV token, drivers, signtool,
-  // and password cache are all working — no EM build required.
+  // and password cache are all working — no @omegajs/desktop build required.
   if (options.smoke) {
     return smokeTest();
   }
@@ -300,7 +300,7 @@ async function verifyOnly(targets) {
 
 // Smoke test: write a 1-byte .exe to %TEMP%, run the full self-hosted signing flow against it.
 // Validates that EV token, SafeNet drivers, signtool, and the password cache are all functional
-// without needing an actual EM build. Cleans up after itself.
+// without needing an actual @omegajs/desktop build. Cleans up after itself.
 async function smokeTest() {
   if (process.platform !== 'win32') {
     throw new Error('--smoke is Windows-only (signtool is required).');

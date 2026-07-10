@@ -1,10 +1,10 @@
 # Build System
 
-EM's pipeline: **prepare-package** (framework only) → **gulp** (consumer) → **webpack** (3 targets) → **electron-builder** (packaging) → **strategy-pluggable signing**.
+@omegajs/desktop's pipeline: **prepare-package** (framework only) → **gulp** (consumer) → **webpack** (3 targets) → **electron-builder** (packaging) → **strategy-pluggable signing**.
 
 ## prepare-package (framework-side)
 
-Copies EM's `src/` → `dist/` so consumers `require('electron-manager/main')` from the built output. Configured in EM's `package.json`:
+Copies @omegajs/desktop's `src/` → `dist/` so consumers `require('@omegajs/desktop/main')` from the built output. Configured in @omegajs/desktop's `package.json`:
 
 ```jsonc
 "preparePackage": {
@@ -20,11 +20,11 @@ Run with `npm start` (watch) or `npm run prepare` (one-shot).
 
 ## Gulp (consumer-side)
 
-Auto-loads tasks from `<EM>/dist/gulp/tasks/*.js` via `<EM>/dist/gulp/main.js`. Consumer's `package.json` points there:
+Auto-loads tasks from `<@omegajs/desktop>/dist/gulp/tasks/*.js` via `<@omegajs/desktop>/dist/gulp/main.js`. Consumer's `package.json` points there:
 
 ```jsonc
 "scripts": {
-  "gulp": "gulp --cwd ./ --gulpfile ./node_modules/electron-manager/dist/gulp/main.js"
+  "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omegajs/desktop/dist/gulp/main.js"
 }
 ```
 
@@ -32,8 +32,8 @@ Auto-loads tasks from `<EM>/dist/gulp/tasks/*.js` via `<EM>/dist/gulp/main.js`. 
 
 | Task | Status | Description |
 |---|---|---|
-| `defaults` | real | Copy `<EM>/dist/defaults/*` into the consumer (skips existing files) |
-| `distribute` | real | Stage consumer `src/` + EM `dist/` into `.em-build/` |
+| `defaults` | real | Copy `<@omegajs/desktop>/dist/defaults/*` into the consumer (skips existing files) |
+| `distribute` | real | Stage consumer `src/` + @omegajs/desktop `dist/` into `.em-build/` |
 | `webpack` | real | Three parallel targets — main / preload / renderer |
 | `sass` | real | SCSS → `dist/assets/css/*` |
 | `html` | real | `src/views/**/index.html` → `dist/views/*` |
@@ -95,7 +95,7 @@ DefinePlugin replaces the bare identifier `EM_BUILD_JSON` with the parsed config
 
 ## electron-builder
 
-EM **generates** `dist/electron-builder.yml` from `config/omega.json5` + EM defaults — the consumer never ships an `electron-builder.yml`. `gulp/build-config` does the materialization, applying:
+@omegajs/desktop **generates** `dist/electron-builder.yml` from `config/omega.json5` + @omegajs/desktop defaults — the consumer never ships an `electron-builder.yml`. `gulp/build-config` does the materialization, applying:
 
 - App metadata: `appId`, `productName`, `copyright` (with `{YEAR}` token expansion to the current year)
 - App-level cross-platform fields: `category` mapping, `languages`, `darkModeSupport`
@@ -127,7 +127,7 @@ Strategy-pluggable via `platforms.win.signing.strategy` in `config/omega.json5`:
 
 | Strategy | Where signing runs | When to use |
 |---|---|---|
-| `self-hosted` | Self-hosted GH Actions runner with USB EV token plugged in | Default for EM v1 — physical EV token desktop |
+| `self-hosted` | Self-hosted GH Actions runner with USB EV token plugged in | Default for @omegajs/desktop v1 — physical EV token desktop |
 | `cloud` | `windows-latest` runner shells out to a cloud signing CLI (Azure Trusted Signing / SSL.com / DigiCert KeyLocker) | Future migration target |
 | `local` | Developer's Windows machine after CI uploads unsigned artifact | Fallback when no runner is available |
 

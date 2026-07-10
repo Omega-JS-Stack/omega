@@ -47,7 +47,7 @@ const TARGET_FRAMEWORKS = {
   web: '@omegajs/web',
   backend: 'backend-manager',
   extension: '@omegajs/extension',
-  desktop: 'electron-manager',
+  desktop: '@omegajs/desktop',
 };
 
 // =============================================================================
