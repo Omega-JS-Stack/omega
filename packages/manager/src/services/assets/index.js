@@ -13,12 +13,11 @@
  * `--onboarding` gate on the write operations (it regenerated blindly, so
  * running every time was too expensive; it also had no dry-run guard).
  *
- * Not ported here: the MrLogo AI brandmark generation (an interactive
- * prompt + a company-mode admin token — rides the onboarding/prompting
- * ports; a missing brandmark is a clean skip with guidance) and the PSD
- * template operations (templates / social-images / store-images — need
- * ag-psd + node-canvas and the company's binary PSD templates; they ride
- * the same later ports).
+ * Not ported here: the MrLogo AI brandmark generation (needs the company's
+ * MrLogo admin token; a missing brandmark is a clean skip with guidance)
+ * and the PSD template operations (templates / social-images / store-images
+ * — need ag-psd + node-canvas and the company's binary PSD templates). Both
+ * wait on those company binaries/tokens — queued with the extension port.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');

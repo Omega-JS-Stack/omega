@@ -5,10 +5,15 @@
  * ships in the frontend); the conversions/events access token is a secret
  * and lives in the brand .env under the exact name backend-manager reads.
  * There's no practical validation API for either token, so this is a
- * presence check with where-to-get guidance — the interactive paste-in flow
- * rides the disperse port (.env writeback).
+ * presence check with where-to-get guidance — interactive runs offer a
+ * paste-in that saves the token to the brand .env (the disperse service
+ * then carries it into the backend's functions/.env); leaving it empty
+ * keeps the warned guidance.
  */
 const chalk = require('chalk').default;
+const { input, isInteractive } = require('@omegajs/devkit/prompt');
+
+const { writeEnvValue } = require('../../../lib/env-secret.js');
 
 /**
  * Check one provider's pixel config + access token.
@@ -17,8 +22,8 @@ const chalk = require('chalk').default;
  * @param {Object} spec - { key, label, idLabel, envVar, tokenSource }
  * @returns {Object} - Handler return ({ output } / warned)
  */
-function ensurePixelToken(context, spec) {
-  const { brandConfig } = context;
+async function ensurePixelToken(context, spec) {
+  const { brandConfig, brandRoot, options = {} } = context;
   const pixelId = brandConfig.analytics?.providers?.[spec.key]?.id;
 
   if (!pixelId) {
@@ -35,6 +40,16 @@ function ensurePixelToken(context, spec) {
 
   console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(spec.envVar)} not set in the brand .env`);
   console.log(`      ${chalk.dim('→')} Get it from ${spec.tokenSource}`);
+
+  if (isInteractive() && !options.dryRun) {
+    const value = (await input({ message: `    ${spec.envVar} (leave empty to skip):` })).trim();
+    if (value) {
+      writeEnvValue(brandRoot, spec.envVar, value);
+      process.env[spec.envVar] = value;
+      console.log(`      ${chalk.green('✓')} ${spec.envVar} saved to the brand .env`);
+      return { output: { [spec.key]: { pixelId, tokenConfigured: true } } };
+    }
+  }
 
   return { status: 'warned', output: { [spec.key]: { pixelId, tokenConfigured: false } } };
 }

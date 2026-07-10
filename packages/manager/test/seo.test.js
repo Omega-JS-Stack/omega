@@ -136,8 +136,8 @@ function runService(config, { root, api, options = {} } = {}) {
 
 // ─── Registry / defaults / template pins ─────────────────────────────────────
 
-test('seo: registered after certificates with the github-repos operation', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('certificates') + 1], 'seo');
+test('seo: registered after disperse with the github-repos operation', () => {
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('disperse') + 1], 'seo');
   assert.deepEqual(OPERATIONS.seo.map((o) => o.name), ['github-repos']);
   assert.deepEqual(DEFAULTS.seo, { enabled: true });
 });

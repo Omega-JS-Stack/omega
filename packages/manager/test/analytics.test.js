@@ -447,6 +447,45 @@ test('analytics: pixel token present succeeds, missing token warns with the env 
   assert.equal(result.output.tiktok.tokenConfigured, false);
 });
 
+test('analytics: interactive paste-in saves the pixel token to the brand .env', async () => {
+  const jetpack = require('fs-jetpack');
+  const brandRoot = makeBrandRoot('{}');
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig({ google: false, metaId: 'PIXEL123' }), { brandRoot });
+    await tty.answer('META_ACCESS_TOKEN (leave empty to skip):', 'pasted-meta-token\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.output.meta.tokenConfigured, true);
+    assert.match(jetpack.read(`${brandRoot}/.env`), /^META_ACCESS_TOKEN="pasted-meta-token"$/m);
+    assert.equal(process.env.META_ACCESS_TOKEN, 'pasted-meta-token');
+  } finally {
+    tty.close();
+    delete process.env.META_ACCESS_TOKEN;
+  }
+});
+
+test('analytics: an empty paste-in keeps the warned guidance and writes nothing', async () => {
+  const jetpack = require('fs-jetpack');
+  const brandRoot = makeBrandRoot('{}');
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig({ google: false, metaId: 'PIXEL123' }), { brandRoot });
+    await tty.answer('META_ACCESS_TOKEN (leave empty to skip):', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.output.meta.tokenConfigured, false);
+    assert.equal(jetpack.exists(`${brandRoot}/.env`), false);
+    assert.equal(process.env.META_ACCESS_TOKEN, undefined);
+  } finally {
+    tty.close();
+  }
+});
+
 // ─── Dry-run ─────────────────────────────────────────────────────────────────
 
 test('analytics: dry-run on a fully drifted brand performs zero mutations', async () => {

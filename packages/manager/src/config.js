@@ -13,15 +13,18 @@
  *   chatsy → replyify → server → assets → certificates → seo → disperse →
  *   update → account → migrations → bookmark → testing
  *
- * Ported so far: the local trio that makes a brand monorepo itself work —
- * workspace (structure/config health), update (install + build every app),
- * testing (per-app local + live health checks) — plus the external
+ * Everything but `bookmark` is ported: the local trio that makes a brand
+ * monorepo itself work — workspace (structure/config health), update
+ * (install + build every app), testing (per-app local + live health
+ * checks) — the external
  * provisioning services github, cloudflare, domain, firebase, recaptcha,
  * analytics, search-console, adsense, sendgrid, beehiiv, payment, slapform,
  * chatsy, replyify, server, assets, certificates, seo, account, and
- * migrations (--migration-gated Firestore data migrations). That drains
- * omega-manager's service order; onboarding/disperse/company mode ride
- * later ports.
+ * migrations (--migration-gated Firestore data migrations), plus disperse
+ * (the remnant: signing artifacts + composed app .env files — the config
+ * dispersal itself dissolved into the omega.json5 hierarchy). Onboarding is
+ * the `onboard` wizard and company mode rides runCompany; `bookmark` stays
+ * parked with the extension port.
  */
 
 // =============================================================================
@@ -542,6 +545,7 @@ const SERVICE_ORDER = [
   'server',          // brand registry entry on the company server's Firestore (company-server operators only)
   'assets',          // derived logo variants, app icons, social icons, favicons (local, mtime-diffed)
   'certificates',    // Apple certs, bundle IDs, provisioning profiles (desktop/mobile targets only)
+  'disperse',        // signing artifacts + composed app .env files land in the apps (after certificates, before update builds)
   'seo',             // parasite SEO GitHub repos — low priority, no downstream deps
   'update',          // installs deps + builds every app
   'account',         // required Firebase Auth accounts + admin roles (after deploy — signup calls hit the live backend)
@@ -683,6 +687,11 @@ const OPERATIONS = {
     { name: 'certificates', ensure: true }, // Signing certs — download or create via CSR, export .p12, keychain import
     { name: 'bundle-ids', ensure: true },   // Brand bundle ID exists with the required capabilities
     { name: 'profiles', ensure: true },     // Provisioning profiles per platform × cert type
+  ],
+
+  disperse: [
+    { name: 'certs', write: true },  // Signing artifacts copied into desktop/mobile apps' certs dirs
+    { name: 'env', write: true },    // Each app's gitignored .env composed (brand env + stream secrets + signing paths)
   ],
 
   seo: [
