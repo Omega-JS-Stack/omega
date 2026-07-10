@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — D15 .env cascade SHIPPED (73a); remaining: DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys, parked verifies (line below); CI: run-6 evidence killed the leak/OOM-from-earlier-suites theory (machine clean, 6.9 GB free pre-suite) — functions workers time out LOADING on 2-core runners (104× 'Failed to load function.'); run 7 carries FUNCTIONS_DISCOVERY_TIMEOUT=120 + on-failure post-mortems
+- N4 architecture sweep (cp73) — D15 .env cascade SHIPPED (73a); remaining: DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys, parked verifies (line below); CI investigation PARKED (run-7 verdict in the parked finding) — all CI opt-in per Ian, no runs until he says
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -28,14 +28,14 @@
 - Checkpoint discipline (structure unchanged): survey (read-only) → design (de-ITW, non-interactive, .env creds, dry-run) → implement → tests → sandbox/fixture proof → docs → commit.
 - Git: explicit `git -C` always (post-incident rule: a checkpoint-5 commit briefly landed in omega-manager via a stray cwd — reverted, nothing pushed); commit-and-continue is standing for THIS repo; `Co-Authored-By: Claude Fable 5` trailer.
 - De-ITW'ing hardcoded company values into config = standard scope; best-implementation-wins normalization is licensed (pick the better behavior, don't keep both quirks).
-- CI runner-minutes (Ian 2026-07-10): the emulator jobs (backend suite + sandbox) are MANUAL-DISPATCH ONLY (`gh workflow run CI`) until the 2-core worker-load problem is fixed — pushes run the lean matrix (~15 min); don't re-enable them on push without Ian.
+- CI runner-minutes (Ian 2026-07-10, escalated same day): **ALL CI is OPT-IN** — push/pull_request triggers commented out in ci.yml (flip-back note inline); `gh workflow run CI` is the only trigger (runs every job) and even deliberate dispatches are PAUSED — no CI runs at all without Ian; local suites are the verification.
 - npu, never raw npm install/npx. Secrets never in omega.json5 — .env / .omega/secrets only (@omega.js/config hard-fails on secret-shaped keys).
 - Local-first (Ian 2026-07-09): build the NEW system locally — zero npm publishes until Ian finalizes versions (orgs now claimed; `@omega.js` names land at N2); migrators/verifiers pinned.
 
 ## ⚠ Parked findings (detail: the named task's CHANGELOG entry)
 - ~~Env prefixes + backend wire format~~ SHIPPED (72); ~~BEM hardcoded emulator ports~~ GRADUATED to queue N7 (70)
 - Ghostii devlog auth still sends the `backendManagerKey` payload field — live external API contract; rename when Ghostii itself migrates to the new stack (72)
-- CI emulator jobs on 2-core runners: 'Failed to load function.' worker-load storms (run 6: 104×, machine otherwise clean — leak theory dead); run 7 = FUNCTIONS_DISCOVERY_TIMEOUT=120 + on-failure post-mortems; if still failing: throttle the trigger storms or split/beef the jobs (73a)
+- CI emulator jobs on 2-core runners, PARKED: worker-load storms (run 6: 104× 'Failed to load function.', machine clean — leak theory dead); run 7 (FUNCTIONS_DISCOVERY_TIMEOUT=120): suites failed CLEAN at 14m35 (no 23-min hang) but the backend step was still killed externally; post-mortems never fired — cancellation ≠ `failure()`, use `if: always()` next time; next escalations if resumed: throttle trigger storms or split/beef jobs (73b)
 - push-secrets under D15: it pushes only the APP .env Default section to repo secrets, but brand/company-level values no longer live there — revisit when the dogfood arc reaches CI publish (D13) (73a)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
@@ -69,4 +69,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 4:10 PM (73a done; omega-api-proxy un-deprecated per Ian — proxifly's separate-backend shape; CI emulator jobs → manual dispatch)*
+*Last updated: 2026-07-10 4:20 PM (73a done; omega-api-proxy un-deprecated per Ian; ALL CI now opt-in — no push/PR triggers, dispatches paused)*

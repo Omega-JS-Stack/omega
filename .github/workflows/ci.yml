@@ -1,11 +1,18 @@
 name: CI
 
+# ALL CI is opt-in for now (Ian 2026-07-10): the private-repo free tier's
+# runner minutes were draining fast under frequent pushes, and every checkpoint
+# already runs the full suites locally — CI is a deliberate safety net here,
+# not the primary verification. The ONLY trigger is manual dispatch, which runs
+# EVERY job (lean matrix + pack-smoke + both emulator jobs):
+#   gh workflow run CI -R Omega-JS-Stack/omega
+# To flip per-push verification back on later: uncomment push/pull_request
+# below — the emulator jobs stay dispatch-only via their `if:` gates, so pushes
+# get the lean matrix (~15 runner-minutes) and dispatch gets everything.
 on:
-  push:
-    branches: [main]
-  pull_request:
-  # Manual runs additionally include the emulator jobs (backend suite + sandbox):
-  #   gh workflow run CI -R Omega-JS-Stack/omega
+  # push:
+  #   branches: [main]
+  # pull_request:
   workflow_dispatch:
 
 # A newer push supersedes the running verification of the same branch.
