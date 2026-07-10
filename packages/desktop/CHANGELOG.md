@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Security` in case of vulnerabilities.
 
 ---
+## [2.0.2] - 2026-07-10
+
+- Fixed
+  - Renderer webpack config bound the `global` identifier via `ProvidePlugin({ global: 'globalThis' })`, which resolves `'globalThis'` as a MODULE request — on case-insensitive macOS it silently resolved to the unrelated `globalthis` npm package (binding `global` to a polyfill *function*), and on case-sensitive Linux the build failed with `Module not found: Can't resolve 'globalThis'`. Now `DefinePlugin({ global: 'globalThis' })` — a textual rewrite to the real global object on every platform.
+
+---
 ## [2.0.1] - 2026-07-10
 
 - Fixed

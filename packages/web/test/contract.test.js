@@ -105,3 +105,20 @@ test('redirect module: careers renders the redirect chrome', () => {
   const careers = page('classy', 'careers/index.html');
   assert.ok(careers.includes('docs.google.com/forms'), 'redirect target URL present');
 });
+
+test('redirect shortlinks: auth + billing defaults emit their targets', () => {
+  const cases = [
+    ['login/index.html', '/signin'],
+    ['register/index.html', '/signup'],
+    ['join/index.html', '/signup'],
+    ['forgot/index.html', '/reset?authSignout=true'],
+    ['recover/index.html', '/reset?authSignout=true'],
+    ['reset-password/index.html', '/reset?authSignout=true'],
+    ['change-password/index.html', '/reset?authSignout=true'],
+    ['cancel/index.html', '/account#billing'],
+    ['refund/index.html', '/terms'],
+  ];
+  for (const [file, target] of cases) {
+    assert.ok(page('classy', file).includes(target), `${file} → ${target}`);
+  }
+});

@@ -245,7 +245,12 @@ function makeRendererConfig(buildJson, isProd) {
     },
     plugins: [
       ...buildJsonPlugins(buildJson),
-      new webpack.ProvidePlugin({ global: 'globalThis' }),
+      // Libraries like lodash/@firebase/util reference the Node-ism `global`; with
+      // target 'web' webpack leaves it undefined. DefinePlugin rewrites the identifier
+      // to `globalThis` textually. (ProvidePlugin is wrong here: it resolves its value
+      // as a MODULE request — on case-insensitive macOS 'globalThis' silently hit the
+      // unrelated `globalthis` npm package; on Linux CI it was Module-not-found.)
+      new webpack.DefinePlugin({ global: 'globalThis' }),
     ],
     optimization: {
       minimize: isProd,
