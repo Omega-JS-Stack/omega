@@ -14,6 +14,7 @@
 
 const { join } = require('node:path');
 const chalk = require('chalk').default;
+const { loadEnvChain } = require('@omega.js/config');
 
 const { SERVICE_ORDER, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
@@ -98,12 +99,12 @@ async function runManage(startDir, options = {}) {
     companyConfig = loadCompanyConfig(marker.companyRoot);
   }
 
-  // Secrets chain: shell env > brand .env > company .env (dotenv never
-  // overrides keys that are already set, so load order = precedence)
-  require('dotenv').config({ path: join(brandRoot, '.env'), quiet: true });
-  if (companyConfig) {
-    require('dotenv').config({ path: join(marker.companyRoot, '.env'), quiet: true });
-  }
+  // Secrets chain: shell env > brand .env > company .env — the shared
+  // cascade (files load strongest-first, never overriding what's set)
+  loadEnvChain([
+    join(brandRoot, '.env'),
+    companyConfig ? join(marker.companyRoot, '.env') : null,
+  ]);
 
   const brand = loadBrand(brandRoot, { companyConfig });
 

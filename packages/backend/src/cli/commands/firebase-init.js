@@ -14,11 +14,8 @@ const { DEFAULT_EMULATOR_PORTS } = require('./setup-tests/emulator-config');
 function initFirebase({ firebaseProjectPath, emulator }) {
   const functionsDir = path.join(firebaseProjectPath, 'functions');
 
-  // Load .env so env vars like GCLOUD_PROJECT are available
-  const envPath = path.join(functionsDir, '.env');
-  if (jetpack.exists(envPath)) {
-    require('dotenv').config({ path: envPath, quiet: true });
-  }
+  // Load the .env cascade so env vars like GCLOUD_PROJECT are available
+  require('@omega.js/config').loadEnv(functionsDir);
 
   // Resolve firebase-admin from the consumer project's node_modules (peer dep)
   const admin = require(path.join(functionsDir, 'node_modules', 'firebase-admin'));

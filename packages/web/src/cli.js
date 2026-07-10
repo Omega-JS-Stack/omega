@@ -4,8 +4,9 @@
  */
 const path = require('node:path');
 
-// Load .env from the consumer project root before any command runs
-require('dotenv').config({ path: path.join(process.cwd(), '.env'), quiet: true });
+// Resolve the .env cascade from the consumer project before any command runs
+// (shell > app .env > brand .env > company .env)
+require('@omega.js/config').loadEnv(process.cwd());
 
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
 

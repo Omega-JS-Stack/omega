@@ -2,8 +2,9 @@
 const path = require('path');
 const { createCliRouter } = require('@omega.js/devkit/cli-router');
 
-// Load .env file from current working directory (project root)
-require('dotenv').config({ path: path.join(process.cwd(), '.env') });
+// Resolve the .env cascade from the project root
+// (shell > app .env > brand .env > company .env)
+require('@omega.js/config').loadEnv(process.cwd());
 
 // Main class — dispatch (positional/flag alias resolution, command loading,
 // error surfacing) is the shared devkit router; this file owns only the alias

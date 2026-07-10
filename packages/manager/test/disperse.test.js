@@ -3,12 +3,13 @@
  * brand monorepos on disk. certs: signing artifacts copied from
  * .omega/certificates/apple/ into desktop/mobile apps (byte-compared
  * idempotency, optional-vs-required miss semantics, the self-protecting
- * certs .gitignore, dry-run zero-write). env: per-app .env composition
- * against the REAL framework templates (packages/desktop + packages/backend
- * _.env), pinning the cross-package key contract — pass-throughs, the
- * per-surface stream secret, exists-gated signing paths, Default-section
- * appends, Custom-section preservation, multi-line escaping, and converged
- * no-rewrite runs.
+ * certs .gitignore, dry-run zero-write). env: composition of the .env files
+ * that must PHYSICALLY exist (D15 — everything else rides the runtime
+ * cascade), against the REAL framework templates (packages/desktop +
+ * packages/backend _.env) — backend's full deploy-artifact pass-through,
+ * the per-surface stream secret, exists-gated signing paths, the
+ * no-brand-values-copied pins, Default-section appends, Custom-section
+ * preservation, multi-line escaping, and converged no-rewrite runs.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -26,7 +27,7 @@ const { ENV_MAP, updateEnvContent } = require('../src/services/disperse/write/en
 // fixture values explicitly.
 const MANAGED_ENV = [...new Set(
   Object.values(ENV_MAP).flatMap((spec) => [
-    ...spec.env,
+    ...(spec.env || []),
     ...(spec.streamSecret ? [spec.streamSecret] : []),
     ...Object.keys(spec.certPaths || {}),
   ]),
@@ -232,7 +233,7 @@ test('certs: dry-run plans the copies without writing', async () => {
 
 // ─── env ─────────────────────────────────────────────────────────────────────
 
-test('env: desktop .env composed against the real framework template', async () => {
+test('env: desktop .env composes only app-owned values against the real framework template', async () => {
   setEnv({
     APPLE_API_KEY_ID: KEY_ID,
     GH_TOKEN: 'fixture-gh-token',
@@ -254,11 +255,12 @@ test('env: desktop .env composed against the real framework template', async () 
   assert.equal(result.output.env.updated, 1);
 
   const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
-  assert.match(env, /^GH_TOKEN="fixture-gh-token"$/m);
   assert.match(env, /^CSC_LINK="config\/certs\/developer-id-application\.p12"$/m);
   assert.match(env, new RegExp(`^APPLE_API_KEY="config/certs/AuthKey_${KEY_ID}\\.p8"$`, 'm'));
   assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
-  // Unset brand env leaves the template placeholder untouched
+  // Brand-level values are NOT copied (the runtime cascade serves them) —
+  // template placeholders stay untouched even though GH_TOKEN is set above
+  assert.match(env, /^GH_TOKEN=""$/m);
   assert.match(env, /^WIN_EV_TOKEN_PATH=""$/m);
   // Unmanaged template keys and the Custom section survive verbatim
   assert.match(env, /^OMEGA_TEST_USER_UID="em-test-user"$/m);
@@ -274,19 +276,20 @@ test('env: signing paths are not stamped when the cert files are absent', async 
   const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
   assert.match(env, /^CSC_LINK=""$/m);
   assert.match(env, /^APPLE_API_KEY=""$/m);
-  assert.match(env, /^GH_TOKEN="fixture-gh-token"$/m);
 });
 
 test('env: a missing .env is created with the section markers', async () => {
-  setEnv({ GH_TOKEN: 'fixture-gh-token' });
+  setEnv();
   const brand = stageBrand(); // desktop app without any .env
 
-  const result = await runService(brand);
+  const result = await runService(brand, {
+    brandState: { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } },
+  });
 
   assert.equal(result.status, 'success');
   const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
   const defaultAt = env.indexOf('Default Values');
-  const keyAt = env.indexOf('GH_TOKEN="fixture-gh-token"');
+  const keyAt = env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"');
   const customAt = env.indexOf('Custom Values');
   assert.ok(defaultAt >= 0 && keyAt > defaultAt && customAt > keyAt, 'keys sit between the section markers');
 });
@@ -309,8 +312,9 @@ test('env: appended keys land in the Default section, above the Custom marker', 
 
   const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
   const customAt = env.indexOf('Custom Values');
-  assert.ok(env.indexOf('GH_TOKEN="fixture-gh-token"') < customAt, 'appended key sits above the Custom marker');
-  assert.ok(env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"') < customAt);
+  const gaAt = env.indexOf('GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"');
+  assert.ok(gaAt >= 0 && gaAt < customAt, 'appended key sits above the Custom marker');
+  assert.ok(!env.includes('GH_TOKEN'), 'brand-level values are not appended (the cascade serves them)');
   assert.match(env, /^UNRELATED="stays"$/m);
   assert.match(env, /^MY_CUSTOM="keep"$/m);
 });
@@ -329,6 +333,8 @@ test('env: backend app composes functions/.env with its own stream secret', asyn
   assert.equal(result.status, 'success');
   const env = jetpack.read(join(brand.root, 'apps', 'backend', 'functions', '.env'));
   assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-backend-secret"$/m);
+  // Backend keeps the FULL pass-through — functions/.env ships with the deploy artifact
+  assert.match(env, /^GH_TOKEN="fixture-gh-token"$/m);
   assert.match(env, /^STRIPE_SECRET_KEY="sk_fixture"$/m);
   assert.match(env, /^SENDGRID_API_KEY="SG\.fixture"$/m);
   // Developer tooling credentials are deliberately not composed
@@ -336,16 +342,16 @@ test('env: backend app composes functions/.env with its own stream secret', asyn
 });
 
 test('env: a converged second run rewrites nothing', async () => {
-  setEnv({ GH_TOKEN: 'fixture-gh-token', SNAPCRAFT_STORE_CREDENTIALS: 'line one\nline two' });
-  const brand = stageBrand({ apps: { desktop: { envFile: DESKTOP_TEMPLATE } } });
+  setEnv({ APPLE_API_KEY_ID: KEY_ID });
+  const brand = stageBrand({ apps: { desktop: { envFile: DESKTOP_TEMPLATE } }, apple: APPLE_FIXTURES });
+  const brandState = { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } };
 
-  await runService(brand);
+  await runService(brand, { brandState });
   const envPath = join(brand.root, 'apps', 'desktop', '.env');
-  // The multi-line blob serialized to one line-safe entry
-  assert.match(jetpack.read(envPath), /^SNAPCRAFT_STORE_CREDENTIALS="line one\\nline two"$/m);
+  assert.match(jetpack.read(envPath), /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
 
   const before = statSync(envPath).mtimeMs;
-  const result = await runService(brand);
+  const result = await runService(brand, { brandState });
 
   assert.equal(result.output.env.updated, 0);
   assert.equal(result.output.env.current, 1);
@@ -353,13 +359,16 @@ test('env: a converged second run rewrites nothing', async () => {
 });
 
 test('env: dry-run reports the plan without touching the file', async () => {
-  setEnv({ GH_TOKEN: 'fixture-gh-token' });
+  setEnv();
   const brand = stageBrand({ apps: { desktop: { envFile: DESKTOP_TEMPLATE } } });
 
-  const result = await runService(brand, { options: { dryRun: true } });
+  const result = await runService(brand, {
+    brandState: { analytics: { streams: { desktop: { apiSecret: 'ga-desktop-secret' } } } },
+    options: { dryRun: true },
+  });
 
   assert.equal(result.output.env.updated, 0);
-  assert.deepEqual(result.output.env.files['apps/desktop/.env'].planned, ['GH_TOKEN']);
+  assert.deepEqual(result.output.env.files['apps/desktop/.env'].planned, ['GOOGLE_ANALYTICS_SECRET']);
   assert.equal(jetpack.read(join(brand.root, 'apps', 'desktop', '.env')), DESKTOP_TEMPLATE);
 });
 
@@ -381,6 +390,13 @@ test('updateEnvContent: replacing a multi-line quoted value leaves no orphan tai
     'SNAPCRAFT_STORE_CREDENTIALS="new blob"',
     'AFTER="also ok"',
   ].join('\n'));
+});
+
+test('updateEnvContent: multi-line values serialize to one \\n-escaped line', () => {
+  const result = updateEnvContent('EXISTING="ok"', { SNAPCRAFT_STORE_CREDENTIALS: 'line one\nline two' });
+
+  assert.deepEqual(result.appended, ['SNAPCRAFT_STORE_CREDENTIALS']);
+  assert.match(result.content, /^SNAPCRAFT_STORE_CREDENTIALS="line one\\nline two"$/m);
 });
 
 test('updateEnvContent: every duplicate occurrence is replaced (dotenv lets the last win)', () => {

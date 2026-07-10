@@ -2,7 +2,7 @@
 const path = require('path');
 const { get: _get, set: _set } = require('lodash');
 const jetpack = require('fs-jetpack');
-const { hasOmegaConfig, loadConfig, formatErrors } = require('@omega.js/config');
+const { hasOmegaConfig, loadConfig, loadEnv, formatErrors } = require('@omega.js/config');
 const EventEmitter = require('events');
 // const EventEmitter = require('events').EventEmitter;
 const util = require('util');
@@ -128,9 +128,10 @@ Manager.prototype.init = function (exporter, options) {
   // Load package.json
   self.package = resolveProjectPackage(options.projectPackageDirectory || self.cwd);
 
-  // Set dotenv
+  // Resolve the .env cascade from the functions dir (functions/.env rides
+  // the deploy artifact; the brand/company layers exist only in local dev)
   try {
-    const env = require('dotenv').config({ quiet: true });
+    loadEnv(self.cwd);
   } catch (e) {
     self.assistant.error(new Error(`Failed to set up environment variables from .env file: ${e.message}`));
   }

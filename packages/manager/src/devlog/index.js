@@ -19,6 +19,7 @@ const { join } = require('node:path');
 
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { loadEnvChain } = require('@omega.js/config');
 
 const { resolveBrandRoot, loadBrand } = require('../lib/brand.js');
 const {
@@ -146,12 +147,12 @@ async function runDevlog(startDir, options = {}, deps = {}) {
     throw new Error(`No devlog.orgs configured for ${brand.id}`);
   }
 
-  // Secrets chain: shell env > brand .env > company .env (dotenv never
-  // overrides keys that are already set, so load order = precedence)
-  require('dotenv').config({ path: join(brand.root, '.env'), quiet: true });
-  if (companyRoot) {
-    require('dotenv').config({ path: join(companyRoot, '.env'), quiet: true });
-  }
+  // Secrets chain: shell env > brand .env > company .env — the shared
+  // cascade (files load strongest-first, never overriding what's set)
+  loadEnvChain([
+    join(brand.root, '.env'),
+    companyRoot ? join(companyRoot, '.env') : null,
+  ]);
 
   const days = Number(options.days || settings.lookbackDays);
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

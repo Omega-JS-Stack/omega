@@ -77,6 +77,32 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 - Schema findings (required/type/match/enum) come back as `errors`, not throws — build-time
   audit throws on them, boot warns/fails per framework policy.
 
+## The .env cascade (secrets) — D15
+
+Secrets mirror the config hierarchy (`src/env.js`), weakest → strongest:
+
+```
+company .env ← brand .env ← app .env ← shell env
+```
+
+- **Same walk as the config cascade**: `{brand}/apps/{app}` layers the brand root's `.env`
+  under the app's; a brand stamped with `.omega/company.json` (written idempotently by
+  company manage runs) layers its company root's `.env` underneath that. `findBrandRoot`
+  in `load.js` is the ONE definition of the walk — both cascades use it.
+- **Precedence via dotenv's no-override semantics**: files load strongest-first and never
+  overwrite keys already set, so the shell always wins and app beats brand beats company.
+- **Defined at the source, resolved at runtime/build**: a brand-wide `GH_TOKEN` lives once
+  in the brand `.env`; every framework CLI/build resolves the chain at boot
+  (`loadEnv(process.cwd())` in the web/desktop/extension CLIs + gulp pipelines,
+  `loadEnv(functionsDir)` in the @omega.js/backend CLI and runtime). Nothing is copied
+  between `.env` files just to be visible.
+- **Backend's app layer is `functions/.env`** — it physically rides the Firebase deploy
+  artifact (the cloud can't walk up), so omega-manager's disperse composes that ONE file
+  from the resolved chain. In the cloud the walk finds no brand/company and behavior is
+  identical to plain dotenv.
+- Missing files and unreadable/stale markers skip silently — `loadEnv` never throws for
+  an absent layer.
+
 ## Validation
 
 `validateConfig(config, { target })` = shared schema + that target's refinements
@@ -211,6 +237,12 @@ const {
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
   getEnabledTargets,   // (config) → ['web', 'backend', …]
+  findBrandRoot,       // (projectDir) → brand root | null — THE hierarchy walk
+  loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
+  resolveEnvChain,     // (startDir) → { app, brand, company } .env paths (no loading)
+  loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip
+  readCompanyRoot,     // (brandRoot) → company root | null (.omega/company.json)
+  COMPANY_MARKER,      // '.omega/company.json'
   validateConfig,      // (config, { target }?) → { errors }
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block

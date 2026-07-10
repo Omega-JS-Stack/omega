@@ -124,15 +124,13 @@ class TestCommand extends BaseCommand {
    * Load project configuration from config/omega.json5 and .env
    */
   loadProjectConfig(functionsDir, argv) {
-    // Load .env first so env vars are available
-    const envPath = path.join(functionsDir, '.env');
-    if (jetpack.exists(envPath)) {
-      require('dotenv').config({ path: envPath, quiet: true });
-    }
+    const { hasOmegaConfig, loadConfig, loadEnv } = require('@omega.js/config');
+
+    // Load the .env cascade first so env vars are available
+    loadEnv(functionsDir);
 
     // Load config/omega.json5 (resolved — the loader walks up to the brand
     // layer from the functions dir in a brand monorepo)
-    const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
     if (!hasOmegaConfig(functionsDir)) {
       this.logError('Error: Missing config/omega.json5');
       return null;

@@ -15,8 +15,8 @@ const package = Manager.getPackage('main');
 const project = Manager.getPackage('project');
 const projectRoot = Manager.getRootPath('project');
 
-// Load .env file from project root
-require('dotenv').config({ path: path.join(projectRoot, '.env') });
+// Resolve the .env cascade from the project root (shell > app > brand > company)
+require('@omega.js/config').loadEnv(projectRoot);
 
 // Empty-string signing placeholders (CSC_LINK="" etc. from the .env template)
 // must read as UNSET — app-builder-lib only null-checks and would resolve ''

@@ -25,10 +25,9 @@ const path = require('node:path');
 const JSON5 = require('json5');
 const jetpack = require('fs-jetpack');
 
-const { resolveConfigPath, hasOmegaConfig, findSecretKeys } = require('@omega.js/config');
+const { resolveConfigPath, hasOmegaConfig, findSecretKeys, readCompanyRoot, COMPANY_MARKER } = require('@omega.js/config');
 const { resolveBrandRoot } = require('./brand.js');
 
-const MARKER_PATH = ['.omega', 'company.json'];
 const DEFAULT_BRAND_ROOTS = ['./brands'];
 
 /**
@@ -160,7 +159,7 @@ function loadCompanyConfig(companyRoot) {
  * @returns {boolean} - true when the marker was (re)written
  */
 function stampCompanyMarker(brandRoot, companyRoot) {
-  const markerPath = path.join(brandRoot, ...MARKER_PATH);
+  const markerPath = path.join(brandRoot, COMPANY_MARKER);
   const existing = jetpack.read(markerPath, 'json');
 
   if (existing?.root === companyRoot) {
@@ -179,10 +178,10 @@ function stampCompanyMarker(brandRoot, companyRoot) {
  * @returns {{ companyRoot: string, stale: boolean }|null}
  */
 function readCompanyMarker(brandRoot) {
-  const marker = jetpack.read(path.join(brandRoot, ...MARKER_PATH), 'json');
-  if (!marker?.root) return null;
+  const root = readCompanyRoot(brandRoot);
+  if (!root) return null;
 
-  return { companyRoot: marker.root, stale: !isCompanyRoot(marker.root) };
+  return { companyRoot: root, stale: !isCompanyRoot(root) };
 }
 
 /**

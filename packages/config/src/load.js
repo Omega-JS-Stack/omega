@@ -72,10 +72,15 @@ function readConfigFile(absolutePath) {
   }
 }
 
-// {brand}/apps/{app} → {brand}/config/omega.json5 — only counts when the
-// brand root actually carries a config (a plain `apps` folder outside a
-// brand monorepo has none, so the walk-up is a no-op there).
-function findBrandConfigPath(projectDir) {
+/**
+ * {brand}/apps/{app} → the brand root — only counts when the brand root
+ * actually carries a config (a plain `apps` folder outside a brand monorepo
+ * has none, so the walk-up is a no-op there). The env cascade (env.js) walks
+ * the same way — this is the ONE definition of the hierarchy.
+ * @param {string} projectDir - The app dir (or its functions/ dir).
+ * @returns {string|null} Absolute brand root, or null outside a brand monorepo.
+ */
+function findBrandRoot(projectDir) {
   let appDir = path.resolve(projectDir);
 
   // A backend's runtime cwd is its functions/ dir (Cloud Functions and the
@@ -88,8 +93,13 @@ function findBrandConfigPath(projectDir) {
   const appsDir = path.dirname(appDir);
   if (path.basename(appsDir) !== 'apps') return null;
 
-  const brandPath = path.join(path.dirname(appsDir), 'config', FILE_NAME);
-  return fs.existsSync(brandPath) ? brandPath : null;
+  const brandRoot = path.dirname(appsDir);
+  return fs.existsSync(path.join(brandRoot, 'config', FILE_NAME)) ? brandRoot : null;
+}
+
+function findBrandConfigPath(projectDir) {
+  const brandRoot = findBrandRoot(projectDir);
+  return brandRoot ? path.join(brandRoot, 'config', FILE_NAME) : null;
 }
 
 function stripTargets(config) {
@@ -183,4 +193,4 @@ function loadConfig(projectDir, target, options) {
   return { config, errors, enabled, files: { app: appPath, brand: brandPath } };
 }
 
-module.exports = { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, FILE_NAME, CONFIG_LOCATIONS };
+module.exports = { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, FILE_NAME, CONFIG_LOCATIONS };

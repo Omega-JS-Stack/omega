@@ -282,11 +282,8 @@ class BaseCommand {
     this.log(chalk.gray('  (Stripe webhook forwarding is currently disabled - coming soon!)\n'));
     return null;
 
-    // Load .env so STRIPE_SECRET_KEY and OMEGA_WEBHOOK_KEY are available
-    const envPath = path.join(functionsDir, '.env');
-    if (jetpack.exists(envPath)) {
-      require('dotenv').config({ path: envPath, quiet: true });
-    }
+    // Load the .env cascade so STRIPE_SECRET_KEY and OMEGA_WEBHOOK_KEY are available
+    require('@omega.js/config').loadEnv(functionsDir);
 
     // Check for Stripe secret key
     if (!process.env.STRIPE_SECRET_KEY) {

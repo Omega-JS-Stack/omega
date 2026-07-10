@@ -6,12 +6,8 @@ class McpCommand extends BaseCommand {
     const self = this;
     const functionsDir = path.join(self.firebaseProjectPath, 'functions');
 
-    // Load .env from functions directory so OMEGA_ADMIN_KEY is available
-    const jetpack = require('fs-jetpack');
-    const envPath = path.join(functionsDir, '.env');
-    if (jetpack.exists(envPath)) {
-      require('dotenv').config({ path: envPath, quiet: true });
-    }
+    // Load the .env cascade from the functions dir so OMEGA_ADMIN_KEY is available
+    require('@omega.js/config').loadEnv(functionsDir);
 
     // Resolve the @omega.js/backend server URL
     const baseUrl = self.argv.url

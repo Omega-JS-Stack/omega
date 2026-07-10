@@ -11,12 +11,14 @@
     "./secrets": "./src/secrets.js",
     "./validate": "./src/validate.js",
     "./load": "./src/load.js",
+    "./env": "./src/env.js",
     "./site-global": "./src/site-global.js"
   },
   "scripts": {
     "test": "node --test"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "json5": "^2.2.3"
   },
   "engines": {

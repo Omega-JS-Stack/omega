@@ -16,6 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     # Hangs must die fast and labeled (the emulator suites stalled silently on the first runs)
     timeout-minutes: 45
+    env:
+      # Run-6 evidence: 104× "Failed to load function." — functions workers time
+      # out REQUIRING the heavy module on the 2-core runner (fine locally). Give
+      # the emulator's codebase load a longer leash.
+      FUNCTIONS_DISCOVERY_TIMEOUT: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -71,10 +76,11 @@ jobs:
       - name: desktop suite (xvfb for Electron)
         run: xvfb-run --auto-servernum npm test --workspace=packages/desktop
 
-      # The emulator jobs keep dying runner-level ("operation was canceled" with
-      # no superseding push; "runner received a shutdown signal") — leading theory
-      # is resource exhaustion from leaked java/Chrome of earlier suites. Kill
-      # leftovers and print headroom so the next failure is diagnosable.
+      # Run 6 proved the machine is CLEAN here (6.9 GB available, no leaked
+      # processes) — the trouble starts DURING the backend suite: functions
+      # workers fail to load under the event storms, the emulator respawns
+      # them, and the job hangs (SIGTERM'd at ~23 min) or the runner dies.
+      # Keep the sweep as belt-and-suspenders and the snapshot as the baseline.
       - name: Preflight for backend suite (kill leaked emulators, show headroom)
         run: |
           pkill -f 'firebase|cloud-firestore-emulator|pubsub-emulator|cloud-database-emulator' || true
@@ -86,10 +92,22 @@ jobs:
       - name: backend suite
         run: npm test --workspace=packages/backend
 
+      # Catch the resource spike in the act — run-6 snapshots only show the
+      # BEFORE picture; if the worker-respawn spiral eats the memory, this
+      # shows it (when the step fails but the runner survives).
+      - name: Post-mortem headroom
+        if: failure()
+        run: |
+          free -m
+          ps aux --sort=-rss | head -15
+
   sandbox:
     name: Sandbox brand (@omega.js/backend corpus + cross-stack e2e)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Same worker-load-timeout leash as the suites job (see run-6 evidence there)
+      FUNCTIONS_DISCOVERY_TIMEOUT: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -140,6 +158,13 @@ jobs:
       - name: Cross-stack e2e
         working-directory: apps/sandbox-brand
         run: npm test
+
+      # Catch the resource spike in the act (see the suites job's twin step)
+      - name: Post-mortem headroom
+        if: failure()
+        run: |
+          free -m
+          ps aux --sort=-rss | head -15
 
   pack-smoke:
     name: Pack → scratch-install smoke

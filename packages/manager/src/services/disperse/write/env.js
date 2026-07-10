@@ -1,18 +1,22 @@
 /**
- * Compose each app's gitignored .env from brand-level values.
+ * Compose the .env files that must PHYSICALLY exist per app — everything
+ * else resolves through the runtime cascade (D15).
  *
- * Secrets can't ride the config hierarchy (omega.json5 hard-fails on
- * secret-shaped keys), and two values genuinely differ per app under the
- * same var name: GOOGLE_ANALYTICS_SECRET is a per-surface GA4 stream
- * secret, and the signing paths (CSC_LINK, APPLE_API_KEY) are app-relative
- * file paths. So each app gets its own .env, composed from:
+ * Brand-wide values (GH_TOKEN, store/signing credentials, API keys) live
+ * ONCE in the brand .env and reach every app at runtime/build through
+ * @omega.js/config's env cascade (shell > app .env > brand .env > company
+ * .env), so disperse no longer copies them around. What still gets written:
  *
- *   env      — pass-through of brand-level process.env (manage.js already
- *              layered shell > brand .env > company .env); empty values are
- *              never written, leaving the framework template's placeholders.
- *   stream   — the app's own GA4 Measurement Protocol secret from analytics
- *              state (streams.{target}.apiSecret).
- *   certPath — signing file paths, stamped ONLY when the certs operation
+ *   backend  — the FULL curated composition into functions/.env: that file
+ *              rides the Firebase deploy artifact and the cloud can't walk
+ *              up to a brand layer. Composed from brand-level process.env
+ *              (manage.js already layered shell > brand > company); empty
+ *              values are never written, leaving template placeholders.
+ *   stream   — each app's own GA4 Measurement Protocol secret from
+ *              analytics state (streams.{target}.apiSecret) — per-app
+ *              derived data that exists nowhere else.
+ *   certPath — desktop signing file paths (CSC_LINK, APPLE_API_KEY),
+ *              app-relative and stamped ONLY when the certs operation
  *              actually placed the file (a path to nothing would break
  *              electron-builder louder than no path at all).
  *
@@ -22,8 +26,7 @@
  * everything else — comments, blanks, the Custom section — is preserved
  * verbatim. A missing .env is created with the two section markers. Values
  * normalize to double-quoted form with newlines escaped as \n (dotenv
- * expands them back), so multi-line blobs like SNAPCRAFT_STORE_CREDENTIALS
- * stay line-safe.
+ * expands them back), so multi-line blobs stay line-safe.
  */
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -33,25 +36,18 @@ const CUSTOM_MARKER = '# ========== Custom Values ==========';
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 
 // Per-target composition spec. `file` is app-relative; `env` names pass
-// through from brand-level process.env; `streamSecret` names the var that
-// receives the app's own analytics stream secret; `certPaths` are stamped
-// only when the file exists (see header). Deliberately NOT composed:
-// per-listing store IDs (CHROME_EXTENSION_ID, FIREFOX_EXTENSION_ID,
-// EDGE_PRODUCT_ID — user-managed per app) and developer tooling credentials
-// (CLAUDE_CODE_OAUTH_TOKEN). Mobile gets certs only — no .env contract yet.
+// through from brand-level process.env (backend ONLY — its .env ships with
+// the deploy artifact; every other target reads brand values through the
+// runtime cascade); `streamSecret` names the var that receives the app's
+// own analytics stream secret; `certPaths` are stamped only when the file
+// exists (see header). web has nothing to materialize. Deliberately NOT
+// composed: per-listing store IDs (CHROME_EXTENSION_ID,
+// FIREFOX_EXTENSION_ID, EDGE_PRODUCT_ID — user-managed per app) and
+// developer tooling credentials (CLAUDE_CODE_OAUTH_TOKEN). Mobile gets
+// certs only — no .env contract yet.
 const ENV_MAP = {
-  web: {
-    file: '.env',
-    env: ['GH_TOKEN'],
-  },
   extension: {
     file: '.env',
-    env: [
-      'GH_TOKEN',
-      'CHROME_CLIENT_ID', 'CHROME_CLIENT_SECRET', 'CHROME_REFRESH_TOKEN',
-      'FIREFOX_API_KEY', 'FIREFOX_API_SECRET',
-      'EDGE_CLIENT_ID', 'EDGE_API_KEY',
-    ],
     streamSecret: 'GOOGLE_ANALYTICS_SECRET',
   },
   backend: {
@@ -71,13 +67,6 @@ const ENV_MAP = {
   },
   desktop: {
     file: '.env',
-    env: [
-      'GH_TOKEN', 'OMEGA_ADMIN_KEY',
-      'CSC_KEY_PASSWORD',
-      'APPLE_API_KEY_ID', 'APPLE_API_ISSUER', 'APPLE_TEAM_ID',
-      'WIN_EV_TOKEN_PATH', 'WIN_CSC_KEY_PASSWORD', 'SIGNTOOL_PATH',
-      'SNAPCRAFT_STORE_CREDENTIALS',
-    ],
     certPaths: {
       CSC_LINK: 'config/certs/developer-id-application.p12',
       APPLE_API_KEY: 'config/certs/AuthKey_{env.APPLE_API_KEY_ID}.p8',
@@ -210,7 +199,7 @@ module.exports = async (context) => {
     // ─── Resolve this app's values ────────────────────────────────────────
     const updates = {};
 
-    for (const name of spec.env) {
+    for (const name of spec.env || []) {
       const value = process.env[name];
       if (value) updates[name] = value;
     }

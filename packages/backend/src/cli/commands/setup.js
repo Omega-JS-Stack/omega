@@ -53,11 +53,8 @@ class SetupCommand extends BaseCommand {
   async loadConfig() {
     const self = this.main;
 
-    // Load environment variables from .env file
-    const envPath = `${self.firebaseProjectPath}/functions/.env`;
-    if (jetpack.exists(envPath)) {
-      require('dotenv').config({ path: envPath, quiet: true });
-    }
+    // Load the .env cascade from the functions dir
+    require('@omega.js/config').loadEnv(`${self.firebaseProjectPath}/functions`);
   }
 
   async runSetup() {

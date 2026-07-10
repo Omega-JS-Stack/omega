@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — FIRST: D15 .env cascade (devkit env module: company←brand←app, shell wins; disperse becomes a composer); then DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys; CI emulator-hang still open (run 5: sandbox failed labeled, suites hung past pin — dig with run-6 logs)
+- N4 architecture sweep (cp73) — D15 .env cascade SHIPPED (73a); remaining: DRY/SSOT review of packages/*, zod route schemas (shapes preserved), D12 provider-discriminated config keys, parked verifies (line below); CI: run-6 evidence killed the leak/OOM-from-earlier-suites theory (machine clean, 6.9 GB free pre-suite) — functions workers time out LOADING on 2-core runners (104× 'Failed to load function.'); run 7 carries FUNCTIONS_DISCOVERY_TIMEOUT=120 + on-failure post-mortems
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -35,7 +35,8 @@
 - ~~Env prefixes + backend wire format~~ SHIPPED (72); ~~BEM hardcoded emulator ports~~ GRADUATED to queue N7 (70)
 - Ghostii devlog auth still sends the `backendManagerKey` payload field — live external API contract; rename when Ghostii itself migrates to the new stack (72)
 - `omega-api-proxy` worker DEPRECATED (D5 addendum 2) — hosting rewrites suffice; delete the worker + its ensure warning once no brand config references it (72)
-- CI watch: 'Failed to load function' flurries in the sandbox onDelete storm on runners (run 4 log) — corpus green locally + labeled failures now; if run 5+ sandbox jobs flake, start here (72)
+- CI emulator jobs on 2-core runners: 'Failed to load function.' worker-load storms (run 6: 104×, machine otherwise clean — leak theory dead); run 7 = FUNCTIONS_DISCOVERY_TIMEOUT=120 + on-failure post-mortems; if still failing: throttle the trigger storms or split/beef the jobs (73a)
+- push-secrets under D15: it pushes only the APP .env Default section to repo secrets, but brand/company-level values no longer live there — revisit when the dogfood arc reaches CI publish (D13) (73a)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
@@ -43,6 +44,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 73a D15 .env cascade — @omega.js/config env module (company←brand←app, shell wins; findBrandRoot = THE hierarchy walk; company-marker read shared), adopted at every boot surface (web/desktop/extension CLIs + gulp, backend CLI + runtime, manager manage/devlog); disperse narrowed to composer (backend functions/.env keeps full pass-through; brand values never copied); dotenv dep consolidated into config; full matrix + corpus + e2e green (this commit) → CHANGELOG
 - [x] 72 N3 wire/env harmonization — `/omega` routes (legacy `/backend-manager` alias kept per Ian), `omega_*` functions, `omega` config section, `///---omega---///` markers, `omega-properties` header, `omega-api-proxy` worker; ~60 env vars → unified `OMEGA_*` (BUILD_JSON/TEST_MODE/AUDIT_FORCE unified cross-framework; UJ_AUDIT_FORCE extension leak fixed); D14 crypto-provisioned keys at onboarding; 10 suites + sandbox corpus + cross-stack e2e + pack-smoke ×4 (this commit) → CHANGELOG
 - [x] 71 Great Rename — `@omega.js` scope everywhere (650 files; lockfiles regenerated, dists re-vendored, regex gates escaped); universal `omega`/`omg`/`mgr` dispatcher bins (devkit 1.2.0, hoist-winner-proof, bootstrap fallback, live cross-dispatch proof); `window.webManager` → `window.omega` sweep (127 files; migrate-codemod collision caught + repaired by fixture tests); docs flip to `npx omega`; 10 suites + pack-smoke ×4 green (this commit) → CHANGELOG
 - [x] 70 core-changes graduation + N1 re-sync + first real CI — inbox DECIDED 10/10 binding, queue = N1–N7 + dogfood, continuous mode ON; repo live at github.com/Omega-JS-Stack/omega; sweep verdict: monorepo is a superset of ALL legacy repos (one gap: 9 UJM redirect shortlinks → web 0.2.1); desktop webpack `global` fix (2.0.2) + CI env fixes (firebase-tools, puppeteer) (this commit) → CHANGELOG
@@ -67,4 +69,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 3:05 PM (checkpoint 72 done; 73 = N4 architecture sweep next)*
+*Last updated: 2026-07-10 4:05 PM (checkpoint 73a done; N4 sweep continues — DRY/SSOT, zod schemas, D12)*

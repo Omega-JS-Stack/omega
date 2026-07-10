@@ -30,8 +30,9 @@ module.exports = async function (options) {
   if (!jetpack.exists(envPath)) {
     throw new Error(`.env not found at ${envPath}. Create one based on .env.example.`);
   }
-  // Also load via dotenv into process.env so the GH_TOKEN we use to push is available.
-  require('dotenv').config({ path: envPath });
+  // Also resolve the .env cascade into process.env so the GH_TOKEN we use to
+  // push is available (it may live at the brand or company level).
+  require('@omega.js/config').loadEnv(projectRoot);
 
   const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (!ghToken) {

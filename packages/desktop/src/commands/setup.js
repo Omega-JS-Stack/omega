@@ -104,9 +104,7 @@ module.exports = async function (options) {
   // Idempotent: only creates if missing. Skipped silently if GH_TOKEN missing or config.releases.enabled = false.
   if (options.provisionRepos !== false) {
     try {
-      const fs = require('fs');
-      const envPath = path.join(process.cwd(), '.env');
-      if (fs.existsSync(envPath)) require('dotenv').config({ path: envPath });
+      require('@omega.js/config').loadEnv(process.cwd());
       if (process.env.GH_TOKEN) {
         await provisionReleaseRepos();
       } else {
@@ -127,7 +125,7 @@ module.exports = async function (options) {
       if (!fs.existsSync(envPath)) {
         logger.log('(Skipping push-secrets: no .env at project root.)');
       } else {
-        require('dotenv').config({ path: envPath });
+        require('@omega.js/config').loadEnv(process.cwd());
         if (!process.env.GH_TOKEN) {
           logger.log('(Skipping push-secrets: GH_TOKEN not set in .env. Run `npx omega push-secrets` after filling it in.)');
         } else {

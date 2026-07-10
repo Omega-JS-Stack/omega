@@ -11,8 +11,8 @@ const package = Manager.getPackage('main');
 const project = Manager.getPackage('project');
 const projectRoot = Manager.getRootPath('project');
 
-// Load .env file from project root
-require('dotenv').config({ path: path.join(projectRoot, '.env') });
+// Resolve the .env cascade from the project root (shell > app > brand > company)
+require('@omega.js/config').loadEnv(projectRoot);
 
 // Tee all stdout/stderr to <projectRoot>/logs/<dev|build>.log for easy `tail -f` / grep / Claude
 // inspection — captures gulp task output, webpack/serve output, console.log calls, the works.
