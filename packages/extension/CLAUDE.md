@@ -15,11 +15,11 @@ OMEGA Extension (@omegajs/extension) is a comprehensive framework for building m
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omegajs/extension ships `web-manager` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with web-manager as much as with @omegajs/extension.
+**@omegajs/extension ships `@omegajs/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omegajs/client as much as with @omegajs/extension.
 
 **Required reading:**
-- **`node_modules/web-manager/CLAUDE.md`** — top-level overview + index
-- **`node_modules/web-manager/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omegajs/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omegajs/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start
 
@@ -37,7 +37,7 @@ OMEGA Extension (@omegajs/extension) is a comprehensive framework for building m
    - `npx mgr test extension:build/config` — run only framework tests matching a path
    - The positional target selects which test FILES run (by source + path); `--filter=<substring>` is orthogonal — it matches test NAMES within them
    - Output is teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, truncated fresh each run — `cat logs/test.log` instead of scrolling scrollback
-   - Extended mode (off by default): `npx mgr test --extended` or `TEST_EXTENDED_MODE=true npx mgr test` opts into tests that hit REAL external services (Firebase via web-manager, push, network). `TEST_EXTENDED_MODE` is the shared, unprefixed name across all OMEGA frameworks; it propagates to every spawned test environment
+   - Extended mode (off by default): `npx mgr test --extended` or `TEST_EXTENDED_MODE=true npx mgr test` opts into tests that hit REAL external services (Firebase via @omegajs/client, push, network). `TEST_EXTENDED_MODE` is the shared, unprefixed name across all OMEGA frameworks; it propagates to every spawned test environment
 
 To load the unpacked extension in Chrome: point chrome://extensions → "Load unpacked" at `packaged/chromium/raw/`.
 
@@ -194,8 +194,8 @@ See [docs/cli.md](docs/cli.md).
 
 ## Dependency Resolution
 
-- **Consumer code can `require()` any @omegajs/extension dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `web-manager`, or any other @omegajs/extension transitive dep. If a dep doesn't resolve, the fix is in @omegajs/extension's webpack config — not the consumer's `package.json`.
-- **web-manager owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `import webManager from 'web-manager'` → `webManager.auth()`, `webManager.firestore()`. Same rule in EM and UJM.
+- **Consumer code can `require()` any @omegajs/extension dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `@omegajs/client`, or any other @omegajs/extension transitive dep. If a dep doesn't resolve, the fix is in @omegajs/extension's webpack config — not the consumer's `package.json`.
+- **@omegajs/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `import webManager from '@omegajs/client'` → `webManager.auth()`, `webManager.firestore()`. Same rule in EM and UJM.
 - **`Manager.require(name)`** resolves from @omegajs/extension's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
 
 ## Development Workflow
@@ -233,7 +233,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — WM mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — @omegajs/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 

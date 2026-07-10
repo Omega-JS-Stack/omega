@@ -1,7 +1,7 @@
 // This file is required by /token page to generate custom auth tokens for extensions/apps
 // Also handles MCP OAuth flow: user signs in → Firebase ID token sent back to Claude as auth code
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Module
 export default function () {

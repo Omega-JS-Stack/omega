@@ -57,7 +57,7 @@ module.exports = {
       run: (ctx) => ctx.expect(ctx.manager.startup._initialized).toBe(true),
     },
     {
-      name: 'web-manager-bridge initialized',
+      name: 'client-bridge initialized',
       run: (ctx) => ctx.expect(ctx.manager.webManager._initialized).toBe(true),
     },
     {

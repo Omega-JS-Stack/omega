@@ -101,7 +101,7 @@ module.exports = {
     {
       name: 'cross-platform identity: same firebase uid → same uuidv5 across surfaces',
       run: async (ctx) => {
-        // The whole point: web-manager and @omegajs/backend seeing the same firebase uid
+        // The whole point: @omegajs/client and @omegajs/backend seeing the same firebase uid
         // produce identical uuidv5 outputs for user_id, given same projectId namespace.
         const restore = await reinit(ctx, { GOOGLE_ANALYTICS_SECRET: 'fake-secret' }, {
           enabled: true,

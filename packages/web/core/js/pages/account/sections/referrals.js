@@ -1,5 +1,5 @@
 // Referrals section module
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Initialize referrals section
 export function init() {

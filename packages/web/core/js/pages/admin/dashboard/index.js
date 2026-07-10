@@ -8,7 +8,7 @@ import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { Chart, DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Register Chart.js components
 Chart.register(DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);

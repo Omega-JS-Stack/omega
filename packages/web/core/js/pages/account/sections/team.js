@@ -1,5 +1,5 @@
 // Team section module
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Initialize team section
 export function init() {

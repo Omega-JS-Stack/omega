@@ -12,9 +12,9 @@ const projectRoot   = Manager.getRootPath('project');
 const frameworkRoot = Manager.getRootPath();
 
 // Shared resolve config — lets consumer code `require()` any of @omegajs/desktop's bundled
-// dependencies (fs-jetpack, web-manager, etc.) without installing them directly.
+// dependencies (fs-jetpack, @omegajs/client, etc.) without installing them directly.
 // Webpack checks the consumer's node_modules first (default), then falls back to
-// the framework's node_modules. Mirrors how UJM/BXM resolve web-manager deps.
+// the framework's node_modules. Mirrors how UJM/BXM resolve @omegajs/client deps.
 const sharedResolve = {
   modules: [
     path.join(projectRoot, 'node_modules'),
@@ -201,7 +201,7 @@ function makeRendererConfig(buildJson, isProd) {
   // environment without Node globals (require, process, global, etc.). 'web' tells
   // webpack to polyfill/fallback Node built-ins (fs, path, crypto, etc.) rather than
   // emitting runtime require() calls that would crash. Libraries bundled through
-  // web-manager (Firebase, etc.) get browser-compatible shims this way.
+  // @omegajs/client (Firebase, etc.) get browser-compatible shims this way.
   return {
     name:    'renderer',
     target:  'web',
@@ -217,7 +217,7 @@ function makeRendererConfig(buildJson, isProd) {
     resolve: {
       ...sharedResolve,
       // For 'web' target: provide empty fallbacks for Node built-ins that libraries
-      // import but don't actually use in the browser. Firebase/web-manager's browser
+      // import but don't actually use in the browser. Firebase/@omegajs/client's browser
       // builds don't need these — the imports are dead code paths for Node-only features.
       fallback: {
         fs:             false,

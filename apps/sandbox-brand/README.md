@@ -28,14 +28,14 @@ is continuously dogfooded.
 | App | Framework | Notes |
 |-----|-----------|-------|
 | `apps/backend` | `packages/backend` (@omegajs/backend) | Real @omegajs/backend consumer: full framework corpus (routes/events/rules/…) runs against the emulator, not just the self-test boot smoke |
-| `apps/website` | `packages/client` (web-manager) | Minimal static site whose esbuild bundle embeds web-manager, pointed at the emulator suite (`FIREBASE_EMULATOR_CONNECT`). Gets replaced by an `@omegajs/web` consumer in Phase 2 — the brand-monorepo slot and the e2e contract stay the same |
+| `apps/website` | `packages/client` (@omegajs/client) | Minimal static site whose esbuild bundle embeds @omegajs/client, pointed at the emulator suite (`FIREBASE_EMULATOR_CONNECT`). Gets replaced by an `@omegajs/web` consumer in Phase 2 — the brand-monorepo slot and the e2e contract stay the same |
 
 ## Cross-stack e2e (`npm test` at the brand root)
 
 `e2e/run.js` boots the REAL stack — the backend's Firebase emulator suite +
 the built website served statically — and drives a real Chromium (puppeteer)
 through the frontend↔backend contract: signup → @omegajs/backend `auth onCreate` creates
-the Firestore user doc → signout → signin via web-manager → session
+the Firestore user doc → signout → signin via @omegajs/client → session
 persistence across reload → subscription resolution. Nothing is mocked; this
 is the brand-monorepo `npm test` contract from the redesign plan (the
 `omega e2e` CLI grows from this harness).
@@ -54,6 +54,6 @@ npx mgr test            # boots the emulator (demo project) + runs the corpus
 npm run test:backend    # same thing, proxied from the brand root
 
 # apps/website needs NO install inside the monorepo — its deps (esbuild,
-# web-manager, firebase, puppeteer) resolve from the workspace root via
+# @omegajs/client, firebase, puppeteer) resolve from the workspace root via
 # Node's directory climb. The declared deps make it installable standalone.
 ```

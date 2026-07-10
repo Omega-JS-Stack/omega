@@ -176,7 +176,7 @@ class Auth {
   // Returns: { credits: { monthly: 5, limit: 100 }, ... }
   //
   // The product catalog lives at `config.payment.products` (OMEGA canonical
-  // shape — matches @omegajs/backend, UJM, and EM). Each product entry has `{ id, limits: {...} }`.
+  // shape — matches @omegajs/backend, UJM, and @omegajs/desktop). Each product entry has `{ id, limits: {...} }`.
   _resolveUsage(state) {
     const accountUsage = state.account?.usage || {};
     const productId    = state.resolved?.plan || 'basic';

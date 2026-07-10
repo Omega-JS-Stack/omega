@@ -8,7 +8,7 @@
 // From the framework's cwd it:
 //   1. Scans dist/ for references to @omegajs packages — CommonJS (require,
 //      require.resolve) AND ESM (import ... from, export ... from, dynamic
-//      import(), side-effect import) — web-manager's dist is ESM. Real host
+//      import(), side-effect import) — @omegajs/client's dist is ESM. Real host
 //      files only: symlinks are never followed and node_modules never entered
 //      (@omegajs/backend's dist carries a self-test fixture with a circular self-link)
 //   2. Copies ONLY the referenced modules (plus their transitive relative

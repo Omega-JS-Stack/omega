@@ -2,7 +2,7 @@
 
 How to drive a browser you can CONTROL — see the frontend live, screenshot it, click, type, read console logs, inspect network requests against your routes — for agents (Claude via MCP/CDP) and humans.
 
-> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / EM / WM) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / EM / @omegajs/client) — same core section, framework-flavored. Edit all five together.
 
 ## The browser: your Claude session owns one
 

@@ -7,7 +7,7 @@ import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // State
 let formManager = null;

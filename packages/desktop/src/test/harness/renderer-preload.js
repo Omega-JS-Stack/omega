@@ -54,7 +54,7 @@ contextBridge.exposeInMainWorld('__emTest', {
 // getVersion / getEnvironment / getApiUrl / getFunctionsUrl / getWebsiteUrl). We
 // instantiate the renderer Manager here in the preload (before contextIsolation
 // closes off `require`) and forward each helper as a sync contextBridge function.
-// We deliberately do NOT call `manager.initialize()` — that touches web-manager /
+// We deliberately do NOT call `manager.initialize()` — that touches @omegajs/client /
 // firebase / IPC, which is heavy + flaky for a helper-shape assertion. Instead we
 // stub `manager.config` from a built-time-injected blob so config-dependent
 // helpers (getEnvironment fallback, getWebsiteUrl prod path) have something to read.

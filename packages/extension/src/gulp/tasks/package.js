@@ -47,14 +47,14 @@ async function generateBuildJs(outputDir) {
     // Get git info
     const gitInfo = getGitInfo();
 
-    // Build config object matching web-manager's expected structure
+    // Build config object matching @omegajs/client's expected structure
     const buildConfig = {
       timestamp: new Date().toISOString(),
       repo: gitInfo,
       environment: Manager.getEnvironment(),
       packages: {
         [package.name]: package.version,
-        'web-manager': getPackageVersion('web-manager'),
+        '@omegajs/client': getPackageVersion('@omegajs/client'),
       },
       config: {
         // Core metadata

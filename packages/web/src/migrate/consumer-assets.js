@@ -30,7 +30,7 @@
  * dropped.
  *
  * Page modules (`js/pages/**`) already match the new `{ manager, options }`
- * export-default convention and import 'web-manager' (aliased by the asset
+ * export-default convention and import '@omegajs/client' (aliased by the asset
  * pipeline) — they port verbatim, nothing to do.
  */
 const fs = require('node:fs');
@@ -121,7 +121,7 @@ function migrateConsumerAssets(root, options = {}) {
       file: rel, line: 1, check: 'ujm-import', severity: 'error',
       message: rel.endsWith(`${path.sep}main.js`)
         ? 'customized main.js imports ultimate-jekyll-manager — port manually: `import coreMain from \'__main_assets__/js/main.js\'` inside `export default async (context) => { await coreMain(context); /* custom code */ }`'
-        : 'imports ultimate-jekyll-manager — no such module in @omegajs/web; port to web-manager or a core module',
+        : 'imports ultimate-jekyll-manager — no such module in @omegajs/web; port to @omegajs/client or a core module',
     });
   }
 

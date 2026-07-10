@@ -2,7 +2,7 @@
  * Prerendered Icons Library
  * Retrieves pre-rendered icon HTML from the frontmatter icon system
  */
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 /**
  * Get pre-rendered icon by name from frontmatter icon system.

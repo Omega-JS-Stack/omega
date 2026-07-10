@@ -90,7 +90,7 @@ See [docs/cli-firestore-auth.md](docs/cli-firestore-auth.md) and [docs/cli-logs.
 ## Dependency Resolution
 
 - **Consumer code can use `Manager.require(name)`** to load any @omegajs/backend dependency from @omegajs/backend's own module context (static + prototype). Consumer projects do NOT need to install @omegajs/backend's transitive deps directly.
-- **web-manager owns Firebase on the client side.** Consumer frontend code (UJM pages, BXM popup/options, EM renderers) NEVER imports Firebase directly — `firebase.firestore()` → `webManager.firestore()`, `firebase.auth()` → `webManager.auth()`. @omegajs/backend backend code uses `firebase-admin` directly (server-side is different). The three frontend frameworks (EM/BXM/UJM) additionally resolve deps via webpack `resolve.modules`.
+- **@omegajs/client owns Firebase on the client side.** Consumer frontend code (UJM pages, BXM popup/options, EM renderers) NEVER imports Firebase directly — `firebase.firestore()` → `webManager.firestore()`, `firebase.auth()` → `webManager.auth()`. @omegajs/backend backend code uses `firebase-admin` directly (server-side is different). The three frontend frameworks (EM/BXM/UJM) additionally resolve deps via webpack `resolve.modules`.
 
 ## Development Workflow
 
@@ -133,7 +133,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / BXM / EM / MAM — WM mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / BXM / EM / MAM — @omegajs/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 

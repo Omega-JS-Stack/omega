@@ -5,25 +5,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/package-json/v/itw-creative-works/web-manager.svg">
-  <br>
-  <img src="https://img.shields.io/bundlephobia/min/web-manager.svg">
-  <img src="https://img.shields.io/codeclimate/maintainability-percentage/itw-creative-works/web-manager.svg">
-  <img src="https://img.shields.io/npm/dm/web-manager.svg">
-  <img src="https://img.shields.io/node/v/web-manager.svg">
-  <img src="https://img.shields.io/website/https/itwcreativeworks.com.svg">
-  <img src="https://img.shields.io/github/license/itw-creative-works/web-manager.svg">
-  <img src="https://img.shields.io/github/contributors/itw-creative-works/web-manager.svg">
-  <img src="https://img.shields.io/github/last-commit/itw-creative-works/web-manager.svg">
-  <br>
-  <br>
-  <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/web-manager">NPM Module</a> | <a href="https://github.com/itw-creative-works/web-manager">GitHub Repo</a>
-  <br>
-  <br>
-  <strong>Web Manager</strong> is a modern JavaScript utility library for building web applications with Firebase integration. It provides authentication, data binding, storage management, push notifications, error tracking, and more.
-  <br>
-  <br>
-  Optimized for use with <a href="https://www.npmjs.com/package/webpack">webpack</a> but works standalone too.
+  <strong>OMEGA Client</strong> — the shared frontend runtime (auth, data binding, storage, push notifications, error tracking) embedded by
+  <a href="../web/">@omegajs/web</a>,
+  <a href="../desktop/">@omegajs/desktop</a>, and
+  <a href="../extension/">@omegajs/extension</a>.
 </p>
 
 ## Table of Contents
@@ -52,7 +37,7 @@
 
 ## Installation
 ```shell
-npm install web-manager
+npm install @omegajs/client
 ```
 
 ## Requirements
@@ -64,7 +49,7 @@ npm install web-manager
 ## Quick Start
 
 ```javascript
-import Manager from 'web-manager';
+import Manager from '@omegajs/client';
 
 // Initialize with your configuration
 await Manager.initialize({
@@ -89,7 +74,7 @@ await Manager.initialize({
   }
 });
 
-console.log('Web Manager initialized!');
+console.log('OMEGA Client initialized!');
 ```
 
 ## Supported Environments
@@ -232,7 +217,7 @@ await Manager.initialize({
 The Manager is a singleton that provides access to all modules:
 
 ```javascript
-import Manager from 'web-manager';
+import Manager from '@omegajs/client';
 
 // Module getters
 Manager.storage();        // Storage API
@@ -681,7 +666,7 @@ try {
 ### DOM Utilities
 
 ```javascript
-import { loadScript, ready } from 'web-manager/modules/dom';
+import { loadScript, ready } from '@omegajs/client/modules/dom';
 // Or: const { loadScript, ready } = Manager.dom();
 
 // Wait for DOM ready
@@ -731,7 +716,7 @@ import {
   isMobile,
   getDevice,
   getContext
-} from 'web-manager/modules/utilities';
+} from '@omegajs/client/modules/utilities';
 // Or: const utils = Manager.utilities();
 
 // Copy to clipboard
@@ -811,29 +796,29 @@ Import individual modules to reduce bundle size:
 
 ```javascript
 // Storage only
-import Storage from 'web-manager/modules/storage';
+import Storage from '@omegajs/client/modules/storage';
 const storage = new Storage();
 
 // Utilities only
-import { clipboardCopy, escapeHTML } from 'web-manager/modules/utilities';
+import { clipboardCopy, escapeHTML } from '@omegajs/client/modules/utilities';
 
 // DOM utilities only
-import { loadScript, ready } from 'web-manager/modules/dom';
+import { loadScript, ready } from '@omegajs/client/modules/dom';
 
 // Full manager (default)
-import Manager from 'web-manager';
+import Manager from '@omegajs/client';
 ```
 
 **Available Modules**:
-- `web-manager/modules/storage` - Storage class
-- `web-manager/modules/utilities` - Utility functions
-- `web-manager/modules/dom` - DOM utilities
-- `web-manager/modules/auth` - Auth class (requires Manager)
-- `web-manager/modules/bindings` - Bindings class (requires Manager)
-- `web-manager/modules/firestore` - Firestore class (requires Manager)
-- `web-manager/modules/notifications` - Notifications class (requires Manager)
-- `web-manager/modules/service-worker` - ServiceWorker class (requires Manager)
-- `web-manager/modules/sentry` - Sentry class (requires Manager)
+- `@omegajs/client/modules/storage` - Storage class
+- `@omegajs/client/modules/utilities` - Utility functions
+- `@omegajs/client/modules/dom` - DOM utilities
+- `@omegajs/client/modules/auth` - Auth class (requires Manager)
+- `@omegajs/client/modules/bindings` - Bindings class (requires Manager)
+- `@omegajs/client/modules/firestore` - Firestore class (requires Manager)
+- `@omegajs/client/modules/notifications` - Notifications class (requires Manager)
+- `@omegajs/client/modules/service-worker` - ServiceWorker class (requires Manager)
+- `@omegajs/client/modules/sentry` - Sentry class (requires Manager)
 
 ## Browser Support
 

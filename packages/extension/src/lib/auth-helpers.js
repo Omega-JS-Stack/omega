@@ -3,20 +3,20 @@
 //
 // Architecture:
 // - Background.js is the SOURCE OF TRUTH for authentication
-// - On context load, contexts wait for WM auth to settle, then ask background if in sync
+// - On context load, contexts wait for @omegajs/client auth to settle, then ask background if in sync
 // - If out of sync, background provides a fresh custom token (fetched from server)
 // - No BXM-specific storage - Web Manager handles auth state internally
 
 /**
  * Sync auth state with background.js on context load
- * Waits for WM auth to settle, then asks background if in sync
+ * Waits for @omegajs/client auth to settle, then asks background if in sync
  * @param {Object} context - The manager instance (must have extension, webManager, logger)
  */
 export async function syncWithBackground(context) {
   const { extension, webManager, logger } = context;
 
   try {
-    // Wait for WM auth state to settle FIRST (prevents race conditions)
+    // Wait for @omegajs/client auth state to settle FIRST (prevents race conditions)
     const localState = await new Promise(resolve => {
       webManager.auth().listen({ once: true }, resolve);
     });
@@ -201,7 +201,7 @@ export function setupAuthEventListeners(context) {
     openAuthPage(context);
   });
 
-  // Note: .auth-signout-btn is handled by web-manager's auth module
+  // Note: .auth-signout-btn is handled by @omegajs/client's auth module
   // setupSignOutListener detects sign-out and notifies background
 
   // Log

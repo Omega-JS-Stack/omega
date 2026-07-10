@@ -2,7 +2,7 @@
 
 Captures, stores, and synchronizes user consent for legal terms (ToS + Privacy) and marketing communications across SendGrid + Beehiiv. Designed for GDPR / CASL / CAN-SPAM compliance with full audit metadata.
 
-This doc covers the **server-side** (@omegajs/backend) part of the system. The matching frontend pieces live in [ultimate-jekyll-manager](https://github.com/itw-creative-works/ultimate-jekyll-manager) and [web-manager](https://github.com/itw-creative-works/web-manager).
+This doc covers the **server-side** (@omegajs/backend) part of the system. The matching frontend pieces live in [ultimate-jekyll-manager](https://github.com/itw-creative-works/ultimate-jekyll-manager) and [@omegajs/client](../../client/).
 
 ## Why this exists
 
@@ -348,7 +348,7 @@ The "all cleanup runs at start, never at the end" rule documented in [docs/test-
 - **UJM auth library** — [libs/auth.js](https://github.com/itw-creative-works/ultimate-jekyll-manager/blob/main/src/assets/js/libs/auth.js) (`captureSignupConsent`, `validateConsent`, `reverseAccidentalSignup` for the Google-on-signin quirk)
 - **UJM core auth listener** — [core/auth.js](https://github.com/itw-creative-works/ultimate-jekyll-manager/blob/main/src/assets/js/core/auth.js) (`ENFORCE_CONSENT_GUARD` flag, page-load silent-signout for orphan accounts)
 - **UJM account page** — [account/index.html](https://github.com/itw-creative-works/ultimate-jekyll-manager/blob/main/src/defaults/dist/_layouts/themes/classy/frontend/pages/account/index.html) + [sections/notifications.js](https://github.com/itw-creative-works/ultimate-jekyll-manager/blob/main/src/assets/js/pages/account/sections/notifications.js)
-- **Web Manager DEFAULT_ACCOUNT** — [modules/auth.js](https://github.com/itw-creative-works/web-manager/blob/main/src/modules/auth.js) (consent fields with `'revoked'` defaults so legacy reads don't crash)
+- **@omegajs/client DEFAULT_ACCOUNT** — [modules/auth.js](../../client/src/modules/auth.js) (consent fields with `'revoked'` defaults so legacy reads don't crash)
 
 ## Future work
 

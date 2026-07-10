@@ -1,4 +1,4 @@
-// Integration tests for web-manager-bridge — actually hits Firebase.
+// Integration tests for client-bridge — actually hits Firebase.
 //
 // Skipped automatically unless EM_TEST_FIREBASE_ADMIN_KEY (or GOOGLE_APPLICATION_CREDENTIALS)
 // points to a Firebase service-account JSON file. This keeps `npx mgr test` fast & green
@@ -40,7 +40,7 @@ const skipReason = checkSkipReason();
 module.exports = {
   type: 'suite',
   layer: 'main',
-  description: 'web-manager-bridge (main, integration)',
+  description: 'client-bridge (main, integration)',
   skip: skipReason || false,
   cleanup: async (ctx) => {
     try {

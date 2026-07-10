@@ -1,6 +1,6 @@
 # Analytics
 
-GA4 Measurement Protocol with cross-platform identity. The same human gets unified events across desktop (@omegajs/desktop), web (UJM/web-manager), and backend (@omegajs/backend) — provided all four reference the same Firebase project ID.
+GA4 Measurement Protocol with cross-platform identity. The same human gets unified events across desktop (@omegajs/desktop), web (UJM/@omegajs/client), and backend (@omegajs/backend) — provided all four reference the same Firebase project ID.
 
 ## How identity works
 
@@ -11,7 +11,7 @@ Every event ships with two GA4 fields:
 
 @omegajs/desktop derives both via `uuidv5(input, namespace)` where:
 
-- `namespace = uuidv5(firebaseConfig.projectId, uuidv5.URL)` — same projectId in @omegajs/backend/UJM/web-manager → same namespace everywhere.
+- `namespace = uuidv5(firebaseConfig.projectId, uuidv5.URL)` — same projectId in @omegajs/backend/UJM/@omegajs/client → same namespace everywhere.
 - `client_id = uuidv5(deviceId, namespace)` — `deviceId` is the first non-internal MAC from `os.networkInterfaces()`, falling back to a persisted `crypto.randomUUID()`.
 - `user_id = uuidv5(firebaseUid, namespace)` — set automatically when `webManager.onAuthChange` fires with a uid; cleared on logout.
 

@@ -1,5 +1,5 @@
 // Backend URL helpers, shared across all Manager contexts (main / renderer / preload /
-// build). Mirror web-manager's contract so @omegajs/desktop apps can hit the same dev/prod backends as
+// build). Mirror @omegajs/client's contract so @omegajs/desktop apps can hit the same dev/prod backends as
 // UJM and BXM consumers.
 //
 // `getEnvironment()` is the SINGLE SOURCE OF TRUTH and lives in src/utils/mode-helpers.js
@@ -35,7 +35,7 @@ function getApiUrl(environment) {
     return 'http://localhost:5002';
   }
 
-  // Prod: api.<authDomain>. Mirrors web-manager.getApiUrl behavior.
+  // Prod: api.<authDomain>. Mirrors @omegajs/client.getApiUrl behavior.
   const authDomain = this?.config?.firebaseConfig?.authDomain;
   if (!authDomain) {
     throw new Error('firebaseConfig.authDomain not set in config/omega.json5');
@@ -66,7 +66,7 @@ function getWebsiteUrl(environment) {
 // Sign-in URL that round-trips an auth token back to the app. Points at the brand
 // website's /signin page (UJM), chained through its /token page so a successful login
 // mints a Firebase custom token and redirects to `<brand.id>://auth/token` — the
-// deep-link built-in that hands the token to web-manager-bridge (signInWithCustomToken).
+// deep-link built-in that hands the token to client-bridge (signInWithCustomToken).
 // Same env split as getWebsiteUrl: dev/test → the local website, prod → brand.url.
 // The token page redirects with ?authToken=<token> — the ONE modern shape the
 // auth/token route reads (legacy-app formats are UJM's concern, not @omegajs/desktop's).

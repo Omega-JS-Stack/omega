@@ -47,7 +47,7 @@ see the harness README for the honest before/after numbers.
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
-| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `web-manager` → @omegajs/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
+| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omegajs/client` → @omegajs/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
 | [build.js](src/build.js) | `buildSite()` — assets → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime) + `resolveClientEntry()` |
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
@@ -112,16 +112,16 @@ see the harness README for the honest before/after numbers.
   `js/pages/**`, `css/main.scss`, `css/pages/**`, theme roots add
   `_theme.scss`/`_theme.js`). `__main_assets__/*` resolves to the core layer /
   themes dir, `__theme__/*` to the active theme (classy fallback),
-  `web-manager` (subpaths included) to @omegajs/client. Manifest:
+  `@omegajs/client` (subpaths included) to @omegajs/client. Manifest:
   `{ js: { main, pages }, css: { main, pages, themePages } }` — base page css
   and the active theme's page css BOTH load. The engine's `pageAssets`
   computed resolves each page's entries (`asset_path` override honored).
   Dev mode (`omega dev`): stable un-hashed names + no minify, so in-place
   asset rebuilds keep their URLs without an HTML re-render.
 - **Boot runtime (ESM + code splitting)** — all bundles come out of ONE
-  esbuild call with `splitting: true`, so web-manager and `runtime/boot.js`
+  esbuild call with `splitting: true`, so @omegajs/client and `runtime/boot.js`
   land in a shared chunk the browser evaluates ONCE per page: every
-  `import webManager from 'web-manager'` — in the main bundle, a page module,
+  `import webManager from '@omegajs/client'` — in the main bundle, a page module,
   anywhere — is the SAME initialized singleton (webpack's single module
   graph, reproduced with `<script type="module">` semantics; both scripts are
   deferred and execute in document order). The handshake: main stub →

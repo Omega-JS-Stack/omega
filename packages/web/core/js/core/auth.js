@@ -1,5 +1,5 @@
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Enforce page-load consent guard. When true, any authenticated user whose doc has
 // consent.legal.status !== 'granted' is silently signed out. Keep FALSE until the

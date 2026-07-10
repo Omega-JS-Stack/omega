@@ -1,6 +1,6 @@
 /**
  * User — thin wrapper over @omegajs/account, the single source of truth for
- * the OMEGA user/account schema (shared with web-manager, so a doc resolved
+ * the OMEGA user/account schema (shared with @omegajs/client, so a doc resolved
  * here is byte-identical to one resolved on the frontend).
  *
  * @omegajs/backend's contribution is injecting the real value generators for the

@@ -1,4 +1,4 @@
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Lazy Loading Module
 export default function () {

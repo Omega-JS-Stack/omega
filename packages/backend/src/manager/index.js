@@ -309,7 +309,7 @@ Manager.prototype.init = function (exporter, options) {
   // Set more properties (need to wait for assistant to determine if DEV)
   self.project.functionsUrl = self.getFunctionsUrl();
 
-  // Set API URL (like web-manager's getApiUrl)
+  // Set API URL (like @omegajs/client's getApiUrl)
   // Testing: http://localhost:5002 (hosting emulator with rewrites)
   // Development: http://localhost:5002 (local hosting)
   // Production: https://api.{domain}

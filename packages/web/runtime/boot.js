@@ -2,10 +2,10 @@
  * Browser boot runtime — the module every generated bundle imports.
  *
  * All bundles (main + one per page) come out of ONE esbuild call with
- * splitting enabled, so this module — and the web-manager singleton it pulls
+ * splitting enabled, so this module — and the @omegajs/client singleton it pulls
  * in — lands in a shared chunk and evaluates exactly once per page, no matter
  * how many bundles the page loads. That is the load-bearing property: it is
- * what makes `import webManager from 'web-manager'` inside any page module
+ * what makes `import webManager from '@omegajs/client'` inside any page module
  * resolve to the SAME initialized instance the main bundle booted (UJM got
  * this from webpack's single module graph).
  *
@@ -17,7 +17,7 @@
  *      pageModule({ manager, options }). Both scripts are `type="module"`
  *      (deferred, document order), so bootMain always registers first.
  */
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 import { Manager } from './manager.js';
 
 let context = null;
@@ -42,7 +42,7 @@ function getContext() {
 async function initialize() {
   const { manager, options } = getContext();
 
-  // Initialize the web-manager singleton with the page-baked config
+  // Initialize the @omegajs/client singleton with the page-baked config
   await webManager.initialize(window.Configuration);
 
   // Development helpers — code-split, only ever fetched in development
@@ -56,7 +56,7 @@ async function initialize() {
 }
 
 /**
- * Boot the main bundle: initialize web-manager, then run the global module.
+ * Boot the main bundle: initialize @omegajs/client, then run the global module.
  * A global-module failure is logged but does NOT block page modules.
  * @param {Function} mod - the global module's default export
  * @returns {Promise<object>} the shared { manager, options } context

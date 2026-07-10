@@ -3,7 +3,7 @@
 
 ## Framework
 
-This project consumes **@omegajs/web** — the OMEGA web framework (Eleventy 3 + LiquidJS). It ships ~60 default pages as virtual templates (nothing copied into this repo), layered themes with zero file copying, a `page.resolved` data cascade, the esbuild/sass/PurgeCSS asset pipeline, and an ESM boot runtime around the web-manager singleton.
+This project consumes **@omegajs/web** — the OMEGA web framework (Eleventy 3 + LiquidJS). It ships ~60 default pages as virtual templates (nothing copied into this repo), layered themes with zero file copying, a `page.resolved` data cascade, the esbuild/sass/PurgeCSS asset pipeline, and an ESM boot runtime around the @omegajs/client singleton.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 

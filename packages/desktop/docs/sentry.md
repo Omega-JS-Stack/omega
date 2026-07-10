@@ -1,6 +1,6 @@
 # Sentry
 
-Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with desktop-specific config gating, dev-mode protection, and automatic user attribution from web-manager auth state.
+Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry/electron` with desktop-specific config gating, dev-mode protection, and automatic user attribution from @omegajs/client auth state.
 
 ## Config (`config/omega.json5`)
 
@@ -51,7 +51,7 @@ In renderer (via preload bridge): `window.em.sentry` would expose the same surfa
 
 ## Auth attribution
 
-When the user signs in via `web-manager-bridge`, @omegajs/desktop automatically calls `manager.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
+When the user signs in via `client-bridge`, @omegajs/desktop automatically calls `manager.sentry.setUser({ id, email })`. On sign-out, `setUser(null)` clears the context. So every error report is attributed to whoever was signed in at the time.
 
 The user object is **normalized** before being sent — only `uid`/`id` and `email` are kept; everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
 

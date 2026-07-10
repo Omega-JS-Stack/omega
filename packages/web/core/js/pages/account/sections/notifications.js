@@ -12,7 +12,7 @@
  */
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 const FORM_ID = 'marketing-emails-form';
 const TOGGLE_ID = 'marketing-emails';

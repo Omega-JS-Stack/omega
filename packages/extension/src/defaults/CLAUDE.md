@@ -17,11 +17,11 @@ This project consumes **OMEGA Extension** (`@omegajs/extension`) — a comprehen
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**OMEGA Extension ships `web-manager` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with web-manager as much as with the extension framework.
+**OMEGA Extension ships `@omegajs/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omegajs/client as much as with the extension framework.
 
 **Required reading:**
-- **`node_modules/web-manager/CLAUDE.md`** — top-level overview + index
-- **`node_modules/web-manager/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omegajs/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omegajs/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick start
 
@@ -86,8 +86,8 @@ Auth UI is declarative — add `.auth-signin-btn` / `.auth-signout-btn` / `.auth
 
 ## Dependency resolution
 
-- **Do NOT install framework dependencies directly** (`firebase`, `web-manager`, etc.). the framework's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in the framework's webpack config — not your `package.json`.
-- **web-manager owns Firebase.** Never `import firebase from 'firebase/app'`. Use `import webManager from 'web-manager'` → `webManager.auth()`, `webManager.firestore()`.
+- **Do NOT install framework dependencies directly** (`firebase`, `@omegajs/client`, etc.). the framework's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in the framework's webpack config — not your `package.json`.
+- **@omegajs/client owns Firebase.** Never `import firebase from 'firebase/app'`. Use `import webManager from '@omegajs/client'` → `webManager.auth()`, `webManager.firestore()`.
 - **`Manager.require(name)`** resolves from the framework's module context at runtime for unbundled code (gulp tasks, test fixtures).
 
 ## Testing

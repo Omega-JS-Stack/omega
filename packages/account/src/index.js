@@ -3,10 +3,10 @@
  *
  * Today the account shape lives in two drifted places: @omegajs/backend's
  * src/manager/helpers/user.js (canonical — schema engine + tokens) and
- * web-manager's DEFAULT_ACCOUNT in modules/auth.js (hand-rolled deep-merge,
+ * @omegajs/client's DEFAULT_ACCOUNT in modules/auth.js (hand-rolled deep-merge,
  * missing flags/activity/personal branches and `everPaid`). This package
  * unifies them; each framework becomes a thin wrapper (@omegajs/backend keeps its
- * `new User(Manager, settings).properties` API, web-manager keeps
+ * `new User(Manager, settings).properties` API, @omegajs/client keeps
  * `resolveAccount(rawData, firebaseUser)`).
  *
  * resolveAccount(data, options):
@@ -15,7 +15,7 @@
  *     (uuid v4, Utilities().randomId, uid-generator); the frontend passes none
  *     and the fields resolve to null (real values always come from the backend).
  *   options.user — optional auth-user overlay ({ uid, email }): fills
- *     account.auth identity when the doc doesn't carry it (web-manager's
+ *     account.auth identity when the doc doesn't carry it (@omegajs/client's
  *     resolveAccount(rawData, firebaseUser) semantic).
  */
 const USER_SCHEMA = require('./schema.js');

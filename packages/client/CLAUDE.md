@@ -1,10 +1,10 @@
-# Web Manager
+# OMEGA Client (@omegajs/client)
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to deep references. The **meat** (module APIs, patterns, behavior tables) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
 ## Identity
 
-Web Manager is a modern JavaScript utility library for web applications with Firebase integration. It runs in the browser, in Electron's renderer process, and inside browser extensions (content scripts, popups, background pages). Provides:
+OMEGA Client is a modern JavaScript utility library for web applications with Firebase integration. It runs in the browser, in Electron's renderer process, and inside browser extensions (content scripts, popups, background pages). Provides:
 
 - A singleton `Manager` instance exposing authentication, reactive DOM data binding, Firestore, storage, push notifications, error tracking (Sentry), service-worker helpers, and DOM/utility functions
 - Lazy Firebase imports to keep consumer bundles small
@@ -13,7 +13,7 @@ Web Manager is a modern JavaScript utility library for web applications with Fir
 
 ### Consumed by the frontend Manager family
 
-Web Manager is the runtime singleton powering **Ultimate Jekyll Manager (UJM)**, **Browser Extension Manager (BXM)**, and **Electron Manager (EM)**. Each framework initializes the singleton once and exposes it as `manager.webManager`. Any consumer of those frameworks gets a fully-wired web-manager via `import webManager from 'web-manager'`.
+OMEGA Client is the runtime singleton powering **@omegajs/web**, **@omegajs/extension**, and **@omegajs/desktop**. Each framework initializes the singleton once and exposes it as `manager.webManager`. Any consumer of those frameworks gets a fully-wired @omegajs/client via `import webManager from '@omegajs/client'`.
 
 ## Recommended skills
 
@@ -23,10 +23,10 @@ Web Manager is the runtime singleton powering **Ultimate Jekyll Manager (UJM)**,
 
 ### For Consuming Projects
 
-Web Manager is consumed indirectly through UJM, BXM, or EM — those frameworks initialize the singleton for you. Inside any consuming code:
+OMEGA Client is consumed indirectly through @omegajs/web, @omegajs/extension, or @omegajs/desktop — those frameworks initialize the singleton for you. Inside any consuming code:
 
 ```javascript
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 webManager.auth().listen({ once: true }, async () => { /* auth settled */ });
 webManager.utilities().escapeHTML(untrustedText);
@@ -35,16 +35,16 @@ webManager.firestore().doc('users/abc').get();
 
 ### For Framework Development (This Repository)
 
-1. `npm install` — install Web Manager's own deps
+1. `npm install` — install OMEGA Client's own deps
 2. `npm run prepare` — build once: copies `src/` → `dist/` via prepare-package (ES5 transpile)
 3. `npm start` — watch mode (rebuild on change)
 4. `npm test` — run Mocha tests
 
-> **Important:** Web Manager is a library, not an app. There is no `npm run build` / `npm run serve` here. Consume it from inside a UJM / BXM / EM project for end-to-end behavior.
+> **Important:** OMEGA Client is a library, not an app. There is no `npm run build` / `npm run serve` here. Consume it from inside an @omegajs/web / @omegajs/extension / @omegajs/desktop project for end-to-end behavior.
 
 ## Architecture
 
-Web Manager exports a singleton `Manager` instance from `src/index.js`. Every `import webManager from 'web-manager'` returns the same already-initialized object — do NOT call `new Manager()`, and do NOT pass `webManager` through function params or module-level variables.
+OMEGA Client exports a singleton `Manager` instance from `src/index.js`. Every `import webManager from '@omegajs/client'` returns the same already-initialized object — do NOT call `new Manager()`, and do NOT pass `webManager` through function params or module-level variables.
 
 The singleton owns nine feature modules under `src/modules/`: `storage`, `auth`, `bindings`, `firestore`, `notifications`, `service-worker`, `sentry`, `dom`, `utilities`. Firebase modules are dynamically imported to keep the bundle small. See [docs/architecture.md](docs/architecture.md) for the directory structure and module dependency graph, and [docs/modules.md](docs/modules.md) for the API reference of each module.
 
@@ -69,7 +69,7 @@ Whenever you make a behavioral change (new module, new method, new pattern, remo
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** WM follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / @omegajs/backend / BXM / EM / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** @omegajs/client follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 
@@ -81,6 +81,6 @@ Deep references live in `docs/`. Treat docs as a first-class deliverable. **When
 - [docs/bindings.md](docs/bindings.md) — `data-wm-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
 - [docs/build-system.md](docs/build-system.md) — `prepare-package` ES5 transpile, build commands, package exports
 - [docs/testing.md](docs/testing.md) — Mocha test setup
-- [docs/cdp-debugging.md](docs/cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify WM inside a consuming site
+- [docs/cdp-debugging.md](docs/cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omegajs/client inside a consuming site
 - [docs/common-tasks.md](docs/common-tasks.md) — adding a utility, adding a module, modifying config defaults, payment config (OMEGA SSOT shape), adding a binding action
 - [docs/dependencies.md](docs/dependencies.md) — dependencies table + important notes (no TypeScript, prefer fs-jetpack, no backwards-compat requirement, etc.)

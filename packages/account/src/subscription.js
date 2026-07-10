@@ -1,6 +1,6 @@
 /**
  * resolveSubscription — extracted verbatim from @omegajs/backend's User.resolveSubscription
- * (the superset: web-manager's drifted copy lacked `everPaid`).
+ * (the superset: @omegajs/client's drifted copy lacked `everPaid`).
  *
  * Resolves calculated subscription fields that require derivation logic.
  * Raw data (product.id, status, trial, cancellation) is on the account directly.

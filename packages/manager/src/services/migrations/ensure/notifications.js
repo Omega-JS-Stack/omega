@@ -1,6 +1,6 @@
 /**
  * Notifications collection migration — converges push-subscription docs to
- * the canonical @omegajs/backend + web-manager shape.
+ * the canonical @omegajs/backend + @omegajs/client shape.
  *
  * Fixes:
  * - Renames `uid` field to `owner` and deletes `uid`
@@ -19,7 +19,7 @@ const { validateDocument } = require('../lib/schema-validator.js');
 const { createSanitizeFix } = require('../lib/sanitize-strings.js');
 
 /**
- * Default context structure from web-manager's getContext()
+ * Default context structure from @omegajs/client's getContext()
  */
 const DEFAULT_CONTEXT = {
   client: {
@@ -37,7 +37,7 @@ const DEFAULT_CONTEXT = {
 
 /**
  * Notifications collection schema
- * Based on web-manager's notifications _saveSubscription()
+ * Based on @omegajs/client's notifications _saveSubscription()
  */
 const schema = {
   token: { type: 'string', required: true },

@@ -1,5 +1,5 @@
 // Celebration animation for confirmation page
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Trigger confetti celebration
 export async function triggerCelebration() {

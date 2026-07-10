@@ -2,7 +2,7 @@
  * Cross-stack e2e harness for the sandbox brand — `npm test` at the brand root.
  *
  * Boots the REAL stack, nothing mocked:
- *   1. builds apps/website (esbuild bundle embedding web-manager)
+ *   1. builds apps/website (esbuild bundle embedding @omegajs/client)
  *   2. boots @omegajs/backend's Firebase emulator suite for apps/backend
  *      (functions, firestore, auth, database, hosting, pubsub — `npx mgr emulator`)
  *   3. serves the built website statically
@@ -208,12 +208,12 @@ async function main() {
     page.on('console', (message) => pageConsole.push(`[${message.type()}] ${message.text()}`));
     page.on('pageerror', (error) => pageConsole.push(`[pageerror] ${error.message}`));
 
-    await step('page boots web-manager against the emulators', async () => {
+    await step('page boots @omegajs/client against the emulators', async () => {
       await page.goto(`http://localhost:${SITE_PORT}/`, { waitUntil: 'load' });
       await page.waitForFunction('window.__omega && (window.__omega.isReady || window.__omega.initError)', { timeout: 30000 });
       const initError = await page.evaluate(() => window.__omega.initError);
       if (initError) {
-        throw new Error(`web-manager initialize failed: ${initError}`);
+        throw new Error(`@omegajs/client initialize failed: ${initError}`);
       }
     });
 
@@ -260,7 +260,7 @@ async function main() {
       }
     });
 
-    await step('sign in via web-manager', async () => {
+    await step('sign in via @omegajs/client', async () => {
       const signedInUid = await page.evaluate(
         (email, password) => window.__omega.signIn(email, password),
         EMAIL, PASSWORD,

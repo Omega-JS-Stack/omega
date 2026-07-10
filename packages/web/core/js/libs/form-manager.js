@@ -12,8 +12,8 @@
  */
 
 // Libraries
-import { ready as domReady } from 'web-manager/modules/dom.js';
-import webManager from 'web-manager';
+import { ready as domReady } from '@omegajs/client/modules/dom.js';
+import webManager from '@omegajs/client';
 
 // Constants
 const HONEYPOT_SELECTOR = '[data-honey], [name="honey"]';

@@ -73,7 +73,7 @@ No logic operators (`&&`, `||`) in conditions — keep conditions simple. Right-
 
 ## Available State Paths
 
-### Auth paths (automatically populated by web-manager)
+### Auth paths (automatically populated by @omegajs/client)
 
 ```
 auth.user                        # Firebase user object (truthy = signed in)
@@ -87,7 +87,7 @@ auth.account.roles.admin         # Boolean
 auth.account.roles.betaTester    # Boolean
 ```
 
-### Usage paths (auto-populated by web-manager + authorized-fetch)
+### Usage paths (auto-populated by @omegajs/client + authorized-fetch)
 
 ```
 usage.{feature}.monthly              # Current monthly usage count

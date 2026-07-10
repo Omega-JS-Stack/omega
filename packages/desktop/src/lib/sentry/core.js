@@ -45,7 +45,7 @@ function resolveConfig(manager) {
   return { shouldEnable: true, options: opts, reason: null };
 }
 
-// Normalize a web-manager / firebase user object into the minimal shape Sentry wants.
+// Normalize a @omegajs/client / firebase user object into the minimal shape Sentry wants.
 // Only the safe fields — never email if `sentry.scrubEmail` is true (default false).
 function normalizeUser(user, opts = {}) {
   if (!user) return null;

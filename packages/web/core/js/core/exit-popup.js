@@ -1,6 +1,6 @@
 // Libraries
 import merge from 'lodash/merge.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Exit Popup Module
 export default function () {

@@ -47,7 +47,7 @@ if (isDevelopment() || isTesting()) { /* DevTools menu items, verbose logging */
 
 ## URL helpers
 
-@omegajs/extension does **not** own backend URL helpers (`getApiUrl` / `getFunctionsUrl` / `getWebsiteUrl`). Extension code that needs a backend URL reads it from the `web-manager` runtime singleton in the runtime contexts (popup / options / sidepanel / background), which follows the same local-in-dev/testing, production-otherwise convention. The rule "call the getter, never hardcode" still applies; the implementation lives in `web-manager`.
+@omegajs/extension does **not** own backend URL helpers (`getApiUrl` / `getFunctionsUrl` / `getWebsiteUrl`). Extension code that needs a backend URL reads it from the `@omegajs/client` runtime singleton in the runtime contexts (popup / options / sidepanel / background), which follows the same local-in-dev/testing, production-otherwise convention. The rule "call the getter, never hardcode" still applies; the implementation lives in `@omegajs/client`.
 
 ## Where they live
 

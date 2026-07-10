@@ -1,7 +1,7 @@
 {
-  "name": "web-manager",
-  "version": "4.3.4",
-  "description": "Easily access important variables such as the query string, current domain, and current page in a single object.",
+  "name": "@omegajs/client",
+  "version": "5.0.0",
+  "description": "OMEGA client runtime — the shared frontend singleton (Firebase auth, account, analytics, notifications, bindings) embedded by the OMEGA web, desktop, and extension frameworks",
   "main": "dist/index.js",
   "files": [
     "dist/",
@@ -9,7 +9,6 @@
     "docs/",
     "CLAUDE.md"
   ],
-  "module": "src/index.js",
   "exports": {
     ".": "./dist/index.js",
     "./modules/*": "./dist/modules/*",
@@ -25,19 +24,12 @@
   "engines": {
     "node": ">=12"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/itw-creative-works/web-manager.git"
-  },
   "keywords": [
+    "omega",
     "library"
   ],
   "author": "ITW Creative Works",
-  "license": "CC-BY-4.0",
-  "bugs": {
-    "url": "https://github.com/itw-creative-works/web-manager/issues"
-  },
-  "homepage": "https://itwcreativeworks.com",
+  "license": "MIT",
   "preparePackage": {
     "input": "./src",
     "output": "./dist",
@@ -48,7 +40,7 @@
     }
   },
   "notes": {
-    "@sentry/browser": "Resolved by using OVERRIDES in web-manager (lighthouse is the issue"
+    "@sentry/browser": "Resolved by using OVERRIDES in @omegajs/client (lighthouse is the issue"
   },
   "dependencies": {
     "@sentry/browser": "^10.57.0",

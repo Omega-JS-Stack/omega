@@ -1,6 +1,6 @@
 // Authorized Fetch - Wrapper for wonderful-fetch with Firebase Authentication
 import fetch from 'wonderful-fetch';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 /**
  * Makes an authorized API request with Firebase token.
@@ -51,7 +51,7 @@ export async function authorizedFetch(url, options = {}) {
 
 /**
  * Sync usage data from bm-properties response header into the top-level
- * `usage` bindings key (same key web-manager seeds on auth settle).
+ * `usage` bindings key (same key @omegajs/client seeds on auth settle).
  *
  * Merges fresh usage counters + limits so the structure becomes:
  *   { credits: { monthly: 5, daily: 2, limit: 100 } }

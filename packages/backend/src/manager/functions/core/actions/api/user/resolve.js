@@ -19,8 +19,8 @@ Module.prototype.main = function () {
       // - Usage for the account
       // - Plan for the account
 
-      // used in EM, WM when signing in or running account().resolve()
-      // on WM, it should hide and show the auth-xxx-xxx things in WM
+      // used in EM, @omegajs/client when signing in or running account().resolve()
+      // on @omegajs/client, it should hide and show the auth-xxx-xxx things in @omegajs/client
     })
     .catch(e => {
       return reject(e);

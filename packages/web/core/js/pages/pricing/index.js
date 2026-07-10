@@ -1,6 +1,6 @@
 // Libraries
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Module
 export default () => {

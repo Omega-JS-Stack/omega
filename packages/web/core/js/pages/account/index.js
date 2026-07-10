@@ -10,7 +10,7 @@ import * as deleteSection from './sections/delete.js';
 import * as dataRequestSection from './sections/data-request.js';
 import * as connectionsSection from './sections/connections.js';
 import * as refundSection from './sections/refund.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 import { getPaymentConfig } from '__main_assets__/js/libs/payment-config.js';
 
 // Module
@@ -103,7 +103,7 @@ async function initializeAccount() {
             const test = testModule.default;
             const merged = deepMerge(real, test);
 
-            // Write back so both JS and WM bindings see the same data
+            // Write back so both JS and @omegajs/client bindings see the same data
             state.account.subscription = merged;
 
             console.log('Test subscription merged:', merged);

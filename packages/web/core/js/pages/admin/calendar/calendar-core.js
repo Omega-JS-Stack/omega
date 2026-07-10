@@ -7,7 +7,7 @@
  * IMPORTANT: All dates/times in this module are UTC.
  * No local time APIs (getHours, getDate, etc.) are used anywhere.
  */
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // View modes
 export const VIEW_MODES = ['day', 'week', 'month', 'year', 'list'];

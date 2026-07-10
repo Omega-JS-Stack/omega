@@ -1,6 +1,6 @@
 // Libraries
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Module
 export default () => {

@@ -328,7 +328,7 @@ function configureOmega(eleventyConfig, options) {
   }
 
   // ---- Globals. site.uj carries UJM-runtime site values the core includes
-  // read (cache_breaker in the web-manager Configuration, date.year in the
+  // read (cache_breaker in the @omegajs/client Configuration, date.year in the
   // copyright meta, placeholder.src in lazy-loaded imgs).
   site.uj = {
     cache_breaker: 0,

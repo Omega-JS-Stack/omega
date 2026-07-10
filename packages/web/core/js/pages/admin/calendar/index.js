@@ -6,7 +6,7 @@
 import CalendarCore from './calendar-core.js';
 import CalendarRenderer from './calendar-renderer.js';
 import CalendarEvents from './calendar-events.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Module
 export default () => {

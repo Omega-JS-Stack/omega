@@ -15,16 +15,16 @@
  * css first, then the active theme's override for the same page).
  *
  * Special import specifiers (UJM conventions, resolved by esbuild plugin):
- *   web-manager             → the @omegajs/client entry (options.clientEntry)
+ *   @omegajs/client             → the @omegajs/client entry (options.clientEntry)
  *   __main_assets__/js/...  → the core layer (framework runtime modules)
  *   __main_assets__/themes/…→ the packaged themes dir (e.g. bootstrap js)
  *   __theme__/...           → active theme root, classy fallback
  *
  * Every js entry is wrapped in a boot stub around the runtime handshake
- * (runtime/boot.js): the main bundle calls bootMain(mod) — web-manager
+ * (runtime/boot.js): the main bundle calls bootMain(mod) — @omegajs/client
  * initialize + global module — and page bundles call bootPage(mod), which
  * awaits the main boot before running the page module with
- * ({ manager, options }). Bundles are ESM with code splitting: web-manager
+ * ({ manager, options }). Bundles are ESM with code splitting: @omegajs/client
  * and the boot runtime land in a shared chunk that evaluates once per page,
  * so every bundle sees the SAME initialized singleton (webpack's single
  * module graph, reproduced with `<script type="module">` semantics).
@@ -56,7 +56,7 @@ function pageKey(rel) {
  * @param {string} options.themesDir - the themes dir (for __main_assets__/themes)
  * @param {string} options.coreDir - the core layer root (for __main_assets__)
  * @param {string} options.outDir - the site output dir (_site)
- * @param {string} options.clientEntry - path to @omegajs/client's entry (aliased as `web-manager`)
+ * @param {string} options.clientEntry - path to @omegajs/client's entry (aliased as `@omegajs/client`)
  * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
  *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
  * @returns {Promise<{ js: object, css: object }>}
@@ -89,7 +89,7 @@ async function buildAssets(options) {
     setup(build) {
       // Boot stubs: main → bootMain (initialize + global module), pages →
       // bootPage (awaits the main boot). The runtime import is what pulls
-      // web-manager into the shared chunk.
+      // @omegajs/client into the shared chunk.
       build.onResolve({ filter: /^omega-boot:/ }, (args) => ({
         path: args.path.slice('omega-boot:'.length),
         namespace: 'omega-boot',
@@ -128,7 +128,7 @@ async function buildAssets(options) {
     entryPoints,
     bundle: true,
     minify: !options.dev,
-    // ESM + splitting is load-bearing: shared modules (web-manager, the boot
+    // ESM + splitting is load-bearing: shared modules (@omegajs/client, the boot
     // runtime) go into one chunk the browser evaluates once — the singleton
     // survives across the main and page bundles.
     format: 'esm',
@@ -137,8 +137,8 @@ async function buildAssets(options) {
     entryNames: options.dev ? '[dir]/[name]' : '[dir]/[name]-[hash]',
     chunkNames: 'chunks/[name]-[hash]',
     metafile: true,
-    // Directory alias so SUBPATH imports work too (web-manager/modules/dom.js)
-    alias: { 'web-manager': path.dirname(options.clientEntry) },
+    // Directory alias so SUBPATH imports work too (@omegajs/client/modules/dom.js)
+    alias: { '@omegajs/client': path.dirname(options.clientEntry) },
     plugins: [bootPlugin],
     logLevel: 'silent',
     define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },

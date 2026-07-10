@@ -19,7 +19,7 @@
       google: { id: '' },
     },
   },
-  // Empty → web-manager-bridge skips Firebase init (no hang on a fake projectId).
+  // Empty → client-bridge skips Firebase init (no hang on a fake projectId).
   firebaseConfig: {},
   targets: {
     desktop: {

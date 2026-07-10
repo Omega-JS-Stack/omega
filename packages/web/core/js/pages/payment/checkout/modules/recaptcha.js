@@ -1,5 +1,5 @@
 // reCAPTCHA management for checkout
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 let recaptchaReady = false;
 let recaptchaSiteKey = null;

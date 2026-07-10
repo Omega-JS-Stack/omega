@@ -1,8 +1,8 @@
 /**
- * Build the sandbox website: bundle src/assets/main.js (which embeds web-manager)
+ * Build the sandbox website: bundle src/assets/main.js (which embeds @omegajs/client)
  * with esbuild and copy static pages into dist/.
  *
- * Inside the Omega monorepo all dependencies (esbuild, web-manager, firebase)
+ * Inside the Omega monorepo all dependencies (esbuild, @omegajs/client, firebase)
  * resolve from the workspace root via Node's directory climb — no per-app install.
  */
 const path = require('path');

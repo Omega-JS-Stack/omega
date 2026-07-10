@@ -5,7 +5,7 @@
  */
 
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 import { VIEW_MODES, DAY_ABBREVS, MONTH_NAMES, TYPE_COLORS, formatDateUTC, formatTimeUTC, parseDateUTC } from './calendar-core.js';
 
 export default class CalendarRenderer {

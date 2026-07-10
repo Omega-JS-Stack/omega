@@ -1,6 +1,6 @@
 // Analytics — GA4 via Measurement Protocol. Mirrors @omegajs/backend's
 // `Manager.config.analytics.providers.google.id` shape so the same person can be
-// tracked across desktop (@omegajs/desktop) + web (UJM/web-manager) + backend (@omegajs/backend) by
+// tracked across desktop (@omegajs/desktop) + web (UJM/@omegajs/client) + backend (@omegajs/backend) by
 // referencing a single namespaced UUIDv5 identity.
 //
 // Cross-platform identity (the key feature):
@@ -8,10 +8,10 @@
 //   user_id   = uuidv5(firebaseUid, namespace) // same human across all surfaces
 //
 // `namespace` is the consumer's `firebaseConfig.projectId` re-encoded as a UUIDv5
-// namespace via uuidv5.URL of the projectId string. Same projectId in @omegajs/backend/web-manager/@omegajs/desktop
+// namespace via uuidv5.URL of the projectId string. Same projectId in @omegajs/backend/@omegajs/client/@omegajs/desktop
 // → identical uuidv5 outputs everywhere → unified analytics.
 //
-// Anonymous (web-manager-bridge hasn't reported auth yet) → user_id stays null.
+// Anonymous (client-bridge hasn't reported auth yet) → user_id stays null.
 // Authed (auth event fires) → user_id is set + a `login` event is dispatched. On
 // logout → user_id clears + `logout` event fires.
 //
@@ -92,7 +92,7 @@ const analytics = {
     analytics._enabled = true;
 
     // Namespace = uuidv5 of the firebase project ID (or app id as fallback). Same
-    // projectId in @omegajs/backend/web-manager/@omegajs/desktop → same namespace → same per-uid UUIDv5
+    // projectId in @omegajs/backend/@omegajs/client/@omegajs/desktop → same namespace → same per-uid UUIDv5
     // everywhere. UUIDv5 needs a UUID-shaped namespace — we derive one from the
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
     const projectId = manager.config.firebaseConfig?.projectId
@@ -200,7 +200,7 @@ const analytics = {
     analytics.event('screen_view', name ? { screen_name: name } : {});
   },
 
-  // Manual user-id override. Normally web-manager-bridge wires this automatically.
+  // Manual user-id override. Normally client-bridge wires this automatically.
   setUserId(uid) {
     if (!analytics._namespace) {
       // Init hasn't run yet — store and apply at init.

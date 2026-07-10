@@ -81,7 +81,7 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically 
 ## Dependency resolution
 
 - **`Manager.require(name)`** resolves from @omegajs/backend's module context. Consumer code (routes, schemas) can use it to access @omegajs/backend's bundled dependencies without installing them directly.
-- **web-manager owns Firebase on the client side.** Frontend consumer code (UJM pages, BXM extensions, EM renderers) NEVER imports Firebase directly. @omegajs/backend backend code uses `firebase-admin` directly (server-side is different).
+- **@omegajs/client owns Firebase on the client side.** Frontend consumer code (UJM pages, BXM extensions, EM renderers) NEVER imports Firebase directly. @omegajs/backend backend code uses `firebase-admin` directly (server-side is different).
 
 ## Testing
 

@@ -84,7 +84,7 @@ The packaged-app process name (for quit/raise/window-id matching) comes from con
 
 Sometimes the thing to drive is a regular **Chrome** — the marketing site, a web flow, an OAuth page — not the Electron app.
 
-> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / @omegajs/desktop / WM) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / @omegajs/desktop / @omegajs/client) — same core section, framework-flavored. Edit all five together.
 
 Browser work runs through the **`chrome-devtools` MCP** (via mcp-router). There is NO launch procedure anymore — no ports, no profile dirs, no curl checks:
 

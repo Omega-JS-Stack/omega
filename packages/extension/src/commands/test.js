@@ -19,7 +19,7 @@ module.exports = async function (options) {
   // `--filter` flag: substring match on test NAMES/descriptions (orthogonal to target).
   const filter      = options.filter   || null;
   const reporter    = options.reporter || 'pretty';
-  // Extended mode — opt into tests that hit REAL external services (Firebase via web-manager,
+  // Extended mode — opt into tests that hit REAL external services (Firebase via @omegajs/client,
   // push, any network call) instead of skipping them. Off by default so `npx mgr test` stays
   // fast and offline-safe. The canonical signal is the unprefixed `TEST_EXTENDED_MODE` env var
   // — the SAME name across @omegajs/backend/BXM/UJM/EM (cross-framework parity); `--extended` is the CLI

@@ -6,7 +6,7 @@
  * This eliminates the need to fetch /backend-manager/brand at runtime.
  */
 
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Get the full payment config object
 export function getPaymentConfig() {

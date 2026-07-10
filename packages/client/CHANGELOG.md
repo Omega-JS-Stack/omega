@@ -15,6 +15,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Security` in case of vulnerabilities.
 
 ---
+## [5.0.0] - 2026-07-10
+
+### BREAKING
+- **Package renamed `web-manager` → `@omegajs/client`** (5.0.0 continues the 4.x line; web-manager 4.x is frozen at 4.3.6 in the legacy repo — old-name publishes come from there, all new work lands here). Import specifiers flip everywhere — `import webManager from '@omegajs/client'`, subpaths `@omegajs/client/modules/*` — including @omegajs/web's bundler alias, so consumer page code writes the new name too.
+- **Deliberately NOT renamed:** the runtime API — the `webManager` singleton, `window.webManager`, and every method — is unchanged; only the package name moved. `omega:wm` skill refs ride the Phase-5 skills rewrite.
+- License CC-BY-4.0 → MIT.
+
+### Fixed
+- **The `module` field no longer points bundlers at un-vendored source.** `"module": "src/index.js"` routed exports-unaware tooling into `src/`, where `modules/auth.js` bare-imports `@omegajs/account` — a devDep vendored only into `dist/vendor` — so consumer bundles failed on a package they don't have. The `exports` map (dist, vendored) is now the only entry surface; `src/` still ships for debugging.
+
+### Removed
+- Legacy `repository`/`bugs`/`homepage` package fields and the README badge header + legacy repo links (sister-style header instead).
+
+## [4.3.6] - 2026-07-06
+
+### Added
+- **`[Firebase] Skipped:` console line when Firebase init is skipped** — when the resolved config has no non-empty `apiKey` (Firebase-less site, or the empty framework merge blob 4.3.5 started ignoring), `initialize()` now says so in the console instead of skipping silently, matching the existing `[Analytics] Skipped:` idiom. Makes both the intentional case and a botched config instantly diagnosable.
+
+---
+## [4.3.5] - 2026-07-06
+
+### Fixed
+- **Firebase no longer initializes on all-empty config blobs** — `_resolveFirebaseConfig()` now requires at least one non-empty value, and initialization additionally requires a non-empty `apiKey`. Framework config merges (e.g. UJM's Jekyll chain, which can't delete the base template's empty-string Firebase keys) inject `{apiKey: "", ...}` blobs into Firebase-less sites; those used to trigger `initializeApp()` and crash every page with `auth/invalid-api-key`. Configs carrying only `projectId`/`authDomain` still resolve for `getFunctionsUrl()`/`getApiUrl()` URL derivation — Firebase just stays uninitialized without an `apiKey`. Consumers that stripped the empty blob themselves (e.g. pre-init `delete window.Configuration.firebase` workarounds) can remove the workaround. See `docs/architecture.md` § Firebase Initialization.
+
+---
 ## [4.3.4] - 2026-07-03
 
 ### Added

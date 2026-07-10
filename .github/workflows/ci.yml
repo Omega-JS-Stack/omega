@@ -93,7 +93,7 @@ jobs:
         working-directory: apps/sandbox-brand
         run: npm run test:backend
 
-      # Real stack, real browser: emulator + built website (web-manager bundle) +
+      # Real stack, real browser: emulator + built website (@omegajs/client bundle) +
       # puppeteer signup → @omegajs/backend onCreate → signin → session persistence → subscription
       - name: Cross-stack e2e
         working-directory: apps/sandbox-brand

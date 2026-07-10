@@ -7,7 +7,7 @@
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 import { DISPLAY_TYPES, formatDateUTC, formatTimeUTC, todayUTC } from './calendar-core.js';
 import { renderEmailPreview, renderPushPreview } from './campaign-preview.js';
 

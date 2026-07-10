@@ -5,13 +5,13 @@
 - (idle — next queue item starts on Ian's "continue")
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. @omegajs/client cutover, local half (web-manager → @omegajs/client; freeze 4.x story; upstream fold: v4.3.5–v4.3.6; revisit the parked src/-bare-imports tarball finding)
-2. Local-linking DX: root `npm start` all-package watch + `omega dev --local` auto-linking (plan §8)
-3. Phase 5 template + **the OMEGA brand dogfood** (Ian 2026-07-10): onboard a brand around omega itself with ALL targets — web + backend + desktop + extension — and make everything work locally
-4. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
+1. Local-linking DX: root `npm start` all-package watch + `omega dev --local` auto-linking (plan §8)
+2. Phase 5 template + **the OMEGA brand dogfood** (Ian 2026-07-10): onboard a brand around omega itself with ALL targets — web + backend + desktop + extension — and make everything work locally
+3. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - electron-manager@1.12.1/1.13.0 publish — 1.12.0 on npm breaks fresh installs; the LEGACY repo now carries both commits (the other agent's merge), so Ian publishes straight from it — the monorepo pre-rename tag (`pre-desktop-rename`, cp66) is just backup
+- Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
 - @omegajs npm org claim (gates publishes ONLY — local work proceeds); GitHub remote creation + first push (ci.yml verification pending)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in @omegajs/web). MAM parked entirely.
 
@@ -31,10 +31,11 @@
 - BEM: custom emulator ports unsupported (getApiUrl/getFunctionsUrl hardcode 5001/5002; test/mcp too) — harmonization candidate (1.2a)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
-- web-manager tarball ships src/ with bare @omegajs imports — exports-unaware consumers would fail loudly; revisit at the client cutover (1.3b)
+- ~~web-manager tarball src/-bare-imports~~ RESOLVED at the client cutover — `module` field removed, exports map (vendored dist) is the only entry surface (68)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 67 @omegajs/backend cutover (local) — third Phase-3 rename: 6.0.0, v5.12.0 folded, boot canary + sandbox corpus 1,252 + cross-stack e2e + pack-smoke green; runner abort-exit-0 bug fixed (this commit) → CHANGELOG
+- [x] 68 @omegajs/client cutover (local) — FINAL Phase-3 rename, every package @omegajs-named: 5.0.0, v4.3.5–4.3.6 folded, module-field finding resolved, 5 suites + e2e + pack-smoke green (this commit) → CHANGELOG
+- [x] 67 @omegajs/backend cutover (local) — third Phase-3 rename: 6.0.0, v5.12.0 folded, boot canary + sandbox corpus 1,252 + cross-stack e2e + pack-smoke green; runner abort-exit-0 bug fixed (be0b2cd) → CHANGELOG
 - [x] 66 @omegajs/desktop cutover (local) — second Phase-3 rename: 2.0.0, EM 1.13.0 folded, suite 758/763 incl. real-Electron boot canary, pack-smoke green; devkit vendor self-name fix + boot scoped-symlink fix (f3948be) → CHANGELOG
 - [x] 65 upstream sync sweep + devlog port — legacy merges pinned: BXM/web/manager already covered EXCEPT devlog → ported to @omegajs/manager (564 tests); EM/BEM/WM deltas annotated onto their cutovers (this commit) → CHANGELOG
 - [x] 64 @omegajs/extension cutover (local) — first Phase-3 rename: 2.0.0, consumer canary builds MV3 ×3 browsers, pack-smoke green; devkit vendor ×2 + gulp5 icons fixes (this commit) → CHANGELOG
@@ -53,4 +54,4 @@
 - [x] Phase 1: devkit slices, @omegajs/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 1:40 AM (checkpoint 67)*
+*Last updated: 2026-07-10 2:05 AM (checkpoint 68)*

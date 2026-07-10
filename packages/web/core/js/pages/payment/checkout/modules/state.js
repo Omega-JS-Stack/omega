@@ -2,7 +2,7 @@
 // Minimal mutable state -- everything else is derived by buildBindingsState()
 
 import { calculatePrices } from './pricing.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // All supported billing frequencies
 export const FREQUENCIES = ['daily', 'weekly', 'monthly', 'annually'];

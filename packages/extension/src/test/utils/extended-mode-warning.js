@@ -6,7 +6,7 @@
 const { makeExtendedModeWarning } = require('@omegajs/devkit/test/extended-mode-warning');
 
 const EXTENDED_MODE_WARNING = makeExtendedModeWarning([
-  'Tests that hit real external services (Firebase via web-manager, push, any network call) are ENABLED!',
+  'Tests that hit real external services (Firebase via @omegajs/client, push, any network call) are ENABLED!',
   'This makes real network calls from the background service worker, popup, and content scripts against live backends.',
 ]);
 

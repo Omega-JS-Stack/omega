@@ -16,7 +16,7 @@ The bridge handles all three.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  MAIN (web-manager-bridge.js)                               │
+│  MAIN (client-bridge.js)                               │
 │  - Owns Firebase Auth instance ("em-auth" app)              │
 │  - Source of truth for auth state                           │
 │  - Listens for desktop:auth:* IPC from renderers                 │
@@ -26,7 +26,7 @@ The bridge handles all three.
               │ sync-request        ▼
 ┌──────────────────────────┐  ┌──────────────────────────┐
 │  RENDERER (window 1)     │  │  RENDERER (window 2)     │
-│  web-manager + Firebase  │  │  web-manager + Firebase  │
+│  @omegajs/client + Firebase  │  │  @omegajs/client + Firebase  │
 └──────────────────────────┘  └──────────────────────────┘
 ```
 
@@ -36,7 +36,7 @@ The bridge handles all three.
 2. @omegajs/desktop's deep-link `auth/token` built-in fires `manager.webManager.handleAuthToken(token)`.
 3. Main calls `signInWithCustomToken(auth, token)` against its own Firebase Auth → main is now signed in.
 4. Main broadcasts `desktop:auth:sign-in-with-token` IPC with the same token to all renderer windows.
-5. Each renderer receives the broadcast, calls `webManager.auth().signInWithCustomToken(token)` against its own (web-manager-managed) Firebase Auth → all renderers signed in with the same user.
+5. Each renderer receives the broadcast, calls `webManager.auth().signInWithCustomToken(token)` against its own (@omegajs/client-managed) Firebase Auth → all renderers signed in with the same user.
 6. Tokens are NOT stored — they expire in 1 hour. Auth state persists via Firebase's built-in IndexedDB persistence.
 
 ### Auth flow: renderer load → sync with main
@@ -84,7 +84,7 @@ off();   // unsubscribe
 await manager.webManager.signOut();
 
 // The renderer-resolved subscription — THE main-side plan source. Renderers run
-// web-manager's full auth cycle (Firestore account fetch → resolveSubscription)
+// @omegajs/client's full auth cycle (Firestore account fetch → resolveSubscription)
 // and push the result to main (desktop:auth:account-resolved, uid-guarded); main can't
 // run Firestore itself. null until a renderer has resolved.
 manager.webManager.getResolvedPlan();
@@ -104,13 +104,13 @@ await renderer.signOut();
 ```
 
 The renderer's `Manager.initialize()` automatically:
-- Boots web-manager (so renderer-side Firebase is available).
+- Boots @omegajs/client (so renderer-side Firebase is available).
 - Wires the auth bridge (`desktop:auth:sync-request` on load + listens for broadcasts).
-- Runs web-manager's **full auth cycle** (`auth().listen()`): waits for auth to settle,
+- Runs @omegajs/client's **full auth cycle** (`auth().listen()`): waits for auth to settle,
   fetches the Firestore account, resolves the subscription, and auto-populates the
   **`data-wm-bind` bindings** — so @omegajs/desktop app views can use UJM/BXM-style reactive HTML
   (`@show auth.user`, `@text auth.account.plan.id`, `@show auth.account.plan.id === 'premium'`,
-  see web-manager's docs/bindings.md). Each settle pushes `{ resolved, roles }` to main
+  see @omegajs/client's docs/bindings.md). Each settle pushes `{ resolved, roles }` to main
   (`desktop:auth:account-resolved`) and re-offers it whenever main announces a state change,
   so a renderer that resolved before main signed in still delivers.
 
@@ -160,7 +160,7 @@ If `firebaseConfig` is empty/missing, the bridge logs a warning and runs in no-o
 
 ## Firebase (bundled)
 
-Firebase is **bundled by webpack from @omegajs/desktop's module context** (web-manager owns it in @omegajs/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
+Firebase is **bundled by webpack from @omegajs/desktop's module context** (@omegajs/client owns it in @omegajs/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
 
 If you're building a no-auth Electron app, just leave `firebaseConfig` empty — the bridge is a clean no-op.
 
@@ -232,11 +232,11 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 
 ### Unit tests (always run)
 
-`web-manager-bridge.test.js` covers the dispatch logic, IPC handler shape, sync-request comparison, and the `auth/token` deep-link integration — all without hitting Firebase.
+`client-bridge.test.js` covers the dispatch logic, IPC handler shape, sync-request comparison, and the `auth/token` deep-link integration — all without hitting Firebase.
 
 ### Extended tests (skip without opt-in + creds)
 
-`web-manager-bridge.integration.test.js` actually mints custom tokens via `firebase-admin` and signs in — it hits REAL Firebase, so it's gated behind extended mode (the cross-framework `TEST_EXTENDED_MODE` opt-in; see [test-framework.md](test-framework.md#extended-vs-normal-mode)). To run:
+`client-bridge.integration.test.js` actually mints custom tokens via `firebase-admin` and signs in — it hits REAL Firebase, so it's gated behind extended mode (the cross-framework `TEST_EXTENDED_MODE` opt-in; see [test-framework.md](test-framework.md#extended-vs-normal-mode)). To run:
 
 ```bash
 npm i -D firebase-admin                                   # already in @omegajs/desktop's devDeps

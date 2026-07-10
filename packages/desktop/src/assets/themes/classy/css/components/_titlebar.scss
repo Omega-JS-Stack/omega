@@ -6,7 +6,7 @@
 // `titleBarStyle: 'hiddenInset'` (mac) and `titleBarOverlay` (windows). This
 // file just makes room for them and provides the drag region.
 //
-// Platform detection: web-manager sets `html[data-platform]` during init to
+// Platform detection: @omegajs/client sets `html[data-platform]` during init to
 // one of "mac" / "windows" / "linux" / etc. We key off that.
 
 $em-titlebar-height: 36px !default;

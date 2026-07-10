@@ -139,7 +139,7 @@ const deepLink = {
   },
 
   _registerBuiltins() {
-    // auth/token — hand off to web-manager-bridge. The receiving end of
+    // auth/token — hand off to client-bridge. The receiving end of
     // manager.getAuthUrl()'s sign-in round-trip: the website's token page redirects
     // here with ?authToken=<custom-token>. MODERN shape only — legacy-app formats
     // (?payload=, ?token=) are UJM's concern, not @omegajs/desktop's.

@@ -4,7 +4,7 @@
 //
 //   1. Main runs its own Firebase Auth instance and is the source of truth.
 //   2. When a deep-link auth/token arrives, main calls signInWithCustomToken with that token,
-//      then BROADCASTS the token to all renderer windows so their web-manager Firebase
+//      then BROADCASTS the token to all renderer windows so their @omegajs/client Firebase
 //      instances can sign in with the SAME token.
 //   3. On every renderer load, the renderer asks main "I'm at UID X (or null)" via the
 //      desktop:auth:sync-request IPC. Main compares with its own UID and either does nothing,
@@ -13,13 +13,13 @@
 //   4. Sign-out: any renderer can request sign-out via desktop:auth:sign-out. Main signs out
 //      its own Firebase + broadcasts desktop:auth:sign-out to all renderers.
 //
-// Firebase is BUNDLED by webpack from @omegajs/desktop's module context (web-manager owns it in @omegajs/desktop's
+// Firebase is BUNDLED by webpack from @omegajs/desktop's module context (@omegajs/client owns it in @omegajs/desktop's
 // tree). If loading fails, the bridge stays in no-op mode and logs the reason.
 
 const LoggerLite = require('./logger-lite.js');
 const authPersistence = require('./auth-persistence.js');
 
-const logger = new LoggerLite('web-manager-bridge');
+const logger = new LoggerLite('client-bridge');
 
 const FIREBASE_APP_NAME = 'em-auth';
 
@@ -44,7 +44,7 @@ const bridge = {
     // Try to load firebase. If it's not installed, run in no-op mode.
     const ok = await bridge._tryLoadFirebase();
     if (!ok) {
-      logger.warn('firebase not installed — web-manager-bridge running in no-op mode. `npm i firebase` to enable auth.');
+      logger.warn('firebase not installed — client-bridge running in no-op mode. `npm i firebase` to enable auth.');
     }
 
     bridge._registerIpc();
@@ -70,7 +70,7 @@ const bridge = {
   },
 
   // Load firebase. Returns true on success. BUNDLED by webpack from @omegajs/desktop's module context
-  // (web-manager owns firebase in @omegajs/desktop's tree) — same treatment as json5 in main.js. It was
+  // (@omegajs/client owns firebase in @omegajs/desktop's tree) — same treatment as json5 in main.js. It was
   // previously a webpackIgnore'd runtime import(), which resolves relative to the CONSUMER's
   // main.bundle.js: that walk never reaches @omegajs/desktop's node_modules when @omegajs/desktop is symlinked
   // (`mgr install dev`) and depends on npm hoisting when installed — every dev app silently
@@ -136,7 +136,7 @@ const bridge = {
       return u ? bridge._snapshotUser(u) : null;
     });
 
-    // Renderer pushes its web-manager account resolution (auth().listen() settled:
+    // Renderer pushes its @omegajs/client account resolution (auth().listen() settled:
     // Firestore account fetched, subscription resolved). Main can't run Firestore,
     // so this is how main-side plan gates learn the REAL plan — BXM's "browser
     // contexts resolve, authority caches" split. UID-guarded: a stale push from a
@@ -279,7 +279,7 @@ const bridge = {
 
   // The renderer-resolved subscription ({ plan, active, trialing, cancelling }) or null
   // while no renderer has resolved yet. THE main-side plan source — consumer plan gates
-  // read this (web-manager's resolveSubscription output, pushed via desktop:auth:account-resolved).
+  // read this (@omegajs/client's resolveSubscription output, pushed via desktop:auth:account-resolved).
   getResolvedPlan() {
     return bridge._resolvedPlan;
   },

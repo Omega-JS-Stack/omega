@@ -3,7 +3,7 @@
  * Handles lazy loading of ad units (verts) when scrolled into view.
  * Configuration is passed via data attributes on the script tag itself.
  */
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Get search params to check for debug mode
 const searchParams = new URLSearchParams(window.location.search);

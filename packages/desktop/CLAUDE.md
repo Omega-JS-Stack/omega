@@ -15,11 +15,11 @@ OMEGA Desktop (@omegajs/desktop) is a comprehensive framework for building moder
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omegajs/desktop ships `web-manager` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with web-manager as much as with @omegajs/desktop.
+**@omegajs/desktop ships `@omegajs/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omegajs/client as much as with @omegajs/desktop.
 
 **Required reading:**
-- **`node_modules/web-manager/CLAUDE.md`** — top-level overview + index
-- **`node_modules/web-manager/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omegajs/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omegajs/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start
 
@@ -84,7 +84,7 @@ new (require('@omegajs/desktop/renderer'))().initialize();
 | `app-state` | storage-backed launch flags + crash sentinel |
 | `protocol` | single-instance lock + scheme registration |
 | `deep-link` | unified deep-link dispatch (cold + warm start, mac + win + linux), built-in routes, pattern matching |
-| `web-manager-bridge` | main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the WM-resolved plan → `getResolvedPlan()` |
+| `client-bridge` | main = source-of-truth Firebase Auth, renderers reflect via IPC; session persists via `auth-persistence`; renderers push the @omegajs/client-resolved plan → `getResolvedPlan()` |
 | `auth-persistence` | pluggable main-session vault (default: safeStorage OS-keychain encryption; `webManager.authPersistence` config) |
 | `auto-updater` | electron-updater wrapper, idle-aware install, 30-day pending gate, dev simulation |
 | `sentry` | per-context split, auto auth attribution, dev-mode gating |
@@ -169,8 +169,8 @@ See [docs/releasing.md](docs/releasing.md) for the end-to-end flow.
 
 ## Dependency Resolution
 
-- **Consumer code can `require()` any @omegajs/desktop dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `fs-jetpack`, `web-manager`, or any other @omegajs/desktop transitive dep. If a dep doesn't resolve, the fix is in @omegajs/desktop's webpack config — not the consumer's `package.json`.
-- **web-manager owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `require('web-manager')` → `webManager.auth()`, `webManager.firestore()` in renderers. In main process, use `manager.webManager` (the @omegajs/desktop bridge). Same rule in BXM and UJM.
+- **Consumer code can `require()` any @omegajs/desktop dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `fs-jetpack`, `@omegajs/client`, or any other @omegajs/desktop transitive dep. If a dep doesn't resolve, the fix is in @omegajs/desktop's webpack config — not the consumer's `package.json`.
+- **@omegajs/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `require('@omegajs/client')` → `webManager.auth()`, `webManager.firestore()` in renderers. In main process, use `manager.webManager` (the @omegajs/desktop bridge). Same rule in BXM and UJM.
 - **`Manager.require(name)`** resolves from @omegajs/desktop's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
 
 ## Development Workflow
@@ -209,7 +209,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — WM mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / MAM — @omegajs/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 
@@ -226,7 +226,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/startup.md](docs/startup.md) — launch modes, zero-bounce production
 - [docs/app-state.md](docs/app-state.md) — launch flags, crash sentinel
 - [docs/deep-link.md](docs/deep-link.md) — cross-platform deep links, single-instance, built-in routes
-- [docs/web-manager-bridge.md](docs/web-manager-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer WM auth cycle (`data-wm-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
+- [docs/client-bridge.md](docs/client-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omegajs/client auth cycle (`data-wm-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
 - [docs/auto-updater.md](docs/auto-updater.md) — startup + periodic checks, 30-day pending-update gate, idle-aware install
 - [docs/analytics.md](docs/analytics.md) — GA4 Measurement Protocol, cross-platform `uuidv5` identity
 - [docs/context.md](docs/context.md) — runtime context block (geolocation, client, session, app)

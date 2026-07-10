@@ -2,7 +2,7 @@
 import fetch from 'wonderful-fetch';
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getRecaptchaToken } from './recaptcha.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Check trial eligibility via backend endpoint
 export async function fetchTrialEligibility() {

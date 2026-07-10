@@ -2,12 +2,12 @@
   "name": "sandbox-brand-website",
   "version": "1.0.0",
   "private": true,
-  "description": "Sandbox brand website — minimal web-manager consumer driven by the cross-stack e2e harness",
+  "description": "Sandbox brand website — minimal @omegajs/client consumer driven by the cross-stack e2e harness",
   "scripts": {
     "build": "node build.js"
   },
   "dependencies": {
-    "web-manager": "file:../../../../packages/client"
+    "@omegajs/client": "file:../../../../packages/client"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

@@ -5,7 +5,7 @@
  */
 
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Lazy-loaded markdown-it instance
 let md = null;

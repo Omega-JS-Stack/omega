@@ -90,7 +90,7 @@ TEST_EXTENDED_MODE=true npx mgr test build/config
 |---|---|---|
 | `build` | Plain Node, fast (~ms) | `Manager.getConfig/getManifest/getPackage`, CLI alias resolution, schema/manifest validation, build helpers, `lib/*.js` regex maps + utilities |
 | `background` | Real MV3 service worker via Puppeteer + CDP | Background boot sequence, Firebase auth wiring, messaging listeners, `chrome.runtime.onMessage` handlers |
-| `view` | Chromium tab loading harness extension's popup.html / options.html / sidepanel.html | DOM bindings, Manager surface, web-manager integration, popup ↔ background messaging |
+| `view` | Chromium tab loading harness extension's popup.html / options.html / sidepanel.html | DOM bindings, Manager surface, @omegajs/client integration, popup ↔ background messaging |
 | `boot` | Real headless Chromium with the **consumer's** `packaged/<browser>/raw/` loaded as unpacked | End-to-end smoke: does the consumer's actual extension boot? Manifest validates? SW comes up? Popup renders? |
 
 `all` (default) runs build → background → view → boot.
@@ -112,7 +112,7 @@ Tests that hit a real external service (Firebase, push, any network call) live i
 
 ### Extended mode (`TEST_EXTENDED_MODE`)
 
-Extended mode is the opt-in for tests that hit REAL external services (Firebase via web-manager, push, any network call from the background SW / popup / content scripts) instead of skipping them.
+Extended mode is the opt-in for tests that hit REAL external services (Firebase via @omegajs/client, push, any network call from the background SW / popup / content scripts) instead of skipping them.
 
 - **Skipped by default.** `npx mgr test` runs fast and offline-safe — external calls no-op in-source.
 - **Opt in** with `npx mgr test --extended` (CLI shorthand) or `TEST_EXTENDED_MODE=true npx mgr test` (env var). `TEST_EXTENDED_MODE=1` is also accepted.

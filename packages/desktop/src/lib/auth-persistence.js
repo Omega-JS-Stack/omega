@@ -120,7 +120,7 @@ const authPersistence = {
   _active: null,   // the strategy resolve() settled on (null until resolved)
 
   // Lib-shape conformance — the real work happens in resolve(), called by the
-  // web-manager bridge at auth boot (it needs the async availability check).
+  // @omegajs/client bridge at auth boot (it needs the async availability check).
   initialize(manager) {
     if (authPersistence._initialized) {
       return;

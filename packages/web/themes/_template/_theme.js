@@ -2,7 +2,7 @@
 // Loaded at runtime via webpack's __theme__ alias. Exposes Bootstrap globally
 // and runs your theme behaviors once the DOM is ready.
 import bootstrap from '__main_assets__/themes/bootstrap/js/index.umd.js';
-import { ready as domReady } from 'web-manager/modules/dom.js';
+import { ready as domReady } from '@omegajs/client/modules/dom.js';
 
 // Make Bootstrap available globally (used by UJM utilities + components)
 window.bootstrap = bootstrap;

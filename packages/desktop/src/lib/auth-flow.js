@@ -17,7 +17,7 @@
 //                <nonce>` as the chain's final hop, and on the browser's redirect
 //                validate the nonce + feed the token into the SAME deep-link pipeline
 //                (synthesized `<brand.id>://` URL) — downstream code is byte-identical
-//                across environments. Requires web-manager ≥ 4.3.4 on the website
+//                across environments. Requires @omegajs/client ≥ 4.3.4 on the website
 //                (isValidRedirectUrl accepts loopback hosts while the SITE runs in dev).
 //
 // Listener hygiene: loopback-bound, single-flight (a new open() supersedes the last),

@@ -6,7 +6,7 @@ import { state, buildBindingsState, resolveProcessor, FREQUENCIES, getAvailableF
 import { applyDiscountCode } from './modules/discount.js';
 import { initializeRecaptcha } from './modules/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 let formManager = null;
 

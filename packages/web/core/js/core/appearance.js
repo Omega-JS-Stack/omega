@@ -2,7 +2,7 @@
  * Appearance Module
  * Handles theme appearance switching (dark, light, system)
  */
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Constants
 const STORAGE_KEY = 'appearance.preference';

@@ -1,6 +1,6 @@
 // This file is required by /signin, /signup, and /reset pages since the logic is mostly the same
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Module
 export default function () {

@@ -17,11 +17,11 @@ This project consumes **OMEGA Desktop** (@omegajs/desktop) — a comprehensive f
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omegajs/desktop ships `web-manager` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with web-manager as much as with @omegajs/desktop.
+**@omegajs/desktop ships `@omegajs/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omegajs/client as much as with @omegajs/desktop.
 
 **Required reading:**
-- **`node_modules/web-manager/CLAUDE.md`** — top-level overview + index
-- **`node_modules/web-manager/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
+- **`node_modules/@omegajs/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omegajs/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick start
 
@@ -82,8 +82,8 @@ In renderer: `window.em.storage`, `window.em.ipc`, `window.em.logger`, `EM_BUILD
 
 ## Dependency resolution
 
-- **Do NOT install framework dependencies directly** (`firebase`, `fs-jetpack`, `web-manager`, etc.). @omegajs/desktop's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in @omegajs/desktop's webpack config — not your `package.json`.
-- **web-manager owns Firebase.** Never `require('firebase')` or `import('firebase/app')`. Use `require('web-manager')` → `webManager.auth()`, `webManager.firestore()` in renderers. In main process, use `manager.webManager` (the @omegajs/desktop bridge).
+- **Do NOT install framework dependencies directly** (`firebase`, `fs-jetpack`, `@omegajs/client`, etc.). @omegajs/desktop's webpack config resolves them through the framework's own `node_modules/`. If something doesn't resolve, the issue is in @omegajs/desktop's webpack config — not your `package.json`.
+- **@omegajs/client owns Firebase.** Never `require('firebase')` or `import('firebase/app')`. Use `require('@omegajs/client')` → `webManager.auth()`, `webManager.firestore()` in renderers. In main process, use `manager.webManager` (the @omegajs/desktop bridge).
 - **`Manager.require(name)`** resolves from @omegajs/desktop's module context at runtime for unbundled code (gulp tasks, test fixtures).
 
 ## Testing

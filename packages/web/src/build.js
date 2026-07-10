@@ -17,7 +17,7 @@ const { PATHS } = require('./paths.js');
  * @param {string} options.consumerDir - the consumer site (Eleventy input dir)
  * @param {object} options.siteData - raw site data (resolved omega config shape)
  * @param {string} options.outDir - output dir (cleared first)
- * @param {string} options.clientEntry - @omegajs/client entry for the `web-manager` esbuild alias
+ * @param {string} options.clientEntry - @omegajs/client entry for the `@omegajs/client` esbuild alias
  * @param {string} [options.siteAssetsDir] - the consumer's own asset layer (js/pages page modules)
  * @param {string} [options.themesDir] - default: packaged themes
  * @param {string} [options.coreDir] - default: packaged core

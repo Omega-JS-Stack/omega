@@ -34,7 +34,7 @@ await manager.initialize();
 //   manager.isDevelopment() / isProduction() / isTesting() / getVersion()  (cross-context helpers)
 ```
 
-The contexts that include `web-manager` (popup / options / sidepanel / page) also run the auth sync handshake automatically — see [auth.md](auth.md).
+The contexts that include `@omegajs/client` (popup / options / sidepanel / page) also run the auth sync handshake automatically — see [auth.md](auth.md).
 
 ## Build-time Manager
 

@@ -55,8 +55,8 @@ const watchInput = [
   // All BXM package src files - watch for changes (includes background.js, popup.js, etc.)
   `${rootPathPackage}/src/**/*.js`,
 
-  // So we can watch for changes while we're developing web-manager
-  `${rootPathPackage}/../web-manager/src`,
+  // So we can watch for changes while we're developing @omegajs/client
+  `${rootPathPackage}/../client/src`,
 ];
 
 const delay = 250;
@@ -106,8 +106,8 @@ function getSettings() {
       },
       // Add module resolution paths
       modules: [
-        // Local web-manager's node_modules (for when we're using "web-manager": "file:../web-manager")
-        path.resolve(rootPathPackage, '../web-manager/node_modules'),
+        // Local @omegajs/client's node_modules (for when we're using "@omegajs/client": "file:../@omegajs/client")
+        path.resolve(rootPathPackage, '../client/node_modules'),
 
         // Package's node_modules
         path.resolve(rootPathPackage, 'node_modules'),
@@ -434,12 +434,12 @@ function getTemplateReplaceOptions() {
     environment: Manager.getEnvironment(),
 
     // Specific
-    firebaseVersion: version.clean(require('web-manager/package.json').dependencies.firebase),
+    firebaseVersion: version.clean(require('@omegajs/client/package.json').dependencies.firebase),
     liveReloadPort: Manager.getLiveReloadPort(),
   }
   const now = Math.round(new Date().getTime() / 1000);
 
-  // Set webManagerConfiguration (matching web-manager's expected structure)
+  // Set webManagerConfiguration (matching @omegajs/client's expected structure)
   const webManagerConfig = options.webManager || {};
   options.webManagerConfiguration = JSON.stringify({
     environment: options.environment || 'production',

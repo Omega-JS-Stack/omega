@@ -73,7 +73,7 @@ Don't conditionally skip `create()` for hidden launches — without `main` in th
 
 `startup.applyEarly()` is the **first** call in `Manager.initialize()` — before `whenReady`, before any other lib. The goal: spend as little time as possible in the dock-bounce window.
 
-Sequence: applyEarly → before-quit hook → ipc → storage → sentry → protocol → deep-link → app-state → whenReady → updater → tray/menu/contextMenu → startup.initialize → web-manager → windows.initialize. **@omegajs/desktop no longer auto-creates the main window** — your `main.js` does that inside the `.then()` callback after `initialize()` resolves.
+Sequence: applyEarly → before-quit hook → ipc → storage → sentry → protocol → deep-link → app-state → whenReady → updater → tray/menu/contextMenu → startup.initialize → @omegajs/client → windows.initialize. **@omegajs/desktop no longer auto-creates the main window** — your `main.js` does that inside the `.then()` callback after `initialize()` resolves.
 
 ## How zero-bounce works on macOS
 

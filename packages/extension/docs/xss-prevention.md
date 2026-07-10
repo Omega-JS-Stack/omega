@@ -8,7 +8,7 @@ Zero tolerance for unescaped attacker-controllable strings in HTML. Extensions a
 
 ```javascript
 // ✅ CORRECT — canonical inline form
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 $el.innerHTML = `<div>${webManager.utilities().escapeHTML(tab.title)}</div>`;
 $el.innerHTML = `<img src="${webManager.utilities().escapeHTML(tab.favIconUrl)}" alt="">`;
@@ -37,7 +37,7 @@ Do NOT:
 - Wrap: `const escape = (s) => webManager.utilities().escapeHTML(s);`
 - Destructure: `const { escapeHTML } = webManager.utilities();`
 - `.bind()` it
-- Define a local `escapeHtml`/`escapeHTML` helper in a `utils.js` and import it across files — this is the most common violation in @omegajs/extension extensions. Delete the helper, add `import webManager from 'web-manager'`, inline the canonical form at every call site.
+- Define a local `escapeHtml`/`escapeHTML` helper in a `utils.js` and import it across files — this is the most common violation in @omegajs/extension extensions. Delete the helper, add `import webManager from '@omegajs/client'`, inline the canonical form at every call site.
 
 ## URLs Must Also Be Sanitized
 
@@ -92,4 +92,4 @@ Safe by context (regardless of value):
 
 - [components.md](components.md) — component architecture (where these strings get rendered)
 - [common-mistakes.md](common-mistakes.md) — the local-helper violation is mistake #1
-- `web-manager/src/modules/utilities.js` — the `escapeHTML` / `sanitizeURL` implementations
+- `@omegajs/client/src/modules/utilities.js` — the `escapeHTML` / `sanitizeURL` implementations

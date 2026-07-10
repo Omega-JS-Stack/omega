@@ -1077,7 +1077,7 @@ const resolved = User.resolveSubscription(account);
 | `trialing` | `boolean` | In active trial (status `'active'` + claimed + unexpired) |
 | `cancelling` | `boolean` | Cancellation pending (status `'active'` + `cancellation.pending`) |
 
-The same function exists as `auth.resolveSubscription(account)` in [web-manager](https://github.com/itw-creative-works/web-manager) with identical logic and return shape.
+The same function exists as `auth.resolveSubscription(account)` in [@omegajs/client](../client/) with identical logic and return shape.
 
 ## Final Words
 

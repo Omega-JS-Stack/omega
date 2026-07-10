@@ -1,7 +1,7 @@
 {
   "name": "@omegajs/account",
   "version": "1.0.0",
-  "description": "The OMEGA user/account schema engine + subscription resolution — the single source of truth shared by @omegajs/backend and web-manager (private workspace package, vendored/bundled into frameworks at prepare time)",
+  "description": "The OMEGA user/account schema engine + subscription resolution — the single source of truth shared by @omegajs/backend and @omegajs/client (private workspace package, vendored/bundled into frameworks at prepare time)",
   "private": true,
   "main": "./src/index.js",
   "exports": {

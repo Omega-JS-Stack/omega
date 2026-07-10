@@ -1,6 +1,6 @@
 // Renderer-process Manager singleton.
 // Consumer entry (per view): `new (require('@omegajs/desktop/renderer'))().initialize()`.
-// Reads window.EM_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps web-manager + auth.
+// Reads window.EM_BUILD_JSON.config (injected by webpack DefinePlugin), bootstraps @omegajs/client + auth.
 //
 // Auth bridge:
 //   - On init, asks main "I'm at UID X (or null), are we in sync?" via desktop:auth:sync-request.
@@ -39,15 +39,15 @@ Manager.prototype.initialize = async function (overrides) {
 
   self.logger.log('Initializing @omegajs/desktop (renderer)...');
 
-  // Boot web-manager so Firebase Auth is available in this renderer.
+  // Boot @omegajs/client so Firebase Auth is available in this renderer.
   try {
-    const wmMod = require('web-manager');
+    const wmMod = require('@omegajs/client');
     self.webManager = wmMod.default || wmMod;
     if (self.webManager?.initialize) {
       await self.webManager.initialize(self.config);
     }
   } catch (e) {
-    self.logger.warn('web-manager not available — auth bridge running in no-op mode.', e?.message);
+    self.logger.warn('@omegajs/client not available — auth bridge running in no-op mode.', e?.message);
   }
 
   // Wire the auth bridge: sync with main, listen for broadcasts.
@@ -184,7 +184,7 @@ Manager.prototype._wireFontAwesome = function () {
 };
 
 // Public alias — minimal surfaces that skip the full initialize() (no
-// web-manager / auth bridge) can still enable the FontAwesome auto-render:
+// @omegajs/client / auth bridge) can still enable the FontAwesome auto-render:
 //   new (require('@omegajs/desktop/renderer'))().enableFontAwesome();
 Manager.prototype.enableFontAwesome = Manager.prototype._wireFontAwesome;
 
@@ -308,7 +308,7 @@ Manager.prototype._wireTooltips = function () {
   }
 };
 
-// Bridge between renderer's web-manager and main's web-manager-bridge.
+// Bridge between renderer's @omegajs/client and main's client-bridge.
 // Mirrors BXM's foreground sync logic.
 Manager.prototype._wireAuthBridge = async function () {
   const self = this;
@@ -342,7 +342,7 @@ Manager.prototype._wireAuthBridge = async function () {
     }
   });
 
-  // Run web-manager's FULL auth cycle (UJM/BXM parity): listen() waits for auth to
+  // Run @omegajs/client's FULL auth cycle (UJM/BXM parity): listen() waits for auth to
   // settle, fetches the Firestore account, resolves the subscription, and auto-populates
   // the data-wm-bind bindings — so any @omegajs/desktop app can write UJM-style reactive HTML
   // (`@show auth.user`, `@text auth.account.plan.id`, ...). Persistent listener: fires

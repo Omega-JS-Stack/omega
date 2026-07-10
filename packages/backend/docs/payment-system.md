@@ -119,7 +119,7 @@ const resolved = User.resolveSubscription(account);
 
 Accepts either a raw Firestore account object or a resolved `User` instance (checks both `account.subscription` and `account.properties.subscription`).
 
-**Unified with web-manager**: The same function exists as `auth.resolveSubscription(account)` in web-manager (`modules/auth.js`) with identical logic and return shape.
+**Unified with @omegajs/client**: The same function exists as `auth.resolveSubscription(account)` in @omegajs/client (`modules/auth.js`) with identical logic and return shape.
 
 **Use this instead of manual access checks** — it centralizes all the derivation logic in one place:
 

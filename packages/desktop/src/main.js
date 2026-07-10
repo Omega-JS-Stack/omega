@@ -18,7 +18,7 @@ const tray         = require('./lib/tray.js');
 const menu         = require('./lib/menu.js');
 const ctxMenu      = require('./lib/context-menu.js');
 const startup      = require('./lib/startup.js');
-const wmBridge     = require('./lib/web-manager-bridge.js');
+const wmBridge     = require('./lib/client-bridge.js');
 const windows      = require('./lib/window-manager.js');
 const context      = require('./lib/context.js');
 const usage        = require('./lib/usage.js');
@@ -432,7 +432,7 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   // update pipeline is broken. Same polling cadence as remote-config.
   self.remoteScripts.initialize(self);
 
-  // 12d. Analytics — GA4 via Measurement Protocol. Wired AFTER web-manager-bridge
+  // 12d. Analytics — GA4 via Measurement Protocol. Wired AFTER client-bridge
   // so it can subscribe to onAuthChange and flip user_id automatically.
   self.analytics.initialize(self);
 

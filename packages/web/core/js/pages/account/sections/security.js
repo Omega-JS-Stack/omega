@@ -6,7 +6,7 @@
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 let firebaseAuth = null;
 let signinMethodForms = new Map(); // Store FormManager instances for signin methods

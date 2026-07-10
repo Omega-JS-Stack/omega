@@ -6,7 +6,7 @@
  * so clips look identical at any size.
  */
 
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 import { FormManager } from '__main_assets__/js/libs/form-manager.js';
 
 const BASE_W = 960;

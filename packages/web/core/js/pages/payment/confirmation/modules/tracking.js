@@ -1,6 +1,6 @@
 // Purchase analytics tracking for confirmation page
 // All three platforms tracked together, no conditional checks
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Build common item array for tracking
 function buildItems(state) {

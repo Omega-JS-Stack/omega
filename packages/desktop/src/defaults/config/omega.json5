@@ -53,9 +53,9 @@
     products: [],
   },
 
-  // Firebase web SDK config. Flat shape — same key names @omegajs/backend/BXM/web-manager all use.
+  // Firebase web SDK config. Flat shape — same key names @omegajs/backend/BXM/@omegajs/client all use.
   // Copy directly from Firebase Console → Project Settings → SDK setup (Config option).
-  // Empty {} disables Firebase Auth in the renderer (web-manager-bridge logs a warn).
+  // Empty {} disables Firebase Auth in the renderer (client-bridge logs a warn).
   firebaseConfig: {
     apiKey:            '',
     authDomain:        '',
@@ -242,7 +242,7 @@
         tag:     'installer',
       },
       // Deep links: scheme is automatically `<brand.id>://...`. Built-in routes:
-      //   auth/token  → web-manager auth token handoff
+      //   auth/token  → @omegajs/client auth token handoff
       //   app/show    → manager.windows.show(query.window || 'main')
       //   app/quit    → app.quit()
       // Add custom routes at runtime: manager.deepLink.on('my-route', (ctx) => {...}) in main.

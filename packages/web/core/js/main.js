@@ -7,12 +7,12 @@ import serviceWorkerModule from '__main_assets__/js/core/service-worker.js';
 import appearanceModule from '__main_assets__/js/core/appearance.js';
 import completeModule from '__main_assets__/js/core/complete.js';
 
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Ultimate Jekyll Manager Module
 export default async function ({ manager, options } = {}) {
   // Add Manager to global scope for easy access in modules
-  // Removed because web-manager is singleton and can be imported directly in modules, so no need to attach it to window
+  // Removed because @omegajs/client is singleton and can be imported directly in modules, so no need to attach it to window
   // window.Manager = manager;
 
   // Initialize the UJ library on webManager for programmatic access to UJ features

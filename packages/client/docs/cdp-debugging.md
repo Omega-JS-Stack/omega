@@ -1,8 +1,8 @@
 # CDP Debugging (driving a live browser)
 
-How to drive a browser you can CONTROL — see a consuming site live, screenshot it, click, type, read console logs, inspect network requests — for agents (Claude via MCP/CDP) and humans. WM has no dev server of its own; it runs INSIDE consumers (UJM sites, BXM extensions, EM renderers), so browser verification means driving a consumer.
+How to drive a browser you can CONTROL — see a consuming site live, screenshot it, click, type, read console logs, inspect network requests — for agents (Claude via MCP/CDP) and humans. @omegajs/client has no dev server of its own; it runs INSIDE consumers (@omegajs/web sites, @omegajs/extension extensions, @omegajs/desktop renderers), so browser verification means driving a consumer.
 
-> Mirrored across the five sister frameworks (UJM / @omegajs/backend / BXM / EM / WM) — same core section, framework-flavored. Edit all five together.
+> Mirrored across the five sister frameworks (UJM / @omegajs/backend / @omegajs/extension / @omegajs/desktop / @omegajs/client) — same core section, framework-flavored. Edit all five together.
 
 ## The browser: your Claude session owns one
 
@@ -19,11 +19,11 @@ Humans: the agent's Chrome window is visible — you can watch it drive. Full re
 
 ## Electron apps are the exception (attach, don't launch)
 
-An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or EM's per-invocation `npx mgr cdp`. See EM's `docs/cdp-debugging.md`.
+An Electron dev app is a running singleton — you ATTACH to it instead of launching a browser: the `chrome-devtools-electron` MCP upstream (reads `EM_CDP_PORT`, default 9222, expanded once at session start) or @omegajs/desktop's per-invocation `npx mgr cdp`. See @omegajs/desktop's `docs/cdp-debugging.md`.
 
-## WM specifics
+## @omegajs/client specifics
 
-- **Verify WM behavior through a consumer.** The usual host is a UJM site's dev server: **`https://localhost:4000` — NEVER the LAN IP** (`https://192.168.x.x:...`); port 4000 by default, increments (4001, …) when multiple sites run — exact port in the WEBSITE project's `.temp/_config_browsersync.yml`. To test uncommitted WM changes, link the local web-manager into the consumer first (see the consumer framework's dev-install flow), then drive the site.
-- What to exercise from the browser: auth flows (`webManager.auth()` states, the Settler Pattern), `data-wm-bind` bindings reacting to state changes (`evaluate_script` to mutate state, `take_snapshot`/`take_screenshot` to verify DOM), Firestore reads/writes on the network tab, and console cleanliness (WM logs its module lifecycle).
+- **Verify @omegajs/client behavior through a consumer.** The usual host is a UJM site's dev server: **`https://localhost:4000` — NEVER the LAN IP** (`https://192.168.x.x:...`); port 4000 by default, increments (4001, …) when multiple sites run — exact port in the WEBSITE project's `.temp/_config_browsersync.yml`. To test uncommitted @omegajs/client changes, link the local @omegajs/client into the consumer first (see the consumer framework's dev-install flow), then drive the site.
+- What to exercise from the browser: auth flows (`webManager.auth()` states, the Settler Pattern), `data-wm-bind` bindings reacting to state changes (`evaluate_script` to mutate state, `take_snapshot`/`take_screenshot` to verify DOM), Firestore reads/writes on the network tab, and console cleanliness (@omegajs/client logs its module lifecycle).
 - Ephemeral profile ⇒ auth'd testing means logging in through the consumer's real UI at the start of the session (test creds).
-- WM inside a BXM extension or EM renderer: drive those through their own surfaces — BXM's `chrome-devtools-extension` upstream, EM's `chrome-devtools-electron`/`mgr cdp` (see those repos' `docs/cdp-debugging.md`).
+- @omegajs/client inside a @omegajs/extension extension or @omegajs/desktop renderer: drive those through their own surfaces — @omegajs/extension's `chrome-devtools-extension` upstream, @omegajs/desktop's `chrome-devtools-electron`/`mgr cdp` (see those repos' `docs/cdp-debugging.md`).

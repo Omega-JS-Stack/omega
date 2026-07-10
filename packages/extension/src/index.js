@@ -1,5 +1,5 @@
 // // Libraries
-// const WebManager = require('web-manager');
+// const WebManager = require('@omegajs/client');
 
 // // Class
 // function Manager() {

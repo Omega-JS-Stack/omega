@@ -1,6 +1,6 @@
 // Runtime context — what we know about the user's machine + their network +
 // the current session. Modeled after @omegajs/backend's `assistant.request.{geolocation,client}`
-// shape so @omegajs/desktop apps + sister projects (@omegajs/backend, UJM, web-manager) all reference the
+// shape so @omegajs/desktop apps + sister projects (@omegajs/backend, UJM, @omegajs/client) all reference the
 // same property paths when reading user info.
 //
 // Populated asynchronously during manager.initialize():

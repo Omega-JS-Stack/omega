@@ -12,7 +12,7 @@
 - **Class**: `Auth`
 - **Key Methods**: `listen(options, callback)`, `isAuthenticated()`, `getUser()`, `signInWithEmailAndPassword()`, `signOut()`, `getIdToken()`, `resolveSubscription(account?)`
 - **Bindings**: Updates `auth` and `usage` context on auth settle
-- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with product limits from `config.payment.products` (OMEGA-canonical shape — same key name in @omegajs/backend, UJM, and EM) to produce the `usage` bindings key (e.g., `{ credits: { monthly: 5, limit: 100 } }`)
+- **Usage Resolution**: `_resolveUsage(state)` merges `account.usage` (Firestore) with product limits from `config.payment.products` (OMEGA-canonical shape — same key name in @omegajs/backend, UJM, and @omegajs/desktop) to produce the `usage` bindings key (e.g., `{ credits: { monthly: 5, limit: 100 } }`)
 
 ### resolveSubscription(account?)
 

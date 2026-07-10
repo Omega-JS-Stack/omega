@@ -1,4 +1,4 @@
-import webManager from 'web-manager';
+import webManager from '@omegajs/client';
 
 // Social Sharing Module
 export default function () {

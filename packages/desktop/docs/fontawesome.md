@@ -41,7 +41,7 @@ renderer bootstrap. No `initialize()` options, no imports.
 ## Minimal surfaces
 
 The auto-render is wired by `initialize()`. A renderer that deliberately skips
-the full init (no web-manager / auth — e.g. a lightweight popover overlay) can
+the full init (no @omegajs/client / auth — e.g. a lightweight popover overlay) can
 enable JUST the icon pipeline:
 
 ```js
