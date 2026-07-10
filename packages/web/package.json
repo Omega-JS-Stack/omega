@@ -1,6 +1,6 @@
 {
   "name": "@omegajs/web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The OMEGA web framework (UJM successor) — Eleventy 3 + LiquidJS + @omegajs/template-kit engine core with the `omega` CLI: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, the esbuild/sass/PurgeCSS asset pipeline, and the ESM boot runtime. Private until first publish.",
   "private": true,
   "main": "./src/index.js",

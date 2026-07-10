@@ -2,7 +2,7 @@
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('install');
 const { safeInstall } = require('../utils/safe-install');
-const os = require('os');
+const local = require('@omegajs/devkit/local');
 
 const package = Manager.getPackage('main');
 
@@ -20,9 +20,12 @@ module.exports = async function (options) {
     }
 
     if (['dev', 'd', 'development', 'local', 'l'].includes(type)) {
-      logger.log('Installing development...');
-      await run(`npm uninstall ${package.name}`);
-      await run(`npm install ${os.homedir()}/Developer/Repositories/ITW-Creative-Works/${package.name} --save-dev`);
+      logger.log('Installing development (local Omega monorepo)...');
+      await local.linkLocalPackages({
+        dir: process.cwd(),
+        monorepoRoot: local.resolveMonorepoRoot(),
+        logger,
+      });
       return logger.log('Development installation complete.');
     }
   } catch (e) {

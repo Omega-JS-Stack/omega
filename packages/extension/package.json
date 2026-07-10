@@ -1,6 +1,6 @@
 {
   "name": "@omegajs/extension",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "OMEGA extension framework — build, test, and package Chrome/Firefox extensions (MV3)",
   "main": "dist/index.js",
   "exports": {

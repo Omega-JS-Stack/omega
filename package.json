@@ -12,20 +12,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "npm run prepare:watch --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "prepare": "node -e \"require('prepare-package')()\"",
-    "prepare:watch": "node -e \"require('prepare-package/watch')()\""
+    "start": "node scripts/watch-all.js",
+    "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0"
-  },
-  "main": "./dist/index.js",
-  "preparePackage": {
-    "input": "./src",
-    "output": "./dist",
-    "replace": {},
-    "type": "copy",
-    "hooks": {}
+    "@changesets/cli": "^2.31.0",
+    "@omegajs/devkit": "*"
   }
 }

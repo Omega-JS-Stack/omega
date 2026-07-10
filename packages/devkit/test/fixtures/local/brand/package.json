@@ -1,0 +1,5 @@
+{
+  "name": "fixture-brand",
+  "private": true,
+  "workspaces": ["apps/*"]
+}

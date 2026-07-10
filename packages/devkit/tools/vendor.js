@@ -204,6 +204,23 @@ function vendorPackages(options) {
     ? hostPackage.name.slice('@omegajs/'.length)
     : null;
 
+  // Published @omegajs RUNTIME deps (dependencies/peer/optional — e.g. desktop's
+  // and extension's @omegajs/client) are never vendor candidates either: they
+  // ship to consumers via npm and must resolve to the installed package, not a
+  // pinned snapshot (client is a shared singleton — a vendored copy duplicates
+  // it and freezes its version). Vendoring is ONLY for the private devDep
+  // workspace packages (devkit, config, account) that never publish.
+  const publishedNames = new Set(
+    Object.keys({
+      ...(hostPackage.dependencies || {}),
+      ...(hostPackage.peerDependencies || {}),
+      ...(hostPackage.optionalDependencies || {}),
+    })
+      .filter((name) => name.startsWith('@omegajs/'))
+      .map((name) => name.slice('@omegajs/'.length))
+  );
+  const neverVendor = (name) => name === hostSelfName || publishedNames.has(name);
+
   // 1. Scan dist for @omegajs references: which files need rewriting, which
   // modules of which packages are used.
   const seedsByPackage = new Map();
@@ -217,7 +234,7 @@ function vendorPackages(options) {
     for (const pattern of REFERENCE_PATTERNS) {
       for (const match of contents.matchAll(pattern)) {
         const name = match[3];
-        if (name === hostSelfName) continue;
+        if (neverVendor(name)) continue;
         if (!seedsByPackage.has(name)) seedsByPackage.set(name, new Set());
         seedsByPackage.get(name).add(subpathToFile(match[4]));
         uses = true;
@@ -252,7 +269,7 @@ function vendorPackages(options) {
     let updated = contents;
     for (const pattern of REFERENCE_PATTERNS) {
       updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
-        if (name === hostSelfName) return match;
+        if (neverVendor(name)) return match;
         const target = path.join(vendorRoot, name, subpathToFile(subpath));
         let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
         if (!relative.startsWith('.')) {

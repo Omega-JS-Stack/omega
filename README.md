@@ -2,7 +2,7 @@
 
 The OMEGA monorepo — a unified full-stack framework ecosystem for launching and operating brands: website, backend, browser extension, and desktop app from one source of truth.
 
-Published packages live under the `@omegajs` npm scope. Shared internals are private workspace packages bundled into the frameworks at build time.
+Published packages live under the `@omegajs` npm scope. Private shared internals (`account`, `config`, `devkit`, `template-kit`) are bundled into the frameworks at build time; `@omegajs/client` publishes as a real runtime dependency of the desktop and extension frameworks.
 
 ## Layout
 
@@ -12,6 +12,10 @@ Published packages live under the `@omegajs` npm scope. Shared internals are pri
 | `spikes/` | Time-boxed experiments (Eleventy vs Astro bake-off) |
 | `apps/` | Sandbox brand for dogfooding and cross-stack e2e |
 | `docs/` | Shared-concept deep references |
+
+## Development
+
+`npm start` at the root watches every dist-building package concurrently (src→dist). In a brand repo, `omega dev --local` links all `@omegajs/*` deps from this monorepo and starts the watch for you; `mgr i local` does the same for a single app. See [docs/local-dev.md](docs/local-dev.md).
 
 ## Status
 

@@ -1,6 +1,6 @@
 const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
-const os = require('os');
+const local = require('@omegajs/devkit/local');
 const powertools = require('node-powertools');
 const Npm = require('npm-api');
 const jetpack = require('fs-jetpack');
@@ -17,8 +17,17 @@ class InstallCommand extends BaseCommand {
   }
 
   async installLocal() {
-    await this.uninstallPkg('@omegajs/backend');
-    await this.installPkg(`npm install ${os.homedir()}/Developer/Repositories/Omega/omega/packages/backend`);
+    // Link every declared @omegajs dependency (functions/package.json for
+    // backend projects) to the local Omega monorepo — idempotent.
+    const actions = await local.linkLocalPackages({
+      dir: this.firebaseProjectPath,
+      monorepoRoot: local.resolveMonorepoRoot(),
+      logger: { log: (m) => this.log(m), warn: (m) => this.logWarning(m) },
+    });
+
+    if (actions.length === 0) {
+      this.logWarning('No @omegajs dependencies declared in this project — nothing to link');
+    }
   }
 
   async installLive() {

@@ -14,6 +14,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+# [6.0.1] - 2026-07-10
+
+- Changed
+  - `mgr i local` now links EVERY declared `@omegajs/*` dependency from the local Omega monorepo via the shared `@omegajs/devkit/local` module (idempotent — already-linked deps are skipped), always installing where the dep is declared (`functions/package.json`) regardless of the invocation directory. Previously it hardcoded the monorepo path and installed into whatever the cwd was.
+  - `mgr i live` unchanged (registry install + peer-dep check).
+
 # [6.0.0] - 2026-07-10
 
 ### BREAKING

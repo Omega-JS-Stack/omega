@@ -7,6 +7,10 @@
  *      rendered HTML stays valid without a re-render; refresh to pick up.
  *
  * `omega dev --port=4000` overrides the default port.
+ *
+ * `omega dev --local` first links every @omegajs framework the brand uses to
+ * the local Omega monorepo (file: installs, idempotent) and starts the
+ * monorepo's src→dist watch, then runs the normal dev loop (master plan §8).
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -23,6 +27,11 @@ const WATCH_DEBOUNCE_MS = 250;
 
 module.exports = async function (options) {
   options = options || {};
+
+  if (options.local) {
+    await linkBrandToMonorepo();
+  }
+
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
   const clientEntry = resolveClientEntry();
@@ -92,3 +101,29 @@ module.exports = async function (options) {
   elev.serve(port);
   logger.log(`Dev server: http://localhost:${port}`);
 };
+
+/**
+ * `--local` prelude: file:-install every @omegajs framework used anywhere in
+ * this brand (all apps, walked up from cwd) from the local Omega monorepo,
+ * then start the monorepo's src→dist watch as a session-scoped child.
+ */
+async function linkBrandToMonorepo() {
+  const local = require('@omegajs/devkit/local');
+  const monorepoRoot = local.resolveMonorepoRoot();
+  const brandRoot = local.findBrandRoot(process.cwd());
+  logger.log(`Local mode: linking @omegajs packages from ${monorepoRoot}`);
+
+  for (const appDir of local.discoverApps(brandRoot)) {
+    await local.linkLocalPackages({ dir: appDir, monorepoRoot, logger });
+  }
+
+  const watch = local.startMonorepoWatch({ monorepoRoot, logger });
+  if (watch.child) {
+    // Session-scoped: the watch dies with this dev server (no orphans)
+    process.on('SIGINT', () => {
+      watch.child.kill('SIGTERM');
+      process.exit(0);
+    });
+    process.on('exit', () => watch.child.kill('SIGTERM'));
+  }
+}

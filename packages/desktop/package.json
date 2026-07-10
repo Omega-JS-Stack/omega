@@ -1,6 +1,6 @@
 {
   "name": "@omegajs/desktop",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "OMEGA desktop framework — build, test, and package Electron apps for macOS, Windows, and Linux",
   "main": "dist/index.js",
   "exports": {

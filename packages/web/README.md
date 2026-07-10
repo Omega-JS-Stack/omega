@@ -17,6 +17,8 @@ migrate → 2,556 pages, ~3.2× the whole Jekyll pipeline).**
 # In a consumer project (scaffolded scripts call these):
 npx omega setup     # scaffold/refresh defaults + sync package.json scripts
 npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds (--port=N)
+                    #   --local: first link every @omegajs dep brand-wide from the local
+                    #   Omega monorepo + start its src→dist watch (docs/local-dev.md there)
 npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → dist/
 npx omega test      # production build + smoke checks + consumer test/ (node --test)
 npx omega deploy    # refuse file: deps → npm run build → `npu sync --message='Deploy'`

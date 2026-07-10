@@ -1,0 +1,7 @@
+{
+  "name": "fixture-brand-backend-functions",
+  "private": true,
+  "dependencies": {
+    "@omegajs/backend": "^6.0.0"
+  }
+}

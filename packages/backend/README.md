@@ -788,9 +788,9 @@ npx @omegajs/backend <command>
 | `mgr test [paths...]` | Run integration tests |
 | `mgr emulator` | Start Firebase emulator (keep-alive mode) |
 | `mgr stripe` | Start Stripe CLI webhook forwarding to local server |
-| `mgr version`, `bem v` | Show @omegajs/backend version |
+| `mgr version`, `mgr v` | Show @omegajs/backend version |
 | `mgr clear` | Clear cache and temp files |
-| `mgr install`, `bem i` | Install @omegajs/backend (local or production) |
+| `mgr install`, `mgr i` | Install @omegajs/backend (local — links every `@omegajs/*` dep from the Omega monorepo — or production) |
 | `mgr clean:npm` | Clean and reinstall npm modules |
 | `mgr firestore:indexes:get` | Get Firestore indexes |
 | `mgr cwd` | Show current working directory |

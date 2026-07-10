@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Security` in case of vulnerabilities.
 
 ---
+## [2.0.1] - 2026-07-10
+
+- Fixed
+  - `mgr i local` (a.k.a. `mgr install dev`) was broken since the @omegajs/desktop rename — it installed from `~/Developer/Repositories/ITW-Creative-Works/@omegajs/desktop`, a path that does not exist. It now links every declared `@omegajs/*` dependency from the local Omega monorepo via `@omegajs/devkit/local` (idempotent).
+  - Shipped dist no longer bundles a vendored copy of `@omegajs/client`: it is a published runtime dependency and now resolves from the consumer install instead of a pinned snapshot (devkit vendor tool fix).
+
 ## [2.0.0] - 2026-07-10
 
 ### BREAKING

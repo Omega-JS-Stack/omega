@@ -38,6 +38,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - **`bxm setup` config merge no longer drops consumer-only keys.** The defaults merge started from the framework template and only walked template keys, so any consumer key absent from the template (e.g. `liveReloadPort`, or anything under `targets.extension`) was silently deleted on every setup. Consumer-only keys now survive at every nesting level.
 
+## [2.0.1] - 2026-07-10
+
+- Fixed
+  - `mgr i local` (a.k.a. `mgr install dev`) was broken since the @omegajs/extension rename — it installed from `~/Developer/Repositories/ITW-Creative-Works/@omegajs/extension`, a path that does not exist. It now links every declared `@omegajs/*` dependency from the local Omega monorepo via `@omegajs/devkit/local` (idempotent).
+  - The prepare-time vendor hook no longer crashes on `require('@omegajs/client/package.json')` (webpack sibling resolution): published `@omegajs` runtime deps are never vendor candidates, so the reference survives as a normal package require. The crash had been leaving raw private devkit references in dist.
+
 ## [2.0.0] - 2026-07-09
 
 ### BREAKING
