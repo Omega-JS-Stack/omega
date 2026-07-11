@@ -46,6 +46,7 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 - `value` — force-set value (ignores user input — e.g. auto-generated IDs)
 - `required` — `true`/`false` or a function `(assistant, settings, options) => bool`. A key counts as missing when it's `undefined` **or `''`** (null/0/false pass). **NEVER combine with `default`** — see the footgun below
 - `min` / `max` — validation bounds (string length, number range, array length); numbers clamp
+- `enum` — array of allowed values. Enforced for values the caller sends (checked post-coercion): out-of-list → `400 Invalid settings {field}: must be one of [...]`. Absent fields pass — combine with `required` if the field must also be present
 - `clean` — a RegExp (matched chars removed) or function `(value) => cleaned`
 - `sanitize` — per-field opt-out (`false`) for HTML sanitization; only meaningful when the route opts in via `Manager.Middleware(req, res).run('route', { sanitize: true })`. See [sanitization.md](sanitization.md)
 
@@ -70,7 +71,7 @@ module.exports = ({ user }) => f.object({
 });
 ```
 
-Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above and `min`-defaults-to-0 (negative numbers clamp to 0 unless the field declares a negative `min`).
+Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `enum`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above and `min`-defaults-to-0 (negative numbers clamp to 0 unless the field declares a negative `min`).
 
 Exporting **raw zod** (no builders) opts into zod-native semantics instead: invalid input **rejects with 400** rather than coercing. Use deliberately — it's a behavior change from the declarative contract.
 

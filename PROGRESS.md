@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep — 73a/73c/73d/74/75/76–78 + **79 (schema tightenings #2–#4: in-house engine replaces powertools.defaults, '' fails required, sanitize surface fixed) SHIPPED**; tightening #1 (enum enforcement) awaits Ian's answer; next: N4 parked verifies (line below) or N5; CI opt-in
+- N4 architecture sweep — 73a/73c/73d/74/75/76–78/79 + **80 (enum enforcement — ALL four schema tightenings now shipped) SHIPPED**; next: N4 parked verifies (line below) → N5; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -46,6 +46,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 80 schema tightening #1 — enum enforced (sent values, post-coercion, absent passes; shared enforceEnums both engines; oauth2 action fields live); tightenings list CLOSED (this commit) → CHANGELOG
 - [x] 79 schema tightenings #2–#4 — schema-engine.js in-house resolver replaces powertools.defaults ×3 (pollution/clone fixes now reach declarative schemas), '' fails required both engines, middleware sanitize pass finally sees the schema; #1 enum → Ian; parity 15/15, corpus 1223/44/0 (this commit) → CHANGELOG
 - [x] 78 zod final cohort — 30 admin/payments/marketing schemas converted; 4 provider webhooks stay declarative-empty by design; ALL framework schemas now zod; corpus green (this commit) → CHANGELOG (folded into 76's entry)
 - [x] 77 zod user cohort + stragglers — 16 user/* + brand/content/handler/special/restart converted (signup consent shape pinned; enum = accepted-not-enforced builder option); parity 13/13; corpus 1221/44/0 (2e2697d) → CHANGELOG (folded into 76's entry)
@@ -77,4 +78,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 8:40 PM (79 shipped — schema tightenings #2–#4; awaiting Ian on #1 enum; next: N4 parked verifies or N5)*
+*Last updated: 2026-07-10 8:50 PM (80 shipped — enum enforced, tightenings CLOSED; next: N4 parked verifies → N5)*

@@ -7,7 +7,7 @@ const path = require('path');
 const _ = require('lodash');
 const moment = require('moment');
 const { isZodSchema, resolveZodSchema, buildSchemaMap } = require('./schema-zod.js');
-const { iterateSchema, resolveSchema } = require('./schema-engine.js');
+const { iterateSchema, resolveSchema, enforceEnums } = require('./schema-engine.js');
 
 
 function Settings(m) {
@@ -99,6 +99,7 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
 
   // Declarative engine (shared pipeline in helpers/schema-engine.js)
   const resolvedSchema = {};
+  const enumPaths = [];
 
   // Required walk — BEFORE resolution, against the RAW input, so defaults never mask
   // a missing required key. A key counts as missing when undefined or ''
@@ -129,12 +130,20 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
       sanitize: typeof schemaNode.sanitize === 'undefined' ? true : schemaNode.sanitize,
     }
 
+    // Collect enum-carrying fields for post-resolution enforcement
+    if (Array.isArray(schemaNode.enum)) {
+      enumPaths.push({ path: path, allowed: schemaNode.enum });
+    }
+
     // Update schema
     _.set(resolvedSchema, path, resolvedNode);
   });
 
   // Resolve settings (defaults, coercion, min/max, forced value, clean — per leaf)
   self.settings = resolveSchema(settings, schema);
+
+  // Enforce enums (sent values checked post-coercion; absent fields pass)
+  enforceEnums(assistant, settings, self.settings, enumPaths);
 
   // Set schema
   self.schema = resolvedSchema;

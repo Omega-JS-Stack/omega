@@ -412,14 +412,37 @@ module.exports = {
     },
 
     {
-      name: 'enum-option-accepted-not-enforced',
+      name: 'enum-enforced-post-resolution',
       async run({ assert }) {
-        // enum was always decorative in the declarative engine (user/oauth2 declares it,
-        // nothing validates) — the builders accept + store it without enforcing;
-        // enforcement is a post-parity tightening decision
+        // cp80 tightening (Ian-approved): enum REJECTS out-of-list values — both
+        // engines, checked post-coercion, only for values the caller actually sent
+        // (absent fields pass: enum does not imply required).
+        const decl = { action: { types: ['string'], default: 'authorize', enum: ['authorize', 'status'] } };
         const zod = f.object({ action: f.string({ default: 'authorize', enum: ['authorize', 'status'] }) });
 
-        assert.equal(resolve(zod, { action: 'not-in-enum' }).action, 'not-in-enum', 'Out-of-enum value passes (decorative parity)');
+        // In-list values and absent-takes-default pass
+        assert.equal(resolve(zod, { action: 'status' }).action, 'status', 'In-enum value passes');
+        assert.equal(resolve(zod, {}).action, 'authorize', 'Absent field takes the default (no enum check)');
+        assert.equal(resolve(decl, {}).action, 'authorize', 'Declarative absent-takes-default passes too');
+
+        // Out-of-enum rejects identically in both engines
+        let declError, zodError;
+        try { resolve(decl, { action: 'banana' }); } catch (e) { declError = e; }
+        try { resolve(zod, { action: 'banana' }); } catch (e) { zodError = e; }
+
+        assert.ok(declError && zodError, 'Both engines reject out-of-enum values');
+        assert.equal(zodError.code, 400, 'Rejects with 400');
+        assert.equal(zodError.message, declError.message, 'Identical message');
+        assert.equal(zodError.message, 'Invalid settings {action}: must be one of [authorize, status]', 'Exact message');
+
+        // Post-coercion: number 5 coerces to '5', which is not in the list
+        let coerced;
+        try { resolve(zod, { action: 5 }); } catch (e) { coerced = e; }
+        assert.equal(coerced && coerced.code, 400, 'Coerced-but-out-of-enum value rejects');
+
+        // No default + field absent → no check (enum ≠ required)
+        const optional = f.object({ mode: f.string({ default: undefined, enum: ['a', 'b'] }) });
+        assert.ok(resolve(optional, {}), 'Absent optional enum field resolves without throwing');
       },
     },
 

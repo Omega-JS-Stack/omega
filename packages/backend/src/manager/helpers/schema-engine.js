@@ -29,8 +29,7 @@ const _ = require('lodash');
 
 // Node options accepted by the zod fields builders — one-to-one with declarative
 // schema nodes. `sanitize` is carried for the middleware sanitize pass; `enum` is
-// accepted and stored but NOT enforced (it was always decorative in the declarative
-// engine; enforcement is a pending tightening decision).
+// enforced post-resolution at the route boundary — see enforceEnums().
 const FIELD_OPTIONS = ['types', 'default', 'value', 'min', 'max', 'required', 'clean', 'sanitize', 'enum'];
 
 // Keys that mark a declarative node as a FIELD (leaf) rather than a nested group.
@@ -146,6 +145,32 @@ function enforceMinMax(value, min, max) {
 }
 
 /**
+ * Enforce enum constraints post-resolution: values the caller actually SENT are
+ * checked against the allowed list (after coercion — the resolved value is what
+ * handlers see); out-of-list values reject with 400. Absent fields pass — enum
+ * does not imply required, and schema-author defaults are presumed valid.
+ * Runs at the route boundary (Settings.resolve / resolveZodSchema), not inside
+ * resolveSchema(), so bare resolution stays a pure defaults/coercion pass.
+ * @param {object} assistant - Assistant (errorify)
+ * @param {object} raw - The ORIGINAL request settings (absence check)
+ * @param {object} resolved - The resolved settings (value check)
+ * @param {Array<{path: string, allowed: Array}>} enumPaths - Fields carrying enum lists
+ */
+function enforceEnums(assistant, raw, resolved, enumPaths) {
+  for (const { path, allowed } of enumPaths) {
+    if (typeof _.get(raw, path) === 'undefined') {
+      continue;
+    }
+
+    const value = _.get(resolved, path);
+
+    if (!allowed.includes(value)) {
+      throw assistant.errorify(`Invalid settings {${path}}: must be one of [${allowed.join(', ')}]`, {code: 400});
+    }
+  }
+}
+
+/**
  * Resolve one field's raw input through the powertools node pipeline:
  * default-or-user → enforceValidTypes → enforceMinMax → forced value → clean.
  */
@@ -192,4 +217,4 @@ function resolveFieldValue(raw, opts) {
   return working;
 }
 
-module.exports = { FIELD_OPTIONS, isFieldNode, iterateSchema, resolveSchema, resolveFieldValue };
+module.exports = { FIELD_OPTIONS, isFieldNode, iterateSchema, resolveSchema, resolveFieldValue, enforceEnums };

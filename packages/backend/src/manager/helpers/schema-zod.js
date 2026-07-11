@@ -34,7 +34,7 @@
 
 const { z } = require('zod');
 const _ = require('lodash');
-const { FIELD_OPTIONS, resolveFieldValue } = require('./schema-engine.js');
+const { FIELD_OPTIONS, resolveFieldValue, enforceEnums } = require('./schema-engine.js');
 
 /**
  * Detect a zod schema (any version with the zod 4 internal marker).
@@ -50,8 +50,9 @@ function isZodSchema(x) {
  * Resolve settings against a zod schema — the zod counterpart of the declarative
  * walk in Settings.resolve().
  * Required semantics (fires on undefined/'', function support, checkRequired
- * opt-out) run from the ._omegaMeta registry that fields.object() builds; the error
- * message and code match the declarative engine exactly.
+ * opt-out) and enum enforcement (sent values checked post-coercion; absent fields
+ * pass) run from the ._omegaMeta registry that fields.object() builds; the error
+ * messages and codes match the declarative engine exactly.
  * @param {object} assistant - Assistant (errorify)
  * @param {import('zod').ZodType} schema - Zod schema (usually from fields.object())
  * @param {object} settings - Raw request data
@@ -85,6 +86,15 @@ function resolveZodSchema(assistant, schema, settings, options) {
     const where = first && first.path.length ? ` {${first.path.join('.')}}` : '';
 
     throw assistant.errorify(`Invalid settings${where}: ${first ? first.message : 'validation failed'}`, {code: 400});
+  }
+
+  // Enum enforcement — post-resolution, same layer as the declarative engine
+  if (meta) {
+    const enumPaths = Object.entries(meta.paths)
+      .filter(([, node]) => Array.isArray(node.enum))
+      .map(([path, node]) => ({ path: path, allowed: node.enum }));
+
+    enforceEnums(assistant, settings, result.data, enumPaths);
   }
 
   return result.data;
