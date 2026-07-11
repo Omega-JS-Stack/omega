@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **N6 IN FLIGHT — cp85 seed-on-boot + devkit e2e harness SHIPPED**; next: cp86 lifecycle browser flows → cp87 /account mock removal + docs sweep; plan: [plans/n6-personas-lifecycle-e2e.md](plans/n6-personas-lifecycle-e2e.md); brand-accounts design unblocked (Ian's a/b/c answers in its plan doc); CI opt-in
+- **N6 IN FLIGHT — cp86 lifecycle browser flows SHIPPED (e2e 19/19)**; next: cp87 /account mock removal + docs sweep (CLOSES N6); plan: [plans/n6-personas-lifecycle-e2e.md](plans/n6-personas-lifecycle-e2e.md); brand-accounts design unblocked (Ian's a/b/c answers in its plan doc); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. N6 (IN FLIGHT — see Now): cp86 lifecycle flows → cp87 /account mock removal + docs sweep + docs
+1. N6 (IN FLIGHT — see Now): cp87 /account mock removal + docs sweep + docs
 2. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002; unified `OMEGA_LIVERELOAD_PORT` needs per-target allocation)
 3. Brand-account provisioning ownership (Ian 2026-07-10) — the 4 auto-created admin accounts (legacy `ADMIN_EMAILS` + hardcoded password formula in omega-manager's account service) become owner-defined: onboarding step + env-var passwords + company-level hooks (none exist yet) for Ian's formula; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md)
 4. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
@@ -44,7 +44,8 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 85 N6 slice 2 — seed.js shared module + `omega emulator` seeds on boot (--no-seed) + devkit e2e-harness (sandbox run.js = consumer); devkit 140, corpus 1224/44/0, e2e 11/11 w/ 53 personas seeded in-boot (this commit) → CHANGELOG
+- [x] 86 N6 slice 3 — lifecycle flows as browser e2e (11→19 steps: persona signin, subscribe, cancel, refund, data-request ×3 incl. FIRST data-request coverage, delete); `__omega.api` Bearer-token fetch; e2e 19/19 (this commit) → CHANGELOG
+- [x] 85 N6 slice 2 — seed.js shared module + `omega emulator` seeds on boot (--no-seed) + devkit e2e-harness (sandbox run.js = consumer); devkit 140, corpus 1224/44/0, e2e 11/11 w/ 53 personas seeded in-boot (d7bd4ad) → CHANGELOG
 - [x] 84 min/max declared-only — implicit 0-floor gone, declared 0 = real bound, both engines; brand-account answers recorded; parity 16/16, corpus 1224/44/0 (b01e9d3) → CHANGELOG
 - [x] 83 N6 slice 1 — refunded persona + deterministic persona password (manual dev signin) + __omega token signin; design doc landed; corpus 1223/44/0 + e2e 11/11 (this commit) → CHANGELOG
 - [x] 82 N5 emulator-first dev — zero-flag SDK auto-connect (FIREBASE_EMULATOR_CONNECT dead); cp74 e2e fixture regression found + fixed (firebaseConfig→cloud.config) + boot step hardened; e2e 11/11 PASSED (this commit) → CHANGELOG
@@ -81,4 +82,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 10:30 PM (85 shipped — seed-on-boot + devkit e2e harness; next: cp86 lifecycle flows)*
+*Last updated: 2026-07-10 10:50 PM (86 shipped — lifecycle browser flows, e2e 19/19; next: cp87 /account mock removal closes N6)*

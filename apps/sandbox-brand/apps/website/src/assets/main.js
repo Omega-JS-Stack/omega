@@ -72,6 +72,32 @@ window.__omega = {
   getIdToken() {
     return manager.auth().getIdToken();
   },
+  // Authenticated backend call for lifecycle e2e (N6): the signed-in user's ID
+  // token rides the Authorization header, exactly what a real page does. Base
+  // URL is the hosting emulator (rewrites /omega/** to omega_api) — hardcoded
+  // like the client's own emulator ports (N7 owns port configurability).
+  // Errors come back as plain text (the backend's wire contract), successes as
+  // JSON — both surfaced so steps can assert on either.
+  api(method, route, body) {
+    return manager.auth().getIdToken()
+      .then((token) => {
+        return fetch(`http://127.0.0.1:5002/omega/${route}`, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      })
+      .then((response) => {
+        return response.text().then((text) => {
+          let json = null;
+          try { json = JSON.parse(text); } catch (error) { /* plain-text error body */ }
+          return { ok: response.ok, status: response.status, json, text };
+        });
+      });
+  },
   signOut() {
     return manager.auth().signOut();
   },

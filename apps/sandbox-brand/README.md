@@ -38,11 +38,16 @@ discovery (`apps/backend` + `apps/website`), website build + static serve,
 emulator boot **with persona seeding** (the harness waits for the post-seed
 ready marker so browser steps never race the seed wipe), step/teardown/log
 plumbing. This file authors only the brand-specific browser steps — a real
-Chromium (puppeteer) driven through the frontend↔backend contract: signup →
-@omega.js/backend `auth onCreate` creates the Firestore user doc → signout →
-signin via @omega.js/client → session persistence across reload → subscription
-resolution. Nothing is mocked; this is the brand-monorepo `npm test` contract
-from the redesign plan.
+Chromium (puppeteer) driven through the frontend↔backend contract: seeded
+persona signs in with the known password → signup → @omega.js/backend
+`auth onCreate` creates the Firestore user doc → signout → signin →
+session persistence across reload → subscription resolution → **the full
+lifecycle** (subscribe via test-processor intent → cancel → refund →
+data-request create/status/cancel → delete account), every backend call
+authenticated with the signed-in user's ID token (`window.__omega.api`)
+and every state change landed by the REAL `payments-webhooks` trigger.
+Nothing is mocked; this is the brand-monorepo `npm test` contract from
+the redesign plan.
 
 Failure logs land in `e2e/.logs/` (emulator output + page console).
 
