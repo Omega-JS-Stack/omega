@@ -1,5 +1,7 @@
 const BaseTest = require('./base-test');
+const path = require('path');
 const jetpack = require('fs-jetpack');
+const JSON5 = require('json5');
 const _ = require('lodash');
 
 // Default emulator ports - SSOT for fallback values
@@ -13,6 +15,33 @@ const DEFAULT_EMULATOR_PORTS = {
   pubsub: 8085,
   ui: 4050,
 };
+
+/**
+ * Load a project's emulator ports from firebase.json, falling back to the
+ * classic defaults. ONE home (N7) — emulator.js, test.js, and
+ * firebase-init.js import this instead of carrying their own copies.
+ * @param {string} projectDir - Firebase project directory.
+ * @returns {object} Name → port map.
+ */
+function loadEmulatorPorts(projectDir) {
+  const emulatorPorts = { ...DEFAULT_EMULATOR_PORTS };
+  const firebaseJsonPath = path.join(projectDir, 'firebase.json');
+
+  if (jetpack.exists(firebaseJsonPath)) {
+    try {
+      const firebaseConfig = JSON5.parse(jetpack.read(firebaseJsonPath));
+      if (firebaseConfig.emulators) {
+        for (const name of Object.keys(DEFAULT_EMULATOR_PORTS)) {
+          emulatorPorts[name] = firebaseConfig.emulators[name]?.port || DEFAULT_EMULATOR_PORTS[name];
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse firebase.json: ${error.message}`);
+    }
+  }
+
+  return emulatorPorts;
+}
 
 const REQUIRED_EMULATORS = {
   auth: { port: DEFAULT_EMULATOR_PORTS.auth },
@@ -77,3 +106,4 @@ class EmulatorConfigTest extends BaseTest {
 
 module.exports = EmulatorConfigTest;
 module.exports.DEFAULT_EMULATOR_PORTS = DEFAULT_EMULATOR_PORTS;
+module.exports.loadEmulatorPorts = loadEmulatorPorts;

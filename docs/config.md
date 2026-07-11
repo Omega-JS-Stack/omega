@@ -103,6 +103,36 @@ company .env ← brand .env ← app .env ← shell env
 - Missing files and unreadable/stale markers skip silently — `loadEnv` never throws for
   an absent layer.
 
+## Port auto-allocation (N7)
+
+`src/ports.js` — classic defaults, probe at boot, per-port +1 bump only when taken, so
+multiple brands run dev stacks concurrently. Single-brand dev with free defaults is
+byte-identical to the pre-N7 behavior (no bumping, no artifacts).
+
+- **`CLASSIC_PORTS`** — the historical defaults (functions 5001, hosting 5002, firestore
+  8080, auth 9099, database 9000, storage 9199, pubsub 8085, ui 4050, website 4000,
+  livereload 35729, cdp 9222).
+- **`resolvePorts({ wanted, pins, claimed })`** — each wanted port keeps its value when
+  free, bumps +1 until free when taken (shared `claimed` set prevents two names landing
+  on one port). `pins` (the config `ports` section) never bump — a busy pin throws.
+- **Ports file** — `writePortsFile/readPortsFile/clearPortsFile(projectDir)`:
+  `<projectDir>/.temp/ports.json` (pid-stamped; readers ignore dead-pid leftovers). The
+  allocator (the backend emulator boot) writes it; siblings of the same brand
+  (`omega test` against a running emulator, the e2e harness) read it; cleared on clean
+  shutdown.
+- **Env channel** — `portsToEnv(ports)` → `OMEGA_<NAME>_PORT` vars injected into spawned
+  children; `envPort(name)` reads them. URL getters resolve env → classic default.
+  Browser code (which can read neither env nor files) receives `dev.ports` via the
+  injected dev config (cp89).
+- **Config `ports` section** (schema, optional object) — explicit pins for any port name;
+  unset = auto-allocate.
+- When a boot bumps emulator ports, the backend CLI materializes
+  `firebase.resolved.json` next to firebase.json (same dir, so relative paths keep
+  resolving) and boots firebase-tools with `--config`; the committed firebase.json never
+  changes. Gitignored; removed on shutdown.
+
+Design + slice plan: [plans/n7-port-allocation.md](../plans/n7-port-allocation.md).
+
 ## Validation
 
 `validateConfig(config, { target })` = shared schema + that target's refinements

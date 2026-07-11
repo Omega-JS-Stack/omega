@@ -18,6 +18,8 @@ logs/
 .temp/
 .cache/
 .omega/
+# Per-run port-bumped emulator config (N7 auto-allocation)
+firebase.resolved.json
 
 # Bake-off generated corpus (deterministic — regenerate via `npm run generate` in spikes/bakeoff-shared)
 spikes/bakeoff-shared/corpus/

@@ -197,6 +197,14 @@ const SHARED_SCHEMA = [
     description: 'Parasite-SEO content (@omega.js/manager seo service): seo.github.content repos. Big content blocks may live in the config/seo.json5 sidecar.',
   },
 
+  // ── ports (dev-only) ─────────────────────────────────────────────────────
+  {
+    path:        'ports',
+    type:        'object',
+    required:    false,
+    description: 'Explicit dev-port pins (N7). Unset ports auto-allocate (classic defaults, bump-if-taken); a pinned port never bumps — busy pin is a hard error. Keys: auth, functions, firestore, database, hosting, storage, pubsub, ui, website, livereload, cdp. Dev/emulator only — production never reads this.',
+  },
+
   // ── theme ────────────────────────────────────────────────────────────────
   {
     path:        'theme.id',

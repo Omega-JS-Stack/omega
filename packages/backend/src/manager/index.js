@@ -249,8 +249,11 @@ Manager.prototype.init = function (exporter, options) {
     // to localhost. NOTE: getParentApiUrl/getParentUrl are intentionally NOT changed —
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
+    // N7: the CLI that booted the stack publishes resolved ports via
+    // OMEGA_*_PORT env (functions workers inherit them) — classic default
+    // when unset (plain local boot).
     return isDev
-      ? `http://localhost:5001/${self.project.projectId}/${self.project.resourceZone}`
+      ? `http://localhost:${process.env.OMEGA_FUNCTIONS_PORT || 5001}/${self.project.projectId}/${self.project.resourceZone}`
       : `https://${self.project.resourceZone}-${self.project.projectId}.cloudfunctions.net`;
   };
 
@@ -262,7 +265,9 @@ Manager.prototype.init = function (exporter, options) {
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
     if (isDev) {
       const httpsPort = process.env.OMEGA_HTTPS_PORT;
-      return httpsPort ? `https://localhost:${httpsPort}` : 'http://localhost:5002';
+      return httpsPort
+        ? `https://localhost:${httpsPort}`
+        : `http://localhost:${process.env.OMEGA_HOSTING_PORT || 5002}`;
     }
     return `https://api.${(self.config.brand?.url || '').replace(/^https?:\/\//, '')}`;
   };
@@ -274,7 +279,7 @@ Manager.prototype.init = function (exporter, options) {
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
     return isDev
-      ? 'https://localhost:4000'
+      ? `https://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`
       : self.config.brand?.url || '';
   };
 

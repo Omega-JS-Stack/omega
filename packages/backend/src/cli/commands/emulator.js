@@ -6,7 +6,8 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const WatchCommand = require('./watch');
-const { DEFAULT_EMULATOR_PORTS } = require('./setup-tests/emulator-config');
+const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
+const { resolvePorts, writePortsFile, clearPortsFile, portsToEnv } = require('@omega.js/config');
 const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warning');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { ensurePublicFiles } = require('../utils/public-files');
@@ -55,7 +56,7 @@ class EmulatorCommand extends BaseCommand {
     // Keep-alive: boot emulators and wait for Ctrl+C. No "command" subprocess —
     // the emulator child IS the foreground process from the user's perspective.
     try {
-      const { shutdown, emulatorPorts, exitPromise } = await this.startEmulators();
+      const { shutdown, emulatorPorts, bumped, exitPromise } = await this.startEmulators();
 
       // Seed personas unless --no-seed was passed (yargs boolean negation:
       // `--no-seed` parses as argv.seed === false). seedPersonas is fully
@@ -91,10 +92,10 @@ class EmulatorCommand extends BaseCommand {
 
       // Resolve when the emulator exits (via shutdown or crash)
       await exitPromise;
-      // Kill any orphaned Java processes left on emulator ports.
+      // Kill any orphaned Java processes left on THIS run's ports.
       // SIGINT listener stays active so Ctrl+C spam during the sweep
       // doesn't kill us before orphans are cleaned up.
-      await this.killOrphanedEmulatorProcesses();
+      await this.killOrphanedEmulatorProcesses(emulatorPorts, { sweepShared: bumped.length === 0 });
       process.removeListener('SIGINT', onSigint);
       this.log(chalk.gray('  Emulator stopped.\n'));
       if (sigintCount > 0) {
@@ -189,14 +190,40 @@ class EmulatorCommand extends BaseCommand {
     // without the folder. Setup remains the authoritative overwrite.
     ensurePublicFiles(projectDir);
 
-    // Load emulator ports from firebase.json
-    const emulatorPorts = this.loadEmulatorPorts(projectDir);
+    // N7 port allocation: firebase.json values (classic defaults) when free,
+    // bump-if-taken — a second brand's stack relocates instead of the old
+    // behavior of KILLING the incumbent. Explicit config `ports` pins never
+    // bump (busy pin = hard error). Crash-leftover orphans on a default port
+    // simply get bumped around; the shutdown sweep still reaps them.
+    const wanted = loadEmulatorPorts(projectDir);
+    const { ports: emulatorPorts, bumped } = await resolvePorts({
+      wanted,
+      pins: this.loadPortPins(projectDir),
+    });
 
-    // Check for port conflicts before starting emulator
-    const canProceed = await this.checkAndKillBlockingProcesses(emulatorPorts);
-    if (!canProceed) {
-      throw new Error('Port conflicts could not be resolved');
+    // Bumped ports can't ride the committed firebase.json — materialize a
+    // patched copy NEXT TO it (same dir, so relative paths keep resolving)
+    // and boot with --config. Defaults-free runs spawn exactly as always.
+    let configFlag = '';
+    if (bumped.length > 0) {
+      const resolvedName = 'firebase.resolved.json';
+      const firebaseConfig = JSON5.parse(jetpack.read(path.join(projectDir, 'firebase.json')));
+      for (const [name, port] of Object.entries(emulatorPorts)) {
+        if (firebaseConfig.emulators?.[name]) {
+          firebaseConfig.emulators[name].port = port;
+        }
+      }
+      jetpack.write(path.join(projectDir, resolvedName), JSON.stringify(firebaseConfig, null, 2));
+      configFlag = ` --config ${resolvedName}`;
+      this.log(chalk.yellow(`  Ports in use — bumped: ${bumped.map((name) => `${name}→${emulatorPorts[name]}`).join(', ')} (booting via ${resolvedName})`));
     }
+
+    // Publish the resolved map: env for our own children (functions workers
+    // inherit through the firebase spawn; URL getters read OMEGA_*_PORT) and
+    // the ports file for sibling processes of this brand (`omega test`
+    // against a running emulator, `omega dev`, the e2e harness).
+    Object.assign(process.env, portsToEnv(emulatorPorts));
+    writePortsFile(projectDir, emulatorPorts);
 
     // Wipe stale firebase-tools debug logs + any leftover @omega.js/backend logs from older versions.
     this.sweepStaleLogs();
@@ -259,7 +286,7 @@ class EmulatorCommand extends BaseCommand {
     // shutdown() can kill the entire group (sh → firebase → java emulators) by
     // signalling the negative pgid. Without it, SIGTERM to the shell doesn't propagate
     // to firebase or its java grandchildren, leaving orphan firestore/pubsub processes.
-    const child = spawn('sh', ['-c', `firebase emulators:start ${EMULATOR_FLAGS}`], {
+    const child = spawn('sh', ['-c', `firebase emulators:start ${EMULATOR_FLAGS}${configFlag}`], {
       cwd: projectDir,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -313,6 +340,10 @@ class EmulatorCommand extends BaseCommand {
         currentStream.end();
       }
       try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* ok */ }
+      // Retract the published port map (clean shutdown). The resolved
+      // firebase config is per-run scratch — remove it too.
+      clearPortsFile(projectDir);
+      try { fs.unlinkSync(path.join(projectDir, 'firebase.resolved.json')); } catch (e) { /* not a bumped run */ }
       exitPromiseResolve({ code, signal });
       // If we exited before becoming ready, fail the readiness wait too
       if (!ready) {
@@ -374,7 +405,7 @@ class EmulatorCommand extends BaseCommand {
       shutdownDone = true;
     };
 
-    return { child, shutdown, emulatorPorts, exitPromise };
+    return { child, shutdown, emulatorPorts, bumped, exitPromise };
   }
 
   /**
@@ -388,7 +419,8 @@ class EmulatorCommand extends BaseCommand {
    * @param {string} command - shell command to run while emulators are up
    */
   async runWithEmulator(command) {
-    const { shutdown, exitPromise } = await this.startEmulators();
+    const { shutdown, emulatorPorts, bumped, exitPromise } = await this.startEmulators();
+    const sweepOptions = { sweepShared: bumped.length === 0 };
 
     // Same synchronous SIGINT pattern as execute() — see comment there.
     let sigintCount = 0;
@@ -413,7 +445,7 @@ class EmulatorCommand extends BaseCommand {
       process.removeListener('SIGINT', onSigint);
       await shutdown();
       await exitPromise;
-      await this.killOrphanedEmulatorProcesses();
+      await this.killOrphanedEmulatorProcesses(emulatorPorts, sweepOptions);
 
       if (cmdExit.code !== 0) {
         throw Object.assign(new Error(`Command exited with code ${cmdExit.code}`), { code: cmdExit.code });
@@ -421,45 +453,51 @@ class EmulatorCommand extends BaseCommand {
     } catch (e) {
       process.removeListener('SIGINT', onSigint);
       await shutdown();
-      await this.killOrphanedEmulatorProcesses();
+      await this.killOrphanedEmulatorProcesses(emulatorPorts, sweepOptions);
       throw e;
     }
   }
 
   /**
-   * Load emulator ports from firebase.json or use defaults
+   * Read explicit port pins from the brand config's `ports` section (N7).
+   * Lenient — a missing/broken config means no pins, never a boot failure.
    */
-  loadEmulatorPorts(projectDir) {
-    const emulatorPorts = { ...DEFAULT_EMULATOR_PORTS };
-    const firebaseJsonPath = path.join(projectDir, 'firebase.json');
-
-    if (jetpack.exists(firebaseJsonPath)) {
-      try {
-        const firebaseConfig = JSON5.parse(jetpack.read(firebaseJsonPath));
-        if (firebaseConfig.emulators) {
-          for (const name of Object.keys(DEFAULT_EMULATOR_PORTS)) {
-            emulatorPorts[name] = firebaseConfig.emulators[name]?.port || DEFAULT_EMULATOR_PORTS[name];
-          }
-        }
-      } catch (error) {
-        this.logWarning(`Warning: Could not parse firebase.json: ${error.message}`);
+  loadPortPins(projectDir) {
+    try {
+      const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
+      const functionsDir = path.join(projectDir, 'functions');
+      if (!hasOmegaConfig(functionsDir)) {
+        return {};
       }
+      const config = loadConfig(functionsDir, 'backend').config;
+      return config.ports && typeof config.ports === 'object' ? config.ports : {};
+    } catch (error) {
+      return {};
     }
-
-    return emulatorPorts;
   }
 
   /**
-   * Kill any processes still listening on emulator ports after shutdown.
-   * Firebase-tools spawns Java emulators (Firestore, Database, PubSub) that
-   * often survive SIGTERM/SIGKILL of the firebase node process. This sweep
-   * runs AFTER the main child exits, so anything still on these ports is orphaned.
+   * Kill any processes still listening on THIS RUN's emulator ports after
+   * shutdown. Firebase-tools spawns Java emulators (Firestore, Database,
+   * PubSub) that often survive SIGTERM/SIGKILL of the firebase node process.
+   * This sweep runs AFTER the main child exits, so anything still on these
+   * ports is orphaned.
+   *
+   * N7: the sweep takes the RESOLVED port map — sweeping firebase.json
+   * defaults after a bumped run would kill ANOTHER brand's live emulator
+   * (the exact behavior allocation removes). No map → no sweep. The shared
+   * hub (4400) + storage (9199) ports are swept only on a defaults run
+   * (`sweepShared`) — on a bumped run they belong to the incumbent.
    */
-  killOrphanedEmulatorProcesses() {
-    const projectDir = this.main.firebaseProjectPath;
-    const ports = Object.values(this.loadEmulatorPorts(projectDir));
-    // Also sweep the emulator hub (4400) and storage (9199)
-    ports.push(4400, 9199);
+  killOrphanedEmulatorProcesses(emulatorPorts, { sweepShared = true } = {}) {
+    if (!emulatorPorts) {
+      return;
+    }
+
+    const ports = Object.values(emulatorPorts);
+    if (sweepShared) {
+      ports.push(4400, 9199);
+    }
 
     // Synchronous sweep — no async delays that Ctrl+C spam can interrupt.
     const { execSync } = require('child_process');

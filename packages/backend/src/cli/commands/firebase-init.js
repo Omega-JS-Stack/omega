@@ -1,7 +1,6 @@
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const JSON5 = require('json5');
-const { DEFAULT_EMULATOR_PORTS } = require('./setup-tests/emulator-config');
+const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 
 /**
  * Initialize firebase-admin for CLI commands.
@@ -27,8 +26,10 @@ function initFirebase({ firebaseProjectPath, emulator }) {
   }
 
   if (emulator) {
-    // Load emulator ports from firebase.json
-    const emulatorPorts = loadEmulatorPorts(firebaseProjectPath);
+    // N7: a running emulator's published map wins (it may have bumped);
+    // otherwise firebase.json/classic values.
+    const { readPortsFile } = require('@omega.js/config');
+    const emulatorPorts = { ...loadEmulatorPorts(firebaseProjectPath), ...(readPortsFile(firebaseProjectPath) || {}) };
 
     // Set emulator env vars so firebase-admin connects to emulator
     process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST
@@ -61,27 +62,6 @@ function initFirebase({ firebaseProjectPath, emulator }) {
   });
 
   return { admin, projectId };
-}
-
-function loadEmulatorPorts(projectDir) {
-  const emulatorPorts = { ...DEFAULT_EMULATOR_PORTS };
-  const firebaseJsonPath = path.join(projectDir, 'firebase.json');
-
-  if (jetpack.exists(firebaseJsonPath)) {
-    try {
-      const firebaseConfig = JSON5.parse(jetpack.read(firebaseJsonPath));
-
-      if (firebaseConfig.emulators) {
-        for (const name of Object.keys(DEFAULT_EMULATOR_PORTS)) {
-          emulatorPorts[name] = firebaseConfig.emulators[name]?.port || DEFAULT_EMULATOR_PORTS[name];
-        }
-      }
-    } catch (e) {
-      // Use defaults
-    }
-  }
-
-  return emulatorPorts;
 }
 
 function resolveProjectId(projectDir, functionsDir) {

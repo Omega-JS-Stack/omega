@@ -27,6 +27,7 @@ const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBr
 const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, COMPANY_MARKER } = require('./env.js');
 const { applyConfigEdits, writeConfigValues } = require('./edit.js');
 const { toSiteGlobal } = require('./site-global.js');
+const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, envName, portsToEnv, envPort } = require('./ports.js');
 
 module.exports = {
   // Loading
@@ -62,6 +63,17 @@ module.exports = {
 
   // Merge
   deepMerge,
+
+  // Port auto-allocation (N7 — dev/emulator only)
+  CLASSIC_PORTS,
+  isPortFree,
+  resolvePorts,
+  writePortsFile,
+  readPortsFile,
+  clearPortsFile,
+  envName,
+  portsToEnv,
+  envPort,
 
   // Schema (pure data)
   TARGETS,

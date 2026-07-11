@@ -847,6 +847,8 @@ npx omega test
 
 `npx omega emulator` **seeds the test personas on boot** (same wipe-and-create pass the test runner uses), so an emulator-connected dev site is signin-able immediately — any persona email + the deterministic `TEST_ACCOUNT_PASSWORD` (`omega-test-password`). Pass `--no-seed` to boot without seeding. Seeding is non-fatal: if it fails (e.g. missing config), the emulator keeps running. See [docs/test-framework.md](docs/test-framework.md#personas-n6).
 
+**Ports auto-allocate (N7)**: boot resolves each emulator port from firebase.json, bumping +1 when taken — so a second brand's emulator runs ALONGSIDE the first instead of killing it (bumped runs boot via a generated, gitignored `firebase.resolved.json`; the committed firebase.json never changes). The resolved map publishes to `.temp/ports.json` (sibling processes — `omega test` reads it automatically) and `OMEGA_<NAME>_PORT` env (URL getters). Pin a port explicitly with the config `ports` section — pins never bump (busy pin = hard error). Single-brand dev on free defaults behaves exactly as before.
+
 ### Extended Mode (real APIs)
 
 Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:

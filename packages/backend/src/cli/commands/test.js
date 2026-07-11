@@ -4,9 +4,9 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const JSON5 = require('json5');
 const powertools = require('node-powertools');
-const { DEFAULT_EMULATOR_PORTS } = require('./setup-tests/emulator-config');
+const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
+const { readPortsFile } = require('@omega.js/config');
 const { writeTestMode, captureSyncedEnv, SYNCED_ENV_KEYS } = require('../../test/utils/test-mode-file');
 const EmulatorCommand = require('./emulator');
 
@@ -61,8 +61,14 @@ class TestCommand extends BaseCommand {
       this.log(chalk.gray(`  Test mode: ${extended ? 'extended (real external APIs)' : 'normal (external APIs skipped)'}`));
     }
 
-    // Load emulator ports from firebase.json
-    const emulatorPorts = this.loadEmulatorPorts(projectDir);
+    // N7: a RUNNING emulator's published port map wins — it may have bumped
+    // off the firebase.json values (second-brand boot). No live map →
+    // firebase.json/classic (and the auto-start path re-resolves after boot).
+    let emulatorPorts = loadEmulatorPorts(projectDir);
+    const publishedPorts = readPortsFile(projectDir);
+    if (publishedPorts) {
+      emulatorPorts = { ...emulatorPorts, ...publishedPorts };
+    }
 
     // Load project configuration
     const projectConfig = this.loadProjectConfig(functionsDir, argv);
@@ -85,42 +91,18 @@ class TestCommand extends BaseCommand {
       isFrameworkSelfTest: isSelfTest, // gates the boot/ smoke layer (excluded for consumers)
     };
 
-    // Build the test command
-    const testCommand = this.buildTestCommand(testConfig);
-
     // Check if emulator is already running
     const emulatorRunning = this.isEmulatorRunning(emulatorPorts);
 
     if (emulatorRunning) {
       this.log(chalk.cyan('Running tests against EXISTING emulator'));
-      await this.runTestsDirectly(testCommand, functionsDir, emulatorPorts);
+      await this.runTestsDirectly(this.buildTestCommand(testConfig), functionsDir, emulatorPorts);
     } else {
       this.log(chalk.cyan('Starting emulator and running tests...'));
-      await this.runEmulatorTests(testCommand, functionsDir);
+      // The command is built INSIDE runEmulatorTests, after boot — allocation
+      // may bump ports, and a pre-built command would bake the stale ones.
+      await this.runEmulatorTests(testConfig, functionsDir);
     }
-  }
-
-  /**
-   * Load emulator ports from firebase.json or use defaults
-   */
-  loadEmulatorPorts(projectDir) {
-    const emulatorPorts = { ...DEFAULT_EMULATOR_PORTS };
-    const firebaseJsonPath = path.join(projectDir, 'firebase.json');
-
-    if (jetpack.exists(firebaseJsonPath)) {
-      try {
-        const firebaseConfig = JSON5.parse(jetpack.read(firebaseJsonPath));
-        if (firebaseConfig.emulators) {
-          for (const name of Object.keys(DEFAULT_EMULATOR_PORTS)) {
-            emulatorPorts[name] = firebaseConfig.emulators[name]?.port || DEFAULT_EMULATOR_PORTS[name];
-          }
-        }
-      } catch (error) {
-        this.logWarning(`Warning: Could not parse firebase.json: ${error.message}`);
-      }
-    }
-
-    return emulatorPorts;
   }
 
   /**
@@ -446,7 +428,7 @@ class TestCommand extends BaseCommand {
    *   - `emulator.log` — `firebase emulators:start` stdout/stderr (managed by EmulatorCommand)
    *   - `test.log`     — the test-runner subprocess stdout/stderr (managed here)
    */
-  async runEmulatorTests(testCommand, functionsDir) {
+  async runEmulatorTests(testConfig, functionsDir) {
     try {
       await powertools.execute('java -version', { log: false });
     } catch (e) {
@@ -468,6 +450,14 @@ class TestCommand extends BaseCommand {
     }
 
     const { shutdown, exitPromise, emulatorPorts } = started;
+
+    // Build the test command from the RESOLVED ports — allocation may have
+    // bumped them off the firebase.json values testConfig was seeded with.
+    const testCommand = this.buildTestCommand({
+      ...testConfig,
+      apiUrl: `http://127.0.0.1:${emulatorPorts.hosting}`,
+      emulatorPorts,
+    });
 
     // Forward Ctrl+C to a clean emulator shutdown
     const onSigint = async () => {
