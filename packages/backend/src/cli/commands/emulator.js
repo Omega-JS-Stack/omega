@@ -46,9 +46,13 @@ class EmulatorCommand extends BaseCommand {
       this.log('');
     }
 
-    // Start @omega.js/backend watcher in background
+    // Start @omega.js/backend watcher in background. Keep the child handle —
+    // interactive Ctrl+C kills it via the terminal process group, but a
+    // PROGRAMMATIC signal to this process alone (e2e harness, kill -INT)
+    // doesn't, leaving an immortal nodemon re-creating the reload trigger
+    // (found live by the cp88 two-emulator proof).
     const watcher = new WatchCommand(this.main);
-    watcher.startBackground();
+    const watcherChild = watcher.startBackground();
 
     // Start Stripe webhook forwarding in background
     this.startStripeWebhookForwarding();
@@ -92,6 +96,11 @@ class EmulatorCommand extends BaseCommand {
 
       // Resolve when the emulator exits (via shutdown or crash)
       await exitPromise;
+      // Reap the background watcher — it is NOT in the firebase child's
+      // process group, so nothing else kills it on a programmatic shutdown.
+      if (watcherChild) {
+        try { watcherChild.kill('SIGTERM'); } catch (e) { /* already gone */ }
+      }
       // Kill any orphaned Java processes left on THIS run's ports.
       // SIGINT listener stays active so Ctrl+C spam during the sweep
       // doesn't kill us before orphans are cleaned up.

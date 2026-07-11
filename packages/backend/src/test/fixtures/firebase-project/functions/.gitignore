@@ -6,3 +6,6 @@ node_modules/
 
 # Runtime-generated throwaway RSA service account (emulator-only). Never committed.
 service-account.json
+
+# Watch-command hot-reload trigger (written when `mgr emulator` boots the fixture)
+omega-reload-trigger.js
