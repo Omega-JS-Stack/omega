@@ -7,19 +7,21 @@
  * - Email object: { email: "user@example.com", name: "John" }
  * - Array of any of the above
  */
-module.exports = () => ({
-  to: { types: ['array', 'string', 'object'], default: [] },
-  cc: { types: ['array', 'string', 'object'], default: [] },
-  bcc: { types: ['array', 'string', 'object'], default: [] },
-  from: { types: ['object'], default: undefined },
-  replyTo: { types: ['string'], default: undefined },
-  sender: { types: ['string'], default: undefined },
-  subject: { types: ['string'], default: undefined },
-  template: { types: ['string'], default: 'card' },
-  group: { types: ['number', 'string'], default: undefined },
-  sendAt: { types: ['number', 'string'], default: undefined },
-  data: { types: ['object'], default: {} },
-  categories: { types: ['array'], default: [] },
-  copy: { types: ['boolean'], default: undefined },
-  html: { types: ['string'], default: undefined, sanitize: false },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  to: f.multi(['array', 'string', 'object'], { default: [] }),
+  cc: f.multi(['array', 'string', 'object'], { default: [] }),
+  bcc: f.multi(['array', 'string', 'object'], { default: [] }),
+  from: f.passthrough({ default: undefined }),
+  replyTo: f.string({ default: undefined }),
+  sender: f.string({ default: undefined }),
+  subject: f.string({ default: undefined }),
+  template: f.string({ default: 'card' }),
+  group: f.multi(['number', 'string'], { default: undefined }),
+  sendAt: f.multi(['number', 'string'], { default: undefined }),
+  data: f.passthrough({ default: {} }),
+  categories: f.array({ default: [] }),
+  copy: f.boolean({ default: undefined }),
+  html: f.string({ default: undefined, sanitize: false }),
 });

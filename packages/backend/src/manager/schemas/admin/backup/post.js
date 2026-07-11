@@ -1,6 +1,8 @@
 /**
  * Schema for POST /admin/backup
  */
-module.exports = () => ({
-  deletionRegex: { types: ['string'], default: undefined },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  deletionRegex: f.string({ default: undefined }),
 });

@@ -1,21 +1,23 @@
 /**
  * Schema for POST /admin/notification
+ * (The route reads named props only and rebuilds filters explicitly, so the zod
+ * engine's clean defaults — no injected types/min/max keys — are wire-identical.)
  */
-module.exports = () => ({
-  notification: {
-    types: ['object'],
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  notification: f.passthrough({
     default: {
       title: 'Notification',
       body: 'Check this out',
     },
-  },
-  filters: {
-    types: ['object'],
+  }),
+  filters: f.passthrough({
     default: {
       tags: false,
       owner: null,
       token: null,
       limit: null,
     },
-  },
+  }),
 });

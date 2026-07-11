@@ -1,11 +1,13 @@
 /**
  * Schema for PUT /admin/post (edit)
  */
-module.exports = () => ({
-  url: { types: ['string'], default: undefined, required: true },
-  body: { types: ['string'], default: undefined, required: true },
-  title: { types: ['string'], default: undefined },
-  postPath: { types: ['string'], default: 'guest' },
-  githubUser: { types: ['string'], default: undefined },
-  githubRepo: { types: ['string'], default: undefined },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  url: f.string({ default: undefined, required: true }),
+  body: f.string({ default: undefined, required: true }),
+  title: f.string({ default: undefined }),
+  postPath: f.string({ default: 'guest' }),
+  githubUser: f.string({ default: undefined }),
+  githubRepo: f.string({ default: undefined }),
 });

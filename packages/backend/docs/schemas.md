@@ -55,7 +55,7 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 
 ## Zod schemas
 
-A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the powertools engine. Build with the `fields` helpers for **powertools-parity semantics** (coerce-never-reject, min/max clamp/truncate, undefined-only `required`, unknown keys stripped — wire shapes identical to the declarative engine, proven by `test/helpers/schema-zod.js`):
+A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the powertools engine. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects. Build with the `fields` helpers for **powertools-parity semantics** (coerce-never-reject, min/max clamp/truncate, undefined-only `required`, unknown keys stripped — wire shapes identical to the declarative engine, proven by `test/helpers/schema-zod.js`):
 
 ```javascript
 const { fields: f } = require('@omega.js/backend/src/manager/helpers/schema-zod.js'); // framework schemas use a relative path

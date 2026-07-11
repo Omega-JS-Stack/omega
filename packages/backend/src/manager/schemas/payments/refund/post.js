@@ -2,17 +2,10 @@
  * Schema: POST /payments/refund
  * Validates subscription refund parameters
  */
-module.exports = () => ({
-  reason: {
-    types: ['string'],
-    required: true,
-  },
-  feedback: {
-    types: ['string'],
-    default: null,
-  },
-  confirmed: {
-    types: ['boolean'],
-    required: true,
-  },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  reason: f.string({ required: true }),
+  feedback: f.string({ default: null }),
+  confirmed: f.boolean({ required: true }),
 });

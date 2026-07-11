@@ -1,21 +1,23 @@
 /**
  * Schema for POST /admin/post (create)
  */
-module.exports = () => ({
-  title: { types: ['string'], default: undefined, required: true },
-  url: { types: ['string'], default: undefined, required: true },
-  description: { types: ['string'], default: undefined, required: true },
-  headerImageURL: { types: ['string'], default: undefined, required: true },
-  body: { types: ['string'], default: undefined, required: true },
-  author: { types: ['string'], default: undefined },
-  affiliate: { types: ['string'], default: '' },
-  tags: { types: ['array'], default: [] },
-  categories: { types: ['array'], default: [] },
-  layout: { types: ['string'], default: 'blueprint/blog/post' },
-  date: { types: ['string'], default: undefined },
-  id: { types: ['number'], default: undefined },
-  postPath: { types: ['string'], default: 'guest' },
-  source: { types: ['string'], default: null },
-  githubUser: { types: ['string'], default: undefined },
-  githubRepo: { types: ['string'], default: undefined },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  title: f.string({ default: undefined, required: true }),
+  url: f.string({ default: undefined, required: true }),
+  description: f.string({ default: undefined, required: true }),
+  headerImageURL: f.string({ default: undefined, required: true }),
+  body: f.string({ default: undefined, required: true }),
+  author: f.string({ default: undefined }),
+  affiliate: f.string({ default: '' }),
+  tags: f.array({ default: [] }),
+  categories: f.array({ default: [] }),
+  layout: f.string({ default: 'blueprint/blog/post' }),
+  date: f.string({ default: undefined }),
+  id: f.number({ default: undefined }),
+  postPath: f.string({ default: 'guest' }),
+  source: f.string({ default: null }),
+  githubUser: f.string({ default: undefined }),
+  githubRepo: f.string({ default: undefined }),
 });

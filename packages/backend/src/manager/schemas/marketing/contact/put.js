@@ -1,6 +1,8 @@
 /**
  * Schema for PUT /marketing/contact (sync)
  */
-module.exports = () => ({
-  uid: { types: ['string'], default: undefined, required: true },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  uid: f.string({ default: undefined, required: true }),
 });

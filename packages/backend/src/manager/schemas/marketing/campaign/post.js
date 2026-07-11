@@ -1,41 +1,43 @@
 /**
  * Schema for POST /marketing/campaign
  */
-module.exports = () => ({
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
   // Identity
-  id: { types: ['string'], default: '' },
-  type: { types: ['string'], default: 'email' },
+  id: f.string({ default: '' }),
+  type: f.string({ default: 'email' }),
 
   // Content
-  name: { types: ['string'], default: undefined, required: true },
-  subject: { types: ['string'], default: undefined, required: true },
-  preheader: { types: ['string'], default: '' },
-  template: { types: ['string'], default: 'card' },
-  data: { types: ['object'], default: {} },
+  name: f.string({ default: undefined, required: true }),
+  subject: f.string({ default: undefined, required: true }),
+  preheader: f.string({ default: '' }),
+  template: f.string({ default: 'card' }),
+  data: f.passthrough({ default: {} }),
 
   // Targeting
-  lists: { types: ['array'], default: [] },
-  segments: { types: ['array'], default: [] },
-  excludeSegments: { types: ['array'], default: [] },
-  all: { types: ['boolean'], default: false },
+  lists: f.array({ default: [] }),
+  segments: f.array({ default: [] }),
+  excludeSegments: f.array({ default: [] }),
+  all: f.boolean({ default: false }),
 
   // Scheduling
-  sendAt: { types: ['string', 'number'], default: '' },
-  recurrence: { types: ['object'], default: undefined },  // { pattern: 'weekly'|'monthly'|'quarterly'|'yearly'|'daily', hour?, day?, month? }
+  sendAt: f.multi(['string', 'number'], { default: '' }),
+  recurrence: f.passthrough({ default: undefined }),  // { pattern: 'weekly'|'monthly'|'quarterly'|'yearly'|'daily', hour?, day?, month? }
 
   // UTM
-  utm: { types: ['object'], default: {} },
+  utm: f.passthrough({ default: {} }),
 
   // Lineage
-  recurringId: { types: ['string'], default: '' },
+  recurringId: f.string({ default: '' }),
 
   // Push notification targeting
-  filters: { types: ['object'], default: {} },
+  filters: f.passthrough({ default: {} }),
 
   // Config
-  test: { types: ['boolean'], default: false },
-  sender: { types: ['string'], default: 'marketing' },
-  providers: { types: ['array'], default: [] },
-  group: { types: ['string'], default: '' },
-  categories: { types: ['array'], default: [] },
+  test: f.boolean({ default: false }),
+  sender: f.string({ default: 'marketing' }),
+  providers: f.array({ default: [] }),
+  group: f.string({ default: '' }),
+  categories: f.array({ default: [] }),
 });

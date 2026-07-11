@@ -2,9 +2,8 @@
  * Schema: POST /payments/portal
  * Validates billing portal session parameters
  */
-module.exports = () => ({
-  returnUrl: {
-    types: ['string'],
-    default: null,
-  },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  returnUrl: f.string({ default: null }),
 });

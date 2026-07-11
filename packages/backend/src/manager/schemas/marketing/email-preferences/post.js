@@ -5,9 +5,11 @@
  * - Authenticated (account page toggle): action ('subscribe' | 'unsubscribe'). Other fields ignored.
  * - Anonymous (HMAC link from email footer): email + asmId + sig + action ('subscribe' | 'unsubscribe').
  */
-module.exports = () => ({
-  email: { types: ['string'], default: undefined, required: false },
-  asmId: { types: ['string', 'number'], default: undefined, required: false },
-  action: { types: ['string'], default: 'unsubscribe', required: true },
-  sig: { types: ['string'], default: undefined, required: false },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  email: f.string({ default: undefined, required: false }),
+  asmId: f.multi(['string', 'number'], { default: undefined, required: false }),
+  action: f.string({ default: 'unsubscribe', required: true }),
+  sig: f.string({ default: undefined, required: false }),
 });

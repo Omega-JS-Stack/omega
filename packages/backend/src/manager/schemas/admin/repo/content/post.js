@@ -1,10 +1,12 @@
 /**
  * Schema for POST /admin/repo/content
  */
-module.exports = () => ({
-  path: { types: ['string'], default: undefined, required: true },
-  content: { types: ['string'], default: undefined, required: true },
-  type: { types: ['string'], default: 'text' },
-  githubUser: { types: ['string'], default: undefined },
-  githubRepo: { types: ['string'], default: undefined },
+const { fields: f } = require('../../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  path: f.string({ default: undefined, required: true }),
+  content: f.string({ default: undefined, required: true }),
+  type: f.string({ default: 'text' }),
+  githubUser: f.string({ default: undefined }),
+  githubRepo: f.string({ default: undefined }),
 });

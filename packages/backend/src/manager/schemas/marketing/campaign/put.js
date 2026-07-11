@@ -2,34 +2,36 @@
  * Schema for PUT /marketing/campaign
  * All fields optional except id — only provided fields are updated.
  */
-module.exports = () => ({
-  id: { types: ['string'], default: undefined, required: true },
-  type: { types: ['string'], default: '' },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  id: f.string({ default: undefined, required: true }),
+  type: f.string({ default: '' }),
 
   // Content
-  name: { types: ['string'], default: '' },
-  subject: { types: ['string'], default: '' },
-  preheader: { types: ['string'], default: '' },
-  template: { types: ['string'], default: '' },
-  content: { types: ['string'], default: '' },
-  data: { types: ['object'], default: undefined },
+  name: f.string({ default: '' }),
+  subject: f.string({ default: '' }),
+  preheader: f.string({ default: '' }),
+  template: f.string({ default: '' }),
+  content: f.string({ default: '' }),
+  data: f.passthrough({ default: undefined }),
 
   // Targeting
-  lists: { types: ['array'], default: undefined },
-  segments: { types: ['array'], default: undefined },
-  excludeSegments: { types: ['array'], default: undefined },
-  all: { types: ['boolean'], default: undefined },
+  lists: f.array({ default: undefined }),
+  segments: f.array({ default: undefined }),
+  excludeSegments: f.array({ default: undefined }),
+  all: f.boolean({ default: undefined }),
 
   // Scheduling
-  sendAt: { types: ['string', 'number'], default: '' },
-  recurrence: { types: ['object'], default: undefined },
+  sendAt: f.multi(['string', 'number'], { default: '' }),
+  recurrence: f.passthrough({ default: undefined }),
 
   // UTM
-  utm: { types: ['object'], default: undefined },
+  utm: f.passthrough({ default: undefined }),
 
   // Config
-  sender: { types: ['string'], default: '' },
-  providers: { types: ['array'], default: undefined },
-  group: { types: ['string'], default: '' },
-  categories: { types: ['array'], default: undefined },
+  sender: f.string({ default: '' }),
+  providers: f.array({ default: undefined }),
+  group: f.string({ default: '' }),
+  categories: f.array({ default: undefined }),
 });

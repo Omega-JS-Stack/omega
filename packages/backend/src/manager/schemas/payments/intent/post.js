@@ -2,37 +2,15 @@
  * Schema: POST /payments/intent
  * Validates intent creation parameters
  */
-module.exports = () => ({
-  processor: {
-    types: ['string'],
-    required: true,
-  },
-  productId: {
-    types: ['string'],
-    required: true,
-  },
-  frequency: {
-    types: ['string'],
-    default: null,
-  },
-  trial: {
-    types: ['boolean'],
-    default: false,
-  },
-  verification: {
-    types: ['object'],
-    default: {},
-  },
-  attribution: {
-    types: ['object'],
-    default: {},
-  },
-  discount: {
-    types: ['string'],
-    default: null,
-  },
-  supplemental: {
-    types: ['object'],
-    default: {},
-  },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  processor: f.string({ required: true }),
+  productId: f.string({ required: true }),
+  frequency: f.string({ default: null }),
+  trial: f.boolean({ default: false }),
+  verification: f.passthrough({ default: {} }),
+  attribution: f.passthrough({ default: {} }),
+  discount: f.string({ default: null }),
+  supplemental: f.passthrough({ default: {} }),
 });

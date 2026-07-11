@@ -1,6 +1,8 @@
 /**
  * Schema for POST /admin/cron
  */
-module.exports = () => ({
-  id: { types: ['string'], default: undefined, required: true },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  id: f.string({ default: undefined, required: true }),
 });

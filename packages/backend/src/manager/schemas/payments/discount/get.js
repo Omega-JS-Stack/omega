@@ -1,9 +1,8 @@
 /**
  * Schema: GET /payments/discount
  */
-module.exports = () => ({
-  code: {
-    types: ['string'],
-    required: true,
-  },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  code: f.string({ required: true }),
 });
