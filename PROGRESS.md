@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — 73a + 73c SHIPPED; remaining: zod route schemas (full route inventory + powertools preservation checklist in hand — slot into Settings.resolve, coerce/strip/clamp semantics must survive) + D12 provider-key proposal (inventory in hand; single-provider roles fit a `provider` field, multi-provider roles — analytics/payment/oauth2 — need a keep-the-map call; 4 keys cross live surfaces via GET /brand → flag for Ian), parked verifies (line below); CI opt-in, investigation parked
+- N4 architecture sweep (cp73) — 73a + 73c SHIPPED; designs DONE + committed: [plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md) (implement next: Settings.resolve zod branch + parity cohorts) and [plans/d12-provider-keys-proposal.md](plans/d12-provider-keys-proposal.md) (R2/R3c shippable under veto window; `cloud`/`errorMonitoring` renames WAIT for Ian); parked verifies (line below); CI opt-in, investigation parked
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
