@@ -1,0 +1,19 @@
+{
+  "name": "omega-website",
+  "private": true,
+  "description": "OMEGA web app",
+  "dependencies": {
+    "@omega.js/web": "file:../../../../packages/web"
+  },
+  "scripts": {
+    "setup": "omega setup",
+    "start": "omega dev",
+    "build": "omega build",
+    "test": "omega test",
+    "clean": "omega clean",
+    "deploy": "omega deploy"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

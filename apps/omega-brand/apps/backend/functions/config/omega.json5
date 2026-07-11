@@ -1,0 +1,81 @@
+// OMEGA backend — APP-level omega.json5. Shared sections (brand, cloud,
+// payment, ...) come from the BRAND file (apps/omega-brand/config/omega.json5)
+// via the loader's brand walk-up — this file carries ONLY the backend
+// target's own settings. (cp93 friction find: the framework-seeded file
+// duplicated every shared section with placeholders, shadowing the brand
+// layer — slimmed to targets-only, sandbox-brand style.)
+{
+  targets: {
+    backend: {
+      parent: '',
+      github: {
+        user: 'Omega-JS-Stack',
+        repo_website: 'https://github.com/Omega-JS-Stack/omega',
+      },
+      marketing: {
+        campaigns: {
+          enabled: false,
+          provider: 'sendgrid',
+          listId: '',
+        },
+        newsletter: {
+          enabled: false,
+          provider: 'beehiiv',
+          publicationId: '',
+          content: [
+            {
+              sources: ['$brand'],
+              sourceCount: 6,
+              categories: [],
+              links: [],
+              instructions: '',
+              tone: 'professional',
+              keywords: [],
+              template: 'clean',
+              article: {
+                enabled: false,
+                author: null,
+              },
+              theme: {
+                primaryColor: '#5B5BFF',
+                secondaryColor: '#1E1E2A',
+                accentColor: '#F6F7FB',
+                font: 'Inter, system-ui, sans-serif',
+              },
+              sponsorships: [],
+            },
+          ],
+        },
+        prune: {
+          enabled: false,
+        },
+      },
+      blog: {
+        enabled: false,
+        provider: 'ghostii',
+        content: [
+          {
+            sources: ['$brand'],
+            categories: [],
+            links: [],
+            instructions: '',
+            tone: 'professional',
+            keywords: [],
+            quantity: 0,
+            chance: 1.0,
+            author: null,
+            postPath: 'ghostii',
+            overrides: {},
+          },
+        ],
+      },
+      reviews: {
+        enabled: false,
+        sites: [],
+      },
+      dataRequest: {
+        queries: [],
+      },
+    },
+  },
+}

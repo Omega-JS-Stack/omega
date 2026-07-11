@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Custom rules
+    // ...
+
+    // ========== OMEGA Rules (v6.2.0) ==========
+    // Lock by default
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Protect user account data
+    match /users/{uid} {
+      allow read: if belongsTo(uid);
+      allow write: if belongsTo(uid) && !isWritingProtectedUserField();
+    }
+
+    // Protect notification data
+    match /notifications/{token} {
+      allow read: if resource == null || existingData().token == token || belongsTo(existingData().owner);
+      allow update: if existingData().token == token;
+      allow create: if true;
+    }
+
+    // Protect abandoned cart data
+    match /payments-carts/{uid} {
+      allow create, update: if belongsTo(uid)
+        && incomingData().owner == uid
+        && incomingData().status == 'pending';
+      allow read: if belongsTo(uid);
+    }
+
+    // Auth functions
+    function authEmail() {
+      return request.auth.token.email;
+    }
+    function authUid() {
+      return request.auth.uid;
+    }
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function belongsTo(identity) {
+      return isAuthenticated() && (authUid() == identity || authEmail() == identity);
+      // eventually include a check for (existingData().owner == identity)...(in case its a doc owned by a user that's not actually user doc)
+    }
+
+    function getRoles() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles;
+    }
+    function getVerifications() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verifications;
+    }
+    function isAdmin() {
+      return getRoles().admin == true;
+    }
+    function emailVerified() {
+      return getVerifications().email == true;
+    }
+
+    function isWritingProtectedUserField() {
+      return isWritingField('auth')
+        || isWritingField('roles')
+        || isWritingField('flags')
+        || isWritingField('plan') // TODO: REMOVE THIS WHEN ALL PROJECTS UPDATED
+        || isWritingField('subscription')
+        || isWritingField('affiliate')
+        || isWritingField('api')
+        || isWritingField('metadata')
+        || isWritingField('usage')
+        || isWritingField('consent');
+    }
+
+    function isCreatingField(field) {
+      return !(field in resource.data) && field in request.resource.data;
+    }
+
+    function isUpdatingField(field) {
+      return field in resource.data && field in request.resource.data && resource.data[field] != request.resource.data[field];
+    }
+
+    function isWritingField(field) {
+      return isCreatingField(field) || isUpdatingField(field);
+    }
+
+    // function userEmail(userId) {
+    //   return get(/databases/$(database)/documents/users/$(userId)).data.email;
+    // }
+    // Helper functions
+    // [READ] Data that exists on the Firestore document
+    function existingData() {
+      return resource.data;
+    }
+    // [WRITE] Data that is sent to a Firestore document
+    function incomingData() {
+      return request.resource.data;
+    }
+    // ========== Tests ==========
+    // match /test-cases/write/admin {
+    //   allow write: if isAdmin();
+    // }
+    // ========== Resources ==========
+    // https://fireship.io/snippets/firestore-rules-recipes/
+    // https://github.com/jaysquared/atom-firestore-grammar
+    // https://fireship.io/courses/firestore-data-modeling/models-roles/
+    // https://firebase.google.com/docs/firestore/security/test-rules-emulator
+    // ========== End OMEGA Rules ==========
+
+  }
+}

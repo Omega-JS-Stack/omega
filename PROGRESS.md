@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **Dogfood arc OPEN (cp92)** — [plans/dogfood-arc.md](plans/dogfood-arc.md) = survey + slicing: cp93 scaffold omega-brand (all 4 targets, in-monorepo, friction log) → cp94 C5 test-scoping → cp95 C1 polish → cp96 C2 pricing/blueprints → cp97 D13 deliberate deploys (live CI proof Ian-gated) → cp98+ C3 redesign (design brief for Ian fronts it) → C4 sharing → arc close (template repo cut)
+- **omega-brand LIVES (cp93)** — apps/omega-brand born from the real wizard, all four targets proven (web :4000 + pricing-from-config, backend demo-omega emulator w/ 10 functions, MV3 ×3 browsers, desktop bundles + Electron launch); [plans/dogfood-friction-log.md](plans/dogfood-friction-log.md) = 19 findings, headline: EVERY framework's config seed shadows the brand layer; arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Dogfood arc execution per [plans/dogfood-arc.md](plans/dogfood-arc.md) — next up: **cp93 scaffold the OMEGA brand** via the real wizard (C1 survey instrument + D10's "scaffolds on current classy")
+1. Dogfood arc per [plans/dogfood-arc.md](plans/dogfood-arc.md) — next: **cp94 C5 test-scoping DX** (bare `omega test` = project; `framework:`/`full:`; folds 1.2a + cp93's em:-from-consumer gap) → cp95 C1 burns the friction log
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -41,6 +41,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 93 omega-brand born — real-wizard scaffold, 4 targets proven (web :4000/pricing-from-config, backend demo-omega emulator, MV3 ×3, Electron boot); friction log = 21 findings (headline: every framework seed shadows the brand layer; EM/BXM gulpfile paths break under hoisting) (this commit) → CHANGELOG
 - [x] 92 dogfood arc opened — survey (C2 further along than spec: products-from-config channel live; D13's autopublish still alive in scaffold; sandbox = 2 targets) + slicing cp93→close in plans/dogfood-arc.md (this commit) → CHANGELOG
 - [x] 91 brand-account ownership — company-config admins (a+b answers via existing layers, schema-known), NEW @omega.js/config owner-hooks (config/hooks/<call-site>.js nested, brand→company), per-account password channels env→hook→lazy-seed, onboarding accounts step; config 89, manager 573 (this commit) → CHANGELOG
 - [x] 90 N7 CLOSED — desktop/extension/stragglers: desktop getters on env channel (+website https→http both sides), livereload/CDP per-target alloc, `mgr serve` allocates + publishes {https,hosting} (kill-check deleted), stripe-forward takes resolved target, oauth listen(0); desktop 758/ext 94/mgr 565/corpus 1224/e2e 18/18 + live serve proof (3882d48) → CHANGELOG
@@ -84,4 +85,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 11:35 AM (92 — dogfood arc opened, plan landed; next: cp93 scaffold omega-brand)*
+*Last updated: 2026-07-11 12:00 PM (93 — omega-brand lives, all four targets proven; next: cp94 C5 test-scoping)*

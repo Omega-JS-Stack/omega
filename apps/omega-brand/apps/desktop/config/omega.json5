@@ -1,0 +1,19 @@
+// OMEGA desktop — APP-level omega.json5. Shared sections (brand, cloud,
+// payment, theme, ...) come from the BRAND file (apps/omega-brand/config/
+// omega.json5) via the loader's brand walk-up — this file carries ONLY the
+// desktop target's own settings. (cp93 friction find: the framework-seeded
+// file carried placeholder brand values that shadowed the brand layer.)
+// Full knob reference: node_modules/@omega.js/desktop/src/defaults/config/omega.json5
+{
+  targets: {
+    desktop: {
+      app: {
+        // Explicit because the framework default derives com.itwcreativeworks.<id>
+        // (de-ITW miss, cp93 friction log) — override until the derivation is fixed.
+        appId: 'dev.omegajs.omega',
+        copyright: '© {YEAR}, OMEGA',
+        category: 'developer-tools',
+      },
+    },
+  },
+}

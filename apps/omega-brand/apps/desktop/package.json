@@ -1,0 +1,26 @@
+{
+  "name": "omega-desktop",
+  "private": true,
+  "description": "OMEGA desktop app",
+  "devDependencies": {
+    "@omega.js/desktop": "file:../../../../packages/desktop",
+    "electron": "^42.6.0",
+    "electron-builder": "^26.15.3",
+    "gulp": "^5.0.1"
+  },
+  "dependencies": {},
+  "scripts": {
+    "start": "npx omega clean && npx omega setup && npm run gulp --",
+    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omega.js/desktop/dist/gulp/main.js",
+    "build": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- build",
+    "package": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- packageBuild",
+    "package:quick": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- packageQuick",
+    "publish": "npx cross-env OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true npm run gulp -- publish",
+    "release": "npx omega release",
+    "release:local": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true npm run gulp -- publish",
+    "postinstall": "node node_modules/@omega.js/desktop/scripts/sync-nvmrc.js",
+    "test": "npx omega test",
+    "electron": "electron ."
+  },
+  "main": "dist/main.bundle.js"
+}

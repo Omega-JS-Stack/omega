@@ -1,0 +1,111 @@
+// OMEGA — brand-level omega.json5: the shared config layer every app
+// under apps/ inherits. App files override any key per-surface; key presence
+// under `targets` = this brand supports that target. Secrets NEVER live here —
+// they go in the gitignored .env (the loader hard-fails on secret-shaped keys).
+{
+  brand: {
+    id: "omega",
+    name: "OMEGA",
+    description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
+    tagline: "One config. Every target.",
+    url: "https://omegajs.dev",
+    contact: {
+      email: "support@omegajs.dev",
+    },
+    // PLACEHOLDER address (CAN-SPAM footer) — Ian's real business address at launch.
+    address: {
+      line1: "123 Main St",
+      line2: "Suite 100",
+      city: "City",
+      region: "ST",
+      postalCode: "12345",
+      country: "United States",
+    },
+    images: {
+      wordmark: "https://omegajs.dev/wordmark.png",
+      brandmark: "https://omegajs.dev/brandmark.png",
+      combomark: "https://omegajs.dev/combomark.png",
+    },
+  },
+
+  monitoring: {
+    provider: "sentry",
+    dsn: null,
+  },
+
+  analytics: {
+    providers: {
+      google: { id: null },
+      meta: { id: null },
+      tiktok: { id: null },
+    },
+  },
+
+  // Project-owned theme — seeded at onboarding, yours to change.
+  theme: {
+    id: "classy",
+    appearance: "system", // "system" | "light" | "dark"
+  },
+
+  // Emulator-only demo project (demo-* = Firebase's offline convention) —
+  // swap for the real project when the brand goes live.
+  cloud: {
+    provider: "firebase",
+    config: {
+      apiKey: "omega-demo-api-key",
+      authDomain: "demo-omega.firebaseapp.com",
+      projectId: "demo-omega",
+      storageBucket: "demo-omega.appspot.com",
+      messagingSenderId: "222222222222",
+      appId: "1:222222222222:web:2222222222222222222222",
+      measurementId: "G-2222222222",
+    },
+  },
+
+  // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
+  // Shapes mirror @omega.js/backend's product schema.
+  payment: {
+    processors: {
+      stripe: { publishableKey: null },
+      paypal: { clientId: null },
+      chargebee: { site: null },
+      coinbase: { enabled: false },
+    },
+    products: [
+      {
+        id: "basic",
+        name: "Basic",
+        type: "subscription",
+        limits: { requests: 100 },
+      },
+      {
+        id: "premium",
+        name: "Premium",
+        type: "subscription",
+        limits: { requests: 10000 },
+        trial: { days: 14 },
+        prices: { monthly: 9.99, annually: 99.99 },
+        stripe: { productId: null },
+        paypal: { productId: null },
+        chargebee: { itemId: null, legacyPlanIds: [] },
+      },
+      {
+        id: "launch-kit",
+        name: "Launch Kit",
+        type: "one-time",
+        prices: { once: 49.99 },
+        stripe: { productId: null },
+        chargebee: { itemId: null },
+      },
+    ],
+  },
+
+  // Key presence = target enabled; the value is that target's type-wide
+  // config (any shared key inside overrides it for that surface).
+  targets: {
+    web: {},
+    backend: {},
+    desktop: {},
+    extension: {},
+  },
+}

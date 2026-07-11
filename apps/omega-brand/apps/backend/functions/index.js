@@ -1,0 +1,12 @@
+/*
+  Initialize
+*/
+const Manager = (new (require('@omega.js/backend'))).init(exports, {
+});
+const { functions } = Manager.libraries;
+
+/*
+  Routes
+  Add custom routes below. Built-in routes (auth, payments, newsletters,
+  usage, etc.) are registered automatically by Backend Manager.
+*/

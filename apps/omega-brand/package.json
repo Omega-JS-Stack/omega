@@ -1,0 +1,11 @@
+{
+  "name": "omega",
+  "private": true,
+  "description": "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "start": "omega-manager"
+  }
+}
