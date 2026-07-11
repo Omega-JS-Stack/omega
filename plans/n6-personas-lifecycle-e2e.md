@@ -26,8 +26,8 @@
 ## Checkpoint plan
 
 - **cp83** (SHIPPED with A + B + C): refunded persona, deterministic `TEST_ACCOUNT_PASSWORD` on every seeded persona (manual dev signin = email + known password), sandbox `__omega` exposes `signInWithCustomToken`/`getIdToken`. **D moved to cp84** — standalone-boot seeding needs the emulator-env spawn machinery and its first consumer IS the harness; building them together avoids speculative design. Gate: corpus (seeding path exercises password + new persona on every boot), e2e.
-- **cp84**: D + E — seed-on-standalone-emulator-boot + harness generalization + sandbox refactor onto it. Gate: e2e 11/11 via the new harness with harness-driven seeding.
-- **cp85**: F — lifecycle browser flows. Gate: extended e2e (signup/cancel/refund/delete/data-request steps) green.
-- **cp86**: G + docs sweep (backend test-framework doc, web README/account docs, sandbox README) + CHANGELOG. Gate: web suite; manual `?_dev_subscription` references gone.
+- **cp85** (was cp84 — cp84 went to the min/max declared-only tightening, Ian's "fix it now"): D + E — seed-on-standalone-emulator-boot + harness generalization + sandbox refactor onto it. Gate: e2e 11/11 via the new harness with harness-driven seeding.
+- **cp86**: F — lifecycle browser flows. Gate: extended e2e (signup/cancel/refund/delete/data-request steps) green.
+- **cp87**: G + docs sweep (backend test-framework doc, web README/account docs, sandbox README) + CHANGELOG. Gate: web suite; manual `?_dev_subscription` references gone.
 
 Verification protocol per standing rules: backend `npm test` (parse audit) + sandbox corpus + cross-stack e2e, env-scrubbed, log-content verified.

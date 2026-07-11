@@ -9,17 +9,19 @@
  *     resolveFieldValue() in z.preprocess pipes.
  *
  * Semantics are powertools.defaults() parity, proven differentially in
- * test/helpers/schema-zod.js, with two deliberate bug fixes:
+ * test/helpers/schema-zod.js, with deliberate bug fixes:
  *   - No default-object pollution: powertools mutated non-empty object/array defaults
  *     in place (injecting types/min/max/value/default keys) and returned them by
  *     reference; this engine clones defaults per request and returns them clean.
  *   - Sound leaf detection: a node is a field when it carries any field option —
  *     powertools' walk only terminated on no-default nodes because its own pollution
  *     added `default`/`value` to them first.
+ *   - min/max enforce ONLY when declared (Ian, cp84): powertools' `min || 0` /
+ *     `max || Infinity` clamped negatives to 0 on every undeclared-min number field
+ *     and made declared 0-bounds vanish. Now: no min → negatives pass through;
+ *     min: 0 / max: 0 are real bounds.
  *
  * Preserved quirks (wire-visible, kept for parity):
- *   - min defaults to 0 / max to Infinity via `||` — negative numbers clamp to 0
- *     unless the schema declares a negative min; min: 0 / max: 0 behave as unset.
  *   - Coerce-never-reject: single-typed fields force(), multi-typed replace with default.
  *   - Empty-object schema nodes ({}) contribute nothing to output; unknown keys strip.
  */
@@ -118,10 +120,10 @@ function enforceValidTypes(value, types, def) {
 }
 
 /**
- * Replicate powertools' enforceMinMax(): numbers clamp to [min, max]; strings and
- * arrays truncate to max (min is ignored for them). Note powertools defaults
- * min to 0 and max to Infinity via `||`, so negative numbers clamp to 0 unless the
- * schema declares a negative min, and min: 0 / max: 0 behave as unset.
+ * Bounds: numbers clamp to [min, max]; strings and arrays truncate to max (min is
+ * ignored for them). Enforced ONLY when the schema declares them — undeclared min
+ * means negatives pass through, and a declared 0 is a real bound (unlike
+ * powertools' `min || 0` / `max || Infinity`).
  */
 function enforceMinMax(value, min, max) {
   const isNumber = typeof value === 'number';
@@ -199,7 +201,7 @@ function resolveFieldValue(raw, opts) {
 
   let working = typeof raw === 'undefined' ? def : raw;
   working = enforceValidTypes(working, types, def);
-  working = enforceMinMax(working, opts.min || 0, opts.max || Infinity);
+  working = enforceMinMax(working, opts.min, opts.max);
 
   if (typeof value !== 'undefined') {
     working = value;

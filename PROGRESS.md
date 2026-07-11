@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **N6 IN FLIGHT — cp83 SHIPPED** (refunded persona, TEST_ACCOUNT_PASSWORD manual signin, __omega token signin); next: cp84 seed-on-standalone-boot + generalized harness → cp85 lifecycle flows → cp86 /account mock removal; plan: [plans/n6-personas-lifecycle-e2e.md](plans/n6-personas-lifecycle-e2e.md); CI opt-in
+- **N6 IN FLIGHT — cp83 personas + cp84 min/max-declared-only (Ian's fix-now) SHIPPED**; next: cp85 seed-on-standalone-boot + generalized harness → cp86 lifecycle flows → cp87 /account mock removal; plan: [plans/n6-personas-lifecycle-e2e.md](plans/n6-personas-lifecycle-e2e.md); brand-accounts design unblocked (Ian's a/b/c answers in its plan doc); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N6 (IN FLIGHT — see Now): cp84 harness generalization → cp85 lifecycle flows → cp86 /account mock removal + docs
@@ -44,6 +44,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 84 min/max declared-only — implicit 0-floor gone, declared 0 = real bound, both engines; brand-account answers recorded; parity 16/16, corpus 1224/44/0 (this commit) → CHANGELOG
 - [x] 83 N6 slice 1 — refunded persona + deterministic persona password (manual dev signin) + __omega token signin; design doc landed; corpus 1223/44/0 + e2e 11/11 (this commit) → CHANGELOG
 - [x] 82 N5 emulator-first dev — zero-flag SDK auto-connect (FIREBASE_EMULATOR_CONNECT dead); cp74 e2e fixture regression found + fixed (firebaseConfig→cloud.config) + boot step hardened; e2e 11/11 PASSED (this commit) → CHANGELOG
 - [x] 81 N4 parked verifies closed — site-wide defaults override = root directory data file (slice pin + README fact 11); config schema gains devlog/seo (+ test); web 54, config 71 (this commit) → CHANGELOG
@@ -79,4 +80,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 9:30 PM (83 shipped — N6 slice 1 personas; next: cp84 seed-on-boot + harness)*
+*Last updated: 2026-07-10 10:00 PM (84 shipped — min/max declared-only; next: cp85 seed-on-boot + harness)*

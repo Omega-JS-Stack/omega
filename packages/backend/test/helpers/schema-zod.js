@@ -38,11 +38,12 @@ const J = (x) => JSON.stringify(x);
 
 // ─── The differential battery ───
 // [label, declarativeNode, zodField, input] — `undefined` input means "key absent".
-// Every powertools quirk is represented: negative clamp-to-0 (min defaults to 0),
-// unparseable string → 1, prefix parseFloat, comma-split arrays, multi-type
-// replace-with-default, max: 0 treated as unset, null-passes-as-object.
+// Coercion quirks are preserved (unparseable string → 1, prefix parseFloat,
+// comma-split arrays, multi-type replace-with-default, null-passes-as-object);
+// min/max enforce ONLY when declared since cp84 (no implicit 0 floor; declared 0
+// is a real bound) — the literal pins live in min-max-enforce-only-when-declared.
 const BATTERY = [
-  ['negative-clamps-to-0',   { types: ['number'], default: 5 },                     f.number({ default: 5 }),                     -10],
+  ['negative-passes-no-min', { types: ['number'], default: 5 },                     f.number({ default: 5 }),                     -10],
   ['negative-min-allows',    { types: ['number'], default: 5, min: -20 },           f.number({ default: 5, min: -20 }),           -10],
   ['unparseable-string-1',   { types: ['number'], default: 5 },                     f.number({ default: 5 }),                     'abc'],
   ['prefix-parsefloat',      { types: ['number'], default: 5 },                     f.number({ default: 5 }),                     '42abc'],
@@ -59,7 +60,7 @@ const BATTERY = [
   ['multi-mismatch-default', { types: ['string', 'number'], default: 'd' },         f.multi(['string', 'number'], { default: 'd' }), { a: 1 }],
   ['multi-valid-kept',       { types: ['string', 'number'], default: 'd' },         f.multi(['string', 'number'], { default: 'd' }), 3],
   ['string-max-truncates',   { types: ['string'], default: '', max: 5 },            f.string({ default: '', max: 5 }),            'abcdefgh'],
-  ['max-zero-is-unset',      { types: ['string'], default: '', max: 0 },            f.string({ default: '', max: 0 }),            'abcdef'],
+  ['max-zero-enforces',      { types: ['string'], default: '', max: 0 },            f.string({ default: '', max: 0 }),            'abcdef'],
   ['array-max-truncates',    { types: ['array'], default: [], max: 2 },             f.array({ default: [], max: 2 }),             [1, 2, 3, 4]],
   ['number-clamp-low',       { types: ['number'], default: 50, min: 10, max: 100 }, f.number({ default: 50, min: 10, max: 100 }), 5],
   ['number-clamp-high',      { types: ['number'], default: 50, min: 10, max: 100 }, f.number({ default: 50, min: 10, max: 100 }), 200],
@@ -300,6 +301,27 @@ module.exports = {
           J({ flag: false }),
           'No-default node resolves its type zero without pollution\'s help'
         );
+      },
+    },
+
+    {
+      name: 'min-max-enforce-only-when-declared',
+      async run({ assert }) {
+        // cp84 tightening (Ian: "min should not be enforced if not provided. Same
+        // as max.") — literal pins, both engines:
+        const noMin = { n: { types: ['number'], default: 5 } };
+        const zodNoMin = f.object({ n: f.number({ default: 5 }) });
+
+        assert.equal(resolve(noMin, { n: -10 }).n, -10, 'Declarative: undeclared min lets negatives through');
+        assert.equal(resolve(zodNoMin, { n: -10 }).n, -10, 'Zod: undeclared min lets negatives through');
+
+        // Declared bounds still clamp — including 0 as a REAL bound
+        assert.equal(resolve(f.object({ n: f.number({ default: 5, min: 0 }) }), { n: -10 }).n, 0, 'min: 0 clamps negatives');
+        assert.equal(resolve(f.object({ n: f.number({ default: 5, max: 0 }) }), { n: 3 }).n, 0, 'max: 0 clamps numbers');
+        assert.equal(resolve(f.object({ s: f.string({ default: '', max: 0 }) }), { s: 'abc' }).s, '', 'max: 0 truncates strings (was silently unset before cp84)');
+
+        // No max → unbounded
+        assert.equal(resolve(zodNoMin, { n: 9999999 }).n, 9999999, 'Undeclared max never clamps');
       },
     },
 

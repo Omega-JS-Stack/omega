@@ -22,12 +22,12 @@
 
 - **Config**: `omega.json5` gains an `accounts` section (owner-defined list: email template + role flags like `admin`/`marketing`, `support@{domain}`-style interpolation kept). NO passwords in config (secrets rule).
 - **Passwords, resolution order**: explicit env var (e.g. `OMEGA_ACCOUNT_PASSWORD__SUPPORT` in the company/brand `.env` cascade from D15) → company hook → generated crypto-random (printed once / stored in `.omega/secrets`).
-- **Company hooks (new, small)**: `.omega/hooks/<name>.js` at the company root, e.g. `account-password.js` exporting `({ email, domain, brand }) => password`. Ian's formula moves into HIS company's private hook file — out of the framework forever. Hook loading = one `require` + shape check; scope it to named hook points (start with just this one).
+- **Company hooks (new, small)**: `.omega/hooks/<call-site path>.js` at the company root — NESTED to mirror the invoking structure (Ian's directive above): `account/password.js` exporting `({ email, domain, brand }) => password`. Ian's formula moves into HIS company's private hook file — out of the framework forever. Hook loading = one `require` + shape check; scope it to named hook points (start with just this one).
 - **Onboarding**: a step that shows the resolved account list (from company defaults) and lets the owner edit/confirm; writes the `accounts` section.
 - **Port target**: the account ensure/audit logic itself ports into the monorepo manager's service set when brand management arrives there (the admin-audit throw is worth keeping).
 
-## Open questions for Ian (when picked up)
+## Ian's answers (2026-07-10 — design is now unblocked)
 
-- Should `support@{domain}` stay a default suggestion for every company, or is even that ITW-specific?
-- Are the two personal-gmail accounts company-level (every ITW brand) or should the onboarding just read them from ITW's company config?
-- Hook points beyond passwords worth doing at the same time (e.g. post-onboarding, post-deploy)? Or keep it to exactly one until a second need appears (YAGNI)?
+- **a. YES** — `support@{domain}` stays a built-in default suggestion for every company.
+- **b. YES** — the personal admin accounts (ian.wiedenman@gmail.com, itw.creative.works@gmail.com, hello@itwcreativeworks.com) are **ITW company-level config** (auto-applied to every ITW brand; zero framework hardcoding).
+- **c. YES** to only the password hook for now — **BUT hooks must be organized NESTED, mirroring the call-site structure** (Ian: "i generally like when the hooks are nested and fit the structure of the original call site"). So `.omega/hooks/account/password.js` (the account service's password step), NOT flat `account-password.js`. Design the hook loader around call-site-mirroring paths from day one; future hooks slot in at their own call-site paths (e.g. `.omega/hooks/onboard/…`).
