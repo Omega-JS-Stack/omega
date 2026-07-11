@@ -182,6 +182,11 @@ see the harness README for the honest before/after numbers.
    renders the body only when the tag asks for it.
 10. Eleventy keeps global-data OBJECT REFERENCES but captures the key set at
     data-init: mutate arrays in place (site collections), never reassign.
+11. Site-wide front-matter defaults: a root directory data file
+    (`<srcDir>/<srcDirName>.11tydata.json`) sits ABOVE layout front matter and
+    BELOW each page's own front matter — the one-place override for
+    layout/blueprint sample content (jekyll-uj-powertools 1.8.1's `defaults:`
+    layer; pinned in slice.test.js).
 
 The full findings log + scorecard: [RESULTS.md](../../spikes/bakeoff-shared/RESULTS.md),
 [DECISION.md](../../spikes/bakeoff-shared/DECISION.md). The codemod rule

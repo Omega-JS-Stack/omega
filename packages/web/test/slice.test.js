@@ -69,6 +69,19 @@ test('frontmatter-only override page: consumer data over layout defaults (deep m
   assert.ok(html.includes('Consumer body content'), 'markdown body rendered');
 });
 
+test('site-wide defaults layer: root directory data beats layout frontmatter, loses to page frontmatter', () => {
+  // mini-site.11tydata.json — Eleventy's root directory data file is the
+  // consumer's ONE-PLACE site-wide override for layout sample content: it sits
+  // ABOVE layout frontmatter and BELOW each page's own frontmatter — the same
+  // layer jekyll-uj-powertools 1.8.1 gave Jekyll sites via _config.yml
+  // `defaults:` (the N4 parked verify this test closes).
+  const html = pages.get('/about/');
+  assert.ok(html.includes('Site-wide directory-data override'), 'directory data replaces layout hero.description site-wide');
+  assert.ok(!html.includes('AI automation for modern businesses'), 'layout sample content loses');
+  assert.ok(html.includes('<title>About - MiniCo</title>'), 'page frontmatter still beats directory data (meta.title)');
+  assert.ok(html.includes('success'), 'sibling layout keys survive the deep merge (hero.headline_accent)');
+});
+
 test('consumer about.md SUPPRESSES the framework default about page', () => {
   const html = pages.get('/about/');
   // The default about page dispatches blueprint/about → classy about layout

@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep — 73a/73c/73d/74/75/76–78/79 + **80 (enum enforcement — ALL four schema tightenings now shipped) SHIPPED**; next: N4 parked verifies (line below) → N5; CI opt-in
+- N4 architecture sweep COMPLETE (73a–81) + **81 (N4 parked verifies closed: site-wide defaults layer proven, devlog/seo schema entries) SHIPPED**; next: N5 emulator-first frontend dev; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -40,12 +40,12 @@
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
-- N4 verifies from the cp70 sweep: web's site-wide defaults-style override intent achievable via the data cascade? (powertools 1.8.1 equivalent); packages/config schema needs `devlog`/`seo` keys if ever made strict (70)
 - N4 deferred consolidations (73c's CHANGELOG entry is the record): ext⇄desktop build.js harness + mode-helpers skeleton, backend runner onto devkit runner-core; micro-dupes (sleep/capitalize/temp-dir scaffolds) rejected — not worth cross-package coupling (73c)
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (`// ========== OMEGA Rules (vX) ==========`, 75)
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 81 N4 parked verifies closed — site-wide defaults override = root directory data file (slice pin + README fact 11); config schema gains devlog/seo (+ test); web 54, config 71 (this commit) → CHANGELOG
 - [x] 80 schema tightening #1 — enum enforced (sent values, post-coercion, absent passes; shared enforceEnums both engines; oauth2 action fields live); tightenings list CLOSED (this commit) → CHANGELOG
 - [x] 79 schema tightenings #2–#4 — schema-engine.js in-house resolver replaces powertools.defaults ×3 (pollution/clone fixes now reach declarative schemas), '' fails required both engines, middleware sanitize pass finally sees the schema; #1 enum → Ian; parity 15/15, corpus 1223/44/0 (this commit) → CHANGELOG
 - [x] 78 zod final cohort — 30 admin/payments/marketing schemas converted; 4 provider webhooks stay declarative-empty by design; ALL framework schemas now zod; corpus green (this commit) → CHANGELOG (folded into 76's entry)
@@ -78,4 +78,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 8:50 PM (80 shipped — enum enforced, tightenings CLOSED; next: N4 parked verifies → N5)*
+*Last updated: 2026-07-10 9:15 PM (81 shipped — N4 verifies closed, N4 arc COMPLETE; next: N5 emulator-first dev)*

@@ -181,6 +181,22 @@ const SHARED_SCHEMA = [
     description: 'Public OAuth client IDs only — never client secrets.',
   },
 
+  // ── devlog ───────────────────────────────────────────────────────────────
+  {
+    path:        'devlog',
+    type:        'object',
+    required:    false,
+    description: 'Commit-digest devlog pipeline (@omega.js/manager devlog): enabled, orgs, lookbackDays, publish settings.',
+  },
+
+  // ── seo ──────────────────────────────────────────────────────────────────
+  {
+    path:        'seo',
+    type:        'object',
+    required:    false,
+    description: 'Parasite-SEO content (@omega.js/manager seo service): seo.github.content repos. Big content blocks may live in the config/seo.json5 sidecar.',
+  },
+
   // ── theme ────────────────────────────────────────────────────────────────
   {
     path:        'theme.id',

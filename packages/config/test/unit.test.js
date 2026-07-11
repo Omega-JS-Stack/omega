@@ -141,6 +141,17 @@ test('match/enum only run on present values — null/empty ids are silent', () =
   assert.deepStrictEqual(errors, []);
 });
 
+test('devlog + seo are schema-known optional objects (manager-read sections)', () => {
+  assert.deepStrictEqual(
+    validateConfig({ ...VALID, devlog: { enabled: true, orgs: ['x'] }, seo: { github: { content: [] } } }).errors,
+    [],
+  );
+
+  const { errors } = validateConfig({ ...VALID, devlog: 'yes', seo: [1] });
+  assert.ok(errors.some((e) => e.includes('config.devlog has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.seo has wrong type')));
+});
+
 // ─── validateConfig: targets sanity ───
 
 test('unknown target names and non-object entries are errors; {} is enabled-with-defaults', () => {
