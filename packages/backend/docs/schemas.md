@@ -53,6 +53,31 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 
 @omega.js/backend checks `required` against the ORIGINAL request value, before defaults apply — so `required: true` on a field with a `default` throws `Required key {field} is missing in settings` before the default is ever used. For fields that must be non-empty but have a derived default (like path-extracted IDs), use `min: 1` instead.
 
+## Zod schemas
+
+A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the powertools engine. Build with the `fields` helpers for **powertools-parity semantics** (coerce-never-reject, min/max clamp/truncate, undefined-only `required`, unknown keys stripped — wire shapes identical to the declarative engine, proven by `test/helpers/schema-zod.js`):
+
+```javascript
+const { fields: f } = require('@omega.js/backend/src/manager/helpers/schema-zod.js'); // framework schemas use a relative path
+
+module.exports = ({ user }) => f.object({
+  name: f.string({ default: undefined, required: true }),
+  limit: f.number({ default: 10, min: 1, max: 100 }),
+  tags: f.array({ default: [] }),
+  config: f.passthrough({ default: {} }),              // types: ['object'] — nested content passes through
+  version: f.multi(['string', 'number'], { default: '5' }),
+  nested: f.object({ level1: f.string({ default: 'x' }) }),
+});
+```
+
+Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above and powertools' `min`-defaults-to-0 (negative numbers clamp to 0 unless the field declares a negative `min`).
+
+Exporting **raw zod** (no builders) opts into zod-native semantics instead: invalid input **rejects with 400** rather than coercing. Use deliberately — it's a behavior change from the declarative contract.
+
+Two deliberate fixes over the powertools engine (documented + asserted in `test/helpers/schema-zod.js`): non-empty object/array defaults are returned **clean** (powertools injects `types`/`min`/`max` keys into them) and **cloned per request** (powertools returns the schema's default object by reference).
+
+Webhook routes (`payments/webhook`, `marketing/webhook`, …) keep their **empty schemas** by design — the body is the raw provider payload; don't wrap them in zod.
+
 ## ID Generation (POST — Create)
 
 IDs are auto-generated in the **schema**, NOT in the route. Use `value` to force-generate via @omega.js/backend's built-in `randomId()` (14-char nanoid, 62-char alphabet, no `-` or `_`):
@@ -122,7 +147,7 @@ module.exports = ({ assistant, data }) => {
 
 ## Reference Implementation
 
-The comprehensive test schema exercising every field option (types, function defaults, forced `value`, conditional `required`, min/max clamping, `clean` regex + function, nested objects, plan-based fields): [`src/manager/schemas/test/schema/post.js`](../src/manager/schemas/test/schema/post.js).
+The comprehensive test schema exercising every field option (types, function defaults, forced `value`, conditional `required`, min/max clamping, `clean` regex + function, nested objects, plan-based fields): [`src/manager/schemas/test/schema/post.js`](../src/manager/schemas/test/schema/post.js) — in zod `fields` form; its frozen declarative twin (the powertools reference it must keep matching) lives in [`test/helpers/schema-zod.js`](../test/helpers/schema-zod.js).
 
 ## Field Sanitization
 

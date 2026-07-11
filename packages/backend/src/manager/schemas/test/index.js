@@ -1,6 +1,5 @@
-module.exports = () => ({
-  delay: {
-    types: ['number'],
-    default: 1000,
-  },
+const { fields: f } = require('../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  delay: f.number({ default: 1000 }),
 });

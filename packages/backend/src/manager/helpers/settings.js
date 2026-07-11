@@ -7,6 +7,7 @@ const path = require('path');
 const powertools = require('node-powertools');
 const _ = require('lodash');
 const moment = require('moment');
+const { isZodSchema, resolveZodSchema } = require('./schema-zod.js');
 
 
 function Settings(m) {
@@ -85,6 +86,15 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
   // If schema is not an object, throw an error
   if (!schema || typeof schema !== 'object') {
     throw assistant.errorify(`Invalid schema provided`, {code: 400});
+  }
+
+  // Zod branch: a schema module may export a zod schema (fields builders for
+  // powertools-parity semantics, raw zod for zod-native) — see helpers/schema-zod.js
+  if (isZodSchema(schema)) {
+    self.settings = resolveZodSchema(assistant, schema, settings, options);
+    self.schema = {};
+
+    return self.settings;
   }
 
   // Resolve settings
