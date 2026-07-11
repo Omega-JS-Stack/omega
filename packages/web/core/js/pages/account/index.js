@@ -82,38 +82,11 @@ async function initializeAccount() {
     }
   });
 
-  // Setup auth listener
+  // Setup auth listener. Dev-testing subscription states = sign in as a
+  // seeded emulator persona (email + TEST_ACCOUNT_PASSWORD) — the old
+  // ?_dev_subscription= mock fixtures are gone (N6).
   omega.auth().listen({}, async (state) => {
     console.log('Auth state with account data:', state);
-
-    /* @dev-only:start */
-    {
-      // Check for test subscription parameter
-      const urlParams = new URLSearchParams(window.location.search);
-      const testSubscription = urlParams.get('_dev_subscription');
-
-      if (testSubscription && omega.isDevelopment()) {
-        try {
-          console.log(`Loading test subscription: ${testSubscription}`);
-          const testModule = await import(`./test-subscriptions/${testSubscription}.js`);
-
-          // Merge test fields INTO the real subscription (preserves real product, payment, etc.)
-          if (state.account) {
-            const real = state.account.subscription || {};
-            const test = testModule.default;
-            const merged = deepMerge(real, test);
-
-            // Write back so both JS and @omega.js/client bindings see the same data
-            state.account.subscription = merged;
-
-            console.log('Test subscription merged:', merged);
-          }
-        } catch (error) {
-          console.error(`Failed to load test subscription '${testSubscription}':`, error);
-        }
-      }
-    }
-    /* @dev-only:end */
 
     loadAllSectionData(state);
 
@@ -362,25 +335,6 @@ function showSection(sectionId) {
   if (sectionModule && sectionModule.onShow) {
     sectionModule.onShow();
   }
-}
-
-// Deep merge utility (target fields are overwritten by source fields)
-function deepMerge(target, source) {
-  const result = { ...target };
-
-  Object.keys(source).forEach(key => {
-    const sourceVal = source[key];
-    const targetVal = target[key];
-
-    if (sourceVal && typeof sourceVal === 'object' && !Array.isArray(sourceVal)
-      && targetVal && typeof targetVal === 'object' && !Array.isArray(targetVal)) {
-      result[key] = deepMerge(targetVal, sourceVal);
-    } else {
-      result[key] = sourceVal;
-    }
-  });
-
-  return result;
 }
 
 // Tracking functions
