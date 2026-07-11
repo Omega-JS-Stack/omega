@@ -5,7 +5,7 @@
 - **Brand-account provisioning SHIPPED (cp91)** — accounts owner-defined (company `account.admins` layer + onboarding step), passwords per-account (`OMEGA_ACCOUNT_PASSWORD__*` env → NEW `config/hooks/account/password.js` owner hook → lazy seed); first hooks system lives in @omega.js/config; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md); next arc: dogfood; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
+1. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys + 7/11 inbox enrichments (C3 theme two-tier, C4 +forms/ads sharing, NEW C5 test-scoping DX)
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
