@@ -2,10 +2,18 @@ const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 
 // Rules-file marker (shared by setup.js + the firestore/realtime rules tests):
-// the ///---omega---/// block marks where the core rules belong. Pre-omega
-// formats ({{ backend-manager }} placeholders etc.) are NOT matched here —
-// converting legacy files is the migration tooling's job (Ian 2026-07-10).
-const omegaAllRulesRegex = /(\/\/\/---omega---\/\/\/)(.*?)(\/\/\/---------end---------\/\/\/)/sgm;
+// the OMEGA-managed block marks where the core rules belong, in the one OMEGA
+// marker grammar (`<comment> ========== <Label> ==========` — see
+// plans/marker-harmonization.md). The open marker carries the version stamp:
+//
+//   // ========== OMEGA Rules (v6.2.0) ==========
+//   ...core rules (framework-owned, replaced wholesale)...
+//   // ========== End OMEGA Rules ==========
+//
+// Pre-family formats ({{ backend-manager }} placeholders, ///---omega---///
+// bracket markers, etc.) are NOT matched here — converting legacy files is the
+// migration tooling's job (Ian 2026-07-10).
+const omegaAllRulesRegex = /(\/\/ ========== OMEGA Rules \(v.*?\) ==========)(.*?)(\/\/ ========== End OMEGA Rules ==========)/sgm;
 
 function loadJSON(path) {
   const contents = jetpack.read(path);

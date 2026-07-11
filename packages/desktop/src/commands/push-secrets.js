@@ -17,9 +17,7 @@ const jetpack = require('fs-jetpack');
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('push-secrets');
 const { discoverRepo } = require('../utils/github.js');
-
-const DEFAULT_MARKER = '# ========== Default Values ==========';
-const CUSTOM_MARKER  = '# ========== Custom Values ==========';
+const { DEFAULT_MARKER, CUSTOM_MARKER } = require('../utils/merge-line-files.js');
 
 module.exports = async function (options) {
   options = options || {};

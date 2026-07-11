@@ -100,7 +100,8 @@ class SetupCommand extends BaseCommand {
 
     // Load the rules files (reads from @omega.js/backend's own templates/, not consumer files)
     this.getRulesFile();
-    self.default.rulesVersionRegex = new RegExp(`///---version=${self.default.version}---///`);
+    // Version rides in the block's open marker: `// ========== OMEGA Rules (v6.2.0) ==========`
+    self.default.rulesVersionRegex = new RegExp(`========== OMEGA Rules \\(v${self.default.version.replace(/\./g, '\\.')}\\) ==========`);
 
     // Resolve project info — safe now, scaffoldConfigs guarantees these exist.
     self.projectId = self.firebaseRC.projects.default;
@@ -149,10 +150,10 @@ class SetupCommand extends BaseCommand {
 
   getRulesFile() {
     const self = this.main;
-    self.default.firestoreRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/firestore.rules`))).replace('=0.0.0-', `=${self.default.version}-`);
+    self.default.firestoreRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/firestore.rules`))).replace('(v0.0.0)', `(v${self.default.version})`);
     self.default.firestoreRulesCore = self.default.firestoreRulesWhole.match(omegaAllRulesRegex)[0];
 
-    self.default.databaseRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/database.rules.json`))).replace('=0.0.0-', `=${self.default.version}-`);
+    self.default.databaseRulesWhole = (jetpack.read(path.resolve(`${__dirname}/../../../templates/database.rules.json`))).replace('(v0.0.0)', `(v${self.default.version})`);
     self.default.databaseRulesCore = self.default.databaseRulesWhole.match(omegaAllRulesRegex)[0];
   }
 

@@ -37,7 +37,7 @@ class FirestoreRulesFileTest extends BaseTest {
 
     const hasTemplate = contents.match(omegaAllRulesRegex);
     if (!hasTemplate) {
-      console.log(chalk.red(`Could not find rules template. Please edit ${name} and add the ///---omega---/// ... ///---------end---------/// marker block to it.`));
+      console.log(chalk.red(`Could not find rules template. Please edit ${name} and add the '// ========== OMEGA Rules (v0.0.0) ==========' ... '// ========== End OMEGA Rules ==========' marker block to it.`));
       return;
     }
 

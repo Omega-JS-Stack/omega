@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep — 73a/73c/73d + **74 (D12) SHIPPED**; next in order: **marker-block harmonization** (Ian 2026-07-10: ONE style family for ALL marker blocks — merge-line-files `Default/Custom Values` sections, rules `///---omega---///` blocks, template placeholders, whatever else the survey finds — no more mixed flavors; survey → design → sweep), **zod parity** ([plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md)); parked verifies (line below); CI opt-in
+- N4 architecture sweep — 73a/73c/73d + 74 (D12) + **75 (marker harmonization) SHIPPED**; next: **zod parity** ([plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md)); parked verifies (line below); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -41,10 +41,11 @@
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
 - N4 verifies from the cp70 sweep: web's site-wide defaults-style override intent achievable via the data cascade? (powertools 1.8.1 equivalent); packages/config schema needs `devlog`/`seo` keys if ever made strict (70)
 - N4 deferred consolidations (73c's CHANGELOG entry is the record): ext⇄desktop build.js harness + mode-helpers skeleton, backend runner onto devkit runner-core; micro-dupes (sleep/capitalize/temp-dir scaffolds) rejected — not worth cross-package coupling (73c)
-- Brand-migration tooling (PINNED) must convert pre-omega file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers — evergreen `mgr setup` only speaks `///---omega---///` now (73d)
+- Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (`// ========== OMEGA Rules (vX) ==========`, 75)
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 75 marker harmonization — ONE grammar (`<comment> ========== <Label> ==========`) for all machine-parsed markers; rules block re-cut (version in open marker, 4 sub-shapes → family), push-secrets + gitignore marker-const dupes killed; live sandbox-setup converge proof; plans/marker-harmonization.md is the record (this commit) → CHANGELOG
 - [x] 74 D12 provider-discriminated role keys — `firebaseConfig`→`cloud.{provider,config}`, `sentry`→`monitoring.{provider,dsn}`, `platform`→`provider` ×4; lockstep across schema/client/bridges/backend/desktop/manager/9 fixtures/docs; client contract + payment/oauth2 maps untouched; R3c vacuous (never ported); bonus: `omega test` abort now exits 1; full matrix + corpus 1208/44/0 + pack-smoke ×4 (this commit) → CHANGELOG — cp71 regex casualties fixed (3 backend setup-tests SyntaxErrors, legacy-matching literals restored) + devkit parse-audit as backend pre-flight (413 files) + clean-dirs; resolveBrandRoot→config, desktop deepMerge→config, web slugify→template-kit, SkipError→devkit, waitForTarget hoist; 5 verified-not-dupes documented; full matrix + pack-smoke ×4 green (this commit) → CHANGELOG
 - [x] 73a D15 .env cascade — @omega.js/config env module (company←brand←app, shell wins; findBrandRoot = THE hierarchy walk; company-marker read shared), adopted at every boot surface (web/desktop/extension CLIs + gulp, backend CLI + runtime, manager manage/devlog); disperse narrowed to composer (backend functions/.env keeps full pass-through; brand values never copied); dotenv dep consolidated into config; full matrix + corpus + e2e green (this commit) → CHANGELOG
 - [x] 72 N3 wire/env harmonization — `/omega` routes (legacy `/backend-manager` alias kept per Ian), `omega_*` functions, `omega` config section, `///---omega---///` markers, `omega-properties` header, `omega-api-proxy` worker; ~60 env vars → unified `OMEGA_*` (BUILD_JSON/TEST_MODE/AUDIT_FORCE unified cross-framework; UJ_AUDIT_FORCE extension leak fixed); D14 crypto-provisioned keys at onboarding; 10 suites + sandbox corpus + cross-stack e2e + pack-smoke ×4 (this commit) → CHANGELOG
@@ -71,4 +72,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 7:15 PM (74 shipped — D12 provider-discriminated role keys; next: marker-block harmonization)*
+*Last updated: 2026-07-10 7:25 PM (75 shipped — marker-block harmonization; next: zod parity)*

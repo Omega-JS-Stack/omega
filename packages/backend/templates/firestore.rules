@@ -4,8 +4,7 @@ service cloud.firestore {
     // Custom rules
     // ...
 
-    ///---omega---///
-    ///---version=0.0.0---///
+    // ========== OMEGA Rules (v0.0.0) ==========
     // Lock by default
     match /{document=**} {
       allow read, write: if isAdmin();
@@ -97,16 +96,16 @@ service cloud.firestore {
     function incomingData() {
       return request.resource.data;
     }
-    ///--------tests--------///
+    // ========== Tests ==========
     // match /test-cases/write/admin {
     //   allow write: if isAdmin();
     // }
-    ///------resources------///
+    // ========== Resources ==========
     // https://fireship.io/snippets/firestore-rules-recipes/
     // https://github.com/jaysquared/atom-firestore-grammar
     // https://fireship.io/courses/firestore-data-modeling/models-roles/
     // https://firebase.google.com/docs/firestore/security/test-rules-emulator
-    ///---------end---------///
+    // ========== End OMEGA Rules ==========
 
   }
 }

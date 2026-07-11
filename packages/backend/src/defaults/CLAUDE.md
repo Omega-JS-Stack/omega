@@ -45,7 +45,7 @@ npx omega install live      # restore the published @omega.js/backend from npm
 - `functions/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
 - `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Some fields managed by `npx omega setup`.
 - `.firebaserc` — Firebase project ID alias.
-- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `///---omega---///` block inside each; everything outside is yours.
+- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside each; everything outside is yours.
 
 ## Per-context imports
 

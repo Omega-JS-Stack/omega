@@ -1,18 +1,18 @@
 # ========== Default Values ==========
-# Backend Manager (@omega.js/backend) — consumer project
+# OMEGA Backend (@omega.js/backend) — consumer project
 
 <!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across UJM/@omega.js/backend/BXM/EM/MAM — same sections, same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit all five together. Canonical skeleton: omega:main skill → resources/mirror-spec.md -->
 
 ## Framework
 
-This project consumes **Backend Manager** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
+This project consumes **OMEGA Backend** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
 **Before doing ANY work on this codebase, Claude MUST read the framework documentation — that is where the architecture, conventions, APIs, and gotchas live. Skipping these will result in solutions that conflict with framework patterns.**
 
 **Required reading:**
-- **`node_modules/backend-manager/CLAUDE.md`** — full framework reference (single comprehensive file; not yet split into per-subsystem docs)
+- **`node_modules/@omega.js/backend/CLAUDE.md`** — full framework reference (single comprehensive file; not yet split into per-subsystem docs)
 
 ## Quick start
 
@@ -20,7 +20,7 @@ This project consumes **Backend Manager** (@omega.js/backend) — a comprehensiv
 cd functions
 npx omega setup             # validate config + scaffold defaults + run checks
 npx omega emulator          # start Firebase emulators (auth/firestore/functions/database/storage)
-npx omega test              # run framework + project test suites (project: → your tests only, mgr:/bem: → framework only)
+npx omega test              # run framework + project test suites (project: → your tests only, mgr:/backend: → framework only)
 npx omega test --extended   # opt into REAL external APIs (shorthand for the shared TEST_EXTENDED_MODE; default: skipped)
 npx omega watch             # auto-reload functions on file change
 npx omega deploy            # deploy to Firebase
@@ -31,21 +31,21 @@ npx omega install dev       # use LOCAL @omega.js/backend source (to test framew
 npx omega install live      # restore the published @omega.js/backend from npm
 ```
 
-All `npx omega <cmd>` aliases — `npx bm <cmd>`, `npx bem <cmd>`, `npx @omega.js/backend <cmd>` work too.
+`npx omega-backend <cmd>` works too (alias of `npx omega <cmd>`).
 
-> Editing the @omega.js/backend framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/backend-manager`). Run `npx omega install live` to switch back.
+> Editing the @omega.js/backend framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/backend`). Run `npx omega install live` to switch back.
 
 ## Where things live
 
 - `functions/index.js` — entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
-- `functions/config/omega.json5` — OMEGA config: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
+- `functions/config/omega.json5` — OMEGA config: shared sections (brand, cloud, analytics, payment, monitoring, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
 - `functions/.env` — secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored.
 - `functions/service-account.json` — Firebase Admin credentials. Gitignored.
 - `functions/routes/<verb>/<path>.js` — custom routes mounted at runtime (e.g. `routes/get/hello.js` → `GET /hello`).
 - `functions/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
 - `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Some fields managed by `npx omega setup`.
 - `.firebaserc` — Firebase project ID alias.
-- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `///---omega---///` block inside each; everything outside is yours.
+- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside each; everything outside is yours.
 
 ## Per-context imports
 
@@ -85,11 +85,19 @@ Auth events, payment-webhook transitions, and cron jobs are wired automatically 
 
 ## Testing
 
-Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/` — handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)` — registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one — "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/backend-manager/docs/test-framework.md`.
+Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/` — handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)` — registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one — "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/@omega.js/backend/docs/test-framework.md`.
 
 <!-- Everything above this marker is owned by the framework and rewritten on every `npx omega setup`. Add your project-specific notes below — they are preserved across setups. -->
 
 # ========== Custom Values ==========
+This project consumes **Backend Manager** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
+- **`node_modules/backend-manager/CLAUDE.md`** — full framework reference (single comprehensive file; not yet split into per-subsystem docs)
+npx omega test              # run framework + project test suites (project: → your tests only, mgr:/bem: → framework only)
+All `npx omega <cmd>` aliases — `npx bm <cmd>`, `npx bem <cmd>`, `npx @omega.js/backend <cmd>` work too.
+> Editing the @omega.js/backend framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/backend-manager`). Run `npx omega install live` to switch back.
+- `functions/config/omega.json5` — OMEGA config: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
+- `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `///---omega---///` block inside each; everything outside is yours.
+Every feature ships with tests at every surface it exposes: **logic** (`test/routes/`, `test/events/` — handler suites against the real emulator), **wiring** (route round-trips over `http.as(...)` — registration, auth gates, schema validation), and **rules** (`test/rules/` when Firestore rules change). Skip a surface only when the feature genuinely doesn't have one — "the handler test covers it" does not excuse the route round-trip. See `test/README.md` and `node_modules/backend-manager/docs/test-framework.md`.
 
 ## Project-specific notes
 

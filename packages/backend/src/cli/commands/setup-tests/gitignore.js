@@ -1,7 +1,7 @@
 const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const path = require('path');
-const { mergeLineBasedFiles, hasSectionMarkers, DEFAULT_SECTION_MARKER } = require('./helpers/merge-line-files');
+const { mergeLineBasedFiles, hasSectionMarkers, DEFAULT_SECTION_MARKER, CUSTOM_SECTION_MARKER } = require('./helpers/merge-line-files');
 
 class GitignoreTest extends BaseTest {
   getName() {
@@ -71,7 +71,7 @@ class GitignoreTest extends BaseTest {
         inDefaultSection = true;
         continue;
       }
-      if (trimmed === '# ========== Custom Values ==========') {
+      if (trimmed === CUSTOM_SECTION_MARKER) {
         break;
       }
 
