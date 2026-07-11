@@ -15,14 +15,17 @@
     webhookKey: 'fixture-webhook-key',
     namespace: '00000000-0000-0000-0000-000000000000',
   },
-  firebaseConfig: {
-    apiKey: 'fixture-api-key',
-    authDomain: 'demo-omega-backend.firebaseapp.com',
-    projectId: 'demo-omega-backend',
-    storageBucket: 'demo-omega-backend.appspot.com',
-    messagingSenderId: '000000000000',
-    appId: '1:000000000000:web:0000000000000000000000',
-    measurementId: 'G-0000000000',
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: 'fixture-api-key',
+      authDomain: 'demo-omega-backend.firebaseapp.com',
+      projectId: 'demo-omega-backend',
+      storageBucket: 'demo-omega-backend.appspot.com',
+      messagingSenderId: '000000000000',
+      appId: '1:000000000000:web:0000000000000000000000',
+      measurementId: 'G-0000000000',
+    },
   },
   targets: {
     backend: {},

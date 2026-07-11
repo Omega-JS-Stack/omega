@@ -14,9 +14,12 @@ const DEFAULTS = {
 // Resolve runtime config + decide whether sentry should boot.
 // Presence-driven: a non-empty `dsn` enables sentry. No separate `enabled` flag —
 // matches @omega.js/backend convention (a config block's credentials are its enable signal).
+// Reads omega.json5's `monitoring` role section; the `provider` discriminator is
+// stripped so the remaining keys feed Sentry.init directly.
 // Returns { shouldEnable, options, reason } where options is the resolved sentry-init opts.
 function resolveConfig(manager) {
-  const cfg = (manager && manager.config && manager.config.sentry) || {};
+  const cfg = { ...((manager && manager.config && manager.config.monitoring) || {}) };
+  delete cfg.provider;
   const opts = { ...DEFAULTS, ...cfg };
 
   if (process.env.OMEGA_SENTRY_ENABLED === 'false') {

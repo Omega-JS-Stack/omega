@@ -272,7 +272,7 @@ test('company mode: the new brand lands under brands.roots[0] and gets the compa
   fs.mkdirSync(path.join(companyRoot, 'config'));
   fs.writeFileSync(path.join(companyRoot, 'config', 'omega.json5'), `{
     brand: { name: 'My Co' },
-    sentry: { dsn: 'https://co@sentry.example/1' },
+    monitoring: { provider: 'sentry', dsn: 'https://co@sentry.example/1' },
     brands: { roots: ['./brands'] },
   }`);
   fs.mkdirSync(path.join(companyRoot, 'brands'));

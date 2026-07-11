@@ -99,7 +99,7 @@ test('unparseable file throws with the file path in the message', (t) => {
 const BRAND_MONOREPO = {
   'config/omega.json5': `{
     brand: { id: 'acme', name: 'Acme' },
-    sentry: { dsn: 'https://brand-shared.example.com' },
+    monitoring: { dsn: 'https://brand-shared.example.com' },
     probe: { value: 'brand-shared', fromBrandShared: true },
     targets: {
       backend: { probe: { value: 'brand-target', fromBrandTarget: true }, github: { user: 'acme-org' } },
@@ -111,7 +111,7 @@ const BRAND_MONOREPO = {
     targets: {
       backend: {
         probe: { value: 'app-target', fromAppTarget: true },
-        sentry: { dsn: 'https://backend-override.example.com' },
+        monitoring: { dsn: 'https://backend-override.example.com' },
       },
     },
   }`,
@@ -148,10 +148,10 @@ test('any shared key inside a target entry overrides the shared value for that s
   cleanup(t, root);
 
   const appDir = path.join(root, 'apps', 'backend');
-  assert.strictEqual(loadConfig(appDir, 'backend').config.sentry.dsn, 'https://backend-override.example.com');
+  assert.strictEqual(loadConfig(appDir, 'backend').config.monitoring.dsn, 'https://backend-override.example.com');
 
   // A different target (or the brand root itself) still sees the shared value
-  assert.strictEqual(loadConfig(root, 'web').config.sentry.dsn, 'https://brand-shared.example.com');
+  assert.strictEqual(loadConfig(root, 'web').config.monitoring.dsn, 'https://brand-shared.example.com');
 });
 
 test('resolved config keeps the merged targets map — enablement survives resolution', (t) => {
@@ -184,7 +184,7 @@ test('backend runtime cwd (the functions/ dir) still walks up to the brand confi
   const root = makeFixture('functions-cwd', {
     'config/omega.json5': `{
       brand: { id: 'acme', name: 'Acme' },
-      firebaseConfig: { projectId: 'acme-prod' },
+      cloud: { provider: 'firebase', config: { projectId: 'acme-prod' } },
       targets: { backend: {} },
     }`,
     'apps/backend/functions/config/omega.json5': `{
@@ -196,7 +196,7 @@ test('backend runtime cwd (the functions/ dir) still walks up to the brand confi
   const functionsDir = path.join(root, 'apps', 'backend', 'functions');
   const fromFunctions = loadConfig(functionsDir, 'backend');
   assert.strictEqual(fromFunctions.files.brand, path.join(root, 'config', 'omega.json5'));
-  assert.strictEqual(fromFunctions.config.firebaseConfig.projectId, 'acme-prod');
+  assert.strictEqual(fromFunctions.config.cloud.config.projectId, 'acme-prod');
   assert.strictEqual(fromFunctions.config.github.user, 'acme-org');
   assert.strictEqual(fromFunctions.enabled, true);
 

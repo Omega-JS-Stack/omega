@@ -102,7 +102,7 @@ Background.js is the source of truth for authentication. Other contexts compare 
 
 Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.auth-signin-btn`, `.auth-signout-btn`, `.auth-account-btn`) wire UI without writing JS. Web-Manager reactive bindings (`data-wm-bind="@show auth.user"`) handle DOM state.
 
-Required setup: `firebaseConfig.authDomain` in config, `tabs` permission in manifest. See [docs/auth.md](docs/auth.md).
+Required setup: `cloud.config.authDomain` in config, `tabs` permission in manifest. See [docs/auth.md](docs/auth.md).
 
 ### Build system
 

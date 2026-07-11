@@ -12,7 +12,8 @@
       combomark: 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/logo/itw-creative-works-combomark-blue-1024x.png',
     },
   },
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: '',
   },
   analytics: {
@@ -22,15 +23,18 @@
       },
     },
   },
-  firebaseConfig: {
-    apiKey: 'AIzaSyD1MvM-EQC_eVWqaTe5ImWALwhBr7iXgh8',
-    authDomain: 'universal-auth.itwcreativeworks.com',
-    databaseURL: 'https://itwcw-universal-auth.firebaseio.com',
-    projectId: 'itwcw-universal-auth',
-    storageBucket: 'itwcw-universal-auth.appspot.com',
-    messagingSenderId: '195162582358',
-    appId: '1:195162582358:web:6f9320c516d9ab4838baf7',
-    measurementId: 'G-W08HGRW4S',
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: 'AIzaSyD1MvM-EQC_eVWqaTe5ImWALwhBr7iXgh8',
+      authDomain: 'universal-auth.itwcreativeworks.com',
+      databaseURL: 'https://itwcw-universal-auth.firebaseio.com',
+      projectId: 'itwcw-universal-auth',
+      storageBucket: 'itwcw-universal-auth.appspot.com',
+      messagingSenderId: '195162582358',
+      appId: '1:195162582358:web:6f9320c516d9ab4838baf7',
+      measurementId: 'G-W08HGRW4S',
+    },
   },
   theme: {
     id: 'classy',

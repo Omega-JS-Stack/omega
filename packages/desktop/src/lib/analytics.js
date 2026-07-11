@@ -7,7 +7,7 @@
 //   client_id = uuidv5(deviceId, namespace)    // anonymous-but-stable per device
 //   user_id   = uuidv5(firebaseUid, namespace) // same human across all surfaces
 //
-// `namespace` is the consumer's `firebaseConfig.projectId` re-encoded as a UUIDv5
+// `namespace` is the consumer's `cloud.config.projectId` re-encoded as a UUIDv5
 // namespace via uuidv5.URL of the projectId string. Same projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop
 // → identical uuidv5 outputs everywhere → unified analytics.
 //
@@ -95,7 +95,7 @@ const analytics = {
     // projectId in @omega.js/backend/@omega.js/client/@omega.js/desktop → same namespace → same per-uid UUIDv5
     // everywhere. UUIDv5 needs a UUID-shaped namespace — we derive one from the
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
-    const projectId = manager.config.firebaseConfig?.projectId
+    const projectId = manager.config.cloud?.config?.projectId
       || manager.config.brand.id;
     analytics._namespace = uuidv5(projectId, uuidv5.URL);
 

@@ -67,6 +67,9 @@ class TestCommand extends BaseCommand {
     // Load project configuration
     const projectConfig = this.loadProjectConfig(functionsDir, argv);
     if (!projectConfig) {
+      // Config-validation abort must fail the process — a bare return exits 0
+      // and reads as a green run to any script chaining on the exit code.
+      process.exitCode = 1;
       return;
     }
 
@@ -151,8 +154,8 @@ class TestCommand extends BaseCommand {
     const domain = contactEmail.includes('@') ? contactEmail.split('@')[1] : '';
 
     // Validate required configuration
-    if (!config.firebaseConfig?.projectId) {
-      this.logError('Error: Missing firebaseConfig.projectId in config/omega.json5');
+    if (!config.cloud?.config?.projectId) {
+      this.logError('Error: Missing cloud.config.projectId in config/omega.json5');
       return null;
     }
 

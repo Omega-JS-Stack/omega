@@ -188,7 +188,7 @@ async function runDevlog(startDir, options = {}, deps = {}) {
   console.log(`${chalk.green('✓')} Collected ${commits.length} commits across ${repos.length} repos`);
 
   // 3. Generate the post
-  console.log(`${chalk.dim('→')} Generating post via ${settings.platform}...`);
+  console.log(`${chalk.dim('→')} Generating post via ${settings.provider}...`);
   const generate = deps.generatePost || generatePost;
   const post = await generate({ brandConfig: brand.config, commits, projectMap, days });
   console.log(`${chalk.green('✓')} Generated: ${chalk.cyan(post.title)}`);

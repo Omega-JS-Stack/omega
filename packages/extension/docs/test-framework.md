@@ -317,10 +317,10 @@ module.exports = {
       },
     },
     {
-      name: 'firebaseConfig.projectId matches brand.id',
+      name: 'cloud.config.projectId matches brand.id',
       run: (ctx) => {
         const cfg = Manager.getConfig();
-        ctx.expect(cfg.firebaseConfig.projectId).toBe(cfg.brand.id);
+        ctx.expect(cfg.cloud.config.projectId).toBe(cfg.brand.id);
       },
     },
   ],

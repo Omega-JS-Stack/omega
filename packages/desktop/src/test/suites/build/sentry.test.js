@@ -31,7 +31,7 @@ module.exports = {
       name: 'resolveConfig: disabled when no DSN set',
       run: (ctx) => {
         const { resolveConfig } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'core.js'));
-        const result = resolveConfig({ config: { sentry: { dsn: '' } } });
+        const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
         ctx.expect(result.shouldEnable).toBe(false);
         ctx.expect(result.reason).toMatch(/dsn/i);
       },
@@ -44,7 +44,7 @@ module.exports = {
         delete process.env.OMEGA_BUILD_MODE;
         delete process.env.OMEGA_SENTRY_FORCE;
         try {
-          const result = resolveConfig({ config: { sentry: { dsn: 'https://x@y.io/1' } } });
+          const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: 'https://x@y.io/1' } } });
           ctx.expect(result.shouldEnable).toBe(false);
           ctx.expect(result.reason).toMatch(/dev mode/);
         } finally {
@@ -60,10 +60,12 @@ module.exports = {
         const orig = process.env.OMEGA_BUILD_MODE;
         process.env.OMEGA_BUILD_MODE = 'true';
         try {
-          const result = resolveConfig({ config: { sentry: { dsn: 'https://x@y.io/1' } } });
+          const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: 'https://x@y.io/1' } } });
           ctx.expect(result.shouldEnable).toBe(true);
           ctx.expect(result.options.environment).toBe('production');
           ctx.expect(result.options.dsn).toBe('https://x@y.io/1');
+          // The role discriminator must NOT leak into Sentry.init options
+          ctx.expect(result.options.provider).toBeUndefined();
         } finally {
           if (orig === undefined) delete process.env.OMEGA_BUILD_MODE; else process.env.OMEGA_BUILD_MODE = orig;
         }
@@ -78,7 +80,7 @@ module.exports = {
         process.env.OMEGA_BUILD_MODE = 'true';
         process.env.OMEGA_SENTRY_ENABLED = 'false';
         try {
-          const result = resolveConfig({ config: { sentry: { dsn: 'https://x@y.io/1' } } });
+          const result = resolveConfig({ config: { monitoring: { provider: 'sentry', dsn: 'https://x@y.io/1' } } });
           ctx.expect(result.shouldEnable).toBe(false);
           ctx.expect(result.reason).toMatch(/OMEGA_SENTRY_ENABLED/);
         } finally {
@@ -119,7 +121,7 @@ module.exports = {
       run: (ctx) => {
         const main = require(path.join(__dirname, '..', '..', '..', 'lib', 'sentry', 'main.js'));
         main.shutdown();
-        main.initialize({ config: { sentry: { dsn: '' } } });
+        main.initialize({ config: { monitoring: { provider: 'sentry', dsn: '' } } });
         ctx.expect(main._enabled).toBe(false);
         // captureException should not throw.
         main.captureException(new Error('test'));

@@ -65,39 +65,41 @@ module.exports = {
       name: 'getFunctionsUrl: dev returns localhost:5001/<projectId>/us-central1',
       run: (ctx) => {
         const m = ctx.manager;
-        m.config.firebaseConfig = m.config.firebaseConfig || {};
-        const orig = m.config.firebaseConfig.projectId;
-        m.config.firebaseConfig.projectId = 'demo-app';
+        m.config.cloud = m.config.cloud || {};
+        m.config.cloud.config = m.config.cloud.config || {};
+        const orig = m.config.cloud.config.projectId;
+        m.config.cloud.config.projectId = 'demo-app';
         try {
           ctx.expect(m.getFunctionsUrl('development')).toBe('http://localhost:5001/demo-app/us-central1');
-        } finally { m.config.firebaseConfig.projectId = orig; }
+        } finally { m.config.cloud.config.projectId = orig; }
       },
     },
     {
       name: 'getFunctionsUrl: prod returns us-central1-<projectId>.cloudfunctions.net',
       run: (ctx) => {
         const m = ctx.manager;
-        m.config.firebaseConfig = m.config.firebaseConfig || {};
-        const orig = m.config.firebaseConfig.projectId;
-        m.config.firebaseConfig.projectId = 'demo-app';
+        m.config.cloud = m.config.cloud || {};
+        m.config.cloud.config = m.config.cloud.config || {};
+        const orig = m.config.cloud.config.projectId;
+        m.config.cloud.config.projectId = 'demo-app';
         try {
           ctx.expect(m.getFunctionsUrl('production')).toBe('https://us-central1-demo-app.cloudfunctions.net');
-        } finally { m.config.firebaseConfig.projectId = orig; }
+        } finally { m.config.cloud.config.projectId = orig; }
       },
     },
     {
       name: 'getFunctionsUrl: throws when projectId missing',
       run: (ctx) => {
         const m = ctx.manager;
-        const orig = m.config.firebaseConfig?.projectId;
-        if (m.config.firebaseConfig) delete m.config.firebaseConfig.projectId;
+        const orig = m.config.cloud?.config?.projectId;
+        if (m.config.cloud?.config) delete m.config.cloud.config.projectId;
         try {
           let threw;
           try { m.getFunctionsUrl('production'); } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
-          ctx.expect(threw.message).toMatch(/firebaseConfig\.projectId/);
+          ctx.expect(threw.message).toMatch(/cloud\.config\.projectId/);
         } finally {
-          if (orig !== undefined) m.config.firebaseConfig.projectId = orig;
+          if (orig !== undefined) m.config.cloud.config.projectId = orig;
         }
       },
     },
@@ -119,27 +121,28 @@ module.exports = {
       name: 'getApiUrl: prod returns api.<authDomain>',
       run: (ctx) => {
         const m = ctx.manager;
-        m.config.firebaseConfig = m.config.firebaseConfig || {};
-        const orig = m.config.firebaseConfig.authDomain;
-        m.config.firebaseConfig.authDomain = 'demo-app.firebaseapp.com';
+        m.config.cloud = m.config.cloud || {};
+        m.config.cloud.config = m.config.cloud.config || {};
+        const orig = m.config.cloud.config.authDomain;
+        m.config.cloud.config.authDomain = 'demo-app.firebaseapp.com';
         try {
           ctx.expect(m.getApiUrl('production')).toBe('https://api.demo-app.firebaseapp.com');
-        } finally { m.config.firebaseConfig.authDomain = orig; }
+        } finally { m.config.cloud.config.authDomain = orig; }
       },
     },
     {
       name: 'getApiUrl: throws when authDomain missing in prod',
       run: (ctx) => {
         const m = ctx.manager;
-        const orig = m.config.firebaseConfig?.authDomain;
-        if (m.config.firebaseConfig) delete m.config.firebaseConfig.authDomain;
+        const orig = m.config.cloud?.config?.authDomain;
+        if (m.config.cloud?.config) delete m.config.cloud.config.authDomain;
         try {
           let threw;
           try { m.getApiUrl('production'); } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
-          ctx.expect(threw.message).toMatch(/firebaseConfig\.authDomain/);
+          ctx.expect(threw.message).toMatch(/cloud\.config\.authDomain/);
         } finally {
-          if (orig !== undefined) m.config.firebaseConfig.authDomain = orig;
+          if (orig !== undefined) m.config.cloud.config.authDomain = orig;
         }
       },
     },

@@ -5,8 +5,8 @@ Crash + error reporting for main, renderer, and preload contexts. Wraps `@sentry
 ## Config (`config/omega.json5`)
 
 ```jsonc
-sentry: {
-  enabled:          true,                    // default true
+monitoring: {
+  provider:         'sentry',
   dsn:              'https://...@sentry.io/0',
   environment:      null,                    // null = auto-detect ('production' if OMEGA_BUILD_MODE=true, else 'development')
   tracesSampleRate: 0.1,
@@ -14,11 +14,14 @@ sentry: {
 }
 ```
 
+Presence-driven: a non-empty `dsn` enables sentry — no separate `enabled` flag (matches the
+@omega.js/backend convention). The `provider` discriminator is stripped before the rest of the
+block feeds `Sentry.init`.
+
 ## Enable / disable rules
 
 Sentry is **disabled** in any of these cases:
-- `config.sentry.enabled === false`
-- `config.sentry.dsn` is empty
+- `config.monitoring.dsn` is empty
 - `OMEGA_SENTRY_ENABLED=false` env var
 - Running in development mode (`OMEGA_BUILD_MODE` is not `'true'`) **AND** `OMEGA_SENTRY_FORCE` is not `'true'`
 
@@ -55,7 +58,7 @@ When the user signs in via `client-bridge`, @omega.js/desktop automatically call
 
 The user object is **normalized** before being sent — only `uid`/`id` and `email` are kept; everything else (display name, photo URL, OAuth provider data, etc.) is stripped to avoid accidentally leaking PII.
 
-If you want to scrub email too, set `config.sentry.scrubEmail: true`.
+If you want to scrub email too, set `config.monitoring.scrubEmail: true`.
 
 ## Release tagging
 

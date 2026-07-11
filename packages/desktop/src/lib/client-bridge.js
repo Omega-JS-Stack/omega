@@ -92,9 +92,9 @@ const bridge = {
   _getFirebaseAuth(strategy) {
     if (bridge._firebaseAuth) return bridge._firebaseAuth;
 
-    const firebaseConfig = bridge._manager.config.firebaseConfig;
+    const firebaseConfig = bridge._manager.config.cloud?.config;
     if (!firebaseConfig || !Object.keys(firebaseConfig).length) {
-      throw new Error('firebaseConfig is empty — cannot initialize auth.');
+      throw new Error('cloud.config is empty — cannot initialize auth.');
     }
 
     const { initializeApp, getApp } = bridge._firebase;

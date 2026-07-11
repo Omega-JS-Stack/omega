@@ -227,12 +227,12 @@ Existing classic-shape templates (`clean`, `editorial`) share their schema via `
 
 Set `TEST_EXTENDED_MODE=1` to switch to the full AI pipeline against real sources from the parent server. That mode requires `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OMEGA_ADMIN_KEY`, and a parent URL.
 
-Per-brand customization lives under `marketing.newsletter.content` — nested under `newsletter` because the newsletter role owns the content pipeline. The whole pipeline is gated by `marketing.newsletter.enabled`. Each role specifies its platform via a `platform` key (e.g. `platform: 'beehiiv'`):
+Per-brand customization lives under `marketing.newsletter.content` — nested under `newsletter` because the newsletter role owns the content pipeline. The whole pipeline is gated by `marketing.newsletter.enabled`. Each role specifies its provider via a `provider` key (e.g. `provider: 'beehiiv'`):
 
 ```js
 marketing.newsletter = {
   enabled: true,
-  platform: 'beehiiv',
+  provider: 'beehiiv',
   publicationId: 'pub_xxxxx',
   content: {
     categories: ['social-media', 'marketing'],
@@ -348,10 +348,10 @@ Created by `npx omega setup` (idempotent, enforced fields checked every run):
 
 ```javascript
 marketing: {
-  campaigns: { enabled: true, platform: 'sendgrid' },
+  campaigns: { enabled: true, provider: 'sendgrid' },
   newsletter: {
     enabled: false,
-    platform: 'beehiiv',
+    provider: 'beehiiv',
     publicationId: 'pub_xxxxx',
     content: {
       categories: ['social-media', 'marketing'],

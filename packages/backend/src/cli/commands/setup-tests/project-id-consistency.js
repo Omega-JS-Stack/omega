@@ -8,8 +8,8 @@ const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
 /**
  * Ensures projectId is consistent across all configuration files:
  * - .firebaserc (projects.default)
- * - functions/config/omega.json5 (firebaseConfig.projectId — resolved, so a
- *   brand-level firebaseConfig in a brand monorepo counts)
+ * - functions/config/omega.json5 (cloud.config.projectId — resolved, so a
+ *   brand-level cloud.config in a brand monorepo counts)
  * - functions/service-account.json (project_id)
  *
  * Mismatches cause tests to fail when running emulator in separate terminals
@@ -42,14 +42,14 @@ class ProjectIdConsistencyTest extends BaseTest {
       if (!sources.bemConfig.projectId) {
         mismatches.push({
           file: 'config/omega.json5',
-          field: 'firebaseConfig.projectId',
+          field: 'cloud.config.projectId',
           expected: expectedProjectId,
           actual: '(missing)',
         });
       } else if (sources.bemConfig.projectId !== expectedProjectId) {
         mismatches.push({
           file: 'config/omega.json5',
-          field: 'firebaseConfig.projectId',
+          field: 'cloud.config.projectId',
           expected: expectedProjectId,
           actual: sources.bemConfig.projectId,
         });
@@ -105,7 +105,7 @@ class ProjectIdConsistencyTest extends BaseTest {
     const omegaExists = hasOmegaConfig(projectPath);
     if (omegaExists) {
       try {
-        omegaProjectId = loadConfig(projectPath, 'backend').config.firebaseConfig?.projectId || null;
+        omegaProjectId = loadConfig(projectPath, 'backend').config.cloud?.config?.projectId || null;
       } catch (e) {
         // Unloadable config — the omega-config test reports it; treat as missing here
       }
@@ -144,17 +144,19 @@ class ProjectIdConsistencyTest extends BaseTest {
     const expectedProjectId = sources.firebaserc.projectId;
 
     // Fix config/omega.json5 — write the APP file (raw): an app-level
-    // firebaseConfig.projectId is the top override layer, so it wins even
+    // cloud.config.projectId is the top override layer, so it wins even
     // when the wrong value came from a brand-level file
     if (sources.bemConfig.exists && sources.bemConfig.projectId !== expectedProjectId) {
       const omegaConfigPath = `${this.self.firebaseProjectPath}/functions/config/omega.json5`;
       const omegaConfigData = JSON5.parse(jetpack.read(omegaConfigPath) || '{}');
 
-      omegaConfigData.firebaseConfig = omegaConfigData.firebaseConfig || {};
-      omegaConfigData.firebaseConfig.projectId = expectedProjectId;
+      omegaConfigData.cloud = omegaConfigData.cloud || {};
+      omegaConfigData.cloud.provider = omegaConfigData.cloud.provider || 'firebase';
+      omegaConfigData.cloud.config = omegaConfigData.cloud.config || {};
+      omegaConfigData.cloud.config.projectId = expectedProjectId;
 
       helpers.saveJSON5(omegaConfigPath, omegaConfigData);
-      console.log(chalk.green(`Fixed: config/omega.json5 → firebaseConfig.projectId = ${expectedProjectId}`));
+      console.log(chalk.green(`Fixed: config/omega.json5 → cloud.config.projectId = ${expectedProjectId}`));
     }
 
     // Cannot auto-fix service-account.json - must download correct one from Firebase Console

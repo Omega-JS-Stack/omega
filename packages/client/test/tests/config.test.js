@@ -83,11 +83,11 @@ describe('Configuration & Initialization', () => {
     assert.strictEqual(Manager._resolveFirebaseConfig(), null);
   });
 
-  it('should skip Firebase when the flat firebaseConfig has an empty apiKey', async () => {
+  it('should skip Firebase when cloud.config has an empty apiKey', async () => {
     const Manager = getManager();
     await Manager.initialize({
       brand: { id: 'test-brand', name: 'Test Brand' },
-      firebaseConfig: { apiKey: '', projectId: '' },
+      cloud: { provider: 'firebase', config: { apiKey: '', projectId: '' } },
       sentry: { enabled: false },
     });
 

@@ -1,6 +1,6 @@
 // omega.json5 — the ONE config file for every OMEGA project type.
 //
-// Shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2)
+// Shared sections (brand, cloud, analytics, payment, monitoring, oauth2)
 // sit at the top level with identical spelling in every omega.json5. Backend
 // settings live under targets.backend — key presence under `targets` means
 // "this project supports this target".
@@ -36,7 +36,8 @@
       combomark: 'https://example.com/combomark.png',
     },
   },
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: 'https://d965557418748jd749d837asf00552f@o777489.ingest.sentry.io/8789941',
   },
   analytics: {
@@ -141,19 +142,22 @@
       // Add more products/tiers here
     ],
   },
-  firebaseConfig: {
-    apiKey: '123-456',
-    authDomain: 'PROJECT-ID.firebaseapp.com',
-    projectId: 'PROJECT-ID',
-    storageBucket: 'PROJECT-ID.appspot.com',
-    messagingSenderId: '123',
-    appId: '1:123:web:456',
-    measurementId: 'G-0123456789',
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: '123-456',
+      authDomain: 'PROJECT-ID.firebaseapp.com',
+      projectId: 'PROJECT-ID',
+      storageBucket: 'PROJECT-ID.appspot.com',
+      messagingSenderId: '123',
+      appId: '1:123:web:456',
+      measurementId: 'G-0123456789',
+    },
   },
 
   // ─── Backend target ────────────────────────────────────────────────────────
   // Key presence = this project supports the backend target. Any shared key may
-  // also appear here as a backend-only override (e.g. a per-surface sentry.dsn).
+  // also appear here as a backend-only override (e.g. a per-surface monitoring.dsn).
   targets: {
     backend: {
       // 'self' = this @omega.js/backend is the parent (newsletter-sources provider);
@@ -167,12 +171,12 @@
       marketing: {
         campaigns: {
           enabled: true,
-          platform: 'sendgrid',
+          provider: 'sendgrid',
           listId: '',  // SendGrid Marketing list UUID. Populated by OMEGA's sendgrid/ensure/list.js. Skips runtime list-discovery API call.
         },
         newsletter: {
           enabled: false,
-          platform: 'beehiiv',
+          provider: 'beehiiv',
           publicationId: '',  // Beehiiv publication ID (e.g., 'pub_xxxxx'). Populated by OMEGA's beehiiv/ensure/publication.js. Required for marketing sync to Beehiiv.
           // Content: single object or array (matches blog config shape). Generator uses the first entry.
           content: [
@@ -207,7 +211,7 @@
       // Set enabled: true and quantity >= 1 to auto-publish independent blog posts.
       // For newsletter-linked articles, use marketing.newsletter.content.article.enabled instead.
       //
-      // `platform` selects the article-generation provider (only 'ghostii' for now).
+      // `provider` selects the article-generation provider (only 'ghostii' for now).
       //
       // Source types:
       //   '$brand'                          — generic brand-topic generation
@@ -220,7 +224,7 @@
       // article is never reprocessed. When a feed is unreachable or exhausted, falls back to $brand.
       blog: {
         enabled: false,
-        platform: 'ghostii',
+        provider: 'ghostii',
         content: [
           {
             sources: [             // '$brand' | '$feed:https://...' | '$parent'
@@ -236,7 +240,7 @@
             quantity: 0,           // number of articles to generate per run
             chance: 1.0,
             author: null,
-            postPath: 'ghostii',  // defaults to platform name; sub-folder under _posts/{year}/
+            postPath: 'ghostii',  // defaults to provider name; sub-folder under _posts/{year}/
             // Per-entry Ghostii API overrides (all optional, fall back to framework defaults)
             overrides: {
               // keywords: ['AI', 'technology'],

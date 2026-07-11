@@ -28,7 +28,7 @@ module.exports = {
     {
       name: 'getCurrentUser returns null when nothing is signed in',
       run: (ctx) => {
-        // The harness boots without auth; either firebase isn't loaded (no firebaseConfig
+        // The harness boots without auth; either firebase isn't loaded (no cloud.config
         // in default config) or it is and there's no user. Either way, currentUser is null.
         ctx.expect(ctx.manager.omega.getCurrentUser()).toBeNull();
       },
@@ -44,9 +44,9 @@ module.exports = {
     {
       name: 'handleAuthToken returns no-op result when firebase not loaded',
       run: async (ctx) => {
-        // Default config has empty firebaseConfig → firebase fails to init → _firebaseAuth=null.
+        // Default config has empty cloud.config → firebase fails to init → _firebaseAuth=null.
         if (ctx.manager.omega._firebaseAuth) {
-          ctx.skip('firebase did load (firebaseConfig was set) — covered by integration tests');
+          ctx.skip('firebase did load (cloud.config was set) — covered by integration tests');
         }
         const r = await ctx.manager.omega.handleAuthToken('whatever');
         ctx.expect(r.success).toBe(false);

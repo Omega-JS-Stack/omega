@@ -28,7 +28,7 @@ Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / @omeg
 | U-04 | HIGH | B | @omega.js/client owns Firebase — never `require('firebase')`; renderers use `omega.auth()` / `.firestore()`, main uses `manager.omega` ([common-mistakes.md](common-mistakes.md), [client-bridge.md](client-bridge.md)) |
 | U-05 | HIGH | C | No @omega.js/desktop transitive deps installed in the consumer `package.json` (`firebase`, `@omega.js/client`, `fs-jetpack`, …) — webpack `resolve.modules` resolves them ([common-mistakes.md](common-mistakes.md)) |
 | U-06 | HIGH | B | Env behavior gated on the INTENTIONAL check — `isProduction()` or `isDevelopment() \|\| isTesting()`, never `!isDevelopment()`; no ad-hoc `process.env.EM_*` reads where a helper exists ([environment-detection.md](environment-detection.md)) |
-| U-07 | HIGH | B | Config canon — `config/omega.json5` validates against the schema (boot validator green); canonical cross-framework blocks (`brand`, `app`, flat 8-key `firebaseConfig`, `sentry`, `analytics`, `payment`) not reinvented ([config-schema.md](config-schema.md)) |
+| U-07 | HIGH | B | Config canon — `config/omega.json5` validates against the schema (boot validator green); canonical cross-framework blocks (`brand`, `app`, `cloud.{provider,config}`, `monitoring`, `analytics`, `payment`) not reinvented ([config-schema.md](config-schema.md)) |
 | U-08 | CRIT | B | No private credentials committed — signing certs (`config/certs/` gitignored), `.env` secrets, tokens, API secret keys ([signing.md](signing.md)). (The Firebase WEB `apiKey` is public by design — do NOT flag it.) |
 | U-09 | HIGH | B | Source discipline — nothing edited in `dist/` or generated files (`dist/electron-builder.yml`, entitlements plist); no live code referencing `_legacy/` / `_backup/` ([build-system.md](build-system.md), [common-mistakes.md](common-mistakes.md)) |
 | U-10 | MED | B | Doc parity — README / CLAUDE.md / `docs/` / CHANGELOG match shipped behavior; CLAUDE.md < 250 lines; the docs index lists every `docs/*.md`; no stale names for renamed commands/patterns |
@@ -47,7 +47,7 @@ Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / @omeg
 | DSK-04 | HIGH | B | Zero-trust IPC — all channels go through `manager.ipc` (never raw `ipcMain`); handlers validate payload content before acting, especially in apps embedding remote web content ([ipc.md](ipc.md#zero-trust-payloads)) |
 | DSK-05 | MED | C | Icons — one native-size PNG per slot (no `@2x` siblings), macOS tray source named `tray.png` (@omega.js/desktop owns the `Template` rename), no `app.icons` config block ([icons.md](icons.md)) |
 | DSK-06 | HIGH | C | File-based integrations — tray/menu/context-menu logic lives in `src/integrations/<name>/index.js`, never expressed in config JSON ([tray.md](tray.md), [menu.md](menu.md), [context-menu.md](context-menu.md)) |
-| DSK-07 | HIGH | B | Presence-driven feature flags — credentials enable features (`sentry.dsn`, `analytics.providers.google.id`, `firebaseConfig`); no invented `enabled:` toggles ([config-schema.md](config-schema.md)) |
+| DSK-07 | HIGH | B | Presence-driven feature flags — credentials enable features (`monitoring.dsn`, `analytics.providers.google.id`, `cloud.config`); no invented `enabled:` toggles ([config-schema.md](config-schema.md)) |
 | DSK-08 | MED | B | Accessibility basics in renderer views — meaningful `alt` text, labeled form fields, real `<button>`/`<a>` elements (no clickable `div`s) |
 
 ## Framework-repo checks (F-xx)

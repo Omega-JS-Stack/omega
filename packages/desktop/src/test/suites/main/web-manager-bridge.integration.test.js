@@ -49,10 +49,10 @@ module.exports = {
   },
   tests: [
     {
-      name: 'firebase loaded (firebaseConfig present in test config)',
+      name: 'firebase loaded (cloud.config present in test config)',
       run: (ctx) => {
         if (!ctx.manager.omega._firebaseAuth) {
-          ctx.skip('firebaseConfig not set in default config — set one in src/defaults/config/omega.json5 to run');
+          ctx.skip('cloud.config not set in default config — set one in src/defaults/config/omega.json5 to run');
         }
         ctx.expect(ctx.manager.omega._firebaseAuth).toBeTruthy();
       },
@@ -79,7 +79,7 @@ module.exports = {
         const result = await ctx.manager.omega.handleAuthToken(token);
 
         if (!result.success) {
-          ctx.skip(`signInWithCustomToken failed: ${result.error || 'unknown'} — likely a project mismatch (firebaseConfig.projectId vs service-account project)`);
+          ctx.skip(`signInWithCustomToken failed: ${result.error || 'unknown'} — likely a project mismatch (cloud.config.projectId vs service-account project)`);
         }
         ctx.expect(result.user.uid).toBe(USER_UID);
 

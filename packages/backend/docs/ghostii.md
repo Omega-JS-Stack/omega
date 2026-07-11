@@ -119,7 +119,7 @@ If a pick's chain is exhausted, that slot is unfilled: the blog skips that artic
 // config/omega.json5 → targets.backend
 blog: {
   enabled: false,
-  platform: 'ghostii',           // provider: only 'ghostii' for now
+  provider: 'ghostii',           // only 'ghostii' for now
   content: [
     {
       quantity: 1,                // articles per cron run (0 = disabled)

@@ -214,7 +214,7 @@ class TestRunner {
    * project IDs differ.
    */
   async checkProjectMismatch(healthData) {
-    const expectedProjectId = this.options.firebaseConfig?.projectId;
+    const expectedProjectId = this.options.cloud?.config?.projectId;
     if (!expectedProjectId) {
       return false;
     }
@@ -318,7 +318,7 @@ class TestRunner {
     process.stdout.write(chalk.gray('  Initializing rules testing context... '));
     try {
       this.rulesContext = await rulesClient.createRulesContext({
-        projectId: this.options.firebaseConfig?.projectId,
+        projectId: this.options.cloud?.config?.projectId,
         rulesPath: this.options.rulesPath,
         // Consumers may run the firestore emulator on a non-default port
         // (firebase.json emulators.firestore.port) — without this the rules
@@ -1037,7 +1037,7 @@ class TestRunner {
       async trigger(functionName) {
         const { PubSub } = require('@google-cloud/pubsub');
         const pubsub = new PubSub({
-          projectId: config.firebaseConfig?.projectId,
+          projectId: config.cloud?.config?.projectId,
           apiEndpoint: 'localhost:8085',
         });
 

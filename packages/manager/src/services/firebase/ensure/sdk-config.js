@@ -1,6 +1,6 @@
 /**
  * Ensure the web SDK config is fetched into state — and that the brand's
- * omega.json5 `firebaseConfig` section matches it.
+ * omega.json5 `cloud.config` section matches it.
  *
  * authDomain is replaced with the brand's own domain (custom auth domain).
  * The fetched config is durable state; drift against omega.json5 is written
@@ -10,7 +10,7 @@
 const chalk = require('chalk').default;
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 
-// The canonical firebaseConfig keys frameworks read from omega.json5
+// The canonical cloud.config keys frameworks read from omega.json5
 const SDK_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
 
 module.exports = async function ensureSdkConfig(context) {
@@ -50,27 +50,30 @@ module.exports = async function ensureSdkConfig(context) {
 
   console.log(`      ${chalk.green('✓')} Got SDK config ${chalk.dim(`(apiKey: ${sdkConfig.apiKey.substring(0, 10)}...)`)}`);
 
-  // === Drift check: omega.json5's firebaseConfig is what the apps run on ===
-  const configured = brandConfig.firebaseConfig || {};
+  // === Drift check: omega.json5's cloud.config is what the apps run on ===
+  const configured = brandConfig.cloud?.config || {};
   const drifted = SDK_KEYS.filter((key) => (configured[key] || '') !== (sdkConfig[key] || ''));
 
   if (drifted.length === 0) {
-    console.log(`      ${chalk.green('✓')} omega.json5 firebaseConfig matches`);
+    console.log(`      ${chalk.green('✓')} omega.json5 cloud.config matches`);
     return { state: { sdkConfig } };
   }
 
-  console.log(`      ${chalk.yellow('↻')} omega.json5 firebaseConfig ${Object.keys(configured).length === 0 ? 'is missing' : `drifts (${drifted.join(', ')})`}`);
+  console.log(`      ${chalk.yellow('↻')} omega.json5 cloud.config ${Object.keys(configured).length === 0 ? 'is missing' : `drifts (${drifted.join(', ')})`}`);
 
   const edits = {};
+  if (brandConfig.cloud?.provider !== 'firebase') {
+    edits['cloud.provider'] = 'firebase';
+  }
   for (const key of drifted) {
-    edits[`firebaseConfig.${key}`] = sdkConfig[key];
+    edits[`cloud.config.${key}`] = sdkConfig[key];
   }
   writeBrandConfig(context, edits);
 
   if (options.dryRun) {
     // The file wasn't touched — hand over the paste block
     console.log(`      ${chalk.dim('→')} Set this in config/omega.json5:`);
-    console.log(chalk.cyan(`      firebaseConfig: ${JSON.stringify(sdkConfig, null, 2).replace(/\n/g, '\n      ')},`));
+    console.log(chalk.cyan(`      cloud: { provider: 'firebase', config: ${JSON.stringify(sdkConfig, null, 2).replace(/\n/g, '\n      ')} },`));
     return {
       status: 'warned',
       state: { sdkConfig },

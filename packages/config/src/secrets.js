@@ -5,7 +5,7 @@
  *
  * This is a key-NAME test, not a value test: a secret key with an empty or
  * placeholder value is still in the wrong home. Public credentials pass by
- * design — publishableKey, clientId, firebaseConfig.apiKey (the Firebase web
+ * design — publishableKey, clientId, cloud.config.apiKey (the Firebase web
  * API key is public) all fail to match.
  */
 

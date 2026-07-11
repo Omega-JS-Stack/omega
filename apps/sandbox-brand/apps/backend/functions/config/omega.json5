@@ -1,5 +1,5 @@
 // Sandbox backend — APP-level omega.json5. Shared sections (brand,
-// firebaseConfig, payment, ...) come from the BRAND file two levels up
+// cloud, payment, ...) come from the BRAND file two levels up
 // (apps/sandbox-brand/config/omega.json5) via the loader's brand walk-up —
 // this file carries only the backend target's own settings. Dogfoods the
 // full five-layer resolution chain in a real consumer.
@@ -14,12 +14,12 @@
       marketing: {
         campaigns: {
           enabled: false,
-          platform: 'sendgrid',
+          provider: 'sendgrid',
           listId: '',
         },
         newsletter: {
           enabled: false,
-          platform: 'beehiiv',
+          provider: 'beehiiv',
           publicationId: '',
           content: [
             {
@@ -51,7 +51,7 @@
       },
       blog: {
         enabled: false,
-        platform: 'ghostii',
+        provider: 'ghostii',
         content: [
           {
             sources: ['$brand'],

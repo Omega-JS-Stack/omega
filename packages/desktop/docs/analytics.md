@@ -11,7 +11,7 @@ Every event ships with two GA4 fields:
 
 @omega.js/desktop derives both via `uuidv5(input, namespace)` where:
 
-- `namespace = uuidv5(firebaseConfig.projectId, uuidv5.URL)` — same projectId in @omega.js/backend/UJM/@omega.js/client → same namespace everywhere.
+- `namespace = uuidv5(cloud.config.projectId, uuidv5.URL)` — same projectId in @omega.js/backend/UJM/@omega.js/client → same namespace everywhere.
 - `client_id = uuidv5(deviceId, namespace)` — `deviceId` is the first non-internal MAC from `os.networkInterfaces()`, falling back to a persisted `crypto.randomUUID()`.
 - `user_id = uuidv5(firebaseUid, namespace)` — set automatically when `omega.onAuthChange` fires with a uid; cleared on logout.
 

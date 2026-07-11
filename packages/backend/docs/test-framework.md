@@ -80,7 +80,7 @@ The test runner's health check verifies that the running emulator belongs to the
 
 Detection uses two sources (tried in order):
 1. **Firebase Emulator Hub** (`localhost:4400/emulators`) — always returns the emulator's `projectId`, regardless of @omega.js/backend version.
-2. **Health endpoint** (`/test/health`) — returns `projectId` from `Manager.config.firebaseConfig.projectId` (@omega.js/backend 5.3.3+).
+2. **Health endpoint** (`/test/health`) — returns `projectId` from `Manager.config.cloud.config.projectId` (@omega.js/backend 5.3.3+).
 
 On mismatch the runner aborts immediately:
 ```

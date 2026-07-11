@@ -125,7 +125,7 @@ function stageCompany(brandSpecs) {
 
 test('devlog: DEFAULTS carry the devlog block, disabled with website destination', () => {
   assert.equal(DEFAULTS.devlog.enabled, false);
-  assert.equal(DEFAULTS.devlog.platform, 'ghostii');
+  assert.equal(DEFAULTS.devlog.provider, 'ghostii');
   assert.deepEqual(DEFAULTS.devlog.destinations, ['website']);
   assert.equal(DEFAULTS.devlog.overrides.research, false);
 });
@@ -280,12 +280,12 @@ test('devlog: generate groups the digest by repo, labels mapped projects, and gr
   assert.deepEqual(post.tags, ['devlog']);
 });
 
-test('devlog: generate rejects unknown platforms and title-less responses', async () => {
+test('devlog: generate rejects unknown providers and title-less responses', async () => {
   const commits = [{ owner: 'o', repo: 'r', homepage: '', message: 'feat: x' }];
 
   await assert.rejects(
-    generatePost({ brandConfig: brandConfigFor('a', { platform: 'quillbot' }), commits, projectMap: {}, days: 5 }),
-    /Unknown devlog.platform: quillbot/,
+    generatePost({ brandConfig: brandConfigFor('a', { provider: 'quillbot' }), commits, projectMap: {}, days: 5 }),
+    /Unknown devlog.provider: quillbot/,
   );
 
   await assert.rejects(

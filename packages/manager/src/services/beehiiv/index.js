@@ -24,9 +24,9 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'marketing.newsletter.enabled = false' };
     }
 
-    const platform = newsletter.platform || 'beehiiv';
-    if (platform !== 'beehiiv') {
-      return { skip: true, reason: `marketing.newsletter.platform = '${platform}'` };
+    const provider = newsletter.provider || 'beehiiv';
+    if (provider !== 'beehiiv') {
+      return { skip: true, reason: `marketing.newsletter.provider = '${provider}'` };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

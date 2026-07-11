@@ -58,8 +58,8 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
   const contentArray = powertools.arrayify(blog.content);
   const { admin } = libraries;
 
-  const platform = blog.platform || 'ghostii';
-  const provider = require(`../../../libraries/content/${platform}.js`);
+  const providerName = blog.provider || 'ghostii';
+  const provider = require(`../../../libraries/content/${providerName}.js`);
 
   for (const entry of contentArray) {
     entry.quantity = entry.quantity || 0;
@@ -71,7 +71,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
     entry.keywords = entry.keywords || [];
     entry.chance = entry.chance || 1.0;
     entry.author = entry.author || undefined;
-    entry.postPath = entry.postPath || platform;
+    entry.postPath = entry.postPath || providerName;
     entry.overrides = entry.overrides || {};
 
     if (entry.brand && entry.brandUrl) {

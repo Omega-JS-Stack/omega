@@ -32,7 +32,7 @@ const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 // omega-manager's disperse enumerates THIS list instead of hardcoding
 // per-target mapping blocks. (`targets` itself is the scoping key, not a
 // shared section; `theme` is project-owned but shared-shaped.)
-const SHARED_SECTIONS = ['brand', 'firebaseConfig', 'analytics', 'payment', 'sentry', 'oauth2', 'theme'];
+const SHARED_SECTIONS = ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme'];
 
 const SHARED_SCHEMA = [
   // ── brand ────────────────────────────────────────────────────────────────
@@ -88,15 +88,22 @@ const SHARED_SCHEMA = [
     description: 'Brand image URLs/paths (wordmark, brandmark, combomark, icon).',
   },
 
-  // ── firebaseConfig ───────────────────────────────────────────────────────
+  // ── cloud (role: app/cloud platform; D12 provider-discriminated) ─────────
   {
-    path:        'firebaseConfig',
-    type:        'object',
+    path:        'cloud.provider',
+    type:        'string',
     required:    false,
-    description: 'Firebase web-app config, verbatim from the console. Public by design — the web API key is not a secret.',
+    enum:        ['firebase'],
+    description: "App/cloud platform provider. Only 'firebase' today — the discriminator exists so a second provider slots in without a key rename.",
   },
   {
-    path:        'firebaseConfig.projectId',
+    path:        'cloud.config',
+    type:        'object',
+    required:    false,
+    description: 'Provider app config. For firebase: the web-app config verbatim from the console. Public by design — the web API key is not a secret.',
+  },
+  {
+    path:        'cloud.config.projectId',
     type:        'string',
     required:    false,
     description: 'Drives auth, emulator project selection, analytics uuidv5 namespace, remote-config URL fallbacks.',
@@ -150,13 +157,20 @@ const SHARED_SCHEMA = [
     description: 'Product catalog (@omega.js/backend-shaped: id, name, type, limits, prices, per-processor IDs) — referenceable from every target.',
   },
 
-  // ── sentry ───────────────────────────────────────────────────────────────
+  // ── monitoring (role: error monitoring; D12 provider-discriminated) ──────
   {
-    path:        'sentry.dsn',
+    path:        'monitoring.provider',
+    type:        'string',
+    required:    false,
+    enum:        ['sentry'],
+    description: "Error-monitoring provider. Only 'sentry' today.",
+  },
+  {
+    path:        'monitoring.dsn',
     type:        'string',
     required:    false,
     match:       /^https?:\/\//,
-    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.sentry.dsn overrides.',
+    description: 'Sentry DSN (public by design). Per-surface DSNs go in targets.<type>.monitoring.dsn overrides.',
   },
 
   // ── oauth2 ───────────────────────────────────────────────────────────────

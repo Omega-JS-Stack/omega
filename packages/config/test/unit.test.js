@@ -39,11 +39,11 @@ test('arrays replace whole — payment.products never concatenates', () => {
 
 test('null replaces, undefined is skipped', () => {
   const result = deepMerge(
-    { sentry: { dsn: 'https://a' }, theme: { id: 'classy' } },
-    { sentry: { dsn: null }, theme: { id: undefined } },
+    { monitoring: { dsn: 'https://a' }, theme: { id: 'classy' } },
+    { monitoring: { dsn: null }, theme: { id: undefined } },
   );
 
-  assert.strictEqual(result.sentry.dsn, null);
+  assert.strictEqual(result.monitoring.dsn, null);
   assert.strictEqual(result.theme.id, 'classy');
 });
 
@@ -95,7 +95,7 @@ test('flags on key NAME even with empty/placeholder values, walks arrays with in
 
 test('public credentials pass by design', () => {
   const found = findSecretKeys({
-    firebaseConfig: { apiKey: 'public-web-key' },
+    cloud: { config: { apiKey: 'public-web-key' } },
     payment: { processors: { stripe: { publishableKey: 'pk_test_x' }, paypal: { clientId: 'x' } } },
     oauth2: { google: { clientId: 'x' } },
     brand: { secrets: 'not-a-match-plural' },
@@ -206,6 +206,6 @@ test('formatErrors renders a numbered block; empty list renders empty', () => {
 test('SHARED_SECTIONS enumerates the disperse-owned sections', () => {
   assert.deepStrictEqual(
     SHARED_SECTIONS,
-    ['brand', 'firebaseConfig', 'analytics', 'payment', 'sentry', 'oauth2', 'theme'],
+    ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme'],
   );
 });

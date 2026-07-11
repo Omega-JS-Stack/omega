@@ -3,7 +3,7 @@
  *
  * One file, config/omega.json5 (functions/config/omega.json5 for standalone
  * backends), identical shape everywhere: shared sections (brand,
- * firebaseConfig, analytics, payment, sentry, oauth2, theme) + a `targets`
+ * cloud, analytics, payment, monitoring, oauth2, theme) + a `targets`
  * object whose KEY PRESENCE says which targets a brand enables and whose
  * values hold target-scoped settings — any shared key inside a target entry
  * overrides the shared value for that surface (one agnostic deep merge).

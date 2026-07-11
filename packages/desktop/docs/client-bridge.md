@@ -147,22 +147,25 @@ keeps the user signed in; renderers then re-resolve the account and re-push the 
 
 ```jsonc
 {
-  "firebaseConfig": {
-    "apiKey":            "...",
-    "authDomain":        "myapp.firebaseapp.com",
-    "projectId":         "myapp",
-    // ... etc.
+  "cloud": {
+    "provider": "firebase",
+    "config": {
+      "apiKey":            "...",
+      "authDomain":        "myapp.firebaseapp.com",
+      "projectId":         "myapp",
+      // ... etc.
+    }
   }
 }
 ```
 
-If `firebaseConfig` is empty/missing, the bridge logs a warning and runs in no-op mode (everything returns harmless defaults).
+If `cloud.config` is empty/missing, the bridge logs a warning and runs in no-op mode (everything returns harmless defaults).
 
 ## Firebase (bundled)
 
 Firebase is **bundled by webpack from @omega.js/desktop's module context** (@omega.js/client owns it in @omega.js/desktop's dependency tree) — the same treatment `json5` gets in main. It was previously runtime-resolved, which silently failed in every symlinked dev app (see CHANGELOG 1.11.1).
 
-If you're building a no-auth Electron app, just leave `firebaseConfig` empty — the bridge is a clean no-op.
+If you're building a no-auth Electron app, just leave `cloud.config` empty — the bridge is a clean no-op.
 
 ## Common patterns
 

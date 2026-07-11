@@ -25,7 +25,8 @@
       combomark: 'https://sandbox-brand.example.com/combomark.png',
     },
   },
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: 'https://d965557418748jd749d837asf00552f@o777489.ingest.sentry.io/8789941',
   },
   analytics: {
@@ -129,14 +130,17 @@
       },
     ],
   },
-  firebaseConfig: {
-    apiKey: 'sandbox-api-key',
-    authDomain: 'demo-sandbox-brand.firebaseapp.com',
-    projectId: 'demo-sandbox-brand',
-    storageBucket: 'demo-sandbox-brand.appspot.com',
-    messagingSenderId: '111111111111',
-    appId: '1:111111111111:web:1111111111111111111111',
-    measurementId: 'G-1111111111',
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: 'sandbox-api-key',
+      authDomain: 'demo-sandbox-brand.firebaseapp.com',
+      projectId: 'demo-sandbox-brand',
+      storageBucket: 'demo-sandbox-brand.appspot.com',
+      messagingSenderId: '111111111111',
+      appId: '1:111111111111:web:1111111111111111111111',
+      measurementId: 'G-1111111111',
+    },
   },
 
   // Enabled targets for this brand (key presence = enabled). Type-wide

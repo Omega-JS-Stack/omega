@@ -4,7 +4,7 @@
 // type — website, backend, extension, desktop), then a `targets` object whose KEY
 // PRESENCE says which targets this brand enables and whose values hold target-scoped
 // settings. Any shared key may also appear inside a target entry to override it for
-// that surface only (e.g. a desktop-specific sentry.dsn under targets.desktop).
+// that surface only (e.g. a desktop-specific monitoring.dsn under targets.desktop).
 //
 // Secrets NEVER live here — they live in .env. The validator hard-fails on
 // secret-shaped keys (…Secret, …privateKey).
@@ -21,7 +21,8 @@
     },
   },
 
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: '',
   },
 
@@ -53,18 +54,22 @@
     products: [],
   },
 
-  // Firebase web SDK config. Flat shape — same key names @omega.js/backend/BXM/@omega.js/client all use.
-  // Copy directly from Firebase Console → Project Settings → SDK setup (Config option).
-  // Empty {} disables Firebase Auth in the renderer (client-bridge logs a warn).
-  firebaseConfig: {
-    apiKey:            '',
-    authDomain:        '',
-    databaseURL:       '',
-    projectId:         '',
-    storageBucket:     '',
-    messagingSenderId: '',
-    appId:             '',
-    measurementId:     '',
+  // App/cloud platform role (provider-discriminated). `config` is the Firebase web
+  // SDK config — copy directly from Firebase Console → Project Settings → SDK setup
+  // (Config option). Same shape every OMEGA target reads.
+  // Empty config {} disables Firebase Auth in the renderer (client-bridge logs a warn).
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey:            '',
+      authDomain:        '',
+      databaseURL:       '',
+      projectId:         '',
+      storageBucket:     '',
+      messagingSenderId: '',
+      appId:             '',
+      measurementId:     '',
+    },
   },
 
   // Appearance — the app's DEFAULT theme. 'system' follows the OS preference live;

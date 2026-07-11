@@ -76,16 +76,16 @@ function configureOmega(eleventyConfig, options) {
   site.theme = { ...(site.theme || {}), id: activeTheme };
 
   // ---- Runtime composition: omega.json5 keeps ONE home per shared section
-  // (firebaseConfig, payment at the top level); the chrome + client contract
+  // (cloud, payment at the top level); the chrome + client contract
   // reads them through site.web_manager (pricing loops over
   // site.web_manager.payment.products, the Configuration spread feeds the
   // client). Compose here — same bridge pattern as extension's package.js
   // mapping analytics.providers → the client's flat shape.
   site.web_manager = site.web_manager || {};
-  if (site.firebaseConfig) {
+  if (site.cloud && site.cloud.config) {
     site.web_manager.firebase = site.web_manager.firebase || {};
     site.web_manager.firebase.app = site.web_manager.firebase.app || {};
-    site.web_manager.firebase.app.config = site.firebaseConfig;
+    site.web_manager.firebase.app.config = site.cloud.config;
   }
   if (site.payment) site.web_manager.payment = site.payment;
 

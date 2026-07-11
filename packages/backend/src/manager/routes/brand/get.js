@@ -10,7 +10,7 @@ module.exports = async ({ assistant, Manager }) => {
 
 /**
  * Build a public-safe config object from Manager.config
- * Excludes sensitive fields: sentry, analytics, blog, etc.
+ * Excludes sensitive fields: monitoring, analytics, blog, etc.
  */
 function buildPublicConfig(config) {
   return {
@@ -18,7 +18,7 @@ function buildPublicConfig(config) {
     github: config.github || {},
     oauth2: config.oauth2 || {},
     payment: config.payment || {},
-    firebaseConfig: config.firebaseConfig || {},
+    cloud: config.cloud || {},
     reviews: config.reviews || {},
   };
 }

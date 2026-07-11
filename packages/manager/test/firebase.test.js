@@ -3,7 +3,7 @@
  * fake of the FirebaseAPI surface (plus a Cloudflare fake for hosting's DNS
  * writes). Proves skip/shared semantics, the converged-project zero-mutation
  * no-op, per-operation drift writes, the de-ITW'd billing guidance, warned
- * manual flows (Google sign-in, VAPID), the omega.json5 firebaseConfig drift
+ * manual flows (Google sign-in, VAPID), the omega.json5 cloud.config drift
  * check, and the dry-run guarantee.
  */
 const test = require('node:test');
@@ -50,7 +50,7 @@ function brandConfig({ firebase = {}, firebaseConfig } = {}) {
     targets: { web: {}, backend: {} },
   };
   if (firebaseConfig) {
-    config.firebaseConfig = firebaseConfig;
+    config.cloud = { provider: 'firebase', config: firebaseConfig };
   }
   return config;
 }
@@ -480,12 +480,12 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
 
 // ─── SDK config drift check ──────────────────────────────────────────────────
 
-test('sdk-config: missing omega.json5 firebaseConfig is written back, comments intact', async () => {
+test('sdk-config: missing omega.json5 cloud.config is written back, comments intact', async () => {
   const handler = require('../src/services/firebase/ensure/sdk-config.js');
   const api = fakeFirebase(convergedResponses());
   const brandRoot = makeBrandRoot(FIREBASE_WRITEBACK_CONFIG);
 
-  const result = await handler(handlerContext(brandConfig(), api, { brandRoot })); // no firebaseConfig in config
+  const result = await handler(handlerContext(brandConfig(), api, { brandRoot })); // no cloud.config in config
 
   assert.equal(result.status, undefined); // drift healed — success, not warned
   assert.deepEqual(result.state.sdkConfig, EXPECTED_SDK);

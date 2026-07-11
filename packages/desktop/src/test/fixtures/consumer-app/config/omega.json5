@@ -11,7 +11,8 @@
       icon: '',
     },
   },
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: '',
   },
   analytics: {
@@ -19,8 +20,8 @@
       google: { id: '' },
     },
   },
-  // Empty → client-bridge skips Firebase init (no hang on a fake projectId).
-  firebaseConfig: {},
+  // Empty config → client-bridge skips Firebase init (no hang on a fake projectId).
+  cloud: { provider: 'firebase', config: {} },
   targets: {
     desktop: {
       startup: {

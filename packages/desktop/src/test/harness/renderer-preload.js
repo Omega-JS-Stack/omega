@@ -72,7 +72,7 @@ try {
   testManager.config = {
     em:    { environment: 'production' },
     brand: { url: 'https://example.com' },
-    firebaseConfig: { projectId: 'demo-app', authDomain: 'demo-app.firebaseapp.com' },
+    cloud: { provider: 'firebase', config: { projectId: 'demo-app', authDomain: 'demo-app.firebaseapp.com' } },
   };
 } catch (e) {
   console.warn('[renderer-preload] Could not instantiate renderer Manager for tests:', e.message);

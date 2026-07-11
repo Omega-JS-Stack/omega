@@ -96,9 +96,9 @@ class Manager {
       this._setHtmlDataAttributes();
 
       // Initialize Firebase if a config blob is present (presence-driven — matches @omega.js/backend
-      // convention). Reads flat `firebaseConfig` (the @omega.js/backend/extension/desktop canonical
-      // shape) and falls back to nested `firebase.app.config` (UJM's current `_config.yml` shape).
-      // Once UJM migrates to the flat shape this fallback can be dropped.
+      // convention). Reads `cloud.config` (the omega.json5 canonical shape — desktop passes its
+      // resolved config through) and falls back to nested `firebase.app.config` (the web/extension
+      // bridge contract shape).
       // Initialize Firebase only when the resolved config can actually boot the
       // SDK — apiKey is mandatory (init without one crashes with auth/invalid-api-key).
       // Configs carrying only projectId/authDomain still resolve for URL derivation.
@@ -397,8 +397,9 @@ class Manager {
     $html.dataset.device = this._utilities.getDevice();
   }
 
-  // Resolve the Firebase web SDK config blob. Flat `firebaseConfig` first (canonical
-  // shape — @omega.js/backend/extension/desktop), then nested `firebase.app.config` (UJM legacy yaml shape).
+  // Resolve the Firebase web SDK config blob. `cloud.config` first (canonical
+  // omega.json5 role shape — desktop passes its resolved config through), then nested
+  // `firebase.app.config` (the web/extension bridge contract shape).
   // A blob only counts when at least one value is non-empty — framework config merges
   // (e.g. UJM's Jekyll chain) inject all-empty-string blobs into Firebase-less sites,
   // and those must resolve to null (no init, no URL derivation).
@@ -407,9 +408,9 @@ class Manager {
       && typeof blob === 'object'
       && Object.values(blob).some((value) => value);
 
-    const flat = this.config.firebaseConfig;
-    if (hasValues(flat)) {
-      return flat;
+    const cloud = this.config.cloud?.config;
+    if (hasValues(cloud)) {
+      return cloud;
     }
     const nested = this.config.firebase?.app?.config;
     if (hasValues(nested)) {

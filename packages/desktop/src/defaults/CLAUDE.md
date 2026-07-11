@@ -47,7 +47,7 @@ npx omega install live # restore the published @omega.js/desktop from npm
 
 ## Where things live
 
-- `config/omega.json5` — the single OMEGA config (JSON5): shared sections (brand, analytics, payment, firebaseConfig, sentry, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, downloads, remoteConfig, restartManager) under `targets.desktop`.
+- `config/omega.json5` — the single OMEGA config (JSON5): shared sections (brand, analytics, payment, cloud, monitoring, theme) at the top level; desktop settings (app, platforms, autoUpdate, startup, releases, downloads, remoteConfig, restartManager) under `targets.desktop`.
 - Packaging config — fully generated. @omega.js/desktop produces `dist/electron-builder.yml` from `config/omega.json5` (brand/app/signing) + @omega.js/desktop's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `omega.json5` if you genuinely need to.
 - `hooks/notarize/post.js` — optional post-notarize extension hook (@omega.js/desktop owns the actual `afterSign` notarize step).
 - `src/main.js` — main-process entry. One-line bootstrap of `@omega.js/desktop/main`.

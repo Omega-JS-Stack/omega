@@ -1,7 +1,7 @@
 /**
  * Devlog generate stage — group the collected commits into a per-repo digest
  * (Ghostii's sourceContent), assemble the brief (description), and have the
- * platform write the article. Project URLs go through Ghostii's `links`
+ * provider write the article. Project URLs go through Ghostii's `links`
  * param — its allocator assigns them to sections natively.
  */
 
@@ -131,7 +131,7 @@ Title style: short, punchy, and specific — like a git commit summary of the pe
 }
 
 /**
- * Generate a devlog post via the configured platform (Ghostii).
+ * Generate a devlog post via the configured provider (Ghostii).
  *
  * @param {object} params - { brandConfig, commits, projectMap, days, write? }
  *   (`write` is the article writer — tests inject a fake; prod uses Ghostii)
@@ -140,8 +140,8 @@ Title style: short, punchy, and specific — like a git commit summary of the pe
 async function generatePost({ brandConfig, commits, projectMap, days, write = writeArticle }) {
   const { devlog } = brandConfig;
 
-  if (devlog.platform !== 'ghostii') {
-    throw new Error(`Unknown devlog.platform: ${devlog.platform} (only 'ghostii' is supported)`);
+  if (devlog.provider !== 'ghostii') {
+    throw new Error(`Unknown devlog.provider: ${devlog.provider} (only 'ghostii' is supported)`);
   }
 
   const digest = buildDigest(commits, projectMap);

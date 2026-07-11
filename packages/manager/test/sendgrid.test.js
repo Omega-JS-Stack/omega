@@ -185,10 +185,10 @@ test('sendgrid: marketing.campaigns.enabled = false skips the service', async ()
   assert.match(result.reason, /marketing\.campaigns\.enabled/);
 });
 
-test('sendgrid: a different campaigns platform skips the service', async () => {
-  const result = await runService(brandConfig({ campaigns: { platform: 'other' } }), { sendgrid: fakeSendgrid() });
+test('sendgrid: a different campaigns provider skips the service', async () => {
+  const result = await runService(brandConfig({ campaigns: { provider: 'other' } }), { sendgrid: fakeSendgrid() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /platform = 'other'/);
+  assert.match(result.reason, /provider = 'other'/);
 });
 
 test('sendgrid: skips without brand.url', async () => {
@@ -201,7 +201,7 @@ test('sendgrid: the defaults carry no company parent URL', () => {
   // omega-manager defaulted parent to the company's brand URL — the manager
   // defaults layer must leave the choice to config
   assert.equal(DEFAULTS.parent, null);
-  assert.equal(DEFAULTS.marketing.campaigns.platform, 'sendgrid');
+  assert.equal(DEFAULTS.marketing.campaigns.provider, 'sendgrid');
   assert.equal(DEFAULTS.marketing.campaigns.listId, null);
 });
 

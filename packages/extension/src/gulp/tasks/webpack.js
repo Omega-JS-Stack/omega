@@ -458,17 +458,20 @@ function getTemplateReplaceOptions() {
     auth: webManagerConfig.auth || { enabled: true, config: {} },
     firebase: {
       app: {
-        enabled: !!(options.firebaseConfig?.apiKey || webManagerConfig.firebase?.app?.config?.apiKey),
-        config: options.firebaseConfig || webManagerConfig.firebase?.app?.config || {},
+        enabled: !!(options.cloud?.config?.apiKey || webManagerConfig.firebase?.app?.config?.apiKey),
+        config: options.cloud?.config || webManagerConfig.firebase?.app?.config || {},
       },
       appCheck: webManagerConfig.firebase?.appCheck || { enabled: false, config: {} },
     },
     cookieConsent: webManagerConfig.cookieConsent || { enabled: true, config: {} },
     chatsy: webManagerConfig.chatsy || { enabled: true, config: {} },
-    sentry: webManagerConfig.sentry || {
-      enabled: !!options.sentry?.dsn,
-      config: options.sentry || {}
-    },
+    sentry: webManagerConfig.sentry || (() => {
+      // omega.json5 `monitoring` → client sentry contract (provider discriminator
+      // stripped — the blob feeds Sentry.init directly)
+      const sentryConfig = { ...(options.monitoring || {}) };
+      delete sentryConfig.provider;
+      return { enabled: !!sentryConfig.dsn, config: sentryConfig };
+    })(),
     exitPopup: webManagerConfig.exitPopup || { enabled: false, config: {} },
     lazyLoading: webManagerConfig.lazyLoading || { enabled: true, config: {} },
     socialSharing: webManagerConfig.socialSharing || { enabled: false, config: {} },

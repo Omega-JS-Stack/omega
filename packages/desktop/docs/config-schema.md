@@ -1,6 +1,6 @@
 # Config schema
 
-@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
+@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, cloud, analytics, payment, monitoring, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
 
 Validation runs in two places:
 
@@ -52,9 +52,9 @@ A non-empty credential value enables a feature — there is no separate `enabled
 
 | Feature | Enable signal | Disable signal |
 |---|---|---|
-| Sentry | `sentry.dsn = 'https://...'` | `sentry.dsn = ''` |
+| Sentry | `monitoring.dsn = 'https://...'` | `monitoring.dsn = ''` |
 | GA4 analytics | `analytics.providers.google.id = 'G-XXXXX'` | `analytics.providers.google.id = ''` |
-| Firebase Auth (renderer) | `firebaseConfig.projectId = '...'` (etc.) | empty `firebaseConfig` |
+| Firebase Auth (renderer) | `cloud.config.projectId = '...'` (etc.) | empty `cloud.config` |
 
 **Exceptions where an explicit `enabled` flag exists:** `remoteConfig.enabled`, `autoUpdate.enabled`, `releases.enabled`, `downloads.enabled`, `restartManager.enabled`, `startup.openAtLogin.enabled`, `platforms.linux.snap.enabled`. These toggle BEHAVIOR, not credentials — you can have `releases.repo` set but still want releases off in a fork, for example.
 

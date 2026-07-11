@@ -127,13 +127,13 @@ test('[key=value] matcher with no matching element throws; matcher below a missi
 
 test('replacing a leaf with an object serializes a house-style block at the right indent', () => {
   const source = `{
-  firebaseConfig: null, // filled by the firebase service
+  cloud: null, // filled by the firebase service
 }
 `;
-  const result = applyConfigEdits(source, { firebaseConfig: { apiKey: 'k', projectId: 'p' } });
+  const result = applyConfigEdits(source, { cloud: { apiKey: 'k', projectId: 'p' } });
 
   assert.equal(result, `{
-  firebaseConfig: {
+  cloud: {
     apiKey: "k",
     projectId: "p",
   }, // filled by the firebase service
@@ -166,12 +166,12 @@ test('insert at the root: goes before the final brace, previous last entry gains
   theme: { id: 'classy' }
 }
 `;
-  const result = applyConfigEdits(source, { 'sentry.dsn': 'https://x@sentry.test/1' });
+  const result = applyConfigEdits(source, { 'monitoring.dsn': 'https://x@sentry.test/1' });
 
   assert.equal(result, `{
   brand: { id: 'a' },
   theme: { id: 'classy' },
-  sentry: {
+  monitoring: {
     dsn: "https://x@sentry.test/1",
   },
 }
@@ -337,16 +337,16 @@ test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with ever
   const result = applyConfigEdits(scaffold, {
     'marketing.campaigns.listId': 'sg-list-1',
     'marketing.newsletter.publicationId': 'pub-1',
-    'firebaseConfig.apiKey': 'AIza-test',
-    'firebaseConfig.authDomain': 'acme.com',
-    'firebaseConfig.projectId': 'acme-app',
-    'firebaseConfig.appId': '1:123:web:abc',
+    'cloud.config.apiKey': 'AIza-test',
+    'cloud.config.authDomain': 'acme.com',
+    'cloud.config.projectId': 'acme-app',
+    'cloud.config.appId': '1:123:web:abc',
   });
 
   const parsed = JSON5.parse(result);
   assert.equal(parsed.marketing.campaigns.listId, 'sg-list-1');
   assert.equal(parsed.marketing.newsletter.publicationId, 'pub-1');
-  assert.deepEqual(parsed.firebaseConfig, { apiKey: 'AIza-test', authDomain: 'acme.com', projectId: 'acme-app', appId: '1:123:web:abc' });
+  assert.deepEqual(parsed.cloud.config, { apiKey: 'AIza-test', authDomain: 'acme.com', projectId: 'acme-app', appId: '1:123:web:abc' });
 
   for (const line of commentLines) {
     assert.ok(result.includes(line), `comment lost: ${line}`);
@@ -356,9 +356,9 @@ test('scaffold-shaped omega.json5 absorbs the manage-run writeback set with ever
   assert.equal(applyConfigEdits(result, {
     'marketing.campaigns.listId': 'sg-list-1',
     'marketing.newsletter.publicationId': 'pub-1',
-    'firebaseConfig.apiKey': 'AIza-test',
-    'firebaseConfig.authDomain': 'acme.com',
-    'firebaseConfig.projectId': 'acme-app',
-    'firebaseConfig.appId': '1:123:web:abc',
+    'cloud.config.apiKey': 'AIza-test',
+    'cloud.config.authDomain': 'acme.com',
+    'cloud.config.projectId': 'acme-app',
+    'cloud.config.appId': '1:123:web:abc',
   }), result);
 });

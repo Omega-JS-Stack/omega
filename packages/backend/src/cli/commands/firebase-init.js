@@ -85,13 +85,13 @@ function loadEmulatorPorts(projectDir) {
 }
 
 function resolveProjectId(projectDir, functionsDir) {
-  // Try config/omega.json5 (resolved — a brand-level firebaseConfig counts)
+  // Try config/omega.json5 (resolved — a brand-level cloud.config counts)
   const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
   if (hasOmegaConfig(projectDir)) {
     try {
       const config = loadConfig(projectDir, 'backend').config;
-      if (config.firebaseConfig?.projectId) {
-        return config.firebaseConfig.projectId;
+      if (config.cloud?.config?.projectId) {
+        return config.cloud.config.projectId;
       }
     } catch (e) {
       // Fall through

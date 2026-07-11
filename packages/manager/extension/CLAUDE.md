@@ -47,7 +47,7 @@ Load the unpacked extension in Chrome: point chrome://extensions → "Load unpac
 
 ## Where things live
 
-- `config/omega.json5` — the single OMEGA config (JSON5): shared sections (brand, firebaseConfig, analytics, sentry, theme) at the top level + `targets.extension` for extension-specific settings. `Manager.getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here — they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
+- `config/omega.json5` — the single OMEGA config (JSON5): shared sections (brand, cloud, analytics, monitoring, theme) at the top level + `targets.extension` for extension-specific settings. `Manager.getConfig()` returns it RESOLVED (target section overlaid onto the top level). Secrets never live here — they go in `.env` (e.g. `GOOGLE_ANALYTICS_SECRET`).
 - `config/messages.json` — i18n source. Auto-translated to 16 languages at build time via the Claude CLI (only missing keys regenerated).
 - `config/description.md` — store-listing description (used by the publish step).
 - `src/manifest.json` — extension manifest. The framework merges its defaults in at build time; you only need to declare what's specific to your extension.

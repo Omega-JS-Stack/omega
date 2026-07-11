@@ -391,7 +391,7 @@ Manager.prototype.init = function (exporter, options) {
   // Setup sentry
   if (self.options.sentry) {
     const sentryRelease = `${brandId || self.project.projectId}@${self.package.version}`;
-    const sentryDSN = self.config?.sentry?.dsn || '';
+    const sentryDSN = self.config?.monitoring?.dsn || '';
     // self.assistant.log('Sentry', sentryRelease, sentryDSN);
 
     self.libraries.sentry = require('@sentry/node');

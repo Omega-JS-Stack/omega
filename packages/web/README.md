@@ -140,7 +140,7 @@ see the harness README for the honest before/after numbers.
   sync to the omega commands.
 - **Migration (`omega migrate`)** — one command converts a UJM consumer in
   place: legacy configs → validated omega.json5 (shared sections extracted
-  with unified spellings — `analytics.providers.<p>.id`, `firebaseConfig`,
+  with unified spellings — `analytics.providers.<p>.id`, `cloud.{provider,config}`,
   `payment` at the top level; the `web_manager` client blob + presentation
   sections + build settings under `targets.web`), the codemod rule table over
   `src/**` templates, seed `main.js` removal (the core main + boot runtime
@@ -149,7 +149,7 @@ see the harness README for the honest before/after numbers.
   consumer main.scss configures the layers below it), page-css self-@use
   drops, liquid-lint, and legacy-file removal (Gemfile & co). `--check` runs
   everything in memory. The ENGINE composes the runtime shape back
-  (firebaseConfig → `web_manager.firebase.app.config`, payment →
+  (cloud.config → `web_manager.firebase.app.config`, payment →
   `web_manager.payment`, providers → the client's flat analytics) so the
   chrome/client contract is unchanged — one home per value in the config,
   same bridge pattern as the extension framework.

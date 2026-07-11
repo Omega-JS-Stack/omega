@@ -34,7 +34,7 @@ const { RunSummary } = require('../src/lib/run-summary.js');
 
 const COMPANY_CONFIG = `{
   brand: { name: 'Fixture Co' },
-  sentry: { dsn: 'https://company@sentry.example/1' },
+  monitoring: { provider: 'sentry', dsn: 'https://company@sentry.example/1' },
   brands: { roots: ['./brands'] },
 }`;
 
@@ -137,7 +137,7 @@ test('company: loadCompanyConfig strips the brands key and hard-fails on secret-
   const { root } = stageCompany();
   const layer = loadCompanyConfig(root);
 
-  assert.equal(layer.sentry.dsn, 'https://company@sentry.example/1');
+  assert.equal(layer.monitoring.dsn, 'https://company@sentry.example/1');
   assert.equal('brands' in layer, false);
 
   const leaky = stageCompany({ config: `{ oauth2: { clientSecret: 'oops' }, brands: { roots: ['./brands'] } }` });
@@ -146,15 +146,15 @@ test('company: loadCompanyConfig strips the brands key and hard-fails on secret-
 
 test('company: loadBrand layers DEFAULTS ← company ← brand, brand values winning', () => {
   const { brands } = stageCompany({ brandIds: ['brand-a'] });
-  const companyConfig = { sentry: { dsn: 'company-dsn' }, brand: { name: 'Company Name' } };
+  const companyConfig = { monitoring: { provider: 'sentry', dsn: 'company-dsn' }, brand: { name: 'Company Name' } };
 
   const layered = loadBrand(brands['brand-a'], { companyConfig });
-  assert.equal(layered.config.sentry.dsn, 'company-dsn');       // company fills the gap
+  assert.equal(layered.config.monitoring.dsn, 'company-dsn');   // company fills the gap
   assert.equal(layered.config.brand.name, 'brand-a brand');     // brand wins
   assert.equal(layered.config.enabled, true);                   // manager DEFAULTS underneath
 
   const standalone = loadBrand(brands['brand-a']);
-  assert.equal(standalone.config.sentry, undefined);            // no layer without a company
+  assert.equal(standalone.config.monitoring, undefined);        // no layer without a company
 });
 
 test('company: stamp is idempotent — unchanged marker is never rewritten', () => {
@@ -207,7 +207,7 @@ test('company: a stamped brand layers company config and .env (shell > brand > c
   try {
     const report = await runManage(brands['brand-a'], { service: 'workspace' });
 
-    assert.equal(report.brand.config.sentry.dsn, 'https://company@sentry.example/1');
+    assert.equal(report.brand.config.monitoring.dsn, 'https://company@sentry.example/1');
     assert.equal(report.brand.config.brand.name, 'brand-a brand');
     assert.equal(process.env.OMEGA_TEST_A, 'from-brand');
     assert.equal(process.env.OMEGA_TEST_B, 'from-brand');
@@ -225,7 +225,7 @@ test('company: a stale marker runs standalone (no company layer)', async () => {
 
   const report = await runManage(brands['brand-a'], { service: 'workspace' });
 
-  assert.equal(report.brand.config.sentry, undefined);
+  assert.equal(report.brand.config.monitoring, undefined);
   assert.equal(report.results.workspace.status, 'success');
 });
 

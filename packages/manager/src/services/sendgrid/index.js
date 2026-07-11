@@ -27,9 +27,9 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'marketing.campaigns.enabled = false' };
     }
 
-    const platform = campaigns.platform || 'sendgrid';
-    if (platform !== 'sendgrid') {
-      return { skip: true, reason: `marketing.campaigns.platform = '${platform}'` };
+    const provider = campaigns.provider || 'sendgrid';
+    if (provider !== 'sendgrid') {
+      return { skip: true, reason: `marketing.campaigns.provider = '${provider}'` };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');

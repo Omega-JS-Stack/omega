@@ -67,11 +67,14 @@ All contexts sign out
 1. **Add `authDomain`** to your Firebase config in `config/omega.json5`:
    ```jsonc
    {
-     firebaseConfig: {
-       apiKey: '...',
-       authDomain: 'tabblar.com',     // ← required for /token redirect flow
-       projectId: 'tabblar',
-       // ...
+     cloud: {
+       provider: 'firebase',
+       config: {
+         apiKey: '...',
+         authDomain: 'tabblar.com',   // ← required for /token redirect flow
+         projectId: 'tabblar',
+         // ...
+       },
      }
    }
    ```
@@ -136,7 +139,7 @@ These bindings live in Web Manager, not @omega.js/extension — but they're how 
 
 2. **Firebase in service workers requires static imports.** Dynamic `import()` fails with webpack chunking inside SWs. @omega.js/extension's background.js uses static `import { initializeApp } from 'firebase/app'`.
 
-3. **Config path is fixed.** `authDomain` lives at `config.firebaseConfig.authDomain` (loaded via the `OMEGA_BUILD_JSON` webpack DefinePlugin replacement).
+3. **Config path is fixed.** `authDomain` comes from omega.json5's `cloud.config.authDomain` (bridged into the packaged snapshot's `firebase.app.config` via the `OMEGA_BUILD_JSON` webpack DefinePlugin replacement).
 
 4. **Tabs permission required.** Without it, background.js can't watch for `/token?authToken=…` redirects.
 

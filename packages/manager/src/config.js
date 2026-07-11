@@ -131,11 +131,11 @@ const DEFAULTS = {
 
   // Devlog — auto-generated commit-digest blog posts (standalone
   // `omega-manager devlog`). Stateless: each run fetches commits from the
-  // last `lookbackDays` days, has the platform (Ghostii) write the article,
+  // last `lookbackDays` days, has the provider (Ghostii) write the article,
   // and publishes to `destinations`. Not a service — never runs during manage.
   devlog: {
     enabled: false,
-    platform: 'ghostii',        // Article writer (only ghostii supported)
+    provider: 'ghostii',        // Article writer (only ghostii supported)
     lookbackDays: 5,
     orgs: [],                   // GitHub orgs/users to fully scan — for NON-brand repos (frameworks, tooling); brand repos are always scanned via the brand configs
     excludeRepos: [],           // Repo names never fetched or mentioned
@@ -186,12 +186,12 @@ const DEFAULTS = {
   marketing: {
     campaigns: {
       enabled: true,
-      platform: 'sendgrid',
+      provider: 'sendgrid',
       listId: null,
     },
     newsletter: {
       enabled: true,
-      platform: 'beehiiv',
+      provider: 'beehiiv',
       publicationId: null,
     },
   },

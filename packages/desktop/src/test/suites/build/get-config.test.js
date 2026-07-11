@@ -99,14 +99,14 @@ module.exports = {
       run: (ctx) => {
         const tmp = stageConsumer(`{
           brand:  { id: 'somiibo', name: 'Somiibo' },
-          sentry: { dsn: 'https://shared.example.com' },
+          monitoring: { provider: 'sentry', dsn: 'https://shared.example.com' },
           targets: { desktop: {
-            sentry: { dsn: 'https://desktop-only.example.com' },
+            monitoring: { dsn: 'https://desktop-only.example.com' },
           } },
         }`);
         try {
           const cfg = loadConfigInDir(tmp);
-          ctx.expect(cfg.sentry.dsn).toBe('https://desktop-only.example.com');
+          ctx.expect(cfg.monitoring.dsn).toBe('https://desktop-only.example.com');
         } finally {
           fs.rmSync(tmp, { recursive: true, force: true });
         }

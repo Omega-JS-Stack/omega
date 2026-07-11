@@ -72,7 +72,7 @@ class Auth {
       options = {};
     }
 
-    // If Firebase isn't configured (no firebaseConfig blob), call callback immediately with null.
+    // If Firebase isn't configured (no resolvable config blob), call callback immediately with null.
     if (!this.manager._resolveFirebaseConfig()) {
       callback({
         user: null,

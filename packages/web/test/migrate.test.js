@@ -7,7 +7,7 @@
  * engine uses), and the end-to-end migration of a synthetic UJM consumer in
  * a temp dir (config conversion validated through the real @omega.js/config
  * loader, legacy files removed, check mode writes nothing). Plus the runtime
- * composition the migration relies on: firebaseConfig/payment/analytics at
+ * composition the migration relies on: cloud/payment/analytics at
  * their omega.json5 homes render into the chrome's composed spots.
  */
 const assert = require('node:assert');
@@ -202,7 +202,8 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.strictEqual(omega.brand.url, 'https://sample.test', 'url folded into brand');
   assert.strictEqual(omega.baseurl, undefined, 'empty baseurl dropped');
   assert.deepStrictEqual(omega.analytics, { providers: { google: { id: 'G-TEST123' }, tiktok: { id: 'TIKTOK1' } } }, 'flat analytics → providers; empty provider dropped');
-  assert.strictEqual(omega.firebaseConfig.apiKey, 'AIza-TEST', 'firebase app config extracted');
+  assert.strictEqual(omega.cloud.provider, 'firebase', 'cloud role gets its provider discriminator');
+  assert.strictEqual(omega.cloud.config.apiKey, 'AIza-TEST', 'firebase app config extracted');
   assert.strictEqual(omega.payment.processors.chargebee.site, 'sample');
   assert.strictEqual(omega.payment.processors.stripe.publishableKey, undefined, 'publishableKey: false dropped');
   assert.strictEqual(omega.oauth2.discord.enabled, true);
@@ -358,11 +359,11 @@ test('e2e: real migration converts config, rewrites templates, removes legacy fi
 // Runtime composition — omega.json5 homes render into the chrome contract
 // ---------------------------------------------------------------------------
 
-test('composition: firebaseConfig/payment/analytics at their omega homes reach the chrome', async () => {
+test('composition: cloud/payment/analytics at their omega homes reach the chrome', async () => {
   const MINI = path.join(__dirname, 'fixtures', 'mini-site');
   const siteData = {
     ...JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8')),
-    firebaseConfig: { apiKey: 'AIza-COMPOSE', projectId: 'compose-test' },
+    cloud: { provider: 'firebase', config: { apiKey: 'AIza-COMPOSE', projectId: 'compose-test' } },
     payment: { processors: { chargebee: { site: 'compose' } }, products: [{ id: 'basic', name: 'Basic' }] },
     analytics: { providers: { google: { id: 'G-COMPOSE1' } } },
   };
@@ -385,6 +386,6 @@ test('composition: firebaseConfig/payment/analytics at their omega homes reach t
 
   assert.ok(html.includes('googletagmanager.com/gtag/js?id=G-COMPOSE1'), 'gtag reads analytics.providers.google.id');
   assert.ok(html.includes('google: "G-COMPOSE1"'), 'Configuration.analytics flat bridge for the client');
-  assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'firebaseConfig composed into web_manager.firebase.app.config');
+  assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config composed into web_manager.firebase.app.config');
   assert.ok(html.includes('"site":"compose"'), 'payment composed into web_manager.payment');
 });

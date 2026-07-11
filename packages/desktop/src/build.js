@@ -128,7 +128,7 @@ Manager.getMode = function () {
 Manager.prototype.getMode = Manager.getMode;
 
 // Config — the consumer's config/omega.json5 resolved for the desktop target via
-// @omega.js/config: shared sections (brand, firebaseConfig, analytics, payment, sentry,
+// @omega.js/config: shared sections (brand, cloud, analytics, payment, monitoring,
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
 // config merges underneath the app's. Then @omega.js/desktop's derived defaults:

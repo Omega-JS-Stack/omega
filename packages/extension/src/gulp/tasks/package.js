@@ -47,6 +47,11 @@ async function generateBuildJs(outputDir) {
     // Get git info
     const gitInfo = getGitInfo();
 
+    // omega.json5 `monitoring` → the client's sentry contract. The blob feeds
+    // Sentry.init directly, so the provider discriminator is stripped.
+    const sentryConfig = { ...(config.monitoring || {}) };
+    delete sentryConfig.provider;
+
     // Build config object matching @omega.js/client's expected structure
     const buildConfig = {
       timestamp: new Date().toISOString(),
@@ -78,8 +83,8 @@ async function generateBuildJs(outputDir) {
 
         firebase: {
           app: {
-            enabled: !!(config.firebaseConfig?.apiKey),
-            config: config.firebaseConfig || {},
+            enabled: !!(config.cloud?.config?.apiKey),
+            config: config.cloud?.config || {},
           },
           appCheck: { enabled: false, config: {} },
         },
@@ -87,8 +92,8 @@ async function generateBuildJs(outputDir) {
         cookieConsent: { enabled: true, config: {} },
         chatsy: { enabled: true, config: {} },
         sentry: {
-          enabled: !!(config.sentry?.dsn),
-          config: config.sentry || {}
+          enabled: !!(sentryConfig.dsn),
+          config: sentryConfig,
         },
         exitPopup: { enabled: false, config: {} },
         lazyLoading: { enabled: true, config: {} },

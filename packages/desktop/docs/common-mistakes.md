@@ -5,7 +5,7 @@
 3. **Shipping `<slot>@2x.png` files** — Ship ONE file at the native (@2x) size; @omega.js/desktop downscales the @1x sibling. Bundled defaults work the same way. See [icons.md](icons.md).
 4. **Naming the macOS tray icon source `trayTemplate.png`** — The input filename is `tray.png` (matches Windows/Linux). @omega.js/desktop owns the `Template` magic when writing to dist.
 5. **Reading `process.cwd()` from packaged-app runtime code** — It's `/` in packaged apps. Use `require('./utils/app-root.js')()` (tries `app.getAppPath()` first, falls back for tests/non-Electron contexts).
-6. **Setting `enabled: true` to turn on sentry/analytics** — Wrong convention. Set the credentials (`sentry.dsn = '...'`, `analytics.providers.google.id = '...'`); presence enables. Same for `firebaseConfig`.
+6. **Setting `enabled: true` to turn on sentry/analytics** — Wrong convention. Set the credentials (`monitoring.dsn = '...'`, `analytics.providers.google.id = '...'`); presence enables. Same for `cloud.config`.
 7. **Defining cross-context helpers on individual Manager prototypes** — Use `attachTo(Manager)` in `src/utils/<topic>-helpers.js` so main/renderer/preload/build all share the same code path.
 8. **Trying to share a Manager instance across processes** — Each process has its own. They communicate via IPC (`manager.ipc.invoke/handle`).
 9. **Calling `shell.openExternal(url)` directly with a dynamic URL** — Gate through `require('./utils/sanitize-url.js')` first (returns `''` for non-http(s) protocols). Any dynamic URL must have its protocol filtered before navigation.

@@ -13,10 +13,10 @@
 
 function getFunctionsUrl(environment) {
   const env = environment || this.getEnvironment();
-  const projectId = this?.config?.firebaseConfig?.projectId;
+  const projectId = this?.config?.cloud?.config?.projectId;
 
   if (!projectId) {
-    throw new Error('firebaseConfig.projectId not set in config/omega.json5');
+    throw new Error('cloud.config.projectId not set in config/omega.json5');
   }
 
   // Local for development OR testing; production otherwise.
@@ -36,9 +36,9 @@ function getApiUrl(environment) {
   }
 
   // Prod: api.<authDomain>. Mirrors @omega.js/client.getApiUrl behavior.
-  const authDomain = this?.config?.firebaseConfig?.authDomain;
+  const authDomain = this?.config?.cloud?.config?.authDomain;
   if (!authDomain) {
-    throw new Error('firebaseConfig.authDomain not set in config/omega.json5');
+    throw new Error('cloud.config.authDomain not set in config/omega.json5');
   }
 
   return `https://api.${authDomain}`;

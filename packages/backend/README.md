@@ -105,7 +105,7 @@ const Manager = (new (require('@omega.js/backend'))).init(exports, options);
 
 ## Configuration File
 
-Create `config/omega.json5` in your functions directory (`npx omega setup` scaffolds it from the template). Shared sections (`brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
+Create `config/omega.json5` in your functions directory (`npx omega setup` scaffolds it from the template). Shared sections (`brand`, `cloud`, `analytics`, `payment`, `monitoring`, `oauth2`) sit at the top level with identical spelling in every OMEGA project; backend-specific settings live under `targets.backend`. Secrets NEVER go in this file — they belong in `.env` (the loader hard-fails on secret-shaped keys).
 
 ```json5
 {
@@ -122,7 +122,8 @@ Create `config/omega.json5` in your functions directory (`npx omega setup` scaff
       combomark: 'https://example.com/combomark.png',
     },
   },
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: 'https://xxx@xxx.ingest.sentry.io/xxx',
   },
   analytics: {
@@ -130,14 +131,17 @@ Create `config/omega.json5` in your functions directory (`npx omega setup` scaff
       google: { id: 'G-XXXXXXXXXX' },
     },
   },
-  firebaseConfig: {
-    apiKey: 'xxx',
-    authDomain: 'project-id.firebaseapp.com',
-    projectId: 'project-id',
-    storageBucket: 'project-id.appspot.com',
-    messagingSenderId: '123456789',
-    appId: '1:123:web:456',
-    measurementId: 'G-XXXXXXXXXX',
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: 'xxx',
+      authDomain: 'project-id.firebaseapp.com',
+      projectId: 'project-id',
+      storageBucket: 'project-id.appspot.com',
+      messagingSenderId: '123456789',
+      appId: '1:123:web:456',
+      measurementId: 'G-XXXXXXXXXX',
+    },
   },
   targets: {
     backend: {

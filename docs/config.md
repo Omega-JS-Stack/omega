@@ -23,10 +23,10 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // SHARED sections — identical spelling in every project type.
   // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
   brand:          { id, name, url, description, tagline, contact: { email }, address: {…}, images: {…} },
-  firebaseConfig: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId },
+  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId } },
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
   payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […] },
-  sentry:         { dsn },
+  monitoring:     { provider: 'sentry', dsn },
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
 
@@ -59,7 +59,7 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 - **Target sections overlay the TOP LEVEL**: `targets.desktop.platforms` resolves to
   `config.platforms`; frameworks never read through `config.targets.<type>.…`.
 - **Any shared key inside a target entry overrides it for that surface** — a desktop-only
-  Sentry DSN is just `targets.desktop.sentry.dsn`; disabling any integration per-surface is
+  Sentry DSN is just `targets.desktop.monitoring.dsn`; disabling any integration per-surface is
   uniformly `<key>: { enabled: false }`. One agnostic deep merge everywhere (objects merge,
   arrays/scalars replace, `null` replaces, `undefined` is skipped).
 - The merged `targets` map rides along on the resolved config so enabled-target enumeration
@@ -71,7 +71,7 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 
 - **Secrets NEVER live in omega.json5** — they live in `.env`. `loadConfig` throws on any
   key matching `/(secret|privateKey|apiSecret)$/i` in any section of a raw file, before any
-  merge. Public credentials (`publishableKey`, `clientId`, `firebaseConfig.apiKey`) pass by
+  merge. Public credentials (`publishableKey`, `clientId`, `cloud.config.apiKey`) pass by
   design.
 - **The legacy `targets` ARRAY form throws** — `targets` is an object keyed by target name.
 - Schema findings (required/type/match/enum) come back as `errors`, not throws — build-time
@@ -147,15 +147,18 @@ dry-run gate + logging.
 ## Migration — legacy configs → omega.json5
 
 No framework reads the legacy files anymore. Convert once, delete the old file. General
-recipe: shared-looking sections (brand, firebaseConfig, analytics, payment, sentry, theme,
-oauth2) move to the TOP LEVEL verbatim; everything framework-specific moves under
-`targets.<type>`.
+recipe: shared-looking sections move to the TOP LEVEL (brand, analytics, payment, theme,
+oauth2 verbatim; `firebaseConfig` becomes `cloud: { provider: 'firebase', config: {…} }` and
+`sentry` becomes `monitoring: { provider: 'sentry', … }` — D12 provider-discriminated role
+keys); everything framework-specific moves under `targets.<type>`.
 
 ### electron-manager (`config/electron-manager.json` → `config/omega.json5`) — DONE (checkpoint 18)
 
 | Legacy | New |
 |---|---|
-| `brand`, `sentry`, `analytics`, `payment`, `firebaseConfig`, `theme` | top level, unchanged |
+| `brand`, `analytics`, `payment`, `theme` | top level, unchanged |
+| `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
+| `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
 | `app` | `targets.desktop.app` |
 | `targets.mac` / `targets.win` / `targets.linux` (per-OS) | `targets.desktop.platforms.mac` / `.win` / `.linux` |
 | `autoUpdate`, `startup`, `releases`, `downloads`, `remoteConfig`, `restartManager` | `targets.desktop.<same key>` |
@@ -168,7 +171,9 @@ oauth2) move to the TOP LEVEL verbatim; everything framework-specific moves unde
 
 | Legacy | New |
 |---|---|
-| `brand`, `firebaseConfig`, `analytics`, `payment`, `sentry`, `oauth2` | top level, unchanged |
+| `brand`, `analytics`, `payment`, `oauth2` | top level, unchanged |
+| `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
+| `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
 | custom keys (`omega`, `mcp`, …) | top level, unchanged |
 | `parent`, `github`, `reviews`, `marketing`, `blog`, `dataRequest` | `targets.backend.<same key>` |
 
@@ -183,7 +188,9 @@ the backend app file carries only `targets.backend`.
 
 | Legacy | New |
 |---|---|
-| `brand`, `firebaseConfig`, `analytics`, `sentry`, `theme` | top level, unchanged |
+| `brand`, `analytics`, `theme` | top level, unchanged |
+| `firebaseConfig` | **`cloud: { provider: 'firebase', config: {…} }`** (D12) |
+| `sentry` | **`monitoring: { provider: 'sentry', dsn }`** (D12) |
 | custom keys (`liveReloadPort`, …) | top level, unchanged |
 | `analytics.providers.google.secret` | **`.env` → `GOOGLE_ANALYTICS_SECRET`** (secrets never in omega.json5; loader hard-fails) |
 | *(no extension-specific keys yet)* | `targets.extension: {}` — presence = enabled; extension-specific settings land here |
@@ -206,7 +213,7 @@ before the report prints.
 | `url` | `brand.url` (site.url derives; empty `baseurl` dropped) |
 | `brand`, `theme`, `oauth2` | top level, verbatim |
 | `analytics.{google,meta,tiktok}` (flat scalars) | `analytics.providers.<p>.id` — the unified spelling; the web chrome emits the client's flat shape from it |
-| `web_manager.firebase.app.config` | **`firebaseConfig`** (top level); the engine composes it back into `web_manager.firebase.app.config` at build |
+| `web_manager.firebase.app.config` | **`cloud: { provider: 'firebase', config: {…} }`** (top level); the engine composes `cloud.config` back into `web_manager.firebase.app.config` at build |
 | `web_manager.payment` | **`payment`** (top level); composed back into `web_manager.payment` (pricing layouts + the client read it there); credential keys set to `false` (legacy "disabled") are dropped |
 | `web_manager` (rest: auth, chatsy, sentry, cookieConsent, exitPopup, …) | `targets.web.web_manager` — the client-runtime settings blob, whole |
 | `meta`, `socials`, `download`, `extension`, `favicon`, `manifest`, `icons`, `recaptcha`, `cloudflare`, `translation` | `targets.web.<same key>` (target overlay puts them back at the top level for web loads) |

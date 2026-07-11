@@ -130,10 +130,10 @@ test('beehiiv: marketing.newsletter.enabled = false skips the service', async ()
   assert.match(result.reason, /marketing\.newsletter\.enabled/);
 });
 
-test('beehiiv: a different newsletter platform skips the service', async () => {
-  const result = await runService(brandConfig({ newsletter: { platform: 'other' } }), { beehiiv: fakeBeehiiv() });
+test('beehiiv: a different newsletter provider skips the service', async () => {
+  const result = await runService(brandConfig({ newsletter: { provider: 'other' } }), { beehiiv: fakeBeehiiv() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /platform = 'other'/);
+  assert.match(result.reason, /provider = 'other'/);
 });
 
 test('beehiiv: skips without brand.url', async () => {
@@ -143,7 +143,7 @@ test('beehiiv: skips without brand.url', async () => {
 });
 
 test('beehiiv: the newsletter defaults carry no company values', () => {
-  assert.equal(DEFAULTS.marketing.newsletter.platform, 'beehiiv');
+  assert.equal(DEFAULTS.marketing.newsletter.provider, 'beehiiv');
   assert.equal(DEFAULTS.marketing.newsletter.publicationId, null);
 });
 

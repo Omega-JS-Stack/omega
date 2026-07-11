@@ -6,7 +6,7 @@
  *
  * - Shared sections to the TOP LEVEL with unified spellings:
  *   `brand` (+ merged `url`), `theme`, `oauth2`,
- *   `web_manager.firebase.app.config` → `firebaseConfig`,
+ *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
  *   `web_manager.payment` → `payment`,
  *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`.
  * - Everything web-only under `targets.web`: presentation sections (meta,
@@ -18,7 +18,7 @@
  * - Dropped with notes: Jekyll machinery keys, `webpack` (esbuild now),
  *   `gems` (Ruby is gone), secret-shaped keys (they belong in .env).
  *
- * The engine composes the runtime shape back together (firebaseConfig →
+ * The engine composes the runtime shape back together (cloud.config →
  * web_manager.firebase.app.config, payment → web_manager.payment) in
  * engine.js, so templates and the client keep their contract.
  */
@@ -90,7 +90,7 @@ function convertConfig({ jekyll, ujm }) {
   const legacyWebManager = take('web_manager') || {};
   const firebaseConfig = legacyWebManager.firebase && legacyWebManager.firebase.app && legacyWebManager.firebase.app.config;
   if (!isEmpty(firebaseConfig)) {
-    omega.firebaseConfig = firebaseConfig;
+    omega.cloud = { provider: 'firebase', config: firebaseConfig };
     delete legacyWebManager.firebase.app.config;
     if (isEmpty(legacyWebManager.firebase.app)) delete legacyWebManager.firebase.app;
     if (isEmpty(legacyWebManager.firebase)) delete legacyWebManager.firebase;

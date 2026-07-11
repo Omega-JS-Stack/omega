@@ -32,7 +32,7 @@ async function main() {
       // When running in emulator, we can initialize without credentials
       // The emulator environment variables tell it where to connect
       firebaseAdmin.initializeApp({
-        projectId: process.env.GCLOUD_PROJECT || testConfig.firebaseConfig?.projectId,
+        projectId: process.env.GCLOUD_PROJECT || testConfig.cloud?.config?.projectId,
       });
     }
     admin = firebaseAdmin;

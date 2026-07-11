@@ -38,7 +38,7 @@ npx omega install live      # restore the published @omega.js/backend from npm
 ## Where things live
 
 - `functions/index.js` — entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
-- `functions/config/omega.json5` — OMEGA config: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
+- `functions/config/omega.json5` — OMEGA config: shared sections (brand, cloud, analytics, payment, monitoring, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
 - `functions/.env` — secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored.
 - `functions/service-account.json` — Firebase Admin credentials. Gitignored.
 - `functions/routes/<verb>/<path>.js` — custom routes mounted at runtime (e.g. `routes/get/hello.js` → `GET /hello`).

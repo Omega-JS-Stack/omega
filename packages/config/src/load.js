@@ -13,7 +13,7 @@
  *
  * "shared" = the file minus its `targets` key. A target entry may override
  * ANY shared key — same agnostic deep merge at every step (see merge.js), so
- * a per-surface sentry.dsn or analytics id is just targets.<type>.sentry.dsn.
+ * a per-surface monitoring.dsn or analytics id is just targets.<type>.monitoring.dsn.
  * Target-section keys land at the TOP LEVEL of the resolved config
  * (targets.desktop.platforms resolves to config.platforms); the merged
  * `targets` map itself is kept on the result purely so enabled-target

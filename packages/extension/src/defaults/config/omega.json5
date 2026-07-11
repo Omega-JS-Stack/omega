@@ -4,7 +4,7 @@
 // type — website, backend, extension, desktop), then a `targets` object whose KEY
 // PRESENCE says which targets this brand enables and whose values hold target-scoped
 // settings. Any shared key may also appear inside a target entry to override it for
-// that surface only (e.g. an extension-specific sentry.dsn under targets.extension).
+// that surface only (e.g. an extension-specific monitoring.dsn under targets.extension).
 //
 // Secrets NEVER live here — they live in .env. The validator hard-fails on
 // secret-shaped keys (…Secret, …privateKey).
@@ -23,7 +23,8 @@
     },
   },
 
-  sentry: {
+  monitoring: {
+    provider: 'sentry',
     dsn: '',
   },
 
@@ -38,15 +39,18 @@
     },
   },
 
-  firebaseConfig: {
-    apiKey: 'AIzaSyD1MvM-EQC_eVWqaTe5ImWALwhBr7iXgh8',
-    authDomain: 'universal-auth.itwcreativeworks.com',
-    databaseURL: 'https://itwcw-universal-auth.firebaseio.com',
-    projectId: 'itwcw-universal-auth',
-    storageBucket: 'itwcw-universal-auth.appspot.com',
-    messagingSenderId: '195162582358',
-    appId: '1:195162582358:web:6f9320c516d9ab4838baf7',
-    measurementId: 'G-W08HGRW4S',
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: 'AIzaSyD1MvM-EQC_eVWqaTe5ImWALwhBr7iXgh8',
+      authDomain: 'universal-auth.itwcreativeworks.com',
+      databaseURL: 'https://itwcw-universal-auth.firebaseio.com',
+      projectId: 'itwcw-universal-auth',
+      storageBucket: 'itwcw-universal-auth.appspot.com',
+      messagingSenderId: '195162582358',
+      appId: '1:195162582358:web:6f9320c516d9ab4838baf7',
+      measurementId: 'G-W08HGRW4S',
+    },
   },
 
   theme: {
