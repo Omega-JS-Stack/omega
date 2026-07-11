@@ -21,12 +21,12 @@
 **E. Generalized brand e2e harness** — boot-all-discovered-targets-and-wait: enumerate via manager `loadBrand` (target-typed), boot each present target (backend emulator, website build+serve; desktop/extension when present later), shared step()/logs; sandbox `run.js` becomes a consumer; consumers author their own brand-level steps. Home: devkit (runner-side, puppeteer stays in the brand's devDeps).
 **F. Lifecycle flows as browser e2e** — signed-in persona drives: cancel (paid test-processor persona, `confirmed:true` → webhook doc → status reflects), refund, delete account (fresh persona), data-request create/status/cancel. Extends the sandbox e2e steps.
 **G. /account mock removal** — delete `packages/web/core/js/pages/account/test-subscriptions/` (5 fixtures) + the `_dev_subscription` `@dev-only` block in `pages/account/index.js` (:89–:116); dev/account testing = emulator personas via B/C+D.
-**H. Contract fix** — sandbox `_init.js` stub returns `accounts: []` but `getAccountDefinitions` (:596) spreads an OBJECT keyed by id; normalize the contract (accept array-of-defs, keyed merge internally) + fix the stub.
+**H. Contract fix** — ~~normalize array-vs-object accounts~~ **ALREADY HANDLED**: `runner.js` `loadInitHooks` (:438) accepts array OR keyed object and normalizes on `id` before anything downstream sees it — the survey's note looked at `getAccountDefinitions` in isolation. No change needed.
 
 ## Checkpoint plan
 
-- **cp83**: A + B + C(sandbox `__omega` expose) + D + H — personas/tokens/seeding. Gate: backend suite (personas seed + new refunded persona tests), corpus, e2e still green.
-- **cp84**: E — harness generalization + sandbox refactor onto it. Gate: e2e 11/11 via the new harness.
+- **cp83** (SHIPPED with A + B + C): refunded persona, deterministic `TEST_ACCOUNT_PASSWORD` on every seeded persona (manual dev signin = email + known password), sandbox `__omega` exposes `signInWithCustomToken`/`getIdToken`. **D moved to cp84** — standalone-boot seeding needs the emulator-env spawn machinery and its first consumer IS the harness; building them together avoids speculative design. Gate: corpus (seeding path exercises password + new persona on every boot), e2e.
+- **cp84**: D + E — seed-on-standalone-emulator-boot + harness generalization + sandbox refactor onto it. Gate: e2e 11/11 via the new harness with harness-driven seeding.
 - **cp85**: F — lifecycle browser flows. Gate: extended e2e (signup/cancel/refund/delete/data-request steps) green.
 - **cp86**: G + docs sweep (backend test-framework doc, web README/account docs, sandbox README) + CHANGELOG. Gate: web suite; manual `?_dev_subscription` references gone.
 

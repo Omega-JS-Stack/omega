@@ -110,6 +110,10 @@ What the runner wipes pre-test (in [src/test/test-accounts.js](../src/test/test-
 
 After the flush, `test/_init.js`'s `setup()` reseeds fixtures into the empty DB.
 
+### Personas (N6)
+
+Every seeded account is a **persona** usable two ways: backend tests authenticate with its `api.privateKey` (`http.as('<id>')`), and a HUMAN or browser flow signs in with its email + the deterministic **`TEST_ACCOUNT_PASSWORD`** (`'omega-test-password'`, exported from [src/test/test-accounts.js](../src/test/test-accounts.js)) — boot the emulators, open an emulator-connected dev site, sign in as any persona. Lifecycle states are first-class personas: `basic` (free), `premium-active` (paid), `premium-cancelling`, `premium-expired`/`refunded` (cancelled; `refunded` is the post-refund-webhook end state on the `test` processor), `premium-suspended`, `delete`/`delete-by-admin`. "Unauthed" needs no persona — that's `http.as('none')` or a signed-out browser. For automated browser signin, mint a custom token for the persona's uid (admin SDK or `POST /user/token` as admin) and use the site's `?authCustomToken=` param / the client's `signInWithCustomToken`.
+
 ### Marketing-provider cleanup
 
 Test signups never reach SendGrid + Beehiiv. The validation pipeline (`src/manager/libraries/email/validation.js`) blocks all `_test.*` emails at the marketing-library layer via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`.

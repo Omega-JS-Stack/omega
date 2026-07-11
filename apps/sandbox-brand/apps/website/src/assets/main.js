@@ -62,6 +62,16 @@ window.__omega = {
     return manager.auth().signInWithEmailAndPassword(email, password)
       .then((user) => user.uid);
   },
+  // Persona signin for lifecycle e2e (N6): the driver mints a custom token for a
+  // seeded persona (admin SDK) and signs the browser in as them — same client
+  // method the real site's ?authCustomToken= param uses.
+  signInWithCustomToken(token) {
+    return manager.auth().signInWithCustomToken(token)
+      .then((user) => user.uid);
+  },
+  getIdToken() {
+    return manager.auth().getIdToken();
+  },
   signOut() {
     return manager.auth().signOut();
   },

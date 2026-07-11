@@ -1,5 +1,11 @@
 const uuid = require('uuid');
 
+// Deterministic password for EVERY seeded persona (N6) — makes manual dev signin
+// possible: boot the emulators, open an emulator-connected dev site, and sign in
+// as any persona with email + this password. Personas only ever exist in the
+// emulator (seeding wipes + recreates them), so a fixed password is safe.
+const TEST_ACCOUNT_PASSWORD = 'omega-test-password';
+
 /**
  * Resolve the first paid subscription product from config
  * Falls back to 'premium' if no config or no paid products found
@@ -107,6 +113,19 @@ const STATIC_ACCOUNTS = {
     properties: {
       roles: {},
       subscription: { product: { id: 'premium' }, status: 'active', expires: getFutureExpires(), cancellation: { pending: true } },
+    },
+  },
+  // Post-refund end state (N6 persona): the refund webhook cancels the subscription —
+  // the refund itself lives on the ORDER doc, not the user doc — so what remains is a
+  // cancelled sub on the test processor with no remaining term. "Unauthed" needs no
+  // persona: that's http.as('none') / a signed-out browser.
+  refunded: {
+    id: 'refunded',
+    uid: '_test-refunded',
+    email: '_test.refunded@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'premium', name: 'Premium' }, status: 'cancelled', expires: getPastExpires(), cancellation: { pending: false }, payment: { processor: 'test', resourceId: 'sub_test_refunded' } },
     },
   },
   delete: {
@@ -703,11 +722,12 @@ async function createAccount(admin, account) {
   const maxAttempts = 3;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    // Create Firebase Auth user - triggers auth:on-create
+    // Create Firebase Auth user - triggers auth:on-create. The deterministic
+    // password is the manual-signin surface (see TEST_ACCOUNT_PASSWORD).
     await admin.auth().createUser({
       uid: account.uid,
       email: account.email,
-      password: uuid.v4(),
+      password: TEST_ACCOUNT_PASSWORD,
       emailVerified: true,
     }).catch(async (e) => {
       // A retry may find the Auth user already present (its doc was clobbered, not the
@@ -718,7 +738,7 @@ async function createAccount(admin, account) {
         await admin.auth().createUser({
           uid: account.uid,
           email: account.email,
-          password: uuid.v4(),
+          password: TEST_ACCOUNT_PASSWORD,
           emailVerified: true,
         });
       } else {
@@ -977,6 +997,7 @@ module.exports = {
   JOURNEY_ACCOUNTS,
   TEST_ACCOUNTS,
   TEST_DATA,
+  TEST_ACCOUNT_PASSWORD,
   getFirstPaidProduct,
   getAccountDefinitions,
   fetchPrivateKeys,
