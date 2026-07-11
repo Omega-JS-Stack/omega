@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **N5 emulator-first dev SHIPPED (82)** — zero-flag emulator auto-connect (flag dead; e2e hardened + un-broken from cp74 fixture miss); N4 COMPLETE (73a–81); next: N6 personas + lifecycle e2e; CI opt-in
+- **N6 personas + lifecycle e2e — DESIGN LANDED (cp83)**: survey done, most machinery exists (55-persona catalog, as() auth, /user/token, ?authCustomToken=, test-processor webhooks); build list + cp83–86 plan in [plans/n6-personas-lifecycle-e2e.md](plans/n6-personas-lifecycle-e2e.md); implementing cp83 (personas/tokens/seed-on-emulator-boot); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
+1. N6 (IN FLIGHT — see Now): cp84 harness generalization → cp85 lifecycle flows → cp86 /account mock removal + docs
 2. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002; unified `OMEGA_LIVERELOAD_PORT` needs per-target allocation)
 3. Brand-account provisioning ownership (Ian 2026-07-10) — the 4 auto-created admin accounts (legacy `ADMIN_EMAILS` + hardcoded password formula in omega-manager's account service) become owner-defined: onboarding step + env-var passwords + company-level hooks (none exist yet) for Ian's formula; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md)
 4. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
