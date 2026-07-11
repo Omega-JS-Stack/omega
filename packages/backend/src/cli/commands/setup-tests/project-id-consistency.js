@@ -176,6 +176,17 @@ class ProjectIdConsistencyTest extends BaseTest {
         throw new Error('service-account.json has wrong project_id - download correct one from Firebase Console');
       }
     }
+
+    // Later checks read the SHARED setup context (isDemoProject gates, console
+    // URLs) — self.projectId was snapshotted from .firebaserc at boot, so a
+    // rewrite here must refresh it or a demo→real swap keeps demo semantics
+    // for the rest of the run (caught live: check 39 skipped seeding
+    // omegajs-playground because self still said demo-omega).
+    this.self.projectId = expectedProjectId;
+    this.self.projectUrl = `https://console.firebase.google.com/project/${expectedProjectId}`;
+    if (this.self.firebaseRC?.projects) {
+      this.self.firebaseRC.projects.default = expectedProjectId;
+    }
   }
 }
 

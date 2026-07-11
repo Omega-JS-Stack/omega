@@ -54,18 +54,19 @@
     languages: ["es"], // dogfood canary scope — expand at launch
   },
 
-  // Emulator-only demo project (demo-* = Firebase's offline convention) —
-  // swap for the real project when the brand goes live.
+  // REAL playground project (created 2026-07-11; console:
+  // https://console.firebase.google.com/project/omegajs-playground). Values
+  // are the web-app config verbatim — public by design. To run offline-only,
+  // temporarily set projectId back to the demo-* convention (demo-omega).
   cloud: {
     provider: "firebase",
     config: {
-      apiKey: "omega-demo-api-key",
-      authDomain: "demo-omega.firebaseapp.com",
-      projectId: "demo-omega",
-      storageBucket: "demo-omega.appspot.com",
-      messagingSenderId: "222222222222",
-      appId: "1:222222222222:web:2222222222222222222222",
-      measurementId: "G-2222222222",
+      apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
+      authDomain: "omegajs-playground.firebaseapp.com",
+      projectId: "omegajs-playground",
+      storageBucket: "omegajs-playground.firebasestorage.app",
+      messagingSenderId: "644778453321",
+      appId: "1:644778453321:web:0d4f0f8774385a21671298",
     },
   },
 
