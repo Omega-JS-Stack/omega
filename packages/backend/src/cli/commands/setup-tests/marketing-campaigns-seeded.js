@@ -9,6 +9,15 @@ class MarketingCampaignsSeededTest extends BaseTest {
   }
 
   async run() {
+    // demo-* projects are emulator-only — live Firestore doesn't exist and the
+    // generated fake service account authenticates nowhere (the first .get()
+    // threw gRPC 16 UNAUTHENTICATED and halted setup — friction #8's class).
+    // Emulator runs seed campaigns through the shared seed module at boot.
+    if (this.isDemoProject) {
+      console.log(chalk.dim(`  demo-* project (${this.self.projectId}) — live campaign seeding skipped (emulator seeds on boot)`));
+      return true;
+    }
+
     const admin = this._getAdmin();
 
     if (!admin) {
@@ -46,6 +55,10 @@ class MarketingCampaignsSeededTest extends BaseTest {
   }
 
   async fix() {
+    if (this.isDemoProject) {
+      return; // run() never fails demo projects; never touch live Firestore here
+    }
+
     const admin = this._getAdmin();
 
     if (!admin) {

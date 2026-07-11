@@ -9,6 +9,15 @@ class BaseTest {
   }
 
   /**
+   * demo-* project ids are EMULATOR-ONLY by convention — checks that touch
+   * live Firebase gate on this (there is no live project to reach).
+   * @returns {boolean}
+   */
+  get isDemoProject() {
+    return String(this.self.projectId || '').startsWith('demo-');
+  }
+
+  /**
    * Override this method in each test
    * @returns {Promise<boolean>} True if test passes, false if it fails
    */

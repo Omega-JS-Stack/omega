@@ -232,7 +232,24 @@ class SetupCommand extends BaseCommand {
     const templatesDir = path.resolve(`${__dirname}/../../../templates`);
     let touched = 0;
 
-    // .firebaserc — resolve project ID from service account or env
+    // config/omega.json5 FIRST — layer-aware (dogfood friction #1): inside a
+    // brand monorepo the app config is TARGETS-ONLY (the brand root owns the
+    // shared sections; a full template here would shadow them). Standalone
+    // consumers get the full template. Seeding before .firebaserc lets
+    // resolveProjectId() read the brand's cloud.config.projectId (friction #11:
+    // config → derived artifacts).
+    const omegaConfigPath = `${self.firebaseProjectPath}/functions/config/omega.json5`;
+    if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)) {
+      if (omegaConfig.resolveSeedMode(self.firebaseProjectPath).standalone) {
+        jetpack.copy(path.join(templatesDir, 'config', 'omega.json5'), omegaConfigPath);
+      } else {
+        jetpack.write(omegaConfigPath, omegaConfig.renderBrandAppSeed('backend'));
+      }
+      ui.status('add', `Created ${chalk.cyan('functions/config/omega.json5')}`, { level: 2 });
+      touched++;
+    }
+
+    // .firebaserc — DERIVED from the resolved config (else service account / env)
     const firebasercPath = `${self.firebaseProjectPath}/.firebaserc`;
     if (!hasContent(self.firebaseRC)) {
       const projectId = this.resolveProjectId();
@@ -250,21 +267,6 @@ class SetupCommand extends BaseCommand {
       touched++;
     }
 
-    // config/omega.json5 — layer-aware (dogfood friction #1): inside a brand
-    // monorepo the app config is TARGETS-ONLY (the brand root owns the shared
-    // sections; a full template here would shadow them). Standalone consumers
-    // get the full template.
-    const omegaConfigPath = `${self.firebaseProjectPath}/functions/config/omega.json5`;
-    if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)) {
-      if (omegaConfig.resolveSeedMode(self.firebaseProjectPath).standalone) {
-        jetpack.copy(path.join(templatesDir, 'config', 'omega.json5'), omegaConfigPath);
-      } else {
-        jetpack.write(omegaConfigPath, omegaConfig.renderBrandAppSeed('backend'));
-      }
-      ui.status('add', `Created ${chalk.cyan('functions/config/omega.json5')}`, { level: 2 });
-      touched++;
-    }
-
     // index.js — entry point for Cloud Functions
     const indexPath = `${self.firebaseProjectPath}/functions/index.js`;
     if (!jetpack.exists(indexPath)) {
@@ -274,13 +276,37 @@ class SetupCommand extends BaseCommand {
       touched++;
     }
 
+    // database.rules.json — firebase.json references it and the emulator dies
+    // ENOENT without it (friction #9). The template ships the v0.0.0-stamped
+    // marker block; the rules checks stamp the live version.
+    const databaseRulesPath = `${self.firebaseProjectPath}/database.rules.json`;
+    if (!jetpack.exists(databaseRulesPath)) {
+      jetpack.copy(path.join(templatesDir, 'database.rules.json'), databaseRulesPath);
+      ui.status('add', `Created ${chalk.cyan('database.rules.json')}`, { level: 2 });
+      touched++;
+    }
+
     return touched;
   }
 
   resolveProjectId() {
     const self = this.main;
-    const saPath = `${self.firebaseProjectPath}/functions/service-account.json`;
 
+    // The config is the source of truth (friction #11): a wizard-seeded brand
+    // carries cloud.config.projectId (demo-<id> convention) before any
+    // artifact exists — .firebaserc derives from it, never the reverse.
+    if (omegaConfig.hasOmegaConfig(self.firebaseProjectPath)) {
+      try {
+        const configured = omegaConfig.loadConfig(self.firebaseProjectPath, 'backend').config.cloud?.config?.projectId;
+        if (configured) {
+          return configured;
+        }
+      } catch (e) {
+        // Unloadable config — the omega-config check reports it
+      }
+    }
+
+    const saPath = `${self.firebaseProjectPath}/functions/service-account.json`;
     if (jetpack.exists(saPath)) {
       try {
         const sa = JSON.parse(jetpack.read(saPath));

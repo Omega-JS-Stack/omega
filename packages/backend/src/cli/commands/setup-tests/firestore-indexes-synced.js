@@ -13,6 +13,14 @@ class FirestoreIndexesSyncedTest extends BaseTest {
     const self = this.self;
     const tempPath = '_firestore.indexes.json';
 
+    // demo-* projects are emulator-only — there is no live Firestore to sync
+    // with. The old behavior hit the live API, got a 403, and the shell
+    // redirect wrote the ERROR TEXT into the json file (friction #8).
+    if (this.isDemoProject) {
+      console.log(chalk.dim(`  demo-* project (${self.projectId}) — live index sync skipped (emulator-only)`));
+      return true;
+    }
+
     const commands = require('../index');
     const IndexesCommand = commands.IndexesCommand;
     const indexesCmd = new IndexesCommand(self);
@@ -87,6 +95,10 @@ class FirestoreIndexesSyncedTest extends BaseTest {
   async fix() {
     const self = this.self;
     const filePath = `${self.firebaseProjectPath}/firestore.indexes.json`;
+
+    if (this.isDemoProject) {
+      return; // run() never fails demo projects; never touch the live API here
+    }
 
     // Fetch live indexes
     const commands = require('../index');
