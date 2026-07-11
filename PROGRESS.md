@@ -12,7 +12,6 @@
 5. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
-- electron-manager@1.12.1/1.13.0 publish — code review DONE (dirty edits + recent commits verified folded, cp65/66); the ONLY open piece is publishing from the legacy repo, now consciously deferred under the long release gate below (accepted: fresh `electron-manager@1.12.0` installs stay broken until then)
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
 - Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go — a LONG way out ("everything good across the board" first)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in the web package). MAM parked entirely.
