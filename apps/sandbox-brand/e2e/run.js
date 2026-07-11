@@ -1,203 +1,30 @@
 /**
- * Cross-stack e2e harness for the sandbox brand — `npm test` at the brand root.
+ * Cross-stack e2e for the sandbox brand — `npm test` at the brand root.
  *
- * Boots the REAL stack, nothing mocked:
- *   1. builds apps/website (esbuild bundle embedding @omega.js/client)
- *   2. boots @omega.js/backend's Firebase emulator suite for apps/backend
- *      (functions, firestore, auth, database, hosting, pubsub — `npx omega emulator`)
- *   3. serves the built website statically
- *   4. drives a real Chromium (puppeteer) through the frontend↔backend contract:
- *      signup → @omega.js/backend auth onCreate creates the user doc → signout → signin →
- *      session persistence across reload → subscription resolution
- *
- * This is the brand-monorepo `npm test` contract from the redesign plan; the
- * `omega e2e` CLI grows from this harness once there is a second consumer.
+ * Uses the shared e2e harness from @omega.js/devkit for infrastructure
+ * (emulator boot + persona seeding, website build + serve) and provides
+ * brand-specific browser steps via puppeteer.
  */
 const path = require('path');
-const fs = require('fs');
-const http = require('http');
-const net = require('net');
-const { spawn } = require('child_process');
+const { E2eHarness } = require('@omega.js/devkit/test/e2e-harness');
 
 const BRAND_ROOT = path.join(__dirname, '..');
-const WEBSITE_DIR = path.join(BRAND_ROOT, 'apps', 'website');
-const WEBSITE_DIST = path.join(WEBSITE_DIR, 'dist');
-const BACKEND_FUNCTIONS = path.join(BRAND_ROOT, 'apps', 'backend', 'functions');
-const LOG_DIR = path.join(__dirname, '.logs');
-const EMULATOR_LOG = path.join(LOG_DIR, 'emulator.log');
-const PAGE_LOG = path.join(LOG_DIR, 'page.log');
-
-const SITE_PORT = 4600;
-// @omega.js/backend only supports the default emulator ports (Manager.getApiUrl()/getFunctionsUrl()
-// hardcode them) — so the harness requires them free rather than picking random ones.
-const EMULATOR_PORTS = [9099, 5001, 8080, 5002];
-const EMULATOR_READY_TIMEOUT = 180000;
 const DOC_CREATE_TIMEOUT = 90000;
 
 const EMAIL = `e2e-${Date.now()}@sandbox-brand.example.com`;
 const PASSWORD = 'sandbox-password-123';
 
-const CONTENT_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json',
-  '.map': 'application/json',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-};
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Resolves true if something is already listening on the port
-function isPortBusy(port) {
-  return new Promise((resolve) => {
-    const socket = net.connect({ port, host: '127.0.0.1' });
-    socket.once('connect', () => { socket.destroy(); resolve(true); });
-    socket.once('error', () => resolve(false));
-  });
-}
-
-// --- Emulator lifecycle ------------------------------------------------------
-
-function startEmulator() {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
-  const logStream = fs.createWriteStream(EMULATOR_LOG);
-
-  // detached → own process group, so teardown can SIGINT npx + mgr + firebase-tools together
-  const child = spawn('npx', ['mgr', 'emulator'], {
-    cwd: BACKEND_FUNCTIONS,
-    env: { ...process.env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-  });
-
-  const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`emulator not ready after ${EMULATOR_READY_TIMEOUT / 1000}s (log: ${EMULATOR_LOG})`));
-    }, EMULATOR_READY_TIMEOUT);
-
-    const watch = (chunk) => {
-      const text = chunk.toString();
-      logStream.write(text);
-      if (/All emulators ready/i.test(text)) {
-        clearTimeout(timer);
-        resolve();
-      }
-    };
-
-    child.stdout.on('data', watch);
-    child.stderr.on('data', watch);
-    child.on('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`emulator exited early (code ${code}, log: ${EMULATOR_LOG})`));
-    });
-  });
-
-  return { child, ready };
-}
-
-async function stopEmulator(child) {
-  if (!child || child.exitCode !== null) {
-    return;
-  }
-
-  const exited = new Promise((resolve) => child.once('exit', resolve));
-
-  try {
-    process.kill(-child.pid, 'SIGINT');
-  } catch (error) {
-    return;
-  }
-
-  const result = await Promise.race([exited.then(() => 'clean'), sleep(20000)]);
-  if (result !== 'clean') {
-    try { process.kill(-child.pid, 'SIGKILL'); } catch (error) { /* already gone */ }
-  }
-}
-
-// --- Static site server ------------------------------------------------------
-
-function startSiteServer() {
-  const server = http.createServer((request, response) => {
-    const urlPath = new URL(request.url, `http://localhost:${SITE_PORT}`).pathname;
-    const relative = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
-    const filePath = path.normalize(path.join(WEBSITE_DIST, relative));
-
-    if (!filePath.startsWith(WEBSITE_DIST) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-      response.writeHead(404);
-      response.end('Not found');
-      return;
-    }
-
-    response.writeHead(200, { 'Content-Type': CONTENT_TYPES[path.extname(filePath)] || 'application/octet-stream' });
-    fs.createReadStream(filePath).pipe(response);
-  });
-
-  return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(SITE_PORT, () => resolve(server));
-  });
-}
-
-// --- Flow --------------------------------------------------------------------
-
 async function main() {
-  console.log('\nSandbox brand cross-stack e2e');
-  console.log(`  site: http://localhost:${SITE_PORT}  |  user: ${EMAIL}\n`);
-
-  const failures = [];
-  let emulator = null;
-  let server = null;
+  const harness = new E2eHarness(BRAND_ROOT);
   let browser = null;
-  const pageConsole = [];
 
-  const step = async (name, fn) => {
-    try {
-      const detail = await fn();
-      console.log(`  ✓ ${name}${detail ? ` (${detail})` : ''}`);
-    } catch (error) {
-      failures.push({ name, error });
-      console.log(`  ✗ ${name}\n      ${error.message}`);
-      throw error;
-    }
-  };
+  console.log('\nSandbox brand cross-stack e2e');
+  console.log(`  site: ${harness.siteUrl}  |  user: ${EMAIL}\n`);
 
   try {
-    await step('website builds', async () => {
-      await require(path.join(WEBSITE_DIR, 'build.js'))();
-    });
-
-    await step('emulator ports free (@omega.js/backend requires default ports)', async () => {
-      for (const port of EMULATOR_PORTS) {
-        if (await isPortBusy(port)) {
-          throw new Error(`port ${port} is already in use — is another emulator running?`);
-        }
-      }
-      if (await isPortBusy(SITE_PORT)) {
-        throw new Error(`site port ${SITE_PORT} is already in use`);
-      }
-    });
-
-    await step('emulator boots (functions, firestore, auth, database, hosting, pubsub)', async () => {
-      emulator = startEmulator();
-      await emulator.ready;
-      return `log: ${path.relative(BRAND_ROOT, EMULATOR_LOG)}`;
-    });
-
-    await step('website serves', async () => {
-      server = await startSiteServer();
-      const body = await new Promise((resolve, reject) => {
-        http.get(`http://localhost:${SITE_PORT}/`, (response) => {
-          let data = '';
-          response.on('data', (chunk) => { data += chunk; });
-          response.on('end', () => resolve(data));
-        }).on('error', reject);
-      });
-      if (!body.includes('Sandbox Brand')) {
-        throw new Error('served page does not look like the sandbox site');
-      }
-    });
+    await harness.boot();
 
     const puppeteer = require('puppeteer');
     browser = await puppeteer.launch({
@@ -205,28 +32,23 @@ async function main() {
       args: process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : [],
     });
     const page = await browser.newPage();
-    page.on('console', (message) => pageConsole.push(`[${message.type()}] ${message.text()}`));
-    page.on('pageerror', (error) => pageConsole.push(`[pageerror] ${error.message}`));
+    harness.capturePageConsole(page);
 
-    await step('page boots @omega.js/client against the emulators', async () => {
-      await page.goto(`http://localhost:${SITE_PORT}/`, { waitUntil: 'load' });
+    await harness.step('page boots @omega.js/client against the emulators', async () => {
+      await page.goto(`${harness.siteUrl}/`, { waitUntil: 'load' });
       await page.waitForFunction('window.__omega && (window.__omega.isReady || window.__omega.initError)', { timeout: 30000 });
       const initError = await page.evaluate(() => window.__omega.initError);
       if (initError) {
         throw new Error(`@omega.js/client initialize failed: ${initError}`);
       }
-      // isReady alone is too weak — the client resolves ready even when Firebase
-      // init is skipped (that hole hid the cp74 firebaseConfig→cloud.config fixture
-      // miss). The emulator connect line is the real "against the emulators" proof:
-      // environment=development must auto-connect with zero flags (N5).
-      if (!pageConsole.some((line) => line.includes('[Firebase] Emulators connected'))) {
+      if (!harness.pageConsole.some((line) => line.includes('[Firebase] Emulators connected'))) {
         throw new Error('client did not auto-connect to the emulators (dev mode must connect with zero flags — check [Firebase] lines in page.log)');
       }
     });
 
     let uid = null;
 
-    await step('signup creates the auth user', async () => {
+    await harness.step('signup creates the auth user', async () => {
       uid = await page.evaluate(
         (email, password) => window.__omega.signUp(email, password),
         EMAIL, PASSWORD,
@@ -237,10 +59,7 @@ async function main() {
       return `uid: ${uid}`;
     });
 
-    await step('@omega.js/backend auth onCreate creates the Firestore user doc', async () => {
-      // The frontend resolver (@omega.js/account with no generators) leaves
-      // api.clientId null — it's only non-null when the account read hits the
-      // REAL doc @omega.js/backend's trigger wrote (the backend generates the $uuid).
+    await harness.step('@omega.js/backend auth onCreate creates the Firestore user doc', async () => {
       const deadline = Date.now() + DOC_CREATE_TIMEOUT;
       let last = null;
       while (Date.now() < deadline) {
@@ -259,7 +78,7 @@ async function main() {
       throw new Error(`user doc not created within ${DOC_CREATE_TIMEOUT / 1000}s (last state: ${JSON.stringify(last)})`);
     });
 
-    await step('sign out', async () => {
+    await harness.step('sign out', async () => {
       await page.evaluate(() => window.__omega.signOut());
       const user = await page.evaluate(() => window.__omega.currentUser());
       if (user) {
@@ -267,7 +86,7 @@ async function main() {
       }
     });
 
-    await step('sign in via @omega.js/client', async () => {
+    await harness.step('sign in via @omega.js/client', async () => {
       const signedInUid = await page.evaluate(
         (email, password) => window.__omega.signIn(email, password),
         EMAIL, PASSWORD,
@@ -277,7 +96,7 @@ async function main() {
       }
     });
 
-    await step('session persists across reload', async () => {
+    await harness.step('session persists across reload', async () => {
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction('window.__omega && (window.__omega.isReady || window.__omega.initError)', { timeout: 30000 });
       const state = await page.evaluate(() => window.__omega.authState().then((s) => ({
@@ -292,15 +111,13 @@ async function main() {
       }
     });
 
-    await step('subscription resolves for a fresh user', async () => {
+    await harness.step('subscription resolves for a fresh user', async () => {
       const resolved = await page.evaluate(() => window.__omega.authState().then((s) => ({
         email: s.account.auth.email,
         plan: s.resolved.plan,
         active: s.resolved.active,
         everPaid: s.resolved.everPaid,
       })));
-      // everPaid must be exactly false (not undefined) — proves the shared
-      // @omega.js/account resolveSubscription is the one running in the bundle
       if (resolved.email !== EMAIL || resolved.plan !== 'basic' || resolved.active !== false || resolved.everPaid !== false) {
         throw new Error(`unexpected resolved state: ${JSON.stringify(resolved)}`);
       }
@@ -309,26 +126,13 @@ async function main() {
   } catch (error) {
     // step() already reported it; fall through to teardown
   } finally {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-    fs.writeFileSync(PAGE_LOG, pageConsole.join('\n') + '\n');
-
     if (browser) {
       await browser.close().catch(() => {});
     }
-    if (server) {
-      server.close();
-    }
-    if (emulator) {
-      await stopEmulator(emulator.child);
-    }
+    await harness.teardown();
   }
 
-  if (failures.length) {
-    console.log(`\n  ${failures.length} step(s) failed — logs: ${path.relative(BRAND_ROOT, LOG_DIR)}/\n`);
-    process.exit(1);
-  }
-
-  console.log('\n  Cross-stack e2e PASSED\n');
+  harness.exit();
 }
 
 main().catch((error) => {

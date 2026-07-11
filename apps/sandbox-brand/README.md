@@ -32,13 +32,17 @@ is continuously dogfooded.
 
 ## Cross-stack e2e (`npm test` at the brand root)
 
-`e2e/run.js` boots the REAL stack — the backend's Firebase emulator suite +
-the built website served statically — and drives a real Chromium (puppeteer)
-through the frontend↔backend contract: signup → @omega.js/backend `auth onCreate` creates
-the Firestore user doc → signout → signin via @omega.js/client → session
-persistence across reload → subscription resolution. Nothing is mocked; this
-is the brand-monorepo `npm test` contract from the redesign plan (the
-`omega e2e` CLI grows from this harness).
+`e2e/run.js` is a consumer of the **shared brand e2e harness**
+(`@omega.js/devkit/test/e2e-harness`), which owns the infrastructure: target
+discovery (`apps/backend` + `apps/website`), website build + static serve,
+emulator boot **with persona seeding** (the harness waits for the post-seed
+ready marker so browser steps never race the seed wipe), step/teardown/log
+plumbing. This file authors only the brand-specific browser steps — a real
+Chromium (puppeteer) driven through the frontend↔backend contract: signup →
+@omega.js/backend `auth onCreate` creates the Firestore user doc → signout →
+signin via @omega.js/client → session persistence across reload → subscription
+resolution. Nothing is mocked; this is the brand-monorepo `npm test` contract
+from the redesign plan.
 
 Failure logs land in `e2e/.logs/` (emulator output + page console).
 

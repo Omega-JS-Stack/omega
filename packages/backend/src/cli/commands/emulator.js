@@ -10,6 +10,7 @@ const { DEFAULT_EMULATOR_PORTS } = require('./setup-tests/emulator-config');
 const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warning');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
 const { ensurePublicFiles } = require('../utils/public-files');
+const { seed } = require('../../test/seed.js');
 
 // Used by both `npx omega emulator` and `npx omega test` auto-start path.
 // Note: `emulators:start` enables the UI by default (controlled by firebase.json's
@@ -54,8 +55,19 @@ class EmulatorCommand extends BaseCommand {
     // Keep-alive: boot emulators and wait for Ctrl+C. No "command" subprocess —
     // the emulator child IS the foreground process from the user's perspective.
     try {
-      const { shutdown, exitPromise } = await this.startEmulators();
+      const { shutdown, emulatorPorts, exitPromise } = await this.startEmulators();
 
+      // Seed personas unless --no-seed was passed (yargs boolean negation:
+      // `--no-seed` parses as argv.seed === false). seedPersonas is fully
+      // non-fatal — any failure logs a warning and the emulator keeps running.
+      if (this.argv.seed !== false) {
+        await this.seedPersonas(emulatorPorts);
+      }
+
+      // NOTE: this line is a readiness MARKER for external drivers (the devkit
+      // e2e harness waits for it) — it must print AFTER seeding so drivers
+      // don't race the seed wipe. Change the text in lockstep with
+      // @omega.js/devkit/test/e2e-harness.js.
       this.log(chalk.gray('\n  Emulator ready. Press Ctrl+C to shut down...\n'));
 
       // Synchronous SIGINT handler — must NOT be async. In Node, registering any
@@ -91,6 +103,73 @@ class EmulatorCommand extends BaseCommand {
     } catch (error) {
       this.logError(`Emulator error: ${error.message || error}`);
       process.exit(1);
+    }
+  }
+
+  /**
+   * Seed the running emulator with test personas so a developer can sign in
+   * manually on any emulator-connected dev site (email + TEST_ACCOUNT_PASSWORD).
+   * Fully non-fatal — the ENTIRE body is guarded; any failure (config load,
+   * firebase-admin init, account creation) logs a warning and the emulator
+   * keeps running. execute()'s catch would otherwise process.exit(1).
+   */
+  async seedPersonas(emulatorPorts) {
+    try {
+      this.log(chalk.cyan('\n  Seeding test personas...\n'));
+
+      const projectDir = this.main.firebaseProjectPath;
+      const functionsDir = path.join(projectDir, 'functions');
+
+      // Load project config (same pattern as test.js loadProjectConfig)
+      const { hasOmegaConfig, loadConfig, loadEnv } = require('@omega.js/config');
+      loadEnv(functionsDir);
+
+      let config = {};
+      let domain = '';
+      if (hasOmegaConfig(functionsDir)) {
+        config = loadConfig(functionsDir, 'backend').config;
+        const contactEmail = config.brand?.contact?.email || '';
+        domain = contactEmail.includes('@') ? contactEmail.split('@')[1] : '';
+      }
+
+      // Persona emails are `_test.<id>@{domain}` — without a domain every
+      // createUser call fails with an invalid email. Skip cleanly instead.
+      if (!domain) {
+        this.logWarning('Skipping persona seeding: no brand.contact.email in config/omega.json5 (personas need a domain for their emails)');
+        return;
+      }
+
+      // Point firebase-admin at the emulators. Set AFTER the firebase child was
+      // spawned, so only THIS process (and the seed module's emulator-only
+      // guards) see them — the emulator child's env is unaffected.
+      process.env.FIRESTORE_EMULATOR_HOST = `127.0.0.1:${emulatorPorts.firestore}`;
+      process.env.FIREBASE_AUTH_EMULATOR_HOST = `127.0.0.1:${emulatorPorts.auth}`;
+      process.env.GCLOUD_PROJECT = config.cloud?.config?.projectId || 'demo-test';
+
+      const firebaseAdmin = require('firebase-admin');
+      if (firebaseAdmin.apps.length === 0) {
+        firebaseAdmin.initializeApp({
+          projectId: process.env.GCLOUD_PROJECT,
+        });
+      }
+
+      const { TEST_ACCOUNT_PASSWORD } = require('../../test/test-accounts.js');
+      const result = await seed({
+        admin: firebaseAdmin,
+        domain,
+        config,
+        projectDir,
+      });
+
+      if (result.accounts) {
+        this.log(chalk.green(`\n  ✓ Personas seeded (${result.created} accounts)`));
+        this.log(chalk.gray(`    Sign in on any emulator-connected dev site with email + password: ${TEST_ACCOUNT_PASSWORD}\n`));
+      } else {
+        this.logWarning('Persona seeding completed with errors (see above)');
+      }
+    } catch (e) {
+      this.logWarning(`Persona seeding failed: ${e.message}`);
+      this.log(chalk.gray('    The emulator is still running — seeding is non-fatal. Re-run with --no-seed to skip.\n'));
     }
   }
 

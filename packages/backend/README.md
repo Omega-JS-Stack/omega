@@ -845,6 +845,8 @@ npx omega test      # Terminal 2 - runs tests
 npx omega test
 ```
 
+`npx omega emulator` **seeds the test personas on boot** (same wipe-and-create pass the test runner uses), so an emulator-connected dev site is signin-able immediately — any persona email + the deterministic `TEST_ACCOUNT_PASSWORD` (`omega-test-password`). Pass `--no-seed` to boot without seeding. Seeding is non-fatal: if it fails (e.g. missing config), the emulator keeps running. See [docs/test-framework.md](docs/test-framework.md#personas-n6).
+
 ### Extended Mode (real APIs)
 
 Pass `--extended` (or set `TEST_EXTENDED_MODE=true`) on the **test command** to opt into real external API calls (SendGrid, Beehiiv, Stripe webhook handlers, marketing libraries). `--extended` is the CLI shorthand for the shared, unprefixed `TEST_EXTENDED_MODE` env var standardized across @omega.js/backend/BXM/UJM/EM — the two forms are equivalent. The mode flows automatically to BOTH the test-runner subprocess and the running emulator (via `<projectRoot>/.temp/test-mode.json`) — no need to set it on the emulator too:

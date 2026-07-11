@@ -5,7 +5,7 @@ const path = require('path');
 // extended='project:foo' with NO targets, silently running EVERYTHING in
 // extended mode against real external APIs).
 const argv = require('yargs')(process.argv.slice(2))
-  .boolean(['extended', 'legacy', 'force', 'raw', 'emulator'])
+  .boolean(['extended', 'legacy', 'force', 'raw', 'emulator', 'seed'])
   .argv;
 const _ = require('lodash');
 

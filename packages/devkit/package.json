@@ -21,6 +21,7 @@
     "./test/assert": "./src/test/assert.js",
     "./test/extended-mode-warning": "./src/test/extended-mode-warning.js",
     "./test/prompt-streams": "./src/test/prompt-streams.js",
+    "./test/e2e-harness": "./src/test/e2e-harness.js",
     "./vendor": "./tools/vendor.js",
     "./omega-bin": "./src/omega-bin.js"
   },
