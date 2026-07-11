@@ -26,7 +26,7 @@ const jetpack = require('fs-jetpack');
 const { input, select, checkbox, confirm, isInteractive } = require('@omega.js/devkit/prompt');
 const { TARGETS, hasOmegaConfig } = require('@omega.js/config');
 
-const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('./config.js');
+const { TARGET_APP_DIRS, TARGET_FRAMEWORKS, DEFAULTS } = require('./config.js');
 const { DEFAULT_BRAND_ROOTS, resolveManageRoot, readRawConfig, stampCompanyMarker } = require('./lib/company.js');
 const { loadBrand } = require('./lib/brand.js');
 const { buildScaffoldPlan, applyScaffoldPlan } = require('./lib/scaffold.js');
@@ -90,11 +90,67 @@ function parseTargetsFlag(value) {
 }
 
 /**
+ * The admin-account list a fresh brand would inherit without writing
+ * anything: the company config's account.admins when onboarding into a
+ * company workspace, else the manager's built-in default.
+ */
+function inheritedAdmins(companyRoot) {
+  const companyAdmins = companyRoot ? readRawConfig(companyRoot)?.account?.admins : null;
+
+  return Array.isArray(companyAdmins) && companyAdmins.length > 0
+    ? { list: companyAdmins, source: 'company config' }
+    : { list: DEFAULTS.account.admins, source: 'built-in default' };
+}
+
+/**
+ * The accounts step: show the list the brand inherits and let the owner
+ * keep it (nothing written — the source layer keeps owning it) or define
+ * the brand's own, which lands as account.admins in its omega.json5.
+ *
+ * @returns {Array|null} Customized entries, or null to inherit
+ */
+async function collectAccountAdmins(inherited, interactive) {
+  if (!interactive) {
+    return null;
+  }
+
+  console.log('');
+  console.log(`  Managed accounts the brand inherits ${chalk.dim(`(${inherited.source})`)}:`);
+  for (const entry of inherited.list) {
+    const flags = [entry.account && 'account', entry.marketing && 'marketing'].filter(Boolean).join(' + ');
+    console.log(`    ${chalk.dim('•')} ${chalk.cyan(entry.email)} ${chalk.dim(`(${flags || 'nothing managed'})`)}`);
+  }
+
+  const keep = await confirm({
+    message: 'Keep this account list? (customizing writes account.admins into the brand config)',
+    default: true,
+  });
+  if (keep) {
+    return null;
+  }
+
+  const entries = [];
+  do {
+    const email = (await input({
+      message: `Account email (${'{domain}'} = brand domain):`,
+      ...(entries.length === 0 ? { default: 'support@{domain}' } : {}),
+      validate: (value) => (value.trim().includes('@') ? true : 'Must be an email address'),
+    })).trim();
+    const account = await confirm({ message: 'Manage the Firebase Auth account (create + admin role + top plan)?', default: true });
+    const marketing = await confirm({ message: 'Sync the contact to marketing providers?', default: true });
+    entries.push({ email, account, marketing });
+  } while (await confirm({ message: 'Add another account?', default: false }));
+
+  return entries;
+}
+
+/**
  * Collect the wizard answers for a FRESH brand: flags win, prompts fill the
  * gaps interactively, derivation covers the rest. `defaultId` comes from the
- * in-place directory name (null in company mode).
+ * in-place directory name (null in company mode); `companyRoot` (when
+ * onboarding into a company workspace) supplies the inherited account list.
  */
-async function collectAnswers(options, defaultId, interactive) {
+async function collectAnswers(options, defaultId, interactive, companyRoot = null) {
   // id — the only field with no universal derivation
   let id = options.id ?? null;
   if (id != null && !ID_PATTERN.test(String(id))) {
@@ -168,6 +224,10 @@ async function collectAnswers(options, defaultId, interactive) {
       : DEFAULT_TARGETS;
   }
 
+  // accounts — inherit by default (null writes nothing); customizing lands
+  // the brand's own account.admins
+  const accountAdmins = await collectAccountAdmins(inheritedAdmins(companyRoot), interactive);
+
   return {
     id,
     name,
@@ -176,6 +236,7 @@ async function collectAnswers(options, defaultId, interactive) {
     tagline: tagline || null,
     email: deriveEmail(url),
     targets,
+    accountAdmins,
   };
 }
 
@@ -287,7 +348,7 @@ async function runOnboard(cwd, options = {}) {
     console.log(`${chalk.dim('→')} Company workspace: ${chalk.cyan(companyRoot)}`);
 
     const brandsDir = await resolveCompanyBrandsDir(companyRoot, interactive);
-    answers = await collectAnswers(options, null, interactive);
+    answers = await collectAnswers(options, null, interactive, companyRoot);
     brandRoot = path.join(brandsDir, answers.id);
 
     if (hasOmegaConfig(brandRoot)) {

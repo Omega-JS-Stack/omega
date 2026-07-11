@@ -1,6 +1,7 @@
 /**
  * Ensure the configured admin accounts exist in Firebase Auth with the
- * derived passwords, carry roles.admin + the highest plan on their
+ * resolved passwords (env var → owner hook → seed derivation, see
+ * lib/resolve-password.js), carry roles.admin + the highest plan on their
  * Firestore user doc, and — the audit — that NO other user holds
  * roles.admin. Unauthorized admins fail the service.
  *
@@ -13,10 +14,8 @@
  */
 const chalk = require('chalk').default;
 
-const { derivePassword } = require('../lib/password.js');
-
 module.exports = async function ensureUsers(context) {
-  const { authAdmin, firestore, accountBackend, admins, domain, apiKey, passwordSeed, brandConfig, options } = context;
+  const { authAdmin, firestore, accountBackend, admins, domain, apiKey, resolvePassword, brandConfig, options } = context;
   const dryRun = options?.dryRun || false;
 
   const counts = { ok: 0, created: 0, updated: 0, adminUpdated: 0, planned: 0, marketingSynced: 0 };
@@ -44,18 +43,21 @@ module.exports = async function ensureUsers(context) {
       continue;
     }
 
-    const password = passwordSeed ? derivePassword(passwordSeed, email, domain) : null;
+    // password null only in a dry run whose seed doesn't exist yet; the
+    // via-marker calls out the non-default channels (env pin, owner hook)
+    const { password, source } = await resolvePassword(email);
+    const via = source && source !== 'seed' ? ` ${chalk.dim(`· via ${source}`)}` : '';
     const user = await authAdmin.getUserByEmail(email);
 
     if (!user) {
       if (dryRun) {
-        console.log(`    ${label} ${chalk.cyan('[DRY RUN]')} Would create ${chalk.cyan(email)} + admin role + signup call`);
+        console.log(`    ${label} ${chalk.cyan('[DRY RUN]')} Would create ${chalk.cyan(email)} + admin role + signup call${via}`);
         counts.planned++;
         continue;
       }
 
       const created = await authAdmin.createUser({ email, password });
-      console.log(`    ${label} ${chalk.green('✓')} ${chalk.cyan(email)} ${chalk.dim(created.uid)} — account created`);
+      console.log(`    ${label} ${chalk.green('✓')} ${chalk.cyan(email)} ${chalk.dim(created.uid)} — account created${via}`);
       console.log(`      ${chalk.red('✗')} Google provider not linked`);
       counts.created++;
 
@@ -84,14 +86,14 @@ module.exports = async function ensureUsers(context) {
       console.log(`    ${label} ${chalk.cyan('[DRY RUN]')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — would set password (seed pending)`);
       counts.planned++;
     } else if (await accountBackend.verifyPassword(email, password)) {
-      console.log(`    ${label} ${chalk.green('✓')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — password OK`);
+      console.log(`    ${label} ${chalk.green('✓')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — password OK${via}`);
       counts.ok++;
     } else if (dryRun) {
-      console.log(`    ${label} ${chalk.cyan('[DRY RUN]')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — would update password`);
+      console.log(`    ${label} ${chalk.cyan('[DRY RUN]')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — would update password${via}`);
       counts.planned++;
     } else {
       await authAdmin.updateUser(user.uid, { password });
-      console.log(`    ${label} ${chalk.green('✓')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — password updated`);
+      console.log(`    ${label} ${chalk.green('✓')} ${chalk.cyan(email)} ${chalk.dim(user.uid)} — password updated${via}`);
       counts.updated++;
     }
 

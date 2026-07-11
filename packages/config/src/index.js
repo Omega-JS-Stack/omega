@@ -26,6 +26,7 @@ const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, COMPANY_MARKER } = require('./env.js');
 const { applyConfigEdits, writeConfigValues } = require('./edit.js');
+const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
 const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, envName, portsToEnv, envPort } = require('./ports.js');
 
@@ -50,6 +51,10 @@ module.exports = {
   // Writeback (comment-preserving edits)
   applyConfigEdits,
   writeConfigValues,
+
+  // Owner hooks (.omega/hooks/<call-site>.js — brand root, then company root)
+  resolveHook,
+  loadHook,
 
   // Template surface
   toSiteGlobal,

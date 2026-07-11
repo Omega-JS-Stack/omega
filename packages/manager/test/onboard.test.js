@@ -186,6 +186,7 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     await tty.answer('Brand description', 'A wizard-made brand\r');
     await tty.answer('Brand tagline', '\r');                  // empty → omitted
     await tty.answer('Targets (', '\r');                      // accept checked defaults: web + backend
+    await tty.answer('Keep this account list?', '\r');        // inherit → nothing written
     await tty.answer('Run manage now?', 'n\r');
 
     const report = await run;
@@ -201,6 +202,36 @@ test('interactive: the full wizard — typed id, accepted defaults, checkbox tar
     assert.equal(config.brand.description, 'A wizard-made brand');
     assert.ok(!('tagline' in config.brand));
     assert.deepEqual(Object.keys(config.targets), ['web', 'backend']);
+    // Inherited account list stays unwritten — the source layer keeps owning it
+    assert.ok(!('account' in config));
+  } finally {
+    tty.close();
+  }
+});
+
+test('interactive: customizing the account list writes account.admins into the brand config', async () => {
+  const root = tempDir();
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runOnboard(root, { id: 'accounts-brand', name: 'Accounts Brand', url: 'https://accountsbrand.com', targets: 'web,backend' });
+
+    await tty.answer('Brand description', '\r');
+    await tty.answer('Brand tagline', '\r');
+    await tty.answer('Keep this account list?', 'n\r');
+    await tty.answer('Account email', 'boss@{domain}\r');
+    await tty.answer('Manage the Firebase Auth account', '\r');   // yes (default)
+    await tty.answer('Sync the contact to marketing providers?', 'n\r');
+    await tty.answer('Add another account?', '\r');               // no (default)
+    await tty.answer('Run manage now?', 'n\r');
+
+    const report = await run;
+    assert.equal(report.valid, true);
+
+    const config = readConfig(root);
+    assert.deepEqual(config.account, {
+      admins: [{ email: 'boss@{domain}', account: true, marketing: false }],
+    });
   } finally {
     tty.close();
   }

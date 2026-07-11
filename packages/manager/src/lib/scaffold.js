@@ -74,6 +74,26 @@ function renderOmegaConfig(answers) {
     '    appearance: "system", // "system" | "light" | "dark"',
     '  },',
     '',
+  );
+
+  // Only a CUSTOMIZED admin list lands here — an inherited one (company
+  // config or the built-in support@{domain} default) stays unwritten so the
+  // source layer keeps owning it.
+  if (answers.accountAdmins) {
+    lines.push(
+      '  // Managed Firebase Auth accounts (account service). Passwords never live',
+      '  // here — OMEGA_ACCOUNT_PASSWORD__* env vars, .omega/hooks/account/password.js,',
+      '  // or the generated ACCOUNT_PASSWORD_SEED.',
+      '  account: {',
+      '    admins: [',
+    );
+    for (const entry of answers.accountAdmins) {
+      lines.push(`      { email: ${JSON.stringify(entry.email)}, account: ${!!entry.account}, marketing: ${!!entry.marketing} },`);
+    }
+    lines.push('    ],', '  },', '');
+  }
+
+  lines.push(
     '  // Key presence = target enabled; the value is that target\'s type-wide',
     '  // config (any shared key inside overrides it for that surface).',
     '  targets: {',

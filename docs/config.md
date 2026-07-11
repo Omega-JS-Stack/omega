@@ -103,6 +103,29 @@ company .env ← brand .env ← app .env ← shell env
 - Missing files and unreadable/stale markers skip silently — `loadEnv` never throws for
   an absent layer.
 
+## Owner hooks (`.omega/hooks/`) — cp91
+
+`src/hooks.js` — owner-supplied code the frameworks call at named hook points, so
+company-specific logic lives in the OWNER'S tree, never in framework source. Layout is
+**nested, mirroring the call site** (Ian's directive): the account service's password
+step loads `.omega/hooks/account/password.js`; a future onboarding hook would live under
+`.omega/hooks/onboard/…` — one file per hook point, path = the invoking structure.
+
+- **Resolution order**: the brand root's own `.omega/hooks/<point>.js`, else the company
+  root's (via the `.omega/company.json` stamp) — a company-wide hook covers every brand,
+  a single brand can still override it.
+- **Contract**: plain CJS, `module.exports = ({ … }) => …` (async fine). Each call site
+  documents its hook's signature/return. Absent hook → `loadHook` returns null and the
+  caller uses its default behavior; a hook that EXISTS but is broken (unloadable,
+  non-function export, bad return) throws — an owner who wrote a hook never gets silent
+  fallback.
+- **First (and so far only) hook point**: `account/password` —
+  `({ email, domain, apex, brand }) => password` (string ≥ 6 chars), letting a company
+  formula generate per-brand passwords without ever living in a repo the framework ships.
+- **Gitignored by default**: hooks are secret-adjacent code, and `.omega/` is ignored
+  like `.env`. To version hooks in a private repo, swap the ignore for `.omega/*` +
+  `!.omega/hooks/`.
+
 ## Port auto-allocation (N7)
 
 `src/ports.js` — classic defaults, probe at boot, per-port +1 bump only when taken, so
@@ -309,6 +332,8 @@ const {
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip
   readCompanyRoot,     // (brandRoot) → company root | null (.omega/company.json)
   COMPANY_MARKER,      // '.omega/company.json'
+  resolveHook,         // (startRoot, 'account/password') → hook file | null (brand → company)
+  loadHook,            // (startRoot, hookPath) → { fn, file } | null — broken hooks THROW
   validateConfig,      // (config, { target }?) → { errors }
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block

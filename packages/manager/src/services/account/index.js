@@ -7,52 +7,25 @@
  *
  * De-ITW'd from omega-manager: the account list was the hardcoded company
  * ADMIN_EMAILS in config.js (personal Gmail addresses) — the port reads
- * account.admins from config, defaulting to support@{domain} only. The
- * password formula was a company-specific scheme in code — the port derives
- * passwords via HMAC from ACCOUNT_PASSWORD_SEED (brand .env,
- * auto-generated + persisted on first real run). firebase-admin is
- * replaced by the Identity Toolkit REST API + FirestoreREST over the
- * brand's own service account.
+ * account.admins from config, defaulting to support@{domain} only (a
+ * company's own list lives in its company omega.json5 and replaces the
+ * default whole). The password formula was a company-specific scheme in
+ * code — passwords now resolve per account through the owner channels
+ * (OMEGA_ACCOUNT_PASSWORD__* env var → .omega/hooks/account/password.js →
+ * lazy ACCOUNT_PASSWORD_SEED derivation; see lib/resolve-password.js).
+ * firebase-admin is replaced by the Identity Toolkit REST API +
+ * FirestoreREST over the brand's own service account.
  */
 const { join } = require('node:path');
-const { randomBytes } = require('node:crypto');
 const jetpack = require('fs-jetpack');
-const chalk = require('chalk').default;
 
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { writeEnvValue } = require('../../lib/env-secret.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../lib/auth-admin.js');
 const { createBackendClient } = require('./lib/backend-client.js');
+const { createPasswordResolver } = require('./lib/resolve-password.js');
 
 const SERVICE_ACCOUNT_PATH = join('.omega', 'secrets', 'service-account.json');
-
-/**
- * Resolve ACCOUNT_PASSWORD_SEED from the brand .env — auto-generated and
- * persisted on first real run (dry-run only notes it). Rotation is safe
- * but updates every managed account's password on the next run.
- *
- * @param {string} brandRoot - Brand-monorepo root
- * @param {boolean} dryRun - Whether this is a dry run
- * @returns {string|null} The seed, or null in dry-run when none exists yet
- */
-function resolvePasswordSeed(brandRoot, dryRun) {
-  let seed = process.env.ACCOUNT_PASSWORD_SEED || '';
-
-  if (!seed) {
-    if (dryRun) {
-      console.log(`      ${chalk.cyan('[DRY RUN]')} Would generate ACCOUNT_PASSWORD_SEED and save it to the brand .env`);
-      return null;
-    }
-
-    seed = randomBytes(24).toString('base64url');
-    writeEnvValue(brandRoot, 'ACCOUNT_PASSWORD_SEED', seed);
-    process.env.ACCOUNT_PASSWORD_SEED = seed;
-    console.log(`      ${chalk.green('✓')} Generated ACCOUNT_PASSWORD_SEED and saved to the brand .env`);
-  }
-
-  return seed;
-}
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -107,10 +80,17 @@ module.exports.run = createServiceRunner({
       accountBackend = createBackendClient({ authAdmin, apiKey, apiBaseUrl });
     }
 
-    // After the client gates so a skipped brand never gets a seed written
+    // Lazy channels: nothing (hook load, seed generation) happens until an
+    // account actually needs a password — a skipped or fully env/hook-covered
+    // brand never grows a seed in its .env
     const dryRun = context.options?.dryRun || false;
-    const passwordSeed = resolvePasswordSeed(context.brandRoot, dryRun);
+    const resolvePassword = createPasswordResolver({
+      brandRoot: context.brandRoot,
+      domain,
+      brand: context.brandConfig.brand,
+      dryRun,
+    });
 
-    return { authAdmin, firestore, accountBackend, admins, domain, apiKey, passwordSeed };
+    return { authAdmin, firestore, accountBackend, admins, domain, apiKey, resolvePassword };
   },
 });

@@ -2,12 +2,11 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **N7 COMPLETE (cp88–90) — every fixed dev port allocates or follows the map**; cp90 closed it: desktop getters on the env channel, livereload/CDP per-target, `mgr serve` publishes `{https,hosting}`, oauth `listen(0)`, website scheme https→http; plan: [plans/n7-port-allocation.md](plans/n7-port-allocation.md); next arc: brand-account provisioning (design unblocked); CI opt-in
+- **Brand-account provisioning SHIPPED (cp91)** — accounts owner-defined (company `account.admins` layer + onboarding step), passwords per-account (`OMEGA_ACCOUNT_PASSWORD__*` env → NEW `.omega/hooks/account/password.js` owner hook → lazy seed); first hooks system lives in @omega.js/config; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md); next arc: dogfood; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Brand-account provisioning ownership (Ian 2026-07-10) — the 4 auto-created admin accounts (legacy `ADMIN_EMAILS` + hardcoded password formula in omega-manager's account service) become owner-defined: onboarding step + env-var passwords + company-level hooks (none exist yet) for Ian's formula; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md)
-2. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
-3. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
+1. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
+2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
@@ -42,8 +41,9 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 90 N7 CLOSED — desktop/extension/stragglers: desktop getters on env channel (+website https→http both sides), livereload/CDP per-target alloc, `mgr serve` allocates + publishes {https,hosting} (kill-check deleted), stripe-forward takes resolved target, oauth listen(0); desktop 758/ext 94/mgr 565/corpus 1224/e2e 18/18 + live serve proof (this commit) → CHANGELOG
-- [x] 89 N7 web/client/sandbox — `omega dev` 8080→4000 via allocator, dev.ports chrome + `window.__OMEGA_DEV_PORTS__` runtime channel, client connects/getters read the map, harness preparePage; e2e 18/18 with ALL classics squatted; killGroup EPERM teardown leak fixed (this commit) → CHANGELOG
+- [x] 91 brand-account ownership — company-config admins (a+b answers via existing layers, schema-known), NEW @omega.js/config owner-hooks (.omega/hooks/<call-site>.js nested, brand→company), per-account password channels env→hook→lazy-seed, onboarding accounts step; config 89, manager 573 (this commit) → CHANGELOG
+- [x] 90 N7 CLOSED — desktop/extension/stragglers: desktop getters on env channel (+website https→http both sides), livereload/CDP per-target alloc, `mgr serve` allocates + publishes {https,hosting} (kill-check deleted), stripe-forward takes resolved target, oauth listen(0); desktop 758/ext 94/mgr 565/corpus 1224/e2e 18/18 + live serve proof (3882d48) → CHANGELOG
+- [x] 89 N7 web/client/sandbox — `omega dev` 8080→4000 via allocator, dev.ports chrome + `window.__OMEGA_DEV_PORTS__` runtime channel, client connects/getters read the map, harness preparePage; e2e 18/18 with ALL classics squatted; killGroup EPERM teardown leak fixed (5688d53) → CHANGELOG
 - [x] 88 N7 foundation + backend — config ports module (probe/bump/pins/file/env) + backend allocator boot; LIVE two-emulator concurrency proof (B bumped, both 200, A alive); config 83, corpus 1224/44/0, e2e 19/19 (d902c7f incl. 88b) → CHANGELOG
 - [x] 87 N6 CLOSED — /account `?_dev_subscription` mocks deleted (5 fixtures + @dev-only block); dev = sign in as seeded persona; web 54/54 (8b6c982) → CHANGELOG
 - [x] 86 N6 slice 3 — lifecycle flows as browser e2e (11→19 steps: persona signin, subscribe, cancel, refund, data-request ×3 incl. FIRST data-request coverage, delete); `__omega.api` Bearer-token fetch; e2e 19/19 (ed6a0d6) → CHANGELOG
@@ -83,4 +83,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 12:35 AM (90 shipped — N7 COMPLETE cp88–90; next: brand-account provisioning)*
+*Last updated: 2026-07-11 1:05 AM (91 shipped — brand-account ownership + first owner-hooks system; next: dogfood arc)*

@@ -2,23 +2,27 @@
  * Account service tests — the users operation against method-level
  * recording fakes of the auth admin, Firestore, and backend clients, with
  * the password derivation and custom-token signing real. Proves skip
- * semantics, the ACCOUNT_PASSWORD_SEED .env writeback (and that dry runs
- * never write it), the converged zero-mutation no-op, account creation
- * with signup, password convergence, the leaf-path admin/plan merge (and
- * the no-products no-op omega-manager got wrong), the {domain} template,
+ * semantics, the owner password channels (OMEGA_ACCOUNT_PASSWORD__* env
+ * pin → .omega/hooks/account/password.js hook, brand + company, with real
+ * hook files → lazy ACCOUNT_PASSWORD_SEED derivation), the seed .env
+ * writeback (and that dry runs and env/hook-covered brands never write
+ * it), the converged zero-mutation no-op, account creation with signup,
+ * password convergence, the leaf-path admin/plan merge (and the
+ * no-products no-op omega-manager got wrong), the {domain} template,
  * marketing-only entries, the unauthorized-admin audit error, and the
  * dry-run zero-mutation guarantee.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { join } = require('node:path');
+const { join, dirname } = require('node:path');
 const { generateKeyPairSync, createVerify } = require('node:crypto');
 const jetpack = require('fs-jetpack');
 
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { derivePassword } = require('../src/services/account/lib/password.js');
+const { passwordEnvVar } = require('../src/services/account/lib/resolve-password.js');
 const { createAuthAdmin, CUSTOM_TOKEN_AUD } = require('../src/lib/auth-admin.js');
 const { writeEnvValue } = require('../src/lib/env-secret.js');
 const service = require('../src/services/account/index.js');
@@ -279,6 +283,110 @@ test('account: generates ACCOUNT_PASSWORD_SEED, persists it to .env, and derives
 
   // The password pushed to Firebase Auth derives from the seed just persisted
   assert.deepEqual(auth.of('updateUser')[0].args, [USER.uid, { password: derivePassword(seedMatch[1], EMAIL, DOMAIN) }]);
+});
+
+// ─── Owner password channels (env → hook → seed) ─────────────────────────────
+
+/** Write a hook file under a root's .omega/hooks/ tree. */
+function writeHook(root, hookPath, source) {
+  const file = join(root, '.omega', 'hooks', ...hookPath.split('/')) + '.js';
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, source);
+  return file;
+}
+
+test('account: passwordEnvVar maps an email to its OMEGA_ACCOUNT_PASSWORD__* pin', () => {
+  assert.equal(passwordEnvVar('support@acme.com'), 'OMEGA_ACCOUNT_PASSWORD__SUPPORT_ACME_COM');
+  assert.equal(passwordEnvVar('ian.wiedenman@gmail.com'), 'OMEGA_ACCOUNT_PASSWORD__IAN_WIEDENMAN_GMAIL_COM');
+});
+
+test('account: an env-pinned password wins and no seed is ever generated', async (t) => {
+  const root = stageBrand();
+  const envVar = passwordEnvVar(EMAIL);
+  process.env[envVar] = 'EnvPinned1!';
+  t.after(() => delete process.env[envVar]);
+
+  const { auth, firestore, backend } = convergedClients();
+  const result = await runService(brandConfig(), { root, auth, firestore, backend, seed: null });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(backend.of('verifyPassword')[0].args, [EMAIL, 'EnvPinned1!']);
+  // Fully env-covered → the lazy seed channel never materializes
+  assert.equal(jetpack.exists(join(root, '.env')), false);
+});
+
+test('account: a real brand hook supplies the password (formula over email/domain/apex/brand)', async () => {
+  const root = stageBrand();
+  writeHook(root, 'account/password', `
+    module.exports = ({ email, domain, apex, brand }) =>
+      \`Hk1!\${brand.id}:\${email.split('@')[0]}:\${apex}:\${domain === apex}\`;
+  `);
+
+  const auth = fakeAuth({ getUserByEmail: USER, getUser: USER, updateUser: undefined });
+  const firestore = fakeFirestore({ getDoc: ADMIN_DOC, runQuery: [{ id: USER.uid, data: {} }] });
+  const backend = fakeBackend({ verifyPassword: false, syncMarketingContact: undefined });
+
+  const result = await runService(brandConfig(), { root, auth, firestore, backend, seed: null });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(auth.of('updateUser')[0].args, [USER.uid, { password: `Hk1!fixture-brand:support:${DOMAIN}:true` }]);
+  // Fully hook-covered → no seed written
+  assert.equal(jetpack.exists(join(root, '.env')), false);
+});
+
+test('account: the env pin beats the hook', async (t) => {
+  const root = stageBrand();
+  writeHook(root, 'account/password', 'module.exports = () => "HookLoses1!";\n');
+  const envVar = passwordEnvVar(EMAIL);
+  process.env[envVar] = 'EnvWins1!';
+  t.after(() => delete process.env[envVar]);
+
+  const { auth, firestore, backend } = convergedClients();
+  await runService(brandConfig(), { root, auth, firestore, backend, seed: null });
+
+  assert.deepEqual(backend.of('verifyPassword')[0].args, [EMAIL, 'EnvWins1!']);
+});
+
+test('account: a company hook covers a stamped brand (Ian\'s formula lives in HIS tree)', async () => {
+  const companyRoot = stageBrand();
+  writeHook(companyRoot, 'account/password', 'module.exports = ({ email, brand }) => `Co1!${brand.id}/${email}`;\n');
+
+  const root = stageBrand();
+  mkdirSync(join(root, '.omega'), { recursive: true });
+  writeFileSync(join(root, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+
+  const { auth, firestore, backend } = convergedClients();
+  const result = await runService(brandConfig(), { root, auth, firestore, backend, seed: null });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(backend.of('verifyPassword')[0].args, [EMAIL, `Co1!fixture-brand/${EMAIL}`]);
+  assert.equal(jetpack.exists(join(root, '.env')), false);
+});
+
+test('account: a hook returning an invalid password fails the service naming the hook file', async () => {
+  const root = stageBrand();
+  writeHook(root, 'account/password', 'module.exports = () => "x";\n');
+
+  const { auth, firestore, backend } = convergedClients();
+  const result = await runService(brandConfig(), { root, auth, firestore, backend, seed: null });
+
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /account\/password.*invalid password for support@fixture-brand\.test/);
+});
+
+test('account: a marketing-only list never touches the password channels — no seed written', async () => {
+  const root = stageBrand();
+  const auth = fakeAuth({ getUserByEmail: USER });
+  const firestore = fakeFirestore({ runQuery: [] });
+  const backend = fakeBackend({ syncMarketingContact: undefined });
+
+  const result = await runService(
+    brandConfig({ admins: [{ email: EMAIL, marketing: true }] }),
+    { root, auth, firestore, backend, seed: null },
+  );
+
+  assert.equal(result.status, 'success');
+  assert.equal(jetpack.exists(join(root, '.env')), false);
 });
 
 // ─── Convergence / mutations ─────────────────────────────────────────────────
