@@ -1,9 +1,11 @@
 /**
  * Schema for POST /special/electron-client
  */
-module.exports = () => ({
-  uid: { types: ['string'], default: undefined },
-  brandId: { types: ['string'], default: undefined },
-  brand: { types: ['string'], default: undefined },
-  config: { types: ['object'], default: {} },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  uid: f.string({ default: undefined }),
+  brandId: f.string({ default: undefined }),
+  brand: f.string({ default: undefined }),
+  config: f.passthrough({ default: {} }),
 });

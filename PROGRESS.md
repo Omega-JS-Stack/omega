@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep — 73a/73c/73d/74/75 + **76 (zod engine + test/general cohort) SHIPPED**; next: **zod cohorts** user → admin/payments/marketing ([plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md) — webhooks stay empty; verify admin/notification pollution consumers; then tightenings list → Ian); parked verifies (line below); CI opt-in
+- N4 architecture sweep — 73a/73c/73d/74/75/76 + **77 (zod user cohort + stragglers) SHIPPED**; next: **zod final cohort** admin/payments/marketing ([plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md) — webhooks stay empty; admin/notification handler verified pollution-safe; then tightenings list → Ian); parked verifies (line below); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -45,6 +45,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 77 zod user cohort + stragglers — 16 user/* + brand/content/handler/special/restart converted (signup consent shape pinned; enum = accepted-not-enforced builder option); parity 13/13; corpus 1221/44/0 (this commit) → CHANGELOG (folded into 76's entry)
 - [x] 76 zod route schemas, engine + first cohort — schema-zod.js `fields` builders + `Settings.resolve` zod branch (powertools parity to the byte; 30-case differential battery + frozen test/schema twin); test/* + general/* converted; 2 powertools bugs found (default-object pollution, min||0 negative clamp) → plan doc for the tightenings list; corpus 1219/44/0 (this commit) → CHANGELOG
 - [x] 75 marker harmonization — ONE grammar (`<comment> ========== <Label> ==========`) for all machine-parsed markers; rules block re-cut (version in open marker, 4 sub-shapes → family), push-secrets + gitignore marker-const dupes killed; live sandbox-setup converge proof; plans/marker-harmonization.md is the record (this commit) → CHANGELOG
 - [x] 74 D12 provider-discriminated role keys — `firebaseConfig`→`cloud.{provider,config}`, `sentry`→`monitoring.{provider,dsn}`, `platform`→`provider` ×4; lockstep across schema/client/bridges/backend/desktop/manager/9 fixtures/docs; client contract + payment/oauth2 maps untouched; R3c vacuous (never ported); bonus: `omega test` abort now exits 1; full matrix + corpus 1208/44/0 + pack-smoke ×4 (this commit) → CHANGELOG — cp71 regex casualties fixed (3 backend setup-tests SyntaxErrors, legacy-matching literals restored) + devkit parse-audit as backend pre-flight (413 files) + clean-dirs; resolveBrandRoot→config, desktop deepMerge→config, web slugify→template-kit, SkipError→devkit, waitForTarget hoist; 5 verified-not-dupes documented; full matrix + pack-smoke ×4 green (this commit) → CHANGELOG

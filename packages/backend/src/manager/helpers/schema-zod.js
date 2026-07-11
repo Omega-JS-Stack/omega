@@ -42,8 +42,10 @@ const _ = require('lodash');
 
 // Node options accepted by fields.field() — one-to-one with declarative schema nodes.
 // `sanitize` is carried for the middleware sanitize pass contract; `available` is not
-// (no schema declares it and nothing reads it).
-const FIELD_OPTIONS = ['types', 'default', 'value', 'min', 'max', 'required', 'clean', 'sanitize'];
+// (no schema declares it and nothing reads it). `enum` is accepted and stored but NOT
+// enforced — it was always decorative in the declarative engine (user/oauth2 declares
+// it, nothing validates it); enforcement is a post-parity tightening decision.
+const FIELD_OPTIONS = ['types', 'default', 'value', 'min', 'max', 'required', 'clean', 'sanitize', 'enum'];
 
 /**
  * Detect a zod schema (any version with the zod 4 internal marker).
@@ -210,6 +212,7 @@ function field(opts) {
   type._omega = {
     required: opts.required || false,
     sanitize: opts.sanitize !== false,
+    enum: opts.enum,
   };
 
   return type;

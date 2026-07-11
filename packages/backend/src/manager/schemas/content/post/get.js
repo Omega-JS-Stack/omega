@@ -1,6 +1,8 @@
 /**
  * Schema for GET /content/post
  */
-module.exports = () => ({
-  url: { types: ['string'], default: undefined, required: true },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = () => f.object({
+  url: f.string({ default: undefined, required: true }),
 });

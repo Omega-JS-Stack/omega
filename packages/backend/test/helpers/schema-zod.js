@@ -290,6 +290,44 @@ module.exports = {
     },
 
     {
+      name: 'user-signup-consent-shape-pin',
+      async run({ assert }) {
+        // Pins the resolved consent contract buildConsentRecord() consumes — captured from
+        // the pre-conversion declarative engine. Omitted consent resolves to
+        // granted: false / text: '' (force-coerced), NOT absent; the route's
+        // never-downgrade logic depends on reading exactly this shape.
+        const signupSchema = require('../../src/manager/schemas/user/signup/post.js');
+        const user = { auth: { uid: 'u1' } };
+
+        const empty = resolve(signupSchema({ user }), {});
+        assert.equal(
+          J(empty),
+          J({ uid: 'u1', attribution: {}, context: {}, consent: { legal: { granted: false, text: '' }, marketing: { granted: false, text: '' } } }),
+          'Empty signup resolves the pinned consent structure'
+        );
+
+        const partial = resolve(signupSchema({ user }), { consent: { legal: { granted: 1 } }, attribution: { src: 'x' }, evil: 'strip' });
+        assert.equal(
+          J(partial),
+          J({ uid: 'u1', attribution: { src: 'x' }, context: {}, consent: { legal: { granted: true, text: '' }, marketing: { granted: false, text: '' } } }),
+          'Partial consent coerces granted, defaults the rest, strips unknowns'
+        );
+      },
+    },
+
+    {
+      name: 'enum-option-accepted-not-enforced',
+      async run({ assert }) {
+        // enum was always decorative in the declarative engine (user/oauth2 declares it,
+        // nothing validates) — the builders accept + store it without enforcing;
+        // enforcement is a post-parity tightening decision
+        const zod = f.object({ action: f.string({ default: 'authorize', enum: ['authorize', 'status'] }) });
+
+        assert.equal(resolve(zod, { action: 'not-in-enum' }).action, 'not-in-enum', 'Out-of-enum value passes (decorative parity)');
+      },
+    },
+
+    {
       name: 'raw-zod-native-semantics',
       async run({ assert }) {
         // Raw zod (no builders) opts into zod-native validation: rejects with 400

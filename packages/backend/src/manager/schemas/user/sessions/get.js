@@ -1,12 +1,6 @@
-module.exports = ({ user }) => ({
-  uid: {
-    types: ['string'],
-    default: user?.auth?.uid,
-    required: false,
-  },
-  id: {
-    types: ['string'],
-    default: 'app',
-    required: false,
-  },
+const { fields: f } = require('../../../helpers/schema-zod.js');
+
+module.exports = ({ user }) => f.object({
+  uid: f.string({ default: user?.auth?.uid, required: false }),
+  id: f.string({ default: 'app', required: false }),
 });

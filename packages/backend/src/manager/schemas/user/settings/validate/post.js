@@ -1,22 +1,8 @@
-module.exports = ({ user }) => ({
-  uid: {
-    types: ['string'],
-    default: user?.auth?.uid,
-    required: false,
-  },
-  defaultsPath: {
-    types: ['string'],
-    default: '',
-    required: false,
-  },
-  existingSettings: {
-    types: ['object'],
-    default: {},
-    required: false,
-  },
-  newSettings: {
-    types: ['object'],
-    default: {},
-    required: false,
-  },
+const { fields: f } = require('../../../../helpers/schema-zod.js');
+
+module.exports = ({ user }) => f.object({
+  uid: f.string({ default: user?.auth?.uid, required: false }),
+  defaultsPath: f.string({ default: '', required: false }),
+  existingSettings: f.passthrough({ default: {}, required: false }),
+  newSettings: f.passthrough({ default: {}, required: false }),
 });
