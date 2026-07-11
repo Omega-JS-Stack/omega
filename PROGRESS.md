@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **Brand-account provisioning SHIPPED (cp91)** — accounts owner-defined (company `account.admins` layer + onboarding step), passwords per-account (`OMEGA_ACCOUNT_PASSWORD__*` env → NEW `config/hooks/account/password.js` owner hook → lazy seed); first hooks system lives in @omega.js/config; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md); next arc: dogfood; CI opt-in
+- **Dogfood arc OPEN (cp92)** — [plans/dogfood-arc.md](plans/dogfood-arc.md) = survey + slicing: cp93 scaffold omega-brand (all 4 targets, in-monorepo, friction log) → cp94 C5 test-scoping → cp95 C1 polish → cp96 C2 pricing/blueprints → cp97 D13 deliberate deploys (live CI proof Ian-gated) → cp98+ C3 redesign (design brief for Ian fronts it) → C4 sharing → arc close (template repo cut)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys + 7/11 inbox enrichments (C3 theme two-tier, C4 +forms/ads sharing, NEW C5 test-scoping DX)
+1. Dogfood arc execution per [plans/dogfood-arc.md](plans/dogfood-arc.md) — next up: **cp93 scaffold the OMEGA brand** via the real wizard (C1 survey instrument + D10's "scaffolds on current classy")
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -41,6 +41,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 92 dogfood arc opened — survey (C2 further along than spec: products-from-config channel live; D13's autopublish still alive in scaffold; sandbox = 2 targets) + slicing cp93→close in plans/dogfood-arc.md (this commit) → CHANGELOG
 - [x] 91 brand-account ownership — company-config admins (a+b answers via existing layers, schema-known), NEW @omega.js/config owner-hooks (config/hooks/<call-site>.js nested, brand→company), per-account password channels env→hook→lazy-seed, onboarding accounts step; config 89, manager 573 (this commit) → CHANGELOG
 - [x] 90 N7 CLOSED — desktop/extension/stragglers: desktop getters on env channel (+website https→http both sides), livereload/CDP per-target alloc, `mgr serve` allocates + publishes {https,hosting} (kill-check deleted), stripe-forward takes resolved target, oauth listen(0); desktop 758/ext 94/mgr 565/corpus 1224/e2e 18/18 + live serve proof (3882d48) → CHANGELOG
 - [x] 89 N7 web/client/sandbox — `omega dev` 8080→4000 via allocator, dev.ports chrome + `window.__OMEGA_DEV_PORTS__` runtime channel, client connects/getters read the map, harness preparePage; e2e 18/18 with ALL classics squatted; killGroup EPERM teardown leak fixed (5688d53) → CHANGELOG
@@ -83,4 +84,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 1:05 AM (91 shipped — brand-account ownership + first owner-hooks system; next: dogfood arc)*
+*Last updated: 2026-07-11 11:35 AM (92 — dogfood arc opened, plan landed; next: cp93 scaffold omega-brand)*
