@@ -10,6 +10,16 @@ import ServiceWorker from './modules/service-worker.js';
 import Sentry from './modules/sentry.js';
 import Usage from './modules/usage.js';
 
+// Classic dev ports (N7) — the browser-side fallbacks when no resolved map is
+// provided. Lockstep with @omega.js/config's CLASSIC_PORTS: browser code can't
+// import that Node module (fs/net), so the numbers live here too.
+const DEV_PORT_FALLBACKS = {
+  auth: 9099,
+  firestore: 8080,
+  functions: 5001,
+  hosting: 5002,
+};
+
 class Manager {
   constructor() {
     // Configuration from init()
@@ -446,19 +456,21 @@ class Manager {
     // auto-connects so dev can mutate data, test rules instantly, and seed the
     // frontend; production builds (environment=production) never connect. There is
     // deliberately NO live-Firebase opt-out for dev — build production locally if you
-    // truly need live. Ports are the Firebase-CLI defaults (auth :9099, firestore
-    // :8080); N7's port map owns making them configurable.
+    // truly need live. Ports come from the resolved dev map when one was provided
+    // (N7: `dev.ports` chrome / `window.__OMEGA_DEV_PORTS__`), classic defaults
+    // otherwise.
     // Both connects live HERE, immediately after the instances are created: the auth
     // module reads accounts via `manager.firebaseFirestore` directly, so connecting
     // lazily (or in only one module) leaves early reads pointed at LIVE Firebase.
     // Auth warnings banner disabled: it injects a DOM overlay that interferes with
     // page content in automated flows.
     if (this.isDevelopment()) {
-      console.log('[Firebase] Connecting to emulators (auth :9099, firestore :8080)');
+      const ports = this._devPorts();
+      console.log(`[Firebase] Connecting to emulators (auth :${ports.auth}, firestore :${ports.firestore})`);
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
-      connectAuthEmulator(this._firebaseAuth, 'http://localhost:9099', { disableWarnings: true });
-      connectFirestoreEmulator(this._firebaseFirestore, 'localhost', 8080);
+      connectAuthEmulator(this._firebaseAuth, `http://localhost:${ports.auth}`, { disableWarnings: true });
+      connectFirestoreEmulator(this._firebaseFirestore, 'localhost', ports.firestore);
       console.log('[Firebase] Emulators connected');
     }
 
@@ -512,6 +524,24 @@ class Manager {
     return this.config.environment === 'development';
   }
 
+  // The dev port map a page was actually GIVEN (N7), without fallbacks — two
+  // channels, runtime wins: `config.dev.ports` is baked into the Configuration
+  // chrome by `omega dev` at render time; `window.__OMEGA_DEV_PORTS__` is
+  // injected at runtime by drivers that know the live map after the chrome was
+  // baked (the devkit e2e harness sets it via evaluateOnNewDocument). Presence
+  // of a key here means a RESOLVED fact about a live stack; absence means
+  // "assume the classics".
+  _providedDevPorts() {
+    return {
+      ...(this.config.dev?.ports || {}),
+      ...(typeof window !== 'undefined' && window.__OMEGA_DEV_PORTS__ || {}),
+    };
+  }
+
+  _devPorts() {
+    return { ...DEV_PORT_FALLBACKS, ...this._providedDevPorts() };
+  }
+
   getFunctionsUrl(environment) {
     const env = environment || this.config.environment;
     const projectId = this._resolveFirebaseConfig()?.projectId;
@@ -521,7 +551,7 @@ class Manager {
     }
 
     if (env === 'development') {
-      return 'http://localhost:5001/' + projectId + '/us-central1';
+      return `http://localhost:${this._devPorts().functions}/${projectId}/us-central1`;
     }
 
     return 'https://us-central1-' + projectId + '.cloudfunctions.net';
@@ -536,8 +566,19 @@ class Manager {
       || this.config.environment;
 
     if (env === 'development') {
-      // @omega.js/backend's `mgr serve` exposes the local API over HTTPS (mkcert proxy on 5002,
-      // since @omega.js/backend 5.7.0) — plain http:// cannot connect to it.
+      // Scheme follows what the provided dev map says is actually running (N7):
+      // - `https` key → `mgr serve`'s mkcert proxy (it owns publishing that key).
+      // - `hosting` key → an allocator-booted emulator stack; the hosting
+      //   emulator speaks plain http on 127.0.0.1 (rewrites /omega/** to the API).
+      // - no map → classic assumption: `mgr serve`'s HTTPS proxy on 5002
+      //   (since @omega.js/backend 5.7.0) — plain http:// cannot connect to it.
+      const provided = this._providedDevPorts();
+      if (provided.https) {
+        return `https://localhost:${provided.https}`;
+      }
+      if (provided.hosting) {
+        return `http://127.0.0.1:${provided.hosting}`;
+      }
       return 'https://localhost:5002';
     }
 

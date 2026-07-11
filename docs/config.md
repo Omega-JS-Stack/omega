@@ -122,8 +122,21 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   shutdown.
 - **Env channel** — `portsToEnv(ports)` → `OMEGA_<NAME>_PORT` vars injected into spawned
   children; `envPort(name)` reads them. URL getters resolve env → classic default.
-  Browser code (which can read neither env nor files) receives `dev.ports` via the
-  injected dev config (cp89).
+- **Browser channel (cp89)** — browser code can read neither env nor files, so it gets
+  two channels, runtime winning: `omega dev` bakes `dev: { ports }` into the
+  Configuration chrome (its resolved website port + a live sibling backend's map read
+  from that app's ports file — boot the backend first for a complete map; a page built
+  before the backend booted picks it up on the next rebuild). Drivers that learn the
+  map only after the chrome was baked set `window.__OMEGA_DEV_PORTS__` instead (the
+  devkit e2e harness — the site builds BEFORE the emulator boots). `@omega.js/client`
+  resolves runtime global → chrome `dev.ports` → classic defaults; its dev `getApiUrl`
+  speaks plain http to a mapped `hosting` (the emulator serves http), https to a mapped
+  `https` (`mgr serve`'s mkcert proxy), and keeps the classic
+  `https://localhost:5002` serve assumption when no map was provided.
+- **Website port (cp89)** — `omega dev` allocates through the same model: classic
+  **4000** (pre-N7 it defaulted to 8080, colliding with the SAME brand's firestore
+  emulator), bump when taken, `--port` flag or config `ports.website` pins; publishes
+  its own ports file in the website app dir.
 - **Config `ports` section** (schema, optional object) — explicit pins for any port name;
   unset = auto-allocate.
 - When a boot bumps emulator ports, the backend CLI materializes

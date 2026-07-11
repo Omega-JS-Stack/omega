@@ -120,3 +120,56 @@ describe('Module Getters', () => {
   it('should return dom module', () => { assert(getManager().dom()); });
   it('should return utilities module', () => { assert(getManager().utilities()); });
 });
+
+describe('Dev ports (N7)', () => {
+
+  afterEach(() => {
+    delete global.window.__OMEGA_DEV_PORTS__;
+  });
+
+  it('should read dev.ports from the baked chrome for functions + api URLs', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
+      dev: { ports: { functions: 5003, hosting: 5004 } },
+    });
+    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5003/my-project/us-central1');
+    assert.strictEqual(Manager.getApiUrl(), 'http://127.0.0.1:5004');
+  });
+
+  it('should let the runtime channel (window.__OMEGA_DEV_PORTS__) win over the chrome', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
+      dev: { ports: { functions: 5003, hosting: 5004 } },
+    });
+    global.window.__OMEGA_DEV_PORTS__ = { functions: 5103, hosting: 5104 };
+    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5103/my-project/us-central1');
+    assert.strictEqual(Manager.getApiUrl(), 'http://127.0.0.1:5104');
+  });
+
+  it('should prefer an https (mkcert proxy) entry over plain-http hosting', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      dev: { ports: { https: 5443, hosting: 5004 } },
+    });
+    assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5443');
+  });
+
+  it('should keep the classic assumptions when no map is provided', async () => {
+    const Manager = getManager();
+    await Manager.initialize({
+      ...TEST_CONFIG,
+      environment: 'development',
+      firebase: { app: { enabled: false, config: { projectId: 'my-project' } } },
+    });
+    assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5002');
+    assert.strictEqual(Manager.getFunctionsUrl(), 'http://localhost:5001/my-project/us-central1');
+  });
+});

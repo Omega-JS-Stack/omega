@@ -159,3 +159,13 @@ test('farm mode (symlinks, dev): identical output to virtual mode', async () => 
   const link = path.join(PKG, '.omega', 'layout-farm', 'frontend', 'core', 'base.html');
   assert.ok(fs.lstatSync(link).isSymbolicLink(), 'farm is symlinks, not copies');
 });
+
+test('dev chrome (N7): jekyll.dev is null by default, the resolved ports map when omega dev injects it', async () => {
+  assert.ok(pages.get('/').includes('dev: null,'), 'default builds carry no dev map (client falls back to classics)');
+
+  const dev = await buildMini({ environment: 'development', dev: { ports: { website: 4001, hosting: 5003 } } });
+  const html = dev.get('/');
+  assert.ok(html.includes('environment: "development"'), 'dev environment in the chrome');
+  assert.ok(html.includes('"website":4001'), 'resolved website port baked into the Configuration chrome');
+  assert.ok(html.includes('"hosting":5003'), 'sibling emulator ports ride along');
+});

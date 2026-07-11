@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **N7 IN FLIGHT — cp88 foundation + backend SHIPPED (two emulators ran concurrently, live-proven)**; next: cp89 web/client/sandbox (dev.ports injection, web 8080→4000) → cp90 desktop/extension (livereload/CDP) + stragglers (serve proxy, stripe-forward, manager oauth 9876); plan: [plans/n7-port-allocation.md](plans/n7-port-allocation.md); brand-accounts design unblocked; CI opt-in
+- **N7 IN FLIGHT — cp89 web/client/sandbox SHIPPED (browser follows the map: e2e 18/18 with ALL classic ports squatted)**; next: cp90 desktop/extension (livereload/CDP) + stragglers (serve proxy publishes `https`, stripe-forward, manager oauth 9876); plan: [plans/n7-port-allocation.md](plans/n7-port-allocation.md); brand-accounts design unblocked; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. N7 (IN FLIGHT — see Now): cp89 web/client/sandbox → cp90 desktop/extension + stragglers
+1. N7 (IN FLIGHT — see Now): cp90 desktop/extension + stragglers (final slice)
 2. Brand-account provisioning ownership (Ian 2026-07-10) — the 4 auto-created admin accounts (legacy `ADMIN_EMAILS` + hardcoded password formula in omega-manager's account service) become owner-defined: onboarding step + env-var passwords + company-level hooks (none exist yet) for Ian's formula; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md)
 3. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
 4. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
@@ -43,7 +43,8 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 88 N7 foundation + backend — config ports module (probe/bump/pins/file/env) + backend allocator boot; LIVE two-emulator concurrency proof (B bumped, both 200, A alive); config 83, corpus 1224/44/0, e2e 19/19 (this commit) → CHANGELOG
+- [x] 89 N7 web/client/sandbox — `omega dev` 8080→4000 via allocator, dev.ports chrome + `window.__OMEGA_DEV_PORTS__` runtime channel, client connects/getters read the map, harness preparePage; e2e 18/18 with ALL classics squatted; killGroup EPERM teardown leak fixed (this commit) → CHANGELOG
+- [x] 88 N7 foundation + backend — config ports module (probe/bump/pins/file/env) + backend allocator boot; LIVE two-emulator concurrency proof (B bumped, both 200, A alive); config 83, corpus 1224/44/0, e2e 19/19 (d902c7f incl. 88b) → CHANGELOG
 - [x] 87 N6 CLOSED — /account `?_dev_subscription` mocks deleted (5 fixtures + @dev-only block); dev = sign in as seeded persona; web 54/54 (8b6c982) → CHANGELOG
 - [x] 86 N6 slice 3 — lifecycle flows as browser e2e (11→19 steps: persona signin, subscribe, cancel, refund, data-request ×3 incl. FIRST data-request coverage, delete); `__omega.api` Bearer-token fetch; e2e 19/19 (ed6a0d6) → CHANGELOG
 - [x] 85 N6 slice 2 — seed.js shared module + `omega emulator` seeds on boot (--no-seed) + devkit e2e-harness (sandbox run.js = consumer); devkit 140, corpus 1224/44/0, e2e 11/11 w/ 53 personas seeded in-boot (d7bd4ad) → CHANGELOG
@@ -52,7 +53,6 @@
 - [x] 82 N5 emulator-first dev — zero-flag SDK auto-connect (FIREBASE_EMULATOR_CONNECT dead); cp74 e2e fixture regression found + fixed (firebaseConfig→cloud.config) + boot step hardened; e2e 11/11 PASSED (this commit) → CHANGELOG
 - [x] 81 N4 parked verifies closed — site-wide defaults override = root directory data file (slice pin + README fact 11); config schema gains devlog/seo (+ test); web 54, config 71 (this commit) → CHANGELOG
 - [x] 80 schema tightening #1 — enum enforced (sent values, post-coercion, absent passes; shared enforceEnums both engines; oauth2 action fields live); tightenings list CLOSED (this commit) → CHANGELOG
-- [x] 79 schema tightenings #2–#4 — schema-engine.js in-house resolver replaces powertools.defaults ×3 (pollution/clone fixes now reach declarative schemas), '' fails required both engines, middleware sanitize pass finally sees the schema; #1 enum → Ian; parity 15/15, corpus 1223/44/0 (this commit) → CHANGELOG
 - [x] 78 zod final cohort — 30 admin/payments/marketing schemas converted; 4 provider webhooks stay declarative-empty by design; ALL framework schemas now zod; corpus green (this commit) → CHANGELOG (folded into 76's entry)
 - [x] 77 zod user cohort + stragglers — 16 user/* + brand/content/handler/special/restart converted (signup consent shape pinned; enum = accepted-not-enforced builder option); parity 13/13; corpus 1221/44/0 (2e2697d) → CHANGELOG (folded into 76's entry)
 - [x] 76 zod route schemas, engine + first cohort — schema-zod.js `fields` builders + `Settings.resolve` zod branch (powertools parity to the byte; 30-case differential battery + frozen test/schema twin); test/* + general/* converted; 2 powertools bugs found (default-object pollution, min||0 negative clamp) → plan doc for the tightenings list; corpus 1219/44/0 (this commit) → CHANGELOG
@@ -83,4 +83,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 11:25 PM (88 shipped — N7 foundation + backend, concurrency live-proven; next: cp89 web/client/sandbox)*
+*Last updated: 2026-07-11 12:20 AM (89 shipped — N7 web/client/sandbox, the browser follows the map; next: cp90 desktop/extension + stragglers)*

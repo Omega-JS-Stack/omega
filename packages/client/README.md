@@ -104,7 +104,9 @@ Web Manager is designed to work in multiple environments:
 
 ## Configuration
 
-> **Dev mode = local Firebase, zero flags.** When `environment` is `'development'`, the client auto-connects the REAL Auth + Firestore SDKs to the local emulator suite (auth `:9099`, firestore `:8080` — Firebase CLI defaults) — never live Firebase. `omega dev` injects that environment automatically; production builds never connect. There is deliberately no live-Firebase opt-out for dev — build production locally if you truly need live.
+> **Dev mode = local Firebase, zero flags.** When `environment` is `'development'`, the client auto-connects the REAL Auth + Firestore SDKs to the local emulator suite — never live Firebase. `omega dev` injects that environment automatically; production builds never connect. There is deliberately no live-Firebase opt-out for dev — build production locally if you truly need live.
+>
+> **Dev ports (N7):** the client resolves the port map with precedence `window.__OMEGA_DEV_PORTS__` (runtime channel — set by drivers like the devkit e2e harness after the page was built) → `config.dev.ports` (baked into the chrome by `omega dev`) → classic defaults (auth `:9099`, firestore `:8080`, functions `:5001`, hosting `:5002`). The emulator connects, `getFunctionsUrl()`, and `getApiUrl()` all read it, so bumped ports (a second brand's concurrent stack) reach the browser. Dev `getApiUrl()`: mapped `hosting` → plain `http://127.0.0.1:<port>` (the hosting emulator speaks http), mapped `https` → `mgr serve`'s mkcert proxy, no map → the classic `https://localhost:5002` serve assumption.
 
 ### Full Configuration Reference
 

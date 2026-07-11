@@ -93,6 +93,7 @@
   var Configuration = {
     runtime: "web",
     environment: "{{ jekyll.environment }}",
+    dev: {{ jekyll.dev | jsonify }},
     buildTime: {{ site.uj.cache_breaker | default: 0 }},
     brand: {{ resolved.brand | jsonify }},
     advertising: {{ resolved.advertising | jsonify }},

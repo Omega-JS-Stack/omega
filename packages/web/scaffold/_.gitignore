@@ -17,6 +17,7 @@ node_modules/
 /dist
 /.omega
 /.cache
+/.temp
 
 # Output of 'npm pack'
 *.tgz

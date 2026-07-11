@@ -133,3 +133,61 @@ test('teardown writes page.log (even empty) and closes the site server', async (
   // Port must actually be free again
   await assert.rejects(() => get('http://localhost:4656/'));
 });
+
+// ---- N7: site-port allocation + resolved-map page injection
+
+test('boot bumps a taken site port via the allocator and serves there', async () => {
+  const root = makeTempBrand(['apps/website/package.json']);
+  const websiteDir = path.join(root, 'apps', 'website');
+  fs.writeFileSync(path.join(websiteDir, 'build.js'), 'module.exports = async () => {};');
+  const distDir = path.join(websiteDir, 'dist');
+  fs.mkdirSync(distDir, { recursive: true });
+  fs.writeFileSync(path.join(distDir, 'index.html'), '<h1>harness fixture site with enough bytes to pass the boot smoke check</h1>');
+
+  // Squat the wanted site port — boot must bump, not throw (pre-N7 behavior)
+  const squatter = http.createServer(() => {});
+  await new Promise((resolve) => squatter.listen(4657, '127.0.0.1', resolve));
+
+  const harness = new E2eHarness(root, { sitePort: 4657 });
+  try {
+    await harness.boot();
+    assert.equal(harness.sitePort, 4658, 'allocator bumped +1 off the squatted port');
+    assert.equal(harness.siteUrl, 'http://localhost:4658');
+    const index = await get(`${harness.siteUrl}/`);
+    assert.equal(index.status, 200);
+    assert.match(index.body, /harness fixture site/);
+    assert.equal(harness.failures.length, 0);
+  } finally {
+    await harness.teardown();
+    squatter.close();
+  }
+});
+
+test('preparePage wires console capture and injects the resolved emulator map', async () => {
+  const root = makeTempBrand([]);
+  const harness = new E2eHarness(root);
+  harness.emulatorPorts = { auth: 9199, firestore: 8180, hosting: 5099 };
+
+  const events = [];
+  const injections = [];
+  const fakePage = {
+    on(event) { events.push(event); },
+    async evaluateOnNewDocument(fn, ports) { injections.push({ fn, ports }); },
+  };
+
+  await harness.preparePage(fakePage);
+
+  assert.deepEqual(events.sort(), ['console', 'pageerror'], 'console capture wired');
+  assert.equal(injections.length, 1);
+  assert.deepEqual(injections[0].ports, { auth: 9199, firestore: 8180, hosting: 5099 });
+  // The injected function must set the runtime channel the client reads
+  const win = {};
+  const originalWindow = global.window;
+  global.window = win;
+  try {
+    injections[0].fn(injections[0].ports);
+  } finally {
+    global.window = originalWindow;
+  }
+  assert.deepEqual(win.__OMEGA_DEV_PORTS__, { auth: 9199, firestore: 8180, hosting: 5099 });
+});

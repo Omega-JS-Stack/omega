@@ -16,10 +16,14 @@ migrate → 2,556 pages, ~3.2× the whole Jekyll pipeline).**
 ```bash
 # In a consumer project (scaffolded scripts call these):
 npx omega setup     # scaffold/refresh defaults + sync package.json scripts
-npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds (--port=N)
+npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
+                    #   port: website convention 4000, auto-bumps +1 when taken (N7);
+                    #   --port=N or config ports.website PINS it (busy = hard error)
                     #   dev pages auto-connect the REAL Auth+Firestore SDKs to the local
                     #   emulators (zero flags; never live Firebase) — start them from the
-                    #   brand's backend app: `npx omega emulator`
+                    #   brand's backend app: `npx omega emulator`. A live backend's
+                    #   resolved (possibly bumped) ports reach the page via the injected
+                    #   dev.ports chrome, so the browser always targets THIS brand's stack
                     #   --local: first link every @omega.js dep brand-wide from the local
                     #   Omega monorepo + start its src→dist watch (docs/local-dev.md there)
 npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → dist/

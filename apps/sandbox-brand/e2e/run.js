@@ -49,8 +49,10 @@ async function main() {
   const harness = new E2eHarness(BRAND_ROOT);
   let browser = null;
 
+  // The site URL prints in the 'website serves' step detail — the port is
+  // allocator-resolved during boot, so it isn't known (truthfully) yet here.
   console.log('\nSandbox brand cross-stack e2e');
-  console.log(`  site: ${harness.siteUrl}  |  user: ${EMAIL}\n`);
+  console.log(`  user: ${EMAIL}\n`);
 
   try {
     await harness.boot();
@@ -61,7 +63,9 @@ async function main() {
       args: process.env.CI ? ['--no-sandbox', '--disable-dev-shm-usage'] : [],
     });
     const page = await browser.newPage();
-    harness.capturePageConsole(page);
+    // Console capture + the resolved emulator port map (bumped ports reach the
+    // browser via window.__OMEGA_DEV_PORTS__ — the build predates the boot)
+    await harness.preparePage(page);
 
     await harness.step('page boots @omega.js/client against the emulators', async () => {
       await page.goto(`${harness.siteUrl}/`, { waitUntil: 'load' });

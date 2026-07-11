@@ -6,7 +6,12 @@
  *      layers) rebuild bundles IN PLACE — URLs are stable in dev, so the
  *      rendered HTML stays valid without a re-render; refresh to pick up.
  *
- * `omega dev --port=4000` overrides the default port.
+ * Port (N7): the website convention is 4000, resolved through the allocator —
+ * taken ports bump +1. `omega dev --port=4001` (or a config `ports.website`
+ * entry) PINS the port instead: busy = hard error, never a silent bump. The
+ * resolved map of a live sibling backend (its `.temp/ports.json`) plus this
+ * website port are injected into the page chrome as `dev.ports` so
+ * @omega.js/client connects to the stack that is ACTUALLY running.
  *
  * `omega dev --local` first links every @omega.js framework the brand uses to
  * the local Omega monorepo (file: installs, idempotent) and starts the
@@ -16,6 +21,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
+const {
+  CLASSIC_PORTS, isPortFree, resolvePorts, envPort,
+  readPortsFile, writePortsFile, clearPortsFile,
+  findBrandRoot, hasOmegaConfig, loadConfig,
+} = require('@omega.js/config');
 const { buildAssets } = require('../assets.js');
 const { configureOmega } = require('../engine.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -35,7 +45,8 @@ module.exports = async function (options) {
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
   const clientEntry = resolveClientEntry();
-  const port = Number(options.port) || 8080;
+  const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
+  const devPorts = { ...readSiblingPorts(paths.root), website: port };
 
   const activeTheme = (siteData.theme && siteData.theme.id) || 'classy';
   const themeLayerDirs = [...new Set([activeTheme, 'classy'])].map((id) => path.join(PATHS.themes, id));
@@ -93,20 +104,107 @@ module.exports = async function (options) {
         activeTheme,
         assetManifest: manifest,
         environment: 'development',
+        dev: { ports: devPorts },
       }),
   });
 
   await elev.init();
   await elev.watch();
   elev.serve(port);
+
+  // Publish the resolved website port for sibling tools (same contract as the
+  // backend emulator's ports file) and retract it on shutdown.
+  writePortsFile(paths.root, { website: port });
+  process.on('exit', () => clearPortsFile(paths.root));
+  process.on('SIGINT', () => process.exit(0));
+
+  if (bumped) {
+    logger.log(`Port ${CLASSIC_PORTS.website} was taken — bumped to ${port}`);
+  }
   logger.log(`Dev server: http://localhost:${port}`);
 };
+
+/**
+ * Resolve the website port through the allocator (N7). An explicit `--port`
+ * flag or a config `ports.website` entry PINS the port (busy = hard error);
+ * otherwise start from OMEGA_WEBSITE_PORT (a parent that already allocated)
+ * or the classic 4000 and bump +1 while taken.
+ */
+async function resolveWebsitePort(root, flagPort) {
+  const pins = {};
+
+  if (flagPort) {
+    if (!(await isPortFree(flagPort))) {
+      throw new Error(`Port ${flagPort} (pinned via --port) is already in use — free it or pick another`);
+    }
+    pins.website = flagPort;
+  } else {
+    const configPin = loadPortPins(root).website;
+    if (typeof configPin === 'number') {
+      pins.website = configPin;
+    }
+  }
+
+  const wanted = { website: envPort('website') || CLASSIC_PORTS.website };
+  const { ports, bumped } = await resolvePorts({ wanted, pins });
+  return { port: ports.website, bumped: bumped.length > 0 };
+}
+
+/**
+ * Read explicit port pins from the consumer's config `ports` section.
+ * Lenient — a missing/broken config means no pins, never a dev-loop failure.
+ */
+function loadPortPins(root) {
+  try {
+    if (!hasOmegaConfig(root)) {
+      return {};
+    }
+    const config = loadConfig(root, 'web').config;
+    return config.ports && typeof config.ports === 'object' ? config.ports : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+/**
+ * Merge the live ports files of sibling apps in the same brand (a running
+ * backend's resolved emulator map). Dead-pid leftovers are ignored by
+ * readPortsFile; our own app dir is skipped (a previous run of THIS server).
+ * No brand root (standalone consumer) → empty map, client falls back to the
+ * classic ports.
+ */
+function readSiblingPorts(root) {
+  const brandRoot = findBrandRoot(root);
+  if (!brandRoot) {
+    return {};
+  }
+
+  const appsDir = path.join(brandRoot, 'apps');
+  const merged = {};
+
+  for (const entry of fs.existsSync(appsDir) ? fs.readdirSync(appsDir, { withFileTypes: true }) : []) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) {
+      continue;
+    }
+    const appDir = path.join(appsDir, entry.name);
+    if (path.resolve(appDir) === path.resolve(root)) {
+      continue;
+    }
+    Object.assign(merged, readPortsFile(appDir) || {});
+  }
+
+  return merged;
+}
 
 /**
  * `--local` prelude: file:-install every @omega.js framework used anywhere in
  * this brand (all apps, walked up from cwd) from the local Omega monorepo,
  * then start the monorepo's src→dist watch as a session-scoped child.
  */
+// Exposed for tests (the command function stays the main export)
+module.exports.resolveWebsitePort = resolveWebsitePort;
+module.exports.readSiblingPorts = readSiblingPorts;
+
 async function linkBrandToMonorepo() {
   const local = require('@omega.js/devkit/local');
   const monorepoRoot = local.resolveMonorepoRoot();

@@ -341,7 +341,13 @@ function configureOmega(eleventyConfig, options) {
     ...(site.uj || {}),
   };
   eleventyConfig.addGlobalData('site', site);
-  eleventyConfig.addGlobalData('jekyll', { environment: options.environment || 'development' });
+  // `dev` rides the jekyll global into the Configuration chrome (N7): `omega
+  // dev` passes { ports } with the resolved map; production builds pass
+  // nothing → null, and @omega.js/client falls back to the classic ports.
+  eleventyConfig.addGlobalData('jekyll', {
+    environment: options.environment || 'development',
+    dev: options.dev || null,
+  });
   eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: { pages: {} }, css: { pages: {}, themePages: {} } });
 
   return { site, layers, layoutMap, frontmatter, suppressed, collectionsHolder };

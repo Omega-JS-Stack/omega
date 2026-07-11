@@ -381,8 +381,17 @@ class EmulatorCommand extends BaseCommand {
       try {
         process.kill(-child.pid, signal);
       } catch (e) {
-        // ESRCH = group already dead, that's fine
-        if (e.code !== 'ESRCH') throw e;
+        // ESRCH = group already dead. EPERM = macOS kill(2) quirk when the
+        // group's remaining members are zombies awaiting reap. Either way the
+        // group is unreachable — and killGroup must NEVER throw out of
+        // shutdown(): the un-awaited shutdown() in the SIGINT handlers turns
+        // a throw into an unhandled rejection that crashes the CLI BEFORE
+        // the orphan sweep + ports-file cleanup run (this exact crash leaked
+        // 3 java emulators per e2e run). The port-based sweep after shutdown
+        // is the safety net for anything a failed signal left behind.
+        if (e.code !== 'ESRCH' && e.code !== 'EPERM') {
+          this.log(chalk.yellow(`  killGroup(${signal}) failed: ${e.message} — relying on the orphan sweep`));
+        }
       }
     };
 

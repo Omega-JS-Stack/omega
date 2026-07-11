@@ -14,8 +14,8 @@
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
-const net = require('net');
 const { spawn } = require('child_process');
+const { resolvePorts, readPortsFile } = require('@omega.js/config');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -27,20 +27,11 @@ const CONTENT_TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-const EMULATOR_PORTS = [9099, 5001, 8080, 5002];
 // Covers emulator boot AND persona seeding (~55 accounts) — the ready marker
 // fires after both (see _startEmulator's watch comment).
 const EMULATOR_READY_TIMEOUT = 240000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function isPortBusy(port) {
-  return new Promise((resolve) => {
-    const socket = net.connect({ port, host: '127.0.0.1' });
-    socket.once('connect', () => { socket.destroy(); resolve(true); });
-    socket.once('error', () => resolve(false));
-  });
-}
 
 /**
  * Discover the brand's app targets by directory naming convention.
@@ -72,14 +63,17 @@ class E2eHarness {
     this.logDir = options.logDir || path.join(brandRoot, 'e2e', '.logs');
 
     this.emulator = null;
+    this.emulatorPorts = {};
     this.siteServer = null;
     this.failures = [];
     this.pageConsole = [];
   }
 
   /**
-   * Boot the full stack: build website, check ports, start emulator (with
-   * persona seeding), serve the built site.
+   * Boot the full stack: build website, start emulator (with persona
+   * seeding), serve the built site. Ports self-allocate (N7): the emulator
+   * CLI bumps taken ports and publishes its resolved map via the ports file;
+   * the site port bumps here. No pre-flight free-check needed.
    */
   async boot() {
     // Build website
@@ -93,31 +87,26 @@ class E2eHarness {
       });
     }
 
-    // Check ports
-    await this.step('emulator ports free (@omega.js/backend requires default ports)', async () => {
-      for (const port of EMULATOR_PORTS) {
-        if (await isPortBusy(port)) {
-          throw new Error(`port ${port} is already in use — is another emulator running?`);
-        }
-      }
-      if (this.targets.website && await isPortBusy(this.sitePort)) {
-        throw new Error(`site port ${this.sitePort} is already in use`);
-      }
-    });
-
     // Boot emulator (persona seeding happens inside `npx mgr emulator` by
     // default; the ready marker fires AFTER it, so steps never race the wipe)
     if (this.targets.backend) {
       await this.step('emulator boots + personas seed (functions, firestore, auth, database, hosting, pubsub)', async () => {
         this.emulator = this._startEmulator();
         await this.emulator.ready;
-        return `log: ${path.relative(this.brandRoot, path.join(this.logDir, 'emulator.log'))}`;
+        // The CLI published where the emulators ACTUALLY landed (classic
+        // defaults or bumped) — preparePage() forwards this map to the
+        // browser so pages connect to THIS stack, never a neighbor's.
+        this.emulatorPorts = readPortsFile(this.targets.backend) || {};
+        const hosting = this.emulatorPorts.hosting ? `, hosting :${this.emulatorPorts.hosting}` : '';
+        return `log: ${path.relative(this.brandRoot, path.join(this.logDir, 'emulator.log'))}${hosting}`;
       });
     }
 
     // Serve website
     if (this.targets.website) {
       await this.step('website serves', async () => {
+        const { ports } = await resolvePorts({ wanted: { website: this.sitePort } });
+        this.sitePort = ports.website;
         const distDir = path.join(this.targets.website, 'dist');
         this.siteServer = await this._startSiteServer(distDir);
         const body = await new Promise((resolve, reject) => {
@@ -130,6 +119,7 @@ class E2eHarness {
         if (!body || body.length < 50) {
           throw new Error('served page is empty or suspiciously short');
         }
+        return this.siteUrl;
       });
     }
   }
@@ -155,6 +145,18 @@ class E2eHarness {
   capturePageConsole(page) {
     page.on('console', (message) => this.pageConsole.push(`[${message.type()}] ${message.text()}`));
     page.on('pageerror', (error) => this.pageConsole.push(`[pageerror] ${error.message}`));
+  }
+
+  /**
+   * Wire a puppeteer page into the harness: console capture + the resolved
+   * emulator port map as `window.__OMEGA_DEV_PORTS__` (N7's runtime channel —
+   * the site was BUILT before the emulator booted, so the baked chrome can't
+   * know bumped ports; @omega.js/client gives this global top precedence).
+   * Call after boot() and before the first page.goto().
+   */
+  async preparePage(page) {
+    this.capturePageConsole(page);
+    await page.evaluateOnNewDocument((ports) => { window.__OMEGA_DEV_PORTS__ = ports; }, this.emulatorPorts);
   }
 
   /**

@@ -74,14 +74,16 @@ window.__omega = {
   },
   // Authenticated backend call for lifecycle e2e (N6): the signed-in user's ID
   // token rides the Authorization header, exactly what a real page does. Base
-  // URL is the hosting emulator (rewrites /omega/** to omega_api) — hardcoded
-  // like the client's own emulator ports (N7 owns port configurability).
+  // URL comes from the client's getApiUrl (N7): the harness injects the
+  // resolved emulator map as window.__OMEGA_DEV_PORTS__, so this exercises the
+  // map-reading branch in a real browser — http to the hosting emulator
+  // (rewrites /omega/** to omega_api), bumped ports included.
   // Errors come back as plain text (the backend's wire contract), successes as
   // JSON — both surfaced so steps can assert on either.
   api(method, route, body) {
     return manager.auth().getIdToken()
       .then((token) => {
-        return fetch(`http://127.0.0.1:5002/omega/${route}`, {
+        return fetch(`${manager.getApiUrl()}/omega/${route}`, {
           method,
           headers: {
             'Content-Type': 'application/json',

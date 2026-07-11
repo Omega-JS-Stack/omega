@@ -49,6 +49,12 @@ and every state change landed by the REAL `payments-webhooks` trigger.
 Nothing is mocked; this is the brand-monorepo `npm test` contract from
 the redesign plan.
 
+Ports self-allocate (N7): the run needs NO free classic ports — the emulator
+CLI bumps taken ports, the harness reads the resolved map from the backend's
+ports file and injects it into every page (`window.__OMEGA_DEV_PORTS__`, via
+`preparePage`), and the site port bumps too. Proven by running the full e2e
+with auth/firestore/hosting/site classics all squatted.
+
 Failure logs land in `e2e/.logs/` (emulator output + page console).
 
 ## Running
