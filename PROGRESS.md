@@ -2,15 +2,14 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep COMPLETE (73a–81) + **81 (N4 parked verifies closed: site-wide defaults layer proven, devlog/seo schema entries) SHIPPED**; next: N5 emulator-first frontend dev; CI opt-in
+- **N5 emulator-first dev SHIPPED (82)** — zero-flag emulator auto-connect (flag dead; e2e hardened + un-broken from cp74 fixture miss); N4 COMPLETE (73a–81); next: N6 personas + lifecycle e2e; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
-2. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
-3. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002; unified `OMEGA_LIVERELOAD_PORT` needs per-target allocation)
-4. Brand-account provisioning ownership (Ian 2026-07-10) — the 4 auto-created admin accounts (legacy `ADMIN_EMAILS` + hardcoded password formula in omega-manager's account service) become owner-defined: onboarding step + env-var passwords + company-level hooks (none exist yet) for Ian's formula; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md)
-5. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
-6. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
+1. N6 personas + lifecycle e2e — seeded persona accounts, signup/delete/cancel/refund/export/deletion flows, consumer-authorable brand tests, /account mock fixtures removed
+2. N7 port auto-allocation — brand-level port map, bump-if-taken, all url getters aware (fixes BEM 5001/5002; unified `OMEGA_LIVERELOAD_PORT` needs per-target allocation)
+3. Brand-account provisioning ownership (Ian 2026-07-10) — the 4 auto-created admin accounts (legacy `ADMIN_EMAILS` + hardcoded password formula in omega-manager's account service) become owner-defined: onboarding step + env-var passwords + company-level hooks (none exist yet) for Ian's formula; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md)
+4. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
+5. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
@@ -45,6 +44,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 82 N5 emulator-first dev — zero-flag SDK auto-connect (FIREBASE_EMULATOR_CONNECT dead); cp74 e2e fixture regression found + fixed (firebaseConfig→cloud.config) + boot step hardened; e2e 11/11 PASSED (this commit) → CHANGELOG
 - [x] 81 N4 parked verifies closed — site-wide defaults override = root directory data file (slice pin + README fact 11); config schema gains devlog/seo (+ test); web 54, config 71 (this commit) → CHANGELOG
 - [x] 80 schema tightening #1 — enum enforced (sent values, post-coercion, absent passes; shared enforceEnums both engines; oauth2 action fields live); tightenings list CLOSED (this commit) → CHANGELOG
 - [x] 79 schema tightenings #2–#4 — schema-engine.js in-house resolver replaces powertools.defaults ×3 (pollution/clone fixes now reach declarative schemas), '' fails required both engines, middleware sanitize pass finally sees the schema; #1 enum → Ian; parity 15/15, corpus 1223/44/0 (this commit) → CHANGELOG
@@ -78,4 +78,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-10 9:15 PM (81 shipped — N4 verifies closed, N4 arc COMPLETE; next: N5 emulator-first dev)*
+*Last updated: 2026-07-10 9:45 PM (82 shipped — N5 emulator-first dev, zero flags; next: N6 personas + lifecycle e2e)*

@@ -104,6 +104,8 @@ Web Manager is designed to work in multiple environments:
 
 ## Configuration
 
+> **Dev mode = local Firebase, zero flags.** When `environment` is `'development'`, the client auto-connects the REAL Auth + Firestore SDKs to the local emulator suite (auth `:9099`, firestore `:8080` — Firebase CLI defaults) — never live Firebase. `omega dev` injects that environment automatically; production builds never connect. There is deliberately no live-Firebase opt-out for dev — build production locally if you truly need live.
+
 ### Full Configuration Reference
 
 ```javascript

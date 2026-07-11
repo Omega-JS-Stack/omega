@@ -28,7 +28,7 @@ is continuously dogfooded.
 | App | Framework | Notes |
 |-----|-----------|-------|
 | `apps/backend` | `packages/backend` (@omega.js/backend) | Real @omega.js/backend consumer: full framework corpus (routes/events/rules/…) runs against the emulator, not just the self-test boot smoke |
-| `apps/website` | `packages/client` (@omega.js/client) | Minimal static site whose esbuild bundle embeds @omega.js/client, pointed at the emulator suite (`FIREBASE_EMULATOR_CONNECT`). Gets replaced by an `@omega.js/web` consumer in Phase 2 — the brand-monorepo slot and the e2e contract stay the same |
+| `apps/website` | `packages/client` (@omega.js/client) | Minimal static site whose esbuild bundle embeds @omega.js/client, pointed at the emulator suite (environment=development auto-connects — zero flags, N5). Gets replaced by an `@omega.js/web` consumer in Phase 2 — the brand-monorepo slot and the e2e contract stay the same |
 
 ## Cross-stack e2e (`npm test` at the brand root)
 

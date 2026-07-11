@@ -3,9 +3,9 @@
  * backend and exposes the hooks the cross-stack e2e driver (../../e2e/run.js) calls.
  *
  * Configuration mirrors the brand config (config/omega.json5 at the brand root)
- * (demo-sandbox-brand, fake-by-design values). environment=development +
- * env.FIREBASE_EMULATOR_CONNECT makes @omega.js/client connect to the local emulator
- * suite instead of live Firebase — the same switch UJM's serve task injects.
+ * (demo-sandbox-brand, fake-by-design values). environment=development ALONE makes
+ * @omega.js/client connect to the local emulator suite instead of live Firebase
+ * (zero flags, N5) — the same signal `omega dev` injects via the chrome.
  */
 import manager from '@omega.js/client';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -16,16 +16,16 @@ const CONFIGURATION = {
     id: 'sandbox-brand',
     name: 'Sandbox Brand',
   },
-  firebaseConfig: {
-    apiKey: 'sandbox-api-key',
-    authDomain: 'demo-sandbox-brand.firebaseapp.com',
-    projectId: 'demo-sandbox-brand',
-    storageBucket: 'demo-sandbox-brand.appspot.com',
-    messagingSenderId: '111111111111',
-    appId: '1:111111111111:web:1111111111111111111111',
-  },
-  env: {
-    FIREBASE_EMULATOR_CONNECT: true,
+  cloud: {
+    provider: 'firebase',
+    config: {
+      apiKey: 'sandbox-api-key',
+      authDomain: 'demo-sandbox-brand.firebaseapp.com',
+      projectId: 'demo-sandbox-brand',
+      storageBucket: 'demo-sandbox-brand.appspot.com',
+      messagingSenderId: '111111111111',
+      appId: '1:111111111111:web:1111111111111111111111',
+    },
   },
 };
 

@@ -215,6 +215,13 @@ async function main() {
       if (initError) {
         throw new Error(`@omega.js/client initialize failed: ${initError}`);
       }
+      // isReady alone is too weak — the client resolves ready even when Firebase
+      // init is skipped (that hole hid the cp74 firebaseConfig→cloud.config fixture
+      // miss). The emulator connect line is the real "against the emulators" proof:
+      // environment=development must auto-connect with zero flags (N5).
+      if (!pageConsole.some((line) => line.includes('[Firebase] Emulators connected'))) {
+        throw new Error('client did not auto-connect to the emulators (dev mode must connect with zero flags — check [Firebase] lines in page.log)');
+      }
     });
 
     let uid = null;

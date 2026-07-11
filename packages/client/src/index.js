@@ -300,9 +300,6 @@ class Manager {
           autoRequest: 1000 * 60
         }
       },
-      env: {
-        FIREBASE_EMULATOR_CONNECT: false,
-      },
       validRedirectHosts: [],
       payment: {
         processors: {},
@@ -444,12 +441,19 @@ class Manager {
     this._firebaseAuth = getAuth(app);
     this._firebaseFirestore = initializeFirestore(app, {});
 
-    // Connect to the local emulator suite in development. Both connects live HERE,
-    // immediately after the instances are created: the auth module reads accounts via
-    // `manager.firebaseFirestore` directly, so connecting lazily (or in only one module)
-    // leaves early reads pointed at LIVE Firebase. Auth warnings banner disabled: it
-    // injects a DOM overlay that interferes with page content in automated flows.
-    if (this.isDevelopment() && this.config.env?.FIREBASE_EMULATOR_CONNECT) {
+    // Connect to the local emulator suite in development — ZERO flags (N5): dev mode
+    // means LOCAL Firebase, period. environment=development (what `omega dev` injects)
+    // auto-connects so dev can mutate data, test rules instantly, and seed the
+    // frontend; production builds (environment=production) never connect. There is
+    // deliberately NO live-Firebase opt-out for dev — build production locally if you
+    // truly need live. Ports are the Firebase-CLI defaults (auth :9099, firestore
+    // :8080); N7's port map owns making them configurable.
+    // Both connects live HERE, immediately after the instances are created: the auth
+    // module reads accounts via `manager.firebaseFirestore` directly, so connecting
+    // lazily (or in only one module) leaves early reads pointed at LIVE Firebase.
+    // Auth warnings banner disabled: it injects a DOM overlay that interferes with
+    // page content in automated flows.
+    if (this.isDevelopment()) {
       console.log('[Firebase] Connecting to emulators (auth :9099, firestore :8080)');
       const { connectAuthEmulator } = await import('firebase/auth');
       const { connectFirestoreEmulator } = await import('firebase/firestore');
