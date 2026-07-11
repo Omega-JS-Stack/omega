@@ -75,7 +75,10 @@ async function generateBuildJs(outputDir) {
         omega: {
           environment: Manager.getEnvironment(),
           cache_breaker: Math.round(new Date().getTime() / 1000),
-          liveReloadPort: config.liveReloadPort || 35729,
+          // Resolved at serve time (N7) — the getter reads the allocator's
+          // OMEGA_LIVERELOAD_PORT, so a bumped server and the baked client
+          // agree. Packaged (non-serve) builds bake the classic default.
+          liveReloadPort: config.liveReloadPort || Manager.getLiveReloadPort(),
         },
 
         // Web-manager features (matching expected structure)

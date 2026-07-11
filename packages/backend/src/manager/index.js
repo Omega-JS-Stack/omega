@@ -278,8 +278,10 @@ Manager.prototype.init = function (exporter, options) {
     // to localhost. NOTE: getParentApiUrl/getParentUrl are intentionally NOT changed —
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
+    // http, not https: `omega dev` (Eleventy) serves plain http — the https
+    // form was a legacy browsersync-mkcert assumption no dev server speaks.
     return isDev
-      ? `https://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`
+      ? `http://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`
       : self.config.brand?.url || '';
   };
 
@@ -322,7 +324,7 @@ Manager.prototype.init = function (exporter, options) {
   self.project.apiUrl = self.getApiUrl();
 
   // Set website URL
-  // Development: https://localhost:4000 (local hosting)
+  // Development: http://localhost:4000 (local `omega dev` hosting)
   // Production: https://{domain} (from brand.url)
   self.project.websiteUrl = self.getWebsiteUrl();
 

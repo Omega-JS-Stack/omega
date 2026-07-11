@@ -200,10 +200,10 @@ module.exports = {
       name: 'getWebsiteUrl: localhost:4000 in development AND testing, brand.url otherwise',
       async run({ Manager, assert }) {
         withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-          assert.equal(Manager.getWebsiteUrl(), 'https://localhost:4000', 'dev → localhost:4000');
+          assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'dev → localhost:4000');
         });
         withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
-          assert.equal(Manager.getWebsiteUrl(), 'https://localhost:4000', 'testing → localhost:4000');
+          assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'testing → localhost:4000');
         });
         withEnv({ ENVIRONMENT: 'production' }, () => {
           const url = Manager.getWebsiteUrl();

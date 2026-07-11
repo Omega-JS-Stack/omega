@@ -104,9 +104,18 @@ module.exports = {
       },
     },
     {
-      name: 'getApiUrl: dev returns http://localhost:5002',
+      name: 'getApiUrl: dev returns http://localhost:5002 (no published ports)',
       run: (ctx) => {
-        ctx.expect(ctx.manager.getApiUrl('development')).toBe('http://localhost:5002');
+        const origHttps = process.env.OMEGA_HTTPS_PORT;
+        const origHosting = process.env.OMEGA_HOSTING_PORT;
+        delete process.env.OMEGA_HTTPS_PORT;
+        delete process.env.OMEGA_HOSTING_PORT;
+        try {
+          ctx.expect(ctx.manager.getApiUrl('development')).toBe('http://localhost:5002');
+        } finally {
+          if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps;
+          if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting;
+        }
       },
     },
     {
@@ -114,7 +123,37 @@ module.exports = {
       run: (ctx) => {
         // Testing resolves to the local URL just like development — tests must hit the
         // local emulator, never the production API.
-        ctx.expect(ctx.manager.getApiUrl('testing')).toBe('http://localhost:5002');
+        const origHttps = process.env.OMEGA_HTTPS_PORT;
+        const origHosting = process.env.OMEGA_HOSTING_PORT;
+        delete process.env.OMEGA_HTTPS_PORT;
+        delete process.env.OMEGA_HOSTING_PORT;
+        try {
+          ctx.expect(ctx.manager.getApiUrl('testing')).toBe('http://localhost:5002');
+        } finally {
+          if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps;
+          if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting;
+        }
+      },
+    },
+    {
+      // N7 env channel — mirrors @omega.js/backend's getApiUrl: a published
+      // OMEGA_HTTPS_PORT (mgr serve's mkcert proxy) wins with https; else a
+      // published OMEGA_HOSTING_PORT is plain http to the hosting emulator.
+      name: 'getApiUrl: dev follows OMEGA_HTTPS_PORT (https) then OMEGA_HOSTING_PORT (http)',
+      run: (ctx) => {
+        const m = ctx.manager;
+        const origHttps = process.env.OMEGA_HTTPS_PORT;
+        const origHosting = process.env.OMEGA_HOSTING_PORT;
+        try {
+          process.env.OMEGA_HOSTING_PORT = '5099';
+          delete process.env.OMEGA_HTTPS_PORT;
+          ctx.expect(m.getApiUrl('development')).toBe('http://localhost:5099');
+          process.env.OMEGA_HTTPS_PORT = '5443';
+          ctx.expect(m.getApiUrl('development')).toBe('https://localhost:5443');
+        } finally {
+          if (origHttps !== undefined) process.env.OMEGA_HTTPS_PORT = origHttps; else delete process.env.OMEGA_HTTPS_PORT;
+          if (origHosting !== undefined) process.env.OMEGA_HOSTING_PORT = origHosting; else delete process.env.OMEGA_HOSTING_PORT;
+        }
       },
     },
     {
@@ -147,9 +186,27 @@ module.exports = {
       },
     },
     {
-      name: 'getWebsiteUrl: dev returns https://localhost:4000 (@omega.js/backend convention)',
+      name: 'getWebsiteUrl: dev returns http://localhost:4000 (`omega dev` speaks plain http)',
       run: (ctx) => {
-        ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('https://localhost:4000');
+        const orig = process.env.OMEGA_WEBSITE_PORT;
+        delete process.env.OMEGA_WEBSITE_PORT;
+        try {
+          ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('http://localhost:4000');
+        } finally {
+          if (orig !== undefined) process.env.OMEGA_WEBSITE_PORT = orig;
+        }
+      },
+    },
+    {
+      name: 'getWebsiteUrl: dev follows OMEGA_WEBSITE_PORT (N7 env channel)',
+      run: (ctx) => {
+        const orig = process.env.OMEGA_WEBSITE_PORT;
+        try {
+          process.env.OMEGA_WEBSITE_PORT = '4001';
+          ctx.expect(ctx.manager.getWebsiteUrl('development')).toBe('http://localhost:4001');
+        } finally {
+          if (orig !== undefined) process.env.OMEGA_WEBSITE_PORT = orig; else delete process.env.OMEGA_WEBSITE_PORT;
+        }
       },
     },
     {
@@ -191,10 +248,10 @@ module.exports = {
         m.config.brand.id = 'demo';
         try {
           const url = new URL(m.getAuthUrl('development'));
-          ctx.expect(url.origin).toBe('https://localhost:4000');
+          ctx.expect(url.origin).toBe('http://localhost:4000');
           ctx.expect(url.pathname).toBe('/signin');
           const tokenUrl = new URL(url.searchParams.get('authReturnUrl'));
-          ctx.expect(tokenUrl.origin).toBe('https://localhost:4000');
+          ctx.expect(tokenUrl.origin).toBe('http://localhost:4000');
           ctx.expect(tokenUrl.pathname).toBe('/token');
           ctx.expect(tokenUrl.searchParams.get('authReturnUrl')).toBe('demo://auth/token');
         } finally {
@@ -274,7 +331,7 @@ module.exports = {
         delete process.env.OMEGA_TEST_MODE;
         try {
           m.config.em.environment = 'development';
-          ctx.expect(m.getWebsiteUrl()).toBe('https://localhost:4000');
+          ctx.expect(m.getWebsiteUrl()).toBe('http://localhost:4000');
           m.config.em.environment = 'production';
           ctx.expect(m.getWebsiteUrl()).toBe('https://example.com');
         } finally {

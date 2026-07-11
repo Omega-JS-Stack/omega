@@ -10,21 +10,35 @@ class ServeCommand extends BaseCommand {
   async execute() {
     const self = this.main;
     const projectDir = self.firebaseProjectPath;
-    const firebaseConfig = JSON.parse(fs.readFileSync(path.join(projectDir, 'firebase.json'), 'utf8'));
-    const port = parseInt(self.argv.port || self.argv?._?.[1] || firebaseConfig?.emulators?.hosting?.port || '5000', 10);
+    const { isPortFree, resolvePorts, writePortsFile, clearPortsFile } = require('@omega.js/config');
+    const { loadEmulatorPorts } = require('./setup-tests/emulator-config.js');
 
-    // HTTPS: proxy on the public port (5002), firebase serve on an internal port (5443).
-    // All services connect to https://localhost:5002. Disable with --no-https.
+    // HTTPS: proxy on the public port (classic 5002), firebase serve on an
+    // internal port (classic 5443). Disable with --no-https.
     const httpsEnabled = self.argv.https !== false;
-    const internalPort = 5443;
 
-    // Check for port conflicts before starting server
-    const portsToCheck = httpsEnabled
-      ? { 'HTTPS': port, 'internal': internalPort }
-      : { serving: port };
-    const canProceed = await this.checkAndKillBlockingProcesses(portsToCheck);
-    if (!canProceed) {
-      throw new Error('Port conflicts could not be resolved');
+    // N7: allocate instead of killing the incumbent — a taken port bumps +1
+    // (a second brand's serve just lands next door). An explicit --port (or
+    // positional) PINS: busy = hard error, never a silent move.
+    const flagPort = parseInt(self.argv.port || self.argv?._?.[1], 10) || null;
+    const pins = {};
+    if (flagPort) {
+      if (!(await isPortFree(flagPort))) {
+        throw new Error(`Port ${flagPort} (pinned via --port) is already in use — free it or pick another`);
+      }
+      pins.public = flagPort;
+    }
+    const { ports: servePorts, bumped } = await resolvePorts({
+      wanted: {
+        public: flagPort || loadEmulatorPorts(projectDir).hosting || 5000,
+        internal: 5443,
+      },
+      pins,
+    });
+    const port = servePorts.public;
+    const internalPort = servePorts.internal;
+    if (bumped.length) {
+      this.log(chalk.yellow(`  Ports bumped (classic taken): ${bumped.map((name) => `${name}→${servePorts[name]}`).join(', ')}\n`));
     }
 
     // Wipe stale firebase-tools debug logs + any leftover @omega.js/backend logs from older
@@ -35,14 +49,25 @@ class ServeCommand extends BaseCommand {
     const watcher = new WatchCommand(self);
     watcher.startBackground();
 
-    // Start Stripe webhook forwarding in background
-    this.startStripeWebhookForwarding();
-
     // Start HTTPS proxy if enabled. If certs can't be obtained, fall back to
     // plain HTTP — don't set OMEGA_HTTPS_PORT or redirect to the internal port.
     const httpsReady = httpsEnabled
       ? await this._startHttpsProxy(port, internalPort, projectDir)
       : false;
+
+    // Start Stripe webhook forwarding in background, aimed at the port that
+    // actually speaks plain http: the internal firebase-serve port under the
+    // https proxy, the public port otherwise. (Pre-N7 it re-derived hosting
+    // from firebase.json and pointed http at the TLS proxy — a dead target.)
+    this.startStripeWebhookForwarding(httpsReady ? internalPort : port);
+
+    // Publish the resolved map for siblings (N7): `omega dev` composes it
+    // into the page chrome, so @omega.js/client's getApiUrl follows even a
+    // bumped serve. `https` = the mkcert proxy, `hosting` = wherever hosting
+    // speaks plain http. Retracted when the firebase child exits.
+    writePortsFile(projectDir, httpsReady
+      ? { https: port, hosting: internalPort }
+      : { hosting: port });
 
     // Set up log file in the project directory.
     const logPath = this.getLogsPath('dev.log');
@@ -100,6 +125,8 @@ class ServeCommand extends BaseCommand {
       firebaseEnv.NODE_TLS_REJECT_UNAUTHORIZED = '0';
       firebaseEnv.OMEGA_HTTPS_PORT = String(port);
     }
+    // Where hosting speaks plain http (N7 env channel — functions inherit)
+    firebaseEnv.OMEGA_HOSTING_PORT = String(firebasePort);
 
     try {
       await powertools.execute(`firebase serve --port ${firebasePort}`, {
@@ -133,6 +160,8 @@ class ServeCommand extends BaseCommand {
             currentStream.end();
           }
           try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* ok */ }
+          // Retract the published port map (clean shutdown)
+          clearPortsFile(projectDir);
         });
       });
     } catch (error) {

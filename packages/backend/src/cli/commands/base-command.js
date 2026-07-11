@@ -272,9 +272,13 @@ class BaseCommand {
    * Start Stripe CLI webhook forwarding in the background
    * Forwards Stripe test webhooks to the local server
    * Gracefully skips if stripe CLI or STRIPE_SECRET_KEY is missing
+   * @param {number} [forwardPort] - The port that speaks plain http to /omega/**
+   *   (serve passes internal-under-https/public-otherwise; the emulator passes
+   *   its resolved hosting port). Absent → a live sibling's ports file →
+   *   firebase.json → classic 5002. (N7)
    * @returns {object|null} - Child process handle or null if skipped
    */
-  startStripeWebhookForwarding() {
+  startStripeWebhookForwarding(forwardPort) {
     const projectDir = this.main.firebaseProjectPath;
     const functionsDir = path.join(projectDir, 'functions');
 
@@ -306,18 +310,14 @@ class BaseCommand {
       return null;
     }
 
-    // Resolve hosting port from firebase.json (default 5002)
-    let hostingPort = 5002;
-    const firebaseJsonPath = path.join(projectDir, 'firebase.json');
-    if (jetpack.exists(firebaseJsonPath)) {
-      try {
-        const JSON5 = require('json5');
-        const firebaseConfig = JSON5.parse(jetpack.read(firebaseJsonPath));
-        hostingPort = firebaseConfig.emulators?.hosting?.port || hostingPort;
-      } catch (e) {
-        // Use default
-      }
-    }
+    // Resolve the plain-http target (N7): explicit from the caller, else a
+    // live sibling's published map, else firebase.json, else classic 5002.
+    const { readPortsFile } = require('@omega.js/config');
+    const { loadEmulatorPorts } = require('./setup-tests/emulator-config.js');
+    const hostingPort = forwardPort
+      || readPortsFile(projectDir)?.hosting
+      || loadEmulatorPorts(projectDir).hosting
+      || 5002;
 
     const forwardUrl = `http://localhost:${hostingPort}/omega/payments/webhook?processor=stripe&key=${process.env.OMEGA_WEBHOOK_KEY}`;
 

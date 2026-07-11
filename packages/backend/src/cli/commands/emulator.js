@@ -54,13 +54,14 @@ class EmulatorCommand extends BaseCommand {
     const watcher = new WatchCommand(this.main);
     const watcherChild = watcher.startBackground();
 
-    // Start Stripe webhook forwarding in background
-    this.startStripeWebhookForwarding();
-
     // Keep-alive: boot emulators and wait for Ctrl+C. No "command" subprocess —
     // the emulator child IS the foreground process from the user's perspective.
     try {
       const { shutdown, emulatorPorts, bumped, exitPromise } = await this.startEmulators();
+
+      // Start Stripe webhook forwarding in background — AFTER boot so it
+      // targets the RESOLVED hosting port, not a classic that may have bumped
+      this.startStripeWebhookForwarding(emulatorPorts.hosting);
 
       // Seed personas unless --no-seed was passed (yargs boolean negation:
       // `--no-seed` parses as argv.seed === false). seedPersonas is fully

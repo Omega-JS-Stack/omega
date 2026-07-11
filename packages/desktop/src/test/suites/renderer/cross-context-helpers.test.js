@@ -100,9 +100,9 @@ module.exports = {
       },
     },
     {
-      name: 'getWebsiteUrl: dev → https://localhost:4000 (@omega.js/backend convention)',
+      name: 'getWebsiteUrl: dev → http://localhost:4000 (@omega.js/backend convention)',
       run: (ctx) => {
-        ctx.expect(window.__emTestManager.getWebsiteUrl('development')).toBe('https://localhost:4000');
+        ctx.expect(window.__emTestManager.getWebsiteUrl('development')).toBe('http://localhost:4000');
       },
     },
     {
@@ -117,10 +117,10 @@ module.exports = {
         // The renderer always runs under OMEGA_TEST_MODE (testing wins), so the no-arg form
         // correctly resolves LOCAL regardless of config — that's the safety guarantee.
         window.__emTestManager.setConfig('em.environment', 'production');
-        ctx.expect(window.__emTestManager.getWebsiteUrl()).toBe('https://localhost:4000');
+        ctx.expect(window.__emTestManager.getWebsiteUrl()).toBe('http://localhost:4000');
         // An explicit env arg bypasses the current environment and pins the mapping.
         ctx.expect(window.__emTestManager.getWebsiteUrl('production')).toBe('https://example.com');
-        ctx.expect(window.__emTestManager.getWebsiteUrl('development')).toBe('https://localhost:4000');
+        ctx.expect(window.__emTestManager.getWebsiteUrl('development')).toBe('http://localhost:4000');
       },
     },
   ],

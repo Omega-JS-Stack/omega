@@ -19,9 +19,11 @@ function getFunctionsUrl(environment) {
     throw new Error('cloud.config.projectId not set in config/omega.json5');
   }
 
-  // Local for development OR testing; production otherwise.
+  // Local for development OR testing; production otherwise. Resolved ports
+  // arrive via the OMEGA_*_PORT env channel (N7) — the CLI that booted the
+  // stack publishes them; classic defaults when unset.
   if (env === 'development' || env === 'testing') {
-    return `http://localhost:5001/${projectId}/us-central1`;
+    return `http://localhost:${process.env.OMEGA_FUNCTIONS_PORT || 5001}/${projectId}/us-central1`;
   }
 
   return `https://us-central1-${projectId}.cloudfunctions.net`;
@@ -30,9 +32,15 @@ function getFunctionsUrl(environment) {
 function getApiUrl(environment) {
   const env = environment || this.getEnvironment();
 
-  // Local for development OR testing; production otherwise.
+  // Local for development OR testing; production otherwise. Mirrors
+  // @omega.js/backend's getApiUrl (N7): a published OMEGA_HTTPS_PORT means
+  // `mgr serve`'s mkcert proxy is up (https); otherwise plain http to the
+  // hosting emulator (resolved port or classic 5002).
   if (env === 'development' || env === 'testing') {
-    return 'http://localhost:5002';
+    const httpsPort = process.env.OMEGA_HTTPS_PORT;
+    return httpsPort
+      ? `https://localhost:${httpsPort}`
+      : `http://localhost:${process.env.OMEGA_HOSTING_PORT || 5002}`;
   }
 
   // Prod: api.<authDomain>. Mirrors @omega.js/client.getApiUrl behavior.
@@ -44,16 +52,17 @@ function getApiUrl(environment) {
   return `https://api.${authDomain}`;
 }
 
-// Marketing-site / brand website URL. Dev → `https://localhost:4000` (matches @omega.js/backend's
-// jekyll-emulator port convention). Prod → `config.brand.url`. Use this whenever app
-// code wants to link out to "the website" (Help → Website tray/menu items, "Open in
-// browser," billing portal landings) so dev runs don't punch out to the real domain.
+// Marketing-site / brand website URL. Dev → `http://localhost:4000` (the `omega dev`
+// server speaks plain http; resolved port via OMEGA_WEBSITE_PORT — N7). Prod →
+// `config.brand.url`. Use this whenever app code wants to link out to "the website"
+// (Help → Website tray/menu items, "Open in browser," billing portal landings) so dev
+// runs don't punch out to the real domain.
 function getWebsiteUrl(environment) {
   const env = environment || this.getEnvironment();
 
   // Local for development OR testing; production otherwise.
   if (env === 'development' || env === 'testing') {
-    return 'https://localhost:4000';
+    return `http://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`;
   }
 
   const url = this?.config?.brand?.url;

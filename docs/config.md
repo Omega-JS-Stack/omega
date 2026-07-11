@@ -137,6 +137,21 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   **4000** (pre-N7 it defaulted to 8080, colliding with the SAME brand's firestore
   emulator), bump when taken, `--port` flag or config `ports.website` pins; publishes
   its own ports file in the website app dir.
+- **Serve + per-target ports (cp90)** — `mgr serve` allocates through the same model
+  (`--port` pins, taken bumps — the old kill-the-incumbent check is gone) and PUBLISHES
+  its map: `https` (the mkcert proxy) + `hosting` (the internal plain-http
+  firebase-serve port), so `omega dev` bakes even a bumped serve into the chrome and
+  Stripe webhook forwarding targets the port that actually speaks http (it used to aim
+  plain http at the TLS proxy). Desktop + extension `serve` allocate `livereload` — two
+  targets of one brand land on distinct ports — and desktop allocates `cdp` when
+  requested (`OMEGA_CDP_PORT` set); desktop URL getters mirror the backend's
+  env-channel reads (`https` → mkcert, `hosting` → plain http, classic otherwise).
+  The manager's Google-OAuth loopback binds an EPHEMERAL port (`listen(0)`, RFC 8252)
+  instead of pinning 9876. `getWebsiteUrl` (backend + desktop) now returns
+  `http://localhost:4000` — the https form was a browsersync-era assumption no current
+  dev server speaks. Packaged extension/desktop artifacts keep BUILD-TIME-BAKED ports
+  by design (a shipped extension can't probe); the extension manifest's dev-website
+  origin documents that inline.
 - **Config `ports` section** (schema, optional object) — explicit pins for any port name;
   unset = auto-allocate.
 - When a boot bumps emulator ports, the backend CLI materializes

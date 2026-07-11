@@ -12,7 +12,43 @@ const { spawn } = require('child_process');
 const projectRoot = Manager.getRootPath('project');
 
 module.exports = function serve(done) {
-  const port = Manager.getLiveReloadPort();
+  // N7: resolve livereload (and CDP when requested) through the allocator —
+  // taken ports bump +1, so two targets of one brand (desktop + extension
+  // serve) land on distinct ports automatically. Config `ports.*` pins.
+  resolveServePorts()
+    .then((ports) => start(ports, done))
+    .catch(done);
+};
+
+async function resolveServePorts() {
+  const { resolvePorts, envPort, CLASSIC_PORTS } = require('@omega.js/config');
+  const configPins = Manager.getConfig()?.ports || {};
+
+  const wanted = { livereload: envPort('livereload') || CLASSIC_PORTS.livereload };
+  const pins = {};
+  if (typeof configPins.livereload === 'number') pins.livereload = configPins.livereload;
+
+  // CDP is opt-in (OMEGA_CDP_PORT set) — allocate it too instead of the old
+  // "try port+1 manually" advice when 9222 is taken.
+  const cdpRequested = !!process.env.OMEGA_CDP_PORT;
+  if (cdpRequested) {
+    wanted.cdp = envPort('cdp') || CLASSIC_PORTS.cdp;
+    if (typeof configPins.cdp === 'number') pins.cdp = configPins.cdp;
+  }
+
+  const { ports, bumped } = await resolvePorts({ wanted, pins });
+  process.env.OMEGA_LIVERELOAD_PORT = String(ports.livereload);
+  if (cdpRequested) {
+    process.env.OMEGA_CDP_PORT = String(ports.cdp);
+  }
+  if (bumped.length) {
+    logger.log(`Ports bumped (classic taken): ${bumped.map((name) => `${name}→${ports[name]}`).join(', ')}`);
+  }
+  return ports;
+}
+
+function start(ports, done) {
+  const port = ports.livereload;
   logger.log(`serve — livereload port=${port}`);
 
   // Resolve the electron binary relative to the consumer project's node_modules.
@@ -77,7 +113,9 @@ module.exports = function serve(done) {
         });
       });
       req.on('error', () => {
-        logger.warn(`CDP port ${cdpPort} not responding — port may be taken by another process. Try a different port: OMEGA_CDP_PORT=${Number(cdpPort) + 1} npm start`);
+        // The port was allocator-probed free before spawn, so a dead endpoint
+        // means Electron itself didn't bring CDP up — not a port clash.
+        logger.warn(`CDP port ${cdpPort} not responding — the app may not have remote debugging enabled`);
       });
       req.setTimeout(3000, () => { req.destroy(); });
     }, 5000);

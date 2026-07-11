@@ -114,19 +114,16 @@ class GoogleOAuth2Client {
    */
   async performOAuth2Flow() {
     return new Promise((resolve, reject) => {
-      const port = 9876;
-      const redirectUri = `http://localhost:${port}/callback`;
-
-      const authUrl = new URL(GOOGLE_AUTH_URL);
-      authUrl.searchParams.set('client_id', this.clientId);
-      authUrl.searchParams.set('redirect_uri', redirectUri);
-      authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('scope', this.scopes.join(' '));
-      authUrl.searchParams.set('access_type', 'offline');
-      authUrl.searchParams.set('prompt', 'consent');
+      // RFC 8252 §7.3 loopback: bind an EPHEMERAL port (listen(0)) and read
+      // the real one at listen time — Google's desktop-app client type
+      // accepts any localhost port, so nothing pins 9876 (which anything
+      // else could be holding; N7 removes fixed dev ports). `redirectUri`
+      // is assigned in the listen callback, before the server is reachable,
+      // so the request handler never sees it null.
+      let redirectUri = null;
 
       const server = createServer(async (req, res) => {
-        const reqUrl = new URL(req.url, `http://localhost:${port}`);
+        const reqUrl = new URL(req.url, 'http://localhost');
 
         if (reqUrl.pathname !== '/callback') {
           res.writeHead(404);
@@ -196,7 +193,18 @@ class GoogleOAuth2Client {
         }
       });
 
-      server.listen(port, () => {
+      server.listen(0, () => {
+        const port = server.address().port;
+        redirectUri = `http://localhost:${port}/callback`;
+
+        const authUrl = new URL(GOOGLE_AUTH_URL);
+        authUrl.searchParams.set('client_id', this.clientId);
+        authUrl.searchParams.set('redirect_uri', redirectUri);
+        authUrl.searchParams.set('response_type', 'code');
+        authUrl.searchParams.set('scope', this.scopes.join(' '));
+        authUrl.searchParams.set('access_type', 'offline');
+        authUrl.searchParams.set('prompt', 'consent');
+
         console.log('');
         console.log(`  ${chalk.dim('→')} Google authentication required — open this URL in your browser:`);
         console.log(`  ${chalk.cyan(authUrl.toString())}`);
