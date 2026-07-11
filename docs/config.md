@@ -29,6 +29,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   monitoring:     { provider: 'sentry', dsn },
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
+  translation:    { enabled, default, languages: [], provider: 'claude'|'chatgpt', model, exclude: [] }, // docs/translation.md
 
   // TARGET-scoped config. KEY PRESENCE = "this brand enables this target"
   // (replaces the legacy brand-config targets ARRAY). `extension: {}` means

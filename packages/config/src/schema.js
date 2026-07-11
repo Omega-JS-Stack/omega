@@ -32,7 +32,7 @@ const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 // omega-manager's disperse enumerates THIS list instead of hardcoding
 // per-target mapping blocks. (`targets` itself is the scoping key, not a
 // shared section; `theme` is project-owned but shared-shaped.)
-const SHARED_SECTIONS = ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme'];
+const SHARED_SECTIONS = ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
 
 const SHARED_SCHEMA = [
   // ── brand ────────────────────────────────────────────────────────────────
@@ -226,6 +226,45 @@ const SHARED_SCHEMA = [
     required:    false,
     enum:        ['system', 'light', 'dark'],
     description: "Default appearance. 'system' follows the OS; a user's runtime choice persists in storage and wins.",
+  },
+
+  // ── translation ──────────────────────────────────────────────────────────
+  {
+    path:        'translation.enabled',
+    type:        'boolean',
+    required:    false,
+    description: 'Master switch (default true). Translation only runs when languages is non-empty.',
+  },
+  {
+    path:        'translation.default',
+    type:        'string',
+    required:    false,
+    description: "Source language code (default 'en'). Drives <html lang>, og:locale, and the default hreflang.",
+  },
+  {
+    path:        'translation.languages',
+    type:        'array',
+    required:    false,
+    description: "Target language codes (e.g. ['es', 'fr']). Empty/absent = translation off. Validated against @omega.js/devkit/translate's language SSOT.",
+  },
+  {
+    path:        'translation.provider',
+    type:        'string',
+    required:    false,
+    enum:        ['claude', 'chatgpt'],
+    description: "AI translation provider. 'claude' (default) rides the local Claude Code install — no API key; 'chatgpt' uses the OpenAI API via OPENAI_API_KEY in env.",
+  },
+  {
+    path:        'translation.model',
+    type:        'string',
+    required:    false,
+    description: "Model override for the provider (defaults: claude → 'sonnet' alias, chatgpt → 'gpt-5.4-nano').",
+  },
+  {
+    path:        'translation.exclude',
+    type:        'array',
+    required:    false,
+    description: 'Web only: extra page paths/folders to skip (system pages like checkout/legal/auth are always skipped).',
   },
 
   // ── targets ──────────────────────────────────────────────────────────────

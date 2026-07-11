@@ -15,6 +15,7 @@
     "./flows": "./src/flows.js",
     "./defaults-engine": "./src/defaults-engine.js",
     "./merge-line-files": "./src/merge-line-files.js",
+    "./translate": "./src/translate/index.js",
     "./clean-dirs": "./src/clean-dirs.js",
     "./parse-audit": "./src/parse-audit.js",
     "./test/runner-core": "./src/test/runner-core.js",

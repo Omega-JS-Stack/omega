@@ -84,9 +84,20 @@ function stripComments(source) {
 }
 
 // Map a package subpath ('' | 'logger' | 'test/assert' | 'logger.js') to its module-root-relative file.
-function subpathToFile(subpath) {
+function subpathToFile(subpath, packageRoot) {
   const name = subpath || 'index';
-  return name.endsWith('.js') ? name : `${name}.js`;
+  if (name.endsWith('.js')) {
+    return name;
+  }
+
+  // Directory modules: '@omega.js/devkit/translate' → 'translate/index.js'
+  if (packageRoot
+    && !jetpack.exists(path.join(packageRoot, `${name}.js`))
+    && jetpack.exists(path.join(packageRoot, name, 'index.js'))) {
+    return `${name}/index.js`;
+  }
+
+  return `${name}.js`;
 }
 
 // Reduce a require/import specifier to its package name ('chalk', '@scope/pkg').
@@ -221,6 +232,16 @@ function vendorPackages(options) {
   );
   const neverVendor = (name) => name === hostSelfName || publishedNames.has(name);
 
+  // Package roots resolve once per name — subpath → file mapping needs them
+  // to detect directory modules (translate/index.js vs translate.js).
+  const packageRoots = new Map();
+  const rootFor = (name) => {
+    if (!packageRoots.has(name)) {
+      packageRoots.set(name, resolvePackageRoot(name, cwd));
+    }
+    return packageRoots.get(name);
+  };
+
   // 1. Scan dist for @omega.js references: which files need rewriting, which
   // modules of which packages are used.
   const seedsByPackage = new Map();
@@ -236,7 +257,7 @@ function vendorPackages(options) {
         const name = match[3];
         if (neverVendor(name)) continue;
         if (!seedsByPackage.has(name)) seedsByPackage.set(name, new Set());
-        seedsByPackage.get(name).add(subpathToFile(match[4]));
+        seedsByPackage.get(name).add(subpathToFile(match[4], rootFor(name)));
         uses = true;
       }
     }
@@ -254,7 +275,7 @@ function vendorPackages(options) {
   // 2. Selective copy per package: seeds + transitive relative deps, nothing else.
   const vendored = {};
   for (const [name, seeds] of seedsByPackage) {
-    const packageRoot = resolvePackageRoot(name, cwd);
+    const packageRoot = rootFor(name);
     const needed = resolveNeededFiles(name, packageRoot, seeds);
     for (const relative of needed) {
       jetpack.copy(path.join(packageRoot, relative), path.join(vendorRoot, name, relative));
@@ -270,7 +291,7 @@ function vendorPackages(options) {
     for (const pattern of REFERENCE_PATTERNS) {
       updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
         if (neverVendor(name)) return match;
-        const target = path.join(vendorRoot, name, subpathToFile(subpath));
+        const target = path.join(vendorRoot, name, subpathToFile(subpath, rootFor(name)));
         let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
         if (!relative.startsWith('.')) {
           relative = `./${relative}`;

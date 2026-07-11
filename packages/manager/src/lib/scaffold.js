@@ -80,6 +80,13 @@ function renderOmegaConfig(answers) {
     '    appearance: "system", // "system" | "light" | "dark"',
     '  },',
     '',
+    '  // AI translation (web /{lang}/ pages, extension _locales). Provider',
+    '  // "claude" (default) rides the local Claude Code install — no API key;',
+    '  // "chatgpt" needs OPENAI_API_KEY in .env. Uncomment to enable:',
+    '  // translation: {',
+    '  //   languages: ["es", "fr", "de"],',
+    '  // },',
+    '',
   );
 
   // Only a CUSTOMIZED admin list lands here — an inherited one (company

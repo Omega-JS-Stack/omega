@@ -47,6 +47,13 @@
     appearance: "system", // "system" | "light" | "dark"
   },
 
+  // AI translation (web /{lang}/ copies + extension _locales) — provider
+  // "claude" (default) rides the local Claude Code install; "chatgpt" needs
+  // OPENAI_API_KEY in .env. Per-string cache commits to each app's translations/.
+  translation: {
+    languages: ["es"], // dogfood canary scope — expand at launch
+  },
+
   // Emulator-only demo project (demo-* = Firebase's offline convention) —
   // swap for the real project when the brand goes live.
   cloud: {

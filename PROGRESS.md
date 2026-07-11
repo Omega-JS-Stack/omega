@@ -2,16 +2,17 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **C1 COMPLETE (cp95a+b+c): 18/22 friction findings dead** — seeds/identity (95a), BEM demo-* start-to-finish (95b), consistency/de-ITW (95c: gulpfile shim + dep-home + 405 + env scrub + EM/BXM brand identity). Open: #6/#7 (C2 = cp96), #15 Node story, #16 sass (C3). Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
+- **cp96 SHIPPED (translation overhaul) — next: cp97 C2 pricing (queue #1)**. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction still open: #6/#7 (cp97), #15 Node story, #16 sass (C3)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **cp96** — C2 pricing/blueprints: kill `### ALL PAGES ###` marker convention + layout frontmatter knobs; products = the ONLY pricing source (#6 empty-state, #7 one-time presentation); KEEP 3-layer JS/CSS, legal append, D8 virtual pages → then cp97 D13 deliberate deploys (live workflow proof Ian-gated)
-2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
+1. **cp97** — C2 pricing/blueprints: kill `### ALL PAGES ###` marker convention + layout frontmatter knobs; products = the ONLY pricing source (#6 empty-state, #7 one-time presentation); KEEP 3-layer JS/CSS, legal append, D8 virtual pages → then cp98 D13 deliberate deploys (live workflow proof Ian-gated)
+2. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
 - Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go — a LONG way out ("everything good across the board" first)
-- PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in the web package). MAM parked entirely.
+- PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; audit port (explicit stub in the web package — translate UNPINNED by Ian 2026-07-11, shipping as cp96). MAM parked entirely.
+- omega-brand real-services mode: Ian to create/authorize a dedicated Firebase project (+ per-service test keys via brand-root .env; projectId swap in omega.json5) — proposed 2026-07-11; D13's live deploy proof would ride it
 
 ## 📏 Standing rules
 - **Continuous mode (Ian 2026-07-10)**: keep iterating/building/testing autonomously, checkpoint after checkpoint — stop ONLY for serious errors or decisions that are genuinely Ian's. (Replaces one-checkpoint-per-"continue".)
@@ -33,7 +34,7 @@
 - Ghostii devlog auth still sends the `backendManagerKey` payload field — live external API contract; rename when Ghostii itself migrates to the new stack (72)
 - CI emulator jobs on 2-core runners, PARKED: worker-load storms (run 6: 104× 'Failed to load function.', machine clean — leak theory dead); run 7 (FUNCTIONS_DISCOVERY_TIMEOUT=120): suites failed CLEAN at 14m35 (no 23-min hang) but the backend step was still killed externally; post-mortems never fired — cancellation ≠ `failure()`, use `if: always()` next time; next escalations if resumed: throttle trigger storms or split/beef jobs (73b)
 - push-secrets under D15: it pushes only the APP .env Default section to repo secrets, but brand/company-level values no longer live there — revisit when the dogfood arc reaches CI publish (D13) (73a)
-- BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
+- ~~BXM translate auto-calls Claude on fresh clones (64)~~ RESOLVED cp96: the per-string cache is COMMITTED (translations/) — warm clones/CI translate with zero provider calls
 - BEM 1.4b residue (~~setup can't complete on demo-*~~ FIXED 95b — 39/39): `mgr serve`'s hosting upstream 403s on demo-* (cp90 proved allocation/publish/proxy/retract regardless); nvmrc fix is two-phase (friction #15); `mgr test` can orphan java emulator grandchildren (95a caught TWO stale generations squatting 8080/8085 with functions_emulator cross-talk timing out corpus cron waits)
 - ~~BEM test path filter vs corpus paths~~ FOLDED into C5 (94a): prefixes now stripped centrally per-source
 - devkit `node --test` full-suite run can flake with "Unable to deserialize cloned data" on e2e-harness.test.js (file-level ✖, all subtests green; 1-in-3, scheduling-sensitive IPC corruption — isolation always passes) (94a)
@@ -42,7 +43,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 95c C1 slice 3 — gulpfile shim (+`./gulp` exports; omega-brand ext builds), dep-home either-section ×5, middleware 405 (+corpus test → 1225), ELECTRON_RUN_AS_NODE spawn scrubs ×3, EM appId/©-from-brand (pins respelled), BXM messages tokens (+omega-brand → OMEGA) (this commit) → CHANGELOG
+- [x] 96 translation overhaul — devkit engine (sentinel batches, claude-local/chatgpt providers, hermetic SDK) + committed per-string cache, web port (build hook + real `omega translate`, hreflang/links/RTL), BXM per-key refresh, `translation` schema section; live es canary both surfaces, idempotent; devkit 176/config 94/web 65/ext 99/mgr 582 (this commit) → CHANGELOG + docs/translation.md — gulpfile shim (+`./gulp` exports; omega-brand ext builds), dep-home either-section ×5, middleware 405 (+corpus test → 1225), ELECTRON_RUN_AS_NODE spawn scrubs ×3, EM appId/©-from-brand (pins respelled), BXM messages tokens (+omega-brand → OMEGA) (this commit) → CHANGELOG
 - [x] 95b C1 slice 2 — demo-* setup completes: isDemoProject gates ×3 live-API heads (synced/file-pull/campaigns) + poisoned-file self-heal, database.rules scaffold, fake-SA autogen, projectId precedence config→artifacts (writeConfigValues; .firebaserc derives); live: fresh demo brand 39/39 exit 0, emulator first-boot, converged rerun (this commit) → CHANGELOG
 - [x] 95a C1 slice 1 — layer-aware seeding (config seed module + 4 setups; ext template de-ITW), wizard deps/cloud/catalog seeds + functions/package.json, #5 schema oracle, #13 ext setup-scaffold, #20 .env empty-shadowing (3 prongs); live scratch brand "My Brand"×0; 7/22 findings closed (this commit) → CHANGELOG
 - [x] 94b C5 brand-root dispatch — omega-bin brand detection (nearest-context; stdlib twin of resolveBrandRoot) → manager cli handoff; manager `test` fan-out (FRAMEWORK_IDS routing, sequential, aggregate exit); live: omega-brand bare 4/4 project-only, `em:`→desktop-only 751, sandbox `backend:routes/general`→5; friction #20 found (.env `""`-shadowing); devkit 161/mgr 582 (this commit) → CHANGELOG
@@ -91,4 +92,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 3:20 PM (95c — C1 complete, 18/22 findings dead; next: cp96 C2 pricing/blueprints)*
+*Last updated: 2026-07-11 4:05 PM (96 — translation overhaul shipped; next: cp97 C2 pricing/blueprints)*

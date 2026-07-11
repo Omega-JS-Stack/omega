@@ -561,19 +561,22 @@ async function deployStoreAssets() {
     logger.log('Store asset: description/en.md');
   }
 
-  // Copy cached translated descriptions
-  const cacheDescDir = path.join(process.cwd(), '.cache', 'translations', 'description');
-  if (jetpack.exists(cacheDescDir)) {
+  // Copy translated descriptions (committed translations/, source marker stripped)
+  const translationsDir = path.join(process.cwd(), 'translations');
+  if (jetpack.exists(translationsDir)) {
+    const { readTranslatedDescription } = require('./translate.js');
     const descDir = path.join(assetsDir, 'description');
-    jetpack.dir(descDir);
 
     let count = 0;
-    const files = jetpack.find(cacheDescDir, { matching: '*.md' });
+    for (const file of jetpack.find(translationsDir, { matching: '*/description.md' })) {
+      const lang = path.basename(path.dirname(file));
+      const content = readTranslatedDescription(lang);
 
-    for (const file of files) {
-      const fileName = path.basename(file);
-      jetpack.copy(file, path.join(descDir, fileName), { overwrite: true });
-      count++;
+      if (content) {
+        jetpack.dir(descDir);
+        jetpack.write(path.join(descDir, `${lang}.md`), content);
+        count++;
+      }
     }
 
     if (count > 0) {

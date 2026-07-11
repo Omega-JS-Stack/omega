@@ -35,9 +35,12 @@ npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
 npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place
 npx omega migrate --check   # full report (config + codemod preview + lint), zero writes
-# translate / audit: explicit not-ported-yet stubs (subsystems ride later checkpoints)
+npx omega translate         # translate dist/ into translation.languages (committed cache;
+                            #   `omega build` runs it automatically when enabled — see
+                            #   docs/translation.md in the Omega repo)
+# audit: explicit not-ported-yet stub (subsystem rides a later checkpoint)
 
-npm test    # 52 tests: engine slice (13) + assets/ESM (6) + CLI/scaffold (7) + migrate (14) + ports (5) + theme contract (7)
+npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme contract + translate
 ```
 
 A bare consumer (`omega setup` in an empty dir, edit brand in
@@ -212,8 +215,8 @@ latent copies) AND forward in consumer files by the codemod.
 
 `omega verify --against <jekyll-dist>` parity harness (B5 — the per-site
 migration gate; the real somiibo URL-set diff, 2,556 vs Jekyll's 2,608 files,
-is its first job) · translate/audit subsystem ports (commands exist as
-explicit not-ported-yet stubs) · UJM-setup extras (CNAME, firebase auth
+is its first job) · audit subsystem port (command exists as an explicit
+not-ported-yet stub — translate shipped in cp96) · UJM-setup extras (CNAME, firebase auth
 handler fetch, GitHub secret publishing, post dedupe) · imagemin w/
 content-hash cache, minifyHtml-as-transform, sitemap/feeds, named css
 bundles, full icon set (B-phase pipeline) · engine consumption of

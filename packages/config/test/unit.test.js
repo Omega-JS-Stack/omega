@@ -141,6 +141,24 @@ test('match/enum only run on present values — null/empty ids are silent', () =
   assert.deepStrictEqual(errors, []);
 });
 
+test('translation section: valid shape passes, provider enum + types enforced', () => {
+  assert.deepStrictEqual(
+    validateConfig({
+      ...VALID,
+      translation: { enabled: true, default: 'en', languages: ['es', 'fr'], provider: 'claude', exclude: ['blog'] },
+    }).errors,
+    [],
+  );
+
+  const { errors } = validateConfig({
+    ...VALID,
+    translation: { languages: 'es', provider: 'gemini' },
+  });
+
+  assert.ok(errors.some((e) => e.includes('config.translation.languages has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.translation.provider') && e.includes('must be one of [claude, chatgpt]')));
+});
+
 test('devlog + seo are schema-known optional objects (manager-read sections)', () => {
   assert.deepStrictEqual(
     validateConfig({ ...VALID, devlog: { enabled: true, orgs: ['x'] }, seo: { github: { content: [] } } }).errors,
@@ -217,6 +235,6 @@ test('formatErrors renders a numbered block; empty list renders empty', () => {
 test('SHARED_SECTIONS enumerates the disperse-owned sections', () => {
   assert.deepStrictEqual(
     SHARED_SECTIONS,
-    ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme'],
+    ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'],
   );
 });
