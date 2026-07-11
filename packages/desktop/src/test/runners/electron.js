@@ -34,13 +34,14 @@ function runElectronTests({ harnessEntry, suiteFiles, rendererSuiteFiles, filter
       args.push('--filter', filter);
     }
 
-    // ELECTRON_RUN_AS_NODE is already stripped by bin/mgr at the CLI boundary, so the child
-    // env is clean — no extra delete here.
     const childEnv = Object.assign({}, process.env, {
       OMEGA_TEST_MODE:              'true',   // canonical signal — manager.isTesting() picks it up
       ELECTRON_NO_ATTACH_CONSOLE: '1',
       NODE_OPTIONS:              '',
     });
+    // Defensive scrub at the spawn (friction 17c) — the CLI boundary strips it,
+    // but paths that bypass the boundary must not boot Electron as plain node.
+    delete childEnv.ELECTRON_RUN_AS_NODE;
 
     const child = spawn(electronBin, args, {
       cwd: projectRoot,

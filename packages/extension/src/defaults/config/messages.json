@@ -1,18 +1,18 @@
 {
   appName: {
-    message: 'Ultimate Browser Extension - Browser Enhancer',
+    message: '[ site.brand.name ]',
     description: 'The name of the extension.',
   },
   appNameShort: {
-    message: 'Ultimate Browser Extension',
+    message: '[ site.brand.name ]',
     description: 'The short name of the extension.',
   },
   appDescription: {
-    message: 'Ultimate Browser Extension - A powerful tool to enhance your browsing experience.',
+    message: 'The official [ site.brand.name ] browser extension.',
     description: 'The description of the extension.',
   },
   btnTooltip: {
-    message: 'Ultimate Browser Extension',
+    message: '[ site.brand.name ]',
     description: 'Tooltip for the button.',
   },
 }

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./config": "./dist/vendor/config/index.js",
+    "./gulp": "./dist/gulp/main.js",
     "./main": "./dist/main.js",
     "./renderer": "./dist/renderer.js",
     "./preload": "./dist/preload.js",
@@ -63,7 +64,7 @@
   },
   "projectScripts": {
     "start": "npx omega clean && npx omega setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omega.js/desktop/dist/gulp/main.js",
+    "gulp": "gulp",
     "build": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- build",
     "package": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- packageBuild",
     "package:quick": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- packageQuick",

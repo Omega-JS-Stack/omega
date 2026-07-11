@@ -6,6 +6,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./config": "./dist/vendor/config/index.js",
+    "./gulp": "./dist/gulp/main.js",
     "./build": "./dist/build.js",
     "./background": "./dist/background.js",
     "./content": "./dist/content.js",
@@ -49,7 +50,7 @@
   },
   "projectScripts": {
     "start": "npx omega clean && npx omega setup && npm run gulp --",
-    "gulp": "gulp --cwd ./ --gulpfile ./node_modules/@omega.js/extension/dist/gulp/main.js",
+    "gulp": "gulp",
     "build": "npx omega clean && npx omega setup && OMEGA_BUILD_MODE=true npm run gulp -- build",
     "publish": "OMEGA_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npm run build && npm run publish",

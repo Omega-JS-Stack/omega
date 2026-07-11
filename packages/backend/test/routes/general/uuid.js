@@ -111,5 +111,21 @@ module.exports = {
         return { success: true };
       },
     },
+
+    {
+      name: 'method-mismatch-is-405',
+      auth: 'none',
+      timeout: 10000,
+
+      async run({ http, assert }) {
+        // uuid is a method-file route (post.js only) — a GET must answer an
+        // honest 405, not the old 500 "Unable to load route" (friction #17)
+        const response = await http.get('backend-manager/general/uuid');
+
+        assert.isError(response, 405, 'GET on a POST-only route should return 405');
+
+        return { success: true };
+      },
+    },
   ],
 };

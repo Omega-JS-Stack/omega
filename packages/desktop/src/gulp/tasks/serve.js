@@ -73,14 +73,16 @@ function start(ports, done) {
 
   logger.log(`Spawning electron: ${electronBin} ${electronArgs.join(' ')} (cwd=${projectRoot})`);
 
-  // ELECTRON_RUN_AS_NODE is already stripped by gulp/main.js at the gulp boundary, so the
-  // child env is clean — no extra delete here.
   const childEnv = Object.assign({}, process.env, {
     OMEGA_LIVERELOAD_PORT: String(port),
     // Force chalk to keep colors when stdout is a pipe; the tee strips them before writing
     // to the log file but the terminal still gets colored output.
     FORCE_COLOR: '1',
   });
+  // Defensive scrub at the spawn (friction 17c): the gulp boundary strips it,
+  // but a path that bypasses the boundary would make require('electron')
+  // return the npm stub inside the app → crash at app.setName.
+  delete childEnv.ELECTRON_RUN_AS_NODE;
 
   // Pipe stdio (instead of 'inherit') so our parent-process attach-log-file tee can capture
   // electron's stdout/stderr too. We forward each chunk to process.stdout/stderr.write, which

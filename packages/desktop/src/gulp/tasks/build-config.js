@@ -143,9 +143,12 @@ function baseConfig(config, extras = {}) {
   config.app   = config.app   || {};
   config.brand = config.brand || {};
 
-  const appId       = config.app.appId       || 'com.itwcreativeworks.app';
+  // Manager.getConfig() derives appId from the brand url/id; the literal here
+  // only backstops bare test configs. Copyright derives from the BRAND, never
+  // a hardcoded company (friction #18).
+  const appId       = config.app.appId       || 'app.omega.consumer';
   const productName = config.app.productName || 'App';
-  const copyright   = expandYear(config.app.copyright || '© {YEAR}, ITW Creative Works');
+  const copyright   = expandYear(config.app.copyright || (config.brand.name ? `© {YEAR}, ${config.brand.name}` : '© {YEAR}'));
 
   // Generic category → per-platform values via lookup table. Default 'productivity' is
   // a safe baseline that fits ~80% of business + utility apps.

@@ -132,10 +132,12 @@ Manager.prototype.getMode = Manager.getMode;
 // theme) at the top level, targets.desktop overlaid onto them (so app/platforms/startup/
 // releases/... land at the top level here), and in a brand monorepo the brand root's
 // config merges underneath the app's. Then @omega.js/desktop's derived defaults:
-//   app.appId       ← `com.itwcreativeworks.${brand.id}` if not set
+//   app.appId       ← reverse-domain of brand.url (`https://foo.example.com` →
+//                     `com.example.foo`), else `app.${brand.id}` — the BRAND
+//                     owns the identity, never a hardcoded company (friction #18)
 //   app.productName ← brand.name if not set
-// These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo' }` is
-// enough; appId/productName flow through automatically.
+// These keep the consumer's config minimal: setting `brand: { id: 'foo', name: 'Foo',
+// url: 'https://foo.com' }` is enough; appId/productName flow through automatically.
 Manager.getConfig = function () {
   const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
 
@@ -148,7 +150,14 @@ Manager.getConfig = function () {
   // `config.brand.X` / `config.app.X` without optional-chaining at every callsite.
   config.brand = config.brand || {};
   config.app   = config.app   || {};
-  if (!config.app.appId       && config.brand.id)   config.app.appId       = `com.itwcreativeworks.${config.brand.id}`;
+  if (!config.app.appId) {
+    const host = String(config.brand.url || '').replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    if (host) {
+      config.app.appId = host.split('.').reverse().join('.');
+    } else if (config.brand.id) {
+      config.app.appId = `app.${config.brand.id}`;
+    }
+  }
   if (!config.app.productName && config.brand.name) config.app.productName = config.brand.name;
 
   return config;

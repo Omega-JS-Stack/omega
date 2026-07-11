@@ -34,14 +34,20 @@ module.exports = {
   description: 'Manager.getConfig — omega.json5 resolution + derived defaults',
   tests: [
     {
-      name: 'derives appId from brand.id when not set',
+      name: 'derives appId from the BRAND: reverse-domain of brand.url, else app.<brand.id> (friction #18)',
       run: (ctx) => {
-        const tmp = stageConsumer(`{ brand: { id: 'somiibo', name: 'Somiibo' }, targets: { desktop: {} } }`);
+        const withUrl = stageConsumer(`{ brand: { id: 'somiibo', name: 'Somiibo', url: 'https://www.somiibo.com' }, targets: { desktop: {} } }`);
         try {
-          const cfg = loadConfigInDir(tmp);
-          ctx.expect(cfg.app.appId).toBe('com.itwcreativeworks.somiibo');
+          ctx.expect(loadConfigInDir(withUrl).app.appId).toBe('com.somiibo');
         } finally {
-          fs.rmSync(tmp, { recursive: true, force: true });
+          fs.rmSync(withUrl, { recursive: true, force: true });
+        }
+
+        const noUrl = stageConsumer(`{ brand: { id: 'somiibo', name: 'Somiibo' }, targets: { desktop: {} } }`);
+        try {
+          ctx.expect(loadConfigInDir(noUrl).app.appId).toBe('app.somiibo');
+        } finally {
+          fs.rmSync(noUrl, { recursive: true, force: true });
         }
       },
     },

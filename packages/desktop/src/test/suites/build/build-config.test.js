@@ -129,18 +129,18 @@ module.exports = {
       run: (ctx) => {
         const { expandYear } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
         const year = new Date().getFullYear();
-        ctx.expect(expandYear('© {YEAR}, ITW Creative Works')).toBe(`© ${year}, ITW Creative Works`);
+        ctx.expect(expandYear('© {YEAR}, Somiibo')).toBe(`© ${year}, Somiibo`);
         ctx.expect(expandYear('no token here')).toBe('no token here');
         ctx.expect(expandYear(null)).toBe(null);
       },
     },
     {
-      name: 'baseConfig: copyright defaults to "© <YEAR>, ITW Creative Works" when not set',
+      name: 'baseConfig: copyright derives from brand.name, never a hardcoded company (friction #18)',
       run: (ctx) => {
         const { baseConfig } = require(path.join(__dirname, '..', '..', '..', 'gulp', 'tasks', 'build-config.js'));
-        const out = baseConfig({});
         const year = new Date().getFullYear();
-        ctx.expect(out.copyright).toBe(`© ${year}, ITW Creative Works`);
+        ctx.expect(baseConfig({ brand: { name: 'Somiibo' } }).copyright).toBe(`© ${year}, Somiibo`);
+        ctx.expect(baseConfig({}).copyright).toBe(`© ${year}`);
       },
     },
     {

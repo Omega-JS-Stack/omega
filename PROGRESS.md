@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **cp95 C1 friction burn: slices A+B SHIPPED, 11/22 findings dead** — 95a seeds/identity (#1 layer-aware seeds, #2-4 wizard, #5 schema oracle, #13, #20 .env empties; scratch brand "My Brand"×0) + 95b BEM demo-* (#8 three live-API heads gated + poison self-heal, #9 rules scaffold, #10 fake SA autogen, #11 config→artifacts precedence; fresh demo setup 39/39 exit 0 + emulator first-boot)
+- **C1 COMPLETE (cp95a+b+c): 18/22 friction findings dead** — seeds/identity (95a), BEM demo-* start-to-finish (95b), consistency/de-ITW (95c: gulpfile shim + dep-home + 405 + env scrub + EM/BXM brand identity). Open: #6/#7 (C2 = cp96), #15 Node story, #16 sass (C3). Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **cp95c** — consistency/de-ITW: #12 dep home rule, #14 gulpfile shim, #17 405-vs-500, #17c ELECTRON_RUN_AS_NODE scrub, #18 EM appId/copyright derivation, #19 BXM manifest branding (+ #15 Node story = document) → then cp96 C2 pricing/blueprints
+1. **cp96** — C2 pricing/blueprints: kill `### ALL PAGES ###` marker convention + layout frontmatter knobs; products = the ONLY pricing source (#6 empty-state, #7 one-time presentation); KEEP 3-layer JS/CSS, legal append, D8 virtual pages → then cp97 D13 deliberate deploys (live workflow proof Ian-gated)
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -42,6 +42,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 95c C1 slice 3 — gulpfile shim (+`./gulp` exports; omega-brand ext builds), dep-home either-section ×5, middleware 405 (+corpus test → 1225), ELECTRON_RUN_AS_NODE spawn scrubs ×3, EM appId/©-from-brand (pins respelled), BXM messages tokens (+omega-brand → OMEGA) (this commit) → CHANGELOG
 - [x] 95b C1 slice 2 — demo-* setup completes: isDemoProject gates ×3 live-API heads (synced/file-pull/campaigns) + poisoned-file self-heal, database.rules scaffold, fake-SA autogen, projectId precedence config→artifacts (writeConfigValues; .firebaserc derives); live: fresh demo brand 39/39 exit 0, emulator first-boot, converged rerun (this commit) → CHANGELOG
 - [x] 95a C1 slice 1 — layer-aware seeding (config seed module + 4 setups; ext template de-ITW), wizard deps/cloud/catalog seeds + functions/package.json, #5 schema oracle, #13 ext setup-scaffold, #20 .env empty-shadowing (3 prongs); live scratch brand "My Brand"×0; 7/22 findings closed (this commit) → CHANGELOG
 - [x] 94b C5 brand-root dispatch — omega-bin brand detection (nearest-context; stdlib twin of resolveBrandRoot) → manager cli handoff; manager `test` fan-out (FRAMEWORK_IDS routing, sequential, aggregate exit); live: omega-brand bare 4/4 project-only, `em:`→desktop-only 751, sandbox `backend:routes/general`→5; friction #20 found (.env `""`-shadowing); devkit 161/mgr 582 (this commit) → CHANGELOG
@@ -90,4 +91,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 2:45 PM (95b — demo-* setup completes 39/39; next: cp95c consistency/de-ITW)*
+*Last updated: 2026-07-11 3:20 PM (95c — C1 complete, 18/22 findings dead; next: cp96 C2 pricing/blueprints)*

@@ -1,18 +1,18 @@
 {
   appName: {
-    message: 'Ultimate Browser Extension - Browser Enhancer',
+    message: 'OMEGA',
     description: 'The name of the extension.',
   },
   appNameShort: {
-    message: 'Ultimate Browser Extension',
+    message: 'OMEGA',
     description: 'The short name of the extension.',
   },
   appDescription: {
-    message: 'Ultimate Browser Extension - A powerful tool to enhance your browsing experience.',
+    message: 'The official OMEGA browser extension.',
     description: 'The description of the extension.',
   },
   btnTooltip: {
-    message: 'Ultimate Browser Extension',
+    message: 'OMEGA',
     description: 'Tooltip for the button.',
   },
 }

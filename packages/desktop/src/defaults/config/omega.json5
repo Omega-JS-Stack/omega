@@ -86,9 +86,10 @@
   targets: {
     desktop: {
       // App-level metadata — universal cross-platform fields. @omega.js/desktop auto-derives sensible
-      // defaults: `appId` ← `com.itwcreativeworks.<brand.id>`, `productName` ← `brand.name`,
-      // `copyright` ← `© <year>, ITW Creative Works`. Override any of these explicitly only
-      // if you must.
+      // defaults from the BRAND: `appId` ← reverse-domain of `brand.url`
+      // (`https://foo.example.com` → `com.example.foo`; no url → `app.<brand.id>`),
+      // `productName` ← `brand.name`, `copyright` ← `© <year>, <brand.name>`.
+      // Override any of these explicitly only if you must.
       //
       // `category` is a generic high-level category — @omega.js/desktop maps it to per-platform values
       // (mac uses Apple's UTI strings, linux uses freedesktop categories). Allowed values:
@@ -97,11 +98,11 @@
       // something specific. See docs/installer-options.md for the full table.
       //
       // `copyright` accepts a `{YEAR}` token expanded at build time to the current year.
-      // Default is `© {YEAR}, ITW Creative Works`. Set explicitly only to change the holder.
+      // Default is `© {YEAR}, <brand.name>`. Set explicitly only to change the holder.
       app: {
         appId:           null,
         productName:     null,
-        copyright:       null,                // null → `© {YEAR}, ITW Creative Works`
+        copyright:       null,                // null → `© {YEAR}, <brand.name>`
         category:        'productivity',
         languages:       ['en'],              // applied as mac.electronLanguages
         darkModeSupport: true,                // mac honors via NSRequiresAquaSystemAppearance; win/linux ignore

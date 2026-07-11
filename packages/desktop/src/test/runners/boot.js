@@ -116,8 +116,9 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
     // Suppress dev-mode dock-bounce / startup item changes during the test.
     NODE_ENV:                      process.env.NODE_ENV || 'test',
   });
-  // ELECTRON_RUN_AS_NODE is already stripped by bin/mgr at the CLI boundary, so the child
-  // env is clean — no extra delete here.
+  // Defensive scrub at the spawn (friction 17c) — the CLI boundary strips it,
+  // but paths that bypass the boundary must not boot Electron as plain node.
+  delete childEnv.ELECTRON_RUN_AS_NODE;
 
   // Args passed to electron:
   //   effectiveRoot — load the consumer project (package.json#main = dist/main.bundle.js).

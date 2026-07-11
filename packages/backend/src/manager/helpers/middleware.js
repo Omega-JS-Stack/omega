@@ -4,6 +4,7 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const powertools = require('node-powertools');
 const { merge } = require('lodash');
 const JSON5 = require('json5');
@@ -94,21 +95,28 @@ Middleware.prototype.run = function (libPath, options) {
     }
 
     // Load route handler
-    // First try method-specific file (e.g., get.js, post.js), then fallback to index.js
+    // First try method-specific file (e.g., get.js, post.js), then fallback to
+    // index.js. Existence is checked BEFORE require so a route module's own
+    // broken require can't be mistaken for a missing file — and a route DIR
+    // that exists with neither file for this method answers an honest 405
+    // instead of a 500 (dogfood friction #17).
     let routeHandler;
 
     try {
       const methodFile = `${method}.js`;
       const methodFilePath = path.resolve(routesDir, methodFile);
+      const indexPath = path.resolve(routesDir, 'index.js');
 
-      try {
+      if (fs.existsSync(methodFilePath)) {
         routeHandler = require(methodFilePath);
         assistant.log(`Middleware.process(): Loaded route: ${methodFile}`);
-      } catch (methodError) {
-        // Fallback to index.js if method-specific file doesn't exist
-        const indexPath = path.resolve(routesDir, 'index.js');
+      } else if (fs.existsSync(indexPath)) {
         routeHandler = require(indexPath);
         assistant.log(`Middleware.process(): Method-specific file (${methodFile}) not found, using index.js`);
+      } else if (fs.existsSync(routesDir)) {
+        return assistant.respond(new Error(`Method not allowed: ${method.toUpperCase()} is not supported by ${libPath}`), {code: 405, sentry: false});
+      } else {
+        return assistant.respond(new Error(`Unable to load route @ (${libPath}): route does not exist`), {code: 500, sentry: true});
       }
     } catch (e) {
       return assistant.respond(new Error(`Unable to load route @ (${libPath}): ${e.message}`), {code: 500, sentry: true});

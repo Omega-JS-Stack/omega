@@ -145,10 +145,12 @@ async function logCWD() {
 
 async function updateManager() {
   const npm = new NPM();
-  const installedVersion = project.devDependencies[package.name];
+  // Either section counts (friction #12) — the framework is a build-time dep,
+  // but web/backend accept dependencies too; one rule everywhere.
+  const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
 
   if (!installedVersion) {
-    throw new Error(`No installed version of ${package.name} found in devDependencies.`);
+    throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
 
   const latestVersion = await npm.repo(package.name)
@@ -312,10 +314,10 @@ async function copyDefaults(targetDir) {
 module.exports.copyDefaults = copyDefaults;
 
 function checkLocality() {
-  const installedVersion = project.devDependencies[package.name];
+  const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
 
   if (!installedVersion) {
-    throw new Error(`No installed version of ${package.name} found in devDependencies.`);
+    throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
 
   if (installedVersion.startsWith('file:')) {

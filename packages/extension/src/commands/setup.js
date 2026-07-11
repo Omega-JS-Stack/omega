@@ -97,8 +97,9 @@ async function logCWD() {
 async function updateManager() {
   const npm = new NPM();
 
-  // Get the latest version
-  const installedVersion = project.devDependencies[package.name];
+  // Get the latest version — either section counts (friction #12): the
+  // framework is a build-time dep, but web/backend accept dependencies too.
+  const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
   const latestVersion = await npm.repo(package.name)
   .package()
     .then((pkg) => {
@@ -111,7 +112,7 @@ async function updateManager() {
 
   // Check if installedVersion is truthy or throw error
   if (!installedVersion) {
-    throw new Error(`No installed version of ${package.name} found in devDependencies.`);
+    throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
 
   // Log
@@ -192,11 +193,11 @@ function setupScripts() {
 }
 
 function checkLocality() {
-  const installedVersion = project.devDependencies[package.name];
+  const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
 
   // Check if installedVersion is truthy or throw error
   if (!installedVersion) {
-    throw new Error(`No installed version of ${package.name} found in devDependencies.`);
+    throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
 
   // Warn if using local version
@@ -245,7 +246,7 @@ function logVersionCheck(name, installedVersion, latestVersion, isUpToDate) {
 
 // Run migrations based on installed version
 async function migrate() {
-  const installedVersion = project.devDependencies[package.name] || '0.0.0';
+  const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name] || '0.0.0';
 
   // Skip if using local version
   if (installedVersion.startsWith('file:')) {

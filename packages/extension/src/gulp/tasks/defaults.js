@@ -67,6 +67,12 @@ const FILE_MAP = {
     mergeLines: true,
   },
 
+  // Consumer-owned after first seed — the framework-resolving shim
+  // (friction #14); consumers may customize their gulpfile.
+  'gulpfile.js': {
+    overwrite: false,
+  },
+
   // Config files
   'config/omega.json5': {
     overwrite: true,
