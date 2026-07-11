@@ -1,0 +1,7 @@
+{
+  "name": "fixture-standalone-consumer",
+  "private": true,
+  "devDependencies": {
+    "@omega.js/desktop": "*"
+  }
+}

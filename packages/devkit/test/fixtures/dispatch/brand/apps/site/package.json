@@ -1,0 +1,7 @@
+{
+  "name": "fixture-dispatch-site",
+  "private": true,
+  "devDependencies": {
+    "@omega.js/web": "*"
+  }
+}

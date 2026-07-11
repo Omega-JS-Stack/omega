@@ -1,7 +1,7 @@
 /**
- * omega-bin dispatcher — target-framework detection + dispatch.
- * Real execution, no mocks: committed fixtures for detection, an os.tmpdir()
- * scratch with a fake installed framework for cross-dispatch.
+ * omega-bin dispatcher — context detection (app framework / brand root) +
+ * dispatch. Real execution, no mocks: committed fixtures for detection, an
+ * os.tmpdir() scratch with a fake installed package for each dispatch case.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -9,10 +9,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { findTargetFramework, FRAMEWORKS, run } = require('../src/omega-bin.js');
+const { findTarget, isBrandRoot, FRAMEWORKS, MANAGER, run } = require('../src/omega-bin.js');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'local');
 const BRAND = path.join(FIXTURES, 'brand');
+const DISPATCH = path.join(__dirname, 'fixtures', 'dispatch');
 
 test('FRAMEWORKS covers exactly the four app frameworks', () => {
   assert.deepEqual(FRAMEWORKS, [
@@ -21,40 +22,82 @@ test('FRAMEWORKS covers exactly the four app frameworks', () => {
     '@omega.js/desktop',
     '@omega.js/extension',
   ]);
+  assert.equal(MANAGER, '@omega.js/manager');
 });
 
-test('findTargetFramework: web app via devDependency', () => {
-  const hit = findTargetFramework(path.join(BRAND, 'apps', 'site'));
-  assert.deepEqual(hit, { name: '@omega.js/web', dir: path.join(BRAND, 'apps', 'site') });
+test('findTarget: web app via devDependency', () => {
+  const hit = findTarget(path.join(BRAND, 'apps', 'site'));
+  assert.deepEqual(hit, { kind: 'framework', name: '@omega.js/web', dir: path.join(BRAND, 'apps', 'site') });
 });
 
-test('findTargetFramework: backend app via the functions/ peek from the app dir', () => {
-  const hit = findTargetFramework(path.join(BRAND, 'apps', 'backend-app'));
+test('findTarget: backend app via the functions/ peek from the app dir', () => {
+  const hit = findTarget(path.join(BRAND, 'apps', 'backend-app'));
   assert.deepEqual(hit, {
+    kind: 'framework',
     name: '@omega.js/backend',
     dir: path.join(BRAND, 'apps', 'backend-app', 'functions'),
   });
 });
 
-test('findTargetFramework: inside functions/ finds backend directly', () => {
-  const hit = findTargetFramework(path.join(BRAND, 'apps', 'backend-app', 'functions'));
+test('findTarget: inside functions/ finds backend directly', () => {
+  const hit = findTarget(path.join(BRAND, 'apps', 'backend-app', 'functions'));
   assert.equal(hit.name, '@omega.js/backend');
 });
 
-test('findTargetFramework: a deep (even nonexistent) dir inside an app walks up to the app', () => {
-  const hit = findTargetFramework(path.join(BRAND, 'apps', 'site', 'src', 'pages', 'deep'));
+test('findTarget: a deep (even nonexistent) dir inside an app walks up to the app', () => {
+  const hit = findTarget(path.join(BRAND, 'apps', 'site', 'src', 'pages', 'deep'));
   assert.equal(hit.name, '@omega.js/web');
 });
 
-test('findTargetFramework: standalone app (desktop devDep)', () => {
-  const hit = findTargetFramework(path.join(FIXTURES, 'standalone-app'));
+test('findTarget: standalone app (desktop devDep)', () => {
+  const hit = findTarget(path.join(FIXTURES, 'standalone-app'));
   assert.equal(hit.name, '@omega.js/desktop');
 });
 
-test('findTargetFramework: no framework anywhere up the chain → null', () => {
+test('findTarget: no framework anywhere up the chain → null', () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-null-'));
-  assert.equal(findTargetFramework(scratch), null);
+  assert.equal(findTarget(scratch), null);
 });
+
+// ─── Brand-root detection (cp94b) ────────────────────────────────────────────
+
+test('findTarget: a brand root (config/omega.json5, no framework dep) → brand kind', () => {
+  const hit = findTarget(path.join(DISPATCH, 'brand'));
+  assert.deepEqual(hit, { kind: 'brand', dir: path.join(DISPATCH, 'brand') });
+});
+
+test('findTarget: deep non-app dir inside a brand walks up to the brand root', () => {
+  const hit = findTarget(path.join(DISPATCH, 'brand', 'config'));
+  assert.deepEqual(hit, { kind: 'brand', dir: path.join(DISPATCH, 'brand') });
+});
+
+test('findTarget: an app inside a brand still dispatches as the app (nearest context wins)', () => {
+  const hit = findTarget(path.join(DISPATCH, 'brand', 'apps', 'site'));
+  assert.deepEqual(hit, {
+    kind: 'framework',
+    name: '@omega.js/web',
+    dir: path.join(DISPATCH, 'brand', 'apps', 'site'),
+  });
+});
+
+test('findTarget: an app-of-brand config with no framework dep is skipped, resolving the brand above', () => {
+  const hit = findTarget(path.join(DISPATCH, 'brand', 'apps', 'rogue'));
+  assert.deepEqual(hit, { kind: 'brand', dir: path.join(DISPATCH, 'brand') });
+});
+
+test('findTarget: standalone consumer with BOTH framework dep and config → framework wins', () => {
+  const hit = findTarget(path.join(DISPATCH, 'standalone-consumer'));
+  assert.equal(hit.kind, 'framework');
+  assert.equal(hit.name, '@omega.js/desktop');
+});
+
+test('isBrandRoot: true at a brand root, false for an app-of-brand config dir', () => {
+  assert.equal(isBrandRoot(path.join(DISPATCH, 'brand')), true);
+  assert.equal(isBrandRoot(path.join(DISPATCH, 'brand', 'apps', 'rogue')), false);
+  assert.equal(isBrandRoot(path.join(DISPATCH, 'brand', 'apps', 'site')), false);
+});
+
+// ─── run() dispatch ──────────────────────────────────────────────────────────
 
 test('run(): no app context falls back to the HOST CLI (bootstrap case, e.g. `omega setup` in a fresh dir)', async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-boot-'));
@@ -114,4 +157,40 @@ test('run(): cross-framework dispatch resolves the target\'s ./cli and calls run
     process.chdir(cwd0);
   }
   assert.equal(fs.readFileSync(marker, 'utf8'), 'dispatched');
+});
+
+test('run(): brand root dispatches to @omega.js/manager\'s ./cli', async () => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-brand-'));
+  const brandRoot = path.join(scratch, 'my-brand');
+  fs.mkdirSync(path.join(brandRoot, 'config'), { recursive: true });
+  fs.writeFileSync(
+    path.join(brandRoot, 'package.json'),
+    JSON.stringify({ name: 'my-brand', private: true, workspaces: ['apps/*'] })
+  );
+  fs.writeFileSync(path.join(brandRoot, 'config', 'omega.json5'), '{ brand: { id: "my-brand" } }\n');
+
+  // Fake installed manager at the brand root (resolution walks up from there).
+  const mgrDir = path.join(brandRoot, 'node_modules', '@omega.js', 'manager');
+  fs.mkdirSync(mgrDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(mgrDir, 'package.json'),
+    JSON.stringify({ name: '@omega.js/manager', exports: { './cli': './cli.js' } })
+  );
+  const marker = path.join(scratch, 'marker.txt');
+  fs.writeFileSync(
+    path.join(mgrDir, 'cli.js'),
+    `module.exports = { run() { require('fs').writeFileSync(${JSON.stringify(marker)}, 'brand-dispatched'); } };`
+  );
+
+  const cwd0 = process.cwd();
+  process.chdir(brandRoot);
+  try {
+    await run({
+      hostName: '@omega.js/web',
+      hostRun: () => { throw new Error('hostRun must not fire at a brand root'); },
+    });
+  } finally {
+    process.chdir(cwd0);
+  }
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'brand-dispatched');
 });

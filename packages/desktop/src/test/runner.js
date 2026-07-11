@@ -18,12 +18,13 @@ const path = require('path');
 const chalk = require('chalk').default;
 
 const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omega.js/devkit/test/runner-core');
+const { FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 
 const runner = createRunner({
   title: 'OMEGA Desktop Tests',
   packageName: '@omega.js/desktop',
   targetAlias: 'desktop',
-  frameworkAliases: ['desktop', 'em'],
+  frameworkAliases: FRAMEWORK_IDS['@omega.js/desktop'],
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 15000,

@@ -1,6 +1,6 @@
 # Dogfood friction log — omega-brand first run (cp93, 2026-07-11)
 
-> The C1 work list. Every wart from scaffolding the OMEGA brand (all four targets) via the REAL wizard + framework setups, in the order met. Severity: 🔴 breaks the run · 🟡 wrong result, run continues · ⚪ polish. Each item names its owning slice (C1/C2/C4/N4-flavored). Positive observations at the bottom — the parts that already feel shipfa.st-grade.
+> The C1 work list. Every wart from scaffolding the OMEGA brand (all four targets) via the REAL wizard + framework setups, in the order met (finding 20 added by cp94b's brand-root fan-out). Severity: 🔴 breaks the run · 🟡 wrong result, run continues · ⚪ polish. Each item names its owning slice (C1/C2/C4/N4-flavored). Positive observations at the bottom — the parts that already feel shipfa.st-grade.
 
 ## The systemic one
 
@@ -24,6 +24,7 @@
 9. 🔴 Scaffolded `firebase.json` references `database.rules.json` but setup never creates the file → `omega emulator` dies ENOENT before ready. (Sandbox's copy was hand-made; copied it over.)
 10. 🟡 `service-account.json` is required even for emulator-only demo projects — user must hand-craft a fake (generated a throwaway-key one). demo-* should auto-generate it.
 11. 🟡 The config auto-fixer resolves conflicts toward STALE ARTIFACTS: it read `.firebaserc`'s `demo-project` (stamped by the placeholder-era first run) and wrote `cloud.config.projectId: 'demo-project'` INTO the app config — shadowing the brand's `demo-omega` — instead of fixing `.firebaserc` from config. It also rewrites the whole file, stripping comments (doesn't use the cp59 comment-preserving editor). Precedence must be config → derived artifacts, never the reverse.
+20. 🔴 **Composed `functions/.env` ships every key as `KEY=""` — 24 empty values, each SHADOWING the brand-root `.env` in the cascade** (app layer wins; found by cp94b's first brand-root fan-out: `omega test` failed "Missing backend manager key" while the wizard-minted `OMEGA_ADMIN_KEY` sat one layer up). The `.env` flavor of finding #1. Fix (C1): composition must omit or comment keys it has no value for (`# KEY=` documents without shadowing), and/or the env cascade should treat empty-string in file layers as unset. omega-brand's copy hand-fixed to commented placeholders.
 
 ## Cross-framework inconsistencies (C1 polish / N4-flavored)
 

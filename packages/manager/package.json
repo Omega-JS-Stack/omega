@@ -9,6 +9,7 @@
   },
   "exports": {
     ".": "./src/index.js",
+    "./cli": "./src/cli-run.js",
     "./service-runner": "./src/lib/service-runner.js",
     "./run-summary": "./src/lib/run-summary.js",
     "./brand": "./src/lib/brand.js",

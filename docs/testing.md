@@ -30,6 +30,21 @@ The sandbox brand's backend corpus is the framework suite run in consumer contex
 - **backend** — framework source = the routes/events/rules corpus (boot/ stays self-test-only); project source = `<project>/test`. Filters are prefix-stripped centrally, so `framework:routes/general` and a bare `general/` (project) match within their own trees only.
 - **desktop / extension** — runner-core handles sources + layers (`--layer build|main|renderer|boot` etc. unchanged, orthogonal to scoping).
 
-## Not yet (cp94b)
+## Brand root (cp94b)
 
-Brand-ROOT dispatch (`npx omega test` at the brand root fanning out over `apps/*`) lands with the omega-bin brand-root detection + the manager's test command — this doc gains that section then.
+At a **brand root** (a directory carrying `config/omega.json5` with no framework declared nearer), every framework's `omega` bin hands over to `@omega.js/manager` — the omega-bin dispatcher detects the brand the same way it detects apps (nearest context wins, walking up; the rule twins `@omega.js/config`'s `resolveBrandRoot`). The manager's `test` command then fans out over the brand's target-mapped apps, spawning each app's own framework bin with `cwd` = the app dir:
+
+| At the brand root | Runs |
+|-------------------|------|
+| `npx omega test` | every app's **project tests** (bare per app) |
+| `npx omega test framework:` | every app's framework suite |
+| `npx omega test full:` | both sources, every app |
+| `npx omega test routes/x` | project filter forwarded to every app (no match = no-op) |
+| `npx omega test web:pages/` | ONLY the web app — its framework suite, scoped |
+| `npx omega test em:` | ONLY the desktop app's framework suite |
+
+- Universal targets (bare paths, `framework:`/`omega:`/`mgr:`, `full:`, `project:`/`brand:`) forward to every app verbatim; per-framework ids route to the app owning that framework. The id → framework map is `FRAMEWORK_IDS` in `@omega.js/devkit/test/scope` — the same SSOT each framework's runner reads its own aliases from.
+- An id with no matching app warns and runs nothing (exit 0 — same semantics as an app-level filter matching no tests). Only-invalid targets fall back to bare-everywhere, mirroring the app-level parser.
+- Apps run **sequentially** with streamed output; any failing app makes the whole run exit 1 (per-app summary at the end).
+- **Flags are not fanned out** (`--layer`, `--extended`, …) — flagged runs are app-level invocations; run them from the app dir.
+- Other manager commands ride the same handoff: bare `omega` at a brand root now means `omega-manager manage`, `omega onboard` reaches the wizard.

@@ -26,6 +26,18 @@ const UNIVERSAL_FRAMEWORK_ALIASES = ['framework', 'omega', 'mgr'];
 const PROJECT_ALIASES = ['project', 'brand'];
 const FULL_ALIASES = ['full'];
 
+// Per-framework id prefixes (current name + legacy short name), keyed by
+// package name. The SSOT for "which prefixes does each framework answer to":
+// framework runners pass their own entry as `frameworkAliases`, and the
+// manager's brand-root `test` fan-out routes `web:`/`em:`/… targets to the
+// app owning that framework.
+const FRAMEWORK_IDS = {
+  '@omega.js/web': ['web', 'ujm'],
+  '@omega.js/backend': ['backend'],
+  '@omega.js/desktop': ['desktop', 'em'],
+  '@omega.js/extension': ['extension', 'bxm'],
+};
+
 /**
  * Parse `omega test` positional targets into sources + per-source path filters.
  *
@@ -98,4 +110,4 @@ function parseTestScope(rawTargets, options = {}) {
   };
 }
 
-module.exports = { parseTestScope, UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES };
+module.exports = { parseTestScope, UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS };

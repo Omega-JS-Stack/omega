@@ -10,7 +10,7 @@ const { seed } = require('./seed.js');
 const rulesClient = require('./utils/firestore-rules-client.js');
 const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
 const { SkipError } = require('@omega.js/devkit/test/runner-core');
-const { parseTestScope } = require('@omega.js/devkit/test/scope');
+const { parseTestScope, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 
 /**
  * @omega.js/backend Integration Test Runner
@@ -107,7 +107,7 @@ class TestRunner {
     // `framework:`/`omega:`/`mgr:`/`backend:` = the framework suite,
     // `full:` = both. Framework self-test defaults to the framework source.
     this.scope = parseTestScope(this.options.testPaths, {
-      frameworkAliases: ['backend'],
+      frameworkAliases: FRAMEWORK_IDS['@omega.js/backend'],
       selfTest: this.options.isFrameworkSelfTest,
     });
     for (const target of this.scope.invalid) {

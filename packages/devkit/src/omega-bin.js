@@ -5,13 +5,22 @@
  * In a brand monorepo with several apps, npm hoists all of them to the brand root
  * and only ONE framework's file wins the node_modules/.bin link — so the bin that
  * actually runs is arbitrary. This module makes any winner correct: it resolves
- * which framework owns the CALLER'S app (nearest package.json walking up from cwd,
- * including the backend's functions/ layout) and runs THAT framework's CLI.
+ * the context that owns the CALLER'S cwd — nearest first, walking up — and runs
+ * THAT context's CLI:
  *
- * Contract: every framework exposes `exports['./cli']` → a module with `run()`
- * that parses process.argv itself, and a bin shim that calls
+ *   - an APP (nearest package.json declaring a framework, including the
+ *     backend's functions/ layout) → that framework's CLI
+ *   - a BRAND ROOT (config/omega.json5 with no framework declared nearer)
+ *     → @omega.js/manager's CLI, so `omega test` at a brand root fans out
+ *     over the brand's apps instead of guessing one framework
+ *
+ * Contract: every dispatch target exposes `exports['./cli']` → a module with
+ * `run()` that parses process.argv itself. Framework bin shims call
  * `run({ hostName, hostRun })` — hostRun executes the host's own CLI via a
  * RELATIVE require (vendor-safe), so the host never resolves itself by name.
+ *
+ * This module stays stdlib-only (fs/path/module): it is vendored into every
+ * framework dist and must never assume another package is installed.
  */
 
 const fs = require('fs');
@@ -24,6 +33,8 @@ const FRAMEWORKS = [
   '@omega.js/desktop',
   '@omega.js/extension',
 ];
+
+const MANAGER = '@omega.js/manager';
 
 function readPackage(dir) {
   try {
@@ -40,21 +51,46 @@ function frameworkOf(pkg) {
 }
 
 /**
- * Walk up from startDir to the nearest package.json that declares an OMEGA
- * framework. Backend consumers declare @omega.js/backend in functions/package.json,
- * so each level also peeks one directory DOWN into functions/.
- *
- * @returns {{ name: string, dir: string } | null} dir = where the dep is declared
+ * Is `dir` a brand-monorepo root? Carries a config/omega.json5 that is not
+ * itself an APP of a brand above it (directly under an apps/ dir whose parent
+ * also carries a brand config). Stdlib twin of @omega.js/config's
+ * resolveBrandRoot rule — that module is the canonical definition; this copy
+ * exists because the dispatcher cannot depend on @omega.js/config.
  */
-function findTargetFramework(startDir) {
+function isBrandRoot(dir) {
+  if (!fs.existsSync(path.join(dir, 'config', 'omega.json5'))) return false;
+
+  const parent = path.dirname(dir);
+  const isAppOfBrand = path.basename(parent) === 'apps'
+    && fs.existsSync(path.join(path.dirname(parent), 'config', 'omega.json5'));
+
+  return !isAppOfBrand;
+}
+
+/**
+ * Walk up from startDir to the nearest dispatch context. At each level, in
+ * order: the dir's own package.json declaring a framework, the backend's
+ * functions/ layout one directory DOWN, then brand-root-ness. Framework
+ * checks come first so a standalone consumer (framework dep AND its own
+ * config/omega.json5 in one dir) dispatches as an app, not a brand.
+ *
+ * @returns {{ kind: 'framework', name: string, dir: string }
+ *   | { kind: 'brand', dir: string } | null} dir = where the framework dep is
+ *   declared (framework) / the brand root (brand)
+ */
+function findTarget(startDir) {
   let dir = path.resolve(startDir);
   while (true) {
     const own = frameworkOf(readPackage(dir));
-    if (own) return { name: own, dir };
+    if (own) return { kind: 'framework', name: own, dir };
 
     const fnDir = path.join(dir, 'functions');
     if (frameworkOf(readPackage(fnDir)) === '@omega.js/backend') {
-      return { name: '@omega.js/backend', dir: fnDir };
+      return { kind: 'framework', name: '@omega.js/backend', dir: fnDir };
+    }
+
+    if (isBrandRoot(dir)) {
+      return { kind: 'brand', dir };
     }
 
     const parent = path.dirname(dir);
@@ -63,16 +99,36 @@ function findTargetFramework(startDir) {
   }
 }
 
-async function run({ hostName, hostRun }) {
-  const target = findTargetFramework(process.cwd());
+/** Resolve a dispatch target's ./cli from where it is declared, with a clear failure. */
+function resolveCli(name, fromDir, hint) {
+  const req = createRequire(path.join(fromDir, 'package.json'));
+  try {
+    return req.resolve(`${name}/cli`);
+  } catch (e) {
+    console.error(`omega: found ${name} context (${fromDir}) but could not resolve '${name}/cli': ${e.message}`);
+    console.error(hint);
+    process.exit(1);
+  }
+}
 
-  // No app context — the bootstrap case (`omega setup` in a fresh directory has
+async function run({ hostName, hostRun }) {
+  const target = findTarget(process.cwd());
+
+  // No context — the bootstrap case (`omega setup` in a fresh directory has
   // no framework dep yet, by definition). Run the HOST framework's CLI, exactly
   // like the pre-dispatcher bins did, and say which one so a hoist-winner at a
   // brand root is never a silent mystery.
   if (!target) {
     console.error(`omega: no app context found from ${process.cwd()} — running ${hostName}`);
     return hostRun();
+  }
+
+  // A brand root — the manager owns brand-level commands (`omega test` fans
+  // out over apps/*). Resolve it from the brand root and hand over.
+  if (target.kind === 'brand') {
+    const cliPath = resolveCli(MANAGER, target.dir,
+      `Is ${MANAGER} installed? Add it to the brand root's devDependencies, or \`mgr i local\` for a monorepo link.`);
+    return require(cliPath).run();
   }
 
   // The bin that won npm's .bin link belongs to this app's framework — run it directly.
@@ -82,16 +138,9 @@ async function run({ hostName, hostRun }) {
 
   // The app belongs to a DIFFERENT framework — resolve its CLI from where the
   // dependency is declared and hand over.
-  const req = createRequire(path.join(target.dir, 'package.json'));
-  let cliPath;
-  try {
-    cliPath = req.resolve(`${target.name}/cli`);
-  } catch (e) {
-    console.error(`omega: found ${target.name} (declared in ${target.dir}) but could not resolve '${target.name}/cli': ${e.message}`);
-    console.error('Is the framework installed? Try npm install, or `mgr i local` for a monorepo link.');
-    process.exit(1);
-  }
+  const cliPath = resolveCli(target.name, target.dir,
+    'Is the framework installed? Try npm install, or `mgr i local` for a monorepo link.');
   return require(cliPath).run();
 }
 
-module.exports = { run, findTargetFramework, FRAMEWORKS };
+module.exports = { run, findTarget, isBrandRoot, FRAMEWORKS, MANAGER };

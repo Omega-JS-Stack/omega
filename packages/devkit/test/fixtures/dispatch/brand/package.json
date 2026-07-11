@@ -1,0 +1,5 @@
+{
+  "name": "fixture-dispatch-brand",
+  "private": true,
+  "workspaces": ["apps/*"]
+}

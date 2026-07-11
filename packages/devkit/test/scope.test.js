@@ -76,3 +76,14 @@ test('windows-style path with drive colon is not treated as a prefix', () => {
   assert.deepStrictEqual(scope.sources, ['project']);
   assert.deepStrictEqual(scope.filters.project, ['C:/tests/x']);
 });
+
+test('FRAMEWORK_IDS covers exactly the dispatcher\'s frameworks with the cp94a id sets', () => {
+  const { FRAMEWORK_IDS } = require('../src/test/scope.js');
+  const { FRAMEWORKS } = require('../src/omega-bin.js');
+
+  assert.deepStrictEqual(Object.keys(FRAMEWORK_IDS).sort(), [...FRAMEWORKS].sort());
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/web'], ['web', 'ujm']);
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/backend'], ['backend']);
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/desktop'], ['desktop', 'em']);
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/extension'], ['extension', 'bxm']);
+});

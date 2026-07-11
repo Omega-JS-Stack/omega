@@ -1,0 +1,10 @@
+// Standalone consumer: framework dep AND its own config in one dir — the
+// framework check must win over brand-root detection.
+{
+  brand: {
+    id: 'fixture-standalone',
+  },
+  targets: {
+    desktop: {},
+  },
+}

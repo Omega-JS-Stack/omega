@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **C5 per-app scoping SHIPPED (cp94a)** — ONE grammar via @omega.js/devkit/test/scope (bare=project-only, `framework:`/`omega:`/`mgr:`/ids, `full:`, `brand:` alias; self-test exception); adopted by runner-core (EM+BXM), backend runner, web test cmd; corpus respelled `framework:` (1224/44/0 parity); [docs/testing.md](docs/testing.md); arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
+- **C5 CLOSED (cp94a+94b)** — ONE grammar both layers: per-app (bare=project-only, `framework:`/ids/`full:`, self-test exception) + brand ROOT (omega-bin detects brand → @omega.js/manager `test` fan-out: universal targets to every app, `web:`/`em:`/… to owning app only, FRAMEWORK_IDS = alias SSOT); [docs/testing.md](docs/testing.md); arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **cp94b** — brand-ROOT test dispatch: omega-bin brand-root detection → @omega.js/manager handoff + manager `test` fan-out over apps (closes C5 + cp93's em:-from-consumer gap 17b) → then cp95 C1 burns [plans/dogfood-friction-log.md](plans/dogfood-friction-log.md) (21 findings)
+1. **cp95** — C1 first-run polish: burn [plans/dogfood-friction-log.md](plans/dogfood-friction-log.md) (22 findings — layer-aware seeds #1, .env `""`-shadowing #20, wizard gaps #2-5, BEM demo-* #8-11, gulpfile shim #14, de-ITW #18-19, 17c env scrub) → then cp96 C2 pricing/blueprints
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -42,6 +42,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 94b C5 brand-root dispatch — omega-bin brand detection (nearest-context; stdlib twin of resolveBrandRoot) → manager cli handoff; manager `test` fan-out (FRAMEWORK_IDS routing, sequential, aggregate exit); live: omega-brand bare 4/4 project-only, `em:`→desktop-only 751, sandbox `backend:routes/general`→5; friction #20 found (.env `""`-shadowing); devkit 161/mgr 582 (this commit) → CHANGELOG
 - [x] 94a C5 per-app test scoping — devkit scope parser + runner-core/backend/web adoption, bare=project-only everywhere (self-test exception), corpus → `framework:`; devkit 153/web 60/ext 94/desktop 760/corpus 1224-44-0; docs/testing.md (this commit) → CHANGELOG
 - [x] 93 omega-brand born — real-wizard scaffold, 4 targets proven (web :4000/pricing-from-config, backend demo-omega emulator, MV3 ×3, Electron boot); friction log = 21 findings (headline: every framework seed shadows the brand layer; EM/BXM gulpfile paths break under hoisting) (this commit) → CHANGELOG
 - [x] 92 dogfood arc opened — survey (C2 further along than spec: products-from-config channel live; D13's autopublish still alive in scaffold; sandbox = 2 targets) + slicing cp93→close in plans/dogfood-arc.md (this commit) → CHANGELOG
@@ -87,4 +88,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 12:00 PM (93 — omega-brand lives, all four targets proven; next: cp94 C5 test-scoping)*
+*Last updated: 2026-07-11 1:15 PM (94b — C5 closed both layers; next: cp95 C1 friction burn)*

@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
-const { parseTestScope } = require('@omega.js/devkit/test/scope');
+const { parseTestScope, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 const { consumerPaths } = require('../consumer.js');
 
 const logger = new Logger('omega:test');
@@ -24,7 +24,7 @@ module.exports = async function (options) {
 
   // ---- C5 scope (bare = project only; the framework suite is explicit)
   const scope = parseTestScope((options._ || []).slice(1), {
-    frameworkAliases: ['web', 'ujm'],
+    frameworkAliases: FRAMEWORK_IDS['@omega.js/web'],
   });
   for (const bad of scope.invalid) {
     logger.warn(`Unknown test scope prefix ignored: ${bad}`);

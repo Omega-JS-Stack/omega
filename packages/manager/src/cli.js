@@ -12,6 +12,7 @@ const { createCliRouter } = require('@omega.js/devkit/cli-router');
 const ALIASES = {
   manage: ['-m', 'start', 'run'],
   onboard: ['-o', '--onboard', 'create', 'new'],
+  test: ['--test'],
   version: ['-v', '--version'],
 };
 

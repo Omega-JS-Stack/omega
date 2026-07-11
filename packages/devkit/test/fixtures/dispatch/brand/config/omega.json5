@@ -1,0 +1,6 @@
+// Fixture brand config — existence is what the dispatcher checks.
+{
+  brand: {
+    id: 'fixture-dispatch-brand',
+  },
+}

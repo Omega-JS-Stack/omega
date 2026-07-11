@@ -18,12 +18,13 @@ const path = require('path');
 const chalk = require('chalk').default;
 
 const { createRunner, SkipError, DISCOVERY_IGNORE } = require('@omega.js/devkit/test/runner-core');
+const { FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 
 const runner = createRunner({
   title: 'OMEGA Extension Tests',
   packageName: '@omega.js/extension',
   targetAlias: 'extension',
-  frameworkAliases: ['extension', 'bxm'],
+  frameworkAliases: FRAMEWORK_IDS['@omega.js/extension'],
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 20000,

@@ -16,9 +16,10 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+
+const { runCommand } = require('../../../lib/run-command.js');
 
 /**
  * Does `name` resolve from `fromDir` via the node_modules directory climb?
@@ -49,25 +50,6 @@ function missingDeps(appPath) {
 
   const declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
   return declared.filter((name) => !isDepInstalled(appPath, name));
-}
-
-/**
- * Run a command in a directory, streaming output. Resolves { success, error? }.
- */
-function runCommand(command, args, cwd) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { cwd, shell: false, stdio: 'inherit' });
-
-    child.on('close', (code) => {
-      resolve(code === 0
-        ? { success: true }
-        : { success: false, error: `exit code ${code}` });
-    });
-
-    child.on('error', (error) => {
-      resolve({ success: false, error: error.message });
-    });
-  });
 }
 
 module.exports = async ({ brandRoot, apps, options }) => {
