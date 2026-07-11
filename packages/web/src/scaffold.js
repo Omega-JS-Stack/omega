@@ -12,7 +12,9 @@
  *     the consumer's Custom section survives verbatim
  */
 const path = require('node:path');
+const jetpack = require('fs-jetpack');
 const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
+const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
 const { PATHS } = require('./paths.js');
 
 // The Node major scaffolded into .nvmrc and the CI workflow (monorepo standard).
@@ -44,10 +46,23 @@ const FILE_MAP = {
 function scaffoldDefaults(options) {
   options = options || {};
 
+  // Layer-aware seed (dogfood friction #1): inside a brand monorepo the app
+  // config is TARGETS-ONLY — the full template (placeholder brand id/name)
+  // would shadow the brand root's config, and the merge rule would keep
+  // re-adding template keys under it. Standalone consumers keep the full
+  // template + JSON5 merge.
+  const fileMap = { ...FILE_MAP };
+  if (!resolveSeedMode(options.outputDir).standalone) {
+    if (!resolveConfigPath(options.outputDir)) {
+      jetpack.write(path.join(options.outputDir, 'config', 'omega.json5'), renderBrandAppSeed('web'));
+    }
+    fileMap['config/omega.json5'] = { overwrite: false };
+  }
+
   return applyDefaults({
     defaultsDir: options.defaultsDir || PATHS.scaffold,
     outputDir: options.outputDir,
-    fileMap: FILE_MAP,
+    fileMap,
     logger: options.logger,
   });
 }

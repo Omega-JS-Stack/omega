@@ -71,7 +71,13 @@ module.exports = async ({ brandRoot, apps, options }) => {
     console.log(`      ${chalk.dim('→')} npm install ${chalk.dim(`(missing: ${missing.join(', ')})`)}`);
     const result = await runCommand('npm', ['install', '--no-audit', '--no-fund'], brandRoot);
     installSteps.push({ phase: 'install', ...result });
-    if (!result.success) failed = true;
+    if (!result.success) {
+      failed = true;
+      // Local-first era: the frameworks aren't on the registry yet
+      if (missing.some((entry) => entry.includes('@omega.js/'))) {
+        console.log(`      ${chalk.yellow('⚠')} @omega.js/* packages are not published yet — link them per app with ${chalk.bold('mgr i local')} (or a workspace/file: reference).`);
+      }
+    }
   }
 
   results.root = { steps: installSteps };

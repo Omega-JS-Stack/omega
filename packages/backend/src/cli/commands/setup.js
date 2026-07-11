@@ -203,10 +203,10 @@ class SetupCommand extends BaseCommand {
     self.firebaseRC = loadJSON(`${self.firebaseProjectPath}/.firebaserc`);
     self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/functions/remoteconfig.template.json`);
     self.projectPackage = loadJSON(`${self.firebaseProjectPath}/package.json`);
-    // Resolved through @omega.js/config WITHOUT the framework-defaults layer —
-    // the omega-config setup test compares these keys against the template, so
-    // defaults here would make every key look present. Throws on secrets/parse
-    // errors (setup IS the audit — hard failures are correct here).
+    // Resolved through @omega.js/config (app ← brand root, no framework-defaults
+    // layer). Throws on secrets/parse errors (setup IS the audit — hard
+    // failures are correct here). The omega-config setup test validates the
+    // resolved config against the shared schema (friction #5).
     self.omegaConfigJSON = omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
       ? omegaConfig.loadConfig(self.firebaseProjectPath, 'backend').config
       : {};
@@ -250,11 +250,17 @@ class SetupCommand extends BaseCommand {
       touched++;
     }
 
-    // config/omega.json5
+    // config/omega.json5 — layer-aware (dogfood friction #1): inside a brand
+    // monorepo the app config is TARGETS-ONLY (the brand root owns the shared
+    // sections; a full template here would shadow them). Standalone consumers
+    // get the full template.
     const omegaConfigPath = `${self.firebaseProjectPath}/functions/config/omega.json5`;
     if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)) {
-      const templatePath = path.join(templatesDir, 'config', 'omega.json5');
-      jetpack.copy(templatePath, omegaConfigPath);
+      if (omegaConfig.resolveSeedMode(self.firebaseProjectPath).standalone) {
+        jetpack.copy(path.join(templatesDir, 'config', 'omega.json5'), omegaConfigPath);
+      } else {
+        jetpack.write(omegaConfigPath, omegaConfig.renderBrandAppSeed('backend'));
+      }
       ui.status('add', `Created ${chalk.cyan('functions/config/omega.json5')}`, { level: 2 });
       touched++;
     }

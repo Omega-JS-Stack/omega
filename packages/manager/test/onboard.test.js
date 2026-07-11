@@ -57,6 +57,17 @@ function readConfig(root) {
   return JSON5.parse(fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8'));
 }
 
+// Scaffolded app package.jsons declare their framework (`*`); stub the
+// packages at the brand root so the update service's resolution climb passes
+// without the registry (pre-publish, and tests must never install).
+function stubFrameworks(root, names) {
+  for (const name of names) {
+    const dir = path.join(root, 'node_modules', name);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, version: '0.0.0-stub' }));
+  }
+}
+
 // ─── Derivation units ────────────────────────────────────────────────────────
 
 test('deriveId/deriveName/deriveUrl: dir names → wizard defaults', () => {
@@ -91,6 +102,7 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     '.env',
     '.gitignore',
     'README.md',
+    'apps/backend/functions/package.json',
     'apps/backend/package.json',
     'apps/desktop/package.json',
     'apps/website/package.json',
@@ -118,6 +130,19 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
 
   const appPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'website', 'package.json'), 'utf8'));
   assert.equal(appPkg.name, 'acme-website');
+
+  // cp95a seeds: framework devDependency per app (backend's lives in
+  // functions/dependencies — its shell stays dep-less), a bootable demo-*
+  // cloud project, and the starter catalog shipped as a comment
+  assert.deepEqual(appPkg.devDependencies, { '@omega.js/web': '*' });
+  const fnPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'backend', 'functions', 'package.json'), 'utf8'));
+  assert.deepEqual(fnPkg.dependencies, { '@omega.js/backend': '*' });
+  const backendShell = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'backend', 'package.json'), 'utf8'));
+  assert.equal(backendShell.devDependencies, undefined, 'backend shell stays dep-less');
+  assert.deepEqual(config.cloud, { provider: 'firebase', config: { projectId: 'demo-acme' } });
+  const rawConfig = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
+  assert.match(rawConfig, /\/\/ payment: \{/, 'starter catalog ships commented');
+  assert.equal(config.payment, undefined, 'catalog is a comment, not config');
 
   // The .env stub documents the credential entry points: external keys
   // commented out, omega-owned keys provisioned with generated secrets
@@ -344,6 +369,7 @@ test('fresh scaffold runs the workspace service green', async () => {
 test('full manage on a fresh brand: services skip cleanly, testing honestly nudges toward the frameworks', async () => {
   const root = tempDir();
   await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false });
+  stubFrameworks(root, ['@omega.js/web']);
 
   const report = await runManage(root, { ...FAKE_FETCH_200 });
 
@@ -369,6 +395,7 @@ test('manage handoff: --manage spawns the real CLI in the new brand', async () =
   const parent = tempDir();
   const root = path.join(parent, 'handoff-brand');
   fs.mkdirSync(root);
+  stubFrameworks(root, ['@omega.js/web']);
 
   // localhost URL → the testing service's live checks fail fast (connection
   // refused, no DNS wait); the child's honest exit 1 comes back through

@@ -118,15 +118,31 @@ function siteTokenTransform(contents, item) {
   }
 }
 
-// Core scaffold — shared devkit engine. Exported for the build-layer scaffold test.
+// Core scaffold — shared devkit engine. Exported for the build-layer scaffold
+// test and the setup command (friction #13: consumers scaffold at setup, and
+// the build's defaults task keeps them synced).
 function scaffoldDefaults(options) {
   options = options || {};
+  const outputDir = options.outputDir || path.resolve('./');
+
+  // Layer-aware seed (dogfood friction #1): inside a brand monorepo the app
+  // config is TARGETS-ONLY — the full template (placeholder brand) would
+  // shadow the brand root, and this task's every-build merge would keep
+  // re-adding template keys under it. Standalone consumers keep the template.
+  const fileMap = { ...FILE_MAP };
+  const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
+  if (!resolveSeedMode(outputDir).standalone) {
+    if (!resolveConfigPath(outputDir)) {
+      jetpack.write(path.join(outputDir, 'config', 'omega.json5'), renderBrandAppSeed('extension'));
+    }
+    fileMap['config/omega.json5'] = { overwrite: false };
+  }
 
   return applyDefaults({
     defaultsDir: path.join(rootPathPackage, 'dist', 'defaults'),
-    outputDir: options.outputDir || path.resolve('./'),
+    outputDir,
     files: options.files || null,
-    fileMap: FILE_MAP,
+    fileMap,
     transform: siteTokenTransform,
     logger,
   });

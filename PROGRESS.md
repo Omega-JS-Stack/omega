@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **C5 CLOSED (cp94a+94b)** — ONE grammar both layers: per-app (bare=project-only, `framework:`/ids/`full:`, self-test exception) + brand ROOT (omega-bin detects brand → @omega.js/manager `test` fan-out: universal targets to every app, `web:`/`em:`/… to owning app only, FRAMEWORK_IDS = alias SSOT); [docs/testing.md](docs/testing.md); arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
+- **cp95 C1 friction burn, slice A SHIPPED** — 7/22 findings dead (#1 layer-aware seeds via config seed module + 4 setups, ext template de-ITW'd; #2-4 wizard deps/functions-pkg/cloud/catalog; #5 schema oracle; #13 ext setup-scaffolds; #20 .env empties: cascade skip + `# KEY=` templates + placeholder merge + disperse uncomment); live: scratch brand = "My Brand" ×0 / name on 64/65 pages, backend 14/15 w/ config check ✓
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **cp95** — C1 first-run polish: burn [plans/dogfood-friction-log.md](plans/dogfood-friction-log.md) (22 findings — layer-aware seeds #1, .env `""`-shadowing #20, wizard gaps #2-5, BEM demo-* #8-11, gulpfile shim #14, de-ITW #18-19, 17c env scrub) → then cp96 C2 pricing/blueprints
+1. **cp95b** — BEM demo-* warts: #8 live index-sync gate, #9 database.rules.json scaffold, #10 fake service-account autogen, #11 fixer precedence config→artifacts + comment-preserving editor (+ .firebaserc should read cloud.config.projectId — seen live in 95a) → **cp95c** consistency/de-ITW: #12 dep home, #14 gulpfile shim, #17 405, #17c env scrub, #18/#19 branding → then cp96 C2
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -34,7 +34,7 @@
 - CI emulator jobs on 2-core runners, PARKED: worker-load storms (run 6: 104× 'Failed to load function.', machine clean — leak theory dead); run 7 (FUNCTIONS_DISCOVERY_TIMEOUT=120): suites failed CLEAN at 14m35 (no 23-min hang) but the backend step was still killed externally; post-mortems never fired — cancellation ≠ `failure()`, use `if: always()` next time; next escalations if resumed: throttle trigger storms or split/beef jobs (73b)
 - push-secrets under D15: it pushes only the APP .env Default section to repo secrets, but brand/company-level values no longer live there — revisit when the dogfood arc reaches CI publish (D13) (73a)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
-- BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json; `mgr serve`'s hosting upstream 403s on demo-* too — cp90 proved allocation/publish/proxy/retract regardless); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
+- BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json; `mgr serve`'s hosting upstream 403s on demo-* too — cp90 proved allocation/publish/proxy/retract regardless); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b — 95a caught TWO stale generations squatting 8080/8085 with functions_emulator cross-talk timing out corpus cron waits)
 - ~~BEM test path filter vs corpus paths~~ FOLDED into C5 (94a): prefixes now stripped centrally per-source
 - devkit `node --test` full-suite run can flake with "Unable to deserialize cloned data" on e2e-harness.test.js (file-level ✖, all subtests green; 1-in-3, scheduling-sensitive IPC corruption — isolation always passes) (94a)
 - N4 deferred consolidations (73c's CHANGELOG entry is the record): ext⇄desktop build.js harness + mode-helpers skeleton, backend runner onto devkit runner-core; micro-dupes (sleep/capitalize/temp-dir scaffolds) rejected — not worth cross-package coupling (73c)
@@ -42,6 +42,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 95a C1 slice 1 — layer-aware seeding (config seed module + 4 setups; ext template de-ITW), wizard deps/cloud/catalog seeds + functions/package.json, #5 schema oracle, #13 ext setup-scaffold, #20 .env empty-shadowing (3 prongs); live scratch brand "My Brand"×0; 7/22 findings closed (this commit) → CHANGELOG
 - [x] 94b C5 brand-root dispatch — omega-bin brand detection (nearest-context; stdlib twin of resolveBrandRoot) → manager cli handoff; manager `test` fan-out (FRAMEWORK_IDS routing, sequential, aggregate exit); live: omega-brand bare 4/4 project-only, `em:`→desktop-only 751, sandbox `backend:routes/general`→5; friction #20 found (.env `""`-shadowing); devkit 161/mgr 582 (this commit) → CHANGELOG
 - [x] 94a C5 per-app test scoping — devkit scope parser + runner-core/backend/web adoption, bare=project-only everywhere (self-test exception), corpus → `framework:`; devkit 153/web 60/ext 94/desktop 760/corpus 1224-44-0; docs/testing.md (this commit) → CHANGELOG
 - [x] 93 omega-brand born — real-wizard scaffold, 4 targets proven (web :4000/pricing-from-config, backend demo-omega emulator, MV3 ×3, Electron boot); friction log = 21 findings (headline: every framework seed shadows the brand layer; EM/BXM gulpfile paths break under hoisting) (this commit) → CHANGELOG
@@ -88,4 +89,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 1:15 PM (94b — C5 closed both layers; next: cp95 C1 friction burn)*
+*Last updated: 2026-07-11 1:50 PM (95a — seeds/identity slice shipped, 7/22 findings dead; next: cp95b BEM demo-*)*

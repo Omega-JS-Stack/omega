@@ -259,9 +259,9 @@ test('env: desktop .env composes only app-owned values against the real framewor
   assert.match(env, new RegExp(`^APPLE_API_KEY="config/certs/AuthKey_${KEY_ID}\\.p8"$`, 'm'));
   assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-desktop-secret"$/m);
   // Brand-level values are NOT copied (the runtime cascade serves them) —
-  // template placeholders stay untouched even though GH_TOKEN is set above
-  assert.match(env, /^GH_TOKEN=""$/m);
-  assert.match(env, /^WIN_EV_TOKEN_PATH=""$/m);
+  // template placeholders stay commented even though GH_TOKEN is set above
+  assert.match(env, /^# GH_TOKEN=$/m);
+  assert.match(env, /^# WIN_EV_TOKEN_PATH=$/m);
   // Unmanaged template keys and the Custom section survive verbatim
   assert.match(env, /^OMEGA_TEST_USER_UID="em-test-user"$/m);
   assert.match(env, /Custom Values/);
@@ -274,8 +274,8 @@ test('env: signing paths are not stamped when the cert files are absent', async 
   await runService(brand);
 
   const env = jetpack.read(join(brand.root, 'apps', 'desktop', '.env'));
-  assert.match(env, /^CSC_LINK=""$/m);
-  assert.match(env, /^APPLE_API_KEY=""$/m);
+  assert.match(env, /^# CSC_LINK=$/m);
+  assert.match(env, /^# APPLE_API_KEY=$/m);
 });
 
 test('env: a missing .env is created with the section markers', async () => {
@@ -338,7 +338,9 @@ test('env: backend app composes functions/.env with its own stream secret', asyn
   assert.match(env, /^STRIPE_SECRET_KEY="sk_fixture"$/m);
   assert.match(env, /^SENDGRID_API_KEY="SG\.fixture"$/m);
   // Developer tooling credentials are deliberately not composed
-  assert.match(env, /^CLAUDE_CODE_OAUTH_TOKEN=""$/m);
+  assert.match(env, /^# CLAUDE_CODE_OAUTH_TOKEN=$/m);
+  // Composed values UNCOMMENT their placeholder in place — no duplicate lines
+  assert.doesNotMatch(env, /^# GH_TOKEN=$/m);
 });
 
 test('env: a converged second run rewrites nothing', async () => {

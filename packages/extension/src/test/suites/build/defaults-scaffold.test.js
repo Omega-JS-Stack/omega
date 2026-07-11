@@ -100,5 +100,23 @@ module.exports = {
         ctx.expect(third.written.length).toBe(0);
       },
     },
+    {
+      name: 'brand-app seed (friction #1): targets-only config inside a brand monorepo, every-build merge stays out',
+      run: (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const appDir = path.join(tmp, 'brand', 'apps', 'extension');
+        jetpack.dir(appDir);
+
+        scaffoldDefaults({ outputDir: appDir });
+        const seeded = jetpack.read(path.join(appDir, 'config', 'omega.json5'));
+        ctx.expect(seeded).toContain('targets');
+        ctx.expect(seeded.includes('my-brand')).toBe(false);
+
+        // The defaults task runs on EVERY build — the merge rule must stay off.
+        scaffoldDefaults({ outputDir: appDir });
+        ctx.expect(jetpack.read(path.join(appDir, 'config', 'omega.json5'))).toBe(seeded);
+      },
+    },
   ],
 };

@@ -278,6 +278,15 @@ async function copyDefaults(targetDir) {
   // write-only-if-changed.
   const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
+  // Layer-aware seed (dogfood friction #1): inside a brand monorepo the app
+  // config is TARGETS-ONLY — the full template's placeholder identity would
+  // shadow the brand root. Pre-writing it wins over the engine's copy-if-missing.
+  const outputDir = targetDir || rootPathProject;
+  const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
+  if (!resolveSeedMode(outputDir).standalone && !resolveConfigPath(outputDir)) {
+    jetpack.write(path.join(outputDir, 'config', 'omega.json5'), renderBrandAppSeed('desktop'));
+  }
+
   applyDefaults({
     defaultsDir,
     outputDir: targetDir || rootPathProject,

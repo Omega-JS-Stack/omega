@@ -63,10 +63,11 @@ module.exports = {
         const tmp = makeTmp();
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        // Consumer fills a default key and adds their own custom key + gitignore line.
+        // Consumer fills a default key (uncommenting its `# KEY=` placeholder)
+        // and adds their own custom key + gitignore line.
         const envPath = path.join(tmp, 'functions', '.env');
         jetpack.write(envPath, jetpack.read(envPath)
-          .replace('GH_TOKEN=""', 'GH_TOKEN="ghp_mine"')
+          .replace('# GH_TOKEN=', 'GH_TOKEN="ghp_mine"')
           .replace('# ...', 'MY_CUSTOM="kept"\n# ...'));
         const giPath = path.join(tmp, '.gitignore');
         jetpack.write(giPath, jetpack.read(giPath).replace('# ...', 'my-secret-dir/\n# ...'));

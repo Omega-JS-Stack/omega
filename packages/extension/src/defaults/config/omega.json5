@@ -10,16 +10,11 @@
 // secret-shaped keys (…Secret, …privateKey).
 {
   brand: {
-    id: 'ultimate-jekyll',
-    name: 'Ultimate Jekyll',
-    url: 'https://ultimate-jekyll.itwcreativeworks.com',
+    id: 'my-brand',
+    name: 'My Brand',
+    url: 'https://example.com',
     contact: {
-      email: 'support@itwcreativeworks.com',
-    },
-    images: {
-      brandmark: 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/logo/itw-creative-works-brandmark-blue-1024x1024.png',
-      wordmark: 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/logo/itw-creative-works-wordmark-blue-1024x.png',
-      combomark: 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/logo/itw-creative-works-combomark-blue-1024x.png',
+      email: 'support@example.com',
     },
   },
 
@@ -39,17 +34,17 @@
     },
   },
 
+  // Firebase web-app config (public client keys — real secrets stay in .env).
+  // Fill from Firebase console → Project settings → your web app.
   cloud: {
     provider: 'firebase',
     config: {
-      apiKey: 'AIzaSyD1MvM-EQC_eVWqaTe5ImWALwhBr7iXgh8',
-      authDomain: 'universal-auth.itwcreativeworks.com',
-      databaseURL: 'https://itwcw-universal-auth.firebaseio.com',
-      projectId: 'itwcw-universal-auth',
-      storageBucket: 'itwcw-universal-auth.appspot.com',
-      messagingSenderId: '195162582358',
-      appId: '1:195162582358:web:6f9320c516d9ab4838baf7',
-      measurementId: 'G-W08HGRW4S',
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
     },
   },
 

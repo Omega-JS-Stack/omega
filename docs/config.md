@@ -91,6 +91,12 @@ company .env ← brand .env ← app .env ← shell env
   in `load.js` is the ONE definition of the walk — both cascades use it.
 - **Precedence via dotenv's no-override semantics**: files load strongest-first and never
   overwrite keys already set, so the shell always wins and app beats brand beats company.
+- **Empty file values never claim a key (cp95a, friction #20)**: `KEY=` / `KEY=""` in any
+  `.env` FILE means "documented here, value supplied by another layer" — a scaffolded app
+  file full of placeholders can't shadow the brand root's real values. Only the shell can
+  deliberately set a key to empty. The framework `_.env` templates ship `# KEY=` commented
+  placeholders (the merge protocol keeps set values on their line, converges empties to
+  the placeholder, and disperse uncomments a placeholder in place when composing a value).
 - **Defined at the source, resolved at runtime/build**: a brand-wide `GH_TOKEN` lives once
   in the brand `.env`; every framework CLI/build resolves the chain at boot
   (`loadEnv(process.cwd())` in the web/desktop/extension CLIs + gulp pipelines,

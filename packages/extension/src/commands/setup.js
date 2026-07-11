@@ -30,6 +30,7 @@ module.exports = async function (options) {
   options.checkPeerDependencies = force(options.checkPeerDependencies || true, 'boolean');
   options.setupScripts = force(options.setupScripts || true, 'boolean');
   options.checkLocality = force(options.checkLocality || true, 'boolean');
+  options.scaffold = force(options.scaffold || true, 'boolean');
   options.migrate = options.migrate !== 'false';
 
   // Log
@@ -69,8 +70,13 @@ module.exports = async function (options) {
       await setupScripts();
     }
 
-    // Copy all files from src/defaults/dist on first run
-    // await copyDefaultDistFiles();
+    // Scaffold the consumer interior at setup — the same engine run the
+    // build's defaults task performs, so extension consumers get their files
+    // when web/desktop consumers do, not at first build (friction #13).
+    if (options.scaffold) {
+      const { scaffoldDefaults } = require('../gulp/tasks/defaults.js');
+      await scaffoldDefaults();
+    }
 
     // Check which locality we are using
     if (options.checkLocality) {

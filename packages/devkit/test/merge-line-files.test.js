@@ -101,3 +101,36 @@ test('normalizeEnvLine: raw wraps, single-quote canonicalizes, double-quote and 
   assert.equal(normalizeEnvLine('# comment'), '# comment');
   assert.equal(normalizeEnvLine('KEY=has "quote"'), 'KEY="has \\"quote\\""');
 });
+
+test('placeholder `# KEY=`: existing SET value keeps its line in default (either section)', () => {
+  const existing = `${DEFAULT_MARKER}\nOMEGA_ADMIN_KEY="real-value"\n${CUSTOM_MARKER}\nCUSTOM_TOKEN="user-set"\n`;
+  const incoming = `${DEFAULT_MARKER}\n# OMEGA_ADMIN_KEY=\n# CUSTOM_TOKEN=\n# NEVER_SET=\n${CUSTOM_MARKER}\n`;
+  const merged = mergeLineBasedFiles(existing, incoming, '.env');
+
+  assert.match(merged, /OMEGA_ADMIN_KEY="real-value"/, 'default-section value survives the placeholder');
+  assert.match(merged, /CUSTOM_TOKEN="user-set"/, 'custom-section value is promoted into default');
+  assert.doesNotMatch(merged, /# OMEGA_ADMIN_KEY=/, 'no duplicate placeholder for a set key');
+  assert.match(merged, /# NEVER_SET=/, 'unset key stays a commented placeholder');
+  const customHalf = merged.slice(merged.indexOf(CUSTOM_MARKER));
+  assert.doesNotMatch(customHalf, /CUSTOM_TOKEN/, 'promoted key drops out of custom');
+});
+
+test('placeholder `# KEY=`: existing EMPTY values converge to the placeholder instead of migrating to custom (friction #20)', () => {
+  const existing = `${DEFAULT_MARKER}\nOMEGA_ADMIN_KEY=""\nOMEGA_WEBHOOK_KEY=\n${CUSTOM_MARKER}\n`;
+  const incoming = `${DEFAULT_MARKER}\n# OMEGA_ADMIN_KEY=\n# OMEGA_WEBHOOK_KEY=\n${CUSTOM_MARKER}\n`;
+  const merged = mergeLineBasedFiles(existing, incoming, '.env');
+
+  assert.match(merged, /# OMEGA_ADMIN_KEY=/, 'quoted-empty converges to the placeholder');
+  assert.match(merged, /# OMEGA_WEBHOOK_KEY=/, 'bare-empty converges to the placeholder');
+  assert.doesNotMatch(merged, /^OMEGA_ADMIN_KEY=/m, 'the shadowing empty line is gone');
+  const customHalf = merged.slice(merged.indexOf(CUSTOM_MARKER));
+  assert.doesNotMatch(customHalf, /OMEGA_/, 'empties never migrate into custom');
+});
+
+test('placeholder merge is idempotent', () => {
+  const existing = `${DEFAULT_MARKER}\nSET_KEY="v"\nEMPTY_KEY=""\n${CUSTOM_MARKER}\nMINE="x"\n`;
+  const incoming = `${DEFAULT_MARKER}\n# SET_KEY=\n# EMPTY_KEY=\n${CUSTOM_MARKER}\n`;
+  const once = mergeLineBasedFiles(existing, incoming, '.env');
+  const twice = mergeLineBasedFiles(once, incoming, '.env');
+  assert.equal(twice, once);
+});

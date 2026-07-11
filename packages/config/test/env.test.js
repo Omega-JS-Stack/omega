@@ -204,3 +204,23 @@ test('resolveEnvChain resolves paths without touching process.env', (t) => {
   assert.strictEqual(chain.brand, path.join(root, 'brand', '.env'));
   assert.strictEqual(process.env.ENVT7_X, undefined);
 });
+
+// ─── Empty file-layer values never claim a key (dogfood friction #20) ───
+
+test('empty app-layer values (KEY= / KEY="") never shadow the brand layer; shell empties still win', (t) => {
+  const root = makeFixture('env-empty', {
+    'brand/config/omega.json5': `{ brand: { id: 'acme' } }`,
+    'brand/.env': 'ENVT9_A=brand-real\nENVT9_B=brand-real\nENVT9_S=brand-real\n',
+    'brand/apps/site/.env': 'ENVT9_A=\nENVT9_B=""\nENVT9_S=""\nENVT9_ONLY=""\n',
+  });
+  cleanup(t, root, ['ENVT9_A', 'ENVT9_B', 'ENVT9_S', 'ENVT9_ONLY']);
+
+  process.env.ENVT9_S = '';
+
+  loadEnv(path.join(root, 'brand', 'apps', 'site'));
+
+  assert.strictEqual(process.env.ENVT9_A, 'brand-real', 'unquoted-empty app line must not shadow the brand value');
+  assert.strictEqual(process.env.ENVT9_B, 'brand-real', 'quoted-empty app line must not shadow the brand value');
+  assert.strictEqual(process.env.ENVT9_S, '', 'a deliberately empty SHELL var still beats every file');
+  assert.strictEqual(process.env.ENVT9_ONLY, undefined, 'empty in every layer = key stays unset');
+});

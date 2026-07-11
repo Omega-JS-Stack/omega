@@ -8,11 +8,12 @@
  * semantics: existing files are NEVER touched, so onboarding is idempotent
  * and re-running it into a partial brand only fills the gaps.
  *
- * Deliberately structural: no framework deps are wired into the app
- * package.jsons — each framework's own setup owns its consumer internals,
- * and the update service records dep-less, build-less apps as skipped, not
- * failed. The testing service's "build output missing — run the update
- * service" error on a fresh brand is the designed next-step nudge.
+ * App package.jsons carry their framework devDependency (`*` — satisfied by
+ * workspace links in a monorepo, `mgr i local` pre-publish, npm post-publish;
+ * dogfood friction #2), so install → setup works without hand-editing; each
+ * framework's own setup still owns the consumer INTERIOR (scripts, config,
+ * scaffolded files). The backend app's shell stays dep-less — @omega.js/backend
+ * belongs in functions/package.json, which the backend setup creates.
  */
 
 const path = require('node:path');
@@ -20,6 +21,11 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const jetpack = require('fs-jetpack');
 
 const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
+
+// The backend framework lives in functions/package.json (a Cloud Functions
+// runtime dependency, created by the backend setup) — its app shell stays
+// dep-less. Every other target declares its framework as an app devDependency.
+const SHELL_ONLY_TARGETS = ['backend'];
 
 // Secret names each service reads from the brand .env — the stub documents
 // every entry point so "where do credentials go" has one obvious answer.
@@ -93,7 +99,43 @@ function renderOmegaConfig(answers) {
     lines.push('    ],', '  },', '');
   }
 
+  // Backend brands get a bootable cloud project out of the box: demo-* ids
+  // are the emulator-only convention (never touch live Firebase), so the
+  // emulator boots before any real project exists (dogfood friction #3).
+  if (answers.targets.includes('backend')) {
+    lines.push(
+      '  // Cloud project (backend target). demo-* ids are EMULATOR-ONLY — the',
+      '  // emulators boot against this immediately; swap in a real Firebase project',
+      '  // id at launch (the firebase service can create one).',
+      '  cloud: {',
+      '    provider: "firebase",',
+      '    config: {',
+      `      projectId: ${JSON.stringify(`demo-${answers.id}`)},`,
+      '    },',
+      '  },',
+      '',
+    );
+  }
+
   lines.push(
+    '  // Payment catalog — pricing pages render THESE products (no products =',
+    '  // no pricing). Uncomment + edit to start selling; ids are permanent once',
+    '  // live. Processor id fields (stripe/paypal/chargebee) are filled by the',
+    '  // payment service — leave them null.',
+    '  // payment: {',
+    '  //   products: [',
+    '  //     {',
+    '  //       id: "premium",',
+    '  //       name: "Premium",',
+    '  //       type: "subscription",',
+    '  //       prices: { monthly: 9.99, annually: 99.99 },',
+    '  //       trial: { days: 14 },',
+    '  //       limits: { requests: 10000 },',
+    '  //     },',
+    '  //     { id: "launch-kit", name: "Launch Kit", type: "one-time", prices: { once: 49.99 } },',
+    '  //   ],',
+    '  // },',
+    '',
     '  // Key presence = target enabled; the value is that target\'s type-wide',
     '  // config (any shared key inside overrides it for that surface).',
     '  targets: {',
@@ -197,17 +239,25 @@ ${appList}
 
 ## Next steps
 
-1. Install each app's framework and run its setup (see the app list above).
-2. Fill in \`.env\` as the brand adopts external services.
-3. \`npx omega-manager\` — reconcile everything; rerun any time.
+1. \`npm install\` — each app declares its framework (workspace link in a
+   monorepo; standalone pre-publish: \`npx mgr i local\` inside each app).
+2. Per app: \`cd apps/<dir> && npx omega setup\` — the framework scaffolds its
+   consumer interior.
+3. Fill in \`.env\` as the brand adopts external services.
+4. \`npx omega-manager\` — reconcile everything; rerun any time.
 `;
 }
 
 function renderAppPackageJson(answers, target, dir) {
+  const framework = SHELL_ONLY_TARGETS.includes(target) ? null : TARGET_FRAMEWORKS[target];
+
   return `${JSON.stringify({
     name: `${answers.id}-${dir}`,
     private: true,
     description: `${answers.name} ${target} app`,
+    // `*`: satisfied by a workspace link in-monorepo, `mgr i local` pre-publish,
+    // and the npm registry once @omega.js/* publish.
+    ...(framework ? { devDependencies: { [framework]: '*' } } : {}),
   }, null, 2)}\n`;
 }
 
@@ -229,6 +279,23 @@ function buildScaffoldPlan(answers) {
   for (const target of answers.targets) {
     const dir = TARGET_APP_DIRS[target] || target;
     plan.push({ path: `apps/${dir}/package.json`, contents: renderAppPackageJson(answers, target, dir) });
+
+    // The backend framework is a Cloud Functions RUNTIME dependency — it
+    // lives in functions/package.json, which is also what the omega bin's
+    // dispatcher keys on. Without it a fresh backend app can't even route
+    // `omega setup` to the framework (friction #2's backend flavor).
+    if (target === 'backend') {
+      plan.push({
+        path: `apps/${dir}/functions/package.json`,
+        contents: `${JSON.stringify({
+          name: `${answers.id}-${dir}-functions`,
+          private: true,
+          description: `${answers.name} backend functions`,
+          main: 'index.js',
+          dependencies: { [TARGET_FRAMEWORKS.backend]: '*' },
+        }, null, 2)}\n`,
+      });
+    }
   }
 
   return plan;

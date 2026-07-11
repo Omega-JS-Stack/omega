@@ -144,6 +144,21 @@ function updateEnvContent(content, updates) {
     }
   }
 
+  // A `# KEY=` placeholder (the framework templates' convention for keys the
+  // cascade usually serves) is the key's documented home — uncomment it in
+  // place instead of appending a duplicate line below it.
+  for (const key of Object.keys(updates)) {
+    if (seen.has(key)) continue;
+    const placeholderRe = new RegExp(`^#\\s*${key}=\\s*$`);
+    const placeholder = entries.find((candidate) => candidate.lines.length === 1 && placeholderRe.test(candidate.lines[0].trim()));
+    if (placeholder) {
+      placeholder.lines = [envLine(key, updates[key])];
+      placeholder.key = key;
+      seen.add(key);
+      written.push(key);
+    }
+  }
+
   const appended = Object.keys(updates).filter((key) => !seen.has(key));
   if (appended.length > 0) {
     const appendEntries = appended.map((key) => ({ lines: [envLine(key, updates[key])], key }));

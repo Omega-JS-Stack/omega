@@ -83,5 +83,23 @@ module.exports = {
           .toBe(JSON.stringify(snapshot));
       },
     },
+    {
+      name: 'brand-app seed (friction #1): targets-only config inside a brand monorepo, template stays out',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
+        jetpack.dir(appDir);
+
+        await copyDefaults(appDir);
+        const seeded = jetpack.read(path.join(appDir, 'config', 'omega.json5'));
+        ctx.expect(seeded).toContain('targets');
+        ctx.expect(seeded.includes('myapp')).toBe(false);
+
+        // Rerun converges — the full template never lands over the slim seed.
+        await copyDefaults(appDir);
+        ctx.expect(jetpack.read(path.join(appDir, 'config', 'omega.json5'))).toBe(seeded);
+      },
+    },
   ],
 };

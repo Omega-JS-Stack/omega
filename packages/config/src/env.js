@@ -67,9 +67,16 @@ function resolveEnvChain(startDir) {
 }
 
 /**
- * dotenv-load an ordered list of .env files (strongest first). dotenv never
- * overrides keys that are already set, so load order = precedence and the
- * shell always wins. Null/missing entries skip silently.
+ * Load an ordered list of .env files (strongest first) with dotenv's
+ * no-override semantics: keys already in process.env (the shell, or a
+ * stronger file) always win, so load order = precedence. Null/missing
+ * entries skip silently.
+ *
+ * One rule on top of plain dotenv (dogfood friction #20): a file layer's
+ * EMPTY value (`KEY=` / `KEY=""`) never claims the key — empty means
+ * "documented here, value supplied by another layer", so a scaffolded
+ * app .env full of placeholders can't shadow the brand root's real
+ * values. Only the shell can deliberately set a key to empty.
  *
  * @param {Array<string|null>} envPaths
  * @returns {string[]} The files that existed and were loaded.
@@ -79,7 +86,13 @@ function loadEnvChain(envPaths) {
 
   for (const envPath of envPaths) {
     if (!envPath || !fs.existsSync(envPath)) continue;
-    require('dotenv').config({ path: envPath, quiet: true });
+
+    const parsed = require('dotenv').parse(fs.readFileSync(envPath, 'utf8'));
+    for (const [key, value] of Object.entries(parsed)) {
+      if (value === '' || key in process.env) continue;
+      process.env[key] = value;
+    }
+
     loaded.push(envPath);
   }
 

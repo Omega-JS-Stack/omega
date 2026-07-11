@@ -30,6 +30,12 @@
 //       KEY="already-quoted"  →   KEY="already-quoted"  (left alone)
 //       KEY=                  →   KEY=                  (empty stays empty/unquoted)
 //     This protects values containing spaces, #, $, or other shell-meaningful chars.
+//   - .env COMMENTED PLACEHOLDERS (`# KEY=` in the template's Default section)
+//     mark keys the framework knows but ships no value for (the env cascade
+//     supplies values from stronger layers — dogfood friction #20). On merge:
+//     an existing NON-EMPTY value for that key (either section) keeps its line
+//     in Default; an existing EMPTY value (`KEY=` / `KEY=""`) converges to the
+//     commented placeholder instead of migrating to Custom.
 //   - .gitignore: same logic, line-based instead of key-based (no quoting).
 //   - CLAUDE.md: same logic as .gitignore (line-based, no quoting). The markers
 //     render as visible H1 headings in markdown — that's intentional UX.
@@ -81,7 +87,25 @@ function mergeLineBasedFiles(existingContent, newContent, fileName) {
       // .gitignore: just keep the new line.
       mergedDefault.push(line);
     } else {
-      // Comment / blank.
+      // Comment / blank — for .env, a `# KEY=` placeholder claims the key:
+      // an existing set value keeps its line, an empty one converges away.
+      const placeholderKey = isEnvFile ? parsePlaceholderKey(trimmed) : null;
+
+      if (placeholderKey) {
+        newDefaultKeys.add(placeholderKey);
+
+        const existingLine = existingDefaultKeys.has(placeholderKey)
+          ? findKeyLine(existingDefault, placeholderKey)
+          : existingCustomKeys.has(placeholderKey)
+            ? findKeyLine(existingCustom, placeholderKey)
+            : null;
+
+        if (existingLine && !envValueIsEmpty(existingLine)) {
+          emit(existingLine);
+          continue;
+        }
+      }
+
       mergedDefault.push(line);
     }
   }
@@ -226,6 +250,20 @@ function findKeyLine(lines, key) {
     if (re.test(line)) return line;
   }
   return `${key}=`;
+}
+
+// `# KEY=` (nothing after the =) → KEY; any other comment → null.
+function parsePlaceholderKey(trimmed) {
+  const match = trimmed.match(/^#\s*([A-Za-z_][A-Za-z0-9_]*)=\s*$/);
+  return match ? match[1] : null;
+}
+
+// KEY= / KEY="" / KEY='' (whitespace tolerated) count as empty.
+function envValueIsEmpty(line) {
+  const eqIdx = line.indexOf('=');
+  if (eqIdx < 0) return true;
+  const value = line.slice(eqIdx + 1).trim();
+  return value === '' || value === '""' || value === "''";
 }
 
 /**

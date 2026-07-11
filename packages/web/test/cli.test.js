@@ -115,6 +115,27 @@ test('FILE_MAP: src/ is consumer-owned after seeding', () => {
   assert.strictEqual(FILE_MAP['.github/workflows/build.yml'].overwrite, true, 'CI workflow re-syncs every setup');
 });
 
+test('scaffold: inside a brand monorepo the seed is targets-only and the template never merges in (friction #1)', () => {
+  const root = tmpConsumer();
+  const appDir = path.join(root, 'brand', 'apps', 'website');
+  fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.mkdirSync(appDir, { recursive: true });
+
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+
+  const seeded = fs.readFileSync(path.join(appDir, 'config', 'omega.json5'), 'utf8');
+  assert.ok(!seeded.includes('my-brand'), 'no placeholder identity in a brand app');
+  assert.match(seeded, /targets/, 'targets-only seed');
+
+  // Rerun (setup runs repeatedly) — the full template must NOT merge under it
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  const { config } = loadConfig(appDir, 'web');
+  assert.strictEqual(config.brand.id, 'acme', 'brand root identity resolves through the app seed');
+  assert.strictEqual(config.brand.name, 'Acme', 'no My Brand shadowing after reruns');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('bin: `omega setup` end-to-end in a fresh consumer (real process, real bin)', () => {
   const root = tmpConsumer();
   execFileSync(process.execPath, [path.join(PKG, 'bin', 'omega'), 'setup'], { cwd: root, stdio: 'pipe' });
