@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — 73a + 73c SHIPPED; designs DONE + committed: [plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md) (implement next: Settings.resolve zod branch + parity cohorts) and [plans/d12-provider-keys-proposal.md](plans/d12-provider-keys-proposal.md) (R2/R3c shippable under veto window; `cloud`/`errorMonitoring` renames WAIT for Ian); parked verifies (line below); CI opt-in, investigation parked
+- N4 architecture sweep (cp73) — 73a + 73c SHIPPED; 73d (legacy-format matchers removed per Ian) validating in background; **D12 fully APPROVED** — Ian locked `cloud` + `monitoring` (single-word roles) → implement the whole sweep next: [plans/d12-provider-keys-proposal.md](plans/d12-provider-keys-proposal.md); then zod parity: [plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md); parked verifies (line below); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -42,6 +42,7 @@
 - BEM: the test path filter matches project tests but not corpus paths (1.2a)
 - N4 verifies from the cp70 sweep: web's site-wide defaults-style override intent achievable via the data cascade? (powertools 1.8.1 equivalent); packages/config schema needs `devlog`/`seo` keys if ever made strict (70)
 - N4 deferred consolidations (73c's CHANGELOG entry is the record): ext⇄desktop build.js harness + mode-helpers skeleton, backend runner onto devkit runner-core; micro-dupes (sleep/capitalize/temp-dir scaffolds) rejected — not worth cross-package coupling (73c)
+- Brand-migration tooling (PINNED) must convert pre-omega file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers — evergreen `mgr setup` only speaks `///---omega---///` now (73d)
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)

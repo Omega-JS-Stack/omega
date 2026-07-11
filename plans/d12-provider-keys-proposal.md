@@ -1,6 +1,6 @@
 # D12 provider-discriminated config keys — exact-shape proposal (N4)
 
-> Status: PROPOSAL — exact key names for D12 ("keys name a ROLE with a `provider` discriminator, e.g. `firebaseConfig` → `<role>: { provider: 'firebase', … }`; shape-only future-proofing, no alternative providers built"). D12 itself says the exact names land in N4's config review — this is that review. Survey: cp73c D12 agent. **The four ⚠-flagged renames touch live surfaces and wait for Ian's OK (data-shape preservation rule).**
+> Status: **APPROVED (Ian 2026-07-10)** — exact key names for D12 ("keys name a ROLE with a `provider` discriminator; shape-only future-proofing, no alternative providers built"). Ian locked the names: **`cloud`** (was `firebaseConfig`) and **`monitoring`** (was `sentry`; his call — "i like single words", which is now the naming convention for future roles). All rules below R1–R5 are green to implement in one sweep — nothing waits on him anymore. Survey: cp73c D12 agent.
 
 ## Reality found: THREE patterns coexist, and one D12 shape can't fit all
 
@@ -14,20 +14,20 @@
 
 - **R1 — multi-provider roles keep the map.** `analytics.providers.*`, `payment.processors.*`, `payment.products[].*`, `oauth2.*` are already role-first and correct. No change. (D12's single-`provider` example simply doesn't apply to them.)
 - **R2 — the discriminator field is `provider`, everywhere.** Rename the `platform` fields → `provider` (`marketing.campaigns`, `marketing.newsletter`, `blog`, `devlog`). Mechanical, in-repo, low risk.
-- **R3 — single-provider roles get `<role>: { provider, … }`.** Proposed names:
-  - `firebaseConfig` → **`cloud: { provider: 'firebase', config: { apiKey, projectId, … } }`** — the role is the app/cloud platform (supabase would be the someday-alternative). `platform` as the key collides with desktop's `platforms`; `app`/`backend` are overloaded. ⚠ WAIT FOR IAN — most-wired key in the repo (client `_resolveFirebaseConfig`, both bridges, backend runtime + `GET /brand`, analytics uuidv5 namespace seeded from `firebaseConfig.projectId`).
-  - `sentry` → **`errorMonitoring: { provider: 'sentry', dsn }`** ⚠ flag (client bridge + backend + extension webpack read it).
+- **R3 — single-provider roles get `<role>: { provider, … }`.** Names APPROVED by Ian (single words):
+  - `firebaseConfig` → **`cloud: { provider: 'firebase', config: { apiKey, projectId, … } }`** — the role is the app/cloud platform (supabase would be the someday-alternative). Most-wired key in the repo (client `_resolveFirebaseConfig`, both bridges, backend runtime + `GET /brand`, analytics uuidv5 namespace seeded from `firebaseConfig.projectId`) — land as ONE sweep with bridges + fixtures + docs in lockstep.
+  - `sentry` → **`monitoring: { provider: 'sentry', dsn }`** (client bridge + backend + extension webpack read it — same-sweep).
   - Manager-side AI: `anthropic`/`openai` top-levels → **`ai.providers.{anthropic,openai}`** (matches the existing `ai.request({ provider })` seam and `newsletterConfig.provider.{structure,filter,svg}` sub-task discriminators). Manager/backend-internal; medium-low risk.
 - **R4 — ITW-service manager keys stay put for now** (`cloudflare`, `recaptcha`, `adsense`, `searchConsole`, `slapform`, `chatsy`, `replyify`, `certificates.apple`): single-purpose provisioning config, not consumer-facing roles; role-ifying them buys nothing until a second provider is imaginable. Revisit only if one appears.
 - **R5 — already-`provider` keys are D12-done**: `domain.provider`, `domain.email.provider`, `platforms.win.signing.cloud.provider`. No change.
 
-## Ian-decision list (⚠ = touches live surfaces; flag with migration story, don't build)
+## Decision record (all resolved 2026-07-10)
 
-| Change | Why it needs Ian | Blast |
-|---|---|---|
-| `firebaseConfig` → `cloud.{provider,config}` | `GET /brand` re-emits it verbatim (wire contract for deployed clients once brands migrate); 9 fixture configs; migrate-codemod output; identity-namespace seed | HIGH |
-| `sentry` → `errorMonitoring.{provider,dsn}` | client flat-contract bridge; `GET /brand` adjacency | MED |
-| `payment.*` / `oauth2` internals | product IDs match live Stripe/PayPal/Chargebee objects + Firestore subscriptions; `user.oauth2.{providerId}` mirrored in Firestore — R1 says DON'T touch, listed so nobody "cleans them up" later | HIGH (that's why: no change) |
-| `platform` → `provider` field renames (R2) + `ai.providers` (R3c) | none really — in-repo; listed for the veto window | LOW |
+| Change | Status |
+|---|---|
+| `firebaseConfig` → `cloud.{provider,config}` | **APPROVED by Ian** — blast: `GET /brand`, both bridges, 9 fixtures, migrate-codemod output, identity-namespace seed; one lockstep sweep |
+| `sentry` → `monitoring.{provider,dsn}` | **APPROVED by Ian** (his pick over `errorMonitoring` — single words) |
+| `payment.*` / `oauth2` internals | **NO CHANGE, permanent** (R1): product IDs match live Stripe/PayPal/Chargebee objects + Firestore subscriptions; `user.oauth2.{providerId}` mirrored in Firestore — listed so nobody "cleans them up" later |
+| `platform` → `provider` field renames (R2) + `ai.providers` (R3c) | Green (in-repo, was never gated) |
 
-**Timing**: D12's own note — "cheap pre-dogfood, expensive after brands migrate." R2 + R3c can ship in the next config checkpoint under the standing veto-window convention; R3a/R3b (`cloud`, `errorMonitoring`) wait for Ian's explicit OK on the names AND the go-ahead, then land as one sweep with both bridges + fixtures + docs in lockstep.
+**Timing**: D12's own note — "cheap pre-dogfood, expensive after brands migrate" — and brands haven't migrated: implement the whole sweep now (next checkpoint).

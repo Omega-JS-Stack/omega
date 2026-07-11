@@ -3,11 +3,6 @@ const jetpack = require('fs-jetpack');
 const path = require('path');
 const { mergeLineBasedFiles, hasSectionMarkers, DEFAULT_SECTION_MARKER } = require('./helpers/merge-line-files');
 
-// Legacy BEM-era marker regex — matches `# BEM>>> ... # <<<BEM` blocks written
-// into old consumers' .gitignore files. The literal must stay `BEM`: it matches
-// bytes that exist in the wild, not our name.
-const OLD_BEM_MARKER_REGEX = /# BEM>>>([\s\S]*?)# <<<BEM\n?/g;
-
 class GitignoreTest extends BaseTest {
   getName() {
     return 'has correct .gitignore';
@@ -24,11 +19,6 @@ class GitignoreTest extends BaseTest {
     }
 
     if (!existingContent) {
-      return false;
-    }
-
-    // Check for legacy BEM markers that need to be removed
-    if (OLD_BEM_MARKER_REGEX.test(existingContent)) {
       return false;
     }
 
@@ -110,10 +100,7 @@ class GitignoreTest extends BaseTest {
 
     let existingContent = jetpack.read(gitignorePath) || '';
 
-    // Remove legacy BEM markers if present
-    existingContent = existingContent.replace(OLD_BEM_MARKER_REGEX, '');
-
-    // Clean up any extra blank lines left behind
+    // Normalize runs of blank lines
     existingContent = existingContent.replace(/\n{3,}/g, '\n\n');
 
     // If file doesn't have section markers, treat existing content as custom values
