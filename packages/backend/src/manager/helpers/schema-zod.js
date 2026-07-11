@@ -3,10 +3,11 @@
  *
  * A `schemas/<route>/<method>.js` module may export a zod schema instead of a
  * declarative node object; Settings.resolve() detects it (isZodSchema) and runs
- * resolveZodSchema() in place of powertools.defaults(). Wire shapes are preserved:
- * schemas built with the `fields` builders replicate node-powertools' resolution
- * semantics exactly (coerce-never-reject, clamp/truncate, undefined-only required)
- * — see plans/zod-route-schemas-design.md for the full preservation checklist.
+ * resolveZodSchema() in place of the declarative walk. Wire shapes are preserved:
+ * schemas built with the `fields` builders run the SAME field pipeline as the
+ * declarative engine (shared in schema-engine.js — coerce-never-reject,
+ * clamp/truncate, required fires on undefined/'') — see
+ * plans/zod-route-schemas-design.md for the full preservation checklist.
  *
  * Builders (mirror the declarative node options one-to-one):
  *   const { z, fields: f } = require('../../helpers/schema-zod.js');
@@ -26,26 +27,14 @@
  * semantics: invalid input REJECTS with 400 instead of coercing, and there is no
  * `required` metadata (use zod's own optional/refine machinery).
  *
- * Deliberate divergences from powertools.defaults() (bug fixes, asserted in
- * test/helpers/schema-zod.js):
- *   - Non-empty object/array defaults are NOT polluted with injected types/min/max/
- *     value/default keys (powertools mutates the schema's default object and returns
- *     it by reference; we return a clean clone per request).
- *   - No `default: undefined` own-property noise on object-typed values.
- *   Both are JSON-invisible except the pollution case, which only fired on
- *   admin/notification's non-empty defaults — reviewed in that cohort's conversion.
+ * The field pipeline (and its deliberate powertools bug fixes: no default-object
+ * pollution, defaults cloned per request) lives in schema-engine.js — shared with
+ * the declarative engine and asserted in test/helpers/schema-zod.js.
  */
 
 const { z } = require('zod');
-const powertools = require('node-powertools');
 const _ = require('lodash');
-
-// Node options accepted by fields.field() — one-to-one with declarative schema nodes.
-// `sanitize` is carried for the middleware sanitize pass contract; `available` is not
-// (no schema declares it and nothing reads it). `enum` is accepted and stored but NOT
-// enforced — it was always decorative in the declarative engine (user/oauth2 declares
-// it, nothing validates it); enforcement is a post-parity tightening decision.
-const FIELD_OPTIONS = ['types', 'default', 'value', 'min', 'max', 'required', 'clean', 'sanitize', 'enum'];
+const { FIELD_OPTIONS, resolveFieldValue } = require('./schema-engine.js');
 
 /**
  * Detect a zod schema (any version with the zod 4 internal marker).
@@ -58,11 +47,11 @@ function isZodSchema(x) {
 }
 
 /**
- * Resolve settings against a zod schema — the zod counterpart of the
- * powertools.defaults() + required/clean loop in Settings.resolve().
- * Required semantics (undefined-only, function support, checkRequired opt-out) run
- * from the ._omegaMeta registry that fields.object() builds; the error message and
- * code match the declarative engine exactly.
+ * Resolve settings against a zod schema — the zod counterpart of the declarative
+ * walk in Settings.resolve().
+ * Required semantics (fires on undefined/'', function support, checkRequired
+ * opt-out) run from the ._omegaMeta registry that fields.object() builds; the error
+ * message and code match the declarative engine exactly.
  * @param {object} assistant - Assistant (errorify)
  * @param {import('zod').ZodType} schema - Zod schema (usually from fields.object())
  * @param {object} settings - Raw request data
@@ -72,8 +61,8 @@ function isZodSchema(x) {
 function resolveZodSchema(assistant, schema, settings, options) {
   const meta = schema._omegaMeta;
 
-  // Required check — same rule as the declarative engine: fires ONLY when the raw
-  // value is undefined ('', null, 0, false all pass), honoring checkRequired and
+  // Required check — same rule as the declarative engine: fires when the raw value
+  // is undefined or '' (null, 0, false pass), honoring checkRequired and
   // function-valued required(assistant, settings, options).
   if (options.checkRequired && meta) {
     for (const [path, node] of Object.entries(meta.paths)) {
@@ -81,7 +70,9 @@ function resolveZodSchema(assistant, schema, settings, options) {
         ? node.required(assistant, settings, options)
         : node.required === true;
 
-      if (isRequired && typeof _.get(settings, path) === 'undefined') {
+      const raw = _.get(settings, path);
+
+      if (isRequired && (typeof raw === 'undefined' || raw === '')) {
         throw assistant.errorify(`Required key {${path}} is missing in settings`, {code: 400});
       }
     }
@@ -100,96 +91,25 @@ function resolveZodSchema(assistant, schema, settings, options) {
 }
 
 /**
- * Replicate powertools' enforceValidTypes() (node-powertools src/lib/object.js):
- * single-typed fields coerce via force(), multi-typed fields replace with the
- * default on mismatch, 'any' accepts everything. null and arrays pass as 'object'
- * (typeof semantics), matching the original.
+ * Build the nested per-field map Settings.resolve exposes as self.schema for the
+ * middleware sanitize pass ({ sanitize } per leaf, mirroring the settings
+ * structure). Raw zod schemas have no registry → {} (every field sanitizes).
+ * @param {import('zod').ZodType} schema - Zod schema
+ * @returns {object} Nested map of leaf path → { sanitize }
  */
-function enforceValidTypes(value, types, def) {
-  const isValidType = types.some((type) => {
-    if (type === 'any') return true;
-    return typeof value === type || (type === 'array' && Array.isArray(value));
-  });
+function buildSchemaMap(schema) {
+  const map = {};
+  const meta = schema._omegaMeta;
 
-  if (types.length === 1 && types[0] !== 'any') {
-    return isValidType ? value : powertools.force(value, types[0]);
+  if (!meta) {
+    return map;
   }
 
-  return isValidType ? value : def;
-}
-
-/**
- * Replicate powertools' enforceMinMax(): numbers clamp to [min, max]; strings and
- * arrays truncate to max (min is ignored for them). Note powertools defaults
- * min to 0 and max to Infinity via `||`, so negative numbers clamp to 0 unless the
- * schema declares a negative min, and min: 0 / max: 0 behave as unset.
- */
-function enforceMinMax(value, min, max) {
-  const isNumber = typeof value === 'number';
-  const isString = typeof value === 'string';
-
-  if (min !== undefined && isNumber && value < min) {
-    return min;
+  for (const [path, node] of Object.entries(meta.paths)) {
+    _.set(map, path, { sanitize: node.sanitize });
   }
 
-  if (max !== undefined) {
-    if (isNumber && value > max) {
-      return max;
-    } else if (isString && value.length > max) {
-      return value.slice(0, max);
-    } else if (Array.isArray(value) && value.length > max) {
-      return value.slice(0, max);
-    }
-  }
-
-  return value;
-}
-
-/**
- * Resolve one field's raw input through the powertools node pipeline:
- * default-or-user → enforceValidTypes → enforceMinMax → forced value → clean.
- */
-function resolveFieldValue(raw, opts) {
-  const types = opts.types || ['any'];
-
-  // powertools skips executing function defaults/values for 'any'/'function' types
-  // (the function itself becomes the value)
-  const shouldExecute = !types.includes('any') && !types.includes('function');
-
-  let value = opts.value;
-  if (typeof value === 'function' && shouldExecute) {
-    value = value();
-  }
-
-  let def = opts.default;
-  if (typeof def === 'function' && shouldExecute) {
-    def = def();
-  }
-
-  // Clone object/array defaults so a request can't mutate schema state and the
-  // pollution divergence documented in the header stays fixed
-  if (def && typeof def === 'object') {
-    def = _.cloneDeep(def);
-  }
-
-  let working = typeof raw === 'undefined' ? def : raw;
-  working = enforceValidTypes(working, types, def);
-  working = enforceMinMax(working, opts.min || 0, opts.max || Infinity);
-
-  if (typeof value !== 'undefined') {
-    working = value;
-  }
-
-  // Clean — same order as Settings.resolve(): applied to the fully-resolved value
-  if (opts.clean) {
-    if (opts.clean instanceof RegExp) {
-      working = working.replace(opts.clean, '');
-    } else if (typeof opts.clean === 'function') {
-      working = opts.clean(working);
-    }
-  }
-
-  return working;
+  return map;
 }
 
 /**
@@ -262,4 +182,4 @@ const fields = {
   multi: (types, opts) => field({ ...opts, types: types }),
 };
 
-module.exports = { z, fields, isZodSchema, resolveZodSchema };
+module.exports = { z, fields, isZodSchema, resolveZodSchema, buildSchemaMap };

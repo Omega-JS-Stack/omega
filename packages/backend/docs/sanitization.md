@@ -35,6 +35,8 @@ name: {
 },
 ```
 
+In zod schemas the same option rides the builder: `f.string({ default: '', sanitize: false })`.
+
 ## Manual Sanitization (Recommended)
 
 For most use cases — particularly anywhere you're inserting user-supplied content into HTML — call `utilities.sanitize()` directly at the insertion site:

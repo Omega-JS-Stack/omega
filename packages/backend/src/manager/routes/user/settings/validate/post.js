@@ -2,6 +2,7 @@ const _ = require('lodash');
 const jetpack = require('fs-jetpack');
 const powertools = require('node-powertools');
 const path = require('path');
+const { resolveSchema } = require('../../../../helpers/schema-engine.js');
 
 /**
  * POST /user/settings/validate - Validate user settings against defaults
@@ -54,7 +55,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
     assistant.log('Combined settings', combined);
 
-    return assistant.respond(powertools.defaults(mergedSettings, combined));
+    return assistant.respond(resolveSchema(mergedSettings, combined));
   } catch (e) {
     return assistant.respond(`Unable to load file at ${resolvedPath}: ${e}`, { code: 500, sentry: true });
   }

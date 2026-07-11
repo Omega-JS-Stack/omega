@@ -1,21 +1,26 @@
 /**
- * Test: helpers/schema-zod.js — zod route schemas with powertools parity
+ * Test: helpers/schema-zod.js + helpers/schema-engine.js — schema resolution parity
  * Differential proof: every declarative-node behavior (coerce-never-reject, clamp/
- * truncate, undefined-only required, unknown-key strip) resolves IDENTICALLY through
- * Settings.resolve() whether the schema is a declarative node object (powertools
- * engine) or a fields.* zod schema (zod engine).
+ * truncate, required on undefined/'', unknown-key strip) resolves IDENTICALLY through
+ * Settings.resolve() whether the schema is a declarative node object (in-house
+ * schema-engine) or a fields.* zod schema (zod engine) — both share the same field
+ * pipeline.
  *
  * Run: npx omega test helpers/schema-zod
  *
- * Also pins the two DELIBERATE divergences (see schema-zod.js header):
+ * The declarative engine replaced powertools.defaults() (cp79); where semantics are
+ * shared, this suite still anchors directly against powertools.defaults() as the
+ * oracle, and pins the deliberate divergences (fixed bugs):
  * - no pollution of non-empty object defaults with types/min/max keys
  * - defaults are cloned, never shared by reference with the schema
+ * - '' counts as missing for required (tightening approved post-parity)
  * And proves the converted test/schema route module against its frozen declarative
  * twin (the pre-conversion schema, preserved here as the reference).
  */
 const powertools = require('node-powertools');
 const Settings = require('../../src/manager/helpers/settings.js');
 const { z, fields: f, isZodSchema } = require('../../src/manager/helpers/schema-zod.js');
+const { resolveSchema } = require('../../src/manager/helpers/schema-engine.js');
 const zodTestSchemaModule = require('../../src/manager/schemas/test/schema/post.js');
 
 // Mock assistant/manager — Settings.resolve only touches these surfaces when the
@@ -114,17 +119,12 @@ const frozenTestSchema = ({ user }) => {
 const basicUser = { auth: { uid: 'basic-uid' }, subscription: { product: { id: 'basic' } } };
 const premiumUser = { auth: { uid: 'premium-uid' }, subscription: { product: { id: 'pro' } } };
 
-// Normalize for twin diffs: JSON round-trip, drop the time-based field, and strip
-// the powertools pollution keys from object/array defaults (the documented
-// divergence — powertools injects types/min/max/value/default into non-empty
-// object defaults when they're used; the zod engine returns them clean)
+// Normalize for twin diffs: JSON round-trip + drop the time-based field. (No
+// pollution-stripping needed anymore — since cp79 BOTH engines return object
+// defaults clean, so twin comparisons are strict.)
 const normalizeTwin = (settings) => {
   const out = JSON.parse(J(settings));
   delete out.functionDefault;
-
-  if (out.objectField && typeof out.objectField === 'object' && !Array.isArray(out.objectField)) {
-    ['types', 'min', 'max', 'value', 'default'].forEach((key) => delete out.objectField[key]);
-  }
 
   return out;
 };
@@ -165,13 +165,26 @@ module.exports = {
     },
 
     {
-      name: 'required-fires-only-on-undefined',
+      name: 'required-fires-on-undefined-and-empty-string',
       async run({ assert }) {
+        // cp79 tightening: '' counts as missing (it used to pass) — identically in
+        // both engines. null, 0, false still pass.
+        const decl = { r: { types: ['string'], default: undefined, required: true } };
         const zod = f.object({ r: f.string({ default: undefined, required: true }) });
 
-        // '', null, 0, false all PASS required (undefined-only rule)
-        assert.equal(resolve(zod, { r: '' }).r, '', 'Empty string passes required');
+        let declError, zodError;
+        try { resolve(decl, { r: '' }); } catch (e) { declError = e; }
+        try { resolve(zod, { r: '' }); } catch (e) { zodError = e; }
+
+        assert.ok(declError && zodError, 'Both engines reject empty string on required');
+        assert.equal(zodError.message, declError.message, 'Identical message');
+        assert.equal(zodError.message, 'Required key {r} is missing in settings', 'Exact message');
+        assert.equal(zodError.code, 400, 'Rejects with 400');
+
+        // null/0/false still pass required
         assert.equal(resolve(zod, { r: null }).r, '', 'null passes required (then coerces)');
+        assert.equal(resolve(f.object({ n: f.number({ default: 9, required: true }) }), { n: 0 }).n, 0, '0 passes required');
+        assert.equal(resolve(f.object({ b: f.boolean({ default: true, required: true }) }), { b: false }).b, false, 'false passes required');
       },
     },
 
@@ -225,21 +238,104 @@ module.exports = {
     {
       name: 'divergence-no-default-pollution',
       async run({ assert }) {
-        // Deliberate fix pinned: powertools mutates non-empty object defaults with
-        // types/min/max keys and returns them by reference; the zod engine clones clean
+        // The bug the in-house engine replaced powertools.defaults() for: powertools
+        // mutates non-empty object defaults with types/min/max keys and returns them
+        // by reference. Pinned here directly against powertools; BOTH our engines
+        // return clean clones.
+        const polluted = powertools.defaults({}, { o: { types: ['object'], default: { key: 'value' } } });
+        assert.ok('types' in polluted.o && 'min' in polluted.o, 'powertools.defaults() pollutes (why it was replaced)');
+
         const node = { o: { types: ['object'], default: { key: 'value' } } };
         const zod = f.object({ o: f.passthrough({ default: { key: 'value' } }) });
 
-        const polluted = resolve(node, {});
-        const clean = resolve(zod, {});
+        assert.equal(J(resolve(node, {}).o), J({ key: 'value' }), 'Declarative engine returns the default clean');
+        assert.equal(J(resolve(zod, {}).o), J({ key: 'value' }), 'Zod engine returns the default clean');
 
-        assert.ok('types' in polluted.o && 'min' in polluted.o, 'Powertools pollution exists (why this divergence is a fix)');
-        assert.equal(J(clean.o), J({ key: 'value' }), 'Zod engine returns the default clean');
+        // And clones: two resolves must not share the default object — both engines
+        const firstDecl = resolve(node, {});
+        firstDecl.o.mutated = true;
+        assert.ok(!('mutated' in resolve(node, {}).o), 'Declarative defaults are cloned per resolve');
 
-        // And clones: two resolves must not share the default object
-        const first = resolve(zod, {});
-        first.o.mutated = true;
-        assert.ok(!('mutated' in resolve(zod, {}).o), 'Defaults are cloned per resolve, never shared');
+        const firstZod = resolve(zod, {});
+        firstZod.o.mutated = true;
+        assert.ok(!('mutated' in resolve(zod, {}).o), 'Zod defaults are cloned per resolve');
+      },
+    },
+
+    {
+      name: 'declarative-engine-powertools-oracle-pins',
+      async run({ assert }) {
+        // resolveSchema() is the drop-in powertools.defaults() replacement (also used
+        // directly by user/settings/validate). Pin the edge semantics probed live
+        // against powertools before the swap:
+
+        // Empty-object schema nodes contribute NOTHING (dynamic-schema `options: {}` pattern)
+        assert.equal(J(resolveSchema({ options: { a: 1 }, junk: 2 }, { options: {} })), J({}), 'Empty node strips its subtree');
+        assert.equal(J(resolveSchema({ a: 1 }, {})), J({}), 'Empty schema resolves to {}');
+
+        // Non-mutating: fresh output object, input untouched
+        const input = { x: '1', junk: 9 };
+        const out = resolveSchema(input, { x: { types: ['number'], default: 0 } });
+        assert.equal(J(out), J({ x: 1 }), 'Coerces and strips like powertools');
+        assert.equal(J(input), J({ x: '1', junk: 9 }), 'Input settings not mutated');
+
+        // Group semantics — direct differential against powertools.defaults()
+        // (fresh schema literal per call: powertools MUTATES the schema it's given)
+        const makeSchema = () => ({ g: { a: { types: ['string'], default: 'dx' } } });
+        assert.equal(
+          J(resolveSchema({ g: { a: '1', zz: 9 } }, makeSchema())),
+          J(powertools.defaults({ g: { a: '1', zz: 9 } }, makeSchema())),
+          'Unknown key inside group stripped — matches powertools'
+        );
+        assert.equal(
+          J(resolveSchema({}, makeSchema())),
+          J(powertools.defaults({}, makeSchema())),
+          'Absent group resolves leaf defaults — matches powertools'
+        );
+
+        // No-default leaf nodes terminate the walk soundly (powertools only terminated
+        // because its pollution added `default` to the node first)
+        assert.equal(
+          J(resolveSchema({}, { flag: { types: ['boolean'], required: false } })),
+          J({ flag: false }),
+          'No-default node resolves its type zero without pollution\'s help'
+        );
+      },
+    },
+
+    {
+      name: 'settings-schema-exposed-for-sanitize-pass',
+      async run({ assert }) {
+        // cp79 fix: Settings.resolve exposes self.schema (per-field sanitize flags) so
+        // the middleware sanitize pass can honor sanitize: false — both engines,
+        // same nested shape. (Previously middleware read a FRESH instance's schema,
+        // which was always undefined.)
+        const decl = new Settings(Manager);
+        decl.resolve(makeAssistant(), {
+          html: { types: ['string'], default: '', sanitize: false },
+          plain: { types: ['string'], default: '' },
+          g: { x: { types: ['string'], default: '', sanitize: false } },
+        }, {});
+
+        assert.equal(decl.schema.html.sanitize, false, 'Declarative: sanitize: false exposed');
+        assert.equal(decl.schema.plain.sanitize, true, 'Declarative: default sanitize true');
+        assert.equal(decl.schema.g.x.sanitize, false, 'Declarative: nested flag exposed');
+
+        const viaZod = new Settings(Manager);
+        viaZod.resolve(makeAssistant(), f.object({
+          html: f.string({ default: '', sanitize: false }),
+          plain: f.string({ default: '' }),
+          g: f.object({ x: f.string({ default: '', sanitize: false }) }),
+        }), {});
+
+        assert.equal(viaZod.schema.html.sanitize, false, 'Zod: sanitize: false exposed');
+        assert.equal(viaZod.schema.plain.sanitize, true, 'Zod: default sanitize true');
+        assert.equal(viaZod.schema.g.x.sanitize, false, 'Zod: nested flag exposed');
+
+        // Raw zod has no registry → empty map (every field sanitizes)
+        const raw = new Settings(Manager);
+        raw.resolve(makeAssistant(), z.object({}), {});
+        assert.equal(J(raw.schema), J({}), 'Raw zod exposes an empty map');
       },
     },
 

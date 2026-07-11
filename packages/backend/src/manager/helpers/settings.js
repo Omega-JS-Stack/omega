@@ -4,10 +4,10 @@
  */
 // const jetpack = require('fs-jetpack');
 const path = require('path');
-const powertools = require('node-powertools');
 const _ = require('lodash');
 const moment = require('moment');
-const { isZodSchema, resolveZodSchema } = require('./schema-zod.js');
+const { isZodSchema, resolveZodSchema, buildSchemaMap } = require('./schema-zod.js');
+const { iterateSchema, resolveSchema } = require('./schema-engine.js');
 
 
 function Settings(m) {
@@ -92,29 +92,20 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
   // powertools-parity semantics, raw zod for zod-native) — see helpers/schema-zod.js
   if (isZodSchema(schema)) {
     self.settings = resolveZodSchema(assistant, schema, settings, options);
-    self.schema = {};
+    self.schema = buildSchemaMap(schema);
 
     return self.settings;
   }
 
-  // Resolve settings
-  self.settings = powertools.defaults(settings, schema);
-  // self.schema = _.merge({}, schema);
+  // Declarative engine (shared pipeline in helpers/schema-engine.js)
   const resolvedSchema = {};
 
-  // console.log('---schema', schema);
-  // console.log('---options', options);
-  // console.log('---self.settings', self.settings);
-
-  // Iterate each key and check for some things
+  // Required walk — BEFORE resolution, against the RAW input, so defaults never mask
+  // a missing required key. A key counts as missing when undefined or ''
+  // (null/0/false pass). Also builds the per-field map the middleware sanitize
+  // pass reads.
   iterateSchema(schema, (path, schemaNode) => {
     const originalValue = _.get(settings, path);
-    const resolvedValue = _.get(self.settings, path);
-    let replaceValue = undefined;
-
-    // console.log('Found:', path, schemaNode);
-    // console.log('originalValue:', originalValue);
-    // console.log('resolvedValue:', resolvedValue);
 
     // Check if this node is marked as required
     let isRequired = false;
@@ -124,37 +115,13 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
       isRequired = schemaNode.required;
     }
 
-    // console.log('isRequired:', isRequired);
-
-    // If the key is required and the original value is undefined, throw an error
-    if (options.checkRequired && isRequired && typeof originalValue === 'undefined') {
+    // If the key is required and the original value is missing, throw an error
+    if (options.checkRequired && isRequired && (typeof originalValue === 'undefined' || originalValue === '')) {
       throw assistant.errorify(`Required key {${path}} is missing in settings`, {code: 400});
     }
 
-    // Clean
-    if (schemaNode.clean) {
-      if (schemaNode.clean instanceof RegExp) {
-        replaceValue = resolvedValue.replace(schemaNode.clean, '');
-      } else if (typeof schemaNode.clean === 'function') {
-        replaceValue = schemaNode.clean(resolvedValue);
-      }
-    }
-
-    // assistant.log('replaceValue:', replaceValue);
-
-    // Replace
-    if (typeof replaceValue !== 'undefined' && replaceValue !== resolvedValue) {
-      assistant.warn(`Replacing ${path}: originalValue=${originalValue}, resolvedValue=${resolvedValue}, replaceValue=${replaceValue}`);
-      _.set(self.settings, path, replaceValue);
-    }
-
-    // Set defaults
-    // @@@TODO: FINISH THIS
-    // !!! NOT SURE WHAT TO DO FOR DEFAULT SINCE IT CAN BE A FN SOMETIMES ???
     const resolvedNode = {
       types: schemaNode.types || [],
-      // value: typeof replaceValue === 'undefined' ? undefined : replaceValue,
-      // default: ???,
       required: isRequired,
       available: typeof schemaNode.available === 'undefined' ? true : schemaNode.available,
       min: typeof schemaNode.min === 'undefined' ? undefined : schemaNode.min,
@@ -165,6 +132,9 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
     // Update schema
     _.set(resolvedSchema, path, resolvedNode);
   });
+
+  // Resolve settings (defaults, coercion, min/max, forced value, clean — per leaf)
+  self.settings = resolveSchema(settings, schema);
 
   // Set schema
   self.schema = resolvedSchema;
@@ -199,23 +169,6 @@ Settings.prototype.constant = function (name, options) {
     }
   }
 };
-
-function iterateSchema(schema, fn, path) {
-  path = path || '';
-
-  // Base case: Check if the current level has 'types' and 'default', indicating metadata
-  if (schema.hasOwnProperty('types') && schema.hasOwnProperty('default')) {
-    // Call the processing function with the current path and schema as arguments
-    fn(path, schema);
-    return;
-  }
-
-  // Recursive case: Iterate through nested keys if we're not at a metadata node
-  Object.keys(schema).forEach(key => {
-    const nextPath = path ? `${path}.${key}` : key;
-    iterateSchema(schema[key], fn, nextPath);
-  });
-}
 
 function loadSchema(assistant, schemaPath) {
   // Build context object with everything the schema might need

@@ -44,7 +44,7 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 - `types` — array of allowed types: `['string']`, `['number']`, `['boolean']`, `['object']`, `['array']`, `['any']`, or multiple (`['string', 'number']`)
 - `default` — default value if not provided; may be a function (`default: () => ...`)
 - `value` — force-set value (ignores user input — e.g. auto-generated IDs)
-- `required` — `true`/`false` or a function `(assistant, settings, options) => bool`. **NEVER combine with `default`** — see the footgun below
+- `required` — `true`/`false` or a function `(assistant, settings, options) => bool`. A key counts as missing when it's `undefined` **or `''`** (null/0/false pass). **NEVER combine with `default`** — see the footgun below
 - `min` / `max` — validation bounds (string length, number range, array length); numbers clamp
 - `clean` — a RegExp (matched chars removed) or function `(value) => cleaned`
 - `sanitize` — per-field opt-out (`false`) for HTML sanitization; only meaningful when the route opts in via `Manager.Middleware(req, res).run('route', { sanitize: true })`. See [sanitization.md](sanitization.md)
@@ -55,7 +55,7 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 
 ## Zod schemas
 
-A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the powertools engine. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects. Build with the `fields` helpers for **powertools-parity semantics** (coerce-never-reject, min/max clamp/truncate, undefined-only `required`, unknown keys stripped — wire shapes identical to the declarative engine, proven by `test/helpers/schema-zod.js`):
+A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the declarative walk. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects — both engines run the SAME field pipeline (`src/manager/helpers/schema-engine.js`), so wire shapes are identical either way (proven by `test/helpers/schema-zod.js`). Build with the `fields` helpers for the shared semantics (coerce-never-reject, min/max clamp/truncate, `required` fires on `undefined`/`''`, unknown keys stripped):
 
 ```javascript
 const { fields: f } = require('@omega.js/backend/src/manager/helpers/schema-zod.js'); // framework schemas use a relative path
@@ -70,11 +70,11 @@ module.exports = ({ user }) => f.object({
 });
 ```
 
-Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above and powertools' `min`-defaults-to-0 (negative numbers clamp to 0 unless the field declares a negative `min`).
+Every builder takes the exact declarative node options (`types` via the builder name, plus `default`, `value`, `min`, `max`, `required`, `clean`, `sanitize`); `f.field(opts)` is the generic form. Builders throw on unknown options (catches typos). All declarative quirks are preserved, including the `required`+`default` footgun above and `min`-defaults-to-0 (negative numbers clamp to 0 unless the field declares a negative `min`).
 
 Exporting **raw zod** (no builders) opts into zod-native semantics instead: invalid input **rejects with 400** rather than coercing. Use deliberately — it's a behavior change from the declarative contract.
 
-Two deliberate fixes over the powertools engine (documented + asserted in `test/helpers/schema-zod.js`): non-empty object/array defaults are returned **clean** (powertools injects `types`/`min`/`max` keys into them) and **cloned per request** (powertools returns the schema's default object by reference).
+Both engines carry two deliberate fixes over the old powertools resolver (documented + asserted in `test/helpers/schema-zod.js`): non-empty object/array defaults are returned **clean** (powertools injected `types`/`min`/`max` keys into them) and **cloned per request** (powertools returned the schema's default object by reference). `powertools.defaults()` is no longer used for settings resolution anywhere — node-powertools remains a dependency for its other utilities.
 
 Webhook routes (`payments/webhook`, `marketing/webhook`, …) keep their **empty schemas** by design — the body is the raw provider payload; don't wrap them in zod.
 

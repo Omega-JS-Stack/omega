@@ -143,14 +143,18 @@ Middleware.prototype.run = function (libPath, options) {
       });
     }
 
-    // Resolve settings
+    // Resolve settings (hold the instance — the sanitize pass below reads the
+    // per-field schema map it exposes)
+    let settingsLib = null;
+
     if (options.setupSettings) {
       // Resolve settings
       try {
         // Attach schema to assistant
         // assistant.schema.dir = schemasDir;
         // assistant.schema.name = options.schema;
-        assistant.settings = Manager.Settings().resolve(assistant, undefined, data, {dir: schemasDir, schema: options.schema});
+        settingsLib = Manager.Settings();
+        assistant.settings = settingsLib.resolve(assistant, undefined, data, {dir: schemasDir, schema: options.schema});
       } catch (e) {
         return assistant.respond(new Error(`Unable to resolve schema ${options.schema}: ${e.message}`), {code: e.code || 500, sentry: true});
       }
@@ -184,7 +188,7 @@ Middleware.prototype.run = function (libPath, options) {
     // Sanitize at the HTML-insertion site instead unless you need a belt-and-suspenders pass here.
     // Respects sanitize: false on individual schema fields.
     if (options.sanitize) {
-      const schema = options.setupSettings ? Manager.Settings().schema : null;
+      const schema = settingsLib ? settingsLib.schema : null;
       const utilities = Manager.Utilities();
 
       assistant.settings = sanitizeWithSchema(utilities, assistant.settings, schema);

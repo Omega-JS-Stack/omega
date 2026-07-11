@@ -2,6 +2,7 @@ const _ = require('lodash')
 const jetpack = require('fs-jetpack')
 const powertools = require('node-powertools')
 const path = require('path')
+const { resolveSchema } = require('../../../../../helpers/schema-engine.js')
 
 function Module() {
 
@@ -40,7 +41,7 @@ Module.prototype.main = function () {
 
         assistant.log('Combined settings', combined)
 
-        return resolve({data: powertools.defaults(settings, combined)});
+        return resolve({data: resolveSchema(settings, combined)});
       } catch (e) {
         return reject(assistant.errorify(`Unable to load file at ${resolvedPath}: ${e}`, {code: 500, sentry: true}));
       }
