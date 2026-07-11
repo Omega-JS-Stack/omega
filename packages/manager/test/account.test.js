@@ -3,7 +3,7 @@
  * recording fakes of the auth admin, Firestore, and backend clients, with
  * the password derivation and custom-token signing real. Proves skip
  * semantics, the owner password channels (OMEGA_ACCOUNT_PASSWORD__* env
- * pin → .omega/hooks/account/password.js hook, brand + company, with real
+ * pin → config/hooks/account/password.js hook, brand + company, with real
  * hook files → lazy ACCOUNT_PASSWORD_SEED derivation), the seed .env
  * writeback (and that dry runs and env/hook-covered brands never write
  * it), the converged zero-mutation no-op, account creation with signup,
@@ -287,9 +287,9 @@ test('account: generates ACCOUNT_PASSWORD_SEED, persists it to .env, and derives
 
 // ─── Owner password channels (env → hook → seed) ─────────────────────────────
 
-/** Write a hook file under a root's .omega/hooks/ tree. */
+/** Write a hook file under a root's config/hooks/ tree. */
 function writeHook(root, hookPath, source) {
-  const file = join(root, '.omega', 'hooks', ...hookPath.split('/')) + '.js';
+  const file = join(root, 'config', 'hooks', ...hookPath.split('/')) + '.js';
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, source);
   return file;

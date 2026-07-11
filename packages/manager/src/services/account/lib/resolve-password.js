@@ -7,7 +7,7 @@
  *               OMEGA_ACCOUNT_PASSWORD__SUPPORT_ACME_COM. Rides the D15
  *               cascade, so a fixed password can live in the brand or
  *               company .env.
- *   2. hook   — .omega/hooks/account/password.js (brand root, else company
+ *   2. hook   — config/hooks/account/password.js (brand root, else company
  *               root via the company stamp): ({ email, domain, apex, brand })
  *               → password. A company-wide formula lives in the OWNER'S tree,
  *               never in framework source. A broken hook throws — an owner

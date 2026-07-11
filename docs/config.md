@@ -103,15 +103,21 @@ company .env ← brand .env ← app .env ← shell env
 - Missing files and unreadable/stale markers skip silently — `loadEnv` never throws for
   an absent layer.
 
-## Owner hooks (`.omega/hooks/`) — cp91
+## Owner hooks (`config/hooks/`) — cp91
 
 `src/hooks.js` — owner-supplied code the frameworks call at named hook points, so
 company-specific logic lives in the OWNER'S tree, never in framework source. Layout is
 **nested, mirroring the call site** (Ian's directive): the account service's password
-step loads `.omega/hooks/account/password.js`; a future onboarding hook would live under
-`.omega/hooks/onboard/…` — one file per hook point, path = the invoking structure.
+step loads `config/hooks/account/password.js`; a future onboarding hook would live under
+`config/hooks/onboard/…` — one file per hook point, path = the invoking structure.
 
-- **Resolution order**: the brand root's own `.omega/hooks/<point>.js`, else the company
+- **Home = `config/`, versioned by default** (Ian 2026-07-11): hooks are AUTHORED code
+  and sit with the other owner-authored omega inputs (omega.json5, seo.json5, chatsy.md,
+  …) — never under machine-owned, gitignored `.omega/`, where a hook lost on a fresh
+  clone would silently change behavior (passwords falling back to the seed channel and
+  rotating). Secrets still belong in `.env` — a hook that needs one reads `process.env`;
+  to keep a hook out of git anyway, add your own `config/hooks/` ignore line.
+- **Resolution order**: the brand root's own `config/hooks/<point>.js`, else the company
   root's (via the `.omega/company.json` stamp) — a company-wide hook covers every brand,
   a single brand can still override it.
 - **Contract**: plain CJS, `module.exports = ({ … }) => …` (async fine). Each call site
@@ -122,9 +128,6 @@ step loads `.omega/hooks/account/password.js`; a future onboarding hook would li
 - **First (and so far only) hook point**: `account/password` —
   `({ email, domain, apex, brand }) => password` (string ≥ 6 chars), letting a company
   formula generate per-brand passwords without ever living in a repo the framework ships.
-- **Gitignored by default**: hooks are secret-adjacent code, and `.omega/` is ignored
-  like `.env`. To version hooks in a private repo, swap the ignore for `.omega/*` +
-  `!.omega/hooks/`.
 
 ## Port auto-allocation (N7)
 

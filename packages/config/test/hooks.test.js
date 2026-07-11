@@ -1,6 +1,6 @@
 /**
  * Owner-hook loader tests for @omega.js/config — call-site-mirroring nested
- * paths (.omega/hooks/<hookPath>.js), brand-over-company precedence via the
+ * paths (config/hooks/<hookPath>.js), brand-over-company precedence via the
  * .omega/company.json marker, absent-hook null, and the loud failures
  * (broken file, non-function export, malformed hook path).
  *
@@ -41,20 +41,20 @@ function stampCompany(brandRoot, companyRoot) {
 
 test('hooks: nested hook path resolves under the brand root', (t) => {
   const root = makeFixture('hooks-brand', {
-    'brand/.omega/hooks/account/password.js': 'module.exports = () => "brand-pw";\n',
+    'brand/config/hooks/account/password.js': 'module.exports = () => "brand-pw";\n',
   });
   cleanup(t, root);
   const brandRoot = path.join(root, 'brand');
 
-  assert.equal(resolveHook(brandRoot, 'account/password'), path.join(brandRoot, '.omega', 'hooks', 'account', 'password.js'));
+  assert.equal(resolveHook(brandRoot, 'account/password'), path.join(brandRoot, 'config', 'hooks', 'account', 'password.js'));
 });
 
 test('hooks: company hook applies when the brand has none, brand wins when both exist', (t) => {
   const root = makeFixture('hooks-precedence', {
-    'company/.omega/hooks/account/password.js': 'module.exports = ({ email }) => `company:${email}`;\n',
+    'company/config/hooks/account/password.js': 'module.exports = ({ email }) => `company:${email}`;\n',
     'brand-a/config/omega.json5': `{ brand: { id: 'a' } }`,
     'brand-b/config/omega.json5': `{ brand: { id: 'b' } }`,
-    'brand-b/.omega/hooks/account/password.js': 'module.exports = ({ email }) => `brand:${email}`;\n',
+    'brand-b/config/hooks/account/password.js': 'module.exports = ({ email }) => `brand:${email}`;\n',
   });
   cleanup(t, root);
   const companyRoot = path.join(root, 'company');
@@ -65,12 +65,12 @@ test('hooks: company hook applies when the brand has none, brand wins when both 
 
   // brand-a: no own hook → the company's
   const fromCompany = loadHook(brandA, 'account/password');
-  assert.equal(fromCompany.file, path.join(companyRoot, '.omega', 'hooks', 'account', 'password.js'));
+  assert.equal(fromCompany.file, path.join(companyRoot, 'config', 'hooks', 'account', 'password.js'));
   assert.equal(fromCompany.fn({ email: 'x@y.z' }), 'company:x@y.z');
 
   // brand-b: its own hook shadows the company's
   const fromBrand = loadHook(brandB, 'account/password');
-  assert.equal(fromBrand.file, path.join(brandB, '.omega', 'hooks', 'account', 'password.js'));
+  assert.equal(fromBrand.file, path.join(brandB, 'config', 'hooks', 'account', 'password.js'));
   assert.equal(fromBrand.fn({ email: 'x@y.z' }), 'brand:x@y.z');
 });
 
@@ -88,7 +88,7 @@ test('hooks: absent everywhere returns null (callers fall through to defaults)',
 
 test('hooks: a hook that exports a non-function throws with the file named', (t) => {
   const root = makeFixture('hooks-nonfn', {
-    'brand/.omega/hooks/account/password.js': 'module.exports = { nope: true };\n',
+    'brand/config/hooks/account/password.js': 'module.exports = { nope: true };\n',
   });
   cleanup(t, root);
 
@@ -100,7 +100,7 @@ test('hooks: a hook that exports a non-function throws with the file named', (t)
 
 test('hooks: a hook that fails to load surfaces the require error, never silent fallback', (t) => {
   const root = makeFixture('hooks-broken', {
-    'brand/.omega/hooks/account/password.js': 'this is not javascript {{{\n',
+    'brand/config/hooks/account/password.js': 'this is not javascript {{{\n',
   });
   cleanup(t, root);
 

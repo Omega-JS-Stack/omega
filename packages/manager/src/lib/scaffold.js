@@ -82,7 +82,7 @@ function renderOmegaConfig(answers) {
   if (answers.accountAdmins) {
     lines.push(
       '  // Managed Firebase Auth accounts (account service). Passwords never live',
-      '  // here — OMEGA_ACCOUNT_PASSWORD__* env vars, .omega/hooks/account/password.js,',
+      '  // here — OMEGA_ACCOUNT_PASSWORD__* env vars, config/hooks/account/password.js,',
       '  // or the generated ACCOUNT_PASSWORD_SEED.',
       '  account: {',
       '    admins: [',

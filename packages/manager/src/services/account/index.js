@@ -11,7 +11,7 @@
  * company's own list lives in its company omega.json5 and replaces the
  * default whole). The password formula was a company-specific scheme in
  * code — passwords now resolve per account through the owner channels
- * (OMEGA_ACCOUNT_PASSWORD__* env var → .omega/hooks/account/password.js →
+ * (OMEGA_ACCOUNT_PASSWORD__* env var → config/hooks/account/password.js →
  * lazy ACCOUNT_PASSWORD_SEED derivation; see lib/resolve-password.js).
  * firebase-admin is replaced by the Identity Toolkit REST API +
  * FirestoreREST over the brand's own service account.

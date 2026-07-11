@@ -5,20 +5,25 @@
  *
  * Layout is NESTED, mirroring the call site that invokes the hook (decided
  * with Ian 2026-07-10): the account service's password step loads
- * `.omega/hooks/account/password.js`, a future onboarding hook would live
- * under `.omega/hooks/onboard/…` — one file per hook point, path = the
+ * `config/hooks/account/password.js`, a future onboarding hook would live
+ * under `config/hooks/onboard/…` — one file per hook point, path = the
  * invoking structure, never a flat name-mangled file.
  *
+ * Hooks live under `config/` — the established home for owner-authored
+ * omega inputs (omega.json5, seo.json5, chatsy.md, …) — and are therefore
+ * VERSIONED by default (Ian 2026-07-11: hooks are authored code, and a
+ * gitignored hook lost on a fresh clone would silently change behavior —
+ * e.g. account passwords falling back to the seed channel). Never `.omega/`,
+ * which is machine-owned bookkeeping. Secrets still belong in .env — a hook
+ * that needs one reads process.env; owners who truly want a hook out of git
+ * add their own `config/hooks/` ignore line.
+ *
  * Resolution walks the same hierarchy as the .env cascade: the brand root's
- * own `.omega/hooks/` first, then the company root's (via the
+ * own `config/hooks/` first, then the company root's (via the
  * .omega/company.json stamp) — so a company-wide hook covers every brand and
  * a single brand can still override it. Hooks are plain CJS modules whose
  * `module.exports` IS the hook function; call-site docs define each hook's
  * signature and return contract.
- *
- * `.omega/` is gitignored by default (hooks are secret-adjacent code, like
- * .env). Owners who want hooks versioned in a private repo swap the ignore
- * for `.omega/*` + `!.omega/hooks/`.
  */
 
 const fs = require('node:fs');
@@ -34,12 +39,12 @@ const HOOK_PATH_PATTERN = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
  * The candidate file for one hook point under one root.
  */
 function hookFile(root, hookPath) {
-  return path.join(root, '.omega', 'hooks', ...hookPath.split('/')) + '.js';
+  return path.join(root, 'config', 'hooks', ...hookPath.split('/')) + '.js';
 }
 
 /**
  * Resolve a hook point to the file that defines it: the brand root's own
- * `.omega/hooks/<hookPath>.js`, else the company root's (company.json stamp).
+ * `config/hooks/<hookPath>.js`, else the company root's (company.json stamp).
  *
  * @param {string} startRoot - Brand (or standalone-project) root
  * @param {string} hookPath - Call-site-mirroring hook point, e.g. 'account/password'

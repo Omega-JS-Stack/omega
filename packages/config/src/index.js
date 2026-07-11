@@ -52,7 +52,7 @@ module.exports = {
   applyConfigEdits,
   writeConfigValues,
 
-  // Owner hooks (.omega/hooks/<call-site>.js — brand root, then company root)
+  // Owner hooks (config/hooks/<call-site>.js — brand root, then company root)
   resolveHook,
   loadHook,
 

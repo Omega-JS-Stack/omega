@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **Brand-account provisioning SHIPPED (cp91)** — accounts owner-defined (company `account.admins` layer + onboarding step), passwords per-account (`OMEGA_ACCOUNT_PASSWORD__*` env → NEW `.omega/hooks/account/password.js` owner hook → lazy seed); first hooks system lives in @omega.js/config; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md); next arc: dogfood; CI opt-in
+- **Brand-account provisioning SHIPPED (cp91)** — accounts owner-defined (company `account.admins` layer + onboarding step), passwords per-account (`OMEGA_ACCOUNT_PASSWORD__*` env → NEW `config/hooks/account/password.js` owner hook → lazy seed); first hooks system lives in @omega.js/config; [plans/brand-account-provisioning.md](plans/brand-account-provisioning.md); next arc: dogfood; CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. Dogfood arc: template/onboarding polish (cloud-setup walkthrough) → blueprint+pricing-from-config rethink → classy CROSS-TARGET redesign → **the OMEGA brand dogfood** (all four targets, `omega dev --local`); includes D13 deliberate deploys (commits never auto-publish; CLI/HTTP/CMS deploy on the one executor; admin post route gains deploy:true option)
@@ -41,7 +41,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 91 brand-account ownership — company-config admins (a+b answers via existing layers, schema-known), NEW @omega.js/config owner-hooks (.omega/hooks/<call-site>.js nested, brand→company), per-account password channels env→hook→lazy-seed, onboarding accounts step; config 89, manager 573 (this commit) → CHANGELOG
+- [x] 91 brand-account ownership — company-config admins (a+b answers via existing layers, schema-known), NEW @omega.js/config owner-hooks (config/hooks/<call-site>.js nested, brand→company), per-account password channels env→hook→lazy-seed, onboarding accounts step; config 89, manager 573 (this commit) → CHANGELOG
 - [x] 90 N7 CLOSED — desktop/extension/stragglers: desktop getters on env channel (+website https→http both sides), livereload/CDP per-target alloc, `mgr serve` allocates + publishes {https,hosting} (kill-check deleted), stripe-forward takes resolved target, oauth listen(0); desktop 758/ext 94/mgr 565/corpus 1224/e2e 18/18 + live serve proof (3882d48) → CHANGELOG
 - [x] 89 N7 web/client/sandbox — `omega dev` 8080→4000 via allocator, dev.ports chrome + `window.__OMEGA_DEV_PORTS__` runtime channel, client connects/getters read the map, harness preparePage; e2e 18/18 with ALL classics squatted; killGroup EPERM teardown leak fixed (5688d53) → CHANGELOG
 - [x] 88 N7 foundation + backend — config ports module (probe/bump/pins/file/env) + backend allocator boot; LIVE two-emulator concurrency proof (B bumped, both 200, A alive); config 83, corpus 1224/44/0, e2e 19/19 (d902c7f incl. 88b) → CHANGELOG
