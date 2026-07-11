@@ -1,6 +1,9 @@
 /**
- * `omega test` — production build + smoke verification, then the consumer's
- * own test suite (node --test over test/) when one exists.
+ * `omega test` — C5-scoped test entry:
+ *   bare / `project:` / `brand:`      → production build + smoke verification,
+ *                                       then the consumer's own suite (node --test test/)
+ *   `framework:` / `omega:` / `web:`  → @omega.js/web's own suite
+ *   `full:`                           → both
  *
  * Smoke checks: pages rendered, 404.html (the guaranteed default page —
  * consumers own their home page) carries the theme root, the manifest's main
@@ -11,12 +14,35 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
+const { parseTestScope } = require('@omega.js/devkit/test/scope');
 const { consumerPaths } = require('../consumer.js');
 
 const logger = new Logger('omega:test');
 
 module.exports = async function (options) {
   const paths = consumerPaths();
+
+  // ---- C5 scope (bare = project only; the framework suite is explicit)
+  const scope = parseTestScope((options._ || []).slice(1), {
+    frameworkAliases: ['web', 'ujm'],
+  });
+  for (const bad of scope.invalid) {
+    logger.warn(`Unknown test scope prefix ignored: ${bad}`);
+  }
+
+  // ---- Framework suite (framework:/omega:/web:/full:)
+  if (scope.sources.includes('framework')) {
+    const frameworkRoot = path.resolve(__dirname, '../..');
+    const frameworkTests = scope.filters.framework.length
+      ? scope.filters.framework.map((f) => `test/${f.replace(/\.js$/, '')}*.test.js`).join(' ')
+      : 'test/*.test.js';
+    logger.log(`Running @omega.js/web framework tests (node --test ${frameworkTests})`);
+    execSync(`node --test ${frameworkTests}`, { stdio: 'inherit', cwd: frameworkRoot });
+  }
+
+  if (!scope.sources.includes('project')) {
+    return;
+  }
 
   // ---- Production build
   const result = await require('./build.js')(options);
@@ -48,7 +74,10 @@ module.exports = async function (options) {
   // ---- Consumer test suite
   const testDir = path.join(paths.root, 'test');
   if (fs.existsSync(testDir)) {
-    logger.log('Running consumer tests (node --test test/)');
-    execSync('node --test test/', { stdio: 'inherit' });
+    const projectTests = scope.filters.project.length
+      ? scope.filters.project.map((f) => `test/${f.replace(/\.js$/, '')}*`).join(' ')
+      : 'test/';
+    logger.log(`Running consumer tests (node --test ${projectTests})`);
+    execSync(`node --test ${projectTests}`, { stdio: 'inherit' });
   }
 };

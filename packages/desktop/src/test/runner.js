@@ -23,6 +23,7 @@ const runner = createRunner({
   title: 'OMEGA Desktop Tests',
   packageName: '@omega.js/desktop',
   targetAlias: 'desktop',
+  frameworkAliases: ['desktop', 'em'],
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 15000,

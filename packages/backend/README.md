@@ -868,10 +868,10 @@ See [docs/test-framework.md](docs/test-framework.md#extended-mode-test_extended_
 ### Filtering Tests
 
 ```bash
-npx omega test rules/             # Run rules tests (both @omega.js/backend and project)
-npx omega test backend:rules/         # Only @omega.js/backend's rules tests
-npx omega test project:rules/     # Only project's rules tests
-npx omega test user/ admin/       # Multiple paths
+npx omega test rules/             # Project rules tests (bare paths = project source; C5 — docs/testing.md)
+npx omega test framework:rules/   # Only @omega.js/backend's rules tests (aliases: omega:, mgr:, backend:)
+npx omega test full:rules/        # Both sources
+npx omega test user/ admin/       # Multiple project paths
 ```
 
 ### Log Files
@@ -889,7 +889,7 @@ Logs are overwritten on each run and gitignored via `*.log`. Use them to debug f
 - **@omega.js/backend core tests:** `test/`
 - **Project tests:** `functions/test/`
 
-Use `backend:` or `project:` prefix to filter by source.
+Bare runs and bare paths are PROJECT-scoped (C5); reach the framework corpus explicitly with `framework:`/`omega:`/`mgr:`/`backend:`, or `full:` for both. Grammar: docs/testing.md in the Omega repo.
 
 ### Writing Tests
 

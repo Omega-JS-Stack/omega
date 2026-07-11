@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **omega-brand LIVES (cp93)** — apps/omega-brand born from the real wizard, all four targets proven (web :4000 + pricing-from-config, backend demo-omega emulator w/ 10 functions, MV3 ×3 browsers, desktop bundles + Electron launch); [plans/dogfood-friction-log.md](plans/dogfood-friction-log.md) = 19 findings, headline: EVERY framework's config seed shadows the brand layer; arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
+- **C5 per-app scoping SHIPPED (cp94a)** — ONE grammar via @omega.js/devkit/test/scope (bare=project-only, `framework:`/`omega:`/`mgr:`/ids, `full:`, `brand:` alias; self-test exception); adopted by runner-core (EM+BXM), backend runner, web test cmd; corpus respelled `framework:` (1224/44/0 parity); [docs/testing.md](docs/testing.md); arc: [plans/dogfood-arc.md](plans/dogfood-arc.md)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. Dogfood arc per [plans/dogfood-arc.md](plans/dogfood-arc.md) — next: **cp94 C5 test-scoping DX** (bare `omega test` = project; `framework:`/`full:`; folds 1.2a + cp93's em:-from-consumer gap) → cp95 C1 burns the friction log
+1. **cp94b** — brand-ROOT test dispatch: omega-bin brand-root detection → @omega.js/manager handoff + manager `test` fan-out over apps (closes C5 + cp93's em:-from-consumer gap 17b) → then cp95 C1 burns [plans/dogfood-friction-log.md](plans/dogfood-friction-log.md) (21 findings)
 2. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test); Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -35,12 +35,14 @@
 - push-secrets under D15: it pushes only the APP .env Default section to repo secrets, but brand/company-level values no longer live there — revisit when the dogfood arc reaches CI publish (D13) (73a)
 - BXM translate task auto-calls Claude (Agent SDK rides local auth) on cache-miss — one live call burned during the 64 canary before .cache seeded; watch on fresh clones (64)
 - BEM: `mgr setup` can't complete on emulator-only demo-* projects (firestore-indexes-synced hits the live API → 403 + stray _firestore.indexes.json; `mgr serve`'s hosting upstream 403s on demo-* too — cp90 proved allocation/publish/proxy/retract regardless); nvmrc fix is two-phase; `mgr test` can orphan java emulator grandchildren (1.4b)
-- BEM: the test path filter matches project tests but not corpus paths (1.2a)
+- ~~BEM test path filter vs corpus paths~~ FOLDED into C5 (94a): prefixes now stripped centrally per-source
+- devkit `node --test` full-suite run can flake with "Unable to deserialize cloned data" on e2e-harness.test.js (file-level ✖, all subtests green; 1-in-3, scheduling-sensitive IPC corruption — isolation always passes) (94a)
 - N4 deferred consolidations (73c's CHANGELOG entry is the record): ext⇄desktop build.js harness + mode-helpers skeleton, backend runner onto devkit runner-core; micro-dupes (sleep/capitalize/temp-dir scaffolds) rejected — not worth cross-package coupling (73c)
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (`// ========== OMEGA Rules (vX) ==========`, 75)
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 94a C5 per-app test scoping — devkit scope parser + runner-core/backend/web adoption, bare=project-only everywhere (self-test exception), corpus → `framework:`; devkit 153/web 60/ext 94/desktop 760/corpus 1224-44-0; docs/testing.md (this commit) → CHANGELOG
 - [x] 93 omega-brand born — real-wizard scaffold, 4 targets proven (web :4000/pricing-from-config, backend demo-omega emulator, MV3 ×3, Electron boot); friction log = 21 findings (headline: every framework seed shadows the brand layer; EM/BXM gulpfile paths break under hoisting) (this commit) → CHANGELOG
 - [x] 92 dogfood arc opened — survey (C2 further along than spec: products-from-config channel live; D13's autopublish still alive in scaffold; sandbox = 2 targets) + slicing cp93→close in plans/dogfood-arc.md (this commit) → CHANGELOG
 - [x] 91 brand-account ownership — company-config admins (a+b answers via existing layers, schema-known), NEW @omega.js/config owner-hooks (config/hooks/<call-site>.js nested, brand→company), per-account password channels env→hook→lazy-seed, onboarding accounts step; config 89, manager 573 (this commit) → CHANGELOG

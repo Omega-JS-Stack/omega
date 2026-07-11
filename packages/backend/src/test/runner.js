@@ -10,6 +10,7 @@ const { seed } = require('./seed.js');
 const rulesClient = require('./utils/firestore-rules-client.js');
 const { EXTENDED_MODE_WARNING } = require('./utils/extended-mode-warning.js');
 const { SkipError } = require('@omega.js/devkit/test/runner-core');
+const { parseTestScope } = require('@omega.js/devkit/test/scope');
 
 /**
  * @omega.js/backend Integration Test Runner
@@ -102,14 +103,25 @@ class TestRunner {
     const frameworkTestsDir = path.resolve(__dirname, '../../test');
     const projectTestsDir = path.join(this.options.projectDir, 'test');
 
+    // C5 scoping: bare/`project:`/`brand:` = project tests only,
+    // `framework:`/`omega:`/`mgr:`/`backend:` = the framework suite,
+    // `full:` = both. Framework self-test defaults to the framework source.
+    this.scope = parseTestScope(this.options.testPaths, {
+      frameworkAliases: ['backend'],
+      selfTest: this.options.isFrameworkSelfTest,
+    });
+    for (const target of this.scope.invalid) {
+      console.log(chalk.yellow(`  ⚠ Unknown test scope prefix ignored: ${target}`));
+    }
+
     // Run @omega.js/backend default tests
-    if (jetpack.exists(frameworkTestsDir)) {
+    if (this.scope.sources.includes('framework') && jetpack.exists(frameworkTestsDir)) {
       console.log(chalk.bold('  @omega.js/backend Core Tests'));
       await this.runTestsInDir(frameworkTestsDir, 'backend');
     }
 
     // Run project-specific tests
-    if (jetpack.exists(projectTestsDir)) {
+    if (this.scope.sources.includes('project') && jetpack.exists(projectTestsDir)) {
       console.log(chalk.bold('\n  Project Tests'));
       await this.runTestsInDir(projectTestsDir, 'project');
     }
@@ -342,49 +354,20 @@ class TestRunner {
   }
 
   /**
-   * Filter tests based on CLI paths
-   * Supports source prefixes (standardized across all OMEGA frameworks):
-   *   mgr:path/ / backend:path/  → framework tests ('mgr:' is the universal alias)
-   *   project:path/          → project tests
-   *   no prefix              → both sources, matched by path
+   * Filter tests for a source using the C5 scope's prefix-stripped paths
+   * (source selection already happened in run() via parseTestScope — this
+   * only path-matches within the source's own tree).
    */
   filterTests(testFiles, source) {
-    if (this.options.testPaths.length === 0) {
+    const filters = this.scope.filters[source === 'backend' ? 'framework' : 'project'];
+    if (filters.length === 0) {
       return testFiles;
     }
 
-    return testFiles.filter(testFile => {
+    return testFiles.filter((testFile) => {
       const relativePath = this.getRelativeTestPath(testFile, source);
-
-      for (const filterPath of this.options.testPaths) {
-        // Check for source prefix (mgr:/backend: → framework, project: → project)
-        const prefixMatch = filterPath.match(/^(mgr|backend|project):(.*)$/);
-
-        if (prefixMatch) {
-          const [, rawPrefix, pathPart] = prefixMatch;
-          // 'mgr' is the universal framework alias → normalize to this framework's source id ('backend').
-          const prefix = rawPrefix === 'mgr' ? 'backend' : rawPrefix;
-
-          // Skip if source doesn't match prefix
-          if (prefix !== source) {
-            continue;
-          }
-
-          // Match against the path part
-          if (relativePath.startsWith(pathPart)
-            || relativePath === pathPart.replace('.js', '') + '.js') {
-            return true;
-          }
-        } else {
-          // No prefix - match against any source
-          if (relativePath.startsWith(filterPath)
-            || relativePath === filterPath.replace('.js', '') + '.js') {
-            return true;
-          }
-        }
-      }
-
-      return false;
+      return filters.some((filterPath) => relativePath.startsWith(filterPath)
+        || relativePath === `${filterPath.replace('.js', '')}.js`);
     });
   }
 

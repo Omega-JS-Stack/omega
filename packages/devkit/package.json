@@ -18,6 +18,7 @@
     "./clean-dirs": "./src/clean-dirs.js",
     "./parse-audit": "./src/parse-audit.js",
     "./test/runner-core": "./src/test/runner-core.js",
+    "./test/scope": "./src/test/scope.js",
     "./test/assert": "./src/test/assert.js",
     "./test/extended-mode-warning": "./src/test/extended-mode-warning.js",
     "./test/prompt-streams": "./src/test/prompt-streams.js",

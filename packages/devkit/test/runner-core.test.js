@@ -186,7 +186,7 @@ test('middle layers dispatch with byLayer/wants; boot aggregates flat test list'
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('target prefixes: project:/mgr:/alias: narrow the source', async () => {
+test('C5 scoping: bare = project only; framework:/alias:/full: select sources', async () => {
   const root = makeTree('runner-target', {
     'framework/suites/fw.js': `module.exports = { description: 'framework test', run: () => {} };`,
     'consumer/package.json': JSON.stringify({ name: 'fixture-consumer' }),
@@ -195,13 +195,25 @@ test('target prefixes: project:/mgr:/alias: narrow the source', async () => {
 
   const runner = createRunner(makeConfig(root));
 
+  // Bare consumer run = PROJECT tests only (never drags the framework suite in).
+  const bare = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run()));
+  assert.equal(bare.result.passed, 1);
+
   const projectOnly = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target: 'project:' })));
   assert.equal(projectOnly.result.passed, 1);
 
-  const frameworkOnly = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target: 'fix:' })));
-  assert.equal(frameworkOnly.result.passed, 1);
+  // 'brand:' is the explicit project alias.
+  const brandAlias = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target: 'brand:' })));
+  assert.equal(brandAlias.result.passed, 1);
 
-  const both = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run()));
+  // The framework suite is an explicit choice: targetAlias ('fix:'), 'framework:', 'omega:'.
+  for (const target of ['fix:', 'framework:', 'omega:']) {
+    const frameworkOnly = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target })));
+    assert.equal(frameworkOnly.result.passed, 1, target);
+  }
+
+  // 'full:' = both sources.
+  const both = await quiet(() => withCwd(path.join(root, 'consumer'), () => runner.run({ target: 'full:' })));
   assert.equal(both.result.passed, 2);
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -219,8 +231,9 @@ test('framework boot/ suites are excluded for consumers but run in self-test mod
     boot: { run: async ({ tests, results }) => { bootCalls += 1; results.passed += tests.length; } },
   });
 
-  // Consumer: boot/ suite excluded from discovery entirely.
-  const consumer = await quiet(() => withCwd(path.join(root, 'consumer'), () => createRunner(config).run()));
+  // Consumer running the framework suite explicitly (C5: bare no longer
+  // reaches it): boot/ stays excluded from discovery entirely.
+  const consumer = await quiet(() => withCwd(path.join(root, 'consumer'), () => createRunner(config).run({ target: 'framework:' })));
   assert.equal(consumer.result.passed, 1);
   assert.equal(bootCalls, 0);
 

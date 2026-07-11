@@ -53,10 +53,11 @@ Run `npx omega setup` again to pull the latest framework defaults. Files you've 
 @omega.js/extension ships a built-in four-layer test framework. Write tests under `test/<layer>/*.test.js` and run with:
 
 ```bash
-npx omega test                   # all layers
-npx omega test --layer build     # build layer only (plain Node, fast)
+npx omega test                   # YOUR project's tests only (C5 scoping — docs/testing.md)
+npx omega test framework:        # the framework's own suite (aliases: omega:, mgr:, extension:, bxm:)
+npx omega test full:             # both sources
+npx omega test --layer build     # build layer only (plain Node, fast; orthogonal to scoping)
 npx omega test --layer boot      # real-Chromium end-to-end test
-npx omega test project:          # ONLY your project's tests (mgr: → only framework tests)
 npx omega test --extended        # also run extended suites against REAL external services (Firebase, etc.)
 ```
 

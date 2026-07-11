@@ -5,9 +5,9 @@
     "start": "cd functions && npx omega setup && npx omega serve",
     "deploy": "cd functions && npx omega setup && npx omega deploy",
     "emulator": "cd functions && npx omega setup && npx omega emulator",
-    "test": "cd functions && npx omega setup && npx omega test",
+    "test": "cd functions && npx omega setup && npx omega test framework:",
     "setup": "cd functions && npx omega setup",
-    "test:offline": "cd functions && npx omega test",
+    "test:offline": "cd functions && npx omega test framework:",
     "preinstall": "cd functions && npm install && echo \"\\n  ✓ Dependencies installed in functions/ (not project root)\\n\""
   }
 }

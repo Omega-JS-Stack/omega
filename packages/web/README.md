@@ -27,7 +27,9 @@ npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
                     #   --local: first link every @omega.js dep brand-wide from the local
                     #   Omega monorepo + start its src→dist watch (docs/local-dev.md there)
 npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → dist/
-npx omega test      # production build + smoke checks + consumer test/ (node --test)
+npx omega test      # PROJECT scope: production build + smoke checks + consumer test/
+                    #   framework:/omega:/web: = @omega.js/web's own suite; full: = both
+                    #   (C5 scoping — docs/testing.md in the Omega repo)
 npx omega deploy    # refuse file: deps → npm run build → `npu sync --message='Deploy'`
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version

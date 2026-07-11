@@ -16,8 +16,11 @@
 //   packageName        — framework npm name; cwd package === this ⇒ framework self-test mode
 //                        (framework boot/ suites only run in self-test mode — they assert on
 //                        the framework's own fixture consumer)
-//   targetAlias        — framework-specific target prefix ('ujm' | 'bxm' | 'em'); 'mgr:',
-//                        'framework:' and 'project:' are universal
+//   targetAlias        — framework-specific target prefix (e.g. 'desktop' | 'extension');
+//                        'framework:'/'omega:'/'mgr:' (framework suite), 'project:'/'brand:'
+//                        (project tests) and 'full:' (both) are universal — see test/scope.js.
+//                        C5 semantics: bare/no-target runs PROJECT tests only in a consumer,
+//                        the framework suite in framework self-test mode.
 //   suitesDir          — the framework's built default suites dir (dist/test/suites)
 //   frameworkTestDir   — the framework repo's own test/ dir (for its _init.js hook)
 //   middleLayers       — ordered special layers between 'build' and 'boot':
@@ -36,6 +39,7 @@ const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
 const expect = require('./assert.js');
+const { parseTestScope } = require('./scope.js');
 
 class SkipError extends Error {
   constructor(reason) { super(reason); this.name = 'SkipError'; }
@@ -339,49 +343,32 @@ function createRunner(config) {
     console.log(chalk.gray(`\n    Total: ${total} tests in ${durationMs}ms\n`));
   }
 
-  // Parse a positional test target into a source filter + path part.
-  // Source prefixes (standardized across all OMEGA frameworks):
-  //   'mgr:' / '<targetAlias>:' / 'framework:' → framework tests  ('mgr:' is the universal alias)
-  //   'project:'                               → project tests
-  //   no prefix                                → both sources, matched by path
-  function parseTarget(target) {
-    if (!target) {
-      return { source: null, pathPart: null };
-    }
-
-    const m = String(target).match(new RegExp(`^(project|mgr|${config.targetAlias}|framework):(.*)$`));
-    if (m) {
-      const source = m[1] === 'project' ? 'project' : 'framework';
-      return { source, pathPart: m[2] || null };
-    }
-
-    return { source: null, pathPart: target };
-  }
-
-  // Narrow a source's file list by the parsed target. A source-prefixed target
-  // excludes the other source entirely; the path part (if any) matches by
-  // relative path prefix.
-  function filterBySource(source, files, sourceFilter, pathPart) {
-    if (sourceFilter && sourceFilter !== source) {
+  // Narrow a source's file list by that source's scope filters (C5: source
+  // selection already happened in parseTestScope — this only path-matches).
+  function filterBySource(source, files, scope) {
+    if (!scope.sources.includes(source)) {
       return [];
     }
-    if (!pathPart) {
+
+    const filters = scope.filters[source];
+    if (filters.length === 0) {
       return files;
     }
 
     return files.filter((file) => {
       const rel = relativizePath(file, source);
       const relNoExt = rel.replace(/\.js$/, '').replace(/\.test$/, '');
-      const partNoExt = pathPart.replace(/\.js$/, '').replace(/\.test$/, '');
-      return rel.startsWith(pathPart)
-        || relNoExt === partNoExt
-        || relNoExt.startsWith(partNoExt + '/')
-        || rel.includes(pathPart);
+      return filters.some((pathPart) => {
+        const partNoExt = pathPart.replace(/\.js$/, '').replace(/\.test$/, '');
+        return rel.startsWith(pathPart)
+          || relNoExt === partNoExt
+          || relNoExt.startsWith(partNoExt + '/')
+          || rel.includes(pathPart);
+      });
     });
   }
 
   function discoverTestFiles(target) {
-    const { source: sourceFilter, pathPart } = parseTarget(target);
 
     const framework = [];
     const project = [];
@@ -419,9 +406,20 @@ function createRunner(config) {
       });
     }
 
+    // C5 scoping: bare/`project:`/`brand:` = project tests only,
+    // `framework:`/`omega:`/`mgr:`/`<targetAlias>:` = the framework suite,
+    // `full:` = both; framework self context defaults to the framework suite.
+    const scope = parseTestScope(target ? [target] : [], {
+      frameworkAliases: config.frameworkAliases || [config.targetAlias],
+      selfTest: isFrameworkSelfTest,
+    });
+    for (const bad of scope.invalid) {
+      console.log(chalk.yellow(`  ⚠ Unknown test scope prefix ignored: ${bad}`));
+    }
+
     return {
-      framework: filterBySource('framework', framework, sourceFilter, pathPart),
-      project:   filterBySource('project',   project,   sourceFilter, pathPart),
+      framework: filterBySource('framework', framework, scope),
+      project:   filterBySource('project',   project,   scope),
     };
   }
 

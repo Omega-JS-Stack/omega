@@ -23,6 +23,7 @@ const runner = createRunner({
   title: 'OMEGA Extension Tests',
   packageName: '@omega.js/extension',
   targetAlias: 'extension',
+  frameworkAliases: ['extension', 'bxm'],
   suitesDir: path.join(__dirname, 'suites'),
   frameworkTestDir: path.resolve(__dirname, '../../test'),
   bootDefaultTimeout: 20000,
