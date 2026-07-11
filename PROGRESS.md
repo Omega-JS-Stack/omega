@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- N4 architecture sweep (cp73) — 73a + 73c SHIPPED; 73d (legacy-format matchers removed per Ian) validating in background; **D12 fully APPROVED** — Ian locked `cloud` + `monitoring` (single-word roles) → implement the whole sweep next: [plans/d12-provider-keys-proposal.md](plans/d12-provider-keys-proposal.md); then zod parity: [plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md); parked verifies (line below); CI opt-in
+- N4 architecture sweep (cp73) — 73a/73c/73d SHIPPED; next in order: **D12 sweep** (APPROVED, `cloud`+`monitoring` locked → [plans/d12-provider-keys-proposal.md](plans/d12-provider-keys-proposal.md)), **marker-block harmonization** (Ian 2026-07-10: ONE style family for ALL marker blocks — merge-line-files `Default/Custom Values` sections, rules `///---omega---///` blocks, template placeholders, whatever else the survey finds — no more mixed flavors; survey → design → sweep), **zod parity** ([plans/zod-route-schemas-design.md](plans/zod-route-schemas-design.md)); parked verifies (line below); CI opt-in
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. N5 emulator-first frontend dev — auto-connect Auth+Firestore emulators in dev, zero flags
@@ -12,9 +12,9 @@
 5. Brand rebuilds on the new stack (post-dogfood): somiibo (easy first real brand) → sweet-saucy (page-count stress test)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
-- electron-manager@1.12.1/1.13.0 publish — 1.12.0 on npm breaks fresh installs; the LEGACY repo now carries both commits (the other agent's merge), so Ian publishes straight from it — the monorepo pre-rename tag (`pre-desktop-rename`, cp66) is just backup
+- electron-manager@1.12.1/1.13.0 publish — code review DONE (dirty edits + recent commits verified folded, cp65/66); the ONLY open piece is publishing from the legacy repo, now consciously deferred under the long release gate below (accepted: fresh `electron-manager@1.12.0` installs stay broken until then)
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
-- npm PUBLISHES still gated (orgs are claimed — see standing rules — but versions not finalized; zero publishes until Ian says go)
+- Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go — a LONG way out ("everything good across the board" first)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; translate/audit ports (explicit stubs in the web package). MAM parked entirely.
 
 ## 📏 Standing rules
