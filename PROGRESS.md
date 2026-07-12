@@ -48,6 +48,7 @@
 - prepare-package after-hooks are NON-BLOCKING: a vendor failure mid-rewrite leaves a part-rewritten dist behind a one-line warning (cp104 hit this live; the publishable-ref throw now fails the common cause loud, and CI's no-@omega.js-refs check remains the hard gate)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 116 playground website LIVE on GH Pages e2e (Ian: "deploy the placeholder" + "run the commands yourself") — manager created repo + Pages config; one-time bootstrap gh-pages push (durable verb = omega deploy CI dispatch @ arc close); placeholder homepage added (framework has NO default index by design — homepage = skin scope); wave: workspace/disperse/recaptcha/account/testing ✓, assets/adsense ⊘; site + api + backend all live-200 (this commit) → CHANGELOG
 - [x] 115 plan-aware proxy eligibility (Ian: "not all users on the same plans — a way to tell would be nice") — deep api domains ask the zone's REAL TLS coverage (Total TLS + active cert packs, true wildcard depth matching) before choosing proxied vs DNS-only; lookup failure → DNS-only fail-safe; cp114b null-cf crash fixed; fb 36/mgr 623 (this commit) → CHANGELOG
 - [x] 114b deep api domains DNS-only (live find: api.playground TLS handshake fail) — Universal SSL stops at one label; hosting proxies eligible names only + one un-proxy exception; fb 32 (5869477) → CHANGELOG
 - [x] 114 missing secrets ask for themselves (Ian: "check that it asks") — ensureEnvSecrets gate (interactive masked ask → .env writeback → continue; non-interactive skip w/ missingEnv) + 🔑 summary aggregate + devkit password prompt; adopted ×5 services (cloudflare/domain/sendgrid/beehiiv/recaptcha); env-less scratch-brand live proof; mgr 618/devkit prompt 18 (this commit) → CHANGELOG
@@ -128,4 +129,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-12 2:12 PM (api.playground LIVE over TLS end-to-end — infra runway 100% done; Ian's remaining: cp99 notes → skin go — THE only gate left anywhere)*
+*Last updated: 2026-07-12 2:52 PM (playground FULLY live — website on GH Pages + api TLS + backend, all 200; services left = analytics/search-console/sendgrid/beehiiv via Ian's interactive `npm start`; then cp99 notes → skin go)*

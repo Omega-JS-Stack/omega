@@ -42,6 +42,16 @@
     provider: "namecheap",
   },
 
+  // Brand repo (github service: repo + Pages). shared: the org profile
+  // belongs to the OMEGA project, not this rehearsal brand. public: GitHub
+  // Pages on a free org needs a public repo — only built site output lands
+  // in it (gh-pages), which is public by definition.
+  github: {
+    org: "Omega-JS-Stack",
+    shared: true,
+    private: false,
+  },
+
   monitoring: {
     provider: "sentry",
     dsn: null,
