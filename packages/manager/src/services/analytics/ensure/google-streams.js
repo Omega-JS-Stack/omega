@@ -10,11 +10,16 @@
  * measurementId + apiSecret the frameworks consume per surface.
  *
  * GA's "User Data Collection Acknowledgement" gate on secret creation has no
- * API — the omega-manager browser poll becomes a warned + settings URL here
- * (acknowledge once, rerun converges).
+ * API — interactive runs open the settings page (Enter-gated, house rule)
+ * and retry-poll until the acknowledgement lands, so ONE run finishes the
+ * job; non-interactive runs warn with the URL and the rerun converges.
+ * Acknowledging is per-property, so the first stream's prompt clears the
+ * gate for every stream after it.
  */
 const chalk = require('chalk').default;
-const { dryRunPlan } = require('../../../lib/run-gates.js');
+const { pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 // target → stream URI subdomain (null = the root domain) + display name.
 // Subdomains for app targets are virtual — they exist only to give each
@@ -136,8 +141,36 @@ module.exports = async function ensureGoogleStreams(context) {
           ? `https://analytics.google.com/analytics/web/#/a${accountId}p${propertyId}/admin/streams/table/${streamId}`
           : 'https://analytics.google.com/analytics/web/';
         console.log(`        ${chalk.yellow('⚠')} Data collection acknowledgement required before secrets can be created`);
-        console.log(`        ${chalk.dim('→')} Acknowledge at: ${chalk.cyan(settingsUrl)} — then rerun`);
-        warned = true;
+
+        if (canPrompt(options)) {
+          await pressEnterToOpen(settingsUrl, 'the data-collection acknowledgement page');
+          const poll = await pollWithSpinner({
+            check: async () => {
+              try {
+                const secret = await createCleanSecret(api, propertyId, streamId);
+                return { done: true, result: secret };
+              } catch (retryError) {
+                if (retryError.message.includes('User Data Collection Acknowledgement')) {
+                  return { done: false };
+                }
+                return { done: true, error: retryError.message };
+              }
+            },
+            intervalMs: 5000,
+            message: 'Waiting for the acknowledgement',
+          });
+
+          if (poll.success && poll.result) {
+            apiSecret = poll.result;
+            console.log(`        ${chalk.green('✓')} API secret created`);
+          } else {
+            console.log(`        ${chalk.dim('→')} Still gated${poll.error ? chalk.dim(` (${poll.error})`) : ''} — rerun converges once acknowledged`);
+            warned = true;
+          }
+        } else {
+          console.log(`        ${chalk.dim('→')} Acknowledge at: ${chalk.cyan(settingsUrl)} — then rerun`);
+          warned = true;
+        }
       } else {
         console.log(`        ${chalk.yellow('⚠')} API secret${chalk.dim(`: ${error.message}`)}`);
         warned = true;

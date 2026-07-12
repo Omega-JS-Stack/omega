@@ -17,7 +17,7 @@
  * per-brand operations only (service-account, sdk-config) so one brand never
  * rewrites a shared project's settings.
  */
-const { join } = require('node:path');
+const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
@@ -46,7 +46,7 @@ module.exports.run = createServiceRunner({
     // Cloudflare is only needed by the hosting operation (custom-domain DNS);
     // without a token the operation reports the required records instead.
     const makeApi = () => context.firebaseApi || new FirebaseAPI({
-      tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-tokens.json'),
+      tokenStorePath: googleTokenStorePath(context.brandRoot),
     });
 
     // firebase.projectId, falling back to the client web config — a brand

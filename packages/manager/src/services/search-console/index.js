@@ -11,7 +11,7 @@
  * webmasters + siteverification scopes are separate from firebase's and
  * analytics' tokens). No credentials → the service skips.
  */
-const { join } = require('node:path');
+const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
@@ -42,7 +42,7 @@ module.exports.run = createServiceRunner({
     // without a token the property operation prints the record to add manually.
     return {
       searchConsoleApi: context.searchConsoleApi || new GoogleSearchConsoleAPI({
-        tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-search-console-tokens.json'),
+        tokenStorePath: googleTokenStorePath(context.brandRoot),
       }),
       cloudflareApi: context.cloudflareApi
         || (process.env.CLOUDFLARE_TOKEN ? new CloudflareAPI() : null),

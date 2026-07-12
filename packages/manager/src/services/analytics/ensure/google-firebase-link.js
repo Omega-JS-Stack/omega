@@ -22,7 +22,9 @@ const { dryRunPlan } = require('../../../lib/run-gates.js');
 module.exports = async function ensureGoogleFirebaseLink(context) {
   const { analyticsApi: api, propertyId, brandConfig, brandState, options = {} } = context;
 
-  const projectId = brandConfig.firebase?.projectId;
+  // Same derivation as the firebase service: explicit firebase.projectId,
+  // else the client web config names the project (cp100)
+  const projectId = brandConfig.firebase?.projectId || brandConfig.cloud?.config?.projectId;
 
   if (brandConfig.firebase?.shared === true) {
     console.log(chalk.dim('      ⊘ Shared Firebase project — the link belongs to its owning brand'));
@@ -30,7 +32,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
   }
 
   if (!projectId) {
-    console.log(chalk.dim('      ⊘ No firebase.projectId configured — nothing to link'));
+    console.log(chalk.dim('      ⊘ No firebase.projectId (or cloud.config.projectId) configured — nothing to link'));
     return {};
   }
 

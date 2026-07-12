@@ -4,16 +4,12 @@
  * explicit). Named-method surface over the shared GoogleOAuth2Client so
  * tests can fake it method-for-method.
  *
- * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; tokens
- * cache separately from the other Google services' (different scope).
+ * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; the ONE
+ * shared token store (GOOGLE_SCOPES union — one consent covers everything).
  */
-const { GoogleOAuth2Client } = require('../../../lib/google-auth.js');
+const { GoogleOAuth2Client, GOOGLE_SCOPES } = require('../../../lib/google-auth.js');
 
 const ADSENSE_API_BASE = 'https://adsense.googleapis.com/v2';
-
-const SCOPES = [
-  'https://www.googleapis.com/auth/adsense.readonly',
-];
 
 class GoogleAdsenseAPI {
   constructor(options = {}) {
@@ -21,7 +17,7 @@ class GoogleAdsenseAPI {
       clientId: options.clientId || process.env.GOOGLE_CLIENT_ID,
       clientSecret: options.clientSecret || process.env.GOOGLE_CLIENT_SECRET,
       tokenStorePath: options.tokenStorePath,
-      scopes: SCOPES,
+      scopes: GOOGLE_SCOPES,
     });
   }
 

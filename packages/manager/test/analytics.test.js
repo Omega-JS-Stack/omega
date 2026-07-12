@@ -327,6 +327,66 @@ test('analytics: the data-collection acknowledgement gate warns instead of faili
   assert.equal(api.mutations().length, 0);
 });
 
+test('analytics: interactive acknowledgement — Enter-gated open, retry poll lands the secret in ONE run', async () => {
+  const promptModule = require('@omega.js/devkit/prompt');
+
+  // openInBrowser is the moment the human sees the page — the stub "acks"
+  let acked = false;
+  const api = fakeAnalytics({
+    ...convergedResponses(),
+    listDataStreams: [WEB_STREAM, FIREBASE_STREAM],
+    listMeasurementProtocolSecrets: () => {
+      throw new Error('HTTP 403: User Data Collection Acknowledgement required.');
+    },
+    createMeasurementProtocolSecret: () => {
+      if (!acked) {
+        throw new Error('HTTP 403: User Data Collection Acknowledgement required.');
+      }
+      return { name: `properties/${PROPERTY}/dataStreams/101/measurementProtocolSecrets/s9`, displayName: 'Secret', secretValue: 'freshcleansecret' };
+    },
+  });
+
+  const opened = [];
+  const realOpen = promptModule.openInBrowser;
+  promptModule.openInBrowser = (url) => {
+    opened.push(url);
+    acked = true;
+    return true;
+  };
+
+  const tty = openTtyPrompt();
+  try {
+    const run = runService(brandConfig({ targets: { web: {} } }), {
+      analytics: api,
+      brandState: FIREBASE_STATE,
+    });
+
+    await tty.answer('Press Enter to open the data-collection acknowledgement page', '\r');
+    await tty.answer('(enter)=check now, (s)=skip', '\r');
+    const result = await run;
+
+    assert.equal(result.state.streams.web.apiSecret, 'freshcleansecret');
+    assert.equal(result.status, 'success', 'the acknowledged run finishes green — no rerun needed');
+    assert.match(opened[0], /analytics\.google\.com/);
+  } finally {
+    promptModule.openInBrowser = realOpen;
+    tty.close();
+  }
+});
+
+test('analytics: firebase-link derives the project from cloud.config when firebase.projectId is absent', async () => {
+  const config = brandConfig({ targets: { web: {} } });
+  config.firebase = {};
+  config.cloud = { provider: 'firebase', config: { projectId: PROJECT } };
+
+  const api = fakeAnalytics(convergedResponses());
+  const result = await runService(config, { analytics: api, brandState: FIREBASE_STATE });
+
+  assert.equal(result.status, 'success');
+  assert.ok(api.callsTo('listFirebaseLinks').length > 0, 'the link op ran instead of skipping on a missing firebase.projectId');
+  assert.equal(api.mutations().length, 0, 'converged link stays a no-op');
+});
+
 test('analytics: a configured propertyId that does not exist warns', async () => {
   const api = fakeAnalytics({
     ...convergedResponses(),

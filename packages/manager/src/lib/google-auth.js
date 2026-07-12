@@ -1,19 +1,46 @@
 /**
  * Google OAuth2 client — omega-manager's shared Google auth handler, ported.
  * Handles token storage, refresh, and the one-time browser authorization flow
- * (localhost callback server; the auth URL is printed for click-through — no
- * browser auto-open dependency).
+ * (localhost callback server; interactive runs gate the browser open behind
+ * Enter — the house rule — with the printed URL as the always-there fallback).
+ *
+ * ONE Google identity for the whole manager (legacy parity): every service
+ * authorizes GOOGLE_SCOPES — the union of everything the manager touches —
+ * against ONE token store, so the operator consents ONCE. The store records
+ * which scopes it was granted; a cached token missing any requested scope
+ * re-consents once instead of 403ing forever (adding a service = one re-ask).
  *
  * Credentials come from GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand
  * .env; tokens cache to the brand's gitignored .omega/auth/ directory.
  */
 const { createServer } = require('node:http');
-const { dirname } = require('node:path');
+const { emitKeypressEvents } = require('node:readline');
+const { dirname, join } = require('node:path');
 const fs = require('node:fs');
 const chalk = require('chalk').default;
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+
+// The manager's full Google surface. Firebase Management + Cloud Platform
+// (IAM, Billing, Service Usage), userinfo.email (consent-screen supportEmail
+// defaults to the AUTHORIZING user — #29), Search Console + site
+// verification, GA4 admin, AdSense (read-only).
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/firebase',
+  'https://www.googleapis.com/auth/cloud-platform',
+  'https://www.googleapis.com/auth/cloud-billing',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/webmasters',
+  'https://www.googleapis.com/auth/siteverification',
+  'https://www.googleapis.com/auth/analytics.edit',
+  'https://www.googleapis.com/auth/adsense.readonly',
+];
+
+/** The ONE brand-local token store every Google service shares. */
+function googleTokenStorePath(brandRoot) {
+  return join(brandRoot, '.omega', 'auth', 'google-tokens.json');
+}
 
 class GoogleOAuth2Client {
   constructor(options = {}) {
@@ -45,7 +72,9 @@ class GoogleOAuth2Client {
     }
 
     fs.mkdirSync(dirname(this.tokenStorePath), { recursive: true });
-    fs.writeFileSync(this.tokenStorePath, JSON.stringify(tokens, null, 2));
+    // Record the granted scopes — getAccessToken() uses them to decide
+    // whether a cached token can serve a client or needs one re-consent
+    fs.writeFileSync(this.tokenStorePath, JSON.stringify({ ...tokens, scopes: this.scopes }, null, 2));
   }
 
   /**
@@ -54,10 +83,19 @@ class GoogleOAuth2Client {
   async getAccessToken() {
     const storedTokens = this.loadStoredTokens();
 
-    if (storedTokens) {
+    // A cached token only counts when it was granted every scope this client
+    // needs — otherwise API calls 403 with no re-consent trigger. Stores from
+    // before scope tracking (no `scopes` array) are treated as insufficient:
+    // one union re-consent upgrades them.
+    const grantedScopes = Array.isArray(storedTokens?.scopes) ? storedTokens.scopes : [];
+    const scopesSufficient = this.scopes.every((scope) => grantedScopes.includes(scope));
+
+    if (storedTokens && scopesSufficient) {
       this.accessToken = storedTokens.access_token;
       this.refreshToken = storedTokens.refresh_token;
       this.tokenExpiry = storedTokens.expiry;
+    } else if (storedTokens) {
+      console.log(`  ${chalk.dim('→')} Cached Google token is missing newly required scopes — one re-consent upgrades it`);
     }
 
     // Return cached token if still valid (with 5 min buffer)
@@ -122,7 +160,12 @@ class GoogleOAuth2Client {
       throw new Error(`Google consent required (scopes: ${this.scopes.join(', ')}) — run the service once interactively to grant it; headless runs work from the cached token after that`);
     }
 
-    return new Promise((resolve, reject) => {
+    // The Enter-gate keypress listener must tear down however the flow
+    // settles (Enter pressed, URL clicked directly, timeout, error) — a
+    // pending listener holds stdin and zombies the process at exit.
+    let disarm = null;
+
+    const flow = new Promise((resolve, reject) => {
       // RFC 8252 §7.3 loopback: bind an EPHEMERAL port (listen(0)) and read
       // the real one at listen time — Google's desktop-app client type
       // accepts any localhost port, so nothing pins 9876 (which anything
@@ -218,12 +261,15 @@ class GoogleOAuth2Client {
         console.log(`  ${chalk.dim('→')} Google authentication required:`);
         console.log(`  ${chalk.cyan(authUrl.toString())}`);
 
-        // Auto-open when a human is watching — stdout-TTY counts even when a
-        // wrapper (npu's npx guard, tee) pipes stdin, which blinds the prompt
-        // module's stdin check. The printed URL stays the fallback. Kills the
-        // dead-link race where a human reads an expired URL (#25).
-        const { isInteractive, openInBrowser } = require('@omega.js/devkit/prompt');
-        if ((process.stdout.isTTY || isInteractive()) && openInBrowser(authUrl.toString())) {
+        const { isInteractive: interactiveNow, openInBrowser } = require('@omega.js/devkit/prompt');
+        if (interactiveNow()) {
+          // House rule (cp101d): browser opens are gated behind Enter. Raw
+          // keypress instead of a prompt — the consent can also complete via
+          // a clicked URL, and the listener tears down on settle.
+          disarm = this._armEnterToOpen(authUrl.toString());
+        } else if (process.stdout.isTTY && openInBrowser(authUrl.toString())) {
+          // stdout-TTY with piped stdin (npu wrapper, tee — #25): a human is
+          // watching but nobody can press Enter, so auto-open remains.
           console.log(`  ${chalk.dim('→')} Opening your browser... (use the URL above if nothing appears)`);
         }
         console.log('');
@@ -240,6 +286,48 @@ class GoogleOAuth2Client {
       timeout.unref();
       server.on('close', () => clearTimeout(timeout));
     });
+
+    return flow.finally(() => {
+      if (disarm) {
+        disarm();
+      }
+    });
+  }
+
+  /**
+   * "Press Enter to open" on a raw keypress listener rather than a prompt:
+   * the consent flow can settle without Enter ever being pressed (clicked
+   * URL, timeout, error), and an abandoned prompt would pin stdin open.
+   *
+   * @returns {Function} disarm - Restores the input stream; call on settle.
+   */
+  _armEnterToOpen(url) {
+    const { getPromptStreams, openInBrowser } = require('@omega.js/devkit/prompt');
+    const { input, output } = getPromptStreams();
+    output.write(`  ${chalk.dim('→')} Press ${chalk.bold('Enter')} to open the Google consent page in your browser...\n`);
+
+    emitKeypressEvents(input);
+    input.setRawMode?.(true);
+    input.resume();
+
+    let opened = false;
+    const handler = (ch, key) => {
+      if (key?.ctrl && key?.name === 'c') {
+        process.exit();
+      }
+      if (key?.name === 'return' && !opened) {
+        opened = true;
+        openInBrowser(url);
+        output.write(`  ${chalk.dim('→')} Opening your browser... (use the URL above if nothing appears)\n`);
+      }
+    };
+    input.on('keypress', handler);
+
+    return () => {
+      input.removeListener('keypress', handler);
+      input.setRawMode?.(false);
+      input.pause();
+    };
   }
 
   /**
@@ -276,4 +364,4 @@ class GoogleOAuth2Client {
   }
 }
 
-module.exports = { GoogleOAuth2Client };
+module.exports = { GoogleOAuth2Client, GOOGLE_SCOPES, googleTokenStorePath };

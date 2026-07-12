@@ -16,7 +16,7 @@
  * meta-pixel/tiktok-pixel are pure local checks and always run when their
  * provider ID is configured.
  */
-const { join } = require('node:path');
+const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { GoogleAnalyticsAPI } = require('./lib/analytics-api.js');
@@ -49,7 +49,7 @@ module.exports.run = createServiceRunner({
     // in the in-memory config re-read just below)
     if (!analytics.providers?.google?.propertyId && haveGoogleAuth) {
       const flowApi = context.analyticsApi || new GoogleAnalyticsAPI({
-        tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-analytics-tokens.json'),
+        tokenStorePath: googleTokenStorePath(context.brandRoot),
       });
       await resolveGoogleProperty(context, flowApi);
     }
@@ -82,7 +82,7 @@ module.exports.run = createServiceRunner({
     return {
       analyticsApi: needsGoogleApi
         ? (context.analyticsApi || new GoogleAnalyticsAPI({
-          tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-analytics-tokens.json'),
+          tokenStorePath: googleTokenStorePath(context.brandRoot),
         }))
         : null,
       domain,

@@ -3,17 +3,13 @@
  * measurement endpoints that never made it into beta). Named-method surface
  * over the shared GoogleOAuth2Client so tests can fake it method-for-method.
  *
- * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; tokens
- * cache separately from the firebase service's (different scopes).
+ * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; the ONE
+ * shared token store (GOOGLE_SCOPES union — one consent covers everything).
  */
-const { GoogleOAuth2Client } = require('../../../lib/google-auth.js');
+const { GoogleOAuth2Client, GOOGLE_SCOPES } = require('../../../lib/google-auth.js');
 
 const API_BASE = 'https://analyticsadmin.googleapis.com/v1beta';
 const API_BASE_ALPHA = 'https://analyticsadmin.googleapis.com/v1alpha';
-
-const SCOPES = [
-  'https://www.googleapis.com/auth/analytics.edit',
-];
 
 class GoogleAnalyticsAPI {
   constructor(options = {}) {
@@ -21,7 +17,7 @@ class GoogleAnalyticsAPI {
       clientId: options.clientId || process.env.GOOGLE_CLIENT_ID,
       clientSecret: options.clientSecret || process.env.GOOGLE_CLIENT_SECRET,
       tokenStorePath: options.tokenStorePath,
-      scopes: SCOPES,
+      scopes: GOOGLE_SCOPES,
     });
   }
 

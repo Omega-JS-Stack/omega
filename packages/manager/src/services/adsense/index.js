@@ -15,7 +15,7 @@
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env
  * (adsense.readonly scope, own token cache).
  */
-const { join } = require('node:path');
+const { googleTokenStorePath } = require('../../lib/google-auth.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { GoogleAdsenseAPI } = require('./lib/adsense-api.js');
 const { resolveConfigValue } = require('../../lib/config-flow.js');
@@ -43,7 +43,7 @@ module.exports.run = createServiceRunner({
 
     // Tests inject a fake client via context.adsenseApi
     const makeApi = () => context.adsenseApi || new GoogleAdsenseAPI({
-      tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-adsense-tokens.json'),
+      tokenStorePath: googleTokenStorePath(context.brandRoot),
     });
 
     // Missing account → offer the interactive selection flow (lands in

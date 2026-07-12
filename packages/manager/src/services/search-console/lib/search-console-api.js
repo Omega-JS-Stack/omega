@@ -4,18 +4,13 @@
  * method surface over the shared GoogleOAuth2Client so tests can fake it
  * method-for-method.
  *
- * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; tokens
- * cache separately from the firebase/analytics services' (different scopes).
+ * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; the ONE
+ * shared token store (GOOGLE_SCOPES union — one consent covers everything).
  */
-const { GoogleOAuth2Client } = require('../../../lib/google-auth.js');
+const { GoogleOAuth2Client, GOOGLE_SCOPES } = require('../../../lib/google-auth.js');
 
 const SEARCH_CONSOLE_API_BASE = 'https://www.googleapis.com/webmasters/v3';
 const SITE_VERIFICATION_API_BASE = 'https://www.googleapis.com/siteVerification/v1';
-
-const SCOPES = [
-  'https://www.googleapis.com/auth/webmasters',
-  'https://www.googleapis.com/auth/siteverification',
-];
 
 class GoogleSearchConsoleAPI {
   constructor(options = {}) {
@@ -23,7 +18,7 @@ class GoogleSearchConsoleAPI {
       clientId: options.clientId || process.env.GOOGLE_CLIENT_ID,
       clientSecret: options.clientSecret || process.env.GOOGLE_CLIENT_SECRET,
       tokenStorePath: options.tokenStorePath,
-      scopes: SCOPES,
+      scopes: GOOGLE_SCOPES,
     });
   }
 

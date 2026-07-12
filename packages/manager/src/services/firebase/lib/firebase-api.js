@@ -10,7 +10,7 @@
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env; tokens
  * cache to the brand's .omega/auth/google-tokens.json.
  */
-const { GoogleOAuth2Client } = require('../../../lib/google-auth.js');
+const { GoogleOAuth2Client, GOOGLE_SCOPES } = require('../../../lib/google-auth.js');
 
 const FIREBASE_API_BASE = 'https://firebase.googleapis.com/v1beta1';
 const SERVICE_USAGE_API_BASE = 'https://serviceusage.googleapis.com/v1';
@@ -21,24 +21,15 @@ const RESOURCE_MANAGER_V3 = 'https://cloudresourcemanager.googleapis.com/v3';
 const FIRESTORE_API_BASE = 'https://firestore.googleapis.com/v1';
 const CLOUD_BILLING_API_BASE = 'https://cloudbilling.googleapis.com/v1';
 
-// Firebase Management + Cloud Platform (includes IAM, Billing, Service Usage).
-// userinfo.email lets the consent-screen step default supportEmail to the
-// AUTHORIZING user (Google rejects any email the caller doesn't own — #29);
-// tokens cached before this scope re-consent once in the browser.
-const SCOPES = [
-  'https://www.googleapis.com/auth/firebase',
-  'https://www.googleapis.com/auth/cloud-platform',
-  'https://www.googleapis.com/auth/cloud-billing',
-  'https://www.googleapis.com/auth/userinfo.email',
-];
-
 class FirebaseAPI {
   constructor(options = {}) {
+    // GOOGLE_SCOPES (the manager-wide union) — one consent covers every
+    // Google service; see google-auth.js
     this.auth = new GoogleOAuth2Client({
       clientId: options.clientId || process.env.GOOGLE_CLIENT_ID,
       clientSecret: options.clientSecret || process.env.GOOGLE_CLIENT_SECRET,
       tokenStorePath: options.tokenStorePath || null,
-      scopes: SCOPES,
+      scopes: GOOGLE_SCOPES,
     });
   }
 
