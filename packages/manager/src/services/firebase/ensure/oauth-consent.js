@@ -14,6 +14,7 @@
  * a doomed value.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureOAuthConsent(context) {
   const { firebaseApi: api, brandConfig, projectId, options = {} } = context;
@@ -40,8 +41,7 @@ module.exports = async function ensureOAuthConsent(context) {
   // === WRITE ===
   if (options.dryRun) {
     const planned = brandConfig.firebase?.supportEmail || "(authorizing user's email)";
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create OAuth consent screen (${brandName}, ${planned})`)}`);
-    return { output: { oauthConsent: { planned: 'create' } } };
+    return dryRunPlan(`create OAuth consent screen (${brandName}, ${planned})`, { output: { oauthConsent: { planned: 'create' } } });
   }
 
   const supportEmail = brandConfig.firebase?.supportEmail

@@ -23,8 +23,8 @@
  * required records are printed instead and the operation warns.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureHosting(context) {
   const { firebaseApi: api, cloudflareApi, brandConfig, projectId, domain, apexDomain, isSubdomainProject, options = {} } = context;
@@ -65,8 +65,7 @@ module.exports = async function ensureHosting(context) {
   if (site) {
     console.log(`      ${chalk.green('✓')} Site exists: ${chalk.cyan(projectId)}`);
   } else if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create hosting site ${projectId}`)}`);
-    return { output: { hosting: { planned: 'create-site' } } };
+    return dryRunPlan(`create hosting site ${projectId}`, { output: { hosting: { planned: 'create-site' } } });
   } else {
     console.log('      Creating hosting site...');
     try {
@@ -113,8 +112,7 @@ async function ensureApiDomain(context, zone, apiDomain) {
   // Soft-deleted → undelete; missing → create. Both then converge as pending.
   if (!status.exists) {
     if (options.dryRun) {
-      console.log(`      ${chalk.dim(`⊘ Dry run — would ${status.deleted ? 'restore' : 'add'} domain ${fullDomain}`)}`);
-      return { domain: fullDomain, status: 'planned' };
+      return dryRunPlan(`${status.deleted ? 'restore' : 'add'} domain ${fullDomain}`, { domain: fullDomain, status: 'planned' });
     }
 
     try {
@@ -145,7 +143,7 @@ async function ensureApiDomain(context, zone, apiDomain) {
   await ensureCname(context, zone, recordName, { proxied: false });
 
   // Interactive runs wait for Firebase to verify (DNS propagation)
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const verified = await waitForVerification(context, zone, fullDomain, recordName, status);
     if (verified) {
       console.log(`      ${chalk.green('✓')} Domain verified: ${chalk.cyan(fullDomain)}`);

@@ -11,6 +11,7 @@
  * every brand; the port warns until a real one is configured.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureSenderIdentity(context) {
   const { sendgridApi: api, brandConfig, options = {} } = context;
@@ -45,8 +46,7 @@ module.exports = async function ensureSenderIdentity(context) {
 
   if (options.dryRun) {
     const planned = match ? 'recreate-unverified-sender' : 'create-sender';
-    console.log(`      ${chalk.dim(`⊘ Dry run — would ${planned} (${fromEmail})`)}`);
-    return { output: { senderIdentity: { planned, fromEmail } } };
+    return dryRunPlan(`${planned} (${fromEmail})`, { output: { senderIdentity: { planned, fromEmail } } });
   }
 
   // An unverified leftover can't be verified retroactively — recreate it

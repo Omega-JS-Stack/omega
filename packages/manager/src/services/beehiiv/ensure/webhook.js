@@ -10,6 +10,7 @@
  * with the minimum diff.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 // Subscription events @omega.js/backend's consent pipeline consumes (they flip
 // consent.marketing.status to 'revoked' and propagate the unsub to SendGrid)
@@ -75,8 +76,7 @@ module.exports = async function ensureWebhook(context) {
     }
 
     if (options.dryRun) {
-      console.log(`      ${chalk.dim(`⊘ Dry run — would patch: ${Object.keys(patch).join(', ')}`)}`);
-      return { output: { webhook: { planned: Object.keys(patch) } } };
+      return dryRunPlan(`patch: ${Object.keys(patch).join(', ')}`, { output: { webhook: { planned: Object.keys(patch) } } });
     }
 
     await api.updateWebhook(publicationId, existing.id, patch);
@@ -85,8 +85,7 @@ module.exports = async function ensureWebhook(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would create the consent-pipeline webhook')}`);
-    return { output: { webhook: { planned: ['create'] } } };
+    return dryRunPlan('create the consent-pipeline webhook', { output: { webhook: { planned: ['create'] } } });
   }
 
   const created = await api.createWebhook(publicationId, {

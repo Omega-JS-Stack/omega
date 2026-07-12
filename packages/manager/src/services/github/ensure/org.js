@@ -7,6 +7,7 @@
  * Skipped entirely for shared orgs (filtered in the service setup).
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureOrg(context) {
   const { brandConfig, options = {}, githubApi: api } = context;
@@ -55,8 +56,7 @@ module.exports = async function ensureOrg(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — org update skipped')}`);
-    return { status: 'success', output: { org: { planned: Object.keys(updates) } } };
+    return dryRunPlan('update org settings', { status: 'success', output: { org: { planned: Object.keys(updates) } } });
   }
 
   try {

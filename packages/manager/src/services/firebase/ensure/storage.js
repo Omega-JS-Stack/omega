@@ -4,6 +4,7 @@
  * {projectId}.appspot.com).
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureStorage(context) {
   const { firebaseApi: api, projectId, options = {} } = context;
@@ -18,8 +19,7 @@ module.exports = async function ensureStorage(context) {
 
   // === WRITE ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would create the default storage bucket')}`);
-    return { output: { storage: { planned: 'create' } } };
+    return dryRunPlan('create the default storage bucket', { output: { storage: { planned: 'create' } } });
   }
 
   console.log('      Creating storage bucket...');

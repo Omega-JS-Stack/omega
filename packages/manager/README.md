@@ -34,6 +34,8 @@ Secrets live in the brand root `.env` (loaded before any service runs) — `@ome
 
 Services declare operations in [src/config.js](src/config.js) `OPERATIONS`; handlers live in `src/services/{service}/{ensure,read,transform,write}/{operation}.js`. Handler returns are **strictly validated** — allowed top-level keys are `state`, `output`, `status`, `error` only; anything else throws. `state` accumulates into `.omega/state.json`, `output` into the run file. Statuses: `success` (✓), `warned` (⚠), `error` (✗), `skipped`.
 
+**Run-mode gates are standardized** in [src/lib/run-gates.js](src/lib/run-gates.js) — never hand-compose them: `canPrompt(options)` (TTY **and** not dry-run — the only prompt gate), `dryRunPlan(message, result?)` (the canonical `⊘ Dry run — would <message>` line, optionally passing a handler return through for one-statement gates), and `needsInteractiveSkip(key, action, note?)` (the warned step-aside carrying the `needsInteractive` marker the run summary aggregates into its ⚑ section with per-service rerun hints).
+
 ## Services (ported so far)
 
 | Service | Operations | What it ensures |

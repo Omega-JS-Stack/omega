@@ -11,9 +11,10 @@
  * keeps the warned guidance.
  */
 const chalk = require('chalk').default;
-const { input, isInteractive } = require('@omega.js/devkit/prompt');
+const { input } = require('@omega.js/devkit/prompt');
 
 const { writeEnvValue } = require('../../../lib/env-secret.js');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 /**
  * Check one provider's pixel config + access token.
@@ -41,7 +42,7 @@ async function ensurePixelToken(context, spec) {
   console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(spec.envVar)} not set in the brand .env`);
   console.log(`      ${chalk.dim('→')} Get it from ${spec.tokenSource}`);
 
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const value = (await input({ message: `    ${spec.envVar} (leave empty to skip):` })).trim();
     if (value) {
       writeEnvValue(brandRoot, spec.envVar, value);

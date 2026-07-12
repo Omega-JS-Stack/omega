@@ -11,6 +11,7 @@
  */
 const chalk = require('chalk').default;
 const { fieldsFor } = require('../../../lib/backend-marketing.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const BEEHIIV_FIELDS = fieldsFor('beehiiv');
 
@@ -52,8 +53,7 @@ module.exports = async function ensureCustomFields(context) {
       create: missing.map((f) => f.display),
       recreate: mismatched.map((f) => `${f.display} (${f.existingKind} → ${KIND_MAP[f.type]})`),
     };
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create ${planned.create.length}, recreate ${planned.recreate.length} field(s)`)}`);
-    return { output: { customFields: { planned } } };
+    return dryRunPlan(`create ${planned.create.length}, recreate ${planned.recreate.length} field(s)`, { output: { customFields: { planned } } });
   }
 
   // Kind mismatches: delete, then recreate alongside the missing ones

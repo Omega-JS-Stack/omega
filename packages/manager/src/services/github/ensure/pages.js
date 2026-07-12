@@ -9,6 +9,7 @@
  * cloudflare port.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensurePages(context) {
   const { brandId, brand, brandConfig, options = {}, githubApi: api } = context;
@@ -34,8 +35,7 @@ module.exports = async function ensurePages(context) {
 
     if (!pages) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim('⊘ Dry run — would enable Pages on gh-pages')}`);
-        return { status: 'success', output: { pages: { planned: ['enable', 'domain'] } } };
+        return dryRunPlan('enable Pages on gh-pages', { status: 'success', output: { pages: { planned: ['enable', 'domain'] } } });
       }
       console.log(`      Enabling Pages on gh-pages...`);
       api.enablePages(github.org, repoName, { branch: 'gh-pages', path: '/' });
@@ -43,7 +43,7 @@ module.exports = async function ensurePages(context) {
       pages = api.getPages(github.org, repoName);
     } else if (pages.source?.branch !== 'gh-pages') {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim(`⊘ Dry run — would switch source branch ${pages.source?.branch} → gh-pages`)}`);
+        dryRunPlan(`switch source branch ${pages.source?.branch} → gh-pages`);
       } else {
         console.log(`      Updating source branch to gh-pages...`);
         api.updatePages(github.org, repoName, { branch: 'gh-pages', path: '/' });
@@ -54,8 +54,7 @@ module.exports = async function ensurePages(context) {
     // Custom domain
     if (pages?.cname !== domain) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim(`⊘ Dry run — would set domain to ${domain}`)}`);
-        return { status: 'success', output: { pages: { planned: ['domain'] } } };
+        return dryRunPlan(`set domain to ${domain}`, { status: 'success', output: { pages: { planned: ['domain'] } } });
       }
       console.log(`      Setting domain to ${chalk.cyan(domain)}...`);
       api.setPagesDomain(github.org, repoName, domain);

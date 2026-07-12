@@ -9,8 +9,8 @@
  * appears); non-READY → warned with what Google is waiting on.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 // AdSense site approval states → run status + operator guidance
 const STATES = {
@@ -36,7 +36,7 @@ module.exports = async function ensureSites(context) {
   console.log(`      ${chalk.yellow('⚠')} ${chalk.cyan(domain)} is not added to AdSense ${chalk.dim('(no API exists to add it)')}`);
 
   // Interactive runs open the add-site page and poll until it appears
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const result = await openBrowserAndPoll({
       url: sitesUrl,
       promptMessage: `Add ${chalk.cyan(domain)} as a site in the AdSense console.`,

@@ -11,6 +11,7 @@
  * Drift is patched with the minimum diff.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 // The consent-pipeline events @omega.js/backend must receive
 const DESIRED_TOGGLES = {
@@ -63,8 +64,7 @@ module.exports = async function ensureEventWebhook(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would patch: ${Object.keys(patch).join(', ')}`)}`);
-    return { output: { eventWebhook: { planned: Object.keys(patch) } } };
+    return dryRunPlan(`patch: ${Object.keys(patch).join(', ')}`, { output: { eventWebhook: { planned: Object.keys(patch) } } });
   }
 
   if (patch.url) {

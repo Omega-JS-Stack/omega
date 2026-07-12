@@ -10,11 +10,12 @@
  * mutate: missing segments warn with human-readable conditions.
  */
 const chalk = require('chalk').default;
-const { select, isInteractive } = require('@omega.js/devkit/prompt');
+const { select } = require('@omega.js/devkit/prompt');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { segmentsFor } = require('../../../lib/backend-marketing.js');
 const { AutomationClient } = require('../../../lib/automation-client.js');
 const { formatCondition, automateCreateSegment } = require('../lib/segment-automation.js');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 const BEEHIIV_SEGMENTS = segmentsFor('beehiiv');
 const SEGMENTS_URL = 'https://app.beehiiv.com/segments';
@@ -56,7 +57,7 @@ module.exports = async function ensureSegments(context) {
   });
 
   // Headless/dry runs stop at the instructions (build them at SEGMENTS_URL)
-  if (!isInteractive() || options.dryRun) {
+  if (!canPrompt(options)) {
     console.log(`        ${chalk.dim(`→ Build them at ${SEGMENTS_URL}`)}`);
     return warned();
   }

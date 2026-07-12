@@ -14,6 +14,7 @@
  * (acknowledge once, rerun converges).
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 // target → stream URI subdomain (null = the root domain) + display name.
 // Subdomains for app targets are virtual — they exist only to give each
@@ -65,7 +66,7 @@ module.exports = async function ensureGoogleStreams(context) {
 
     if (!stream) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim(`⊘ Dry run — would create ${target} stream (${uri})`)}`);
+        dryRunPlan(`create ${target} stream (${uri})`);
         planned.push({ target, action: 'create', uri });
         continue;
       }

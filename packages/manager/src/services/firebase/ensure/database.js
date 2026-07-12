@@ -3,6 +3,7 @@
  * ({projectId}-default-rtdb in us-central1).
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureDatabase(context) {
   const { firebaseApi: api, projectId, options = {} } = context;
@@ -25,8 +26,7 @@ module.exports = async function ensureDatabase(context) {
 
   // === WRITE ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would create the Realtime Database')}`);
-    return { output: { database: { planned: 'create' } } };
+    return dryRunPlan('create the Realtime Database', { output: { database: { planned: 'create' } } });
   }
 
   console.log('      Creating Realtime Database...');

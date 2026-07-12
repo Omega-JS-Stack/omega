@@ -29,9 +29,10 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
-const { input, isInteractive } = require('@omega.js/devkit/prompt');
+const { input } = require('@omega.js/devkit/prompt');
 const { withSpinner } = require('@omega.js/devkit/flows');
 const { resolveBrandmarkSpec, resolveLogoApiToken, generateBrandmark } = require('./lib/brandmark-api.js');
+const { canPrompt } = require('../../lib/run-gates.js');
 
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
@@ -50,7 +51,7 @@ module.exports.run = createServiceRunner({
     if (!jetpack.exists(brandmarkPath)) {
       const spec = resolveBrandmarkSpec(context.brandConfig);
 
-      if (spec && isInteractive() && !context.options?.dryRun) {
+      if (spec && canPrompt(context.options)) {
         try {
           const direction = (await input({ message: 'Logo prompt (press Enter to skip):', default: '' })).trim();
           const token = await resolveLogoApiToken(spec, context.brandRoot);

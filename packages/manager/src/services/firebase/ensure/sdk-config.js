@@ -9,6 +9,7 @@
  */
 const chalk = require('chalk').default;
 const { writeBrandConfig } = require('../../../lib/config-write.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 // The canonical cloud.config keys frameworks read from omega.json5
 const SDK_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
@@ -22,8 +23,7 @@ module.exports = async function ensureSdkConfig(context) {
 
   if (!appId) {
     if (options.dryRun) {
-      console.log(`      ${chalk.dim('⊘ Dry run — would create a web app and fetch its SDK config')}`);
-      return { output: { sdkConfig: { planned: 'create-web-app' } } };
+      return dryRunPlan('create a web app and fetch its SDK config', { output: { sdkConfig: { planned: 'create-web-app' } } });
     }
 
     console.log('      Creating web app...');

@@ -10,10 +10,10 @@
  * verifying.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 function isUnverifiedError(error) {
   return error.message.includes('2054') || error.message.toLowerCase().includes('not verified');
@@ -50,7 +50,7 @@ async function handleUnverified(api, zoneId, destination, retryWrite, options = 
 
   const dashboardUrl = `https://dash.cloudflare.com/${accountId}/email-routing/destination-addresses`;
 
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const result = await openBrowserAndPoll({
       url: dashboardUrl,
       promptMessage: `Verify ${chalk.cyan(destination)} in Cloudflare Email Routing (check the inbox).`,
@@ -99,8 +99,7 @@ module.exports = async function ensureEmailRouting(context) {
     routing = resp.result;
   } catch {
     if (options.dryRun) {
-      console.log(`      ${chalk.dim('⊘ Dry run — would enable email routing')}`);
-      return { status: 'success', output: { emailRouting: { planned: 'enable' } } };
+      return dryRunPlan('enable email routing', { status: 'success', output: { emailRouting: { planned: 'enable' } } });
     }
     console.log(`      ${chalk.dim('→')} Enabling email routing...`);
     await api.makeRequest(`/zones/${zoneId}/email/routing/enable`, { method: 'POST' });
@@ -148,7 +147,7 @@ module.exports = async function ensureEmailRouting(context) {
       console.log(`      ${chalk.green('✓')} ${chalk.cyan('*')} → ${chalk.dim(desiredCatchAll.to)}`);
       skipped++;
     } else if (options.dryRun) {
-      console.log(`      ${chalk.dim(`⊘ Dry run — would set catch-all → ${desiredCatchAll.to}`)}`);
+      dryRunPlan(`set catch-all → ${desiredCatchAll.to}`);
       planned++;
     } else {
       console.log(`      ${chalk.dim('→')} Updating catch-all: ${chalk.cyan('*')} → ${chalk.dim(desiredCatchAll.to)}`);
@@ -197,7 +196,7 @@ module.exports = async function ensureEmailRouting(context) {
     }
 
     if (options.dryRun) {
-      console.log(`      ${chalk.dim(`⊘ Dry run — would create ${matcherValue} → ${desired.to}`)}`);
+      dryRunPlan(`create ${matcherValue} → ${desired.to}`);
       planned++;
       continue;
     }
@@ -246,7 +245,7 @@ module.exports = async function ensureEmailRouting(context) {
 
     if (!isDesired) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim(`⊘ Dry run — would remove ${matcher.value} → ${action.value?.[0]}`)}`);
+        dryRunPlan(`remove ${matcher.value} → ${action.value?.[0]}`);
         planned++;
         continue;
       }
@@ -263,7 +262,7 @@ module.exports = async function ensureEmailRouting(context) {
     const currentCatchAll = catchAllResp.result;
     if (currentCatchAll?.enabled && currentCatchAll?.actions?.[0]?.type === 'forward') {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim('⊘ Dry run — would disable catch-all (not in config)')}`);
+        dryRunPlan('disable catch-all (not in config)');
         planned++;
       } else {
         console.log(`      ${chalk.dim('→')} Disabling catch-all (not in config)`);

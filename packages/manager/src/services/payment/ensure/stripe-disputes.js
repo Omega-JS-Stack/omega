@@ -7,7 +7,8 @@
  * confirmed (`disputesConfirmed` in state). Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
-const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
+const { confirm } = require('@omega.js/devkit/prompt');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureStripeDisputes(context) {
   const { stripeApi: api, serviceData, options = {} } = context;
@@ -29,7 +30,7 @@ module.exports = async function ensureStripeDisputes(context) {
   console.log(`      ${chalk.yellow('⚠')} No API for dispute protection — activate ${chalk.bold('Enhanced Dispute Protection')} in the Dashboard`);
   console.log(`      ${chalk.dim('→')} Dispute settings: ${chalk.cyan(disputesUrl)}`);
 
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const done = await confirm({ message: 'Enhanced Dispute Protection activated in the Dashboard?', default: false });
     if (done) {
       console.log(`      ${chalk.green('✓')} Enhanced Dispute Protection confirmed`);

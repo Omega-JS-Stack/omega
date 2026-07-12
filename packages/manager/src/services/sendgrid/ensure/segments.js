@@ -12,6 +12,7 @@
 const chalk = require('chalk').default;
 const { segmentsFor } = require('../../../lib/backend-marketing.js');
 const { buildQueryDsl } = require('../lib/segment-query.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const SENDGRID_SEGMENTS = segmentsFor('sendgrid');
 
@@ -55,8 +56,7 @@ module.exports = async function ensureSegments(context) {
       update: stale.map((s) => s.name),
       sweepOrphans: orphans.length,
     };
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create ${planned.create.length}, update ${planned.update.length}, sweep ${planned.sweepOrphans} orphan(s)`)}`);
-    return { output: { segments: { planned } } };
+    return dryRunPlan(`create ${planned.create.length}, update ${planned.update.length}, sweep ${planned.sweepOrphans} orphan(s)`, { output: { segments: { planned } } });
   }
 
   // Sweep leaked __temp_ segments

@@ -17,6 +17,7 @@
  * often with no URI) to the naming convention — diff-gated.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureGoogleFirebaseLink(context) {
   const { analyticsApi: api, propertyId, brandConfig, brandState, options = {} } = context;
@@ -64,8 +65,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
     const plannedActions = elsewhere
       ? [`unlink from property ${elsewhere.propertyId}`, `link to property ${propertyId}`]
       : [`link to property ${propertyId}`];
-    console.log(`      ${chalk.dim(`⊘ Dry run — would ${plannedActions.join(', then ')}`)}`);
-    return { output: { firebaseLink: { planned: plannedActions } } };
+    return dryRunPlan(`${plannedActions.join(', then ')}`, { output: { firebaseLink: { planned: plannedActions } } });
   }
 
   if (elsewhere) {

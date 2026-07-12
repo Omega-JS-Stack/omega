@@ -8,6 +8,7 @@
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
 const { fetchRuleset, getZoneId } = require('../lib/ruleset-helper.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const PHASE = 'http_response_headers_transform';
 
@@ -61,8 +62,7 @@ module.exports = async function ensureRulesResponseHeaders(context) {
   console.log(`      ${chalk.dim('·')} ${chalk.bold(configuredRules.length)} rules`);
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — response header rules update skipped')}`);
-    return { status: 'success', output: { responseHeaders: { planned: configuredRules.length } } };
+    return dryRunPlan('update response header rules', { status: 'success', output: { responseHeaders: { planned: configuredRules.length } } });
   }
 
   // === WRITE ===

@@ -11,9 +11,9 @@
  * comment-preserving) and mirrored in state.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 const CREATE_URL = 'https://app.beehiiv.com/settings/workspace/overview?create_publication=true';
 
@@ -69,7 +69,7 @@ module.exports = async function ensurePublication(context) {
 
   // Interactive runs: open the dashboard and poll until the publication
   // appears (same auto-match), then land it in omega.json5
-  if (isInteractive() && !context.options?.dryRun) {
+  if (canPrompt(context.options)) {
     const result = await openBrowserAndPoll({
       url: CREATE_URL,
       promptMessage: `Create the publication for ${chalk.cyan(brandName)} with the values above.`,

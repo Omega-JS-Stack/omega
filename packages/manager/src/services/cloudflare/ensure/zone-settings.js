@@ -11,6 +11,7 @@ const chalk = require('chalk').default;
 const { DEFAULTS } = require('../../../config.js');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 // Settings not returned by /zones/{id}/settings — each needs its own GET.
 const ADDON_SETTINGS = ['speed_brain', 'fonts'];
@@ -79,8 +80,7 @@ module.exports = async function ensureZoneSettings(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would patch ${Object.keys(updates).length} setting(s)`)}`);
-    return { status: 'success', output: { settings: { planned: Object.keys(updates) } } };
+    return dryRunPlan(`patch ${Object.keys(updates).length} setting(s)`, { status: 'success', output: { settings: { planned: Object.keys(updates) } } });
   }
 
   // === WRITE ===

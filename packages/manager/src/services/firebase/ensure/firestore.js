@@ -3,6 +3,7 @@
  * Point-in-Time Recovery enabled (7-day disaster recovery).
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureFirestore(context) {
   const { firebaseApi: api, projectId, options = {} } = context;
@@ -27,8 +28,7 @@ module.exports = async function ensureFirestore(context) {
 
   // === WRITE ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would create Firestore database (nam5) + enable PITR')}`);
-    return { output: { firestore: { planned: 'create' } } };
+    return dryRunPlan('create Firestore database (nam5) + enable PITR', { output: { firestore: { planned: 'create' } } });
   }
 
   console.log('      Creating Firestore database...');
@@ -66,8 +66,7 @@ async function ensurePITR(api, projectId, database, options) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would enable PITR')}`);
-    return;
+    return dryRunPlan('enable PITR');
   }
 
   console.log('      Enabling PITR (Point-in-Time Recovery)...');

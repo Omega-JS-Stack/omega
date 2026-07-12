@@ -9,7 +9,8 @@
  * override. Cannot mutate by construction.
  */
 const chalk = require('chalk').default;
-const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
+const { confirm } = require('@omega.js/devkit/prompt');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureStripeRadar(context) {
   const { brandConfig, stripeApi: api, serviceData, options = {} } = context;
@@ -48,7 +49,7 @@ module.exports = async function ensureStripeRadar(context) {
   console.log('');
   console.log(`      ${chalk.dim('→')} Radar rules: ${chalk.cyan(radarUrl)}`);
 
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const done = await confirm({ message: 'Radar rules added in the Dashboard?', default: false });
     if (done) {
       console.log(`      ${chalk.green('✓')} Radar rules confirmed (${desiredRules.length} rules)`);

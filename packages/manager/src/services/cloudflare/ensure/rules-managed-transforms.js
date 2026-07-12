@@ -8,6 +8,7 @@
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const REQUEST_HEADERS_MAP = {
   addClientCertificateHeaders: 'add_client_certificate_headers',
@@ -74,8 +75,7 @@ module.exports = async function ensureManagedTransforms(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — Managed Transforms update skipped')}`);
-    return { status: 'success', output: { managedTransforms: { planned: true } } };
+    return dryRunPlan('update Managed Transforms', { status: 'success', output: { managedTransforms: { planned: true } } });
   }
 
   // === WRITE ===

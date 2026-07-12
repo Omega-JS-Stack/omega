@@ -10,6 +10,7 @@ const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
 const { diffRecords } = require('../lib/dns-records-helpers.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureDnsRecords(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, domain, isSubdomainProject, options = {} } = context;
@@ -29,7 +30,7 @@ module.exports = async function ensureDnsRecords(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create ${diff.toCreate.length}, update ${diff.toUpdate.length}, delete ${diff.toDelete.length}`)}`);
+    dryRunPlan(`create ${diff.toCreate.length}, update ${diff.toUpdate.length}, delete ${diff.toDelete.length}`);
     return {
       status: 'success',
       output: { dns: { planned: { create: diff.toCreate.length, update: diff.toUpdate.length, delete: diff.toDelete.length } } },

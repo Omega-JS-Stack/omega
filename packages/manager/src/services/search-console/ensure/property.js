@@ -10,8 +10,8 @@
  * rerun converges.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 // Google answers this when the domain was verified by an earlier attempt
 const isAlreadyVerified = (error) => error.message.includes('already verified')
@@ -32,8 +32,7 @@ module.exports = async function ensureProperty(context) {
   console.log(`      ${chalk.dim('→')} Domain property ${chalk.cyan(propertyUrl)} does not exist yet`);
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would verify the domain (DNS TXT) and add the property')}`);
-    return { output: { property: { planned: 'verify-and-add' } } };
+    return dryRunPlan('verify the domain (DNS TXT) and add the property', { output: { property: { planned: 'verify-and-add' } } });
   }
 
   // === Verification token (same token returned until verification succeeds) ===
@@ -99,7 +98,7 @@ module.exports = async function ensureProperty(context) {
     lastError = error.message;
   }
 
-  if (!verified && isInteractive() && !options.dryRun) {
+  if (!verified && canPrompt(options)) {
     const result = await pollWithSpinner({
       check: async () => {
         try {

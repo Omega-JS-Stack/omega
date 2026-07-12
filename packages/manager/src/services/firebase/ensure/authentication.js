@@ -17,7 +17,8 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { confirm, isInteractive, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureAuthentication(context) {
   const { firebaseApi: api, brandRoot, projectId, domain, serviceData = {}, options = {} } = context;
@@ -30,8 +31,7 @@ module.exports = async function ensureAuthentication(context) {
 
   if (!config) {
     if (options.dryRun) {
-      console.log(`      ${chalk.dim('⊘ Dry run — would enable Identity Platform')}`);
-      return { output: { authentication: { planned: 'initialize' } } };
+      return dryRunPlan('enable Identity Platform', { output: { authentication: { planned: 'initialize' } } });
     }
 
     try {
@@ -62,8 +62,7 @@ module.exports = async function ensureAuthentication(context) {
       return;
     }
     if (options.dryRun) {
-      console.log(`      ${chalk.dim(`⊘ Dry run — would configure ${label}`)}`);
-      return;
+      return dryRunPlan(`configure ${label}`);
     }
     try {
       await api.updateIdentityConfig(projectId, payload);
@@ -156,7 +155,7 @@ module.exports = async function ensureAuthentication(context) {
     // No API to create the OAuth client — manual enable in the console
     console.log(`      ${chalk.yellow('⚠')} Google sign-in not enabled — requires one-time manual setup`);
     console.log(`      ${chalk.dim('→')} Enable "Google", pick a support email, Save — then rerun`);
-    if (isInteractive() && !options.dryRun) {
+    if (canPrompt(options)) {
       await pressEnterToOpen(firebaseAuthUrl, 'the sign-in providers page');
     } else {
       console.log(`      ${chalk.dim('→')} ${chalk.cyan(firebaseAuthUrl)}`);
@@ -172,7 +171,7 @@ module.exports = async function ensureAuthentication(context) {
     console.log(`      ${chalk.dim('→')} Authorized origins: https://localhost, https://localhost:5000, https://${projectId}.firebaseapp.com, https://${domain}`);
     console.log(`      ${chalk.dim('→')} Redirect URIs: https://localhost:5000/__/auth/handler, https://${projectId}.firebaseapp.com/__/auth/handler, https://${domain}/__/auth/handler`);
 
-    if (isInteractive() && !options.dryRun) {
+    if (canPrompt(options)) {
       await pressEnterToOpen(gcpCredentialsUrl, 'the OAuth client settings');
       const done = await confirm({ message: 'Origins + redirect URIs configured in the OAuth client?', default: false });
       if (done) {
@@ -203,7 +202,7 @@ module.exports = async function ensureAuthentication(context) {
   if (domainsToAdd.length === 0) {
     console.log(`      ${chalk.green('✓')} Authorized domains configured`);
   } else if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would add ${domainsToAdd.length} authorized domain(s)`)}`);
+    dryRunPlan(`add ${domainsToAdd.length} authorized domain(s)`);
   } else {
     try {
       await api.updateIdentityConfig(projectId, {

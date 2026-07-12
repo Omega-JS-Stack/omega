@@ -11,11 +11,12 @@
  * processor stays unconfigured and its operations print their dim note.
  */
 const chalk = require('chalk').default;
-const { input, select, isInteractive } = require('@omega.js/devkit/prompt');
+const { input, select } = require('@omega.js/devkit/prompt');
 const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 const { setAtPath } = require('../../../lib/config-flow.js');
 const { writeEnvValue } = require('../../../lib/env-secret.js');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 const PROCESSORS = {
   stripe: {
@@ -79,7 +80,7 @@ const PROCESSORS = {
  * @param {string} name - 'stripe' | 'paypal' | 'chargebee'
  */
 async function processorSetupFlow(context, name) {
-  if (!isInteractive() || context.options?.dryRun) {
+  if (!canPrompt(context.options)) {
     return false;
   }
 

@@ -6,6 +6,7 @@
  * a converged project is a zero-mutation no-op.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const WEB_APP_NAME = 'Web App';
 
@@ -22,7 +23,7 @@ module.exports = async function ensureProjectSettings(context) {
     console.log(`      ${chalk.green('✓')} Project name: ${chalk.cyan(brandName)}`);
     updates.projectName = brandName;
   } else if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would rename project ${gcpProject?.displayName || '(unknown)'} → ${brandName}`)}`);
+    dryRunPlan(`rename project ${gcpProject?.displayName || '(unknown)'} → ${brandName}`);
   } else {
     try {
       await api.updateProjectName(projectId, brandName);
@@ -39,7 +40,7 @@ module.exports = async function ensureProjectSettings(context) {
 
     if (apps.length === 0) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim(`⊘ Dry run — would create web app "${WEB_APP_NAME}"`)}`);
+        dryRunPlan(`create web app "${WEB_APP_NAME}"`);
       } else {
         console.log('      Creating web app...');
         await api.createWebApp(projectId, WEB_APP_NAME);
@@ -48,7 +49,7 @@ module.exports = async function ensureProjectSettings(context) {
       }
     } else if (apps[0].displayName !== WEB_APP_NAME) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim(`⊘ Dry run — would rename web app ${apps[0].displayName} → ${WEB_APP_NAME}`)}`);
+        dryRunPlan(`rename web app ${apps[0].displayName} → ${WEB_APP_NAME}`);
       } else {
         try {
           await api.updateWebAppDisplayName(projectId, apps[0].appId, WEB_APP_NAME);

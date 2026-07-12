@@ -15,6 +15,7 @@ const jetpack = require('fs-jetpack');
 const { templateObject } = require('../../../config.js');
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 async function getAccountId(api, zoneId) {
   const zone = await api.makeRequest(`/zones/${zoneId}`);
@@ -117,7 +118,7 @@ module.exports = async function ensureWorkers(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — worker/route writes skipped')}`);
+    dryRunPlan('write the worker + routes');
     return {
       status: 'success',
       output: {

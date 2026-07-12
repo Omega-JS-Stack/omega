@@ -8,6 +8,7 @@
  */
 const chalk = require('chalk').default;
 const { writeBrandConfig } = require('../../../lib/config-write.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureList(context) {
   const { sendgridApi: api, brandConfig, serviceData, options = {} } = context;
@@ -39,8 +40,7 @@ module.exports = async function ensureList(context) {
 
   // 3. Create
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create list "${listName}"`)}`);
-    return { output: { list: { planned: 'create', listName } } };
+    return dryRunPlan(`create list "${listName}"`, { output: { list: { planned: 'create', listName } } });
   }
 
   const created = await api.createList(listName);

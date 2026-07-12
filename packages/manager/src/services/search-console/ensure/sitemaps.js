@@ -8,6 +8,7 @@
  * web target have no sitemap to serve and are skipped.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureSitemaps(context) {
   const { searchConsoleApi: api, brandConfig, brand, domain, serviceData, options = {} } = context;
@@ -43,8 +44,7 @@ module.exports = async function ensureSitemaps(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would submit ${missing.length} sitemap(s): ${missing.join(', ')}`)}`);
-    return { output: { sitemaps: { planned: missing } } };
+    return dryRunPlan(`submit ${missing.length} sitemap(s): ${missing.join(', ')}`, { output: { sitemaps: { planned: missing } } });
   }
 
   // === WRITE: submit only the missing ones ===

@@ -9,6 +9,7 @@
 
 const chalk = require('chalk').default;
 const { writeConfigValues } = require('@omega.js/config');
+const { dryRunPlan } = require('./run-gates.js');
 
 /**
  * Write resolved values into the brand's omega.json5. Already-equal values
@@ -30,8 +31,7 @@ function writeBrandConfig(context, edits) {
   }
 
   if (dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would write ${report.applied.join(', ')} to omega.json5`)}`);
-    return [];
+    return dryRunPlan(`write ${report.applied.join(', ')} to omega.json5`, []);
   }
 
   console.log(`      ${chalk.green('✓')} omega.json5 ← ${chalk.cyan(report.applied.join(', '))}`);

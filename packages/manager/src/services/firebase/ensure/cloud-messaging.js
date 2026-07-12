@@ -9,7 +9,8 @@
  * The private key lives in gitignored state, never omega.json5.
  */
 const chalk = require('chalk').default;
-const { input, isInteractive, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { input, pressEnterToOpen } = require('@omega.js/devkit/prompt');
+const { canPrompt, dryRunPlan, needsInteractiveSkip } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureCloudMessaging(context) {
   const { firebaseApi: api, projectId, serviceData = {}, options = {} } = context;
@@ -20,7 +21,7 @@ module.exports = async function ensureCloudMessaging(context) {
   if (fcmEnabled) {
     console.log(`      ${chalk.green('✓')} FCM API enabled`);
   } else if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would enable the FCM API')}`);
+    dryRunPlan('enable the FCM API');
   } else {
     console.log('      Enabling FCM API...');
     try {
@@ -51,18 +52,14 @@ module.exports = async function ensureCloudMessaging(context) {
   console.log(`      ${chalk.yellow('⚠')} No VAPID key pair in state — web push won't work without one`);
   console.log(`      ${chalk.dim('→')} Under "Web Push certificates": generate (or reveal via ⋮) the key pair`);
 
-  if (!isInteractive() || options.dryRun) {
+  if (!canPrompt(options)) {
     console.log(`      ${chalk.dim('→')} ${chalk.cyan(consoleUrl)}`);
     console.log(`      ${chalk.dim('→')} Rerun in an interactive terminal to paste both keys; they land in .omega/state.json`);
-    return {
-      status: 'warned',
-      output: {
-        cloudMessaging: {
-          note: 'no VAPID key pair in state (needs an interactive run)',
-          needsInteractive: 'paste the VAPID key pair from the Cloud Messaging settings',
-        },
-      },
-    };
+    return needsInteractiveSkip(
+      'cloudMessaging',
+      'paste the VAPID key pair from the Cloud Messaging settings',
+      'no VAPID key pair in state (needs an interactive run)',
+    );
   }
 
   await pressEnterToOpen(consoleUrl, 'the Cloud Messaging settings');

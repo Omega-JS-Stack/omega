@@ -8,6 +8,7 @@
  */
 const chalk = require('chalk').default;
 const { fieldsFor } = require('../../../lib/backend-marketing.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const SENDGRID_FIELDS = fieldsFor('sendgrid');
 
@@ -43,8 +44,7 @@ module.exports = async function ensureCustomFields(context) {
       create: missing.map((f) => f.name),
       recreate: mismatched.map((f) => `${f.name} (${f.existingType} → ${TYPE_MAP[f.type]})`),
     };
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create ${planned.create.length}, recreate ${planned.recreate.length} field(s)`)}`);
-    return { output: { customFields: { planned } } };
+    return dryRunPlan(`create ${planned.create.length}, recreate ${planned.recreate.length} field(s)`, { output: { customFields: { planned } } });
   }
 
   // Type mismatches: delete, then recreate alongside the missing ones

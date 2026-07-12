@@ -9,6 +9,7 @@
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
 const { getZoneId } = require('../lib/ruleset-helper.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureSpeedScheduledTests(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, domain, options = {} } = context;
@@ -73,8 +74,7 @@ module.exports = async function ensureSpeedScheduledTests(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — speed test schedule skipped')}`);
-    return { status: 'success', output: { speedTest: { planned: existingSchedule ? 'update' : 'create' } } };
+    return dryRunPlan(`${existingSchedule ? 'update' : 'create'} the speed test schedule`, { status: 'success', output: { speedTest: { planned: existingSchedule ? 'update' : 'create' } } });
   }
 
   // === WRITE ===

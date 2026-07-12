@@ -7,6 +7,7 @@
  * is a zero-mutation no-op. The IAM grant was already diff-based — kept.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const REQUIRED_SERVICES = [
   'serviceusage.googleapis.com', // Must be first — Firebase CLI v15.20.0+ pre-flight checks require it
@@ -43,7 +44,7 @@ module.exports = async function ensureServices(context) {
   if (missing.length === 0) {
     console.log(`      ${chalk.green('✓')} All ${chalk.bold(REQUIRED_SERVICES.length)} required APIs enabled`);
   } else if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would enable ${missing.length} API(s): ${missing.join(', ')}`)}`);
+    dryRunPlan(`enable ${missing.length} API(s): ${missing.join(', ')}`);
   } else {
     console.log(`      Enabling ${chalk.bold(missing.length)} missing API(s)...`);
     try {
@@ -87,7 +88,7 @@ module.exports = async function ensureServices(context) {
 
     if (changed) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim('⊘ Dry run — would grant compute service account deploy roles')}`);
+        dryRunPlan('grant compute service account deploy roles');
       } else {
         await api.setIamPolicy(projectId, policy);
         console.log(`      ${chalk.green('✓')} Granted compute service account deploy roles`);

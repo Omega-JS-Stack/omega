@@ -11,8 +11,8 @@
  * manual fix converges on rerun.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { pollWithSpinner } = require('@omega.js/devkit/flows');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 const SUBDOMAIN = 'emailauth';
 
@@ -33,8 +33,7 @@ module.exports = async function ensureDomainAuth(context) {
 
   if (options.dryRun) {
     const planned = domainAuth ? ['dns-records', 'validate'] : ['authenticate-domain', 'dns-records', 'validate'];
-    console.log(`      ${chalk.dim(`⊘ Dry run — would ${planned.join(' → ')}`)}`);
-    return { output: { domainAuth: { planned } } };
+    return dryRunPlan(`${planned.join(' → ')}`, { output: { domainAuth: { planned } } });
   }
 
   // === Create the authentication when missing ===
@@ -62,7 +61,7 @@ module.exports = async function ensureDomainAuth(context) {
 
   let valid = isValid(await api.validateDomain(domainAuth.id));
 
-  if (!valid && isInteractive() && !options.dryRun) {
+  if (!valid && canPrompt(options)) {
     const result = await pollWithSpinner({
       check: async () => {
         try {

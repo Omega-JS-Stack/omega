@@ -13,6 +13,7 @@
  */
 const chalk = require('chalk').default;
 const psl = require('psl');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureNameservers(context) {
   const { cloudflareApi, namecheapApi, domain, provider, options = {} } = context;
@@ -82,8 +83,7 @@ async function ensureNamecheap(domain, required, api, options) {
 
   // === WRITE ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would set Cloudflare nameservers at Namecheap')}`);
-    return { output: { nameservers: { planned: 'update', current: currentNs, required } } };
+    return dryRunPlan('set Cloudflare nameservers at Namecheap', { output: { nameservers: { planned: 'update', current: currentNs, required } } });
   }
 
   console.log(`      ${chalk.dim('→')} Setting Cloudflare nameservers at Namecheap...`);

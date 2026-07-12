@@ -13,6 +13,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const REQUIRED_ROLES = [
   'roles/firebase.admin',
@@ -49,8 +50,7 @@ async function ensureRoles(api, projectId, serviceAccountEmail, options) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would grant missing IAM roles')}`);
-    return;
+    return dryRunPlan('grant missing IAM roles');
   }
 
   await api.setIamPolicy(projectId, policy);
@@ -75,7 +75,7 @@ module.exports = async function ensureServiceAccount(context) {
 
     if (destKeyPath && !jetpack.exists(destKeyPath)) {
       if (options.dryRun) {
-        console.log(`      ${chalk.dim('⊘ Dry run — would copy key to the backend app')}`);
+        dryRunPlan('copy key to the backend app');
       } else {
         jetpack.copy(sourceKeyPath, destKeyPath);
         console.log(`      ${chalk.green('✓')} Copied key to ${chalk.cyan(`${backendApp.dir}/functions/`)}`);
@@ -104,8 +104,7 @@ module.exports = async function ensureServiceAccount(context) {
     serviceAccountEmail = `firebase-adminsdk@${projectId}.iam.gserviceaccount.com`;
 
     if (options.dryRun) {
-      console.log(`      ${chalk.dim('⊘ Dry run — would create service account + key')}`);
-      return { output: { serviceAccount: { planned: 'create' } } };
+      return dryRunPlan('create service account + key', { output: { serviceAccount: { planned: 'create' } } });
     }
 
     console.log('      Creating service account...');
@@ -131,7 +130,7 @@ module.exports = async function ensureServiceAccount(context) {
 
   // === Create + download a new key (up to 10 per account) ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — would create + download a service account key')}`);
+    dryRunPlan('create + download a service account key');
     return {
       state: { serviceAccount: { email: serviceAccountEmail } },
       output: { serviceAccount: { planned: 'create-key' } },

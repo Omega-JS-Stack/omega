@@ -8,6 +8,7 @@
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
 const { fetchRuleset, getZoneId } = require('../lib/ruleset-helper.js');
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const PHASE = 'http_request_firewall_custom';
 const MANAGED_PHASE = 'http_request_firewall_managed';
@@ -109,8 +110,7 @@ module.exports = async function ensureRulesSecurity(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — security rules update skipped')}`);
-    return { status: 'success', output: { security: { planned: modifiedRules.length } } };
+    return dryRunPlan('update security rules', { status: 'success', output: { security: { planned: modifiedRules.length } } });
   }
 
   // === WRITE ===

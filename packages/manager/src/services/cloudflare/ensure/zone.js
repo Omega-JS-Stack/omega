@@ -12,10 +12,10 @@
  * State: { zoneId } — later operations in THIS run read it via getZoneId.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { openBrowserAndPoll, pollWithSpinner } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
 const { API_PROVIDERS, REGISTRAR_NAMESERVER_URLS } = require('../../domain/lib/registrars.js');
+const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 function reportPending(zone) {
   console.log(`      ${chalk.yellow('⚠')} Zone pending — set these nameservers at your domain registrar:`);
@@ -39,7 +39,7 @@ async function waitForActiveZone(context, zone) {
   // API registrars: the domain service sets the nameservers right after this
   // service. No provider yet: nothing to open (fresh brand). Non-interactive
   // and dry runs never sit in a poll.
-  if (!isInteractive() || options.dryRun || !provider || API_PROVIDERS.has(provider)) {
+  if (!canPrompt(options) || !provider || API_PROVIDERS.has(provider)) {
     console.log(`      ${chalk.dim('Rerun after the nameservers propagate (the domain service automates this for API registrars).')}`);
     return null;
   }
@@ -119,8 +119,7 @@ module.exports = async function ensureZone(context) {
 
   // === WRITE: create the zone ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would add zone ${domain} to Cloudflare`)}`);
-    return { status: 'success', output: { zone: { planned: 'create' } } };
+    return dryRunPlan(`add zone ${domain} to Cloudflare`, { status: 'success', output: { zone: { planned: 'create' } } });
   }
 
   console.log(`      Adding zone ${chalk.cyan(domain)} to Cloudflare...`);

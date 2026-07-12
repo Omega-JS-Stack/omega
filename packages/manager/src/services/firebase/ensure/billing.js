@@ -10,6 +10,7 @@
  */
 const chalk = require('chalk').default;
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
+const { dryRunPlan, needsInteractiveSkip } = require('../../../lib/run-gates.js');
 
 /** Interactive pick/create/opt-out flow — the answer lands in omega.json5. */
 function resolveBillingAccount(context, api) {
@@ -69,21 +70,16 @@ module.exports = async function ensureBilling(context) {
   if (!billingAccountName) {
     console.log(`      ${chalk.dim('→')} Set firebase.billingAccount ("billingAccounts/XXXXXX-XXXXXX-XXXXXX") in company/brand config to auto-upgrade`);
     console.log(`      ${chalk.dim('→')} Or upgrade manually: ${chalk.cyan(`https://console.firebase.google.com/project/${projectId}/usage/details`)}`);
-    return {
-      status: 'warned',
-      output: {
-        billing: {
-          note: 'no firebase.billingAccount configured',
-          needsInteractive: 'pick or create a billing account (the answer lands in omega.json5)',
-        },
-      },
-    };
+    return needsInteractiveSkip(
+      'billing',
+      'pick or create a billing account (the answer lands in omega.json5)',
+      'no firebase.billingAccount configured',
+    );
   }
 
   // === WRITE ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would link ${billingAccountName} (Blaze plan)`)}`);
-    return { output: { billing: { planned: 'link' } } };
+    return dryRunPlan(`link ${billingAccountName} (Blaze plan)`, { output: { billing: { planned: 'link' } } });
   }
 
   console.log(`      ${chalk.yellow('⏳')} Upgrading to Blaze plan...`);

@@ -19,9 +19,10 @@
  * flows may offer an inline opt-out choice via `spec.optOut`.
  */
 const chalk = require('chalk').default;
-const { input, select, isInteractive } = require('@omega.js/devkit/prompt');
+const { input, select } = require('@omega.js/devkit/prompt');
 const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('./config-write.js');
+const { canPrompt } = require('./run-gates.js');
 
 const CREATE_NEW = '__CREATE_NEW__';
 const OPT_OUT = '__OPT_OUT__';
@@ -262,7 +263,7 @@ async function resolveConfigValue(context, spec) {
     return existing;
   }
 
-  if (!isInteractive() || context.options?.dryRun) {
+  if (!canPrompt(context.options)) {
     return null;
   }
 

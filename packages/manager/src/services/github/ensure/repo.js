@@ -10,6 +10,7 @@
  * later services (analytics, seo, …) read the repo identity from here.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureRepo(context) {
   const { brandId, brandConfig, options = {}, githubApi: api } = context;
@@ -25,8 +26,7 @@ module.exports = async function ensureRepo(context) {
   // ── Missing: create it ─────────────────────────────────────────────────────
   if (!repo) {
     if (options.dryRun) {
-      console.log(`      ${chalk.dim(`⊘ Dry run — would create ${fullName} (${isPrivate ? 'private' : 'public'})`)}`);
-      return { status: 'success', output: { repo: { planned: 'create' } } };
+      return dryRunPlan(`create ${fullName} (${isPrivate ? 'private' : 'public'})`, { status: 'success', output: { repo: { planned: 'create' } } });
     }
 
     console.log(`      Creating ${chalk.cyan(fullName)}...`);
@@ -73,8 +73,7 @@ module.exports = async function ensureRepo(context) {
   }
 
   if (options.dryRun) {
-    console.log(`      ${chalk.dim('⊘ Dry run — repo update skipped')}`);
-    return { status: 'success', state, output: { repo: { planned: Object.keys(updates) } } };
+    return dryRunPlan('update repo settings', { status: 'success', state, output: { repo: { planned: Object.keys(updates) } } });
   }
 
   try {

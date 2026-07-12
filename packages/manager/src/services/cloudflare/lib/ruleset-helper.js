@@ -13,6 +13,7 @@
  * entrypoint ruleset" — detected here so the first write POSTs a new ruleset.
  */
 const chalk = require('chalk').default;
+const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 /**
  * Fetch the entrypoint ruleset for a phase. Returns { ruleset, needsCreate }.
@@ -39,7 +40,7 @@ async function applyRuleset(api, zoneId, { ruleset, needsCreate, rules, phase, n
   const output = { updated: false };
 
   if (dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — ${label} ${needsCreate ? 'create' : 'update'} skipped (${rules.length} rules)`)}`);
+    dryRunPlan(`${needsCreate ? 'create' : 'update'} ${label} (${rules.length} rules)`);
     output.planned = needsCreate ? 'create' : 'update';
     return output;
   }

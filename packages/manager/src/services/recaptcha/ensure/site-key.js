@@ -13,8 +13,8 @@
  * identically to a normal run.
  */
 const chalk = require('chalk').default;
-const { isInteractive } = require('@omega.js/devkit/prompt');
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
+const { canPrompt } = require('../../../lib/run-gates.js');
 
 // Throwaway token for the secret-validity probe — never a real assessment
 const PROBE_TOKEN = 'omega-manager-secret-validation-probe';
@@ -46,7 +46,7 @@ module.exports = async function ensureSiteKey(context) {
     return { output };
   }
 
-  if (isInteractive() && !options.dryRun) {
+  if (canPrompt(options)) {
     const result = await openBrowserAndPoll({
       url: consoleUrl,
       promptMessage: `Add ${chalk.cyan(domains.join(' + '))} to the reCAPTCHA key's domain list.`,
