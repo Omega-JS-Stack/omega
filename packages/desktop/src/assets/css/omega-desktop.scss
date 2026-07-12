@@ -8,8 +8,20 @@
 
 // Forward the active theme so consumers can override theme variables via @use ... with ()
 @forward 'theme';
+
+// Core design tokens (C4) — the cross-target `--omega-*` contract, vendored
+// from @omega.js/web at prepare (package.json `omega.vendorAssets`). Emitted
+// BEFORE the theme so theme rules can override at equal specificity.
+@use 'tokens/index' as omega-tokens;
+
 @use 'theme' as *;
 
 // desktop-specific core styles (desktop-targeted)
 @use 'core/_initialize' as *;
 @use 'core/_fontawesome' as *;
+
+// First cross-target token consumer: native controls pick up the brand accent.
+// The full component migration onto tokens lands with the D10 skin (C4 cp109).
+body {
+  accent-color: var(--omega-accent);
+}

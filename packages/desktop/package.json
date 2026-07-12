@@ -55,6 +55,15 @@
       "after": "node -e \"require('@omega.js/devkit/vendor')()\""
     }
   },
+  "omega": {
+    "vendorAssets": [
+      {
+        "package": "@omega.js/web",
+        "from": "core/css/tokens/_index.scss",
+        "to": "assets/css/tokens/_index.scss"
+      }
+    ]
+  },
   "scripts": {
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('prepare-package')()\"",
@@ -101,6 +110,7 @@
     "@electron/notarize": "^3.1.1",
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
+    "@omega.js/web": "*",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "firebase-admin": "^13.9.0",

@@ -92,6 +92,17 @@ When you run `npm run build`, @omega.js/extension auto-translates `src/_locales/
 
 Only missing translations are generated — existing translations are preserved. Full guide: [docs/translations.md](docs/translations.md).
 
+## 🎨 Design tokens (C4)
+
+The cross-target `--omega-*` token contract (defined once in
+`@omega.js/web`'s `core/css/tokens/_index.scss`) is vendored into
+`dist/assets/css/tokens/` at prepare (package.json `omega.vendorAssets`)
+and emitted by the `omega-extension` entry BEFORE the theme — theme rules
+override at equal specificity, and component scss can read
+`var(--omega-*)` directly. First consumer: `body { accent-color:
+var(--omega-accent) }`. The full component migration onto tokens lands
+with the C3/D10 skin.
+
 ## 🌎 Publishing your extension
 
 ### Manual upload

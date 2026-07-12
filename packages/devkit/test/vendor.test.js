@@ -268,3 +268,66 @@ test('throws when dist does not exist yet', (t) => {
 
   assert.throws(() => vendorDevkit({ cwd: root }), /run prepare first/);
 });
+
+test('omega.vendorAssets copies declared cross-package assets into dist (with or without JS refs)', (t) => {
+  const root = makeFixture('vendor-assets', {
+    packageJSON: {
+      name: 'fixture-assets-host',
+      version: '1.0.0',
+      dependencies: HOST_DEPS,
+      omega: {
+        vendorAssets: [
+          { package: '@omega.js/fakeweb', from: 'core/css/tokens/_index.scss', to: 'assets/css/tokens/_index.scss' },
+        ],
+      },
+    },
+    files: {
+      // No dist JS references @omega.js at all — assets must still copy
+      'dist/untouched.js': `module.exports = 1;`,
+      // The source package, resolvable from the host via its own node_modules
+      'node_modules/@omega.js/fakeweb/package.json': JSON.stringify({ name: '@omega.js/fakeweb', version: '0.0.1', main: './src/index.js' }),
+      'node_modules/@omega.js/fakeweb/src/index.js': `module.exports = {};`,
+      'node_modules/@omega.js/fakeweb/core/css/tokens/_index.scss': `:root { --omega-fixture: 1; }`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const result = vendorDevkit({ cwd: root });
+
+  const copied = path.join(root, 'dist', 'assets', 'css', 'tokens', '_index.scss');
+  assert.ok(fs.existsSync(copied), 'declared asset copied into dist');
+  assert.equal(fs.readFileSync(copied, 'utf8'), `:root { --omega-fixture: 1; }`, 'byte-identical to the source');
+  assert.equal(result.assets.length, 1);
+  assert.equal(result.rewritten, 0);
+});
+
+test('omega.vendorAssets fails loud on a missing source and on dist-escaping targets', (t) => {
+  const host = (vendorAssets) => makeFixture('vendor-assets-bad', {
+    packageJSON: { name: 'fixture-assets-bad', version: '1.0.0', dependencies: HOST_DEPS, omega: { vendorAssets } },
+    files: {
+      'dist/untouched.js': `module.exports = 1;`,
+      'node_modules/@omega.js/fakeweb/package.json': JSON.stringify({ name: '@omega.js/fakeweb', version: '0.0.1', main: './src/index.js' }),
+      'node_modules/@omega.js/fakeweb/src/index.js': `module.exports = {};`,
+    },
+  });
+
+  const missing = host([{ package: '@omega.js/fakeweb', from: 'core/css/nope.scss', to: 'assets/x.scss' }]);
+  t.after(() => fs.rmSync(missing, { recursive: true, force: true }));
+  assert.throws(() => vendorDevkit({ cwd: missing }), /Asset source not found/);
+
+  const escaping = host([{ package: '@omega.js/fakeweb', from: 'src/index.js', to: '../outside.js' }]);
+  t.after(() => fs.rmSync(escaping, { recursive: true, force: true }));
+  assert.throws(() => vendorDevkit({ cwd: escaping }), /must stay inside the output dir/);
+});
+
+test('a dist reference to a publishable @omega.js package (not a runtime dep) fails loud', (t) => {
+  const root = makeFixture('vendor-publishable', {
+    packageJSON: { name: 'fixture-publishable', version: '1.0.0', dependencies: HOST_DEPS },
+    files: {
+      'dist/lib/uses.js': `module.exports = require.resolve('@omega.js/web');`,
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  assert.throws(() => vendorDevkit({ cwd: root }), /not a vendorable private utility.*declare it as a runtime dependency/);
+});

@@ -24,6 +24,14 @@
 // subpath exports live beside it ('@omega.js/x/foo' → src/foo.js) — the entry's
 // directory is the module root, resolved via require.resolve of the bare name.
 //
+// Non-JS assets (C4): a host can also declare `omega.vendorAssets` in its
+// package.json — [{ package, from, to }] — and each source (a file or dir,
+// package-root-relative) is copied to the dist-relative `to` on every run.
+// This is the cross-target channel for sass sheets/templates that JS
+// reference-scanning can't see (e.g. desktop/extension vendoring the web
+// package's --omega-* token sheet). Same freshness contract as module
+// vendoring: re-copied from the resolved source on every prepare.
+//
 // Notes:
 //   - prepare-package `after` hooks are non-blocking (a failure warns but doesn't
 //     stop prepare). The hard gate is CI's pack→scratch-install smoke plus its
@@ -43,6 +51,12 @@ const logger = new Logger('devkit-vendor');
 
 // Specifier body shared by every reference pattern: package name + optional subpath.
 const SPECIFIER = '@omega\\.js\\/([a-z0-9-]+)(?:\\/([A-Za-z0-9._/-]+))?';
+
+// The private workspace utility packages vendoring exists FOR (never published;
+// hosts wire them as devDependencies). A dist reference to any OTHER @omega.js
+// package is an error unless it's a declared runtime dependency — publishable
+// packages (web, client, backend, ...) are never folded into a host's dist.
+const VENDORABLE_PACKAGES = ['devkit', 'config', 'account'];
 
 // The ways dist code can reference an @omega.js package. Each pattern captures:
 // 1 = prefix (kept verbatim on rewrite), 2 = quote, 3 = package name, 4 = subpath.
@@ -152,6 +166,57 @@ function resolvePackageRoot(name, cwd) {
   }
 }
 
+// Locate a package's ROOT directory (where its package.json lives) for asset
+// vendoring — entry-relative walk-up, since exports maps rarely expose
+// './package.json' to require.resolve.
+function resolveAssetPackageRoot(name, cwd) {
+  let entry;
+  try {
+    entry = require.resolve(name, { paths: [cwd, __dirname] });
+  } catch (error) {
+    throw new Error(`[devkit vendor] Cannot resolve '${name}' from ${cwd} — is it a devDependency of the host?`);
+  }
+
+  let dir = path.dirname(entry);
+  while (dir !== path.dirname(dir)) {
+    const manifest = path.join(dir, 'package.json');
+    if (jetpack.exists(manifest) && (jetpack.read(manifest, 'json') || {}).name === name) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  throw new Error(`[devkit vendor] Cannot locate the package root of '${name}' from its entry ${entry}`);
+}
+
+// Copy the host's declared cross-package assets (package.json `omega.vendorAssets`)
+// into dist. Sources are package-root-relative files or dirs; `to` is
+// dist-relative and must stay inside dist.
+function vendorDeclaredAssets(hostPackage, cwd, distPath) {
+  const declarations = (hostPackage.omega && hostPackage.omega.vendorAssets) || [];
+  const copied = [];
+
+  for (const entry of declarations) {
+    if (!entry || !entry.package || !entry.from || !entry.to) {
+      throw new Error(`[devkit vendor] omega.vendorAssets entries need { package, from, to } — got ${JSON.stringify(entry)}`);
+    }
+
+    const source = path.join(resolveAssetPackageRoot(entry.package, cwd), entry.from);
+    if (!jetpack.exists(source)) {
+      throw new Error(`[devkit vendor] Asset source not found: ${entry.package}/${entry.from}`);
+    }
+
+    const destination = path.resolve(distPath, entry.to);
+    if (!destination.startsWith(distPath + path.sep)) {
+      throw new Error(`[devkit vendor] Asset 'to' must stay inside the output dir — got ${entry.to}`);
+    }
+
+    jetpack.copy(source, destination, { overwrite: true });
+    copied.push(`${entry.package}/${entry.from} → ${entry.to}`);
+  }
+
+  return copied;
+}
+
 // From a seed set of module-root-relative files, follow relative requires/imports
 // inside the package until closure. Returns the full set of files to vendor.
 function resolveNeededFiles(name, packageRoot, seeds) {
@@ -187,7 +252,7 @@ function resolveNeededFiles(name, packageRoot, seeds) {
  *
  * @param {object} [options]
  * @param {string} [options.cwd] - Host framework root (defaults to process.cwd())
- * @returns {{ rewritten: number, vendored: Object<string, string[]>, vendorRoot: string }}
+ * @returns {{ rewritten: number, vendored: Object<string, string[]>, assets: string[], vendorRoot: string }}
  */
 function vendorPackages(options) {
   options = options || {};
@@ -205,6 +270,13 @@ function vendorPackages(options) {
   }
 
   const vendorRoot = path.join(distPath, 'vendor');
+
+  // Declared cross-package assets copy on every run, independent of whether
+  // any dist JS references @omega.js modules.
+  const assets = vendorDeclaredAssets(hostPackage, cwd, distPath);
+  if (assets.length > 0) {
+    logger.log(`Vendored ${assets.length} declared asset(s) into ${hostPackage.name}: ${assets.join(', ')}`);
+  }
 
   // The host's OWN name is never a vendor candidate: files that reference the
   // host by name (boot harnesses, consumer fixtures under src/test/) run in a
@@ -256,6 +328,9 @@ function vendorPackages(options) {
       for (const match of contents.matchAll(pattern)) {
         const name = match[3];
         if (neverVendor(name)) continue;
+        if (!VENDORABLE_PACKAGES.includes(name)) {
+          throw new Error(`[devkit vendor] ${hostPackage.name} dist references '@omega.js/${name}' (${path.relative(cwd, abs)}), which is not a vendorable private utility (${VENDORABLE_PACKAGES.join(', ')}) — declare it as a runtime dependency instead, or drop the reference`);
+        }
         if (!seedsByPackage.has(name)) seedsByPackage.set(name, new Set());
         seedsByPackage.get(name).add(subpathToFile(match[4], rootFor(name)));
         uses = true;
@@ -269,7 +344,7 @@ function vendorPackages(options) {
   jetpack.remove(vendorRoot);
   if (seedsByPackage.size === 0) {
     logger.log(`No @omega.js references found in ${hostPackage.name} dist — nothing to vendor`);
-    return { rewritten: 0, vendored: {}, vendorRoot };
+    return { rewritten: 0, vendored: {}, assets, vendorRoot };
   }
 
   // 2. Selective copy per package: seeds + transitive relative deps, nothing else.
@@ -337,7 +412,7 @@ function vendorPackages(options) {
   const summary = Object.entries(vendored).map(([name, files]) => `${name} (${files.length})`).join(', ');
   logger.log(`Vendored ${summary} into ${path.relative(cwd, vendorRoot)}, rewrote ${rewritten} file(s) in ${hostPackage.name}`);
 
-  return { rewritten, vendored, vendorRoot };
+  return { rewritten, vendored, assets, vendorRoot };
 }
 
 module.exports = vendorPackages;

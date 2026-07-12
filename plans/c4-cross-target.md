@@ -52,12 +52,18 @@ extension package/webpack `validRedirectHosts`.)
 
 ## Slices (cp104+; order = backbone first, modules after)
 
-1. **cp104 — cross-target token plumbing.** Desktop + extension sass builds
-   gain the omega layer chain (build-time dep on `@omega.js/web`, loadPath /
-   `omega:` importer into `web/core/css`); both entries pull
-   `tokens/_index.scss` (+ shell where it makes sense) and one visible
-   token-consuming rule per target proves it. Design-agnostic; makes the D10
-   skin land once for all three targets. *This is the C4 backbone.*
+1. **cp104 — cross-target token plumbing. ✅ SHIPPED (2026-07-11).** Channel
+   chosen: devkit vendor's NEW declared-assets manifest (`omega.vendorAssets`
+   in package.json — copies from the resolved `@omega.js/web` devDep into
+   dist at every prepare; loud on missing source) rather than a runtime dep
+   or sass importer — dist stays self-contained for consumers. Both entries
+   emit `tokens/index` before the theme; first consumer
+   `body { accent-color: var(--omega-accent) }` on both targets. Bonus
+   hardening: vendor scan now REFUSES publishable-package references outside
+   runtime deps (allowlist devkit/config/account) instead of folding whole
+   packages into dist. Proofs: byte-identical sheets on plain install;
+   omega-brand extension + desktop builds carry the tokens; devkit 186 /
+   desktop 764 / extension 102.
 2. **cp105 — `advertising.*` schema + vert de-ITW.** Role-keyed section into
    `SHARED_SECTIONS` (providers incl. inhouse server URL), vert.js reads
    config (fallback URL, origin, special-case die), ad TYPE param per the arc

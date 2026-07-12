@@ -100,6 +100,17 @@ See [docs/logging.md](docs/logging.md) for the full picture (renderer forwarding
 
 Override gulp's `dev.log` path via `OMEGA_LOG_FILE=<path>`; disable entirely via `OMEGA_LOG_FILE=false`. The default `.gitignore` includes `logs/`.
 
+## Design tokens (C4)
+
+The cross-target `--omega-*` token contract (defined once in
+`@omega.js/web`'s `core/css/tokens/_index.scss`) is vendored into
+`dist/assets/css/tokens/` at prepare (package.json `omega.vendorAssets`)
+and emitted by the `omega-desktop` entry BEFORE the theme — theme rules
+override at equal specificity, and consumer scss can read
+`var(--omega-*)` directly. First consumer: `body { accent-color:
+var(--omega-accent) }`. The full component migration onto tokens lands
+with the C3/D10 skin.
+
 ## Per-process imports
 
 ```js
