@@ -167,9 +167,26 @@ module.exports = async function ensureAuthentication(context) {
   let oauthRedirectsConfigured = serviceData.authentication?.oauthRedirectsConfigured || false;
   if (googleClientId && !oauthRedirectsConfigured) {
     const gcpCredentialsUrl = `https://console.cloud.google.com/apis/credentials/oauthclient/${googleClientId}?project=${projectId}`;
+    const authorizedOrigins = [
+      'https://localhost',
+      'https://localhost:5000',
+      `https://${projectId}.firebaseapp.com`,
+      `https://${domain}`,
+    ];
+    const redirectUris = [
+      'https://localhost:5000/__/auth/handler',
+      `https://${projectId}.firebaseapp.com/__/auth/handler`,
+      `https://${domain}/__/auth/handler`,
+    ];
     console.log(`      ${chalk.yellow('⚠')} OAuth client redirect URIs need one-time manual configuration`);
-    console.log(`      ${chalk.dim('→')} Authorized origins: https://localhost, https://localhost:5000, https://${projectId}.firebaseapp.com, https://${domain}`);
-    console.log(`      ${chalk.dim('→')} Redirect URIs: https://localhost:5000/__/auth/handler, https://${projectId}.firebaseapp.com/__/auth/handler, https://${domain}/__/auth/handler`);
+    console.log(`      ${chalk.dim('→')} Authorized origins:`);
+    for (const origin of authorizedOrigins) {
+      console.log(`        ${chalk.cyan(origin)}`);
+    }
+    console.log(`      ${chalk.dim('→')} Redirect URIs:`);
+    for (const uri of redirectUris) {
+      console.log(`        ${chalk.cyan(uri)}`);
+    }
 
     if (canPrompt(options)) {
       await pressEnterToOpen(gcpCredentialsUrl, 'the OAuth client settings');
