@@ -155,7 +155,7 @@ test('uj_translation_url prefixes languages, honors default + excludes + blog no
 });
 
 test('uj_icon loads from injected dirs with brands fallback, flag mapping, and default icon', () => {
-  const options = { icons: { fontAwesomeDir: path.join(FIXTURES, 'icons'), flagsDir: path.join(FIXTURES, 'flags') } };
+  const options = { icons: { fontAwesomeDirs: [path.join(FIXTURES, 'icons')], flagsDir: path.join(FIXTURES, 'flags') } };
   const ctx = makeCtx({}, { options });
 
   const rocket = TAGS.uj_icon.render(ctx, 'rocket');
@@ -179,6 +179,31 @@ test('uj_icon loads from injected dirs with brands fallback, flag mapping, and d
   // no dirs configured -> default icon, no crash
   const bare = makeCtx({});
   assert.ok(TAGS.uj_icon.render(bare, 'rocket').includes('M320 64'));
+});
+
+test('uj_icon walks the dir chain and resolves aliases (icon-core semantics)', () => {
+  const options = {
+    icons: {
+      fontAwesomeDirs: [path.join(FIXTURES, 'icons'), path.join(FIXTURES, 'icons-fallback')],
+      aliasFile: path.join(FIXTURES, 'icon-families.json'),
+    },
+  };
+  const ctx = makeCtx({}, { options });
+
+  // first dir wins for names it has
+  assert.ok(TAGS.uj_icon.render(ctx, 'rocket').includes('M1 1'));
+
+  // a name only the second dir has resolves through the chain
+  const bolt = TAGS.uj_icon.render(ctx, 'bolt');
+  assert.ok(bolt.includes('M9 9'));
+
+  // the shared root attributes ride every icon (icon-core's full set)
+  assert.ok(bolt.includes('aria-hidden="true"') && bolt.includes('overflow="visible"'));
+
+  // alias resolves to the canonical file ('search' → 'magnifying-glass')
+  const search = TAGS.uj_icon.render(ctx, 'search');
+  assert.ok(search.includes('M8 8'));
+  assert.ok(search.startsWith('<i class="fa" data-icon="search">')); // data-icon keeps the requested name
 });
 
 test('uj_logo prefixes SVG ids uniquely per instance', () => {

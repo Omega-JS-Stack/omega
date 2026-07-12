@@ -30,7 +30,7 @@ function makeEngine(overrides = {}) {
     getCollectionNames: overrides.getCollectionNames,
     fileExists: overrides.fileExists,
     markdown: overrides.markdown,
-    icons: { fontAwesomeDir: path.join(FIXTURES, 'icons'), flagsDir: path.join(FIXTURES, 'flags') },
+    icons: { fontAwesomeDirs: [path.join(FIXTURES, 'icons')], flagsDir: path.join(FIXTURES, 'flags') },
     logos: { dir: path.join(FIXTURES, 'logos') },
   });
   return engine;

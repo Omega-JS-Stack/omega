@@ -1,6 +1,7 @@
-// FontAwesome — the bundled Font Awesome Pro icon library (solid + brands SVGs
-// shipped inside @omega.js/desktop at assets/icons/font-awesome/), served to renderers on
-// demand so consumers get icons with ZERO setup.
+// FontAwesome — the Font Awesome icon server: resolves icons from the
+// @fortawesome/fontawesome-free npm package (a runtime dependency — nothing
+// vendored) and serves them to renderers on demand, so consumers get icons
+// with ZERO setup.
 //
 // Main-side API:
 //   manager.fontawesome.get(name, style)  → svg string | null   ('play', 'solid')
@@ -9,45 +10,44 @@
 // Renderer-side (preload contextBridge):
 //   window.em.fontawesome.get(name, style) → Promise<svg string | null>
 //
-// Renderers normally never call this directly — @omega.js/desktop's renderer bootstrap
-// auto-renders any `<i class="fa-solid fa-play">` element by injecting the SVG
-// inline (see src/renderer.js _wireFontAwesome). The SVGs ship with
-// fill="currentColor" and are served with width/height="1em", so icons inherit
-// the surrounding text color and scale with font-size — no icon font, no CSS
-// framework, works offline.
+// Renderers normally never call this directly — @omega.js/desktop's renderer
+// bootstrap auto-renders any `<i class="fa-solid fa-play">` element by
+// injecting the SVG inline (see src/renderer.js _wireFontAwesome). Served
+// SVGs size to the surrounding font and inherit its color — no icon font,
+// no CSS framework, works offline (fs reads through asar transparently in
+// packaged apps).
+//
+// Icon SEMANTICS (valid names/styles, candidate order incl. the brands
+// fallback, the injected root attributes, alias mapping) live in
+// @omega.js/client's icon-core (C4 cp108) — the SAME module web's
+// build-time uj_icon tag uses, so lookup rules and rendered markup can
+// never drift between the surfaces. Aliases ('search' →
+// 'magnifying-glass') resolve through fontawesome-free's own metadata.
 //
 // Lookups are sanitized (lowercase slug names, style whitelist) so the IPC
-// channel can never be used to read outside the icon directories, and cached —
-// each icon file is read from disk once per app run.
-//
-// Icon set: Font Awesome Pro (commercial license — https://fontawesome.com/license).
-// Update process mirrors ultimate-jekyll-manager docs/icons.md: download the
-// pro-plus web release, replace svgs/solid + svgs/brands under
-// src/assets/icons/font-awesome/. Aliases (e.g. search.svg → magnifying-glass)
-// are part of the download, so common legacy names resolve too.
+// channel can never be used to read outside the icon directories, and
+// cached — each icon file is read from disk once per app run.
 
 const path = require('path');
 const jetpack = require('fs-jetpack');
+const {
+  isValidIconName,
+  isValidStyle,
+  injectSvgAttributes,
+  candidateRelPaths,
+  buildAliasMap,
+} = require('@omega.js/client/modules/icon-core.js');
 
 const LoggerLite = require('./logger-lite.js');
 const ipc = require('./ipc.js');
 
 const logger = new LoggerLite('fontawesome');
 
-const STYLES = ['solid', 'brands'];
-const NAME_REGEX = /^[a-z0-9-]+$/;
-
-// Attributes injected on the <svg> root at serve time (UJM parity): icons size
-// to the surrounding font and inherit its color. overflow="visible" mirrors
-// FA's own kit CSS (.svg-inline--fa { overflow: visible }) — FA Pro 7 glyphs
-// may draw OUTSIDE their viewBox (fa-lock's shackle peaks at y=-32 in a
-// 0 0 384 512 box) and the SVG-root default of overflow:hidden clips them.
-const SVG_ATTRIBUTES = 'width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false" overflow="visible"';
-
 const fontawesome = {
   _initialized: false,
   _manager: null,
   _root: null,
+  _aliasMap: null,
   _cache: new Map(),
 
   initialize(manager) {
@@ -63,26 +63,16 @@ const fontawesome = {
     fontawesome._initialized = true;
   },
 
-  // The SVGs ship inside @omega.js/desktop's dist/. When main runs UNBUNDLED (@omega.js/desktop's own test
-  // harness, plain node) __dirname points there directly; a consumer's
-  // webpack-bundled main loses the module's real __dirname, so fall back to
-  // the installed package under the app root — valid in dev AND inside a
-  // packaged app.asar (fs reads through asar transparently).
+  // The @fortawesome/fontawesome-free package root ({svgs,metadata} live
+  // under it). A declared runtime dependency, so it resolves in dev and
+  // inside a packaged app.asar alike.
   _resolveRoot() {
-    const candidates = [path.join(__dirname, '..', 'assets', 'icons', 'font-awesome')];
     try {
-      const { app } = require('electron');
-      if (app) {
-        candidates.push(path.join(app.getAppPath(), 'node_modules', '@omega.js/desktop', 'dist', 'assets', 'icons', 'font-awesome'));
-      }
+      return path.dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
     } catch (e) {
-      // Not running under Electron — the unbundled candidate is the only one.
+      logger.warn('@fortawesome/fontawesome-free not resolvable — icon lookups will return null.');
+      return null;
     }
-    const found = candidates.find((dir) => jetpack.exists(dir) === 'dir');
-    if (!found) {
-      logger.warn(`icon assets not found (tried: ${candidates.join(', ')}) — lookups will return null.`);
-    }
-    return found || candidates[0];
   },
 
   _registerIpc() {
@@ -99,7 +89,7 @@ const fontawesome = {
   // Unknown names, invalid slugs, and unknown styles all return null — a
   // missing icon is a content problem, not a crash.
   get(name, style = 'solid') {
-    if (typeof name !== 'string' || !NAME_REGEX.test(name) || !STYLES.includes(style)) {
+    if (!isValidIconName(name) || !isValidStyle(style)) {
       return null;
     }
 
@@ -108,9 +98,9 @@ const fontawesome = {
       return fontawesome._cache.get(key);
     }
 
-    const raw = jetpack.read(path.join(fontawesome._root, style, `${name}.svg`), 'utf8');
-    const svg = raw ? raw.replace('<svg ', `<svg ${SVG_ATTRIBUTES} `).trim() : null;
-    if (!raw) {
+    const svg = fontawesome._read(name, style)
+      || fontawesome._read(fontawesome._alias(name), style);
+    if (!svg) {
       logger.warn(`unknown icon '${key}'.`);
     }
 
@@ -122,12 +112,47 @@ const fontawesome = {
     return fontawesome.get(name, style) !== null;
   },
 
-  // Tear down IPC + cache (idempotent).
+  // Read one icon through icon-core's candidate order (style dir, then the
+  // brands fallback). Null name (no alias) or unresolved root → null.
+  _read(name, style) {
+    if (!name || !fontawesome._root) {
+      return null;
+    }
+    for (const rel of candidateRelPaths(name, style)) {
+      const raw = jetpack.read(path.join(fontawesome._root, 'svgs', rel), 'utf8');
+      if (raw) {
+        return injectSvgAttributes(raw);
+      }
+    }
+    return null;
+  },
+
+  // Alias slug → canonical slug from fontawesome-free's metadata, built
+  // once per app run ('search' → 'magnifying-glass').
+  _alias(name) {
+    if (!fontawesome._aliasMap) {
+      let map = new Map();
+      const raw = fontawesome._root
+        && jetpack.read(path.join(fontawesome._root, 'metadata', 'icon-families.json'), 'utf8');
+      if (raw) {
+        try {
+          map = buildAliasMap(JSON.parse(raw));
+        } catch (e) {
+          logger.warn('could not parse icon-families.json — aliases disabled.');
+        }
+      }
+      fontawesome._aliasMap = map;
+    }
+    return fontawesome._aliasMap.get(name) || null;
+  },
+
+  // Tear down IPC + caches (idempotent).
   disable() {
     if (ipc._initialized) {
       ipc.unhandle('desktop:fontawesome:get');
     }
     fontawesome._cache.clear();
+    fontawesome._aliasMap = null;
     fontawesome._initialized = false;
   },
 };

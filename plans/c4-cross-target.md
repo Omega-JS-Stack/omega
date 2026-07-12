@@ -113,9 +113,27 @@ extension package/webpack `validRedirectHosts`.)
    real import under the test DOM shim, constructor-throw behavior,
    relative-imports/no-alias pins, dist presence) / web 103 / desktop 764 /
    ext 102.
-5. **cp108 — FontAwesome story.** One icon mechanism (likely: shared runtime
-   inline-SVG module + per-target asset supply; desktop's FA-Pro set stays its
-   asset source). Decide after cp104 proves the css channel.
+5. **cp108 — FontAwesome story. ✅ SHIPPED (2026-07-12, Ian's go).** ONE icon
+   mechanism: NEW `@omega.js/client/modules/icon-core.js` (pure CJS, the
+   analytics-core pattern) owns icon SEMANTICS — name/style whitelists,
+   candidate order (style dir → brands fallback), the injected root
+   attributes (merged best-of-both: web's only-when-absent injection +
+   desktop's full set incl. the FA-7 `overflow="visible"` clip fix), and
+   alias mapping. Asset source = **@fortawesome/fontawesome-free npm dep**
+   (web + desktop; resolved from node_modules, never vendored) — kills the
+   LICENSE BUG (desktop vendored 21MB/4,799 FA **Pro** SVGs inside a
+   package destined for public npm = redistribution) and closes web's icon
+   gap (core had only 12 curated SVGs; the other ~579 `uj_icon` uses
+   rendered the default triangle — now the chain
+   `[core/icons, fa-free/svgs]` + `metadata/icon-families.json` aliases
+   resolves everything, with a warn-once on true misses). template-kit's
+   `uj_icon` and desktop's `lib/fontawesome.js` both consume icon-core
+   (template-kit gains the client dep; desktop's IPC/renderer contract
+   unchanged). Extension supply + brand-level Pro override land with cp109+
+   (no icon consumers there yet — don't build speculative). Proofs: live
+   chain render (curated-first `rocket`, free-only `circle-user`, alias
+   `search`, brands-fallback `github` — all `+attrs`); client 94 (+4) /
+   template-kit 42 (+1) / web 103 / desktop 764+5skip.
 6. **cp109 — theme-once acceptance.** Desktop/extension consume the FULL theme
    layer chain (classy triplication dies); omega-brand desktop + extension
    render the brand theme zero-copy-paste. Lands with/after the skin pass so

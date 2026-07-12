@@ -28,7 +28,7 @@ module.exports = {
       },
     },
     {
-      name: 'served SVGs carry overflow="visible" — FA Pro 7 glyphs may draw outside their viewBox',
+      name: 'served SVGs carry overflow="visible" — FA 7 glyphs may draw outside their viewBox',
       run: (ctx) => {
         // fa-lock's shackle peaks at y=-32 in a 0 0 384 512 viewBox; the SVG
         // root default (overflow: hidden) clips it — FA's own kit renders
@@ -48,7 +48,7 @@ module.exports = {
       },
     },
     {
-      name: 'FA aliases resolve (the download ships them as real files)',
+      name: 'FA aliases resolve (via the fontawesome-free metadata map)',
       run: (ctx) => {
         // 'search' is the classic alias of 'magnifying-glass'.
         ctx.expect(ctx.manager.fontawesome.has('search')).toBe(true);

@@ -170,6 +170,12 @@ function configureOmega(eleventyConfig, options) {
     return holderSet(name, docs);
   };
 
+  // Icon roots (C4 cp108): the curated core set wins, the full
+  // @fortawesome/fontawesome-free npm set (resolved, never vendored) fills
+  // in everything else; its metadata resolves legacy aliases (search →
+  // magnifying-glass).
+  const faFreeRoot = path.dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
+
   eleventyConfig.amendLibrary('liquid', (engine) => {
     registerLiquid(engine, {
       site,
@@ -178,7 +184,11 @@ function configureOmega(eleventyConfig, options) {
       fileExists: (file) => fs.existsSync(path.join(options.consumerDir, file)),
       markdown: (content) => md.render(content),
       icons: {
-        fontAwesomeDir: path.join(coreDir, 'icons'),
+        fontAwesomeDirs: [
+          path.join(coreDir, 'icons'),
+          path.join(faFreeRoot, 'svgs'),
+        ],
+        aliasFile: path.join(faFreeRoot, 'metadata', 'icon-families.json'),
         flagsDir: path.join(coreDir, 'icons', 'flags'),
         style: 'solid',
       },

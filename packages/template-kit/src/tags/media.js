@@ -3,14 +3,20 @@
  *
  * Ported from jekyll-uj-powertools lib/tags/{icon,logo,image,video}.rb.
  * Icon/logo SVG loading is directory-injectable via the adapter options
- * (`options.icons.fontAwesomeDir` / `options.icons.flagsDir` /
- * `options.logos.dir`) — no hardcoded node_modules path like the Ruby had.
- * Missing dirs or files fall back to the same default warning-triangle SVG.
+ * (`options.icons.fontAwesomeDirs` — an ordered chain of icon roots, each
+ * holding `{solid,regular,brands}/` subdirs, earlier dirs win;
+ * `options.icons.aliasFile` — fontawesome-free's icon-families.json for
+ * alias resolution; `options.icons.flagsDir` / `options.logos.dir`) — no
+ * hardcoded node_modules path like the Ruby had. Icon semantics (candidate
+ * order, root attributes, aliases) live in @omega.js/client's icon-core
+ * (C4 cp108), shared with desktop's runtime icon server. Missing icons
+ * fall back to the same default warning-triangle SVG with a warn-once.
  */
 
 // Libraries
 const fs = require('fs');
 const path = require('path');
+const { injectSvgAttributes, candidateRelPaths, buildAliasMap } = require('@omega.js/client/modules/icon-core.js');
 const { resolveInput, parseArguments, parseOptions, stripQuotes } = require('../variable-resolver.js');
 const { LANGUAGE_TO_COUNTRY } = require('../data/language-flags.js');
 
@@ -21,6 +27,8 @@ const IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAA
 // Caches (module-level like the Ruby class variables)
 const iconCache = new Map();
 const logoCache = new Map();
+const aliasMaps = new Map(); // aliasFile path → Map(alias → canonical)
+const warnedIcons = new Set(); // names already warned about (warn-once)
 let logoInstanceCounter = 0;
 
 /**
@@ -65,29 +73,64 @@ const ujIcon = {
 
 function loadIcon(ctx, iconName) {
   const icons = (ctx.options && ctx.options.icons) || {};
+  const dirs = icons.fontAwesomeDirs || [];
   const style = (ctx.site.config.icons && ctx.site.config.icons.style) || icons.style || 'solid';
-  const cacheKey = `${icons.fontAwesomeDir || ''}|${style}/${iconName}`;
+  const cacheKey = `${dirs.join('|')}|${style}/${iconName}`;
 
   if (iconCache.has(cacheKey)) return iconCache.get(cacheKey);
 
   const svg = tryLoadFontAwesome(icons, iconName, style)
     || tryLoadFlag(icons, iconName)
-    || DEFAULT_ICON;
+    || defaultIconWithWarning(iconName, dirs);
 
   iconCache.set(cacheKey, svg);
   return svg;
 }
 
 function tryLoadFontAwesome(icons, iconName, style) {
-  if (!icons.fontAwesomeDir || !iconName) return null;
+  const dirs = icons.fontAwesomeDirs || [];
+  if (!dirs.length || !iconName) return null;
 
-  const styled = readFileIfExists(path.join(icons.fontAwesomeDir, style, `${iconName}.svg`));
-  if (styled) return styled;
+  const alias = aliasFor(icons.aliasFile, iconName);
+  const names = alias ? [iconName, alias] : [iconName];
 
-  if (style !== 'brands') {
-    return readFileIfExists(path.join(icons.fontAwesomeDir, 'brands', `${iconName}.svg`));
+  for (const dir of dirs) {
+    for (const name of names) {
+      for (const rel of candidateRelPaths(name, style)) {
+        const svg = readFileIfExists(path.join(dir, rel));
+        if (svg) return svg;
+      }
+    }
   }
   return null;
+}
+
+/** Alias slug → canonical slug from the configured metadata file (cached). */
+function aliasFor(aliasFile, iconName) {
+  if (!aliasFile) return null;
+
+  if (!aliasMaps.has(aliasFile)) {
+    let map = new Map();
+    const raw = readFileIfExists(aliasFile);
+    if (raw) {
+      try {
+        map = buildAliasMap(JSON.parse(raw));
+      } catch {
+        // Unparseable metadata — resolve without aliases.
+      }
+    }
+    aliasMaps.set(aliasFile, map);
+  }
+  return aliasMaps.get(aliasFile).get(iconName) || null;
+}
+
+/** The default warning-triangle, with a once-per-name build warning. */
+function defaultIconWithWarning(iconName, dirs) {
+  if (iconName && dirs.length && !warnedIcons.has(iconName)) {
+    warnedIcons.add(iconName);
+    console.warn(`[template-kit] uj_icon: no SVG found for "${iconName}" — rendering the default icon`);
+  }
+  return DEFAULT_ICON;
 }
 
 function tryLoadFlag(icons, iconName) {
@@ -99,22 +142,6 @@ function tryLoadFlag(icons, iconName) {
   const countryCode = LANGUAGE_TO_COUNTRY[iconName.toLowerCase()];
   if (!countryCode) return null;
   return readFileIfExists(path.join(icons.flagsDir, `${countryCode}.svg`));
-}
-
-/**
- * Inject width/height/fill into the opening <svg> tag when absent.
- */
-function injectSvgAttributes(svgContent) {
-  if (!svgContent.includes('<svg')) return svgContent;
-
-  return svgContent.replace(/<svg([^>]*)>/, (match, existingAttrs) => {
-    const toAdd = [];
-    if (!existingAttrs.includes('width=')) toAdd.push('width="1em"');
-    if (!existingAttrs.includes('height=')) toAdd.push('height="1em"');
-    if (!existingAttrs.includes('fill=')) toAdd.push('fill="currentColor"');
-
-    return toAdd.length ? `<svg${existingAttrs} ${toAdd.join(' ')}>` : match;
-  });
 }
 
 // {% uj_logo name %} / {% uj_logo name, type, color %} — inline SVG with

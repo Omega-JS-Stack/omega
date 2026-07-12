@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **CATCH-UP PASS (Ian 2026-07-12: get us to the classy rebuild / brand rebuild / CMS)** — his gos, in order: cp102b run-gates ✅ → cp108 fontawesome → cp109 theme-once (mechanism now; the skin rides it — Ian says he's ready for the skin AFTER this pass; cp99 board comments still pending) → #15 Node story → playground manage cycle (cloudflare CNAME propose-first + Google-toggle verify; payment gated) → brand rebuilds LAST (his "after we're pretty much done"). **C4 OPEN** ([plans/c4-cross-target.md](plans/c4-cross-target.md)): cp104-107 ✅. omegajs.dev REGISTERED — wire at arc close
+- **CATCH-UP PASS (Ian 2026-07-12: get us to the classy rebuild / brand rebuild / CMS)** — his gos, in order: cp102b run-gates ✅ → cp108 fontawesome ✅ → cp109 theme-once (mechanism now; the skin rides it — Ian says he's ready for the skin AFTER this pass; cp99 board comments still pending) → #15 Node story → playground manage cycle (cloudflare CNAME propose-first + Google-toggle verify; payment gated) → brand rebuilds LAST (his "after we're pretty much done"). **C4 OPEN** ([plans/c4-cross-target.md](plans/c4-cross-target.md)): cp104-107 ✅. omegajs.dev REGISTERED — wire at arc close
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 0. **cp108 — FontAwesome story** (C4: ONE icon mechanism across web's prerendered SVGs / desktop's IPC server / extension's nothing — decide after the cp104 css channel, which is now proven), then cp109 theme-once
@@ -46,7 +46,8 @@
 - prepare-package after-hooks are NON-BLOCKING: a vendor failure mid-rewrite leaves a part-rewritten dist behind a one-line warning (cp104 hit this live; the publishable-ref throw now fails the common cause loud, and CI's no-@omega.js-refs check remains the hard gate)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 102b run-gates standardized — canPrompt (21 sites, 3 spellings dead) / dryRunPlan (~60 sites, canonical ⊘ line) / needsInteractiveSkip (#32 builder); 46 files, zero behavior change; manager 602 (this commit) → CHANGELOG
+- [x] 108 FontAwesome ONE mechanism (C4) — icon-core in client (semantics SSOT: names/styles/candidates/attrs/aliases), fontawesome-free npm dep = default set (never vendored), desktop's 21MB vendored FA-PRO set DELETED (license bug), web's 12-icon gap closed (chain + aliases + warn-once); client 94/tk 42/web 103/desktop 764 (this commit) → CHANGELOG
+- [x] 102b run-gates standardized — canPrompt (21 sites, 3 spellings dead) / dryRunPlan (~60 sites, canonical ⊘ line) / needsInteractiveSkip (#32 builder); 46 files, zero behavior change; manager 602 (8a8110d) → CHANGELOG
 - [x] 107 FormManager → client (C4) — moved verbatim to client/modules (relative primitive imports), 23 web sites + classy dynamic import respelled, web copy DELETED, desktop's dead alias import now live via the client runtime dep, extension gains it free; client 90/web 103/desktop 764/ext 102 (this commit) → CHANGELOG
 - [x] 100e resolved-config deploys (#31 FIXED + LIVE-VERIFIED) — composeTargetConfig freezes the brand+app interleave into ONE self-contained upload file (presence-only targets, no baked defaults; equivalence theorem tested) + deploy stage/restore step; config 99/boot 11; live redeploy → production /omega/brand serves "OMEGA Playground" (da4a5c5 + this commit) → CHANGELOG
 - [x] 102 tri-state provisioning (#33) + needs-interactive aggregate (#32) — null=ask (answer lands in omega.json5) / false=opted-out (silent, ancestor-aware) / value=use, engine-wide in config-flow; org asked at project create (list or standalone), billing asked at billing step (pick/create/stay-Spark); RunSummary ⚑ section + npm-start retry command; manager 599 (this commit) → CHANGELOG
@@ -118,4 +119,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-12 4:35 AM (catch-up pass opened on Ian's gos; cp102b shipped; next cp108 fontawesome)*
+*Last updated: 2026-07-12 4:45 AM (catch-up pass: cp102b + cp108 shipped; next cp109 theme-once)*

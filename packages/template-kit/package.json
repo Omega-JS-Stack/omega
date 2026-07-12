@@ -18,6 +18,9 @@
   "engines": {
     "node": ">=22"
   },
+  "dependencies": {
+    "@omega.js/client": "*"
+  },
   "devDependencies": {
     "liquidjs": "^10.24.0"
   },

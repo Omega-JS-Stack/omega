@@ -243,7 +243,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/css.md](docs/css.md) — SCSS architecture: main entry, theme `@use` config, per-window bundles, Bootstrap-first
 - [docs/hooks.md](docs/hooks.md) — lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize/post)
 - [docs/icons.md](docs/icons.md) — convention-only icon resolution (`global/` + per-platform), retina derivation, macOS Template magic
-- [docs/fontawesome.md](docs/fontawesome.md) — bundled Font Awesome Pro (solid + brands SVGs): `<i class="fa-solid fa-*">` auto-render, `manager.fontawesome.get`
+- [docs/fontawesome.md](docs/fontawesome.md) — Font Awesome Free served from the npm dep (icon semantics shared with web via @omega.js/client's icon-core): `<i class="fa-solid fa-*">` auto-render, `manager.fontawesome.get`
 - [docs/installer-options.md](docs/installer-options.md) — per-target installer config, defaults table
 - [docs/signing.md](docs/signing.md) — code signing for macOS + Windows
 - [docs/releasing.md](docs/releasing.md) — end-to-end release walkthrough

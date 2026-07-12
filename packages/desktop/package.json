@@ -117,6 +117,7 @@
     "prepare-package": "^2.1.0"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.0",
     "@octokit/rest": "^22.0.1",
     "@omega.js/client": "*",
     "@popperjs/core": "^2.11.8",

@@ -92,7 +92,7 @@ function realEngine() {
   const engine = new Liquid({ jekyllInclude: true });
   registerLiquid(engine, {
     icons: {
-      fontAwesomeDir: path.join(PKG, 'core', 'icons'),
+      fontAwesomeDirs: [path.join(PKG, 'core', 'icons')],
       flagsDir: path.join(PKG, 'core', 'icons', 'flags'),
       style: 'solid',
     },
