@@ -16,6 +16,7 @@
 
 ## 📏 Standing rules
 - **Continuous mode (Ian 2026-07-10)**: keep iterating/building/testing autonomously, checkpoint after checkpoint — stop ONLY for serious errors or decisions that are genuinely Ian's. (Replaces one-checkpoint-per-"continue".)
+- **Test-brand live policy (Ian 2026-07-11)**: do as much as possible FOR REAL on omega-brand/omegajs-playground (Blaze it, break it, delete it — test infrastructure). Gated as truly-dangerous: real ITW resources (standing), omegajs.dev DNS/registrar/Cloudflare writes, live-mode payment keys, mass email sends, GH Actions runs (runner minutes), npm/store publishes. Credential file-to-file copies stay human-only (auto-mode classifier, 2×) — Ian pastes, Claude runs from there.
 - **Orgs claimed + locked (Ian 2026-07-10)**: npm org `omega.js` and GH org `Omega-JS-Stack` are Ian's — names are final. GH org is empty; full control granted to create repos/push/try things. npm publishes REMAIN gated (versions not finalized).
 - **Data-shape preservation (Ian 2026-07-10)**: existing Firestore shapes (`users/{uid}`, payment orders, …) + backend route semantics are presumed good. Any breaking change that would require migrating existing data needs Ian's explicit OK — flag with a migration plan, don't build.
 - Core-changes spec: [plans/omega-core-changes-inbox.md](plans/omega-core-changes-inbox.md) (DECIDED 10/10, 2026-07-10) is binding alongside the master plan; classy/CMS/admin arcs build systems/extensibility first — visuals are the easy part (Ian).
