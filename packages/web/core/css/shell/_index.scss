@@ -1,0 +1,156 @@
+// OMEGA app shell — structural mechanics for backend/admin surfaces (C3).
+// Layout GEOMETRY only: regions (sidebar / topbar / main / scrim) and
+// STATES (desktop rail collapse, mobile drawer, viewport lock). All paint
+// comes from the token contract (tokens/_index.scss), so a skin restyles by
+// redefining tokens or layering rules — never by fighting these.
+//
+// Markup contract (theme layouts emit this; core/js/core/app-shell.js drives it):
+//
+//   <div class="omega-shell" data-omega-shell>
+//     <aside class="omega-shell__sidebar" id="…">
+//       …nav; text that hides in the rail wears .omega-shell__label…
+//     </aside>
+//     <header class="omega-shell__topbar">
+//       <div class="omega-shell__topbar-start">
+//         <button data-shell-toggle="drawer" aria-expanded="false" aria-controls="…">…</button>
+//         <button data-shell-toggle="collapse" aria-expanded="true" aria-controls="…">…</button>
+//       </div>
+//       <div class="omega-shell__topbar-end">…</div>
+//     </header>
+//     <main class="omega-shell__main">…</main>
+//     <div class="omega-shell__scrim" data-shell-dismiss></div>
+//   </div>
+//
+// States (stamped on .omega-shell by app-shell.js):
+//   data-shell-collapsed="true" — desktop sidebar → icon rail (persisted)
+//   data-shell-open="true"      — mobile drawer slid in (scrim visible)
+// Variant: .omega-shell--locked — main never scrolls (calendar/studio pages
+// manage their own interior scroll).
+
+// Below this, the sidebar becomes the drawer (matches classy's xl cutover).
+$shell-breakpoint: 1200px;
+
+:root {
+  --omega-shell-sidebar-w: 260px;
+  --omega-shell-rail-w: 68px;
+  --omega-shell-topbar-h: 56px;
+  --omega-shell-pad: 24px;
+}
+
+.omega-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  background: var(--omega-ground);
+  color: var(--omega-ink);
+}
+
+.omega-shell__sidebar {
+  display: flex;
+  flex-direction: column;
+  grid-row: 1 / -1;
+  width: var(--omega-shell-sidebar-w);
+  overflow-y: auto;
+  background: var(--omega-surface);
+  border-inline-end: 1px solid var(--omega-line);
+  transition: width var(--omega-speed) var(--omega-ease), transform var(--omega-speed) var(--omega-ease);
+}
+
+.omega-shell__topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-column: 2;
+  min-height: var(--omega-shell-topbar-h);
+  padding-inline: 12px;
+  background: var(--omega-surface);
+  border-bottom: 1px solid var(--omega-line);
+}
+
+.omega-shell__topbar-start,
+.omega-shell__topbar-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omega-shell__topbar-end {
+  margin-inline-start: auto;
+}
+
+.omega-shell__main {
+  grid-column: 2;
+  overflow-y: auto;
+  padding: var(--omega-shell-pad);
+}
+
+// Scrim only participates in the mobile drawer state.
+.omega-shell__scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1040; // pairs with the drawer below; sits under modal layers (1050+)
+  background: rgb(0 0 0 / 45%);
+}
+
+// ─── Desktop rail collapse ───────────────────────────────────────────────────
+
+.omega-shell[data-shell-collapsed='true'] .omega-shell__sidebar {
+  width: var(--omega-shell-rail-w);
+}
+
+.omega-shell[data-shell-collapsed='true'] .omega-shell__label {
+  display: none;
+}
+
+// ─── Viewport-locked variant ─────────────────────────────────────────────────
+
+.omega-shell--locked .omega-shell__main {
+  overflow: hidden;
+}
+
+// ─── Mobile: sidebar becomes the drawer ──────────────────────────────────────
+
+@media (max-width: ($shell-breakpoint - 0.02px)) {
+  .omega-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .omega-shell__topbar,
+  .omega-shell__main {
+    grid-column: 1;
+  }
+
+  .omega-shell__sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 1045;
+    transform: translateX(-100%);
+  }
+
+  // The drawer always shows at full width with labels — desktop rail
+  // collapse has no meaning here.
+  .omega-shell[data-shell-collapsed='true'] .omega-shell__sidebar {
+    width: var(--omega-shell-sidebar-w);
+  }
+
+  .omega-shell[data-shell-collapsed='true'] .omega-shell__label {
+    display: revert;
+  }
+
+  .omega-shell[data-shell-open='true'] .omega-shell__sidebar {
+    transform: translateX(0);
+  }
+
+  .omega-shell[data-shell-open='true'] .omega-shell__scrim {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omega-shell__sidebar {
+    transition: none;
+  }
+}

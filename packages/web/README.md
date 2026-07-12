@@ -202,6 +202,27 @@ consumer-local themes beat packaged ones ([resolveThemeLayers](src/layers.js)),
 to the classy base (until the C3 reskin folds the base layer into core).
 Legacy `themes/<id>/…` layout spellings alias for consumer ids too.
 
+## App shell (C3)
+
+[core/css/shell/_index.scss](core/css/shell/_index.scss) is the
+skin-independent structure for backend/admin surfaces: regions
+(`.omega-shell__sidebar/topbar/main/scrim`, with `__topbar-start/-end`
+slots) and states — desktop rail collapse (`data-shell-collapsed`,
+persisted under `shell.collapsed`; `.omega-shell__label` text hides in the
+rail), mobile drawer below 1200px (`data-shell-open` + scrim, matching
+classy's xl cutover), and a `.omega-shell--locked` variant whose main never
+scrolls (calendar/studio-style pages). Geometry only — every painted value
+is a `var(--omega-*)` token, dimensions are `--omega-shell-*` custom
+properties, and motion respects `prefers-reduced-motion`.
+[core/js/core/app-shell.js](core/js/core/app-shell.js) drives it
+declaratively (`[data-shell-toggle="collapse|drawer"]`,
+`[data-shell-dismiss]`, Escape closes the drawer, `aria-expanded` synced)
+and exposes `omega.uj().appShell`. The full contract markup is documented
+at the top of the sheet; theme layouts emit it (one tree — no duplicated
+mobile nav like classy's offcanvas). Because the state attributes are
+stamped at runtime, `purgeCss` safelists `/omega-shell/`. Classy keeps its
+Bootstrap shell untouched; the D10 skin's layouts adopt this contract.
+
 ## Pricing from config (C2)
 
 `payment.products` in omega.json5 is the ONLY pricing source. The engine

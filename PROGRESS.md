@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **Ian: reviewing cp99 boards (comments incoming)** · **cp101 + cp102 SHIPPED** (token layer + brand ramp; two-tier theming mechanics — consumer main.scss tier PINNED, consumer-local full themes WIN) — next: cp103 app-shell structure (backend/admin layout mechanics). Manage LIVE run parked on Ian's 2-line cred paste (see Blocked). omegajs.dev REGISTERED — wire at arc close. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction open: #15, #24 (translate-on-build design call)
+- **Ian: still analyzing cp99 boards (his call 2026-07-11: "skip for now", comments later)** · **cp101 + cp102 + cp103 SHIPPED** (tokens/brand ramp · two-tier theming · app-shell mechanics) — C3 systems track DRAINED; next: **C4 cross-target sharing (Ian's go 2026-07-11)**; skin pass waits on Ian's board notes; arc close waits on the finished skin (Ian confirmed). Manage LIVE run parked on Ian's 2-line cred paste (see Blocked). omegajs.dev REGISTERED — wire at arc close. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction open: #15 + #24 — both posed to Ian as design questions 2026-07-11, answers pending
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **cp99a+** — C3 systems track (design-agnostic, brief already out): cross-target core token layer (D10), #16 sass modernization, app-shell mechanics, two-tier theme mechanics (toy second theme proves tiers) → Ian's notes land as the skin pass (default pages + blueprints, auth/account/payment, omega-brand showcase) → C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
@@ -44,6 +44,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 103 app-shell mechanics — core shell sheet (regions + rail-collapse/drawer/locked states, token-painted, one markup tree) + app-shell.js (declarative toggles, persisted collapse, Escape/scrim, aria sync) + FIRST purge safelist (runtime-stamped states were silently purged — caught by the live proof); toy-theme engine proof + classy fall-through; web 98 (this commit) → CHANGELOG
 - [x] 102 two-tier theming mechanics — resolveThemeLayers SSOT (3 dupes killed), consumer-local themes win + legacy-spelling aliases for consumer ids, explicit themeRoots, tier-1 `omega:main with (…)` PINNED, toy-theme engine proof; web 91 (this commit) → CHANGELOG
 - [x] 101 C3 token layer — `--omega-*` contract sheet (light/dark/attr plumbing, zero-deprecation pin) + brand.color→accent ramp (engine seed, head emission, WCAG ink) + #16 fixed (obsolete mixed-decls silence dropped); #24 logged (cold-cache translate hang, 6h emulator zombies killed); web 88 (1eef94b) → CHANGELOG
 - [x] 100 manage-cycle dogfood — first real manage run vs omega-brand (25-service dry-run wiring map, Ian's nudge); #22 porcelain path clip + #23 projectId-from-cloud.config FIXED; firebase.billingAccount configured (Blaze one Ian-step away); manager 584 (this commit) → CHANGELOG
@@ -101,4 +102,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 9:05 PM (cp102 — two-tier theming shipped, autonomous while Ian notes on boards; next: cp103 app-shell mechanics)*
+*Last updated: 2026-07-11 9:15 PM (cp103 — app-shell mechanics shipped; C3 systems track drained, C4 next per Ian; skin pass + arc close wait on his board notes)*

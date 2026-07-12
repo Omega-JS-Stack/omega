@@ -7,6 +7,11 @@
 // block redefines tokens at equal specificity, and brand.color's inline
 // ramp (head.html) wins over both. Contract: core/css/tokens/_index.scss.
 @use 'tokens/index' as omega-tokens;
+
+// App shell mechanics (C3) — structural, token-painted; before the theme so
+// theme rules can override at equal-or-later cascade position.
+@use 'shell/index' as omega-shell;
+
 @use 'omega:theme' as *;
 
 // Vendor styles

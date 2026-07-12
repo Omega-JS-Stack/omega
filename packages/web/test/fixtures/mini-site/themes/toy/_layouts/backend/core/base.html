@@ -1,0 +1,23 @@
+---
+layout: core/root
+---
+
+<div class="omega-shell" data-omega-shell>
+  <aside class="omega-shell__sidebar" id="toy-shell-sidebar">
+    <span class="omega-shell__label">TOY SHELL NAV</span>
+  </aside>
+
+  <header class="omega-shell__topbar">
+    <div class="omega-shell__topbar-start">
+      <button type="button" data-shell-toggle="drawer" aria-expanded="false" aria-controls="toy-shell-sidebar">Menu</button>
+      <button type="button" data-shell-toggle="collapse" aria-expanded="true" aria-controls="toy-shell-sidebar">Collapse</button>
+    </div>
+    <div class="omega-shell__topbar-end">TOY SHELL TOPBAR</div>
+  </header>
+
+  <main class="omega-shell__main">
+    {{ content }}
+  </main>
+
+  <div class="omega-shell__scrim" data-shell-dismiss></div>
+</div>
