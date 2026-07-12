@@ -2,6 +2,7 @@ const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
+const stageLocalPackages = require('../utils/stage-local-packages');
 const { ensurePublicFiles } = require('../utils/public-files');
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -11,13 +12,6 @@ const DEFAULT_REGION = 'us-central1';
 class DeployCommand extends BaseCommand {
   async execute() {
     const self = this.main;
-
-    // Quick check that not using local packages
-    const allDeps = JSON.stringify(self.packageJSON.dependencies || {}) + JSON.stringify(self.packageJSON.devDependencies || {});
-    if (allDeps.includes('file:')) {
-      this.logError(`Please remove local packages before deploying!`);
-      return;
-    }
 
     const logPath = this.getLogsPath('deploy.log');
     attachLogFile(logPath);
@@ -31,6 +25,24 @@ class DeployCommand extends BaseCommand {
     // --only pass-through (e.g. `omega deploy --only hosting` — deploys
     // hosting on Spark plans where functions would demand Blaze)
     const only = self.argv?.only ? ` --only ${self.argv.only}` : '';
+
+    // Local file: dependencies (local-first @omega.js packages) can't be
+    // followed by Cloud Build — stage them into the upload as packed tarballs
+    const firebaseJSON = jetpack.read(path.join(self.firebaseProjectPath, 'firebase.json'), 'json') || {};
+    const functionsBlock = Array.isArray(firebaseJSON.functions) ? firebaseJSON.functions[0] : firebaseJSON.functions;
+    const functionsPath = path.join(self.firebaseProjectPath, functionsBlock?.source || 'functions');
+    const deployingFunctions = !self.argv?.only || String(self.argv.only).split(',').some((t) => t.trim().startsWith('functions'));
+
+    // Without an Artifact Registry cleanup policy, firebase deploy EXITS 1
+    // after a successful functions deploy — and the post-steps below (public
+    // invoker) never run. Ensure it up front.
+    if (deployingFunctions) {
+      await this.ensureArtifactCleanupPolicy();
+    }
+
+    const staging = deployingFunctions
+      ? await stageLocalPackages({ functionsPath, log: (message) => this.log(message) })
+      : null;
 
     try {
       await powertools.execute(`firebase deploy${only}`, {
@@ -48,7 +60,27 @@ class DeployCommand extends BaseCommand {
       // After successful deploy, ensure HTTP functions are publicly invocable
       await this.ensurePublicInvoker();
     } finally {
+      if (staging) {
+        await staging.restore();
+      }
       await attachLogFile.detach();
+    }
+  }
+
+  /**
+   * Ensure the Artifact Registry cleanup policy exists (old container images
+   * auto-delete). Best-effort: Spark plans, a disabled API, or a first-ever
+   * deploy (no gcf-artifacts repo yet) just skip — deploy proceeds either way.
+   */
+  async ensureArtifactCleanupPolicy() {
+    try {
+      await powertools.execute('firebase functions:artifacts:setpolicy --force', {
+        log: false,
+        config: { cwd: this.main.firebaseProjectPath },
+      });
+      this.log(chalk.gray('  Artifact cleanup policy ensured\n'));
+    } catch (e) {
+      // Non-fatal — the deploy itself doesn't need the policy
     }
   }
 

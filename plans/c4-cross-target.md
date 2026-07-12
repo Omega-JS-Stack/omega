@@ -88,10 +88,16 @@ extension package/webpack `validRedirectHosts`.)
    - **cp106b** — desktop's lib collapses onto the client engine (main-process
      wrapper keeps the preload/renderer IPC bridge + env secret; the
      analytics-bridge suite repins).
-   - **QUEUED TO IAN**: web analytics — keep gtag.js (Google's script,
-     auto-collected page_view/scroll/engagement) or unify on the client's
-     Measurement Protocol (no third-party script, but auto-collection is
-     lost)? Marketing-data trade-off, not an engineering call.
+   - **IAN ANSWERED (2026-07-12)**: "We definitely need an analytics system
+     for backend and potentially desktop and extension… events don't
+     automatically fire for desktop and extension… if we need an analytics
+     library, we should unify it and have it in one place. Right?" →
+     **ONE unified lib, living in @omega.js/client** (the MP engine for every
+     runtime where nothing auto-fires: desktop, extension, web-as-needed;
+     backend keeps its server-side MP sender on the same config/env
+     conventions). Web keeps gtag.js for auto-collection — it's a tag the
+     page loads, not a second library we maintain; the client engine is the
+     single in-house implementation. cp106a/cp106b proceed as sliced.
 4. **cp107 — FormManager → shared.** Moves into `@omega.js/client` (it already
    only uses client primitives); web re-imports; desktop/extension gain it for
    real (fixes desktop's dead alias).

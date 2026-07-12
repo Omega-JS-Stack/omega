@@ -43,9 +43,26 @@ engines treat workflow files as framework-owned overwrites).
 | web | sync (commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact POST, send nothing; bypasses the `file:` guard since nothing publishes), `--local` (build only), `--no-sync` |
 | extension | sync → dispatch `publish.yml` | `--dry-run`, `--no-sync` |
 | desktop | `--dry-run` prints the dispatch; otherwise delegates to `omega release` (dispatch + live CI log streaming) | `--dry-run`, `--platforms` |
-| backend | `firebase deploy` + public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
+| backend | artifact cleanup-policy pre-step → local-package staging → `firebase deploy` → public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
 
 Real deploys refuse `file:` deps (web); dry-runs always show the plan.
+
+### Backend: local-package staging
+
+Cloud Build only installs what's inside the uploaded functions folder, and its
+buildpack runs `npm ci` (lockfile required) — so a local-first dep like
+`"@omega.js/backend": "file:../../../../../packages/backend"` can never deploy
+as-is. When `--only` includes functions, the deploy command stages the
+functions dir in place (`src/cli/utils/stage-local-packages.js`): each
+outside-the-folder `file:` dep is `npm pack`ed into `functions/omega_modules/*.tgz`
+(pack runs the package's prepare, so the tarball reflects current source),
+package.json is respelled to the tarball, and the lockfile is regenerated for
+the staged shape. After the deploy — success or failure — the original
+package.json + package-lock.json are restored verbatim and `omega_modules/` is
+removed. Published (registry) deps are untouched; a functions dir with no
+outside `file:` deps stages nothing. The Artifact Registry cleanup policy is
+ensured before deploying because firebase-tools otherwise exits 1 AFTER a
+successful functions deploy, which would skip the public-invoker fix.
 
 ## Content-publish implies deploy
 

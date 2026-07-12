@@ -83,8 +83,12 @@
   // project to this; projectId derives from cloud.config above — cp100).
   // billingAccount = ITW Main Billing Account (ID only — unusable without
   // IAM; repo is private). The billing ensure-step links it → Blaze.
+  // organizationId = ITW Creative Works GCP org — projects the manager
+  // creates land inside it (org placement grants the default compute SA
+  // roles; legacy omega-manager hardcoded this id, now it's config).
   firebase: {
     billingAccount: "billingAccounts/01A0C2-98EAA4-A772AE",
+    organizationId: "1076309192968",
   },
 
   // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
