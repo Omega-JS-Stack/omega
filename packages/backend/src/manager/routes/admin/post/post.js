@@ -12,6 +12,7 @@ const { Octokit } = require('@octokit/rest');
 const { get, set } = require('lodash');
 
 const deduplicateImageAlts = require('./deduplicate-image-alts');
+const dispatchDeploy = require('./dispatch-deploy');
 
 const POST_TEMPLATE = jetpack.read(`${__dirname}/templates/post.html`);
 const IMAGE_PATH_SRC = `src/assets/images/blog/post-{id}/`;
@@ -142,6 +143,9 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   }
 
   assistant.log('main(): commitAll', commitResult);
+
+  // D13: content-publish implies deploy (deploy: false opts out)
+  await dispatchDeploy(assistant, octokit, settings);
 
   // Track analytics
   analytics.event('admin/post', { action: 'create' });

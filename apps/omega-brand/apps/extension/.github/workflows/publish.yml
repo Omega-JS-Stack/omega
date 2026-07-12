@@ -1,11 +1,12 @@
+# Deliberate deploys (D13): commits never auto-publish — save = commit,
+# publish = an explicit dispatch (`omega deploy`, the CMS publish action, or
+# a plain HTTP workflow_dispatch/repository_dispatch call).
 name: Build and Publish Extension
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
-      - main
+  repository_dispatch:
+    types: [omega-deploy]
 
 concurrency:
   group: ${{ github.ref }}
@@ -71,15 +72,16 @@ jobs:
         run: |
           npx omega setup && npm run build
 
-      - name: Upload extension artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-${{ github.sha }}
-          path: packaged/extension.zip
-          retention-days: 30
-
-      - name: Purge old artifacts
-        uses: kolpav/purge-artifacts-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          expire-in: 7 days
+      # Artifact channel = GitHub releases (D9 addendum 2) — the same channel
+      # desktop distributes from, and where CMS download links point. Store
+      # uploads happen in the build step when credentials are present; the zip
+      # here is the durable, downloadable fallback for manual store uploads.
+      - name: Upload package to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="extension-v$VERSION"
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "Extension v$VERSION" --notes "Browser extension package for v$VERSION (built from ${{ github.sha }})."
+          gh release upload "$TAG" packaged/extension.zip --clobber

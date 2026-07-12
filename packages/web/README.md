@@ -30,7 +30,9 @@ npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → 
 npx omega test      # PROJECT scope: production build + smoke checks + consumer test/
                     #   framework:/omega:/web: = @omega.js/web's own suite; full: = both
                     #   (C5 scoping — docs/testing.md in the Omega repo)
-npx omega deploy    # refuse file: deps → npm run build → `npu sync --message='Deploy'`
+npx omega deploy    # THE publish verb (D13): sync (push triggers nothing) → dispatch
+                    #   build.yml so CI builds + publishes; --dry-run prints the exact
+                    #   POST, --local builds only (docs/deploys.md in the Omega repo)
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
 npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place

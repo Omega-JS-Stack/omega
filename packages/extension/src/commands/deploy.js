@@ -1,40 +1,23 @@
 /**
  * `omega deploy` — the explicit publish verb (D13: commits never
  * auto-publish). Syncs the working tree (commit + push — push triggers
- * NOTHING), then dispatches the scaffolded build workflow so CI runs the
- * SAME build and publishes to gh-pages.
+ * NOTHING), then dispatches the scaffolded publish workflow: CI builds,
+ * uploads to the stores when credentials are present, and attaches the
+ * package zip to a GitHub release (the durable artifact channel).
  *
  * Flags: --dry-run (print the exact dispatch, send nothing; skips sync),
- * --local (production build only — no sync, no dispatch),
  * --no-sync (dispatch without committing/pushing first).
- * Refuses to deploy with local `file:` packages installed.
  */
-const path = require('node:path');
 const { execSync } = require('node:child_process');
-const Logger = require('@omega.js/devkit/logger');
+const Manager = new (require('../build.js'));
+const logger = Manager.logger('deploy');
 const { deployViaDispatch } = require('@omega.js/devkit/deploy');
 
-const logger = new Logger('omega:deploy');
-
-const WORKFLOW = 'build.yml';
+const WORKFLOW = 'publish.yml';
 
 module.exports = async function (options) {
   options = options || {};
   const dryRun = options.dryRun || options['dry-run'];
-  const project = require(path.join(process.cwd(), 'package.json'));
-
-  // Check for local packages — real deploys only; a dry-run publishes
-  // nothing, so it may always show the plan
-  const allDeps = JSON.stringify(project.dependencies || {}) + JSON.stringify(project.devDependencies || {});
-  if (!dryRun && allDeps.includes('file:')) {
-    throw new Error('Please remove local packages before deploying!');
-  }
-
-  if (options.local) {
-    logger.log('Building (local only — no dispatch)...');
-    execSync('npm run build', { stdio: 'inherit' });
-    return;
-  }
 
   if (!dryRun && options.sync !== false) {
     logger.log('Syncing (commit + push — publishes nothing by itself)...');
@@ -44,7 +27,7 @@ module.exports = async function (options) {
   const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });
 
   if (dispatched) {
-    logger.log(`Dispatched ${WORKFLOW} — CI builds and publishes this deploy.`);
+    logger.log(`Dispatched ${WORKFLOW} — CI builds, publishes to stores, and attaches the zip to a GitHub release.`);
     logger.log(`Watch: ${plan.runsUrl}`);
   } else {
     logger.log('DRY RUN — would send:');

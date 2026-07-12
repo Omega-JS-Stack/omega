@@ -28,8 +28,12 @@ class DeployCommand extends BaseCommand {
     // (authoritative overwrite); this covers a bare `npx omega deploy`.
     ensurePublicFiles(self.firebaseProjectPath);
 
+    // --only pass-through (e.g. `omega deploy --only hosting` — deploys
+    // hosting on Spark plans where functions would demand Blaze)
+    const only = self.argv?.only ? ` --only ${self.argv.only}` : '';
+
     try {
-      await powertools.execute('firebase deploy', {
+      await powertools.execute(`firebase deploy${only}`, {
         log: false,
         config: {
           cwd: self.firebaseProjectPath,

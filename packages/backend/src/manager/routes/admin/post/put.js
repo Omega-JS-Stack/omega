@@ -6,6 +6,8 @@ const moment = require('moment');
 const powertools = require('node-powertools');
 const { Octokit } = require('@octokit/rest');
 
+const dispatchDeploy = require('./dispatch-deploy');
+
 module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   const fetch = Manager.require('wonderful-fetch');
 
@@ -78,6 +80,9 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   }
 
   assistant.log('main(): uploadPost', uploadResult);
+
+  // D13: content-publish implies deploy (deploy: false opts out)
+  await dispatchDeploy(assistant, octokit, settings);
 
   // Track analytics
   analytics.event('admin/post', { action: 'edit' });
