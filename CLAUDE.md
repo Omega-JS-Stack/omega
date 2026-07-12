@@ -19,6 +19,12 @@ The OMEGA monorepo holds the `@omega.js` framework ecosystem: the successors to 
 
 Single config format everywhere: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme) + a `targets` object (key presence = target enabled; values = target config; any shared key inside a target entry overrides it). Merge chain: `defaults ← company ← brand shared ← brand targets.<type> ← app shared ← app targets.<type>`. Secrets stay in `.env` — the validator hard-fails secret-shaped keys in config. **No dual-read (Ian's call, 2026-07-06)**: frameworks flip to omega.json5 outright; legacy brands convert once via the mapping tables in [docs/config.md](docs/config.md). Owned by `@omega.js/config`; EM flipped first (desktop settings under `targets.desktop`, per-OS `targets` renamed `platforms`).
 
+## Brand topology (who is who — settled with Ian 2026-07-11)
+
+- **`apps/sandbox-brand`** — synthetic fixture for the AUTOMATED corpus/e2e (offline, `demo-*` Firebase, deterministic; test runs may mangle and reset it). Never touches real cloud.
+- **`apps/omega-brand`** — the hand-dogfood brand: born through the real wizard, wears the OMEGA identity as a REHEARSAL (id `omega`, url omegajs.dev) and points at the real-but-throwaway Firebase project `omegajs-playground` (sanctioned for live proofs — Blaze it, break it, delete it; it is TEST INFRASTRUCTURE, never production). Secrets live only in `.env`/`.omega/secrets` (gitignored; the config loader hard-fails secret-shaped keys) — the committed omega.json5 carries public-by-design values only.
+- **The real OMEGA brand** — does NOT exist yet. Born at/after arc close as its OWN standalone brand monorepo consuming published omega (the template-repo-outside-the-monorepo test), with its own production Firebase project, Cloudflare zone, and omegajs.dev pointed at it for real. The in-repo brands and the playground project stay test-only forever; nothing in this monorepo is ever the production brand.
+
 ## Local dev loop
 
 Root `npm start` watches every dist-building package concurrently (single-instance lock); `omega dev --local` in a brand's website app links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per app. Mechanics: `@omega.js/devkit/local`. Full contract: [docs/local-dev.md](docs/local-dev.md).
