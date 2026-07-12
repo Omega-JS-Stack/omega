@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **Ian: cp99 board comments still pending (skin pass waits on them)** · **C4 OPEN** ([plans/c4-cross-target.md](plans/c4-cross-target.md)): cp104 tokens ✅ · cp105 advertising ✅ · cp106 CLOSED ✅ (canonical shape + uuidv5 identity + ONE shared core, desktop collapsed) — next: cp107 forms · cp108 fontawesome · cp109 theme-once. Also queued: cp100e resolved-config-in-deploy (#31) · #15 Node story (DECIDED: manager drives per-app Node, setups don't halt). Arc close waits on the finished skin. omegajs.dev REGISTERED — wire at arc close
+- **Ian: cp99 board comments still pending (skin pass waits on them)** · **C4 OPEN** ([plans/c4-cross-target.md](plans/c4-cross-target.md)): cp104 tokens ✅ · cp105 advertising ✅ · cp106 CLOSED ✅ (canonical shape + uuidv5 identity + ONE shared core, desktop collapsed) — next: cp107 forms · cp108 fontawesome · cp109 theme-once. Also queued: #15 Node story (DECIDED: manager drives per-app Node, setups don't halt). Arc close waits on the finished skin. omegajs.dev REGISTERED — wire at arc close
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-0. **cp100e — deploy ships the RESOLVED config** (friction #31: live backend serves "My Brand" placeholders; brand-layer omega.json5 never crosses the upload boundary — compose it into the staged upload like the packages)
+0. **cp107 — FormManager → @omega.js/client** (C4: web re-imports; desktop/extension gain it — fixes desktop's dead alias), then cp108 fontawesome · cp109 theme-once
 1. **cp99a+** — C3 systems track (design-agnostic, brief already out): cross-target core token layer (D10), #16 sass modernization, app-shell mechanics, two-tier theme mechanics (toy second theme proves tiers) → Ian's notes land as the skin pass (default pages + blueprints, auth/account/payment, omega-playground showcase) → C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
 2. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
 
@@ -46,6 +46,7 @@
 - prepare-package after-hooks are NON-BLOCKING: a vendor failure mid-rewrite leaves a part-rewritten dist behind a one-line warning (cp104 hit this live; the publishable-ref throw now fails the common cause loud, and CI's no-@omega.js-refs check remains the hard gate)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 100e resolved-config deploys (#31 FIXED) — composeTargetConfig freezes the brand+app interleave into ONE self-contained upload file (presence-only targets, no baked defaults; equivalence theorem tested) + deploy stage/restore step; config 99/boot 11 + live staging proof on the real playground tree; live /omega/brand re-probe rides the next Ian-named deploy (this commit) → CHANGELOG
 - [x] 102 tri-state provisioning (#33) + needs-interactive aggregate (#32) — null=ask (answer lands in omega.json5) / false=opted-out (silent, ancestor-aware) / value=use, engine-wide in config-flow; org asked at project create (list or standalone), billing asked at billing step (pick/create/stay-Spark); RunSummary ⚑ section + npm-start retry command; manager 599 (this commit) → CHANGELOG
 - [x] 106b ONE engine literally — analytics-core.js (pure CJS in client: identity/name/payload/URL) consumed by BOTH the browser engine and desktop's main lib (client = desktop runtime dep; dupes deleted); client 85/desktop 764/web 103; cp106 CLOSED (this commit) → CHANGELOG
 - [x] 101d walkthrough UX (Ian's calls) — build translates by DEFAULT (#24 final; --cached-only opts out) + press-Enter-to-open pattern (devkit pressEnterToOpen/openInBrowser; VAPID console, sign-in providers page, OAuth-client settings) + auth URL AUTO-OPENS w/ 5-min window (#25 partial); web 103/devkit 188/mgr 586 (this commit) → CHANGELOG
@@ -115,4 +116,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-12 3:15 AM (cp102 — tri-state provisioning standard + needs-interactive aggregate shipped; next cp100e resolved-config-in-deploy)*
+*Last updated: 2026-07-12 3:40 AM (cp102 tri-state + cp100e resolved-config deploys shipped; next cp107 forms; live /omega/brand re-probe waits on Ian's next named deploy)*

@@ -147,6 +147,24 @@ function stripTargets(config) {
 }
 
 /**
+ * Raw-file hard fails, applied BEFORE any merge: secrets anywhere in the
+ * file (requested target or not) and the legacy targets ARRAY (it would
+ * silently mangle into {0: 'web', …} through the merge).
+ */
+function assertUsableRawFile(file, data) {
+  if (!data) return;
+
+  const secrets = findSecretKeys(data);
+  if (secrets.length) {
+    throw new Error(`Secret-shaped keys in ${file} — secrets live in .env, never in ${FILE_NAME}: ${secrets.join(', ')}`);
+  }
+
+  if (data.targets !== undefined && !isPlainObject(data.targets)) {
+    throw new Error(`targets in ${file} must be an object keyed by target name (key presence = enabled) — the legacy array form is not valid ${FILE_NAME}`);
+  }
+}
+
+/**
  * Enabled targets of a config (raw or resolved): the keys of its `targets`
  * object — key presence IS the enablement signal.
  * @param {object} config
@@ -187,21 +205,8 @@ function loadConfig(projectDir, target, options) {
   const app = readConfigFile(appPath);
   const brand = brandPath ? readConfigFile(brandPath) : null;
 
-  // ─── Raw-file hard fails: secrets + legacy targets array ────────────────
-  [{ file: brandPath, data: brand }, { file: appPath, data: app }].forEach(({ file, data }) => {
-    if (!data) return;
-
-    const secrets = findSecretKeys(data);
-    if (secrets.length) {
-      throw new Error(`Secret-shaped keys in ${file} — secrets live in .env, never in ${FILE_NAME}: ${secrets.join(', ')}`);
-    }
-
-    // The legacy brand-config `targets` ARRAY would silently mangle into
-    // {0: 'web', ...} through the merge — catch it loudly instead
-    if (data.targets !== undefined && !isPlainObject(data.targets)) {
-      throw new Error(`targets in ${file} must be an object keyed by target name (key presence = enabled) — the legacy array form is not valid ${FILE_NAME}`);
-    }
-  });
+  assertUsableRawFile(brandPath, brand);
+  assertUsableRawFile(appPath, app);
 
   // ─── Resolve ─────────────────────────────────────────────────────────────
   const hasTargets = !!((brand && brand.targets) || app.targets);
@@ -231,4 +236,57 @@ function loadConfig(projectDir, target, options) {
   return { config, errors, enabled, files: { app: appPath, brand: brandPath } };
 }
 
-module.exports = { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS };
+/**
+ * Compose the brand+app layers into ONE self-contained config file for a
+ * target's deploy upload (friction #31). The runtime's brand walk-up dies at
+ * the upload boundary — `firebase deploy` ships only the functions folder —
+ * so the staged file must carry the brand layer itself. The target's full
+ * interleave (brand shared ← brand targets[target] ← app shared ← app
+ * targets[target]) is frozen into the shared namespace: the deployed
+ * runtime's own `deepMerge(defaults, shared, targets[target])` then yields
+ * EXACTLY the local resolution. `targets` keeps presence-only keys
+ * (presence = enabled; every value is already folded in, so nothing
+ * re-applies above the frozen interleave — a raw merged targets map would
+ * let a brand-target value beat an app-shared one, flipping the chain).
+ * Framework defaults are NOT baked in: the deployed runtime applies its
+ * own, so defaults evolve with the shipped package, not the deploy moment.
+ *
+ * @param {string} projectDir - App root or its functions/ dir.
+ * @param {string} target - Canonical target the upload serves ('backend').
+ * @returns {{ config: object, files: { app: string, brand: string|null } }}
+ *   `files.brand` null = no brand layer above the app (already self-contained).
+ */
+function composeTargetConfig(projectDir, target) {
+  if (!TARGETS.includes(target)) {
+    throw new Error(`Unknown target "${target}" — must be one of [${TARGETS.join(', ')}]`);
+  }
+
+  const appPath = resolveConfigPath(projectDir);
+  if (!appPath) {
+    throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')})`);
+  }
+
+  const brandPath = findBrandConfigPath(projectDir);
+  const app = readConfigFile(appPath);
+  const brand = brandPath ? readConfigFile(brandPath) : null;
+
+  assertUsableRawFile(brandPath, brand);
+  assertUsableRawFile(appPath, app);
+
+  const config = deepMerge(
+    stripTargets(brand),
+    brand && brand.targets ? brand.targets[target] : null,
+    stripTargets(app),
+    app.targets ? app.targets[target] : null,
+  );
+
+  const hasTargets = !!((brand && brand.targets) || app.targets);
+  if (hasTargets) {
+    const targets = deepMerge(brand ? brand.targets : null, app.targets);
+    config.targets = Object.fromEntries(Object.keys(targets).map((name) => [name, {}]));
+  }
+
+  return { config, files: { app: appPath, brand: brandPath } };
+}
+
+module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS };

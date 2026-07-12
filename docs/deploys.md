@@ -64,6 +64,22 @@ outside `file:` deps stages nothing. The Artifact Registry cleanup policy is
 ensured before deploying because firebase-tools otherwise exits 1 AFTER a
 successful functions deploy, which would skip the public-invoker fix.
 
+### Backend: resolved-config staging (#31)
+
+The config cascade (company ← brand ← app) is a walk-up over the local tree,
+and the upload boundary cuts it — Cloud Functions receives only the functions
+folder with its slim targets-only app config, so a deployed backend used to
+serve framework defaults ("My Brand"). Alongside package staging, the deploy
+command stages the resolved config (`src/cli/utils/stage-resolved-config.js`):
+`@omega.js/config`'s `composeTargetConfig(functionsPath, 'backend')` freezes
+the full interleave (brand shared ← brand target ← app shared ← app target)
+into the staged app file's shared namespace with a presence-only `targets`
+map, so the deployed runtime's own `defaults ← shared ← targets[backend]`
+merge yields EXACTLY the local resolution (framework defaults are NOT baked —
+the shipped package applies its own). The original file is restored verbatim
+after the deploy; apps with no brand layer are already self-contained and
+stage nothing.
+
 ## Content-publish implies deploy
 
 `POST/PUT /admin/post` commit the article to the website repo, then dispatch

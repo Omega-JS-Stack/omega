@@ -14,6 +14,8 @@ const path = require('path');
 const jetpack = require('fs-jetpack');
 
 const stageLocalPackages = require('../../dist/cli/utils/stage-local-packages.js');
+const stageResolvedConfig = require('../../dist/cli/utils/stage-resolved-config.js');
+const { loadConfig } = require('@omega.js/config');
 
 function makeTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'bem-stage-'));
@@ -89,6 +91,67 @@ module.exports = {
 
         assert.deepEqual(staging.staged, []);
         assert.equal(jetpack.exists(path.join(functionsPath, 'omega_modules')), false, 'nothing staged');
+        await staging.restore(); // harmless no-op
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      name: 'stages-resolved-config-across-the-upload-boundary-and-restores',
+      async run({ assert }) {
+        const tmp = makeTmp();
+
+        // Brand monorepo shape: brand layer above a slim targets-only app file
+        // (the exact shape that served "My Brand" from production — #31)
+        const brandRoot = path.join(tmp, 'acme');
+        const functionsPath = path.join(brandRoot, 'apps', 'api', 'functions');
+        jetpack.write(path.join(brandRoot, 'config', 'omega.json5'), `{
+          // brand layer — must cross the upload boundary
+          brand: { id: 'acme', name: 'Acme Corp', url: 'https://acme.test' },
+          targets: { backend: {}, web: {} },
+        }`);
+        const appConfigPath = path.join(functionsPath, 'config', 'omega.json5');
+        const originalAppSource = `{ targets: { backend: { flavor: 'api' } } }\n`;
+        jetpack.write(appConfigPath, originalAppSource);
+
+        const staging = await stageResolvedConfig({ functionsPath });
+        assert.equal(staging.staged, true);
+        assert.ok(jetpack.read(appConfigPath).startsWith('// Composed by `omega deploy`'), 'staged file carries the banner');
+
+        // Simulate the upload: the functions folder ALONE, no brand parent —
+        // the real loader must now resolve brand values, not defaults
+        const uploadDir = path.join(tmp, 'upload');
+        jetpack.copy(functionsPath, uploadDir);
+        const uploaded = loadConfig(uploadDir, 'backend', {
+          defaults: { brand: { id: 'my-app', name: 'My Brand' } },
+        });
+        assert.equal(uploaded.config.brand.name, 'Acme Corp', 'brand layer crossed the boundary');
+        assert.equal(uploaded.config.flavor, 'api', 'app target section survived the flatten');
+        assert.equal(uploaded.enabled, true);
+
+        // Restore: original bytes back verbatim
+        await staging.restore();
+        assert.equal(jetpack.read(appConfigPath), originalAppSource);
+
+        jetpack.remove(tmp);
+      },
+    },
+
+    {
+      name: 'config-staging-no-op-without-a-brand-layer',
+      async run({ assert }) {
+        const tmp = makeTmp();
+
+        const functionsPath = path.join(tmp, 'functions');
+        const appConfigPath = path.join(functionsPath, 'config', 'omega.json5');
+        const source = `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: {} } }\n`;
+        jetpack.write(appConfigPath, source);
+
+        const staging = await stageResolvedConfig({ functionsPath });
+
+        assert.equal(staging.staged, false);
+        assert.equal(jetpack.read(appConfigPath), source, 'self-contained file untouched');
         await staging.restore(); // harmless no-op
 
         jetpack.remove(tmp);

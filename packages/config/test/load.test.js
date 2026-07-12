@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot } = require('../src/index.js');
+const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, resolveBrandRoot } = require('../src/index.js');
 
 const TEMP_ROOT = path.join(__dirname, '..', '.temp');
 
@@ -317,4 +317,108 @@ test('resolveBrandRoot: null when no omega.json5 exists up the tree', (t) => {
   cleanup(t, root);
 
   assert.equal(resolveBrandRoot(path.join(root, 'src')), null);
+});
+
+// ─── composeTargetConfig (#31 — the deploy upload boundary) ───
+
+// Brand + app fixture exercising every interleave position, INCLUDING the
+// corner a naive whole-file merge gets wrong: `corner` is set by brand
+// TARGET and app SHARED — locally app-shared wins (it merges later), and a
+// raw merged targets map would re-apply the brand-target value above it.
+const COMPOSE_TREE = {
+  'config/omega.json5': `{
+    brand: { id: 'acme', name: 'Acme Corp', url: 'https://acme.test' },
+    shade: 'brand-shared',
+    corner: 'from-brand-shared',
+    targets: {
+      backend: { flavor: 'from-brand-target', corner: 'from-brand-target' },
+      web: {},
+    },
+  }`,
+  'apps/api/functions/config/omega.json5': `{
+    corner: 'from-app-shared',
+    targets: { backend: { flavor: 'from-app-target' } },
+  }`,
+};
+
+const COMPOSE_DEFAULTS = {
+  brand: { id: 'my-app', name: 'My Brand' },
+  corner: 'from-defaults',
+  defaultOnly: true,
+};
+
+test('composeTargetConfig: freezes the full interleave into shared, targets go presence-only', (t) => {
+  const brandRoot = makeFixture('compose-tree', COMPOSE_TREE);
+  cleanup(t, brandRoot);
+  const appDir = path.join(brandRoot, 'apps', 'api');
+
+  const { config, files } = composeTargetConfig(path.join(appDir, 'functions'), 'backend');
+
+  assert.strictEqual(config.brand.name, 'Acme Corp'); // brand layer crossed the boundary
+  assert.strictEqual(config.shade, 'brand-shared');
+  assert.strictEqual(config.flavor, 'from-app-target'); // app target beats brand target
+  assert.strictEqual(config.corner, 'from-app-shared'); // app SHARED beats brand TARGET (the interleave pin)
+  assert.deepStrictEqual(config.targets, { backend: {}, web: {} }); // presence-only
+  assert.strictEqual(config.defaultOnly, undefined); // defaults are NOT baked in
+  assert.strictEqual(files.brand, path.join(brandRoot, 'config', 'omega.json5'));
+});
+
+test('composeTargetConfig: loading the composed file standalone resolves EXACTLY like the local walk-up (the theorem)', (t) => {
+  const brandRoot = makeFixture('compose-theorem', COMPOSE_TREE);
+  cleanup(t, brandRoot);
+  const appDir = path.join(brandRoot, 'apps', 'api');
+
+  const { config: composed } = composeTargetConfig(appDir, 'backend');
+
+  // Simulate the upload boundary: the composed file alone in a fresh root
+  const uploadRoot = makeFixture('compose-upload', {
+    'config/omega.json5': JSON.stringify(composed, null, 2),
+  });
+  cleanup(t, uploadRoot);
+
+  const local = loadConfig(appDir, 'backend', { defaults: COMPOSE_DEFAULTS });
+  const viaUpload = loadConfig(uploadRoot, 'backend', { defaults: COMPOSE_DEFAULTS });
+
+  // targets is enumeration-only ("settings are never read from it") — the
+  // resolved settings and the enabled-target set must match exactly
+  const { targets: localTargets, ...localConfig } = local.config;
+  const { targets: uploadTargets, ...uploadConfig } = viaUpload.config;
+  assert.deepStrictEqual(uploadConfig, localConfig);
+  assert.deepStrictEqual(Object.keys(uploadTargets).sort(), Object.keys(localTargets).sort());
+  assert.strictEqual(viaUpload.enabled, local.enabled);
+  assert.deepStrictEqual(viaUpload.errors, local.errors);
+});
+
+test('composeTargetConfig: app dir and its functions/ dir compose identically; no brand layer → self-contained', (t) => {
+  const brandRoot = makeFixture('compose-dirs', COMPOSE_TREE);
+  cleanup(t, brandRoot);
+  const appDir = path.join(brandRoot, 'apps', 'api');
+
+  assert.deepStrictEqual(
+    composeTargetConfig(appDir, 'backend').config,
+    composeTargetConfig(path.join(appDir, 'functions'), 'backend').config,
+  );
+
+  const solo = makeFixture('compose-solo', {
+    'functions/config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: { flavor: 'solo-target' } } }`,
+  });
+  cleanup(t, solo);
+
+  const { config, files } = composeTargetConfig(solo, 'backend');
+  assert.strictEqual(files.brand, null);
+  assert.strictEqual(config.flavor, 'solo-target');
+});
+
+test('composeTargetConfig: secrets in either layer hard-fail before any merge', (t) => {
+  const brandRoot = makeFixture('compose-secrets', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, apiSecret: 'leaked' }`,
+    'apps/api/config/omega.json5': `{ targets: { backend: {} } }`,
+  });
+  cleanup(t, brandRoot);
+
+  assert.throws(
+    () => composeTargetConfig(path.join(brandRoot, 'apps', 'api'), 'backend'),
+    /Secret-shaped keys/,
+  );
+  assert.throws(() => composeTargetConfig(brandRoot, 'nope'), /Unknown target/);
 });

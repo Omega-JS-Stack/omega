@@ -3,6 +3,7 @@ const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
 const stageLocalPackages = require('../utils/stage-local-packages');
+const stageResolvedConfig = require('../utils/stage-resolved-config');
 const { ensurePublicFiles } = require('../utils/public-files');
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -44,6 +45,12 @@ class DeployCommand extends BaseCommand {
       ? await stageLocalPackages({ functionsPath, log: (message) => this.log(message) })
       : null;
 
+    // The brand config layer also stops at the upload boundary (#31) —
+    // compose it into the staged app file so production serves brand values
+    const configStaging = deployingFunctions
+      ? await stageResolvedConfig({ functionsPath, log: (message) => this.log(message) })
+      : null;
+
     try {
       await powertools.execute(`firebase deploy${only}`, {
         log: false,
@@ -60,6 +67,9 @@ class DeployCommand extends BaseCommand {
       // After successful deploy, ensure HTTP functions are publicly invocable
       await this.ensurePublicInvoker();
     } finally {
+      if (configStaging) {
+        await configStaging.restore();
+      }
       if (staging) {
         await staging.restore();
       }

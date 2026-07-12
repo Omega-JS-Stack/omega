@@ -352,6 +352,7 @@ its Phase-3 cutover (enumerating `SHARED_SECTIONS`, per-surface values into
 ```js
 const {
   loadConfig,          // (projectDir, target?, { defaults }?) → { config, errors, enabled, files }
+  composeTargetConfig, // (projectDir, target) → { config, files } — brand+app frozen into ONE self-contained file (deploy upload boundary, #31)
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
   getEnabledTargets,   // (config) → ['web', 'backend', …]

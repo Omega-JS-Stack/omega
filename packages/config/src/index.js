@@ -23,7 +23,7 @@ const { TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS } = require('./s
 const { deepMerge } = require('./merge.js');
 const { findSecretKeys, SECRET_KEY_PATTERN } = require('./secrets.js');
 const { validateConfig, runSchema, formatErrors } = require('./validate.js');
-const { loadConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
+const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, COMPANY_MARKER } = require('./env.js');
 const { applyConfigEdits, writeConfigValues } = require('./edit.js');
 const { renderBrandAppSeed, resolveSeedMode } = require('./seed.js');
@@ -34,6 +34,7 @@ const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, 
 module.exports = {
   // Loading
   loadConfig,
+  composeTargetConfig,
   hasOmegaConfig,
   resolveConfigPath,
   getEnabledTargets,
