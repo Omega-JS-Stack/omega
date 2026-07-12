@@ -59,7 +59,7 @@
 
   analytics: {
     providers: {
-      google: { id: null },
+      google: { id: null, accountId: "377753992", propertyId: "545069570" },
       meta: { id: null },
       tiktok: { id: null },
     },
