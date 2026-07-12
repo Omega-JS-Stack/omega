@@ -176,9 +176,13 @@ extension package/webpack `validRedirectHosts`.)
    framework edits, traversal guarantee intact. web: NEW
    `src/fontawesome-roots.js` (engine chain `[core, brand?, free]` +
    richest aliasFile). desktop: `_resolveRoots()` walks the same chain
-   (env logged, Pro logged, multi-root `_read`/`_alias` fallthrough).
-   Tests Pro-presence-PROOF (adaptive — green before/after Ian installs
-   Pro; desktop main-process proof: env-root glyph resolves while
-   play/search still come from free). client 95 (+1) / web 107 (+4) /
-   template-kit 42 / desktop 765 (+1). Extension still consumer-less for
-   icons — its supply keeps riding the vendor channel when one appears.
+   (env logged, Pro logged, multi-root `_read`/`_alias` fallthrough), and
+   the renderer auto-render learns FA's family × weight classes
+   (`fa-sharp fa-light` → sharp-light; pre-cp111 everything but fa-brands
+   rendered SOLID — Pro markup without Pro now stays empty, never the
+   wrong style). Tests Pro-presence-PROOF (adaptive — green before/after
+   Ian installs Pro; desktop main-process proof: env-root glyph resolves
+   while play/search still come from free; renderer proof: fa-light never
+   falls back to solid). client 95 (+1) / web 107 (+4) / template-kit 42 /
+   desktop 766 (+2). Extension still consumer-less for icons — its supply
+   keeps riding the vendor channel when one appears.

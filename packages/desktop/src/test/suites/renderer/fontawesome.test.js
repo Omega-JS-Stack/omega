@@ -96,6 +96,44 @@ module.exports = {
       },
     },
     {
+      name: 'Pro family/weight classes request the composed style — never a wrong-style fallback (cp111)',
+      run: async (ctx) => {
+        const until = async (fn) => {
+          const t0 = Date.now();
+          while (!fn()) {
+            if (Date.now() - t0 > 3000) throw new Error('timed out waiting for icon mark');
+            await new Promise((r) => setTimeout(r, 25));
+          }
+        };
+
+        // Without a Pro set, `fa-light fa-play` must stay EMPTY (style
+        // 'light' resolves null) — the pre-cp111 renderer ignored the class
+        // and wrongly injected the SOLID glyph. With Pro supplied it lights
+        // up for real; either way an SVG here may only be a non-solid one.
+        const el = document.createElement('i');
+        el.className = 'fa-light fa-play';
+        document.body.appendChild(el);
+
+        await until(() => el.dataset.emFa);
+        ctx.expect(el.dataset.emFa).toBe('play'); // family/weight classes are never names
+        const lightSvg = await window.em.fontawesome.get('play', 'light');
+        await new Promise((r) => setTimeout(r, 150));
+        ctx.expect((el.querySelector('svg') !== null)).toBe(lightSvg !== null);
+
+        // sharp + weight composes: `fa-sharp fa-light` asks for sharp-light.
+        const sharpSvg = await window.em.fontawesome.get('play', 'sharp-light');
+        const el2 = document.createElement('i');
+        el2.className = 'fa-sharp fa-light fa-play';
+        document.body.appendChild(el2);
+        await until(() => el2.dataset.emFa);
+        await new Promise((r) => setTimeout(r, 150));
+        ctx.expect((el2.querySelector('svg') !== null)).toBe(sharpSvg !== null);
+
+        el.remove();
+        el2.remove();
+      },
+    },
+    {
       name: 'unknown icon names leave the element empty (marked, no SVG)',
       run: async (ctx) => {
         const until = async (fn) => {

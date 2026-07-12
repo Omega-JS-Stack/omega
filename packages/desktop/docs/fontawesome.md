@@ -43,9 +43,14 @@ drift on how an icon name resolves or what the served SVG looks like.
 - **Preload bridge** — `window.em.fontawesome.get(name, style)` →
   `Promise<svg | null>`.
 - **Renderer auto-render** (`renderer.js _wireFontAwesome`) — scans for
-  `i[class*="fa-"]` at init and watches the DOM via MutationObserver. The style
-  comes from `fa-solid` (default) / `fa-brands`; the icon name is the first
-  `fa-*` class that isn't a known modifier (`fa-fw`, `fa-2x`, `fa-spin`, …).
+  `i[class*="fa-"]` at init and watches the DOM via MutationObserver. The
+  style comes from FA's family × weight classes: `fa-solid` (default),
+  `fa-regular`, `fa-brands`, and — with a Pro set supplied — `fa-light`,
+  `fa-thin`, plus the `fa-sharp`/`fa-duotone`/`fa-sharp-duotone` family
+  prefixes composing with the weight (`fa-sharp fa-light` → `sharp-light`).
+  Pro-style markup without a Pro set stays empty — never a wrong-style
+  fallback. The icon name is the first `fa-*` class that isn't a known
+  modifier (`fa-fw`, `fa-2x`, `fa-spin`, …).
   The SVG is injected as a child of the `<i>`, sized `1em`/`currentColor` — it
   inherits text color and scales with font-size (bump it via `font-size` or a
   `fs-*` utility). Served SVGs also carry `overflow="visible"` (FA-kit parity:

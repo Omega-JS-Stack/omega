@@ -98,8 +98,10 @@ Manager.prototype._wireThemeControls = function () {
 
 // FontAwesome auto-render — any `<i>` element carrying `fa-*` classes gets the
 // bundled Font Awesome SVG injected inline (fetched from main over IPC, cached
-// per icon). Style comes from `fa-solid` (default) / `fa-brands`; the icon name
-// is the first `fa-*` class that isn't a known modifier. Works for markup
+// per icon). Style comes from FA's family × weight classes (`fa-solid`
+// default, `fa-brands`, and — with a brand-supplied Pro set — light/thin/
+// duotone/sharp-* combinations); the icon name is the first `fa-*` class
+// that isn't a known modifier. Works for markup
 // present at init AND anything inserted later (MutationObserver). Unknown names
 // resolve to null and the element is simply left empty — consumers that want a
 // fallback check `window.em.fontawesome.get()` themselves.
@@ -124,18 +126,35 @@ Manager.prototype._wireFontAwesome = function () {
   };
 
   // fa-* classes that are modifiers (style/size/animation/layout), not icon names.
-  const MODIFIER = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp|fw|xs|sm|lg|xl|2xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
+  const MODIFIER = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp-duotone|sharp|fw|xs|sm|lg|xl|2xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
+
+  // FA's family × style class model (cp111): a base style class picks the
+  // weight, a family class (sharp / duotone / sharp-duotone) prefixes it —
+  // `fa-sharp fa-light fa-play` → sharp-light. Families and Pro weights
+  // resolve only when the brand supplies a Pro set; otherwise the lookup
+  // returns null and the element stays empty (never a wrong-style icon).
+  const BASE_STYLE = {
+    'fa-solid': 'solid', fas: 'solid',
+    'fa-regular': 'regular', far: 'regular',
+    'fa-light': 'light', fal: 'light',
+    'fa-thin': 'thin', fat: 'thin',
+    'fa-brands': 'brands', fab: 'brands',
+  };
+  const FAMILY = { 'fa-sharp': 'sharp', 'fa-duotone': 'duotone', fad: 'duotone', 'fa-sharp-duotone': 'sharp-duotone' };
 
   const render = (el) => {
     if (el.dataset.emFa || el.querySelector('svg')) {
       return;
     }
 
-    let style = 'solid';
+    let base = 'solid';
+    let family = '';
     let name = null;
     for (const cls of el.classList) {
-      if (cls === 'fa-brands' || cls === 'fab') {
-        style = 'brands';
+      if (BASE_STYLE[cls]) {
+        base = BASE_STYLE[cls];
+      } else if (FAMILY[cls]) {
+        family = FAMILY[cls];
       } else if (!name && cls.startsWith('fa-') && !MODIFIER.test(cls)) {
         name = cls.slice(3);
       }
@@ -143,6 +162,11 @@ Manager.prototype._wireFontAwesome = function () {
     if (!name) {
       return;
     }
+    // duotone-solid lives in the bare `duotone` dir; every other family
+    // composes family-weight (sharp-light, duotone-thin, sharp-duotone-solid).
+    const style = (base === 'brands' || !family) ? base
+      : (family === 'duotone' && base === 'solid') ? 'duotone'
+        : `${family}-${base}`;
 
     el.dataset.emFa = name;
     resolve(name, style).then((svg) => {
