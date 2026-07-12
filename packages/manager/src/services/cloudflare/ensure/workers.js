@@ -14,7 +14,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 const { templateObject } = require('../../../config.js');
 const { cacheRead } = require('../lib/read-cache.js');
-const { getZoneId } = require('../lib/ruleset-helper.js');
+const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 async function getAccountId(api, zoneId) {
@@ -37,6 +37,8 @@ function buildScriptFormData(scriptContent, env) {
 module.exports = async function ensureWorkers(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, domain, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'workers');
+  if (gated) return gated;
 
   // === DIFF config presence first — reads are pointless without any config ===
   const workersConfig = brandConfig?.cloudflare?.workers;

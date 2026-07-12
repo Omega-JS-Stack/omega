@@ -12,7 +12,7 @@
 const chalk = require('chalk').default;
 const { openBrowserAndPoll } = require('@omega.js/devkit/flows');
 const { cacheRead } = require('../lib/read-cache.js');
-const { getZoneId } = require('../lib/ruleset-helper.js');
+const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { canPrompt, dryRunPlan } = require('../../../lib/run-gates.js');
 
 function isUnverifiedError(error) {
@@ -85,6 +85,8 @@ async function handleUnverified(api, zoneId, destination, retryWrite, options = 
 module.exports = async function ensureEmailRouting(context) {
   const { cloudflareApi: api, brandRoot, domain, brandConfig, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'emailRouting');
+  if (gated) return gated;
   const emailConfig = brandConfig.domain?.email;
 
   if (emailConfig?.provider !== 'cloudflare') {

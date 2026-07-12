@@ -35,7 +35,14 @@ function brandConfig({ url = `https://${DOMAIN}`, provider = 'namecheap' } = {})
 
 /** Fake CloudflareAPI — only the zone lookup the domain service uses. */
 function fakeCloudflare(zone) {
-  return { getZoneByName: async () => zone || null };
+  const api = {
+    lookups: [],
+    getZoneByName: async (name) => {
+      api.lookups.push(name);
+      return zone || null;
+    },
+  };
+  return api;
 }
 
 /**
@@ -130,6 +137,26 @@ test('domain: converged nameservers are a zero-mutation no-op', async () => {
   assert.equal(result.status, 'success');
   assert.equal(result.output.nameservers.alreadySet, true);
   assert.equal(namecheap.mutations().length, 0);
+});
+
+test('domain: subdomain project manages the PARENT domain\'s nameservers (cp113)', async () => {
+  // playground.omegajs.dev-style brand: the zone AND the registrar entry are
+  // the registrable parent — never the subdomain.
+  const zone = { id: 'zone-1', name: DOMAIN, status: 'pending', name_servers: CF_NS };
+  const cloudflare = fakeCloudflare(zone);
+  const namecheap = fakeNamecheap({ current: ['dns1.registrar-servers.com'] });
+
+  const result = await runService(brandConfig({ url: `https://app.${DOMAIN}` }), {
+    cloudflare,
+    namecheap,
+  });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(cloudflare.lookups, [DOMAIN]); // parent zone queried, not app.DOMAIN
+  const set = namecheap.mutations();
+  assert.equal(set.length, 1);
+  assert.equal(`${set[0].sld}.${set[0].tld}`, DOMAIN); // registrar write hits the parent
+  assert.deepEqual(set[0].nameservers, CF_NS_SORTED);
 });
 
 test('domain: drifted nameservers are set at Namecheap (sorted)', async () => {

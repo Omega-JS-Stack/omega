@@ -7,7 +7,7 @@
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
-const { getZoneId } = require('../lib/ruleset-helper.js');
+const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const REQUEST_HEADERS_MAP = {
@@ -25,6 +25,8 @@ const RESPONSE_HEADERS_MAP = {
 module.exports = async function ensureManagedTransforms(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'rulesManagedTransforms');
+  if (gated) return gated;
 
   // === READ ===
   const data = await api.makeRequest(`/zones/${zoneId}/managed_headers`);

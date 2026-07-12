@@ -8,13 +8,15 @@
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
-const { getZoneId } = require('../lib/ruleset-helper.js');
+const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { diffRecords } = require('../lib/dns-records-helpers.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureDnsRecords(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, domain, isSubdomainProject, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'dnsRecords');
+  if (gated) return gated;
 
   // === READ ===
   const data = await api.makeRequest(`/zones/${zoneId}/dns_records`);

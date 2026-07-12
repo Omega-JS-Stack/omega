@@ -1,13 +1,15 @@
 /**
  * Ensure the zone exists in Cloudflare.
  *
- * Creates the zone when missing (apex domains only — subdomain projects
- * require the parent zone to exist already). A pending zone reports its
- * nameservers; when the registrar is a manual one, interactive runs open its
- * nameserver page and poll until the zone activates. API registrars are left
- * to the domain service (it sets the nameservers right after this service),
- * and non-interactive/dry runs just report — a later run picks the zone up
- * once it activates.
+ * Creates the zone when missing — for subdomain projects that means the
+ * PARENT zone (playground.omegajs.dev → creates omegajs.dev): the zone is
+ * a prerequisite resource the brand's records live in, and creating it is
+ * inert until the registrar's nameservers point at it (which the domain
+ * service automates for API registrars, right after this service). A
+ * pending zone reports its nameservers; when the registrar is a manual
+ * one, interactive runs open its nameserver page and poll until the zone
+ * activates. Non-interactive/dry runs just report — a later run picks the
+ * zone up once it activates.
  *
  * State: { zoneId } — later operations in THIS run read it via getZoneId.
  */
@@ -77,7 +79,7 @@ async function waitForActiveZone(context, zone) {
 }
 
 module.exports = async function ensureZone(context) {
-  const { cloudflareApi: api, brandRoot, domain, zoneDomain, isSubdomainProject, options = {} } = context;
+  const { cloudflareApi: api, brandRoot, zoneDomain, isSubdomainProject, options = {} } = context;
 
   // === READ ===
   const accounts = await api.makeRequest('/accounts');
@@ -112,23 +114,24 @@ module.exports = async function ensureZone(context) {
     };
   }
 
-  // For subdomain projects, the parent zone must already exist
+  // === WRITE: create the zone (the PARENT zone for subdomain projects —
+  // inert until the registrar points at it, so records under the subdomain
+  // can land in the same run) ===
   if (isSubdomainProject) {
-    throw new Error(`Parent zone "${zoneDomain}" not found in Cloudflare. Add the parent domain first.`);
+    console.log(`      ${chalk.yellow('⚠')} Parent zone ${chalk.cyan(zoneDomain)} not in Cloudflare yet — creating it (subdomain project)`);
   }
 
-  // === WRITE: create the zone ===
   if (options.dryRun) {
-    return dryRunPlan(`add zone ${domain} to Cloudflare`, { status: 'success', output: { zone: { planned: 'create' } } });
+    return dryRunPlan(`add zone ${zoneDomain} to Cloudflare`, { status: 'success', output: { zone: { planned: 'create' } } });
   }
 
-  console.log(`      Adding zone ${chalk.cyan(domain)} to Cloudflare...`);
+  console.log(`      Adding zone ${chalk.cyan(zoneDomain)} to Cloudflare...`);
 
   const response = await api.makeRequest('/zones', {
     method: 'POST',
     body: JSON.stringify({
       account: { id: accountId },
-      name: domain,
+      name: zoneDomain,
       type: 'full',
     }),
   });

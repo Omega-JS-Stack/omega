@@ -10,7 +10,7 @@
 const chalk = require('chalk').default;
 const { DEFAULTS } = require('../../../config.js');
 const { cacheRead } = require('../lib/read-cache.js');
-const { getZoneId } = require('../lib/ruleset-helper.js');
+const { getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 // Settings not returned by /zones/{id}/settings — each needs its own GET.
@@ -19,6 +19,8 @@ const ADDON_SETTINGS = ['speed_brain', 'fonts'];
 module.exports = async function ensureZoneSettings(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'zoneSettings');
+  if (gated) return gated;
 
   // === READ ===
   const bulkResponse = await api.makeRequest(`/zones/${zoneId}/settings`);

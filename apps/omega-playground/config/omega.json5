@@ -36,6 +36,12 @@
     },
   },
 
+  // Registrar of the PARENT omegajs.dev (subdomain project — the domain
+  // service manages the parent's nameservers at Namecheap → Cloudflare).
+  domain: {
+    provider: "namecheap",
+  },
+
   monitoring: {
     provider: "sentry",
     dsn: null,

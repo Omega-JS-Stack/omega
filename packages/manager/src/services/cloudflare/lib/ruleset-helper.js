@@ -85,4 +85,24 @@ function getZoneId(context) {
   return context.serviceData?.zoneId ?? context.zoneId ?? null;
 }
 
-module.exports = { fetchRuleset, applyRuleset, getZoneId };
+/**
+ * Gate for zone-scoped operations: no zoneId means the zone doesn't exist
+ * yet — reachable only in a dry-run (live runs create the zone first, its
+ * id flowing through serviceData; cp113 made that true for subdomain
+ * parents too), where the op plans instead of calling the API with
+ * zones/null. Returns the handler's early return, or null to proceed.
+ */
+function zoneGate(context, key) {
+  if (getZoneId(context)) {
+    return null;
+  }
+  if (context.options?.dryRun) {
+    return dryRunPlan(
+      `reconcile ${key} once zone ${context.zoneDomain} exists`,
+      { status: 'success', output: { [key]: { planned: 'after-zone' } } },
+    );
+  }
+  return { status: 'warned', output: { [key]: { note: 'no zone available' } } };
+}
+
+module.exports = { fetchRuleset, applyRuleset, getZoneId, zoneGate };

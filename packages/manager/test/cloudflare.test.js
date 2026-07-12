@@ -269,6 +269,64 @@ test('zone: dry-run never creates', async () => {
   assert.deepEqual(api.mutations(), []);
 });
 
+test('zone: subdomain project with a missing parent zone CREATES the parent (cp113)', async () => {
+  const ensureZone = require('../src/services/cloudflare/ensure/zone.js');
+  const sub = `app.${DOMAIN}`;
+  const api = fakeApi({
+    zones: [],
+    responses: {
+      'GET /accounts': [{ id: 'acct-1' }],
+      'POST /zones': { id: 'zone-parent', status: 'pending', name_servers: ['a.ns.cloudflare.com', 'b.ns.cloudflare.com'] },
+    },
+  });
+
+  const result = await ensureZone(handlerContext(brandConfig(`https://${sub}`), api, {
+    domain: sub,
+    zoneDomain: DOMAIN,
+    isSubdomainProject: true,
+  }));
+
+  // The zone POSTed is the PARENT, not the subdomain
+  const create = api.call('POST', '/zones');
+  assert.equal(create.body.name, DOMAIN);
+  assert.equal(result.state.zoneId, 'zone-parent');
+  assert.equal(result.output.zone.created, true);
+  assert.equal(result.output.zone.status, 'pending');
+  assert.deepEqual(result.output.zone.nameservers, ['a.ns.cloudflare.com', 'b.ns.cloudflare.com']);
+});
+
+test('cloudflare: dry-run with NO existing zone plans every op — zero API writes, no zones/null calls (cp113)', async () => {
+  // The latent bug: ops after `zone` used to call /zones/null/… when the
+  // zone didn't exist yet. fakeApi throws on any un-stubbed call, so this
+  // passing means only /accounts was ever read.
+  const api = fakeApi({ zones: [], responses: { 'GET /accounts': [{ id: 'acct-1' }] } });
+
+  const result = await runService(brandConfig(), api, { dryRun: true });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(api.mutations(), []);
+
+  const sub = fakeApi({ zones: [], responses: { 'GET /accounts': [{ id: 'acct-1' }] } });
+  const subResult = await runService(brandConfig(`https://app.${DOMAIN}`), sub, { dryRun: true });
+  assert.equal(subResult.status, 'success');
+  assert.deepEqual(sub.mutations(), []);
+});
+
+test('zone: subdomain missing-parent dry-run plans the parent create, zero mutations', async () => {
+  const ensureZone = require('../src/services/cloudflare/ensure/zone.js');
+  const api = fakeApi({ zones: [], responses: { 'GET /accounts': [{ id: 'acct-1' }] } });
+
+  const result = await ensureZone(handlerContext(brandConfig(`https://app.${DOMAIN}`), api, {
+    domain: `app.${DOMAIN}`,
+    zoneDomain: DOMAIN,
+    isSubdomainProject: true,
+    options: { dryRun: true },
+  }));
+
+  assert.equal(result.output.zone.planned, 'create');
+  assert.deepEqual(api.mutations(), []);
+});
+
 test('zone: a zone created this run is visible to later operations via serviceData', async () => {
   const ensureDns = require('../src/services/cloudflare/ensure/dns-records.js');
   const api = fakeApi({

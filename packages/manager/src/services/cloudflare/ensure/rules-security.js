@@ -7,7 +7,7 @@
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
-const { fetchRuleset, getZoneId } = require('../lib/ruleset-helper.js');
+const { fetchRuleset, getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const PHASE = 'http_request_firewall_custom';
@@ -16,6 +16,8 @@ const MANAGED_PHASE = 'http_request_firewall_managed';
 module.exports = async function ensureRulesSecurity(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'rulesSecurity');
+  if (gated) return gated;
 
   // === READ ===
   const { ruleset: customRuleset } = await fetchRuleset(api, zoneId, PHASE);

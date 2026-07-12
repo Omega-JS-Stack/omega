@@ -18,11 +18,19 @@ const { dryRunPlan } = require('../../../lib/run-gates.js');
 module.exports = async function ensureNameservers(context) {
   const { cloudflareApi, namecheapApi, domain, provider, options = {} } = context;
 
+  // Nameservers live at the REGISTRABLE domain — for subdomain projects
+  // (playground.omegajs.dev) that's the parent (omegajs.dev): the zone the
+  // cloudflare service manages, and the domain the registrar actually holds.
+  const zoneName = psl.get(domain) || domain;
+  if (zoneName !== domain) {
+    console.log(`      ${chalk.dim(`Subdomain project — managing nameservers for parent ${zoneName}`)}`);
+  }
+
   // === READ: Cloudflare's assigned nameservers ===
-  const zone = await cloudflareApi.getZoneByName(domain);
+  const zone = await cloudflareApi.getZoneByName(zoneName);
 
   if (!zone) {
-    console.log(`      ${chalk.yellow('⚠')} No Cloudflare zone found for ${chalk.cyan(domain)} — rerun once the cloudflare service creates it`);
+    console.log(`      ${chalk.yellow('⚠')} No Cloudflare zone found for ${chalk.cyan(zoneName)} — rerun once the cloudflare service creates it`);
     return { status: 'warned', output: { nameservers: { note: 'no Cloudflare zone found' } } };
   }
 
@@ -36,7 +44,7 @@ module.exports = async function ensureNameservers(context) {
   console.log(`      ${chalk.dim('→')} Cloudflare nameservers: ${required.map((ns) => chalk.cyan(ns)).join(', ')}`);
 
   if (provider === 'namecheap') {
-    return await ensureNamecheap(domain, required, namecheapApi, options);
+    return await ensureNamecheap(zoneName, required, namecheapApi, options);
   }
 
   // === Manual registrars — no read API, but the zone status is proof enough:

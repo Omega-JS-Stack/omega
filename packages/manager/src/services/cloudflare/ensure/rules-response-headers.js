@@ -7,7 +7,7 @@
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
-const { fetchRuleset, getZoneId } = require('../lib/ruleset-helper.js');
+const { fetchRuleset, getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 const PHASE = 'http_response_headers_transform';
@@ -15,6 +15,8 @@ const PHASE = 'http_response_headers_transform';
 module.exports = async function ensureRulesResponseHeaders(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'rulesResponseHeaders');
+  if (gated) return gated;
 
   // === READ ===
   const { ruleset } = await fetchRuleset(api, zoneId, PHASE);

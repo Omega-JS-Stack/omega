@@ -7,11 +7,13 @@
  */
 const chalk = require('chalk').default;
 const { cacheRead } = require('../lib/read-cache.js');
-const { fetchRuleset, applyRuleset, getZoneId } = require('../lib/ruleset-helper.js');
+const { fetchRuleset, applyRuleset, getZoneId, zoneGate } = require('../lib/ruleset-helper.js');
 
 module.exports = async function ensureRulesConfiguration(context) {
   const { cloudflareApi: api, brandRoot, brandConfig, options = {} } = context;
   const zoneId = getZoneId(context);
+  const gated = zoneGate(context, 'rulesConfiguration');
+  if (gated) return gated;
 
   // === READ ===
   const { ruleset, needsCreate } = await fetchRuleset(api, zoneId, 'http_config_settings');
