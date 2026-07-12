@@ -23,6 +23,7 @@ module.exports = async function ensureAuthentication(context) {
   const { firebaseApi: api, brandRoot, projectId, domain, serviceData = {}, options = {} } = context;
 
   let warned = false;
+  let needsInteractive = null; // #32: set when a step steps aside for lack of a TTY
 
   // === Identity Platform (upgrade only when the config GET says it's absent) ===
   let config = await api.getIdentityConfig(projectId);
@@ -183,6 +184,7 @@ module.exports = async function ensureAuthentication(context) {
     } else {
       console.log(`      ${chalk.dim('→')} ${chalk.cyan(gcpCredentialsUrl)}`);
       console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
+      needsInteractive = 'confirm the OAuth client origins + redirect URIs (the run opens the console for you)';
       warned = true;
     }
   } else if (googleClientId) {
@@ -222,5 +224,6 @@ module.exports = async function ensureAuthentication(context) {
         oauthRedirectsConfigured,
       },
     },
+    ...(needsInteractive ? { output: { authentication: { needsInteractive } } } : {}),
   };
 };

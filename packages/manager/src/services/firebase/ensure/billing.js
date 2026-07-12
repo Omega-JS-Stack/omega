@@ -2,10 +2,35 @@
  * Ensure the project is on the Blaze plan.
  *
  * omega-manager silently linked a hardcoded company billing account; the
- * account is config now (`firebase.billingAccount`) — unconfigured projects
- * on Spark warn with guidance instead of linking someone's card.
+ * account is tri-state config now (#33) — `firebase.billingAccount` set →
+ * link it, `false` → the user chose Spark (silent, no nagging), missing →
+ * ask in an interactive run (pick from the accounts the authed user can
+ * see, or create one in the console; the answer lands in omega.json5) and
+ * warn with guidance otherwise.
  */
 const chalk = require('chalk').default;
+const { resolveConfigValue } = require('../../../lib/config-flow.js');
+
+/** Interactive pick/create/opt-out flow — the answer lands in omega.json5. */
+function resolveBillingAccount(context, api) {
+  return resolveConfigValue(context, {
+    path: 'firebase.billingAccount',
+    label: 'Billing account',
+    instructions: [
+      'Blaze (pay-as-you-go) unlocks functions deploys and outbound network.',
+      'The account you pick links to this brand\'s projects from now on.',
+    ],
+    choices: () => api.listBillingAccounts(),
+    getName: (account) => `${account.displayName} (${account.name.replace('billingAccounts/', '')})${account.open === false ? ' [closed]' : ''}`,
+    getValue: (account) => account.name,
+    createNew: {
+      label: 'billing account',
+      url: 'https://console.cloud.google.com/billing/create',
+      refreshChoices: true,
+    },
+    optOut: { label: 'Stay on the Spark plan (free) — don\'t ask again' },
+  });
+}
 
 module.exports = async function ensureBilling(context) {
   const { firebaseApi: api, brandConfig, projectId, options = {} } = context;
@@ -25,14 +50,34 @@ module.exports = async function ensureBilling(context) {
     };
   }
 
+  // Tri-state (#33): false = the user chose Spark — a clean state, not a warning
+  if (brandConfig.firebase?.billingAccount === false) {
+    console.log(`      ${chalk.dim('⊘ Billing opted out (firebase.billingAccount: false) — staying on the Spark plan')}`);
+    return { output: { billing: { note: 'billing opted out — Spark plan' } } };
+  }
+
   console.log(`      ${chalk.yellow('⚠')} Project is on the Spark plan (free tier)`);
 
-  const billingAccountName = brandConfig.firebase?.billingAccount;
+  const billingAccountName = brandConfig.firebase?.billingAccount
+    || await resolveBillingAccount(context, api);
+
+  // The flow may have just landed the opt-out
+  if (brandConfig.firebase?.billingAccount === false) {
+    return { output: { billing: { note: 'billing opted out — Spark plan' } } };
+  }
 
   if (!billingAccountName) {
     console.log(`      ${chalk.dim('→')} Set firebase.billingAccount ("billingAccounts/XXXXXX-XXXXXX-XXXXXX") in company/brand config to auto-upgrade`);
     console.log(`      ${chalk.dim('→')} Or upgrade manually: ${chalk.cyan(`https://console.firebase.google.com/project/${projectId}/usage/details`)}`);
-    return { status: 'warned', output: { billing: { note: 'no firebase.billingAccount configured' } } };
+    return {
+      status: 'warned',
+      output: {
+        billing: {
+          note: 'no firebase.billingAccount configured',
+          needsInteractive: 'pick or create a billing account (the answer lands in omega.json5)',
+        },
+      },
+    };
   }
 
   // === WRITE ===

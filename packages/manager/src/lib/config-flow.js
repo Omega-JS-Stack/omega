@@ -10,6 +10,13 @@
  * Non-interactive or dry-run sessions get null back and each service keeps
  * its clean skip; every flow leads with a uniform Yes / Skip / Disable
  * gate ("Disable" writes `<section>: false` so the service stops asking).
+ *
+ * Tri-state standard (#33, Ian's call): a missing/null value means ASK
+ * (this module), `false` at the path — or any ancestor section — means the
+ * user OPTED OUT (silent skip, never prompt or warn again), and any other
+ * value means USE IT. Every flow can land the `false`: the gate's Disable
+ * writes it (disablePath defaults to the value's own path), and selection
+ * flows may offer an inline opt-out choice via `spec.optOut`.
  */
 const chalk = require('chalk').default;
 const { input, select, isInteractive } = require('@omega.js/devkit/prompt');
@@ -17,12 +24,24 @@ const { openBrowser } = require('@omega.js/devkit/flows');
 const { writeBrandConfig } = require('./config-write.js');
 
 const CREATE_NEW = '__CREATE_NEW__';
+const OPT_OUT = '__OPT_OUT__';
 
 /**
- * Read a dot-notation path from an object (undefined when any segment is missing).
+ * Read a dot-notation path for the tri-state standard: `false` at the path
+ * or any ancestor section means opted out; missing segments are undefined.
  */
-function getAtPath(obj, path) {
-  return path.split('.').reduce((node, key) => (node == null ? undefined : node[key]), obj);
+function readTriState(obj, path) {
+  let node = obj;
+  for (const key of path.split('.')) {
+    if (node === false) {
+      return { optedOut: true, value: undefined };
+    }
+    if (node == null) {
+      return { optedOut: false, value: undefined };
+    }
+    node = node[key];
+  }
+  return { optedOut: node === false, value: node === false ? undefined : node };
 }
 
 /**
@@ -141,6 +160,12 @@ async function runSelection(context, spec) {
     createNewLabel: createNew ? (createNew.label || label) : null,
   });
 
+  // Inline opt-out (tri-state): picking it lands `false` — resolveConfigValue
+  // handles the landing so this stays a pure selection
+  if (spec.optOut) {
+    built.choices.push({ name: spec.optOut.label || `No ${label} — don't ask again`, value: OPT_OUT });
+  }
+
   const picked = await select({
     message: spec.message || `Select ${label}:`,
     choices: built.choices,
@@ -200,30 +225,39 @@ async function runEntry(context, spec) {
 /**
  * Resolve a required config value interactively and land it in omega.json5.
  *
- * Returns the value already in config if present (idempotent); returns null
- * without prompting when non-interactive or dry-run, and when the user
- * skips or disables — callers keep their existing clean-skip handling.
+ * Tri-state (#33): returns the value already in config if present
+ * (idempotent); returns null WITHOUT prompting when the value — or any
+ * ancestor section — is `false` (the user opted out); returns null without
+ * prompting when non-interactive or dry-run, and when the user skips or
+ * disables — callers keep their existing clean-skip handling.
  *
  * @param {Object} context - Service context (brandConfig, brandRoot, options)
  * @param {Object} spec
  * @param {string} spec.path - omega.json5 dot path the value lands at
  * @param {string} spec.label - Human name ("GA4 property", "Chatsy chat agent")
  * @param {string[]} [spec.instructions] - Numbered guidance lines shown before the gate
+ * @param {string} [spec.message] - Selection prompt (default "Select <label>:")
  * @param {Function} [spec.choices] - async (context) → items (selection mode)
  * @param {Function} [spec.getName] - item → display name
  * @param {Function} [spec.getValue] - item → value
  * @param {*} [spec.defaultValue] - Sorts its item to the top of the list
  * @param {Object} [spec.createNew] - { label, handler } (API) or { label, url, refreshChoices } (browser)
  * @param {Object} [spec.entry] - { url, message, validate } (paste-back mode)
- * @param {string} [spec.disablePath] - Offer "Disable" → writes `<disablePath>: false`
+ * @param {Object} [spec.optOut] - { label } inline selection choice → lands `false`
+ * @param {string} [spec.disablePath] - Where Disable/opt-out writes `false`
+ *   (defaults to spec.path — section paths let one opt-out cover a service)
  * @param {boolean} [spec.gate] - false = skip the Yes/Skip/Disable gate (a
  *   chained value whose flow the user already said Yes to)
  * @returns {Promise<*>} - The landed value, or null
  */
 async function resolveConfigValue(context, spec) {
-  const { path, label, disablePath } = spec;
+  const { path, label } = spec;
+  const disablePath = spec.disablePath || path;
 
-  const existing = getAtPath(context.brandConfig, path);
+  const { optedOut, value: existing } = readTriState(context.brandConfig, path);
+  if (optedOut) {
+    return null;
+  }
   if (existing !== undefined && existing !== null) {
     return existing;
   }
@@ -244,7 +278,7 @@ async function resolveConfigValue(context, spec) {
       choices: [
         { name: 'Yes', value: 'yes' },
         { name: 'Skip for now', value: 'skip' },
-        ...(disablePath ? [{ name: 'Disable (stop prompting)', value: 'disable' }] : []),
+        { name: 'Disable (stop prompting)', value: 'disable' },
       ],
       default: 'yes',
     });
@@ -255,7 +289,7 @@ async function resolveConfigValue(context, spec) {
 
     if (action === 'disable') {
       landValue(context, disablePath, false);
-      console.log(`    ${chalk.yellow('!')} ${label} disabled in omega.json5`);
+      console.log(`    ${chalk.yellow('!')} ${label} disabled in omega.json5 (${disablePath}: false — delete the line to be asked again)`);
       return null;
     }
   }
@@ -263,6 +297,12 @@ async function resolveConfigValue(context, spec) {
   const value = spec.choices
     ? await runSelection(context, spec)
     : await runEntry(context, spec);
+
+  if (value === OPT_OUT) {
+    landValue(context, disablePath, false);
+    console.log(`    ${chalk.yellow('!')} ${label}: opted out (${disablePath}: false — delete the line to be asked again)`);
+    return null;
+  }
 
   if (value === undefined || value === null || value === '') {
     return null;

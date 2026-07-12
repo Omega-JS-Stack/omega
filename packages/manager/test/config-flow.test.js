@@ -175,6 +175,88 @@ test('config-flow: Skip answer returns null and writes nothing', async () => {
   }
 });
 
+// ─── Tri-state standard (#33): false = opted out ─────────────────────────────
+
+test('config-flow: `false` at the path = opted out — null with no prompting, even on a TTY', async () => {
+  const tty = openTtyPrompt();
+  try {
+    const context = makeContext();
+    context.brandConfig.chatsy.agentId = false;
+
+    const value = await resolveConfigValue(context, {
+      path: 'chatsy.agentId',
+      label: 'Chatsy chat agent',
+      entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
+    });
+
+    assert.equal(value, null);
+    assert.equal(readConfigSource(context.brandRoot), CONFIG_SOURCE); // untouched
+  } finally {
+    tty.close();
+  }
+});
+
+test('config-flow: `false` on an ancestor section = opted out for every path under it', async () => {
+  const tty = openTtyPrompt();
+  try {
+    const context = makeContext();
+    context.brandConfig.chatsy = false; // the section-level Disable landing shape
+
+    const value = await resolveConfigValue(context, {
+      path: 'chatsy.agentId',
+      label: 'Chatsy chat agent',
+      entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
+    });
+
+    assert.equal(value, null);
+  } finally {
+    tty.close();
+  }
+});
+
+test('config-flow: Disable without an explicit disablePath writes `<path>: false`, honored on the next call', async () => {
+  const tty = openTtyPrompt();
+  try {
+    const context = makeContext();
+    const spec = {
+      path: 'chatsy.agentId',
+      label: 'Chatsy chat agent',
+      entry: { url: 'https://chatsy.ai', message: 'Chatsy agent ID:' },
+    };
+
+    const run = resolveConfigValue(context, spec);
+    await tty.answer('Set up now?', `${DOWN}${DOWN}\r`); // Disable (stop prompting)
+    assert.equal(await run, null);
+
+    assert.equal(context.brandConfig.chatsy.agentId, false);
+    assert.ok(readConfigSource(context.brandRoot).includes('agentId: false'));
+
+    // Round-trip: the landed false short-circuits silently (a prompt would hang here)
+    assert.equal(await resolveConfigValue(context, spec), null);
+  } finally {
+    tty.close();
+  }
+});
+
+test('config-flow: inline opt-out choice lands `false` and returns null', async () => {
+  const tty = openTtyPrompt();
+  try {
+    const context = makeContext();
+    const run = resolveConfigValue(context, accountSpec({
+      optOut: { label: 'No analytics — don\'t ask again' },
+    }));
+    await tty.answer('Set up now?', '\r');
+    // Choices: Fixture Brand (222), Other Org (111), No analytics — cursor on the brand match
+    await tty.answer('Select Google Analytics account:', `${DOWN}${DOWN}\r`);
+    assert.equal(await run, null);
+
+    assert.equal(context.brandConfig.analytics.providers.google.accountId, false);
+    assert.ok(readConfigSource(context.brandRoot).includes('accountId: false'));
+  } finally {
+    tty.close();
+  }
+});
+
 test('config-flow: Disable answer writes `<section>: false` and returns null', async () => {
   const tty = openTtyPrompt();
   try {

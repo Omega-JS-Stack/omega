@@ -126,6 +126,22 @@ class RunSummary {
       }
     }
 
+    // Needs-interactive aggregate (#32): steps that stepped aside for lack
+    // of a TTY say so HERE, not just in scroll-back
+    const needsInteractive = this._getNeedsInteractive();
+    if (needsInteractive.length > 0) {
+      const multiBrand = brandSet.size > 1;
+      console.log('');
+      console.log(`  ${chalk.yellow('⚑')} Skipped — needs an interactive run:`);
+      for (const item of needsInteractive) {
+        const prefix = multiBrand ? `${item.brandName} · ` : '';
+        console.log(`      ${prefix}${chalk.bold(`${item.serviceName}/${item.operation}`)}: ${item.what}`);
+      }
+      for (const serviceName of [...new Set(needsInteractive.map((item) => item.serviceName))]) {
+        console.log(`      ${chalk.dim(`→ npm start -- --service=${serviceName}   (from the brand root)`)}`);
+      }
+    }
+
     // Retry command
     if (hasErrors) {
       console.log('');
@@ -138,10 +154,43 @@ class RunSummary {
   }
 
   /**
-   * Build a retry command from the original argv
+   * Build a retry command from the original argv. `npm start` is the blessed
+   * form — npx can be rerouted by shell wrappers (npu) that pipe stdio and
+   * kill interactivity.
    */
   _buildRetryCommand() {
-    return `npx omega-manager ${this.argv.join(' ')}`.trim();
+    const args = this.argv.join(' ').trim();
+    return args ? `npm start -- ${args}` : 'npm start';
+  }
+
+  /**
+   * Collect needs-interactive markers (#32): any handler output sub-object
+   * may carry `needsInteractive: '<what an interactive run would do>'` —
+   * the convention for steps that step aside without a TTY.
+   */
+  _getNeedsInteractive() {
+    const items = [];
+
+    for (const entry of this.entries) {
+      const output = entry.result?.output;
+      if (!output || typeof output !== 'object') {
+        continue;
+      }
+
+      for (const [operation, data] of Object.entries(output)) {
+        if (data && typeof data === 'object' && typeof data.needsInteractive === 'string') {
+          items.push({
+            brandId: entry.brandId,
+            brandName: entry.brandName,
+            serviceName: entry.serviceName,
+            operation,
+            what: data.needsInteractive,
+          });
+        }
+      }
+    }
+
+    return items;
   }
 
   /**

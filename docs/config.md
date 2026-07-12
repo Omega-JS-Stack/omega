@@ -201,6 +201,25 @@ Design + slice plan: [plans/n7-port-allocation.md](../plans/n7-port-allocation.m
 (`TARGET_SCHEMAS[target]`), run against the RESOLVED config. `brand.id` (URL-scheme-safe
 slug) and `brand.name` are the only universally required fields.
 
+## Tri-state provisioning values (#33)
+
+Provisioning-flow keys (org, billing account, service/agent ids — anything a manage
+flow can set up interactively) follow ONE contract, enforced by the manager's
+config-flow engine (`packages/manager/src/lib/config-flow.js`):
+
+| Value | Meaning |
+|-------|---------|
+| missing / `null` | ASK in an interactive run — the answer lands in omega.json5; without a TTY: warn + skip, aggregated in the run summary |
+| `false` | The user opted OUT — silent skip, never prompt or warn again. `false` on an ancestor section (`chatsy: false`) opts out every key under it |
+| anything else | Use it |
+
+Every ask offers the opt-out (the gate's "Disable" and, in selection flows, an inline
+"No …" choice), so `false` is always reachable; delete the line to be asked again.
+First consumers: `firebase.organizationId` (asked at project creation — pick an org or
+create standalone) and `firebase.billingAccount` (pick/create a billing account or stay
+on Spark). `firebase.supportEmail`'s null auto-derives the authorizing user's email
+instead of asking.
+
 ## Consumer access
 
 Each framework exposes the vendored loader — desktop: `require('@omega.js/desktop/config')`,

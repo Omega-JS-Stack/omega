@@ -54,7 +54,15 @@ module.exports = async function ensureCloudMessaging(context) {
   if (!isInteractive() || options.dryRun) {
     console.log(`      ${chalk.dim('→')} ${chalk.cyan(consoleUrl)}`);
     console.log(`      ${chalk.dim('→')} Rerun in an interactive terminal to paste both keys; they land in .omega/state.json`);
-    return { status: 'warned', output: { cloudMessaging: { note: 'no VAPID key pair in state (needs an interactive run)' } } };
+    return {
+      status: 'warned',
+      output: {
+        cloudMessaging: {
+          note: 'no VAPID key pair in state (needs an interactive run)',
+          needsInteractive: 'paste the VAPID key pair from the Cloud Messaging settings',
+        },
+      },
+    };
   }
 
   await pressEnterToOpen(consoleUrl, 'the Cloud Messaging settings');

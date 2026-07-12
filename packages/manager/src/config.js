@@ -94,8 +94,8 @@ const DEFAULTS = {
   firebase: {
     shared: false,        // true = project shared with other brands; only per-brand ops run (service-account, sdk-config)
     supportEmail: null,   // OAuth consent screen support email (defaults to the AUTHORIZING user's email — Google rejects any address the caller doesn't own; set only for an owned Google Group)
-    organizationId: null, // GCloud org ID — the project-create flow creates projects inside it (proper default permissions)
-    billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — required to auto-upgrade to Blaze
+    organizationId: null, // GCloud org ID — tri-state (#33): null = ask at project create, false = no org (standalone), value = create inside it (proper default permissions)
+    billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — tri-state: null = ask, false = stay on Spark, value = auto-upgrade to Blaze
     apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
   },
 

@@ -19,6 +19,7 @@ const FIREBASE_HOSTING_API_BASE = 'https://firebasehosting.googleapis.com/v1beta
 const RESOURCE_MANAGER_V1 = 'https://cloudresourcemanager.googleapis.com/v1';
 const RESOURCE_MANAGER_V3 = 'https://cloudresourcemanager.googleapis.com/v3';
 const FIRESTORE_API_BASE = 'https://firestore.googleapis.com/v1';
+const CLOUD_BILLING_API_BASE = 'https://cloudbilling.googleapis.com/v1';
 
 // Firebase Management + Cloud Platform (includes IAM, Billing, Service Usage).
 // userinfo.email lets the consent-screen step default supportEmail to the
@@ -85,6 +86,23 @@ class FirebaseAPI {
   async listProjects() {
     const response = await this.request(`${FIREBASE_API_BASE}/projects`);
     return response.results || [];
+  }
+
+  /**
+   * Organizations visible to the authed user — [] when there are none OR the
+   * search fails (org-less personal accounts are the normal case; a listing
+   * error must never block project creation).
+   */
+  async listOrganizations() {
+    try {
+      const response = await this.request(`${RESOURCE_MANAGER_V1}/organizations:search`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      return response.organizations || [];
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -300,14 +318,20 @@ class FirebaseAPI {
 
   async getProjectBillingInfo(projectId) {
     try {
-      return await this.request(`https://cloudbilling.googleapis.com/v1/projects/${projectId}/billingInfo`);
+      return await this.request(`${CLOUD_BILLING_API_BASE}/projects/${projectId}/billingInfo`);
     } catch {
       return null;
     }
   }
 
+  /** Billing accounts visible to the authed user (open + closed; callers mark closed) */
+  async listBillingAccounts() {
+    const response = await this.request(`${CLOUD_BILLING_API_BASE}/billingAccounts`);
+    return response.billingAccounts || [];
+  }
+
   async linkBillingAccount(projectId, billingAccountName) {
-    return this.request(`https://cloudbilling.googleapis.com/v1/projects/${projectId}/billingInfo`, {
+    return this.request(`${CLOUD_BILLING_API_BASE}/projects/${projectId}/billingInfo`, {
       method: 'PUT',
       body: JSON.stringify({ billingAccountName }),
     });
