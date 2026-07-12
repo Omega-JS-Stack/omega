@@ -185,6 +185,23 @@ inline AFTER the bundles so the brand wins the cascade. No/invalid color
 → the sheet's neutral placeholder stands. Token VALUES are C3 scaffolding
 until Ian's direction notes land; the names + plumbing are the contract.
 
+## Theming — two consumer tiers (C3)
+
+**Tier 1 — restyle the stock theme.** Ship `src/assets/css/main.scss` in the
+brand website app: the consumer layer leads the chain, so your entry wins
+the layered `main.scss` lookup. Open with `@use 'omega:main' with (…)` — the
+self-skipping `omega:` importer resolves to the next layer's entry, core
+`@forward`s the active theme's variables (so `with (…)` configures them),
+and your own rules land last to win the cascade. This is the migrated form
+of UJM's `@use 'ultimate-jekyll-manager' with (…)` customization.
+
+**Tier 2 — ship a full theme.** Put `themes/<id>/` in the brand website app
+(own `_theme.scss`, `_layouts/`, `css/`, `js/`) and set `theme.id: "<id>"` —
+consumer-local themes beat packaged ones ([resolveThemeLayers](src/layers.js)),
+`omega dev` watches them, and anything the theme doesn't cover falls through
+to the classy base (until the C3 reskin folds the base layer into core).
+Legacy `themes/<id>/…` layout spellings alias for consumer ids too.
+
 ## Pricing from config (C2)
 
 `payment.products` in omega.json5 is the ONLY pricing source. The engine

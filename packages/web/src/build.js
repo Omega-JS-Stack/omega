@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
 const { configureOmega } = require('./engine.js');
+const { resolveThemeLayers } = require('./layers.js');
 const { PATHS } = require('./paths.js');
 
 /**
@@ -35,7 +36,7 @@ async function buildSite(options) {
   const coreDir = options.coreDir || PATHS.core;
   const defaultsDir = options.defaultsDir || PATHS.defaults;
   const activeTheme = options.activeTheme || (options.siteData.theme && options.siteData.theme.id) || 'classy';
-  const themeLayerDirs = [...new Set([activeTheme, 'classy'])].map((id) => path.join(themesDir, id));
+  const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: options.consumerDir, themesDir });
 
   const timings = {};
   const started = process.hrtime.bigint();
@@ -57,6 +58,7 @@ async function buildSite(options) {
         ...themeLayerDirs,
         coreDir,
       ],
+      themeRoots: themeLayerDirs,
       themesDir,
       coreDir,
       outDir: options.outDir,

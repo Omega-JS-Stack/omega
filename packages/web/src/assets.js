@@ -53,6 +53,8 @@ function pageKey(rel) {
  * Build the js + css bundles for a site, returning the asset manifest.
  * @param {object} options
  * @param {string[]} options.layers - ordered layer roots (site → active theme → classy → core)
+ * @param {string[]} options.themeRoots - the theme layer dirs within `layers`
+ *   (resolveThemeLayers output — consumer-local theme dirs can't be derived)
  * @param {string} options.themesDir - the themes dir (for __main_assets__/themes)
  * @param {string} options.coreDir - the core layer root (for __main_assets__)
  * @param {string} options.outDir - the site output dir (_site)
@@ -63,7 +65,9 @@ function pageKey(rel) {
  */
 async function buildAssets(options) {
   const manifest = { js: { pages: {} }, css: { pages: {}, themePages: {} } };
-  const themeRoots = options.layers.filter((layer) => layer !== options.coreDir && path.dirname(layer) === options.themesDir);
+  // Explicit (resolveThemeLayers output) — a consumer-local theme dir can't
+  // be recognized by its parent dir, so callers name the theme roots.
+  const themeRoots = options.themeRoots;
 
   // ---- JS entries: layered union of page modules + the main bundle
   const jsDirs = options.layers.map((layer) => path.join(layer, 'js')).filter((dir) => fs.existsSync(dir));
@@ -256,4 +260,4 @@ function layeredFileImporter(layers) {
   };
 }
 
-module.exports = { buildAssets, purgeCss };
+module.exports = { buildAssets, purgeCss, layeredFileImporter };

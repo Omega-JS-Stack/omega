@@ -13,7 +13,7 @@ const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
-const { collectLayered } = require('./layers.js');
+const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerCollections } = require('./collections.js');
@@ -103,8 +103,8 @@ function configureOmega(eleventyConfig, options) {
   site.brandTokens = composeBrandTokens(site.brand?.color);
 
   // ---- Theme layer chain: active theme → classy base → core
-  const themeLayers = [...new Set([activeTheme, 'classy'])]
-    .map((id) => path.join(themesDir, id));
+  // (consumer-local themes/<id> beats the packaged theme — C3 tier 2)
+  const themeLayers = resolveThemeLayers({ activeTheme, consumerDir: options.consumerDir, themesDir });
   const layers = [...themeLayers, coreDir];
 
   // ---- LiquidJS: Jekyll include syntax + layered include roots.
@@ -218,9 +218,14 @@ function configureOmega(eleventyConfig, options) {
   // legacy spellings aliased (`themes/[ site.theme.id ]/frontend/pages/X`,
   // plus hardcoded `themes/<id>/X`). Migrated content uses the plain names;
   // the migration codemod (B4) rewrites the legacy idioms away permanently.
-  const themeIds = fs.readdirSync(themesDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
+  // Packaged ids + the active id — a consumer-local theme (C3 tier 2) is
+  // not under themesDir, but its legacy spellings must alias all the same.
+  const themeIds = [...new Set([
+    activeTheme,
+    ...fs.readdirSync(themesDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name),
+  ])];
   for (const rel of layoutMap.keys()) {
     const plain = rel.replace(/\.[a-z]+$/, '');
     const spellings = [

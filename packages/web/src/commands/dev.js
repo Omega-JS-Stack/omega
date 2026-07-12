@@ -28,6 +28,7 @@ const {
 } = require('@omega.js/config');
 const { buildAssets } = require('../assets.js');
 const { configureOmega } = require('../engine.js');
+const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { PATHS, resolveClientEntry } = require('../paths.js');
 
@@ -49,7 +50,7 @@ module.exports = async function (options) {
   const devPorts = { ...readSiblingPorts(paths.root), website: port };
 
   const activeTheme = (siteData.theme && siteData.theme.id) || 'classy';
-  const themeLayerDirs = [...new Set([activeTheme, 'classy'])].map((id) => path.join(PATHS.themes, id));
+  const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: paths.root, themesDir: PATHS.themes });
   const layers = [
     ...(fs.existsSync(paths.assets) ? [paths.assets] : []),
     ...themeLayerDirs,
@@ -61,6 +62,7 @@ module.exports = async function (options) {
 
   const build = () => buildAssets({
     layers,
+    themeRoots: themeLayerDirs,
     themesDir: PATHS.themes,
     coreDir: PATHS.core,
     outDir: paths.out,

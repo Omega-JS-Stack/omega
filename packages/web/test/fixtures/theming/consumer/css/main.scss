@@ -1,0 +1,9 @@
+// Tier-1 consumer entry: this file WINS the layered main.scss lookup, pulls
+// the whole stock chain below it via the self-skipping omega:main import,
+// configures a theme variable through core's @forward, and appends its own
+// override — the migrated UJM `@use '…' with (…)` customization pattern.
+@use 'omega:main' with ($mini-color: blue);
+
+:root {
+  --tier1-marker: yes;
+}

@@ -23,12 +23,14 @@ const OUT = path.join(PKG, '.omega', 'assets-test-out');
  * @returns {Promise<object>} manifest
  */
 function build(themeIds) {
+  const themeRoots = themeIds.map((id) => path.join(PKG, 'themes', id));
   return buildAssets({
     layers: [
       path.join(__dirname, 'fixtures', 'site-assets'),
-      ...themeIds.map((id) => path.join(PKG, 'themes', id)),
+      ...themeRoots,
       path.join(PKG, 'core'),
     ],
+    themeRoots,
     themesDir: path.join(PKG, 'themes'),
     coreDir: path.join(PKG, 'core'),
     outDir: OUT,
@@ -126,6 +128,7 @@ test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () =>
   fs.rmSync(OUT, { recursive: true, force: true });
   const manifest = await buildAssets({
     layers: [path.join(__dirname, 'fixtures', 'site-assets'), path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')],
+    themeRoots: [path.join(PKG, 'themes', 'classy')],
     themesDir: path.join(PKG, 'themes'),
     coreDir: path.join(PKG, 'core'),
     outDir: OUT,

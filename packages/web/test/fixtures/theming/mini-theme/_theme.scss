@@ -1,0 +1,9 @@
+// Minimal theme layer for importer-chain tests: one configurable variable
+// (proves `@use 'omega:main' with (…)` flows through core's @forward) and
+// one marker custom property (proves the theme layer resolved at all).
+$mini-color: red !default;
+
+:root {
+  --mini-theme-marker: yes;
+  --mini-color: #{$mini-color};
+}
