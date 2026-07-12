@@ -8,6 +8,9 @@ import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
 // Import theme (exposes Bootstrap to window.bootstrap)
 import '__theme__/_theme.js';
 
+// Icon auto-render (fa-* markup, static or JS-set) — shared client watcher
+import './lib/icons.js';
+
 // Class
 class Manager {
   constructor() {

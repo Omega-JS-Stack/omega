@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
 const { configureOmega } = require('./engine.js');
-const { emitIcons } = require('./icons.js');
+const { emitIcons } = require('@omega.js/devkit/icons');
 const { resolveThemeLayers } = require('./layers.js');
 const { PATHS } = require('./paths.js');
 

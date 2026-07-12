@@ -19,7 +19,7 @@ const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerCollections } = require('./collections.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
-const { resolveFontAwesomeRoots } = require('./fontawesome-roots.js');
+const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
 const { PATHS } = require('./paths.js');
 
 // Data-cascade keys that are engine machinery, not page/layout data — everything

@@ -59,7 +59,7 @@ exports.build = series(
   exports.defaults,
   exports.distribute,
   exports.translate,
-  parallel(exports.sass, exports.webpack, exports.icons, exports.html),
+  parallel(exports.sass, exports.webpack, exports.icons, exports.fontawesome, exports.html),
   exports.package,
   exports.audit,
   exports.publish,

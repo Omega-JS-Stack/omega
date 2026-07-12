@@ -24,8 +24,7 @@ color), `overflow="visible"` (FA 7 glyphs may overdraw their viewBox).
 | `icon-core` | `@omega.js/client/modules/icon-core.js` | Pure semantics: name/style validation, `parseIconClasses` (FA's family × weight class model), candidate lookup order (style dir → brands fallback), SVG root attributes, alias mapping, the package preference order (`PACKAGES`) |
 | `icon-renderer` | `@omega.js/client/modules/icon-renderer.js` | The ONE browser auto-render: scan + MutationObserver (insertions AND class changes), render/re-render/clear, caching. Transport-injected — callers pass one `resolve(name, style) → Promise<svg\|null>` |
 | Build-time inlining | `@omega.js/template-kit` `uj_icon` | Static template icons inlined into the HTML at build (zero runtime cost); same icon-core semantics |
-| Asset chain | `@omega.js/web` `src/fontawesome-roots.js` + desktop `lib/fontawesome.js` `_resolveRoots()` | Best-first roots: `OMEGA_FONTAWESOME_ROOT` → brand's `@fortawesome/fontawesome-pro` → `@fortawesome/fontawesome-free` floor (always last — a partial brand set never loses icons/aliases a lower rung has) |
-| Runtime emission | `@omega.js/web` `src/icons.js` | Every build ships the merged set to the site's `assets/fa/<style>/<name>.svg` (~25MB with Pro; hosting deploys diff by hash, browsers fetch only icons actually used) |
+| Asset chain + emission | `@omega.js/devkit/icons` (build-side, ONE impl for web + extension) + desktop `lib/fontawesome.js` `_resolveRoots()` (runtime) | Best-first roots: `OMEGA_FONTAWESOME_ROOT` → brand's `@fortawesome/fontawesome-pro` → `@fortawesome/fontawesome-free` floor (always last — a partial brand set never loses icons/aliases a lower rung has). `emitIcons` ships the merged set to a build output's `assets/fa/<style>/<name>.svg` (~25MB with Pro; hosting deploys diff by hash, browsers fetch only icons actually used) |
 
 ## Per-target transport (the only non-shared line)
 
@@ -33,7 +32,8 @@ color), `overflow="visible"` (FA 7 glyphs may overdraw their viewBox).
 |--------|----------|----------|
 | Web pages | `fetch('/assets/fa/<style>/<name>.svg')` from the site's own origin | `runtime/boot.js` `initialize()` — every page, main bundle or not |
 | Desktop renderers | IPC `desktop:fontawesome:get` → main's icon server (fs, works packaged/offline) | `renderer.js` `_wireFontAwesome` |
-| Extension pages | not wired yet (no icon consumer). Recipe when one lands: emit/vendor the set into `dist/assets/fa`, resolver = `fetch(chrome.runtime.getURL('assets/fa/…'))` | — |
+| Extension pages | `fetch(chrome.runtime.getURL('assets/fa/…'))` — the packaged set (gulp `fontawesome` task emits it to `dist/assets/fa` at every brand build), fully offline | `src/lib/icons.js` (self-starting side-effect import) in popup/options/sidepanel/page |
+| Extension content scripts | NOT auto-wired on purpose — watching a HOST page's DOM would collide with sites using FA themselves. Injected UI imports `createIconRenderer` and `scan()`s its own container; `assets/fa/*` is in `web_accessible_resources` for exactly this | manual, per injected surface |
 
 Rendered elements carry `data-omega-fa="<style>/<name>"`. Unknown icons /
 Pro styles without a Pro set leave the element **empty** (marked) — a
@@ -91,5 +91,8 @@ future FA families work with zero framework changes.
 - `packages/desktop/src/test/suites/{main,renderer}/fontawesome.test.js` —
   the real-DOM proof of the SHARED renderer (insert, re-class, clear,
   Pro-adaptive assertions) + main's root chain and IPC sanitization.
-- `packages/web/test/fontawesome-roots.test.js` + `test/icons.test.js` —
-  chain resolution + emission merge.
+- `packages/devkit/test/fontawesome-roots.test.js` + `test/icons.test.js` —
+  chain resolution + emission merge (the shared build-side impl).
+- Live consumer proof: the playground extension build emits the full
+  merged set (Pro included via the brand `.env`) and compiles the watcher
+  into all four page bundles.

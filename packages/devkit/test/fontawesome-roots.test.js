@@ -11,7 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const { resolveFontAwesomeRoots } = require('../src/fontawesome-roots.js');
+const { resolveFontAwesomeRoots } = require('../src/icons.js');
 
 // Pro is token-gated, so its presence depends on the machine — assertions
 // adapt so the suite is green before AND after a brand installs it.

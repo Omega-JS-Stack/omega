@@ -204,3 +204,12 @@ extension package/webpack `validRedirectHosts`.)
    pointer; CLAUDE.md Icons section). client 96 / web 109 / desktop 767
    (live re-class → swap → clear proof). The desktop suite IS the
    real-DOM proof of the exact module web pages run — same code path.
+   **cp112b (same day, Ian: "SYNONYMOUS IN ALL including bxm"):** ext
+   wired — build-side chain+emit moved to `@omega.js/devkit/icons` (ONE
+   impl; web's copies deleted), ext gains the fa-free floor dep + gulp
+   `fontawesome` emit task + self-starting `lib/icons.js` watcher import
+   on all four page surfaces (getURL fetch, packaged/offline) + WAR
+   `assets/fa/*` for content-script-injected UI (host DOMs never
+   auto-watched — collision by design). Playground ext build: 5,681
+   icons emitted incl Pro-only acorn (brand .env → BXM chain proven).
+   devkit 195 / web 103 / ext 102.
