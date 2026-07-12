@@ -198,9 +198,12 @@ async function ensureNodeVersion(requiredMajor) {
   logVersionCheck('Node.js', `v${installedMajor}`, `v${requiredMajor}`, matches);
 
   if (!matches) {
-    throw new Error(
+    // #15: a wrong RUNNING Node no longer halts setup — the .nvmrc pin is
+    // already written (ensureNvmrc runs first), the remaining checks
+    // complete, and manage runs spawn setup under the app's own Node anyway.
+    logger.warn(
       `Node version mismatch: running v${installedMajor} but Electron requires v${requiredMajor} (matches Electron's bundled Node). ` +
-      `Run \`nvm use\` (the .nvmrc has been written to v${requiredMajor}/*) and re-run setup.`,
+      `Standalone shells: run \`nvm use\` (the .nvmrc is pinned to v${requiredMajor}/*) before the next build.`,
     );
   }
 }

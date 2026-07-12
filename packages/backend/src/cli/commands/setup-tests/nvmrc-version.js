@@ -21,9 +21,10 @@ class NvmrcVersionTest extends BaseTest {
 
     jetpack.write(`${this.self.firebaseProjectPath}/functions/.nvmrc`, `v${v}/*`);
 
-    console.log(chalk.red(`Please run ${chalk.bold(`nvm use ${v}`)} to use the correct version of Node.js`));
-
-    throw new Error('');
+    // #15: the pin is now correct — the fix IS complete and the run
+    // continues (manage runs spawn setup under the app's own Node; only a
+    // standalone shell needs the nvm switch, for NEXT time).
+    console.log(chalk.yellow(`.nvmrc pinned to v${v}/* — standalone shells: run ${chalk.bold(`nvm use ${v}`)}`));
   }
 }
 

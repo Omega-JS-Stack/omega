@@ -12,9 +12,13 @@ class NodeVersionTest extends BaseTest {
     const engineHasVer = this.context.package.engines.node;
     const processVer = process.versions.node;
 
-    // Check if the process version is less than the required version
+    // #15: a wrong RUNNING Node no longer halts the whole setup — the
+    // remaining checks complete and this lands in the summary as a warning
+    // (manage runs spawn setup under the app's own .nvmrc Node, so this
+    // fires mostly in standalone shells).
     if (wonderfulVersion.is(processVer, '<', engineReqVer)) {
-      return new Error(`Please use at least version ${engineReqVer} of Node.js with this project. You need to update your package.json and your .nvmrc file. Then, make sure to run ${chalk.bold(`nvm use ${engineReqVer}`)}`);
+      this._warning = `running Node ${processVer} but this project needs ${engineReqVer} — run ${chalk.bold(`nvm use ${engineReqVer}`)}`;
+      return 'warn';
     }
 
     // Check if the engine version is less than the required version
@@ -24,6 +28,10 @@ class NodeVersionTest extends BaseTest {
 
     // Return
     return wonderfulVersion.is(engineHasVer, '>=', engineReqVer);
+  }
+
+  getWarning() {
+    return this._warning ? [this._warning] : [];
   }
 
   async fix() {
