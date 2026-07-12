@@ -1,15 +1,3 @@
-// Dev mode credentials by runtime
-const DEV_CREDENTIALS = {
-  'browser-extension': {
-    id: 'G-5NWE9SPEEM',
-    secret: '33E5W1cCQGKPK4lyMMOWOQ',
-  },
-  'electron': {
-    id: 'G-WMNERKK9J2',
-    secret: 'UeKzq8UvS3GD5D2aHcuZgQ',
-  },
-};
-
 // Supported runtimes for analytics
 const SUPPORTED_RUNTIMES = ['browser-extension', 'electron'];
 
@@ -50,25 +38,14 @@ class Analytics {
       return;
     }
 
-    // Check for development mode
+    // Check for development mode — dev NEVER posts to a real property
+    // (consumers' dev traffic must not land in anyone's GA4; the baked-in
+    // fallback credentials are gone by design — C4 cp106a de-ITW).
     this.devMode = this.manager.isDevelopment();
 
-    // Get measurement ID and secret (use dev credentials in dev mode)
-    if (this.devMode) {
-      const devCreds = DEV_CREDENTIALS[this.runtime];
-      if (devCreds) {
-        this.measurementId = devCreds.id;
-        this.secret = devCreds.secret;
-        console.log(`[Analytics] Dev mode: using ${this.runtime} dev credentials`);
-      } else {
-        // No dev credentials for this runtime, use provided config
-        this.measurementId = config.measurementId || config.id;
-        this.secret = config.secret;
-      }
-    } else {
-      this.measurementId = config.measurementId || config.id;
-      this.secret = config.secret;
-    }
+    // Get measurement ID and secret from config
+    this.measurementId = config.measurementId || config.id;
+    this.secret = config.secret;
 
     // Skip if no measurement ID
     if (!this.measurementId) {
@@ -149,6 +126,12 @@ class Analytics {
 
   // Send event via Measurement Protocol (fetch)
   _sendViaFetch(eventName, params = {}) {
+    // Dev mode logs only — nothing posts
+    if (this.devMode) {
+      console.log('[Analytics] Dev mode: event logged locally, not sent');
+      return;
+    }
+
     // Measurement Protocol requires api_secret
     if (!this.secret) {
       console.warn('[Analytics] No API secret provided, cannot send via Measurement Protocol');
