@@ -9,13 +9,17 @@
  * added — the website hosts elsewhere (GitHub Pages).
  *
  * Per domain, one reconciliation pass:
- *   verified  → ensure the Cloudflare CNAME is proxied
+ *   verified  → ensure the Cloudflare CNAME has the right proxy state:
+ *               proxied when Universal SSL covers the name (apex or one
+ *               label below the zone), DNS-only when deeper (subdomain
+ *               projects — api.{sub}.{zone}; the free cert can't cover
+ *               two levels, so Firebase serves the certificate instead)
  *   pending   → write Firebase's required DNS records (TXT ownership/ACME +
  *               unproxied CNAME); interactive runs then poll until Firebase
  *               verifies (writing any NEW records it demands mid-poll — the
  *               ACME challenge appears once ownership passes) and finish by
- *               proxying the CNAME; non-interactive/dry runs report state,
- *               warned — rerun converges
+ *               setting the CNAME's final proxy state; non-interactive/dry
+ *               runs report state, warned — rerun converges
  *   deleted   → undelete, then treat as pending
  *   missing   → create, then treat as pending
  *
@@ -94,18 +98,36 @@ module.exports = async function ensureHosting(context) {
 };
 
 /**
+ * Cloudflare Universal SSL only covers the apex and ONE label below it
+ * (*.zone). Deeper hostnames (api.playground.zone — subdomain projects)
+ * can never complete a TLS handshake through the proxy on the free cert;
+ * their CNAME stays DNS-only and Firebase serves its own certificate.
+ */
+function universalSslCovers(fullDomain, zoneName) {
+  return fullDomain === zoneName
+    || (fullDomain.endsWith(`.${zoneName}`)
+      && !fullDomain.slice(0, -(zoneName.length + 1)).includes('.'));
+}
+
+/**
  * One reconciliation pass over a single API domain.
  */
 async function ensureApiDomain(context, zone, apiDomain) {
   const { firebaseApi: api, projectId, apexDomain, options = {} } = context;
   const { fullDomain, recordName } = apiDomain;
 
+  // Deep hostnames can't ride the proxy (no Universal SSL coverage)
+  const proxyEligible = universalSslCovers(fullDomain, zone.name);
+
   let status = await api.checkDomainStatus(projectId, projectId, fullDomain);
 
-  // Fully verified — just make sure the CNAME is proxied
+  // Fully verified — just make sure the CNAME has the right proxy state
   if (status.verified) {
     console.log(`      ${chalk.green('✓')} Domain verified: ${chalk.cyan(fullDomain)}`);
-    await ensureCname(context, zone, recordName, { proxied: true });
+    if (!proxyEligible) {
+      console.log(`      ${chalk.dim(`${fullDomain} is deeper than *.${zone.name} — Universal SSL can't cover it; CNAME stays DNS-only (Firebase serves the certificate)`)}`);
+    }
+    await ensureCname(context, zone, recordName, { proxied: proxyEligible });
     return { domain: fullDomain, status: 'verified' };
   }
 
@@ -147,7 +169,7 @@ async function ensureApiDomain(context, zone, apiDomain) {
     const verified = await waitForVerification(context, zone, fullDomain, recordName, status);
     if (verified) {
       console.log(`      ${chalk.green('✓')} Domain verified: ${chalk.cyan(fullDomain)}`);
-      await ensureCname(context, zone, recordName, { proxied: true });
+      await ensureCname(context, zone, recordName, { proxied: proxyEligible });
       return { domain: fullDomain, status: 'verified' };
     }
   }
@@ -282,9 +304,13 @@ async function ensureCname(context, zone, recordName, { proxied }) {
   try {
     const existing = await findDnsRecord(cloudflareApi, zone.id, fullRecordName, 'CNAME');
 
-    // Never un-proxy a working record; only lift proxied → true after verify
+    // Never un-proxy a working record (verify-cycle flapping) — EXCEPT when
+    // the name is too deep for Universal SSL, where proxied can never work
+    // and the record must come back down to DNS-only.
     const needsUpdate = existing
-      && (existing.content !== cnameTarget || (proxied === true && existing.proxied === false));
+      && (existing.content !== cnameTarget
+        || (proxied === true && existing.proxied === false)
+        || (proxied === false && existing.proxied === true && !universalSslCovers(fullRecordName, zone.name)));
 
     if (existing && !needsUpdate) {
       return;
@@ -312,3 +338,5 @@ async function ensureCname(context, zone, recordName, { proxied }) {
     console.log(`        ${chalk.yellow('⚠')} CNAME error for ${chalk.cyan(recordName)}${chalk.dim(`: ${error.message}`)}`);
   }
 }
+
+module.exports.universalSslCovers = universalSslCovers;

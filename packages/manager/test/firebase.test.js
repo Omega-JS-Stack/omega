@@ -313,6 +313,46 @@ test('firebase: fully converged project is a zero-mutation no-op across all 13 o
   assert.equal(result.state.hosting.domains[0].status, 'verified');
 });
 
+// ─── Hosting: Universal SSL depth limit (cp114b) ─────────────────────────────
+
+test('hosting: deep subdomain-project api domain comes back to DNS-only (Universal SSL limit)', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+
+  // The rule itself: apex + one label ride the proxy, deeper never does
+  assert.equal(handler.universalSslCovers(DOMAIN, DOMAIN), true);
+  assert.equal(handler.universalSslCovers(`api.${DOMAIN}`, DOMAIN), true);
+  assert.equal(handler.universalSslCovers(`api.play.${DOMAIN}`, DOMAIN), false);
+
+  // Live-found shape (api.playground.omegajs.dev): verified domain, CNAME
+  // proxied:true from the pre-fix run → must be PATCHed down to DNS-only so
+  // Firebase can serve the certificate.
+  const sub = `play.${DOMAIN}`;
+  const api = fakeFirebase({
+    listHostingSites: [{ name: `projects/${PROJECT}/sites/${PROJECT}` }],
+    checkDomainStatus: { exists: true, verified: true },
+  });
+  const cf = fakeCf({
+    records: [{ id: 'c9', type: 'CNAME', name: `api.play.${DOMAIN}`, content: `${PROJECT}.web.app`, proxied: true }],
+  });
+
+  const result = await handler({
+    firebaseApi: api,
+    cloudflareApi: cf,
+    brandConfig: {},
+    projectId: PROJECT,
+    domain: sub,
+    apexDomain: DOMAIN,
+    isSubdomainProject: true,
+    options: {},
+    serviceData: {},
+  });
+
+  assert.equal(result.state.hosting.domains[0].status, 'verified');
+  const patch = cf.mutations().find((c) => c.method === 'PATCH');
+  assert.ok(patch, 'expected the proxied CNAME to be PATCHed');
+  assert.equal(patch.body.proxied, false);
+});
+
 // ─── Billing (de-ITW'd) ──────────────────────────────────────────────────────
 
 test('billing: Spark plan with no firebase.billingAccount warns instead of linking', async () => {
