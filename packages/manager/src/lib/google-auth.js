@@ -209,11 +209,12 @@ class GoogleOAuth2Client {
         console.log(`  ${chalk.dim('→')} Google authentication required:`);
         console.log(`  ${chalk.cyan(authUrl.toString())}`);
 
-        // Auto-open in interactive terminals (omega-manager convention) —
-        // the printed URL stays the fallback. Kills the dead-link race
-        // where a human reads the URL after its listener expired (#25).
+        // Auto-open when a human is watching — stdout-TTY counts even when a
+        // wrapper (npu's npx guard, tee) pipes stdin, which blinds the prompt
+        // module's stdin check. The printed URL stays the fallback. Kills the
+        // dead-link race where a human reads an expired URL (#25).
         const { isInteractive, openInBrowser } = require('@omega.js/devkit/prompt');
-        if (isInteractive() && openInBrowser(authUrl.toString())) {
+        if ((process.stdout.isTTY || isInteractive()) && openInBrowser(authUrl.toString())) {
           console.log(`  ${chalk.dim('→')} Opening your browser... (use the URL above if nothing appears)`);
         }
         console.log('');
