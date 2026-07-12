@@ -63,11 +63,12 @@
     provider: "firebase",
     config: {
       apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
-      authDomain: "omegajs-playground.firebaseapp.com",
+      authDomain: "omegajs.dev",
       projectId: "omegajs-playground",
       storageBucket: "omegajs-playground.firebasestorage.app",
       messagingSenderId: "644778453321",
       appId: "1:644778453321:web:0d4f0f8774385a21671298",
+      databaseURL: "https://omegajs-playground-default-rtdb.firebaseio.com",
     },
   },
 
