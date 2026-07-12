@@ -11,7 +11,7 @@
  * left it — they can try Save again without re-flipping.
  */
 import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
-import { FormManager } from '__main_assets__/js/libs/form-manager.js';
+import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 
 const FORM_ID = 'marketing-emails-form';

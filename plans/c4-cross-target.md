@@ -102,9 +102,17 @@ extension package/webpack `validRedirectHosts`.)
      conventions). Web keeps gtag.js for auto-collection — it's a tag the
      page loads, not a second library we maintain; the client engine is the
      single in-house implementation. cp106a/cp106b proceed as sliced.
-4. **cp107 — FormManager → shared.** Moves into `@omega.js/client` (it already
-   only uses client primitives); web re-imports; desktop/extension gain it for
-   real (fixes desktop's dead alias).
+4. **cp107 — FormManager → shared. ✅ SHIPPED (2026-07-12).** Moved verbatim
+   into `@omega.js/client/modules/form-manager.js` — its only imports were
+   already client primitives, now relative (`./dom.js`, `../index.js`; no
+   self-name refs, pre-publish safe). 23 web import sites + web classy's
+   dynamic import respelled to the client path; web's copy DELETED. Desktop's
+   dead `__main_assets__` alias import (classy hero-demo-form) now points at
+   the client module (client is a desktop runtime dep since cp106b);
+   extension gets the module for free via its client dep. client 90 (+5:
+   real import under the test DOM shim, constructor-throw behavior,
+   relative-imports/no-alias pins, dist presence) / web 103 / desktop 764 /
+   ext 102.
 5. **cp108 — FontAwesome story.** One icon mechanism (likely: shared runtime
    inline-SVG module + per-target asset supply; desktop's FA-Pro set stays its
    asset source). Decide after cp104 proves the css channel.

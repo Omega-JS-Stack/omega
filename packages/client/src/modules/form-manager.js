@@ -12,8 +12,8 @@
  */
 
 // Libraries
-import { ready as domReady } from '@omega.js/client/modules/dom.js';
-import omega from '@omega.js/client';
+import { ready as domReady } from './dom.js';
+import omega from '../index.js';
 
 // Constants
 const HONEYPOT_SELECTOR = '[data-honey], [name="honey"]';

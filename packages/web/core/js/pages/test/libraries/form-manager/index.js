@@ -3,7 +3,7 @@
  */
 
 // Libraries
-import { FormManager } from '__main_assets__/js/libs/form-manager.js';
+import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 
 // Module

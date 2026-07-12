@@ -7,7 +7,7 @@
  */
 
 import omega from '@omega.js/client';
-import { FormManager } from '__main_assets__/js/libs/form-manager.js';
+import { FormManager } from '@omega.js/client/modules/form-manager.js';
 
 const BASE_W = 960;
 const BASE_H = 540;

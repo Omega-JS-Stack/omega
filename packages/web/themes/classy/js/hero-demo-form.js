@@ -14,7 +14,7 @@ export default async function initHeroDemoForm() {
   }
 
   // Dynamic import FormManager only when needed
-  const { FormManager } = await import('__main_assets__/js/libs/form-manager.js');
+  const { FormManager } = await import('@omega.js/client/modules/form-manager.js');
 
   const formManager = new FormManager($form, {
     submittingText: 'Processing...',

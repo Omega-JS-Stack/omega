@@ -1,5 +1,5 @@
 // Payment Checkout Page
-import { FormManager } from '__main_assets__/js/libs/form-manager.js';
+import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPaymentConfig, getProcessors, getProductById } from '__main_assets__/js/libs/payment-config.js';
 import { fetchTrialEligibility, warmupServer, createPaymentIntent } from './modules/api.js';
 import { state, buildBindingsState, resolveProcessor, FREQUENCIES, getAvailableFrequencies } from './modules/state.js';
