@@ -106,7 +106,7 @@ test('resolved site seed: site sections surface as resolved.* (Configuration blo
   assert.ok(html.includes('src="/assets/js/main-TEST.js"'), 'main bundle from the manifest');
 });
 
-test('pricing: plan defaults from the real classy layout frontmatter', () => {
+test('pricing: template-default hero copy renders (layout frontmatter knobs are gone)', () => {
   const html = pages.get('/pricing/');
   assert.ok(html.includes('The right plans,'), 'classy pricing hero default');
   assert.ok(html.includes('for the right price'), 'hero accent');

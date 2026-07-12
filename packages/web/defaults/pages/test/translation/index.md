@@ -1,9 +1,7 @@
 ---
-### ALL PAGES ###
 layout: frontend/core/minimal
 permalink: /test/translation
 
-### REGULAR PAGES ###
 sitemap:
   include: false
 meta:
@@ -12,7 +10,6 @@ meta:
   breadcrumb: "Test translation page"
   index: false
 
-### WEB MANAGER CONFIG ###
 web_manager:
   exitPopup:
     enabled: false

@@ -36,10 +36,8 @@ function localDateStamp(date) {
 function renderPostFile(brandConfig, post) {
   return [
     '---',
-    '### ALL PAGES ###',
     'layout: blueprint/blog/post',
     '',
-    '### POST ONLY ###',
     'post:',
     `  title: ${JSON.stringify(post.title)}`,
     `  description: ${JSON.stringify(post.description)}`,

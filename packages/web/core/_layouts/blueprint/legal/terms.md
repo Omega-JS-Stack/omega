@@ -1,14 +1,11 @@
 ---
-### ALL PAGES ###
 layout: frontend/core/minimal
 
-### REGULAR PAGES ###
 meta:
   title: "Terms Of Service - {{ site.brand.name }}"
   description: "By accessing and using our products and services, you agree to comply with the Terms of Use listed here."
   breadcrumb: "Terms of Service"
 
-### WEB MANAGER CONFIG ###
 web_manager:
   exitPopup:
     enabled: false

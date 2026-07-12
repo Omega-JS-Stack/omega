@@ -15,8 +15,9 @@
 
 ## Blueprint / pricing (C2)
 
-6. 🟡 **Zero-products brand renders HARDCODED fake plans** — classy's pricing layout falls back to baked-in "Basic"/"Premium" content that looks real and sells nothing. Products must be the ONLY source: empty catalog → honest empty state or a build warning.
-7. ⚪ One-time products (`launch-kit`) render on the subscription pricing page with no type distinction — C2 decides presentation per `type`.
+6. ✅ (was 🟡, FIXED cp97) **Zero-products brand renders HARDCODED fake plans** — classy's pricing layout falls back to baked-in "Basic"/"Premium" content that looks real and sells nothing. Products must be the ONLY source: empty catalog → honest empty state or a build warning. **Fixed cp97**: the engine composes `site.pricing` from `payment.products` alone (src/pricing.js); all three themes render it; empty catalog → explicit `#pricing-empty` state + `omega build` warning; ALL fictional layout defaults (plans, 5M-customers social proof, fake testimonials, generic FAQs, always-on promo banner, unconditional Enterprise card) deleted — those sections are consumer-frontmatter-only now.
+7. ✅ (was ⚪, FIXED cp97) One-time products (`launch-kit`) render on the subscription pricing page with no type distinction — C2 decides presentation per `type`. **Fixed cp97**: `type: 'one-time'` products get their own section (single price, "Buy now", no billing cadence); checkout URLs drive frequency off `data-plan-type`, not hardcoded plan ids.
+21. 🟡 **foot.html's SoftwareApplication schema FABRICATES aggregateRating** — hash-derived 4.8/4.9 rating with a fake 200k–1M ratingCount emitted as JSON-LD on every page that enables it (blueprint/pricing does). Fake review markup is a Google manual-action risk. Ported UJM behavior, predates C2 — the schema subsystem rides C3/SEO; kill or make it consumer-supplied real data.
 
 ## BEM setup on demo-* projects (parked 1.4b, now in full color — C1)
 

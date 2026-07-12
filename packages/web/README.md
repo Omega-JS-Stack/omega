@@ -80,7 +80,7 @@ see the harness README for the honest before/after numbers.
 - `core/` — the theme-agnostic layer: `_layouts/blueprint/**` (45 page-type
   contracts), `_layouts/core/root.html` (the document shell),
   `_layouts/modules/` (redirect utility), `_includes/` (head/body/foot chrome,
-  adsense/promo adunits, resolve-plan pricing math, default nav/footer/account
+  adsense/promo adunits, price-per-unit pricing math, default nav/footer/account
   data JSONs), `css/` (main.scss + core styles + per-page css), `js/` (the UJM
   runtime: main module, core modules, libs, per-page modules), `icons/`.
 - `defaults/pages/**` — ~60 default pages at their real URLs (about, pricing,
@@ -165,6 +165,25 @@ see the harness README for the honest before/after numbers.
   `web_manager.payment`, providers → the client's flat analytics) so the
   chrome/client contract is unchanged — one home per value in the config,
   same bridge pattern as the extension framework.
+
+## Pricing from config (C2)
+
+`payment.products` in omega.json5 is the ONLY pricing source. The engine
+composes `site.pricing` ([src/pricing.js](src/pricing.js)) — subscription
+plans (config order), one-time products (own section, no billing cadence),
+billing-toggle availability (both cadences must exist), an HONEST savings
+badge (computed from real prices), and the feature-comparison matrix (tiers
+inherit earlier plans' features) — and it surfaces as `resolved.pricing` in
+every theme's pricing layout. Optional presentation fields per product:
+`tagline`, `popular`, `url`, `features [{ id, name, icon, definition,
+value }]` (value falls back to `limits[id]`; `-1` renders Unlimited). Free
+plan = no prices → anchors to `/signup`. Empty catalog → an explicit
+`#pricing-empty` state + an `omega build` warning — never fictional plans.
+Consumer page frontmatter still overrides presentation per-page (hero copy,
+`faqs`, `social_proof`, `pricing.enterprise`, `pricing.promo`,
+`pricing.guarantee`, `pricing.price_per_unit`); the framework ships NO
+fictional defaults (the dispersal-era `### ALL PAGES ###` marker convention
+is dead — pinned by a contract test).
 
 ## Engine facts worth knowing (test-pinned)
 

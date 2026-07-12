@@ -1,0 +1,33 @@
+{% comment %}
+  Per-unit pricing math — shared by every theme's pricing layout. Jekyll
+  includes share the caller's variable scope, so the assigns land in the
+  calling template.
+
+  In:  include.plan — a composed resolved.pricing.plans item
+       resolved.pricing.price_per_unit — consumer knob { enabled, feature_id, label }
+
+  Out: monthly_price_per_unit — $/unit at monthly billing (nil unless computable)
+       annual_price_per_unit  — $/unit at annual billing, monthly-equivalent
+
+  Only computes for paid plans whose target feature resolves to a usable
+  positive number (guards the divided_by). Re-assigned on every call so loop
+  iterations never see a previous plan's values.
+{% endcomment %}
+
+{% assign monthly_price_per_unit = nil %}
+{% assign annual_price_per_unit = nil %}
+{% assign _ppu_value = nil %}
+
+{% if include.plan.prices.monthly > 0 %}
+  {% for _ppu_feature in include.plan.features %}
+    {% if _ppu_feature.id == resolved.pricing.price_per_unit.feature_id %}
+      {% assign _ppu_value = _ppu_feature.value %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+  {% if _ppu_value and _ppu_value > 0 %}
+    {% assign monthly_price_per_unit = include.plan.prices.monthly | times: 1.0 | divided_by: _ppu_value | round: 2 %}
+    {% assign _ppu_annual_monthly = include.plan.prices.annually | divided_by: 12.0 %}
+    {% assign annual_price_per_unit = _ppu_annual_monthly | divided_by: _ppu_value | round: 2 %}
+  {% endif %}
+{% endif %}

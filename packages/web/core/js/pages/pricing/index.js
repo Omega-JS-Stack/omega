@@ -145,6 +145,7 @@ function setupPlanButtons() {
 // Handle plan selection
 function handlePlanSelection(button) {
   const planId = button.dataset.planId;
+  const planType = button.dataset.planType || 'subscription';
   const billingType = document.querySelector(`${config.selectors.billingRadios}:checked`)?.dataset.billing || 'monthly';
 
   if (!planId) {
@@ -160,10 +161,10 @@ function handlePlanSelection(button) {
   const price = priceElement ? parseFloat(priceElement.textContent) : 0;
 
   // Track add to cart event
-  trackAddToCart(planId, planName, price, billingType);
+  trackAddToCart(planId, planName, price, billingType, planType);
 
   // Log for debugging
-  console.log(`Added to cart: ${planId} (${billingType} frequency) - $${price}`);
+  console.log(`Added to cart: ${planId} (${planType}, ${billingType} frequency) - $${price}`);
 
   // Special handling for enterprise plan
   if (planId === 'enterprise') {
@@ -176,8 +177,9 @@ function handlePlanSelection(button) {
   const url = new URL('/payment/checkout', window.location.origin);
   url.searchParams.set('product', planId);
 
-  // Add frequency parameter for non-basic plans
-  if (planId !== 'basic') {
+  // Billing frequency only applies to subscriptions — one-time products
+  // have a single price (payment.products type drives this via data-plan-type)
+  if (planType === 'subscription') {
     url.searchParams.set('frequency', billingType);
   }
 
@@ -201,11 +203,11 @@ function trackPricingToggle(billingType) {
   });
 }
 
-function trackAddToCart(planId, planName, price, billingType) {
+function trackAddToCart(planId, planName, price, billingType, planType) {
   const items = [{
     item_id: planId,
     item_name: planName,
-    item_category: 'subscription',
+    item_category: planType || 'subscription',
     item_variant: billingType,
     price: price,
     quantity: 1
@@ -337,9 +339,10 @@ function setupCurrentPlanIndicator() {
       $currentButton.classList.add('btn-adaptive');
     }
 
-    // Update other paid plan buttons to "Switch to this plan"
+    // Update other subscription buttons to "Switch to this plan" — one-time
+    // products and the enterprise contact button keep their own CTAs
     document.querySelectorAll('button[data-plan-id]').forEach(($button) => {
-      if ($button.dataset.planId === resolved.plan || $button.dataset.planId === 'basic' || $button.dataset.planId === 'enterprise') {
+      if ($button.dataset.planId === resolved.plan || $button.dataset.planId === 'enterprise' || $button.dataset.planType !== 'subscription') {
         return;
       }
       $button.textContent = 'Switch to This Plan';

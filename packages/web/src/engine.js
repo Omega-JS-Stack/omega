@@ -17,6 +17,7 @@ const { collectLayered } = require('./layers.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerCollections } = require('./collections.js');
+const { composePricing } = require('./pricing.js');
 const { PATHS } = require('./paths.js');
 
 // Data-cascade keys that are engine machinery, not page/layout data — everything
@@ -88,6 +89,12 @@ function configureOmega(eleventyConfig, options) {
     site.web_manager.firebase.app.config = site.cloud.config;
   }
   if (site.payment) site.web_manager.payment = site.payment;
+
+  // Pricing view-model (C2): payment.products is the ONLY plan source — the
+  // seed surfaces as resolved.pricing (cascade still lets consumer frontmatter
+  // override presentation). Lives OUTSIDE web_manager so the client
+  // Configuration payload stays the raw catalog. null = honest empty state.
+  site.pricing = composePricing(site.payment);
 
   // ---- Theme layer chain: active theme → classy base → core
   const themeLayers = [...new Set([activeTheme, 'classy'])]

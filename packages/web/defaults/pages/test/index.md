@@ -1,9 +1,7 @@
 ---
-### ALL PAGES ###
 layout: frontend/core/minimal
 permalink: /test
 
-### REGULAR PAGES ###
 sitemap:
   include: false
 meta:

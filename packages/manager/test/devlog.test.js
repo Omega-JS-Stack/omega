@@ -314,7 +314,8 @@ const POST = {
 test('devlog: renderPostFile emits blueprint front matter with the brand author', () => {
   const file = renderPostFile(brandConfigFor('alpha'), POST);
 
-  assert.ok(file.startsWith('---\n### ALL PAGES ###\nlayout: blueprint/blog/post\n'));
+  assert.ok(file.startsWith('---\nlayout: blueprint/blog/post\n'), 'plain frontmatter — no dispersal-era section markers (C2)');
+  assert.ok(!file.includes('###'), 'marker convention retired');
   assert.ok(file.includes('post:\n  title: "Auth Round Trips"'));
   assert.ok(file.includes('  author: alpha'));
   assert.ok(file.includes('  tags: ["devlog"]'));

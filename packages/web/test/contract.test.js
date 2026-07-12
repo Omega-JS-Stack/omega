@@ -85,6 +85,25 @@ test('manifest-injected assets on every theme (hashed main css/js, valid Configu
   }
 });
 
+test('dispersal-era section markers are DEAD: no packaged template carries `### X ###` (C2)', () => {
+  const roots = [
+    path.join(PKG, 'defaults'),
+    path.join(PKG, 'core'),
+    path.join(PKG, 'themes'),
+  ];
+  const offenders = [];
+  for (const root of roots) {
+    for (const entry of fs.readdirSync(root, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !/\.(html|md)$/.test(entry.name)) continue;
+      const file = path.join(entry.parentPath, entry.name);
+      if (/^### .+ ###\s*$/m.test(fs.readFileSync(file, 'utf8'))) {
+        offenders.push(path.relative(PKG, file));
+      }
+    }
+  }
+  assert.deepStrictEqual(offenders, [], 'files still carrying dispersal-era markers');
+});
+
 test('no unresolved Liquid syntax leaks into any built page', () => {
   for (const theme of THEMES) {
     const outDir = path.join(PKG, '.omega', `contract-${theme}`);

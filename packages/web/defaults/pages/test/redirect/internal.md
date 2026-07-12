@@ -1,9 +1,7 @@
 ---
-### ALL PAGES ###
 layout: modules/utilities/redirect
 permalink: /test/redirect/internal
 
-### REGULAR PAGES ###
 sitemap:
   include: false
 meta:
@@ -12,7 +10,6 @@ meta:
   breadcrumb: "Internal redirect test page"
   index: false
 
-### REDIRECT PAGES ###
 redirect:
   url: "/test"
 ---

@@ -20,6 +20,12 @@ module.exports = async function (options) {
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
 
+  // C2: payment.products is the only pricing source — surface the honest
+  // empty state loudly so a bare catalog is a choice, not a surprise
+  if (!siteData.payment || !Array.isArray(siteData.payment.products) || siteData.payment.products.length === 0) {
+    logger.warn('payment.products is empty — /pricing renders the "no published pricing" empty state');
+  }
+
   const result = await buildSite({
     consumerDir: paths.src,
     siteAssetsDir: paths.assets,
