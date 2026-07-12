@@ -1,26 +1,26 @@
 <!-- Get Client ID -->
-{%- assign page-adsense-client = resolved.advertising.google-adsense.client -%}
+{%- assign page-adsense-client = resolved.advertising.providers.google-adsense.client -%}
 
 <!-- Determine the type of ad unit -->
 {% assign type = include.type | default: "display" %}
 
 <!-- Configure based on type -->
 {% if type == "display" %}
-  {% assign slot = include.slot | default: resolved.advertising.google-adsense.display-slot %}
+  {% assign slot = include.slot | default: resolved.advertising.providers.google-adsense.display-slot %}
   {% assign layout = "" %}
   {% assign layout-key = "" %}
   {% assign style = include.style | default: "" %}
   {% assign format = "auto" %}
   {% assign full-width-responsive = "true" %}
 {% elsif type == "in-article" %}
-  {% assign slot = include.slot | default: resolved.advertising.google-adsense.in-article-slot %}
+  {% assign slot = include.slot | default: resolved.advertising.providers.google-adsense.in-article-slot %}
   {% assign layout = "in-article" %}
   {% assign layout-key = "" %}
   {% assign style = include.style | default: "" %}
   {% assign format = "fluid" %}
   {% assign full-width-responsive = "" %}
 {% elsif type == "in-feed" %}
-  {% assign slot = include.slot | default: resolved.advertising.google-adsense.in-feed-slot %}
+  {% assign slot = include.slot | default: resolved.advertising.providers.google-adsense.in-feed-slot %}
   {% assign layout = "" %}
   {% assign layout-key-input = include.layout | default: "image-above" %}
   {% if layout-key-input == "image-above" %}
@@ -34,7 +34,7 @@
   {% assign format = "fluid" %}
   {% assign full-width-responsive = "" %}
 {% elsif type == "multiplex" %}
-  {% assign slot = include.slot | default: resolved.advertising.google-adsense.multiplex-slot %}
+  {% assign slot = include.slot | default: resolved.advertising.providers.google-adsense.multiplex-slot %}
   {% assign layout = "" %}
   {% assign layout-key = "" %}
   {% assign style = include.style | default: "" %}

@@ -228,8 +228,8 @@
 
 <!-- Script - Google Adsense -->
 {% comment %}
-{% iftruthy resolved.advertising.google-adsense.client %}
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-{{ site.advertising.google-adsense.client }}" crossorigin="anonymous"></script>
+{% iftruthy resolved.advertising.providers.google-adsense.client %}
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-{{ resolved.advertising.providers.google-adsense.client }}" crossorigin="anonymous"></script>
 {% endiftruthy %}
 {% endcomment %}
 

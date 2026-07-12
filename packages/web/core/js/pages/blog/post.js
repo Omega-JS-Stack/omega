@@ -24,8 +24,8 @@ function insertBlogPostAds() {
   }
 
   // Get ad configuration from window.Configuration (set by Jekyll)
-  const adClient = window.Configuration?.advertising?.['google-adsense']?.client;
-  const adSlot = window.Configuration?.advertising?.['google-adsense']?.['in-article-slot'];
+  const adClient = window.Configuration?.advertising?.providers?.['google-adsense']?.client;
+  const adSlot = window.Configuration?.advertising?.providers?.['google-adsense']?.['in-article-slot'];
   const adLayout = 'in-article';
   const adFormat = 'fluid';
 

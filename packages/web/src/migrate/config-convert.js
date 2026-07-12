@@ -8,7 +8,8 @@
  *   `brand` (+ merged `url`), `theme`, `oauth2`,
  *   `web_manager.firebase.app.config` → `cloud.{provider,config}`,
  *   `web_manager.payment` → `payment`,
- *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`.
+ *   flat `analytics.{google,meta,tiktok}` → `analytics.providers.<p>.id`,
+ *   flat `advertising.<provider>` → `advertising.providers.<provider>`.
  * - Everything web-only under `targets.web`: presentation sections (meta,
  *   socials, download, extension, favicon, manifest, icons, recaptcha,
  *   cloudflare, translation), blog/engine config (permalink, pagination,
@@ -106,6 +107,12 @@ function convertConfig({ jekyll, ujm }) {
       else providers[provider] = { id: String(id) };
     }
     if (!isEmpty(providers)) omega.analytics = { providers };
+  }
+
+  // ---- advertising: legacy flat providers → role-keyed providers shape
+  const advertising = take('advertising');
+  if (!isEmpty(advertising)) {
+    omega.advertising = advertising.providers ? advertising : { providers: advertising };
   }
 
   if (!isEmpty(legacyWebManager.payment)) {

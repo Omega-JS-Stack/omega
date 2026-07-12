@@ -80,6 +80,11 @@ const loadAdSenseScript = (config) => {
   });
 };
 
+// Resolve the in-house ad server from config (advertising.providers.inhouse)
+const getInhouseServerUrl = () => {
+  return omega.config.advertising?.providers?.inhouse?.serverUrl || '';
+};
+
 // Set up message handler for iframe communication (only once)
 const setupMessageHandler = () => {
   // Ensure this is only set up once
@@ -90,9 +95,21 @@ const setupMessageHandler = () => {
   // Flag as set up
   window.__ujVertMessageHandlerSetup = true;
 
+  // Messages are accepted from this page's own origin and the configured
+  // in-house ad server only
+  const allowedOrigins = [window.location.origin];
+  const serverUrl = getInhouseServerUrl();
+  if (serverUrl) {
+    try {
+      allowedOrigins.push(new URL(serverUrl).origin);
+    } catch (e) {
+      console.warn('[Vert] Invalid advertising.providers.inhouse.serverUrl:', serverUrl);
+    }
+  }
+
   // Listen for messages from vert iframes (validate origin)
   window.addEventListener('message', (event) => {
-    if (event.origin !== window.location.origin && event.origin !== 'https://promo-server.itwcreativeworks.com') {
+    if (!allowedOrigins.includes(event.origin)) {
       return;
     }
 
@@ -182,11 +199,25 @@ const createCustomAd = ($vertUnit, config) => {
   // Generate unique ID for the iframe
   const iframeId = `vert-${window.__ujVertIdCounter = (window.__ujVertIdCounter || 0) + 1}`;
 
+  // No configured in-house server and no debug override → nothing to serve
+  const serverUrl = getInhouseServerUrl();
+  if (!serverUrl && !qsDebug) {
+    console.log('[Vert] No in-house ad server configured (advertising.providers.inhouse.serverUrl) — skipping custom ad');
+    return;
+  }
+
+  // The brand that HOSTS the ad server serves its own /verts locally in dev
+  let servesOwnAds = false;
+  try {
+    servesOwnAds = !!serverUrl && new URL(serverUrl).host === new URL(omega.config.brand?.url || '').host;
+  } catch (e) {
+    servesOwnAds = false;
+  }
+
   // Build base URL for the ad content
-  // Use local server if debug=true OR if we're in development mode AND on promo-server
-  const baseURL = (qsDebug || (omega.isDevelopment() && omega.config.brand.id === 'promo-server'))
+  const baseURL = (qsDebug || (omega.isDevelopment() && servesOwnAds))
     ? `${window.location.protocol}//${window.location.host}/verts/main`
-    : 'https://promo-server.itwcreativeworks.com/verts/main';
+    : `${serverUrl.replace(/\/+$/, '')}/verts/main`;
 
   // Build full URL with parameters
   const adURL = new URL(baseURL);

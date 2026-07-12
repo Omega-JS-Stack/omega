@@ -235,6 +235,17 @@ test('formatErrors renders a numbered block; empty list renders empty', () => {
 test('SHARED_SECTIONS enumerates the disperse-owned sections', () => {
   assert.deepStrictEqual(
     SHARED_SECTIONS,
-    ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'],
+    ['brand', 'cloud', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'],
   );
+});
+
+test('advertising schema: role-keyed providers with the inhouse server url (C4 cp105)', () => {
+  const { SHARED_SCHEMA } = require('../src/schema.js');
+  const paths = SHARED_SCHEMA.map((entry) => entry.path);
+
+  assert.ok(paths.includes('advertising.providers.google-adsense.client'));
+  assert.ok(paths.includes('advertising.providers.inhouse.serverUrl'));
+  for (const slot of ['display-slot', 'in-article-slot', 'in-feed-slot', 'multiplex-slot']) {
+    assert.ok(paths.includes(`advertising.providers.google-adsense.${slot}`), `missing ${slot}`);
+  }
 });

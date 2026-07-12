@@ -25,6 +25,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   brand:          { id, name, url, description, tagline, contact: { email }, address: {…}, images: {…} },
   cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId } },
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
+  advertising:    { providers: { 'google-adsense': { client, 'display-slot', 'in-article-slot', 'in-feed-slot', 'multiplex-slot' }, inhouse: { serverUrl } } }, // C4 cp105
   payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […] },
   monitoring:     { provider: 'sentry', dsn },
   oauth2:         { /* public client IDs only */ },

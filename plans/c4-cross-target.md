@@ -64,10 +64,12 @@ extension package/webpack `validRedirectHosts`.)
    packages into dist. Proofs: byte-identical sheets on plain install;
    omega-brand extension + desktop builds carry the tokens; devkit 186 /
    desktop 764 / extension 102.
-2. **cp105 — `advertising.*` schema + vert de-ITW.** Role-keyed section into
-   `SHARED_SECTIONS` (providers incl. inhouse server URL), vert.js reads
-   config (fallback URL, origin, special-case die), ad TYPE param per the arc
-   note. Small, independent.
+2. **cp105 — `advertising.*` schema + vert de-ITW. ✅ SHIPPED (2026-07-11).**
+   `advertising.providers.{google-adsense.{client,4 slots}, inhouse.serverUrl}`
+   in SHARED_SECTIONS; all consumers respelled; vert.js hardcodes dead (URL,
+   origin allowlist, promo-server special-case → "brand hosts the ad server"
+   rule); config-convert lifts legacy flat shape; ad TYPE param was already
+   live (cp63 port). config 95 / web 102 / manager 584.
 3. **cp106 — analytics ONE engine.** Client module = the single GA4 MP engine:
    nested schema shape everywhere (kill the flatten bridge), web runtime
    support (retire/relegate gtag path per decision), desktop's parallel lib

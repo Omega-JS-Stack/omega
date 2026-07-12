@@ -32,7 +32,7 @@ const TARGETS = ['web', 'backend', 'desktop', 'extension', 'mobile'];
 // omega-manager's disperse enumerates THIS list instead of hardcoding
 // per-target mapping blocks. (`targets` itself is the scoping key, not a
 // shared section; `theme` is project-owned but shared-shaped.)
-const SHARED_SECTIONS = ['brand', 'cloud', 'analytics', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
+const SHARED_SECTIONS = ['brand', 'cloud', 'analytics', 'advertising', 'payment', 'monitoring', 'oauth2', 'theme', 'translation'];
 
 const SHARED_SCHEMA = [
   // ── brand ────────────────────────────────────────────────────────────────
@@ -128,6 +128,44 @@ const SHARED_SCHEMA = [
     type:        'string',
     required:    false,
     description: 'TikTok Pixel ID. Presence-driven.',
+  },
+
+  // ── advertising ──────────────────────────────────────────────────────────
+  {
+    path:        'advertising.providers.google-adsense.client',
+    type:        'string',
+    required:    false,
+    description: 'AdSense publisher client id (ca-pub-…). Presence-driven: set to enable ad units.',
+  },
+  {
+    path:        'advertising.providers.google-adsense.display-slot',
+    type:        'string',
+    required:    false,
+    description: 'Default AdSense slot id for display units (per-include override wins).',
+  },
+  {
+    path:        'advertising.providers.google-adsense.in-article-slot',
+    type:        'string',
+    required:    false,
+    description: 'Default AdSense slot id for in-article units.',
+  },
+  {
+    path:        'advertising.providers.google-adsense.in-feed-slot',
+    type:        'string',
+    required:    false,
+    description: 'Default AdSense slot id for in-feed units.',
+  },
+  {
+    path:        'advertising.providers.google-adsense.multiplex-slot',
+    type:        'string',
+    required:    false,
+    description: 'Default AdSense slot id for multiplex units.',
+  },
+  {
+    path:        'advertising.providers.inhouse.serverUrl',
+    type:        'string',
+    required:    false,
+    description: 'In-house ad server base URL (serves /verts/main; the AdSense-unfilled fallback and `type: custom` units). Presence-driven — unset disables in-house ads.',
   },
 
   // ── payment ──────────────────────────────────────────────────────────────
