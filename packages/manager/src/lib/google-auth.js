@@ -220,11 +220,16 @@ class GoogleOAuth2Client {
         console.log('');
       });
 
-      // Timeout after 5 minutes (was 2 — humans relaying URLs need slack, #25)
-      setTimeout(() => {
+      // Timeout after 5 minutes (was 2 — humans relaying URLs need slack,
+      // #25). unref + clear on settle: a finished flow must never hold the
+      // event loop (a live run idled minutes after its summary — the zombie
+      // timer from a SUCCESSFUL auth).
+      const timeout = setTimeout(() => {
         server.close();
         reject(new Error('Authentication timed out'));
       }, 300000);
+      timeout.unref();
+      server.on('close', () => clearTimeout(timeout));
     });
   }
 
