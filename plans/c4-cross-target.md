@@ -70,10 +70,28 @@ extension package/webpack `validRedirectHosts`.)
    origin allowlist, promo-server special-case → "brand hosts the ad server"
    rule); config-convert lifts legacy flat shape; ad TYPE param was already
    live (cp63 port). config 95 / web 102 / manager 584.
-3. **cp106 — analytics ONE engine.** Client module = the single GA4 MP engine:
-   nested schema shape everywhere (kill the flatten bridge), web runtime
-   support (retire/relegate gtag path per decision), desktop's parallel lib
-   collapses onto client via its bridge, hardcoded dev creds → config/env.
+3. **cp106 — analytics ONE engine.** Survey verdict (2026-07-11): the collapse
+   direction REVERSES — desktop's `src/lib/analytics.js` is the superior
+   engine (canonical `analytics.providers.google.id` read, secret via
+   `GOOGLE_ANALYTICS_SECRET` env like backend/extension, uuidv5 cross-surface
+   identity: deviceId→client_id, firebaseUid→user_id, namespace from
+   projectId); the client module is the weak twin (flat `analytics.google`
+   shape, **real ITW GA4 ids+API secrets hardcoded in source** as dev creds,
+   no identity model). Best-implementation-wins:
+   - **cp106a** — client engine adopts desktop's semantics: canonical
+     providers shape (index.js flat handoff + web foot.html's flatten bridge
+     DIE), uuidv5 identity, secret stays env-at-build (extension package.js
+     already bakes `GOOGLE_ANALYTICS_SECRET`), and the ITW dev creds are
+     DELETED — dev mode logs events instead of posting (consumers' dev
+     traffic must not land in ITW properties). Web runtime becomes
+     shape-ready but gtag remains the web path pending Ian.
+   - **cp106b** — desktop's lib collapses onto the client engine (main-process
+     wrapper keeps the preload/renderer IPC bridge + env secret; the
+     analytics-bridge suite repins).
+   - **QUEUED TO IAN**: web analytics — keep gtag.js (Google's script,
+     auto-collected page_view/scroll/engagement) or unify on the client's
+     Measurement Protocol (no third-party script, but auto-collection is
+     lost)? Marketing-data trade-off, not an engineering call.
 4. **cp107 — FormManager → shared.** Moves into `@omega.js/client` (it already
    only uses client primitives); web re-imports; desktop/extension gain it for
    real (fixes desktop's dead alias).
