@@ -2,17 +2,17 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **cp97 + 98 + 98b SHIPPED (pricing-from-config, markers dead, deliberate deploys live, marketing chrome restored per Ian) — next: cp99 C3 redesign (queue #1)**. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction still open: #15 Node story, #16 sass (C3); #21 closed DECIDED-KEEP
+- **cp99 C3 STARTED — design brief + 3 direction boards OUT FOR IAN'S NOTES** ([plans/c3-design-brief.md](plans/c3-design-brief.md), artifact link inside; note via corner tags A·hero/B·type/… or D1–D10); systems track proceeds in parallel, nothing blocks on notes. omegajs.dev REGISTERED (Ian 2026-07-11) — wire at arc close. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction open: #15 Node story, #16 sass (in flight here)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **cp99+** — C3 classy redesign (multi-checkpoint): FRONT-LOAD the design brief FOR IAN (typography/palette/motion — the genuinely-Ian surface) while systems work proceeds — cross-target core tokens/primitives (D10), two-tier theme mechanics, default pages + blueprints reskinned, auth/account/payment surfaces, omega-brand as showcase; #16 sass folds in → then C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
+1. **cp99a+** — C3 systems track (design-agnostic, brief already out): cross-target core token layer (D10), #16 sass modernization, app-shell mechanics, two-tier theme mechanics (toy second theme proves tiers) → Ian's notes land as the skin pass (default pages + blueprints, auth/account/payment, omega-brand showcase) → C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
 2. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
 - Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go — a LONG way out ("everything good across the board" first)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; audit port (explicit stub in the web package — translate UNPINNED by Ian 2026-07-11, shipping as cp96). MAM parked entirely.
-- omegajs-playground billing: FUNCTIONS deploy needs Blaze — Ian's call (hosting live-deployed on Spark at cp98: omegajs-playground.web.app); live Actions workflow runs also Ian-gated (runner minutes)
+- omegajs-playground Blaze: billing account EXISTS (gcloud "Main Billing Account", open) — attach is one word from Ian (hosting already live on Spark: omegajs-playground.web.app); OMEGA auto-attach ensure-step (billing account in company config) = agreed feature (Ian 2026-07-11), lands with provisioning; live Actions runs still Ian-gated
 
 ## 📏 Standing rules
 - **Continuous mode (Ian 2026-07-10)**: keep iterating/building/testing autonomously, checkpoint after checkpoint — stop ONLY for serious errors or decisions that are genuinely Ian's. (Replaces one-checkpoint-per-"continue".)
@@ -96,4 +96,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 6:40 PM (98b — marketing chrome restored per Ian; next: cp99 C3 redesign, design brief first)*
+*Last updated: 2026-07-11 6:55 PM (cp99 — C3 brief + boards out for Ian's notes; next: cp99a systems track)*
