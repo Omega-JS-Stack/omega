@@ -181,3 +181,37 @@ test('sequential prompts on one stream pair all render and resolve', async () =>
   streams.input.write('y\r');
   assert.equal(await third, true);
 });
+
+test('pressEnterToOpen: non-TTY prints the URL and returns false (no browser)', async () => {
+  const streams = makeStreams({ tty: false });
+  prompt.setPromptStreams(streams);
+
+  const opened = await prompt.pressEnterToOpen('https://example.com/console', 'the console');
+  assert.equal(opened, false);
+  assert.ok(streams.getRendered().includes('https://example.com/console'), 'URL printed as the fallback');
+  assert.ok(!streams.getRendered().includes('Press Enter'), 'no prompt without a TTY');
+});
+
+test('pressEnterToOpen: interactive waits for Enter, then launches the browser', async () => {
+  const streams = makeStreams({ tty: true });
+  prompt.setPromptStreams(streams);
+
+  const opened = [];
+  const realOpen = prompt.openInBrowser;
+  prompt.openInBrowser = (url) => { opened.push(url); return true; };
+
+  try {
+    const pending = prompt.pressEnterToOpen('https://example.com/console', 'the console');
+    await waitForOutput(streams, 'Press Enter to open the console');
+    streams.input.write('\r');
+    assert.equal(await pending, true);
+    assert.deepEqual(opened, ['https://example.com/console'], 'launch happens only after Enter');
+  } finally {
+    prompt.openInBrowser = realOpen;
+  }
+});
+
+test('openCommand maps the current platform to its opener', () => {
+  const expected = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  assert.equal(prompt.openCommand(), expected);
+});

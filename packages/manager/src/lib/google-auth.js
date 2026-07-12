@@ -206,16 +206,24 @@ class GoogleOAuth2Client {
         authUrl.searchParams.set('prompt', 'consent');
 
         console.log('');
-        console.log(`  ${chalk.dim('→')} Google authentication required — open this URL in your browser:`);
+        console.log(`  ${chalk.dim('→')} Google authentication required:`);
         console.log(`  ${chalk.cyan(authUrl.toString())}`);
+
+        // Auto-open in interactive terminals (omega-manager convention) —
+        // the printed URL stays the fallback. Kills the dead-link race
+        // where a human reads the URL after its listener expired (#25).
+        const { isInteractive, openInBrowser } = require('@omega.js/devkit/prompt');
+        if (isInteractive() && openInBrowser(authUrl.toString())) {
+          console.log(`  ${chalk.dim('→')} Opening your browser... (use the URL above if nothing appears)`);
+        }
         console.log('');
       });
 
-      // Timeout after 2 minutes
+      // Timeout after 5 minutes (was 2 — humans relaying URLs need slack, #25)
       setTimeout(() => {
         server.close();
         reject(new Error('Authentication timed out'));
-      }, 120000);
+      }, 300000);
     });
   }
 

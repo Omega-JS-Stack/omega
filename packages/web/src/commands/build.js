@@ -3,10 +3,10 @@
  * Eleventy → PurgeCSS, into dist/. The asset manifest also lands in
  * .omega/asset-manifest.json for the dev config and post-build tooling.
  * When translation.languages is set, the built site is then translated into
- * /{lang}/ copies from the committed per-string cache ONLY — build never
- * calls a live provider; pages with cold strings are skipped with a warning
- * and belong to an explicit `omega translate` run (friction #24 decision).
- * `omega build --translate` opts one build into the full live pass.
+ * /{lang}/ copies — cache-first (committed per-string cache), and cold
+ * strings translate LIVE by default so a build always ships the complete
+ * translated site (Ian's #24 final call). `omega build --cached-only` skips
+ * cold pages instead (with a warning list) for LLM-free builds.
  */
 const path = require('node:path');
 const Logger = require('@omega.js/devkit/logger');
@@ -42,12 +42,12 @@ module.exports = async function (options) {
   logger.log(`Built ${result.htmlCount} pages in ${result.timings.total.toFixed(2)}s → ${path.relative(paths.root, paths.out)}/`);
 
   // Post-build translation (site.* IS the resolved config shape).
-  // cachedOnly: a routine build must never sit inside a live LLM — pages with
-  // cold strings are skipped with a warning; `omega translate` translates
-  // them. `omega build --translate` opts a single build into the full
-  // live-provider pass (equivalent to build + translate in one command).
-  if (options.translate) {
-    logger.log('--translate: cold pages WILL be translated live this build');
+  // Default: translate EVERYTHING — warm strings from the committed cache
+  // (instant), cold strings live through the provider, so a build always
+  // ships the complete translated site. --cached-only skips cold pages
+  // instead (warning lists them) for provider-free builds.
+  if (options.cachedOnly) {
+    logger.log('--cached-only: cold pages will be skipped, not translated');
   }
 
   const translation = await translateSite({
@@ -56,7 +56,7 @@ module.exports = async function (options) {
     config: siteData,
     logger,
     only: process.env.OMEGA_TRANSLATE_ONLY,
-    cachedOnly: !options.translate,
+    cachedOnly: Boolean(options.cachedOnly),
   });
 
   if (!translation.skipped) {
@@ -67,7 +67,7 @@ module.exports = async function (options) {
       const preview = translation.skippedCold.slice(0, 10).join(', ');
       const more = translation.skippedCold.length > 10 ? ` (+${translation.skippedCold.length - 10} more)` : '';
       logger.warn(`translation: ${translation.skippedCold.length} page-language pair(s) skipped — cold cache: ${preview}${more}`);
-      logger.warn('translation: run `omega translate` to translate them (build only uses the committed cache)');
+      logger.warn('translation: run `omega translate` (or build without --cached-only) to translate them');
     }
   }
 

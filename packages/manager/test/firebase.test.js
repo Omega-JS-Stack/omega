@@ -437,17 +437,26 @@ test('authentication: wrong-project OAuth client is flagged, credentials not sav
 
 test('authentication: interactive redirect-URI confirm records completion in state', async () => {
   const handler = require('../src/services/firebase/ensure/authentication.js');
+  const prompt = require('@omega.js/devkit/prompt');
   const api = fakeFirebase(convergedResponses());
   const tty = openTtyPrompt();
 
+  // Stub the real browser launch behind the press-Enter-to-open step
+  const opened = [];
+  const realOpen = prompt.openInBrowser;
+  prompt.openInBrowser = (url) => { opened.push(url); return true; };
+
   try {
     const run = handler(handlerContext(brandConfig(), api));
+    await tty.answer('Press Enter to open the OAuth client settings', '\r');
     await tty.answer('Origins + redirect URIs configured in the OAuth client?', 'y\r');
     const result = await run;
 
     assert.equal(result.status, 'success');
     assert.equal(result.state.authentication.oauthRedirectsConfigured, true);
+    assert.equal(opened.length, 1, 'Enter opened the OAuth client settings');
   } finally {
+    prompt.openInBrowser = realOpen;
     tty.close();
   }
 });
@@ -466,11 +475,16 @@ test('cloud-messaging: missing VAPID key pair warns with console guidance', asyn
 
 test('cloud-messaging: interactive paste-back validates lengths and lands both keys in state', async () => {
   const handler = require('../src/services/firebase/ensure/cloud-messaging.js');
+  const prompt = require('@omega.js/devkit/prompt');
   const api = fakeFirebase({ isServiceEnabled: () => true });
   const tty = openTtyPrompt();
 
+  const realOpen = prompt.openInBrowser;
+  prompt.openInBrowser = () => true;
+
   try {
     const run = handler(handlerContext(brandConfig(), api));
+    await tty.answer('Press Enter to open the Cloud Messaging settings', '\r');
     await tty.answer('VAPID public key:', 'too-short\r');
     // \x15 (ctrl-U) clears the rejected line before retyping
     await tty.answer('must be exactly 87 characters', `\x15${'B'.repeat(87)}\r`);
@@ -484,6 +498,7 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
     assert.notEqual(result.status, 'warned');
     assert.equal(api.mutations().length, 0);
   } finally {
+    prompt.openInBrowser = realOpen;
     tty.close();
   }
 });

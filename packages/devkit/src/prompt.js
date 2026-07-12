@@ -102,6 +102,53 @@ function confirm(opts) {
   return _confirm(opts, _streams || undefined);
 }
 
+/**
+ * Launch the OS browser for a URL. Dependency-free `open`: darwin `open`,
+ * win32 `start`, else `xdg-open`. Fire-and-forget; failures are the
+ * caller's printed-URL fallback. Exposed for tests (openCommand).
+ */
+function openCommand() {
+  if (process.platform === 'darwin') {
+    return 'open';
+  }
+  if (process.platform === 'win32') {
+    return 'start';
+  }
+  return 'xdg-open';
+}
+
+function openInBrowser(url) {
+  const { spawn } = require('node:child_process');
+  try {
+    const child = spawn(openCommand(), [url], { stdio: 'ignore', detached: true, shell: process.platform === 'win32' });
+    child.unref();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * The onboarding walkthrough pattern (omega-manager convention): "Press
+ * Enter to open <label> in your browser". Interactive: waits for Enter,
+ * opens the URL, returns true. Non-interactive: prints the URL and returns
+ * false so callers know the human never saw a browser. The URL is always
+ * printed either way — terminals with link support stay clickable.
+ */
+async function pressEnterToOpen(url, label = 'this page') {
+  const output = _streams?.output || process.stdout;
+  output.write(`      → ${url}\n`);
+
+  if (!isInteractive()) {
+    return false;
+  }
+
+  await _input({ message: `Press Enter to open ${label} in your browser...` }, _streams || undefined);
+  // Via module.exports so tests can stub the actual browser launch
+  module.exports.openInBrowser(url);
+  return true;
+}
+
 module.exports = {
   isInteractive,
   getPromptStreams,
@@ -110,4 +157,7 @@ module.exports = {
   checkbox,
   confirm,
   setPromptStreams,
+  pressEnterToOpen,
+  openInBrowser,
+  openCommand,
 };

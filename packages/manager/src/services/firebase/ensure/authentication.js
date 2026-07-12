@@ -17,7 +17,7 @@
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
-const { confirm, isInteractive } = require('@omega.js/devkit/prompt');
+const { confirm, isInteractive, pressEnterToOpen } = require('@omega.js/devkit/prompt');
 
 module.exports = async function ensureAuthentication(context) {
   const { firebaseApi: api, brandRoot, projectId, domain, serviceData = {}, options = {} } = context;
@@ -154,8 +154,12 @@ module.exports = async function ensureAuthentication(context) {
   } else {
     // No API to create the OAuth client — manual enable in the console
     console.log(`      ${chalk.yellow('⚠')} Google sign-in not enabled — requires one-time manual setup`);
-    console.log(`      ${chalk.dim('→')} ${chalk.cyan(firebaseAuthUrl)}`);
     console.log(`      ${chalk.dim('→')} Enable "Google", pick a support email, Save — then rerun`);
+    if (isInteractive() && !options.dryRun) {
+      await pressEnterToOpen(firebaseAuthUrl, 'the sign-in providers page');
+    } else {
+      console.log(`      ${chalk.dim('→')} ${chalk.cyan(firebaseAuthUrl)}`);
+    }
     warned = true;
   }
 
@@ -164,11 +168,11 @@ module.exports = async function ensureAuthentication(context) {
   if (googleClientId && !oauthRedirectsConfigured) {
     const gcpCredentialsUrl = `https://console.cloud.google.com/apis/credentials/oauthclient/${googleClientId}?project=${projectId}`;
     console.log(`      ${chalk.yellow('⚠')} OAuth client redirect URIs need one-time manual configuration`);
-    console.log(`      ${chalk.dim('→')} ${chalk.cyan(gcpCredentialsUrl)}`);
     console.log(`      ${chalk.dim('→')} Authorized origins: https://localhost, https://localhost:5000, https://${projectId}.firebaseapp.com, https://${domain}`);
     console.log(`      ${chalk.dim('→')} Redirect URIs: https://localhost:5000/__/auth/handler, https://${projectId}.firebaseapp.com/__/auth/handler, https://${domain}/__/auth/handler`);
 
     if (isInteractive() && !options.dryRun) {
+      await pressEnterToOpen(gcpCredentialsUrl, 'the OAuth client settings');
       const done = await confirm({ message: 'Origins + redirect URIs configured in the OAuth client?', default: false });
       if (done) {
         oauthRedirectsConfigured = true;
@@ -177,6 +181,7 @@ module.exports = async function ensureAuthentication(context) {
         warned = true;
       }
     } else {
+      console.log(`      ${chalk.dim('→')} ${chalk.cyan(gcpCredentialsUrl)}`);
       console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
       warned = true;
     }

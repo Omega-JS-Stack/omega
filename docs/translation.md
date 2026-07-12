@@ -69,17 +69,15 @@ string. Committed to git — that's the whole point:
 
 ## Web (`@omega.js/web`)
 
-`omega build` translates from the committed cache ONLY — it never calls a
-live provider (friction #24 decision: a routine build must not sit inside an
-LLM). A page-language pair with any cold string is skipped WHOLE (no
-mixed-language copies, hreflang stays honest) and listed in a build warning;
-`omega translate` owns live-LLM translation: it runs standalone against an
-existing dist/, translates cold strings through the provider, and exits 1 on
-failures. After one translate run the cache is warm and committed, so every
-subsequent build ships the FULLY translated site with zero provider calls.
-`omega build --translate` opts a single build into the full live pass
-(build + translate in one command). `OMEGA_TRANSLATE_ONLY=<route>` limits
-any of these to one page (canary/debug).
+`omega build` translates everything by default (Ian's #24 final call): warm
+strings come from the committed cache instantly, cold strings translate live
+through the provider — a build always ships the COMPLETE translated site,
+and a warm cache means zero provider calls. `omega build --cached-only`
+skips cold page-language pairs WHOLE instead (no mixed-language copies,
+hreflang stays honest; the warning lists them) for provider-free builds.
+`omega translate` still runs the live pass standalone against an existing
+dist/ and exits 1 on failures. `OMEGA_TRANSLATE_ONLY=<route>` limits any of
+these to one page (canary/debug).
 
 Per page × language: text nodes/`<title>`/meta/attribute copy translate
 (cache-first), then the copy lands at `dist/{lang}/...` with `<html lang dir>`
