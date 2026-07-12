@@ -174,8 +174,8 @@ module.exports = async function ensureAuthentication(context) {
       `https://${domain}`,
     ];
     const redirectUris = [
-      'https://localhost:5000/__/auth/handler',
       `https://${projectId}.firebaseapp.com/__/auth/handler`,
+      'https://localhost:5000/__/auth/handler',
       `https://${domain}/__/auth/handler`,
     ];
     console.log(`      ${chalk.yellow('⚠')} OAuth client redirect URIs need one-time manual configuration`);
