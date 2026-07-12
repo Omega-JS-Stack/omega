@@ -14,6 +14,10 @@ $danger: #DC3545 !default;
 $light: #F8F9FA !default;
 $dark: #1A1A23 !default;
 
+// Bootstrap's WCAG threshold for auto-picking button/badge text color —
+// lower it when a light brand color should still get white text.
+$min-contrast-ratio: 4.5 !default;
+
 // ============================================
 // Typography
 // ============================================
@@ -178,6 +182,7 @@ $avatar-sizes: (
   $info: $info,
   $warning: $warning,
   $danger: $danger,
+  $min-contrast-ratio: $min-contrast-ratio,
   $light: $light,
   $dark: $dark,
   $font-family-sans-serif: $font-family-sans-serif,

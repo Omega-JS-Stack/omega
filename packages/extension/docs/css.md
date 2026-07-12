@@ -60,7 +60,7 @@ The HTML pipeline auto-injects `<link rel="stylesheet" href="../assets/css/compo
 
 ## Theme integration
 
-Themes vendor their own SCSS under `src/assets/themes/<theme-id>/`. The load path resolves `@use 'theme'` to the active theme — flip `config.theme.id` to switch themes without code changes. See [themes.md](themes.md).
+Theme SCSS is vendored from @omega.js/web's `themes/` tree into `dist/assets/themes/<theme-id>/` at prepare (C4 cp109 — one theme tree for web/desktop/extension). The load path resolves `@use 'theme'` to the active theme — flip `config.theme.id` to switch themes without code changes. See [themes.md](themes.md).
 
 ## Adding a utility class
 

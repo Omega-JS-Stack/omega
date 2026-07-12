@@ -6,9 +6,9 @@
 
 | Theme | Source | What it provides |
 |---|---|---|
-| `bootstrap` | [src/assets/themes/bootstrap/](../src/assets/themes/bootstrap/) | Pure Bootstrap 5.3+. Use when you want unopinionated Bootstrap. |
-| `classy` | [src/assets/themes/classy/](../src/assets/themes/classy/) | Bootstrap 5 + custom design system (colors, typography, components). The "branded" theme. |
-| `_template` | [src/assets/themes/_template/](../src/assets/themes/_template/) | Template for creating new themes. Underscore prefix excludes it from production builds. |
+| `bootstrap` | `dist/assets/themes/bootstrap/` (vendored from @omega.js/web) | Pure Bootstrap 5.3+. Use when you want unopinionated Bootstrap. |
+| `classy` | `dist/assets/themes/classy/` (vendored from @omega.js/web) | Bootstrap 5 + custom design system (colors, typography, components). The "branded" theme. |
+| `_template` | `dist/assets/themes/_template/` (vendored from @omega.js/web) | Template for creating new themes. Underscore prefix excludes it from production builds. |
 
 ## Activating a theme
 
@@ -23,12 +23,12 @@ Set in `config/omega.json5`:
 }
 ```
 
-Webpack's `__theme__` alias resolves to `src/assets/themes/<id>/` so consumer JS can do `import '__theme__/_theme.js'` and get the right theme's entry point. SCSS gets the same via the `theme` load-path entry (see [css.md](css.md)).
+Webpack's `__theme__` alias resolves to the package's `dist/assets/themes/<id>/` so consumer JS can do `import '__theme__/_theme.js'` and get the right theme's entry point. SCSS gets the same via the `theme` load-path entry (see [css.md](css.md)).
 
 ## Theme structure
 
 ```
-src/assets/themes/<theme-id>/
+dist/assets/themes/<theme-id>/   (vendored — the SSOT is @omega.js/web/themes/)
 ├── _config.scss      # Theme variables (with !default so consumers can override)
 ├── _theme.scss       # Theme entry — @forward + @use
 ├── scss/             # Theme-specific SCSS (components, utilities)
@@ -38,7 +38,7 @@ src/assets/themes/<theme-id>/
 
 ## Creating a new theme
 
-1. Copy `_template/` to a new directory: `cp -r src/assets/themes/_template src/assets/themes/my-theme`
+1. Copy `_template/` into your CONSUMER project's theme dir (or add the theme to @omega.js/web's `themes/` — the one tree every target vendors)
 2. Rename the directory (remove the `_` prefix — that's only for the template).
 3. Customize `_config.scss` — variables like `$primary`, `$font-family-base`, etc.
 4. Add theme-specific styles under `scss/`.
@@ -68,7 +68,7 @@ Consumer views can use `{{ theme.appearance }}` in their HTML to apply per-page 
 
 ## Why not Tailwind?
 
-Themes are SCSS-first because @omega.js/extension's roots are Bootstrap-based and most @omega.js/extension consumers already use Bootstrap-style class names (`.btn`, `.card`, `.modal`). Tailwind requires a build step (PostCSS + content scanning) that would complicate the lean gulp pipeline. If a future theme wants Tailwind, drop it under `src/assets/themes/tailwind/` and wire its own build hook.
+Themes are SCSS-first because @omega.js/extension's roots are Bootstrap-based and most @omega.js/extension consumers already use Bootstrap-style class names (`.btn`, `.card`, `.modal`). Tailwind requires a build step (PostCSS + content scanning) that would complicate the lean gulp pipeline. If a future theme wants Tailwind, add it to @omega.js/web's `themes/` and wire its own build hook.
 
 ## See also
 

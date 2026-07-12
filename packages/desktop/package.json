@@ -61,6 +61,11 @@
         "package": "@omega.js/web",
         "from": "core/css/tokens/_index.scss",
         "to": "assets/css/tokens/_index.scss"
+      },
+      {
+        "package": "@omega.js/web",
+        "from": "themes",
+        "to": "assets/themes"
       }
     ]
   },

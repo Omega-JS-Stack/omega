@@ -4,12 +4,13 @@
 
 ## How it works
 
-@omega.js/desktop bundles two themes in `<em>/dist/assets/themes/`:
+@omega.js/desktop carries @omega.js/web's FULL theme tree in `<em>/dist/assets/themes/` — vendored from the resolved `@omega.js/web` devDependency at every prepare via the declared-assets channel (C4 cp104/cp109), never hand-copied:
 
 | Theme | Base | Use case |
 |---|---|---|
-| `classy` (default) | Bootstrap 5.3 + UJM design system | Polished, modern app shell |
+| `classy` (default) | Bootstrap 5.3 + OMEGA design system | Polished, modern app shell |
 | `bootstrap` | Plain Bootstrap 5.3 | Minimal, vanilla Bootstrap |
+| `neobrutalism` / `newsflash` | Bootstrap 5.3 | Alternate skins (universal `theme.id`) |
 
 The active theme is selected via `config.theme.id` (default `'classy'`). The `gulp/sass` task adds `<em>/dist/assets/themes/<theme>` to its sass `loadPaths` so the bare `@use 'theme'` import inside `@omega.js/desktop.scss` resolves to the active theme.
 
@@ -119,13 +120,11 @@ Any element with `data-em-theme-set` becomes a theme switch (wired by the render
 
 ## Where the themes live
 
-@omega.js/desktop's themes are vendored — copied from UJM into `<em>/src/assets/themes/{classy,bootstrap}`. They get rebuilt to `<em>/dist/assets/themes/...` via `prepare-package`. Consumers import them via the sass `loadPaths` mechanism — **they're never copied into the consumer's tree**.
+The SSOT is **`@omega.js/web/themes/`** — one theme tree for web, desktop, and extension (C4 cp109: the classy triplication is dead). @omega.js/desktop declares `omega.vendorAssets` in its package.json, and every `prepare-package` run copies the resolved web package's `themes/` into `<em>/dist/assets/themes/`. Consumers import via the sass `loadPaths` mechanism — **nothing is ever copied into the consumer's tree**. Desktop-specific theme bits (the `.em-titlebar` component, the `$min-contrast-ratio` knob) were upstreamed INTO the shared classy rather than kept as a fork.
 
 ## Updating themes
 
-Update flows via `npm update @omega.js/desktop`. @omega.js/desktop's themes are frozen at the version of UJM they were copied from; if UJM updates classy, @omega.js/desktop has to do another vendor sync.
-
-Future: extract themes to a standalone `@itw/classy-theme` npm module that both UJM and @omega.js/desktop consume. For now they're owned by @omega.js/desktop directly.
+A theme change lands once in `packages/web/themes/` and rides into desktop + extension on their next prepare. There is no sync step and no version skew — dist is rebuilt from the resolved web package every time. (A standalone `@omega.js/themes` package was considered and rejected for now: the vendor channel gives one-source semantics without another publishable surface.)
 
 ## Gotchas
 

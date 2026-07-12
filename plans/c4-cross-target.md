@@ -134,8 +134,32 @@ extension package/webpack `validRedirectHosts`.)
    chain render (curated-first `rocket`, free-only `circle-user`, alias
    `search`, brands-fallback `github` — all `+attrs`); client 94 (+4) /
    template-kit 42 (+1) / web 103 / desktop 764+5skip.
-6. **cp109 — theme-once acceptance.** Desktop/extension consume the FULL theme
-   layer chain (classy triplication dies); omega-brand desktop + extension
-   render the brand theme zero-copy-paste. Lands with/after the skin pass so
-   the reskin ships everywhere at once. `@omega.js/themes` packaging revisited
-   here (master-plan note).
+6. **cp109 — theme-once MECHANISM. ✅ SHIPPED (2026-07-12, Ian's go; skin
+   rides it).** The classy/bootstrap TRIPLICATION IS DEAD: web's `themes/`
+   tree is the ONE source; desktop + extension vendor it whole
+   (`omega.vendorAssets` += `{from: 'themes', to: 'assets/themes'}` — the
+   proven cp104 channel; both targets' sass loadPaths + ext webpack
+   `__theme__`/`__main_assets__` aliases already pointed at
+   `dist/assets/themes`, so pipelines barely changed) and their local
+   copies are DELETED. The drift audit proved the pain both ways —
+   desktop's fork was MISSING web's has-validation forms fix while web was
+   MISSING desktop's `safeRedirect` hero-form security gate — so the SSOT
+   classy is the UNION, best-implementation-wins: upstreamed INTO web
+   classy = desktop's safeRedirect (hero-demo-form.js), desktop's
+   `$min-contrast-ratio` knob (+bootstrap map pass), desktop's
+   `_titlebar.scss` (inert without desktop DOM), and extension's six
+   fork-only modules (soft-colors, spacing, avatars, links, logo-scroll,
+   spinners); web wins every divergent shared file (the living line —
+   ext's stale fork deltas die, resurfacing in the skin pass rewrite
+   anyway). Desktop's prebuilt `bootstrap.bundle.js` moved out of themes/
+   to `assets/js/` (renderer + test-preload respelled). `@omega.js/themes`
+   packaging RE-DECIDED: no separate package — the vendor channel gives
+   one-source semantics without another publishable surface. Proofs:
+   vendored dists carry has-validation + safeRedirect + titlebar in BOTH
+   targets; omega-playground extension AND desktop consumer builds exit 0
+   with compiled css carrying has-validation/em-titlebar/avatar-/
+   logo-scroll (the ext build also proves web's `_theme.js` resolves via
+   the existing `__main_assets__` alias — ext pages now get the real
+   component init, not the commented-out stub). Suites: web 103 / ext 102 /
+   desktop 764+5skip. REMAINING for the arc: the actual skin (cp99a+ on
+   Ian's board notes) ships everywhere at once through this channel.

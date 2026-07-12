@@ -109,7 +109,7 @@ contextBridge.exposeInMainWorld('__emTestTooltip', {
     try {
       if (process.env.OMEGA_TEST_RENDERER_MANAGER_PATH) {
         const path = require('path');
-        require(path.join(path.dirname(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH), 'assets', 'themes', 'bootstrap', 'js', 'bootstrap.bundle.js'));
+        require(path.join(path.dirname(process.env.OMEGA_TEST_RENDERER_MANAGER_PATH), 'assets', 'js', 'bootstrap.bundle.js'));
       }
       return null;
     } catch (e) {

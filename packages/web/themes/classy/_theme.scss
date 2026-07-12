@@ -9,6 +9,8 @@
 @import 'css/base/animations';
 @import 'css/base/backgrounds';
 @import 'css/base/borders';
+@import 'css/base/soft-colors';
+@import 'css/base/spacing';
 @import 'css/base/typography';
 @import 'css/base/utilities';
 
@@ -21,13 +23,18 @@
 
 // Import component styles
 @import 'css/components/accordion';
+@import 'css/components/avatars';
 @import 'css/components/badges';
 @import 'css/components/buttons';
 @import 'css/components/cards';
 @import 'css/components/carousel';
 @import 'css/components/forms';
 @import 'css/components/infinite-scroll';
+@import 'css/components/links';
+@import 'css/components/logo-scroll';
+@import 'css/components/spinners';
 @import 'css/components/text';
+@import 'css/components/titlebar';
 
 // Import universal Bootstrap overrides (shared across all UJ themes)
 // Must come AFTER Bootstrap is loaded via config to use @extend

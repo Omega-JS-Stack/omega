@@ -190,7 +190,7 @@ Manager.prototype.enableFontAwesome = Manager.prototype._wireFontAwesome;
 
 // Bootstrap tooltips — auto-initialize every `[data-bs-toggle="tooltip"]`
 // element (Bootstrap's JS + Popper ship inside @omega.js/desktop as a prebuilt bundle —
-// assets/themes/bootstrap/js/bootstrap.bundle.js; consumers add ZERO setup).
+// assets/js/bootstrap.bundle.js; consumers add ZERO setup).
 // Live-managed via MutationObserver:
 //   - elements inserted later get their tooltip on arrival
 //   - `data-bs-title` / `title` changes update the live instance (emptying it
@@ -218,7 +218,7 @@ Manager.prototype._wireTooltips = function () {
     let Tooltip;
     try {
       // Prebuilt UMD (Popper inlined) — loads via webpack AND plain require().
-      const bootstrap = require('./assets/themes/bootstrap/js/bootstrap.bundle.js');
+      const bootstrap = require('./assets/js/bootstrap.bundle.js');
       Tooltip = bootstrap.Tooltip;
       window.bootstrap = Object.assign(window.bootstrap || {}, bootstrap);
     } catch (e) {
