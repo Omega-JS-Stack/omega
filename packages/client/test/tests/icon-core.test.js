@@ -15,7 +15,7 @@ describe('icon-core', () => {
     core = require(DIST_PATH);
   });
 
-  it('validates names as lowercase slugs and styles against the whitelist', () => {
+  it('validates names as lowercase slugs and styles by path-safe shape', () => {
     assert.strictEqual(core.isValidIconName('magnifying-glass'), true);
     assert.strictEqual(core.isValidIconName('Play'), false);
     assert.strictEqual(core.isValidIconName('../../etc/passwd'), false);
@@ -25,7 +25,21 @@ describe('icon-core', () => {
     assert.strictEqual(core.isValidStyle('solid'), true);
     assert.strictEqual(core.isValidStyle('regular'), true);
     assert.strictEqual(core.isValidStyle('brands'), true);
-    assert.strictEqual(core.isValidStyle('duotone'), false);
+    // Pro styles pass the shape check — existence is the file lookup's job.
+    assert.strictEqual(core.isValidStyle('duotone'), true);
+    assert.strictEqual(core.isValidStyle('sharp-light'), true);
+    // but path-unsafe or non-slug values never do
+    assert.strictEqual(core.isValidStyle('../solid'), false);
+    assert.strictEqual(core.isValidStyle('Solid'), false);
+    assert.strictEqual(core.isValidStyle(''), false);
+    assert.strictEqual(core.isValidStyle(null), false);
+  });
+
+  it('prefers Pro over free in the package order', () => {
+    assert.deepStrictEqual(core.PACKAGES, [
+      '@fortawesome/fontawesome-pro',
+      '@fortawesome/fontawesome-free',
+    ]);
   });
 
   it('candidate order is requested style first, then the brands fallback', () => {

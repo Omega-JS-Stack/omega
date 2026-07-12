@@ -1,7 +1,15 @@
 // FontAwesome — the Font Awesome icon server: resolves icons from the
-// @fortawesome/fontawesome-free npm package (a runtime dependency — nothing
-// vendored) and serves them to renderers on demand, so consumers get icons
-// with ZERO setup.
+// brand's best available icon set and serves them to renderers on demand,
+// so consumers get icons with ZERO setup. Roots, best-first (cp111):
+//
+//   1. OMEGA_FONTAWESOME_ROOT — a fontawesome.com download dir
+//      (contains svgs/ + metadata/); no npm token needed.
+//   2. @fortawesome/fontawesome-pro — installed by the BRAND app with its
+//      own FA npm token (a prod dependency there, so it ships in the asar).
+//      Never a dependency of @omega.js/desktop itself — license.
+//   3. @fortawesome/fontawesome-free — the declared-dependency floor
+//      (nothing vendored). Stays in the chain under a brand set, so a
+//      partial Pro supply never loses icons the free set has.
 //
 // Main-side API:
 //   manager.fontawesome.get(name, style)  → svg string | null   ('play', 'solid')
@@ -24,13 +32,14 @@
 // never drift between the surfaces. Aliases ('search' →
 // 'magnifying-glass') resolve through fontawesome-free's own metadata.
 //
-// Lookups are sanitized (lowercase slug names, style whitelist) so the IPC
-// channel can never be used to read outside the icon directories, and
-// cached — each icon file is read from disk once per app run.
+// Lookups are sanitized (lowercase slug names, path-safe style slugs) so
+// the IPC channel can never be used to read outside the icon directories,
+// and cached — each icon file is read from disk once per app run.
 
 const path = require('path');
 const jetpack = require('fs-jetpack');
 const {
+  PACKAGES,
   isValidIconName,
   isValidStyle,
   injectSvgAttributes,
@@ -46,7 +55,7 @@ const logger = new LoggerLite('fontawesome');
 const fontawesome = {
   _initialized: false,
   _manager: null,
-  _root: null,
+  _roots: [],
   _aliasMap: null,
   _cache: new Map(),
 
@@ -56,23 +65,51 @@ const fontawesome = {
     }
 
     fontawesome._manager = manager;
-    fontawesome._root = fontawesome._resolveRoot();
+    fontawesome._roots = fontawesome._resolveRoots();
 
     fontawesome._registerIpc();
 
     fontawesome._initialized = true;
   },
 
-  // The @fortawesome/fontawesome-free package root ({svgs,metadata} live
-  // under it). A declared runtime dependency, so it resolves in dev and
-  // inside a packaged app.asar alike.
-  _resolveRoot() {
-    try {
-      return path.dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
-    } catch (e) {
-      logger.warn('@fortawesome/fontawesome-free not resolvable — icon lookups will return null.');
-      return null;
+  // The icon package roots ({svgs,metadata} live under each), best-first:
+  // OMEGA_FONTAWESOME_ROOT dir → Pro npm install → the free floor (a
+  // declared runtime dependency, so it resolves in dev and inside a
+  // packaged app.asar alike). Preference order is icon-core's PACKAGES —
+  // the same chain web builds use.
+  _resolveRoots() {
+    const roots = [];
+
+    const envRoot = process.env.OMEGA_FONTAWESOME_ROOT;
+    if (envRoot) {
+      if (jetpack.exists(path.join(envRoot, 'svgs')) === 'dir') {
+        logger.log(`brand icon set active — OMEGA_FONTAWESOME_ROOT=${envRoot}`);
+        roots.push(envRoot);
+      } else {
+        logger.warn(`OMEGA_FONTAWESOME_ROOT has no svgs/ dir — ignored (${envRoot}).`);
+      }
     }
+
+    for (const pkg of PACKAGES) {
+      try {
+        const root = path.dirname(require.resolve(`${pkg}/package.json`));
+        if (roots.length === 0 && pkg === PACKAGES[0]) {
+          logger.log('Font Awesome Pro npm set active.');
+        }
+        roots.push(root);
+      } catch (e) {
+        // Pro is brand-supplied and usually absent; a missing FREE set is
+        // a real problem.
+        if (pkg === PACKAGES[PACKAGES.length - 1]) {
+          logger.warn(`${pkg} not resolvable — icon lookups may return null.`);
+        }
+      }
+    }
+
+    if (roots.length === 0) {
+      logger.warn('no Font Awesome set resolvable — icon lookups will return null.');
+    }
+    return roots;
   },
 
   _registerIpc() {
@@ -113,33 +150,39 @@ const fontawesome = {
   },
 
   // Read one icon through icon-core's candidate order (style dir, then the
-  // brands fallback). Null name (no alias) or unresolved root → null.
+  // brands fallback), across the root chain best-first. Null name (no
+  // alias) or no resolved roots → null.
   _read(name, style) {
-    if (!name || !fontawesome._root) {
+    if (!name) {
       return null;
     }
-    for (const rel of candidateRelPaths(name, style)) {
-      const raw = jetpack.read(path.join(fontawesome._root, 'svgs', rel), 'utf8');
-      if (raw) {
-        return injectSvgAttributes(raw);
+    for (const root of fontawesome._roots) {
+      for (const rel of candidateRelPaths(name, style)) {
+        const raw = jetpack.read(path.join(root, 'svgs', rel), 'utf8');
+        if (raw) {
+          return injectSvgAttributes(raw);
+        }
       }
     }
     return null;
   },
 
-  // Alias slug → canonical slug from fontawesome-free's metadata, built
-  // once per app run ('search' → 'magnifying-glass').
+  // Alias slug → canonical slug from the richest metadata in the root
+  // chain, built once per app run ('search' → 'magnifying-glass').
   _alias(name) {
     if (!fontawesome._aliasMap) {
       let map = new Map();
-      const raw = fontawesome._root
-        && jetpack.read(path.join(fontawesome._root, 'metadata', 'icon-families.json'), 'utf8');
-      if (raw) {
+      for (const root of fontawesome._roots) {
+        const raw = jetpack.read(path.join(root, 'metadata', 'icon-families.json'), 'utf8');
+        if (!raw) {
+          continue;
+        }
         try {
           map = buildAliasMap(JSON.parse(raw));
         } catch (e) {
           logger.warn('could not parse icon-families.json — aliases disabled.');
         }
+        break;
       }
       fontawesome._aliasMap = map;
     }

@@ -1,6 +1,7 @@
-// Main-process tests for lib/fontawesome.js — bundled-icon resolution, alias
-// coverage, style whitelist, name sanitization (the IPC channel must never
-// read outside the icon directories), caching, and the IPC round-trip.
+// Main-process tests for lib/fontawesome.js — icon resolution across the
+// root chain (brand set → free floor), alias coverage, style shape checks,
+// name sanitization (the IPC channel must never read outside the icon
+// directories), caching, and the IPC round-trip.
 
 module.exports = {
   type: 'suite',
@@ -59,8 +60,51 @@ module.exports = {
       name: 'unknown names and unknown styles return null (never throw)',
       run: (ctx) => {
         ctx.expect(ctx.manager.fontawesome.get('definitely-not-an-icon-xyz')).toBe(null);
-        ctx.expect(ctx.manager.fontawesome.get('play', 'duotone')).toBe(null);
+        // 'no-such-style' is shape-valid but exists in NO Font Awesome set —
+        // stays null even after a brand supplies Pro (whose styles, like
+        // duotone, are legitimate lookups now).
+        ctx.expect(ctx.manager.fontawesome.get('play', 'no-such-style')).toBe(null);
+        ctx.expect(ctx.manager.fontawesome.get('play', '../solid')).toBe(null);
         ctx.expect(ctx.manager.fontawesome.has('definitely-not-an-icon-xyz')).toBe(false);
+      },
+    },
+    {
+      name: 'OMEGA_FONTAWESOME_ROOT wins the root chain; free stays as fallthrough (cp111)',
+      run: (ctx) => {
+        const os = require('os');
+        const path = require('path');
+        const jetpack = require('fs-jetpack');
+        const fa = ctx.manager.fontawesome;
+
+        const brandRoot = path.join(os.tmpdir(), `omega-fa-test-${process.pid}`);
+        jetpack.write(
+          path.join(brandRoot, 'svgs', 'solid', 'omega-test-glyph.svg'),
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><path d="M0 0"/></svg>',
+        );
+
+        const savedEnv = process.env.OMEGA_FONTAWESOME_ROOT;
+        const savedRoots = fa._roots;
+        try {
+          process.env.OMEGA_FONTAWESOME_ROOT = brandRoot;
+          fa._roots = fa._resolveRoots();
+          fa._cache.clear();
+          fa._aliasMap = null;
+
+          ctx.expect(fa._roots[0]).toBe(brandRoot);
+          // the brand-only glyph resolves from the env root…
+          ctx.expect(fa.get('omega-test-glyph').includes('<svg')).toBe(true);
+          // …while icons the brand set lacks still come from the free floor,
+          // and aliases still resolve (metadata falls through too).
+          ctx.expect(fa.has('play')).toBe(true);
+          ctx.expect(fa.has('search')).toBe(true);
+        } finally {
+          if (savedEnv === undefined) delete process.env.OMEGA_FONTAWESOME_ROOT;
+          else process.env.OMEGA_FONTAWESOME_ROOT = savedEnv;
+          fa._roots = savedRoots;
+          fa._cache.clear();
+          fa._aliasMap = null;
+          jetpack.remove(brandRoot);
+        }
       },
     },
     {

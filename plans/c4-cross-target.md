@@ -129,8 +129,8 @@ extension package/webpack `validRedirectHosts`.)
    resolves everything, with a warn-once on true misses). template-kit's
    `uj_icon` and desktop's `lib/fontawesome.js` both consume icon-core
    (template-kit gains the client dep; desktop's IPC/renderer contract
-   unchanged). Extension supply + brand-level Pro override land with cp109+
-   (no icon consumers there yet — don't build speculative). Proofs: live
+   unchanged). Brand-level Pro override → shipped as cp111; extension
+   supply still waits for an icon consumer there. Proofs: live
    chain render (curated-first `rocket`, free-only `circle-user`, alias
    `search`, brands-fallback `github` — all `+attrs`); client 94 (+4) /
    template-kit 42 (+1) / web 103 / desktop 764+5skip.
@@ -163,3 +163,22 @@ extension package/webpack `validRedirectHosts`.)
    component init, not the commented-out stub). Suites: web 103 / ext 102 /
    desktop 764+5skip. REMAINING for the arc: the actual skin (cp99a+ on
    Ian's board notes) ships everywhere at once through this channel.
+7. **cp111 — brand Pro supply. ✅ SHIPPED (2026-07-12, Ian: "i want to use
+   my pro icons").** The channel cp108 deferred: best-first root chain on
+   every icon surface — `OMEGA_FONTAWESOME_ROOT` (fontawesome.com download
+   dir, tokenless route) → brand-installed `@fortawesome/fontawesome-pro`
+   (FA npm-token route) → the free floor, ALWAYS last in the chain so a
+   partial brand set never loses free icons/metadata. Pro stays out of
+   every package.json omega owns (license — the brand authenticates the
+   `@fortawesome` scope itself). icon-core owns the order (`PACKAGES`) and
+   style validity moves whitelist → path-safe shape (`STYLE_REGEX`): Pro
+   families (light/thin/duotone/sharp-*) and future FA sets work with zero
+   framework edits, traversal guarantee intact. web: NEW
+   `src/fontawesome-roots.js` (engine chain `[core, brand?, free]` +
+   richest aliasFile). desktop: `_resolveRoots()` walks the same chain
+   (env logged, Pro logged, multi-root `_read`/`_alias` fallthrough).
+   Tests Pro-presence-PROOF (adaptive — green before/after Ian installs
+   Pro; desktop main-process proof: env-root glyph resolves while
+   play/search still come from free). client 95 (+1) / web 107 (+4) /
+   template-kit 42 / desktop 765 (+1). Extension still consumer-less for
+   icons — its supply keeps riding the vendor channel when one appears.

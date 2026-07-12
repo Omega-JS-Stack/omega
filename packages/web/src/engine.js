@@ -19,6 +19,7 @@ const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerCollections } = require('./collections.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
+const { resolveFontAwesomeRoots } = require('./fontawesome-roots.js');
 const { PATHS } = require('./paths.js');
 
 // Data-cascade keys that are engine machinery, not page/layout data — everything
@@ -170,11 +171,12 @@ function configureOmega(eleventyConfig, options) {
     return holderSet(name, docs);
   };
 
-  // Icon roots (C4 cp108): the curated core set wins, the full
-  // @fortawesome/fontawesome-free npm set (resolved, never vendored) fills
-  // in everything else; its metadata resolves legacy aliases (search →
-  // magnifying-glass).
-  const faFreeRoot = path.dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
+  // Icon roots (C4 cp108/cp111): the curated core set wins, then the
+  // brand's own Font Awesome set when one is supplied (Pro npm install or
+  // OMEGA_FONTAWESOME_ROOT download dir), with the free npm set (resolved,
+  // never vendored) as the always-present floor; the richest metadata
+  // resolves legacy aliases (search → magnifying-glass).
+  const fa = resolveFontAwesomeRoots();
 
   eleventyConfig.amendLibrary('liquid', (engine) => {
     registerLiquid(engine, {
@@ -186,9 +188,9 @@ function configureOmega(eleventyConfig, options) {
       icons: {
         fontAwesomeDirs: [
           path.join(coreDir, 'icons'),
-          path.join(faFreeRoot, 'svgs'),
+          ...fa.svgsDirs,
         ],
-        aliasFile: path.join(faFreeRoot, 'metadata', 'icon-families.json'),
+        aliasFile: fa.aliasFile,
         flagsDir: path.join(coreDir, 'icons', 'flags'),
         style: 'solid',
       },

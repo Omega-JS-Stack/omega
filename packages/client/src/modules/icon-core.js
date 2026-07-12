@@ -8,7 +8,8 @@
  * again. File reading stays with each consumer (build tags read at build
  * time, desktop main reads at runtime) — this module owns every decision
  * ABOUT the files: valid names/styles, candidate lookup order, the inline
- * root attributes, and alias mapping from the @fortawesome/fontawesome-free
+ * root attributes, the package preference order (Pro when the brand
+ * supplies it, free floor), and alias mapping from the icon set's own
  * metadata ('search' → 'magnifying-glass').
  *
  * CJS on purpose: template-kit and Electron main require() it directly (via
@@ -16,8 +17,22 @@
  * interop.
  */
 
-// Valid icon styles (the @fortawesome/fontawesome-free svgs/ directories).
+// Icon asset packages, best-first (cp111): a brand that supplies Font
+// Awesome Pro gets it automatically; the free set is the always-present
+// floor (a declared dependency of web + desktop). Pro is NEVER a dependency
+// of any omega package — redistribution is a license violation — each brand
+// brings its own licensed copy (npm token install, or a fontawesome.com
+// download dir via OMEGA_FONTAWESOME_ROOT).
+const PACKAGES = ['@fortawesome/fontawesome-pro', '@fortawesome/fontawesome-free'];
+
+// The free set's svgs/ directories. Pro supplies more (light, thin,
+// duotone, sharp-*, …) — validation is by shape, not this list, so new
+// Pro families work without this module tracking Font Awesome's catalog.
 const STYLES = ['solid', 'regular', 'brands'];
+
+// Style dirs are path segments too — same traversal rule as names, so an
+// unknown style can only ever be a file-not-found, never an escape.
+const STYLE_REGEX = /^[a-z][a-z-]*$/;
 
 // Lowercase slug names only — lookups build file paths, so this whitelist
 // is also what keeps callers (like desktop's IPC channel) from ever reading
@@ -49,13 +64,17 @@ function isValidIconName(name) {
 }
 
 /**
- * Whether a value is a known icon style.
+ * Whether a value is a plausible icon style ('solid', 'duotone',
+ * 'sharp-light'). Shape-validated (path-safe slug), not whitelist-validated:
+ * whether the style actually exists in the supplied icon set is decided by
+ * the file lookup — a bogus style is a missing icon, never a crash or an
+ * escape from the icon directories.
  *
- * @param {*} style - Candidate style ('solid').
- * @returns {boolean} True when the style directory exists in the set.
+ * @param {*} style - Candidate style.
+ * @returns {boolean} True for lowercase path-safe style slugs.
  */
 function isValidStyle(style) {
-  return STYLES.includes(style);
+  return typeof style === 'string' && STYLE_REGEX.test(style);
 }
 
 /**
@@ -113,7 +132,9 @@ function buildAliasMap(iconFamilies) {
 }
 
 module.exports = {
+  PACKAGES,
   STYLES,
+  STYLE_REGEX,
   NAME_REGEX,
   SVG_ATTRIBUTES,
   isValidIconName,

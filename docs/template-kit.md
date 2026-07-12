@@ -40,7 +40,7 @@ Two consumption paths (plan §4 A0):
 | `uj_social` | inline | `page.resolved.socials.*` + SOCIAL_URLS data |
 | `uj_language` | inline | LANGUAGES data (184 codes, machine-extracted from the Ruby) |
 | `uj_translation_url` | inline | `site.translation` {default, languages, exclude} |
-| `uj_icon` | inline | `options.icons.{fontAwesomeDirs,aliasFile,flagsDir}` (+ `site.icons.style`); ordered root chain (earlier dirs win), alias resolution from fontawesome-free metadata, brands fallback, flag fallback via LANGUAGE_TO_COUNTRY (43 codes), default warning-triangle SVG with warn-once, module cache — semantics shared with desktop via `@omega.js/client/modules/icon-core.js` (C4 cp108) |
+| `uj_icon` | inline | `options.icons.{fontAwesomeDirs,aliasFile,flagsDir}` (+ `site.icons.style`); ordered root chain (earlier dirs win — web's engine feeds curated core → brand Pro set when supplied → free floor via `src/fontawesome-roots.js`, C4 cp111), alias resolution from the set's metadata, brands fallback, flag fallback via LANGUAGE_TO_COUNTRY (43 codes), default warning-triangle SVG with warn-once, module cache — semantics shared with desktop via `@omega.js/client/modules/icon-core.js` (C4 cp108) |
 | `uj_logo` | inline | `options.logos.dir`; per-instance SVG id prefixing (url()/href/xlink:href refs rewritten) |
 | `uj_image` | inline | pure HTML builder (picture + webp sources + lazy placeholders; `max_width`, `webp=false`, external `<img>`) |
 | `uj_video` | inline | pure HTML builder (flag attrs, mime map, lazy sources) |
