@@ -114,6 +114,53 @@ function candidateRelPaths(name, style) {
   return candidates;
 }
 
+// Font Awesome's class model: a base WEIGHT class, an optional FAMILY
+// prefix class, and everything else is a modifier or the icon name.
+const BASE_STYLE_CLASSES = {
+  'fa-solid': 'solid', fas: 'solid',
+  'fa-regular': 'regular', far: 'regular',
+  'fa-light': 'light', fal: 'light',
+  'fa-thin': 'thin', fat: 'thin',
+  'fa-brands': 'brands', fab: 'brands',
+};
+const FAMILY_CLASSES = { 'fa-sharp': 'sharp', 'fa-duotone': 'duotone', fad: 'duotone', 'fa-sharp-duotone': 'sharp-duotone' };
+
+// fa-* classes that are modifiers (style/size/animation/layout), not icon names.
+const MODIFIER_REGEX = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp-duotone|sharp|fw|xs|sm|lg|xl|2xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
+
+/**
+ * Parse an element's class list the way Font Awesome does:
+ * `fa-sharp fa-light fa-play me-2` → { name: 'play', style: 'sharp-light' }.
+ * Weight defaults to solid; a family class prefixes it (duotone-solid lives
+ * in the bare `duotone` dir). Null when no icon name is present.
+ *
+ * @param {Iterable<string>} classList - Element class names.
+ * @returns {{ name: string, style: string }|null} Parsed lookup, or null.
+ */
+function parseIconClasses(classList) {
+  let base = 'solid';
+  let family = '';
+  let name = null;
+
+  for (const cls of classList) {
+    if (BASE_STYLE_CLASSES[cls]) {
+      base = BASE_STYLE_CLASSES[cls];
+    } else if (FAMILY_CLASSES[cls]) {
+      family = FAMILY_CLASSES[cls];
+    } else if (!name && cls.startsWith('fa-') && !MODIFIER_REGEX.test(cls)) {
+      name = cls.slice(3);
+    }
+  }
+  if (!name) {
+    return null;
+  }
+
+  const style = (base === 'brands' || !family) ? base
+    : (family === 'duotone' && base === 'solid') ? 'duotone'
+      : `${family}-${base}`;
+  return { name, style };
+}
+
 /**
  * Build the alias → canonical name map from fontawesome-free's
  * metadata/icon-families.json ('search' → 'magnifying-glass').
@@ -141,5 +188,6 @@ module.exports = {
   isValidStyle,
   injectSvgAttributes,
   candidateRelPaths,
+  parseIconClasses,
   buildAliasMap,
 };

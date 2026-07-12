@@ -18,6 +18,7 @@
  *      (deferred, document order), so bootMain always registers first.
  */
 import omega from '@omega.js/client';
+import { createIconRenderer } from '@omega.js/client/modules/icon-renderer.js';
 import { Manager } from './manager.js';
 
 let context = null;
@@ -44,6 +45,15 @@ async function initialize() {
 
   // Initialize the @omega.js/client singleton with the page-baked config
   await omega.initialize(window.Configuration);
+
+  // Font Awesome auto-render (C4 cp112) — the same shared watcher desktop
+  // runs; web's transport is the site's OWN emitted icon set (assets/fa/,
+  // the brand's Pro chain + free floor). Static fa-* markup and classes
+  // set or changed via JS both render; only used icons ever transfer.
+  createIconRenderer({
+    resolve: (name, style) => fetch(`/assets/fa/${style}/${name}.svg`)
+      .then((response) => (response.ok ? response.text() : null)),
+  }).start(document);
 
   // Development helpers — code-split, only ever fetched in development
   if (manager.isDevelopment()) {

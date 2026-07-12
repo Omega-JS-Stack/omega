@@ -42,6 +42,24 @@ describe('icon-core', () => {
     ]);
   });
 
+  it('parses fa-* class lists the way Font Awesome does (family × weight)', () => {
+    const parse = (classes) => core.parseIconClasses(classes.split(' '));
+
+    assert.deepStrictEqual(parse('fa-solid fa-play me-2'), { name: 'play', style: 'solid' });
+    assert.deepStrictEqual(parse('fa-play'), { name: 'play', style: 'solid' }); // weight defaults
+    assert.deepStrictEqual(parse('fa-brands fa-github'), { name: 'github', style: 'brands' });
+    assert.deepStrictEqual(parse('fa-light fa-play'), { name: 'play', style: 'light' });
+    assert.deepStrictEqual(parse('fa-sharp fa-light fa-play'), { name: 'play', style: 'sharp-light' });
+    assert.deepStrictEqual(parse('fa-duotone fa-play'), { name: 'play', style: 'duotone' }); // bare duotone dir
+    assert.deepStrictEqual(parse('fa-duotone fa-thin fa-play'), { name: 'play', style: 'duotone-thin' });
+    assert.deepStrictEqual(parse('fa-sharp-duotone fa-play'), { name: 'play', style: 'sharp-duotone-solid' });
+
+    // modifiers are never names; no name → null
+    assert.deepStrictEqual(parse('fa-solid fa-fw fa-2x fa-spin fa-rocket'), { name: 'rocket', style: 'solid' });
+    assert.strictEqual(parse('fa-solid fa-fw'), null);
+    assert.strictEqual(parse('btn btn-primary'), null);
+  });
+
   it('candidate order is requested style first, then the brands fallback', () => {
     assert.deepStrictEqual(core.candidateRelPaths('apple', 'solid'), ['solid/apple.svg', 'brands/apple.svg']);
     assert.deepStrictEqual(core.candidateRelPaths('github', 'brands'), ['brands/github.svg']);

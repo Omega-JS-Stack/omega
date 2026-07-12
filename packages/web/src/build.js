@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
 const { configureOmega } = require('./engine.js');
+const { emitIcons } = require('./icons.js');
 const { resolveThemeLayers } = require('./layers.js');
 const { PATHS } = require('./paths.js');
 
@@ -69,6 +70,12 @@ async function buildSite(options) {
     fs.mkdirSync(path.dirname(options.manifestPath), { recursive: true });
     fs.writeFileSync(options.manifestPath, JSON.stringify(manifest, null, 2));
   }
+
+  // ---- runtime icon set (assets/fa/) — feeds the browser-side auto-render
+  await phase('icons', () => emitIcons({
+    outDir: options.outDir,
+    coreIconsDir: path.join(coreDir, 'icons'),
+  }));
 
   // ---- Eleventy
   await phase('eleventy', async () => {

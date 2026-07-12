@@ -97,14 +97,14 @@ Manager.prototype._wireThemeControls = function () {
 };
 
 // FontAwesome auto-render — any `<i>` element carrying `fa-*` classes gets the
-// bundled Font Awesome SVG injected inline (fetched from main over IPC, cached
-// per icon). Style comes from FA's family × weight classes (`fa-solid`
-// default, `fa-brands`, and — with a brand-supplied Pro set — light/thin/
-// duotone/sharp-* combinations); the icon name is the first `fa-*` class
-// that isn't a known modifier. Works for markup
-// present at init AND anything inserted later (MutationObserver). Unknown names
-// resolve to null and the element is simply left empty — consumers that want a
-// fallback check `window.em.fontawesome.get()` themselves.
+// Font Awesome SVG injected inline, whether present at init, inserted later,
+// or re-classed via JS at any time (`el.className = 'fa-solid fa-stop'`
+// re-renders in place). The whole DOM mechanism — class parsing (FA's
+// family × weight model), MutationObserver, caching, re-render/clear — is
+// @omega.js/client's shared icon-renderer (C4 cp112), the SAME module web
+// pages run; desktop only supplies the transport (IPC to main's icon
+// server). Unknown names leave the element empty (marked data-omega-fa) —
+// consumers that want a fallback check `window.em.fontawesome.get()`.
 //
 //   <i class="fa-solid fa-rocket me-2"></i>   →   <i …><svg …>…</svg></i>
 Manager.prototype._wireFontAwesome = function () {
@@ -114,97 +114,11 @@ Manager.prototype._wireFontAwesome = function () {
     return;
   }
 
-  const cache = new Map(); // 'style/name' → Promise<svg|null>
-  const resolve = (name, style) => {
-    const key = `${style}/${name}`;
-    if (!cache.has(key)) {
-      cache.set(key, self.ipc.invoke('desktop:fontawesome:get', { name, style })
-        .then((r) => r?.svg ?? null)
-        .catch(() => null));
-    }
-    return cache.get(key);
-  };
-
-  // fa-* classes that are modifiers (style/size/animation/layout), not icon names.
-  const MODIFIER = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp-duotone|sharp|fw|xs|sm|lg|xl|2xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
-
-  // FA's family × style class model (cp111): a base style class picks the
-  // weight, a family class (sharp / duotone / sharp-duotone) prefixes it —
-  // `fa-sharp fa-light fa-play` → sharp-light. Families and Pro weights
-  // resolve only when the brand supplies a Pro set; otherwise the lookup
-  // returns null and the element stays empty (never a wrong-style icon).
-  const BASE_STYLE = {
-    'fa-solid': 'solid', fas: 'solid',
-    'fa-regular': 'regular', far: 'regular',
-    'fa-light': 'light', fal: 'light',
-    'fa-thin': 'thin', fat: 'thin',
-    'fa-brands': 'brands', fab: 'brands',
-  };
-  const FAMILY = { 'fa-sharp': 'sharp', 'fa-duotone': 'duotone', fad: 'duotone', 'fa-sharp-duotone': 'sharp-duotone' };
-
-  const render = (el) => {
-    if (el.dataset.emFa || el.querySelector('svg')) {
-      return;
-    }
-
-    let base = 'solid';
-    let family = '';
-    let name = null;
-    for (const cls of el.classList) {
-      if (BASE_STYLE[cls]) {
-        base = BASE_STYLE[cls];
-      } else if (FAMILY[cls]) {
-        family = FAMILY[cls];
-      } else if (!name && cls.startsWith('fa-') && !MODIFIER.test(cls)) {
-        name = cls.slice(3);
-      }
-    }
-    if (!name) {
-      return;
-    }
-    // duotone-solid lives in the bare `duotone` dir; every other family
-    // composes family-weight (sharp-light, duotone-thin, sharp-duotone-solid).
-    const style = (base === 'brands' || !family) ? base
-      : (family === 'duotone' && base === 'solid') ? 'duotone'
-        : `${family}-${base}`;
-
-    el.dataset.emFa = name;
-    resolve(name, style).then((svg) => {
-      if (svg && el.isConnected && !el.querySelector('svg')) {
-        el.innerHTML = svg;
-      }
-    });
-  };
-
-  const scan = (root) => {
-    if (root.matches?.('i[class*="fa-"]')) {
-      render(root);
-    }
-    root.querySelectorAll?.('i[class*="fa-"]').forEach(render);
-  };
-
-  // Observe + initial scan. Deferred until the document exists — when this
-  // runs from a preload (the @omega.js/desktop test harness does), documentElement isn't
-  // built yet.
-  const start = () => {
-    new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) {
-            scan(node);
-          }
-        });
-      }
-    }).observe(document.documentElement, { childList: true, subtree: true });
-
-    scan(document.documentElement);
-  };
-
-  if (document.documentElement && document.readyState !== 'loading') {
-    start();
-  } else {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  }
+  const { createIconRenderer } = require('@omega.js/client/modules/icon-renderer.js');
+  createIconRenderer({
+    resolve: (name, style) => self.ipc.invoke('desktop:fontawesome:get', { name, style })
+      .then((r) => r?.svg ?? null),
+  }).start(document);
 };
 
 // Public alias — minimal surfaces that skip the full initialize() (no

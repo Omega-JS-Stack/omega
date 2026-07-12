@@ -186,3 +186,21 @@ extension package/webpack `validRedirectHosts`.)
    falls back to solid). client 95 (+1) / web 107 (+4) / template-kit 42 /
    desktop 766 (+2). Extension still consumer-less for icons — its supply
    keeps riding the vendor channel when one appears.
+8. **cp112 — dynamic icons everywhere. ✅ SHIPPED (2026-07-12, Ian:
+   "fa-{icon} via js MUST work" + "one single WEB library").** ONE browser
+   auto-render in client — NEW `modules/icon-renderer.js` (scan +
+   MutationObserver over insertions AND class changes → set/changed fa-*
+   classes re-render in place, removal clears; `data-omega-fa` marker;
+   caching; transport injected) + `parseIconClasses` joins icon-core
+   (family × weight SSOT — desktop's cp111b local copy deleted same-day,
+   as it should be). Desktop renderer = 10-line IPC wrapper; web boots
+   the watcher on every page (runtime/boot.js initialize) with a fetch
+   resolver against the site's OWN emitted set — new `icons` build phase
+   ships the merged chain (Pro + free + curated core, best per file) to
+   assets/fa/ (~25MB with Pro; fetch-per-icon so only used icons ever
+   transfer; hosting diffs by hash). Extension: recipe in docs/icons.md,
+   wires when its first consumer lands. docs/icons.md is now the icon
+   HUB (authoring + chain + Pro supply; desktop doc trimmed to a
+   pointer; CLAUDE.md Icons section). client 96 / web 109 / desktop 767
+   (live re-class → swap → clear proof). The desktop suite IS the
+   real-DOM proof of the exact module web pages run — same code path.

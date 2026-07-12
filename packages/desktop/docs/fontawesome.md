@@ -42,15 +42,15 @@ drift on how an icon name resolves or what the served SVG looks like.
   renderers over `desktop:fontawesome:get`.
 - **Preload bridge** — `window.em.fontawesome.get(name, style)` →
   `Promise<svg | null>`.
-- **Renderer auto-render** (`renderer.js _wireFontAwesome`) — scans for
-  `i[class*="fa-"]` at init and watches the DOM via MutationObserver. The
-  style comes from FA's family × weight classes: `fa-solid` (default),
-  `fa-regular`, `fa-brands`, and — with a Pro set supplied — `fa-light`,
-  `fa-thin`, plus the `fa-sharp`/`fa-duotone`/`fa-sharp-duotone` family
-  prefixes composing with the weight (`fa-sharp fa-light` → `sharp-light`).
-  Pro-style markup without a Pro set stays empty — never a wrong-style
-  fallback. The icon name is the first `fa-*` class that isn't a known
-  modifier (`fa-fw`, `fa-2x`, `fa-spin`, …).
+- **Renderer auto-render** (`renderer.js _wireFontAwesome`) — a thin
+  wrapper over **@omega.js/client's shared `icon-renderer`** (C4 cp112, the
+  same module web pages run): scan + MutationObserver for insertions AND
+  class changes (`el.className = 'fa-solid fa-stop'` re-renders in place;
+  dropping the classes clears the SVG), FA's family × weight class parsing
+  (`fa-sharp fa-light` → `sharp-light`; Pro markup without a Pro set stays
+  empty — never a wrong-style fallback), caching, and the
+  `data-omega-fa="<style>/<name>"` marker. Desktop supplies only the
+  transport: IPC to main's icon server.
   The SVG is injected as a child of the `<i>`, sized `1em`/`currentColor` — it
   inherits text color and scales with font-size (bump it via `font-size` or a
   `fs-*` utility). Served SVGs also carry `overflow="visible"` (FA-kit parity:
@@ -70,39 +70,17 @@ new (require('@omega.js/desktop/renderer'))().enableFontAwesome();
 
 ## Supplying Font Awesome Pro (C4 cp111)
 
-The framework never redistributes Font Awesome Pro (publishing a package
-that vendors Pro SVGs violates its license) — a brand that owns a Pro
-license brings its own copy, and every surface picks it up automatically.
-Two supply routes:
-
-1. **npm (preferred)** — authenticate the `@fortawesome` scope with your FA
-   npm token (from fontawesome.com → Account → API Tokens), machine-global,
-   never committed:
-
-   ```bash
-   npm config set "@fortawesome:registry" "https://npm.fontawesome.com/"
-   npm config set "//npm.fontawesome.com/:_authToken" "YOUR-TOKEN"
-   ```
-
-   Then install `@fortawesome/fontawesome-pro`. In the Omega monorepo a
-   root install covers web + desktop + extension dev at once; a real brand
-   desktop app declares it as its own **prod dependency** so it ships
-   inside the packaged asar.
-
-2. **Download dir (no token)** — point `OMEGA_FONTAWESOME_ROOT` at a
-   fontawesome.com "Pro for Web" download (any dir containing `svgs/` +
-   `metadata/`). Wins over the npm sets when set; ignored with a warning
-   when the dir has no `svgs/`.
-
-Pro styles (`light`, `thin`, `duotone`, `sharp-*`, …) work as soon as a Pro
-set is present — style validation is by path-safe shape, not a whitelist,
-so new FA families need no framework change. Without Pro, those lookups
-just return `null`/render nothing.
+Pro is brand-supplied, never redistributed by the framework. The two
+routes (FA npm token, or an `OMEGA_FONTAWESOME_ROOT` download dir), the
+chain semantics, and the style/family model are documented once at the
+repo hub: **[docs/icons.md](../../../docs/icons.md)**. Desktop-specific
+note: a packaged brand app declares `@fortawesome/fontawesome-pro` as its
+own **prod dependency** so the set ships inside the asar.
 
 ## Notes
 
 - **Unknown names render nothing** — the `<i>` stays empty (marked
-  `data-em-fa`). If you need a fallback, resolve through
+  `data-omega-fa`). If you need a fallback, resolve through
   `window.em.fontawesome.get()` and swap yourself.
 - **Free set = solid + regular + brands.** Pro styles (light/duotone/sharp)
   need a supplied Pro set (above); otherwise
@@ -117,7 +95,9 @@ just return `null`/render nothing.
   the `overflow="visible"` serve attribute, and the cp111 root chain
   (`OMEGA_FONTAWESOME_ROOT` wins, free set falls through for icons and
   metadata the brand set lacks).
-- `src/test/suites/renderer/fontawesome.test.js` — the real auto-render
-  pipeline: inserted `<i>` elements get SVGs on the live DOM, modifier classes
-  are never mistaken for names, unknown names stay empty, injected SVGs compute
-  `overflow: visible` (out-of-viewBox glyphs must not clip).
+- `src/test/suites/renderer/fontawesome.test.js` — the real-DOM proof of
+  the SHARED icon-renderer: inserted `<i>` elements get SVGs on the live
+  DOM, class changes re-render in place and class removal clears (cp112),
+  modifier classes are never mistaken for names, Pro family/weight classes
+  compose (Pro-adaptive assertions), unknown names stay empty, injected
+  SVGs compute `overflow: visible` (out-of-viewBox glyphs must not clip).
