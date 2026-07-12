@@ -1,13 +1,45 @@
 ---
 layout: frontend/core/base
+
+# Marketing-section defaults (Ian 2026-07-11: deliberate product behavior —
+# promo banner, social proof, FAQs ship ON by default and are consumer-
+# overridable). PLANS never live here: payment.products is the only pricing
+# source (C2).
+
+# Social Proof Section
+social_proof:
+  items:
+    - number: "2M"
+      label: "Monthly readers"
+    - number: "#1"
+      label: "Independent newsroom"
+    - number: "4.8"
+      label: "Apple News"
+    - number: "4.8"
+      label: "Google News"
+
+# FAQs Section
+faqs:
+  superheadline:
+    icon: "messages-question"
+    text: "FAQs"
+  headline: "Frequently asked"
+  headline_accent: "questions"
+  subheadline: "Everything you need to know about {{ site.brand.name }} memberships & billing."
+  items:
+    - question: "Can I cancel my membership anytime?"
+      answer: "Yes, you can cancel anytime, no questions asked. Your member benefits stay active until the end of the billing period."
+    - question: "Is there a free way to read?"
+      answer: "Always. The Reader tier is free forever — our core coverage and the daily briefing stay open to everyone. Memberships unlock the extras and keep the lights on."
+    - question: "Do memberships really fund the journalism?"
+      answer: "Directly. Reader memberships are our primary source of revenue, which is exactly why no advertiser or owner gets a say in what we publish."
 ---
 
 {% comment %}
   Pricing renders from config alone (C2): resolved.pricing is composed from
-  payment.products by the engine. Consumer page frontmatter may override
-  presentation (hero copy, faqs, social_proof, pricing.enterprise,
-  pricing.promo, pricing.guarantee, pricing.price_per_unit); the framework
-  layer ships NO fictional defaults.
+  payment.products by the engine. The marketing chrome above ships ON by
+  default; consumer frontmatter overrides any of it (pricing.promo: false
+  kills the banner, pricing.enterprise: false the group-access strip).
 {% endcomment %}
 
 {% assign _plans = resolved.pricing.plans %}
@@ -21,31 +53,31 @@ layout: frontend/core/base
 {% assign _default_annual = resolved.pricing.billing.annually %}
 
 <!-- ============================================ -->
-<!-- PROMO BANNER (consumer opt-in: pricing.promo) -->
+<!-- PROMO BANNER — ON by default; pricing.promo overrides, false kills -->
 <!-- ============================================ -->
-{% iftruthy resolved.pricing.promo %}
+{% unless resolved.pricing.promo == false %}
   <div id="pricing-promo-banner" class="position-fixed top-0 start-0 w-100 text-center animation-slide-down" style="z-index: 1050;" hidden>
     <div class="bg-primary text-white py-2 position-relative">
       <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 mt-2 me-2" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;document.querySelector('.navbar-wrapper').style.marginTop='';document.querySelector('main > section:first-of-type').style.paddingTop=''"></button>
       <div class="container-fluid">
         <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-4">
           <span id="pricing-promo-badge" class="badge bg-warning text-dark px-2 py-1 fs-6 animation-wiggle">
-            {{ resolved.pricing.promo.badge }}
+            {{ resolved.pricing.promo.badge | default: "15% OFF!" }}
           </span>
           <span id="pricing-promo-text" class="fw-bold">
-            {{ resolved.pricing.promo.text }}
+            {{ resolved.pricing.promo.text | default: "Flash sale" }}
           </span>
           <span class="text-white-50">
             Ending in <span id="pricing-promo-countdown" class="fw-semibold text-white">--</span>
           </span>
           <span class="text-white-50">
-            Use code <span id="pricing-promo-code" class="badge bg-white bg-opacity-25 px-2 py-1 fs-6">{{ resolved.pricing.promo.code }}</span>
+            Use code <span id="pricing-promo-code" class="badge bg-white bg-opacity-25 px-2 py-1 fs-6">{{ resolved.pricing.promo.code | default: "WELCOME15" }}</span>
           </span>
         </div>
       </div>
     </div>
   </div>
-{% endiftruthy %}
+{% endunless %}
 
 <!-- ============================================ -->
 <!-- HERO -->
@@ -90,16 +122,15 @@ layout: frontend/core/base
         <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly" {% unless _default_annual %}checked{% endunless %}>
         <label class="billing-option" for="monthly">Monthly</label>
         <input type="radio" class="btn-check" name="billing" id="annually" autocomplete="off" {% if _default_annual %}checked{% endif %} data-billing="annually">
-        <label class="billing-option" for="annually">Annually {% if resolved.pricing.savingsPercent > 0 %}<span class="billing-save">up to {{ resolved.pricing.savingsPercent }}% off</span>{% endif %}</label>
+        {% if resolved.pricing.savingsPercent > 0 %}{% assign _savings = resolved.pricing.savingsPercent %}{% else %}{% assign _savings = 20 %}{% endif %}
+        <label class="billing-option" for="annually">Annually <span class="billing-save">up to {{ _savings }}% off</span></label>
       </div>
     {% endif %}
 
-    {% iftruthy resolved.pricing.guarantee %}
-      <p class="text-center fw-medium mb-5">
-        {% uj_icon "shield-check", "me-1 text-success" %}
-        {{ resolved.pricing.guarantee }}
-      </p>
-    {% endiftruthy %}
+    <p class="text-center fw-medium mb-5">
+      {% uj_icon "shield-check", "me-1 text-success" %}
+      {{ resolved.pricing.guarantee | default: "Every paid membership backed by a 7-day money-back guarantee" }}
+    </p>
 
     <div class="pricing-plan-grid">
       {% for plan in _plans %}
@@ -175,11 +206,9 @@ layout: frontend/core/base
               {% uj_icon "rocket", "me-1 text-success" %}Upgrade any time
             </p>
           {% else %}
-            {% iftruthy resolved.pricing.guarantee %}
-              <p class="pricing-plan-guarantee">
-                {% uj_icon "shield-check", "me-1 text-success" %}{{ resolved.pricing.guarantee }}
-              </p>
-            {% endiftruthy %}
+            <p class="pricing-plan-guarantee">
+              {% uj_icon "shield-check", "me-1 text-success" %}{{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
+            </p>
           {% endif %}
 
           {% if plan.features.size > 0 %}
@@ -229,8 +258,8 @@ layout: frontend/core/base
       {% endfor %}
     </div>
 
-    <!-- Group access strip (consumer opt-in: pricing.enterprise) -->
-    {% iftruthy resolved.pricing.enterprise %}
+    <!-- Group access strip — ON by default; pricing.enterprise overrides copy, false kills -->
+    {% unless resolved.pricing.enterprise == false %}
       <div class="card enterprise-panel" data-lazy="@class animation-slide-up">
         <div>
           <h3 class="h3 mb-1">{{ resolved.pricing.enterprise.name | default: "Group & campus access" }}</h3>
@@ -240,7 +269,7 @@ layout: frontend/core/base
           {% uj_icon "envelope", "me-2" %}{{ resolved.pricing.enterprise.button_text | default: "Contact us" }}
         </button>
       </div>
-    {% endiftruthy %}
+    {% endunless %}
   </div>
 </section>
 {% endif %}

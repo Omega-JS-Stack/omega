@@ -183,11 +183,12 @@ for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
     assert.ok(html.includes('data-plan-type="one-time"'), `${theme}: one-time checkout type`);
     assert.ok(html.includes('49.99'), `${theme}: one-time price`);
 
-    // Honest chrome: real savings %, no fabricated social proof
+    // Savings badge computes from real prices; marketing chrome ships ON by
+    // default (Ian 2026-07-11: banner/social proof/FAQ defaults are product
+    // behavior — only PLAN fiction is dead)
     assert.ok(html.includes('17%'), `${theme}: computed savings badge`);
-    assert.ok(!html.includes('5M'), `${theme}: no fake customer counts`);
-    assert.ok(!html.includes('Sarah Johnson'), `${theme}: no fake testimonials`);
-    assert.ok(!html.includes('WELCOME15'), `${theme}: no fake promo code`);
+    assert.ok(html.includes('WELCOME15'), `${theme}: promo banner on by default`);
+    assert.ok(html.includes('id="pricing-promo-banner"'), `${theme}: banner markup present`);
   });
 
   test(`${theme}: bare catalog → honest empty state (friction #6)`, async () => {
@@ -209,6 +210,16 @@ test('classy: monthly-only catalog hides the billing toggle', async () => {
   const html = pages.get('/pricing/');
   assert.ok(!html.includes('name="billing"'), 'no toggle without both cadences');
   assert.ok(html.includes('data-plan-id="solo"'), 'plan still renders');
+});
+
+test('classy: marketing chrome defaults ship ON (Ian 2026-07-11 — social proof, testimonials, FAQs, enterprise)', async () => {
+  const pages = await buildWith({ ...miniData, payment: CATALOG });
+  const html = pages.get('/pricing/');
+  assert.ok(html.includes('5M'), 'default social proof');
+  assert.ok(html.includes('Sarah Johnson'), 'default testimonials');
+  assert.ok(html.includes('Can I cancel at any time?'), 'default FAQs');
+  assert.ok(html.includes('data-plan-id="enterprise"'), 'enterprise card on by default');
+  assert.ok(html.includes('7-day money-back guarantee'), 'guarantee line default');
 });
 
 test('classy: consumer frontmatter still overrides presentation (consumer surface)', async () => {

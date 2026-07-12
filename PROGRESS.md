@@ -2,10 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **cp97 + 98 SHIPPED (pricing-from-config + markers dead; deliberate deploys live — omegajs-playground.web.app serves) — next: cp99 C3 redesign (queue #1)**. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction still open: #15 Node story, #16 sass + #21 fake-ratings schema (C3)
+- **cp97 + 98 + 98b SHIPPED (pricing-from-config, markers dead, deliberate deploys live, marketing chrome restored per Ian) — next: cp99 C3 redesign (queue #1)**. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction still open: #15 Node story, #16 sass (C3); #21 closed DECIDED-KEEP
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **cp99+** — C3 classy redesign (multi-checkpoint): FRONT-LOAD the design brief FOR IAN (typography/palette/motion — the genuinely-Ian surface) while systems work proceeds — cross-target core tokens/primitives (D10), two-tier theme mechanics, default pages + blueprints reskinned, auth/account/payment surfaces, omega-brand as showcase; #16 sass + #21 fake-ratings schema fold in → then C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
+1. **cp99+** — C3 classy redesign (multi-checkpoint): FRONT-LOAD the design brief FOR IAN (typography/palette/motion — the genuinely-Ian surface) while systems work proceeds — cross-target core tokens/primitives (D10), two-tier theme mechanics, default pages + blueprints reskinned, auth/account/payment surfaces, omega-brand as showcase; #16 sass folds in → then C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
 2. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -43,6 +43,7 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 98b marketing chrome restored (Ian's cp97 scope correction) — banner/badge/guarantees/enterprise/social-proof/testimonials/FAQ defaults ON again ×3 themes w/ consumer overrides + kill switches; plans stay config-only; #21 DECIDED-KEEP; live re-proof omega-brand; web 81 (this commit) → CHANGELOG
 - [x] 98 D13 deliberate deploys — devkit REST executor (7 tests, injectable), scaffolded workflows trigger-free (dispatch-only; ext zip → GH releases), `omega deploy` uniform verb ×4 targets (+dry-run; backend --only), admin post/put dispatch-on-publish; proofs: 3× dry-run exact-POST + LIVE omegajs-playground.web.app 200 on Spark; corpus 1225/desktop 761/ext 99/web 80 (this commit) → CHANGELOG + docs/deploys.md
 - [x] 97 C2 pricing/blueprints — payment.products = ONLY pricing source (engine composer → resolved.pricing; 3 themes rewritten, zero fiction; one-time section; honest empty state + build warn; #6/#7 closed), 167-file marker sweep + 3 emitters + guard test (convention DEAD); proofs: omega-brand live build + sandbox catalog; web 80/config 94/mgr 582; friction #21 logged (fake-ratings schema → C3) (this commit) → CHANGELOG
 - [x] 96b omegajs-playground LIVE (Ian's go 2026-07-11) — real Firebase project + web app + Firestore(nam5) + real SA (gitignored); omega-brand cloud.config = real values; live setup 39/39 with demo gates stepping aside (indexes synced live, 5 campaigns seeded + READ BACK from real Firestore); stale-self bug found+fixed (consistency fix now refreshes self.projectId; BEM self-test 7/7) (this commit) → CHANGELOG
@@ -95,4 +96,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 6:10 PM (98 — deliberate deploys shipped, playground hosting LIVE; next: cp99 C3 redesign, design brief first)*
+*Last updated: 2026-07-11 6:40 PM (98b — marketing chrome restored per Ian; next: cp99 C3 redesign, design brief first)*
