@@ -1,15 +1,22 @@
-// OMEGA — brand-level omega.json5: the shared config layer every app
-// under apps/ inherits. App files override any key per-surface; key presence
-// under `targets` = this brand supports that target. Secrets NEVER live here —
-// they go in the gitignored .env (the loader hard-fails on secret-shaped keys).
+// OMEGA Playground — brand-level omega.json5: the shared config layer every
+// app under apps/ inherits. App files override any key per-surface; key
+// presence under `targets` = this brand supports that target. Secrets NEVER
+// live here — they go in the gitignored .env (the loader hard-fails on
+// secret-shaped keys). This is the REHEARSAL brand (Ian 2026-07-11):
+// playground identity, playground subdomain — the real OMEGA brand is born
+// standalone at arc close and owns omegajs.dev.
 {
   brand: {
-    id: "omega",
-    name: "OMEGA",
+    id: "omega-playground",
+    name: "OMEGA Playground",
     description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
     tagline: "One config. Every target.",
     color: "#3b5bdb", // PLACEHOLDER accent (drives --omega-accent-* ramp) — Ian picks with the C3 board notes
-    url: "https://omegajs.dev",
+    // PLAYGROUND scope (Ian 2026-07-11): this rehearsal brand lives on a
+    // SUBDOMAIN of the real domain, so every derived surface (authDomain,
+    // api.playground.omegajs.dev, canonicals) stays clear of the REAL
+    // omegajs.dev site — which belongs to the future standalone OMEGA brand.
+    url: "https://playground.omegajs.dev",
     contact: {
       email: "support@omegajs.dev",
     },
@@ -23,9 +30,9 @@
       country: "United States",
     },
     images: {
-      wordmark: "https://omegajs.dev/wordmark.png",
-      brandmark: "https://omegajs.dev/brandmark.png",
-      combomark: "https://omegajs.dev/combomark.png",
+      wordmark: "https://playground.omegajs.dev/wordmark.png",
+      brandmark: "https://playground.omegajs.dev/brandmark.png",
+      combomark: "https://playground.omegajs.dev/combomark.png",
     },
   },
 
@@ -58,12 +65,12 @@
   // REAL playground project (created 2026-07-11; console:
   // https://console.firebase.google.com/project/omegajs-playground). Values
   // are the web-app config verbatim — public by design. To run offline-only,
-  // temporarily set projectId back to the demo-* convention (demo-omega).
+  // temporarily set projectId back to the demo-* convention (demo-omega-playground).
   cloud: {
     provider: "firebase",
     config: {
       apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
-      authDomain: "omegajs.dev",
+      authDomain: "playground.omegajs.dev",
       projectId: "omegajs-playground",
       storageBucket: "omegajs-playground.firebasestorage.app",
       messagingSenderId: "644778453321",

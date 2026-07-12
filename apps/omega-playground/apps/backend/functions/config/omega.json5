@@ -1,5 +1,5 @@
 // OMEGA backend — APP-level omega.json5. Shared sections (brand, cloud,
-// payment, ...) come from the BRAND file (apps/omega-brand/config/omega.json5)
+// payment, ...) come from the BRAND file (apps/omega-playground/config/omega.json5)
 // via the loader's brand walk-up — this file carries ONLY the backend
 // target's own settings. (cp93 friction find: the framework-seeded file
 // duplicated every shared section with placeholders, shadowing the brand

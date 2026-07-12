@@ -1,18 +1,18 @@
 {
   appName: {
-    message: 'OMEGA',
+    message: 'OMEGA Playground',
     description: 'The name of the extension.',
   },
   appNameShort: {
-    message: 'OMEGA',
+    message: 'OMEGA Playground',
     description: 'The short name of the extension.',
   },
   appDescription: {
-    message: 'The official OMEGA browser extension.',
+    message: 'The OMEGA Playground browser extension — the rehearsal brand for the OMEGA stack.',
     description: 'The description of the extension.',
   },
   btnTooltip: {
-    message: 'OMEGA',
+    message: 'OMEGA Playground',
     description: 'Tooltip for the button.',
   },
 }
