@@ -169,4 +169,9 @@
     desktop: {},
     extension: {},
   },
+  marketing: {
+    campaigns: {
+      listId: "daae211b-bc50-4d57-ae5e-8e86f6abb734",
+    },
+  },
 }
