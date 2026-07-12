@@ -5,16 +5,19 @@
  * No OAuth clients here — IAP-created clients are locked (no redirect URIs);
  * Firebase auto-creates the client when Google sign-in is enabled.
  *
- * supportEmail must be the authenticated user's email or a Google Group they
- * own; `firebase.supportEmail` in config, defaulting to support@{domain}
- * (omega-manager defaulted to the company googlegroup — config owns it now).
+ * Google only accepts a supportEmail the AUTHORIZING USER owns (their own
+ * email or a Google Group they manage) — anything else is "Request contains
+ * an invalid argument" (friction #29; the old support@{domain} default could
+ * never work). `firebase.supportEmail` in config wins (the Google-Group
+ * case); the default is the authenticated user's own email via the
+ * userinfo.email scope. Neither available → warn with guidance, never send
+ * a doomed value.
  */
 const chalk = require('chalk').default;
 
 module.exports = async function ensureOAuthConsent(context) {
-  const { firebaseApi: api, brandConfig, projectId, domain, options = {} } = context;
+  const { firebaseApi: api, brandConfig, projectId, options = {} } = context;
   const brandName = brandConfig.brand?.name;
-  const supportEmail = brandConfig.firebase?.supportEmail || `support@${domain}`;
 
   // === READ ===
   const existingBrands = await api.listBrands(projectId);
@@ -36,8 +39,18 @@ module.exports = async function ensureOAuthConsent(context) {
 
   // === WRITE ===
   if (options.dryRun) {
-    console.log(`      ${chalk.dim(`⊘ Dry run — would create OAuth consent screen (${brandName}, ${supportEmail})`)}`);
+    const planned = brandConfig.firebase?.supportEmail || "(authorizing user's email)";
+    console.log(`      ${chalk.dim(`⊘ Dry run — would create OAuth consent screen (${brandName}, ${planned})`)}`);
     return { output: { oauthConsent: { planned: 'create' } } };
+  }
+
+  const supportEmail = brandConfig.firebase?.supportEmail
+    || await api.getAuthenticatedEmail();
+
+  if (!supportEmail) {
+    console.log(`      ${chalk.yellow('⚠')} No usable support email — Google only accepts one the authorizing user OWNS`);
+    console.log(`      ${chalk.dim('→')} Re-auth to grant the email scope (delete .omega/auth/google-tokens.json and rerun), or set firebase.supportEmail to a Google Group you own`);
+    return { status: 'warned', output: { oauthConsent: { note: 'no ownable supportEmail available' } } };
   }
 
   console.log('      Creating OAuth consent screen...');

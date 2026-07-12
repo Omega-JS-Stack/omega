@@ -93,7 +93,7 @@ const DEFAULTS = {
   // land in company/brand config.
   firebase: {
     shared: false,        // true = project shared with other brands; only per-brand ops run (service-account, sdk-config)
-    supportEmail: null,   // OAuth consent screen support email (defaults to support@{domain}; must be the authed user's email or a Google Group they own)
+    supportEmail: null,   // OAuth consent screen support email (defaults to the AUTHORIZING user's email — Google rejects any address the caller doesn't own; set only for an owned Google Group)
     organizationId: null, // GCloud org ID — the project-create flow creates projects inside it (proper default permissions)
     billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — required to auto-upgrade to Blaze
     apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain

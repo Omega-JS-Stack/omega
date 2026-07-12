@@ -70,6 +70,7 @@ const API_METHODS = [
   'getGcpProject', 'listWebApps', 'getWebAppConfig', 'listBrands', 'listServiceAccounts',
   'listHostingSites', 'checkDomainStatus', 'getFirestoreDatabase', 'listRealtimeDatabases',
   'getIdentityConfig', 'getIdpConfig', 'getStorageBucket', 'isServiceEnabled',
+  'getAuthenticatedEmail',
 ];
 
 /**
@@ -607,6 +608,43 @@ test('firebase: dry-run on a fully drifted project performs zero mutations', asy
   assert.deepEqual(cf.mutations(), []);
   // No key file or secrets materialized either
   assert.equal(jetpack.exists(path.join(brandRoot, '.omega', 'secrets')), false);
+});
+
+// ─── OAuth consent: supportEmail must be OWNABLE by the caller (#29) ─────────
+
+const ensureOAuthConsent = require('../src/services/firebase/ensure/oauth-consent.js');
+
+test('oauth-consent: defaults supportEmail to the AUTHORIZING user, never support@domain (#29)', async () => {
+  const api = fakeFirebase({
+    listBrands: [],
+    getAuthenticatedEmail: 'owner@example.com',
+    createBrand: (projectId, title, email) => ({ name: 'projects/123/brands/b9', applicationTitle: title, supportEmail: email }),
+  });
+
+  const result = await ensureOAuthConsent({ firebaseApi: api, brandConfig: brandConfig(), projectId: PROJECT, domain: DOMAIN });
+
+  assert.deepEqual(api.callsTo('createBrand')[0].args, [PROJECT, 'Fixture Brand', 'owner@example.com']);
+  assert.equal(result.state.oauthConsent.supportEmail, 'owner@example.com');
+});
+
+test('oauth-consent: config supportEmail (owned Google Group) wins; no email at all warns without mutating', async () => {
+  const grp = fakeFirebase({
+    listBrands: [],
+    createBrand: (projectId, title, email) => ({ name: 'b', applicationTitle: title, supportEmail: email }),
+  });
+  await ensureOAuthConsent({
+    firebaseApi: grp,
+    brandConfig: brandConfig({ firebase: { supportEmail: 'team@groups.example.com' } }),
+    projectId: PROJECT,
+    domain: DOMAIN,
+  });
+  assert.deepEqual(grp.callsTo('createBrand')[0].args, [PROJECT, 'Fixture Brand', 'team@groups.example.com']);
+  assert.equal(grp.callsTo('getAuthenticatedEmail').length, 0, 'config wins — no lookup');
+
+  const none = fakeFirebase({ listBrands: [], getAuthenticatedEmail: null });
+  const result = await ensureOAuthConsent({ firebaseApi: none, brandConfig: brandConfig(), projectId: PROJECT, domain: DOMAIN });
+  assert.equal(result.status, 'warned');
+  assert.equal(none.callsTo('createBrand').length, 0, 'never sends a doomed value');
 });
 
 // ─── Interactive project selection/creation (config-landing flow) ────────────

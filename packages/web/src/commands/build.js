@@ -6,6 +6,7 @@
  * /{lang}/ copies from the committed per-string cache ONLY — build never
  * calls a live provider; pages with cold strings are skipped with a warning
  * and belong to an explicit `omega translate` run (friction #24 decision).
+ * `omega build --translate` opts one build into the full live pass.
  */
 const path = require('node:path');
 const Logger = require('@omega.js/devkit/logger');
@@ -42,14 +43,20 @@ module.exports = async function (options) {
 
   // Post-build translation (site.* IS the resolved config shape).
   // cachedOnly: a routine build must never sit inside a live LLM — pages with
-  // cold strings are skipped with a warning; `omega translate` translates them.
+  // cold strings are skipped with a warning; `omega translate` translates
+  // them. `omega build --translate` opts a single build into the full
+  // live-provider pass (equivalent to build + translate in one command).
+  if (options.translate) {
+    logger.log('--translate: cold pages WILL be translated live this build');
+  }
+
   const translation = await translateSite({
     root: paths.root,
     outDir: paths.out,
     config: siteData,
     logger,
     only: process.env.OMEGA_TRANSLATE_ONLY,
-    cachedOnly: true,
+    cachedOnly: !options.translate,
   });
 
   if (!translation.skipped) {

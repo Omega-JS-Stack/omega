@@ -75,8 +75,11 @@ LLM). A page-language pair with any cold string is skipped WHOLE (no
 mixed-language copies, hreflang stays honest) and listed in a build warning;
 `omega translate` owns live-LLM translation: it runs standalone against an
 existing dist/, translates cold strings through the provider, and exits 1 on
-failures. `OMEGA_TRANSLATE_ONLY=<route>` limits either to one page
-(canary/debug).
+failures. After one translate run the cache is warm and committed, so every
+subsequent build ships the FULLY translated site with zero provider calls.
+`omega build --translate` opts a single build into the full live pass
+(build + translate in one command). `OMEGA_TRANSLATE_ONLY=<route>` limits
+any of these to one page (canary/debug).
 
 Per page × language: text nodes/`<title>`/meta/attribute copy translate
 (cache-first), then the copy lands at `dist/{lang}/...` with `<html lang dir>`
