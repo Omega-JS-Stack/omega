@@ -1,4 +1,4 @@
-import { v5 as uuidv5 } from 'uuid';
+import core from './analytics-core.js';
 
 // Supported runtimes for analytics
 const SUPPORTED_RUNTIMES = ['browser-extension', 'electron'];
@@ -64,10 +64,9 @@ class Analytics {
       return;
     }
 
-    // Cross-surface identity (matches @omega.js/desktop + @omega.js/backend):
-    // namespace = uuidv5(projectId); client_id = uuidv5(deviceId, namespace);
-    // user_id = uuidv5(firebaseUid, namespace) — same human on every surface
-    this.namespace = this.projectId ? uuidv5(this.projectId, uuidv5.URL) : null;
+    // Cross-surface identity — shared analytics-core (the ONE place the
+    // uuidv5 math lives; desktop's main-process lib uses the same module)
+    this.namespace = core.deriveNamespace(this.projectId);
 
     // Generate or retrieve client ID
     this.clientId = this._getClientId();
@@ -104,7 +103,7 @@ class Analytics {
       }
     }
 
-    return this.namespace ? uuidv5(deviceId, this.namespace) : deviceId;
+    return core.deriveClientId(deviceId, this.namespace);
   }
 
   // Get page data to include with all events
@@ -154,21 +153,19 @@ class Analytics {
       return;
     }
 
-    const url = `https://www.google-analytics.com/mp/collect?measurement_id=${this.measurementId}&api_secret=${this.secret}`;
+    const url = core.buildCollectUrl(this.measurementId, this.secret);
 
-    const payload = {
-      client_id: this.clientId,
-      ...(this.userId ? { user_id: this.userId } : {}),
-      ...(Object.keys(this.userProperties).length ? { user_properties: this.userProperties } : {}),
-      events: [{
-        name: eventName,
-        params: {
-          ...params,
-          engagement_time_msec: 100,
-          session_id: this._getSessionId(),
-        },
-      }],
-    };
+    const payload = core.buildPayload({
+      clientId: this.clientId,
+      userId: this.userId,
+      userProperties: this.userProperties,
+      eventName,
+      params: {
+        ...params,
+        engagement_time_msec: 100,
+        session_id: this._getSessionId(),
+      },
+    });
 
     // Send via fetch (fire and forget)
     fetch(url, {
@@ -231,12 +228,7 @@ class Analytics {
       return;
     }
 
-    const wrapped = {};
-    for (const [key, value] of Object.entries(properties)) {
-      wrapped[key] = { value };
-    }
-
-    this.userProperties = { ...this.userProperties, ...wrapped };
+    this.userProperties = { ...this.userProperties, ...core.wrapUserProperties(properties) };
   }
 
   // Set user ID — raw uid in, uuidv5 out (the same value desktop/backend
@@ -251,7 +243,7 @@ class Analytics {
       return;
     }
 
-    this.userId = (userId && this.namespace) ? uuidv5(userId, this.namespace) : null;
+    this.userId = core.deriveUserId(userId, this.namespace);
   }
 }
 

@@ -89,7 +89,7 @@ extension package/webpack `validRedirectHosts`.)
      wrapped {value}, ITW dev creds DELETED (prong 1) — dev logs, never
      posts. Dead `itwcw-package-analytics` dep dropped; `uuid` added.
      client 85 / web 103 / extension 102.
-   - **cp106b** — desktop's lib collapses onto the client engine (main-process
+   - **cp106b — SHIPPED (2026-07-12)** — desktop's lib collapses onto the client engine (main-process
      wrapper keeps the preload/renderer IPC bridge + env secret; the
      analytics-bridge suite repins).
    - **IAN ANSWERED (2026-07-12)**: "We definitely need an analytics system

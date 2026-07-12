@@ -43,11 +43,13 @@
 const crypto     = require('crypto');
 const LoggerLite = require('./logger-lite.js');
 const fetch      = require('wonderful-fetch');
-const { v5: uuidv5, NIL: UUID_NIL } = require('uuid');
+// The MP semantics live in ONE place — @omega.js/client's analytics-core
+// (C4 cp106b): identity math, event-name rules, payload + URL shape are
+// shared with the browser engine and can never drift again.
+const core = require('@omega.js/client/modules/analytics-core.js');
 
 const logger = new LoggerLite('analytics');
 
-const GA_ENDPOINT = 'https://www.google-analytics.com/mp/collect';
 const FETCH_TIMEOUT_MS = 30 * 1000;
 const MAX_QUEUE = 200;
 
@@ -97,13 +99,13 @@ const analytics = {
     // string projectId by hashing it into uuidv5.URL space (RFC 4122).
     const projectId = manager.config.cloud?.config?.projectId
       || manager.config.brand.id;
-    analytics._namespace = uuidv5(projectId, uuidv5.URL);
+    analytics._namespace = core.deriveNamespace(projectId);
 
     // client_id = stable per-device UUID. context.session.deviceId is async-resolved;
     // by the time analytics.initialize() runs (post-context init in boot sequence),
     // it's already populated. Fall back to a fresh UUID if for any reason it isn't.
     const deviceId = manager.context.session.deviceId || crypto.randomUUID();
-    analytics._clientId = uuidv5(deviceId, analytics._namespace);
+    analytics._clientId = core.deriveClientId(deviceId, analytics._namespace);
 
     // Wire auth subscription so user_id flips automatically on login/logout.
     analytics._authUnsub = manager.omega.onAuthChange((snap) => {
@@ -169,17 +171,15 @@ const analytics = {
 
     const enrichedParams = analytics._enrichParams(params || {});
 
-    const payload = {
-      client_id:       analytics._clientId,
-      ...(analytics._userId ? { user_id: analytics._userId } : {}),
-      user_properties: analytics._userProperties,
-      events: [{
-        name:   cleanName,
-        params: enrichedParams,
-      }],
-    };
+    const payload = core.buildPayload({
+      clientId:       analytics._clientId,
+      userId:         analytics._userId,
+      userProperties: analytics._userProperties,
+      eventName:      cleanName,
+      params:         enrichedParams,
+    });
 
-    const url = `${GA_ENDPOINT}?measurement_id=${encodeURIComponent(analytics._measurementId)}&api_secret=${encodeURIComponent(analytics._apiSecret)}`;
+    const url = core.buildCollectUrl(analytics._measurementId, analytics._apiSecret);
 
     fetch(url, {
       method:   'post',
@@ -207,17 +207,13 @@ const analytics = {
       analytics._pendingUid = uid || null;
       return;
     }
-    analytics._userId = uid ? uuidv5(uid, analytics._namespace) : null;
+    analytics._userId = core.deriveUserId(uid, analytics._namespace);
   },
 
   // Merge into the user_properties block sent on every subsequent event.
   setUserProperties(props) {
     if (!props || typeof props !== 'object') return;
-    const wrapped = {};
-    for (const [k, v] of Object.entries(props)) {
-      wrapped[k] = { value: v };
-    }
-    analytics._userProperties = { ...analytics._userProperties, ...wrapped };
+    analytics._userProperties = { ...analytics._userProperties, ...core.wrapUserProperties(props) };
   },
 
   // ─── Internals ──────────────────────────────────────────────────────────────
@@ -229,11 +225,7 @@ const analytics = {
   // GA4 event names: letters/digits/underscore, ≤40 chars, can't start/end with underscore.
   _normalizeName(name) {
     if (!name || typeof name !== 'string') return null;
-    return name
-      .replace(/[^a-zA-Z0-9_]/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .replace(/_+/g, '_')
-      .slice(0, 40);
+    return core.normalizeEventName(name);
   },
 
   // GA4 param contract: each event needs engagement_time_msec (else session bounces),
