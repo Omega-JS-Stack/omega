@@ -20,6 +20,11 @@
  *  - `--service=<name>` narrows the child run to one service; the
  *    core-presence check only applies to full runs.
  *  - `--dry-run` forwards to the child (plan-only pass, still asserted).
+ *  - `--deploy=web,backend` runs the DEPLOY legs after the service cycle
+ *    (web = `omega deploy --direct` gh-pages push; backend = the target's
+ *    own `omega deploy` — a REAL functions deploy). Off by default; each
+ *    leg lands in the scorecard as `deploy:<target>` and an exit-nonzero
+ *    leg fails the pipeline.
  *
  * This spends real API calls and reconciles real infrastructure — run it
  * on demand, SPARINGLY. It is deliberately NOT part of `npm test` or CI.
@@ -29,7 +34,13 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const chalk = require('chalk').default;
 
-const { resolveBrandRoot } = require('../lib/brand.js');
+const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
+
+// deploy target → the command run in that target's app dir
+const DEPLOY_LEGS = {
+  web: ['npm', 'run', 'deploy', '--', '--direct'],
+  backend: ['npm', 'run', 'deploy'],
+};
 
 // Services that must RUN green on a full pipeline pass — these are the
 // provisioning spine; a skip here means a seed is missing, not a choice.
@@ -148,6 +159,42 @@ module.exports = async (argv = {}) => {
     console.error(chalk.red(`\n✗ PIPELINE FAIL — no run record appeared in .omega/runs/ (child exit ${exitCode})`));
     process.exitCode = 1;
     return;
+  }
+
+  // Deploy legs — spawned in the owning app's dir, same non-interactive
+  // construction; results join the record as deploy:<target> rows so the
+  // evaluator's any-error rule covers them
+  const deployTargets = String(argv.deploy || '').split(',').map((s) => s.trim()).filter(Boolean);
+  for (const target of deployTargets) {
+    const leg = DEPLOY_LEGS[target];
+    const app = discoverApps(brandRoot).find((a) => a.target === target);
+
+    if (!leg || !app) {
+      found.record.services.push({
+        service: `deploy:${target}`,
+        status: 'error',
+        output: null,
+        error: leg ? `no ${target} app in this brand` : `unknown deploy target (${Object.keys(DEPLOY_LEGS).join(', ')})`,
+      });
+      continue;
+    }
+
+    console.log(chalk.bold(`\n🧪 Deploy leg: ${target} ${chalk.dim(`(${leg.join(' ')} in ${app.dir})`)}`));
+    const legExit = await new Promise((resolve) => {
+      const child = spawn(leg[0], leg.slice(1), {
+        cwd: app.path,
+        stdio: ['ignore', 'inherit', 'inherit'],
+        env: { ...process.env, OMEGA_NON_INTERACTIVE: '1' },
+      });
+      child.on('close', (code) => resolve(code ?? 1));
+    });
+
+    found.record.services.push({
+      service: `deploy:${target}`,
+      status: legExit === 0 ? 'success' : 'error',
+      output: null,
+      error: legExit === 0 ? null : `exit ${legExit}`,
+    });
   }
 
   const verdict = evaluatePipeline(found.record, { require: requireExtra, scoped: Boolean(argv.service) });

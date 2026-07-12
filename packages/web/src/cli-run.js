@@ -9,7 +9,7 @@ async function run() {
   // CLI fix. yargs' built-in --version/--help are disabled so `-v`/`--version`
   // route to our version command through the alias table.
   const argv = require('yargs')(process.argv.slice(2))
-    .boolean(['extended', 'check', 'dry-run', 'local'])
+    .boolean(['extended', 'check', 'dry-run', 'local', 'direct'])
     .version(false)
     .help(false)
     .parseSync();

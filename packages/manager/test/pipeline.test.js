@@ -68,6 +68,16 @@ test('pipeline: --require promotes a service into the core set', () => {
   assert.match(strict.failures[0], /sendgrid: CORE service skipped/);
 });
 
+test('pipeline: deploy legs ride the same rules — an error leg fails, a green leg passes as non-core', () => {
+  const ok = greenRecord([{ service: 'deploy:web', status: 'success', output: null, error: null }]);
+  assert.equal(evaluatePipeline(ok).pass, true);
+
+  const bad = greenRecord([{ service: 'deploy:backend', status: 'error', output: null, error: 'exit 1' }]);
+  const verdict = evaluatePipeline(bad);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.failures[0], /deploy:backend: error — exit 1/);
+});
+
 test('pipeline: headless Google consent fails FAST with the seeding instruction (no server, no 5-min wait)', async () => {
   const { GoogleOAuth2Client } = require('../src/lib/google-auth.js');
   const client = new GoogleOAuth2Client({
