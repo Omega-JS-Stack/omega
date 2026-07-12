@@ -12,7 +12,7 @@
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
 - Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go — a LONG way out ("everything good across the board" first)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; audit port (explicit stub in the web package — translate UNPINNED by Ian 2026-07-11, shipping as cp96). MAM parked entirely.
-- omegajs-playground Blaze: billing account EXISTS (gcloud "Main Billing Account", open) — attach is one word from Ian (hosting already live on Spark: omegajs-playground.web.app); OMEGA auto-attach ensure-step (billing account in company config) = agreed feature (Ian 2026-07-11), lands with provisioning; live Actions runs still Ian-gated
+- omegajs-playground Blaze: ensure-step ALREADY PORTED (manager firebase/ensure/billing.js — de-ITW'd: links only when `firebase.billingAccount` configured, legacy hardcoded-card behavior removed, dry-run aware); playground never ran the manage pipeline (created directly at cp96b). Blaze = set the key + run the firebase service — one word from Ian (hosting live on Spark: omegajs-playground.web.app); live Actions runs still Ian-gated
 
 ## 📏 Standing rules
 - **Continuous mode (Ian 2026-07-10)**: keep iterating/building/testing autonomously, checkpoint after checkpoint — stop ONLY for serious errors or decisions that are genuinely Ian's. (Replaces one-checkpoint-per-"continue".)
