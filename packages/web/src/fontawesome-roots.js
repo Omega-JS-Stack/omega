@@ -8,10 +8,11 @@
  *      FA npm token. NEVER a dependency of any omega package (license).
  *   3. @fortawesome/fontawesome-free — the declared-dependency floor.
  *
- * The free set stays in the lookup chain even when a brand set wins, so a
- * partial supply (an old solid-only download) never loses icons the free
- * set has. Preference order itself is icon-core's PACKAGES — shared with
- * desktop's runtime icon server so the surfaces can't drift.
+ * Every available rung stays in the chain ([env, pro, free] when all
+ * exist — same as desktop's), so a partial supply (an old solid-only
+ * download) never loses icons a lower rung has. Preference order itself
+ * is icon-core's PACKAGES — shared with desktop's runtime icon server so
+ * the surfaces can't drift.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -28,33 +29,29 @@ const { PACKAGES } = require('@omega.js/client/modules/icon-core.js');
  *   source — where the winning set came from.
  */
 function resolveFontAwesomeRoots(env = process.env) {
-  const freeRoot = path.dirname(require.resolve(`${PACKAGES[PACKAGES.length - 1]}/package.json`));
-
-  let brandRoot = null;
+  const roots = [];
   let source = 'free';
 
   const envRoot = env.OMEGA_FONTAWESOME_ROOT;
   if (envRoot && fs.existsSync(path.join(envRoot, 'svgs'))) {
-    brandRoot = envRoot;
+    roots.push(envRoot);
     source = 'env';
-  } else {
-    try {
-      brandRoot = path.dirname(require.resolve(`${PACKAGES[0]}/package.json`));
-      source = 'pro';
-    } catch (e) {
-      // free-only — the normal case for brands without a Pro license
-    }
   }
 
-  const brandAliasFile = brandRoot && path.join(brandRoot, 'metadata', 'icon-families.json');
+  try {
+    roots.push(path.dirname(require.resolve(`${PACKAGES[0]}/package.json`)));
+    if (source === 'free') source = 'pro';
+  } catch (e) {
+    // Pro npm set not installed — the normal case for brands without a token
+  }
+
+  roots.push(path.dirname(require.resolve(`${PACKAGES[PACKAGES.length - 1]}/package.json`)));
+
+  const aliasRoot = roots.find((root) => fs.existsSync(path.join(root, 'metadata', 'icon-families.json')))
+    || roots[roots.length - 1];
   return {
-    svgsDirs: [
-      ...(brandRoot ? [path.join(brandRoot, 'svgs')] : []),
-      path.join(freeRoot, 'svgs'),
-    ],
-    aliasFile: brandAliasFile && fs.existsSync(brandAliasFile)
-      ? brandAliasFile
-      : path.join(freeRoot, 'metadata', 'icon-families.json'),
+    svgsDirs: roots.map((root) => path.join(root, 'svgs')),
+    aliasFile: path.join(aliasRoot, 'metadata', 'icon-families.json'),
     source,
   };
 }

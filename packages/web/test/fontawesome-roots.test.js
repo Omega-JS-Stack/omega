@@ -35,7 +35,7 @@ test('no env override: Pro npm set when installed, otherwise the free floor alon
   assert.match(fa.aliasFile, /metadata[\/\\]icon-families\.json$/);
 });
 
-test('OMEGA_FONTAWESOME_ROOT with svgs/ wins; free stays as the fallback rung', () => {
+test('OMEGA_FONTAWESOME_ROOT with svgs/ wins; every lower rung stays in the chain', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-fa-'));
   fs.mkdirSync(path.join(root, 'svgs', 'solid'), { recursive: true });
   fs.mkdirSync(path.join(root, 'metadata'), { recursive: true });
@@ -44,19 +44,21 @@ test('OMEGA_FONTAWESOME_ROOT with svgs/ wins; free stays as the fallback rung', 
   const fa = resolveFontAwesomeRoots({ OMEGA_FONTAWESOME_ROOT: root });
   assert.equal(fa.source, 'env');
   assert.equal(fa.svgsDirs[0], path.join(root, 'svgs'));
-  assert.match(fa.svgsDirs[1], /fontawesome-free[\/\\]svgs$/);
+  assert.equal(fa.svgsDirs.length, proInstalled ? 3 : 2);
+  assert.match(fa.svgsDirs[fa.svgsDirs.length - 1], /fontawesome-free[\/\\]svgs$/);
   assert.equal(fa.aliasFile, path.join(root, 'metadata', 'icon-families.json'));
 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('a brand set without metadata falls back to the free alias file', () => {
+test('a brand set without metadata falls back to the next rung\'s alias file', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-fa-'));
   fs.mkdirSync(path.join(root, 'svgs', 'solid'), { recursive: true });
 
   const fa = resolveFontAwesomeRoots({ OMEGA_FONTAWESOME_ROOT: root });
   assert.equal(fa.source, 'env');
-  assert.match(fa.aliasFile, /fontawesome-free[\/\\]metadata[\/\\]icon-families\.json$/);
+  assert.ok(!fa.aliasFile.startsWith(root));
+  assert.match(fa.aliasFile, /metadata[\/\\]icon-families\.json$/);
 
   fs.rmSync(root, { recursive: true, force: true });
 });
