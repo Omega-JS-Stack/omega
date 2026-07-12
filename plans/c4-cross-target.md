@@ -1,0 +1,79 @@
+# C4 — Cross-target sharing (survey + slicing)
+
+> Opened cp103+ (2026-07-11), Ian's go. Read-only survey by fan-out agent over
+> packages/{web,desktop,extension,client,config}; verified spot-wise. Arc
+> context: [dogfood-arc.md](dogfood-arc.md) cp10x block. Acceptance for the
+> whole arc: **omega-brand desktop + extension render the brand theme + shared
+> modules with zero copy-paste.**
+
+## Survey — what's duplicated, where
+
+**Theme/CSS (the anchor cluster).** Bootstrap 5.3 + classy are TRIPLICATED —
+full copies in `web/themes/`, `desktop/src/assets/themes/`,
+`extension/src/assets/themes/`; each target's sass pipeline
+(`desktop/src/gulp/tasks/sass.js`, `extension/src/gulp/tasks/sass.js`) resolves
+only its own copy, and they're already drifting (`hero-demo-form.js` differs
+web↔desktop; extension's classy is a reduced stub). **Zero `--omega-*` token
+references outside packages/web** — the C3 contract stops at web's boundary;
+desktop/extension classy `_config.scss` still speak raw Bootstrap vars.
+
+**FontAwesome — three incompatible systems.** web: build-time prerendered SVGs
+(`uj_icon` tag + `libs/prerendered-icons.js` + `_custom-font-awesome.scss`).
+desktop: hand-rolled main-process IPC server over a vendored FA-Pro SVG set
+(`src/lib/fontawesome.js` + renderer `_wireFontAwesome`). extension: nothing
+(commented-out import).
+
+**Analytics — GA4 implemented 2–3×.** `client/src/modules/analytics.js` =
+browser Measurement Protocol (runtimes: extension+electron; web is a literal
+TODO) with **hardcoded ITW dev GA4 ids/secrets at the top**;
+`desktop/src/lib/analytics.js` = a second, independent Node MP implementation;
+web = a third path via gtag.js in `foot.html`. Config-shape split: schema says
+`analytics.providers.google.id` (nested), client reads flattened
+`analytics.google`/`googleSecret`, and web's foot.html hand-flattens between
+them.
+
+**Ads — web-only + unschema'd + ITW-hardcoded.** `vert.js`/`popupads.js`/
+`_verts.scss`/`adunits/*` exist only in web. Templates consume
+`resolved.advertising.google-adsense.*` but **`advertising` is NOT in the
+config schema** (`SHARED_SECTIONS`) — pure passthrough today. De-ITW targets in
+`vert.js`: hardcoded `https://promo-server.itwcreativeworks.com/verts/main`
+fallback (L189), same-origin allowlist (L95), `brand.id === 'promo-server'`
+special-case (L187).
+
+**Forms — web-only, wanted elsewhere.** `web/core/js/libs/form-manager.js`
+builds on `@omega.js/client` primitives; desktop's copied classy theme
+dead-imports `__main_assets__/js/libs/form-manager.js` (alias undefined in
+desktop webpack); extension has nothing; client has no form module.
+
+**Theme-once mechanism: none.** No `@omega.js/web` imports in desktop or
+extension; themes were hand-copied and drift. (Other ITW hardcodes noted for
+later: `extension/src/background.js` api.itwcreativeworks.com fallback,
+extension package/webpack `validRedirectHosts`.)
+
+## Slices (cp104+; order = backbone first, modules after)
+
+1. **cp104 — cross-target token plumbing.** Desktop + extension sass builds
+   gain the omega layer chain (build-time dep on `@omega.js/web`, loadPath /
+   `omega:` importer into `web/core/css`); both entries pull
+   `tokens/_index.scss` (+ shell where it makes sense) and one visible
+   token-consuming rule per target proves it. Design-agnostic; makes the D10
+   skin land once for all three targets. *This is the C4 backbone.*
+2. **cp105 — `advertising.*` schema + vert de-ITW.** Role-keyed section into
+   `SHARED_SECTIONS` (providers incl. inhouse server URL), vert.js reads
+   config (fallback URL, origin, special-case die), ad TYPE param per the arc
+   note. Small, independent.
+3. **cp106 — analytics ONE engine.** Client module = the single GA4 MP engine:
+   nested schema shape everywhere (kill the flatten bridge), web runtime
+   support (retire/relegate gtag path per decision), desktop's parallel lib
+   collapses onto client via its bridge, hardcoded dev creds → config/env.
+4. **cp107 — FormManager → shared.** Moves into `@omega.js/client` (it already
+   only uses client primitives); web re-imports; desktop/extension gain it for
+   real (fixes desktop's dead alias).
+5. **cp108 — FontAwesome story.** One icon mechanism (likely: shared runtime
+   inline-SVG module + per-target asset supply; desktop's FA-Pro set stays its
+   asset source). Decide after cp104 proves the css channel.
+6. **cp109 — theme-once acceptance.** Desktop/extension consume the FULL theme
+   layer chain (classy triplication dies); omega-brand desktop + extension
+   render the brand theme zero-copy-paste. Lands with/after the skin pass so
+   the reskin ships everywhere at once. `@omega.js/themes` packaging revisited
+   here (master-plan note).
