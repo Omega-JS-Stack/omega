@@ -99,8 +99,13 @@ function fakeFirebase(responses = {}) {
   return api;
 }
 
-/** Cloudflare fake for hosting's DNS reads/writes. */
-function fakeCf({ zone = ZONE, records = [] } = {}) {
+/**
+ * Cloudflare fake for hosting's DNS reads/writes + TLS-coverage lookups.
+ * Defaults model a free zone: /acm/total_tls rejects (no ACM entitlement,
+ * like the real API) and the only certificate pack is the Universal one.
+ * Pass an Error as certPacks/totalTls to simulate a lookup failure.
+ */
+function fakeCf({ zone = ZONE, records = [], certPacks, totalTls } = {}) {
   const api = { calls: [], records };
 
   api.getZoneByName = async () => zone;
@@ -109,6 +114,18 @@ function fakeCf({ zone = ZONE, records = [] } = {}) {
     api.calls.push({ method, endpoint, body: options.body ? JSON.parse(options.body) : undefined });
 
     if (method === 'GET') {
+      if (endpoint.includes('/acm/total_tls')) {
+        if (totalTls instanceof Error) throw totalTls;
+        if (!totalTls) throw new Error('Cloudflare API Error: [{"code":1001,"message":"no ACM entitlement"}]');
+        return { success: true, result: totalTls };
+      }
+      if (endpoint.includes('/ssl/certificate_packs')) {
+        if (certPacks instanceof Error) throw certPacks;
+        return {
+          success: true,
+          result: certPacks || [{ type: 'universal', status: 'active', hosts: [zone.name, `*.${zone.name}`] }],
+        };
+      }
       const url = new URL(`https://cf.test${endpoint}`);
       const type = url.searchParams.get('type');
       const name = url.searchParams.get('name');
@@ -313,44 +330,113 @@ test('firebase: fully converged project is a zero-mutation no-op across all 13 o
   assert.equal(result.state.hosting.domains[0].status, 'verified');
 });
 
-// ─── Hosting: Universal SSL depth limit (cp114b) ─────────────────────────────
+// ─── Hosting: TLS coverage → proxy eligibility (cp114b/cp115) ────────────────
 
-test('hosting: deep subdomain-project api domain comes back to DNS-only (Universal SSL limit)', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
-
-  // The rule itself: apex + one label ride the proxy, deeper never does
-  assert.equal(handler.universalSslCovers(DOMAIN, DOMAIN), true);
-  assert.equal(handler.universalSslCovers(`api.${DOMAIN}`, DOMAIN), true);
-  assert.equal(handler.universalSslCovers(`api.play.${DOMAIN}`, DOMAIN), false);
-
-  // Live-found shape (api.playground.omegajs.dev): verified domain, CNAME
-  // proxied:true from the pre-fix run → must be PATCHed down to DNS-only so
-  // Firebase can serve the certificate.
-  const sub = `play.${DOMAIN}`;
-  const api = fakeFirebase({
-    listHostingSites: [{ name: `projects/${PROJECT}/sites/${PROJECT}` }],
-    checkDomainStatus: { exists: true, verified: true },
-  });
-  const cf = fakeCf({
-    records: [{ id: 'c9', type: 'CNAME', name: `api.play.${DOMAIN}`, content: `${PROJECT}.web.app`, proxied: true }],
-  });
-
-  const result = await handler({
-    firebaseApi: api,
-    cloudflareApi: cf,
+/** Direct-handler context for a subdomain project (api.play.{DOMAIN}). */
+function deepProjectContext(firebase, cloudflare) {
+  return {
+    firebaseApi: firebase,
+    cloudflareApi: cloudflare,
     brandConfig: {},
     projectId: PROJECT,
-    domain: sub,
+    domain: `play.${DOMAIN}`,
     apexDomain: DOMAIN,
     isSubdomainProject: true,
     options: {},
     serviceData: {},
+  };
+}
+
+/** Firebase fake for a project whose api domain is already verified. */
+function verifiedDomainFirebase() {
+  return fakeFirebase({
+    listHostingSites: [{ name: `projects/${PROJECT}/sites/${PROJECT}` }],
+    checkDomainStatus: { exists: true, verified: true },
   });
+}
+
+test('hosting: deep subdomain-project api domain comes back to DNS-only (Universal SSL limit)', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+
+  // Universal SSL: apex + one label ride the proxy, deeper never does
+  assert.equal(handler.universalSslCovers(DOMAIN, DOMAIN), true);
+  assert.equal(handler.universalSslCovers(`api.${DOMAIN}`, DOMAIN), true);
+  assert.equal(handler.universalSslCovers(`api.play.${DOMAIN}`, DOMAIN), false);
+
+  // Certificate-host matching: a TLS wildcard spans exactly ONE label
+  assert.equal(handler.certHostMatches(`api.play.${DOMAIN}`, `api.play.${DOMAIN}`), true);
+  assert.equal(handler.certHostMatches(`*.play.${DOMAIN}`, `api.play.${DOMAIN}`), true);
+  assert.equal(handler.certHostMatches(`*.${DOMAIN}`, `api.play.${DOMAIN}`), false);
+  assert.equal(handler.certHostMatches(DOMAIN, `api.${DOMAIN}`), false);
+
+  // Live-found shape (api.playground.omegajs.dev on a free zone): verified
+  // domain, CNAME proxied:true from the pre-fix run → must be PATCHed down
+  // to DNS-only so Firebase can serve the certificate.
+  const cf = fakeCf({
+    records: [{ id: 'c9', type: 'CNAME', name: `api.play.${DOMAIN}`, content: `${PROJECT}.web.app`, proxied: true }],
+  });
+
+  const result = await handler(deepProjectContext(verifiedDomainFirebase(), cf));
 
   assert.equal(result.state.hosting.domains[0].status, 'verified');
   const patch = cf.mutations().find((c) => c.method === 'PATCH');
   assert.ok(patch, 'expected the proxied CNAME to be PATCHed');
   assert.equal(patch.body.proxied, false);
+});
+
+test('hosting: deep api domain rides the proxy when the zone has Total TLS', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+
+  // Converged DNS-only from a free-era run; the zone since gained Total TLS,
+  // which mints a certificate for every proxied hostname → PATCH up.
+  const cf = fakeCf({
+    totalTls: { enabled: true, certificate_authority: 'lets_encrypt' },
+    records: [{ id: 'c9', type: 'CNAME', name: `api.play.${DOMAIN}`, content: `${PROJECT}.web.app`, proxied: false }],
+  });
+
+  const result = await handler(deepProjectContext(verifiedDomainFirebase(), cf));
+
+  assert.equal(result.state.hosting.domains[0].status, 'verified');
+  const patch = cf.mutations().find((c) => c.method === 'PATCH');
+  assert.ok(patch, 'expected the DNS-only CNAME to be PATCHed up to proxied');
+  assert.equal(patch.body.proxied, true);
+});
+
+test('hosting: deep api domain rides the proxy only once a covering cert pack is ACTIVE', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const universalPack = { type: 'universal', status: 'active', hosts: [DOMAIN, `*.${DOMAIN}`] };
+  const deepPack = (status) => ({ type: 'advanced', status, hosts: [`*.play.${DOMAIN}`] });
+
+  // Pending validation → not covered yet → CNAME created DNS-only
+  const pendingCf = fakeCf({ certPacks: [universalPack, deepPack('pending_validation')] });
+  await handler(deepProjectContext(verifiedDomainFirebase(), pendingCf));
+  const pendingPost = pendingCf.mutations().find((c) => c.method === 'POST');
+  assert.equal(pendingPost.body.proxied, false);
+
+  // Active → covered → CNAME created proxied
+  const activeCf = fakeCf({ certPacks: [universalPack, deepPack('active')] });
+  await handler(deepProjectContext(verifiedDomainFirebase(), activeCf));
+  const activePost = activeCf.mutations().find((c) => c.method === 'POST');
+  assert.equal(activePost.body.proxied, true);
+});
+
+test('hosting: TLS-coverage lookups failing falls back to DNS-only', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const cf = fakeCf({ totalTls: new Error('boom'), certPacks: new Error('boom') });
+
+  const result = await handler(deepProjectContext(verifiedDomainFirebase(), cf));
+
+  assert.equal(result.state.hosting.domains[0].status, 'verified');
+  const post = cf.mutations().find((c) => c.method === 'POST');
+  assert.equal(post.body.proxied, false);
+});
+
+test('hosting: no Cloudflare client — verified domain reports without DNS writes', async () => {
+  const handler = require('../src/services/firebase/ensure/hosting.js');
+
+  const result = await handler(deepProjectContext(verifiedDomainFirebase(), null));
+
+  assert.equal(result.state.hosting.domains[0].status, 'verified');
 });
 
 // ─── Billing (de-ITW'd) ──────────────────────────────────────────────────────

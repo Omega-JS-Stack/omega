@@ -10,10 +10,13 @@
  *
  * Per domain, one reconciliation pass:
  *   verified  → ensure the Cloudflare CNAME has the right proxy state:
- *               proxied when Universal SSL covers the name (apex or one
- *               label below the zone), DNS-only when deeper (subdomain
- *               projects — api.{sub}.{zone}; the free cert can't cover
- *               two levels, so Firebase serves the certificate instead)
+ *               proxied when the zone's TLS coverage reaches the name.
+ *               Universal SSL (every plan) covers the apex + one label;
+ *               deeper names (api.{sub}.{zone} — subdomain projects) ask
+ *               the zone what paid coverage it ACTUALLY has (Total TLS,
+ *               Advanced certificate packs — plans differ per brand).
+ *               Uncovered names stay DNS-only and Firebase serves the
+ *               certificate instead
  *   pending   → write Firebase's required DNS records (TXT ownership/ACME +
  *               unproxied CNAME); interactive runs then poll until Firebase
  *               verifies (writing any NEW records it demands mid-poll — the
@@ -97,37 +100,96 @@ module.exports = async function ensureHosting(context) {
   };
 };
 
+// ─── TLS coverage (proxy eligibility) ────────────────────────────────────────
+
 /**
- * Cloudflare Universal SSL only covers the apex and ONE label below it
- * (*.zone). Deeper hostnames (api.playground.zone — subdomain projects)
- * can never complete a TLS handshake through the proxy on the free cert;
- * their CNAME stays DNS-only and Firebase serves its own certificate.
+ * TLS certificate-host matching: an exact host matches itself; a wildcard
+ * (`*.X`) covers exactly ONE label below X — standard certificate semantics,
+ * a wildcard never spans two levels.
+ */
+function certHostMatches(certHost, fullDomain) {
+  if (certHost === fullDomain) {
+    return true;
+  }
+  if (!certHost.startsWith('*.')) {
+    return false;
+  }
+  const base = certHost.slice(2);
+  return fullDomain.endsWith(`.${base}`)
+    && !fullDomain.slice(0, -(base.length + 1)).includes('.');
+}
+
+/**
+ * Cloudflare Universal SSL (every plan, free included) covers the apex and
+ * ONE label below it (*.zone) — never deeper.
  */
 function universalSslCovers(fullDomain, zoneName) {
-  return fullDomain === zoneName
-    || (fullDomain.endsWith(`.${zoneName}`)
-      && !fullDomain.slice(0, -(zoneName.length + 1)).includes('.'));
+  return fullDomain === zoneName || certHostMatches(`*.${zoneName}`, fullDomain);
+}
+
+/**
+ * Whether the zone can terminate TLS for fullDomain at the proxy. Universal
+ * SSL answers statically; deeper names (api.playground.zone) ask the zone
+ * what coverage it ACTUALLY has — plans differ per brand: Total TLS mints a
+ * certificate for every proxied hostname, and Advanced certificate packs can
+ * carry deeper wildcards. Lookup failures fall back to not-covered — a
+ * DNS-only record works on every plan, a wrongly-proxied one never does.
+ *
+ * @returns {{ covered: boolean, via: string|null }}
+ */
+async function zoneTlsCoverage(cloudflareApi, zone, fullDomain) {
+  if (universalSslCovers(fullDomain, zone.name)) {
+    return { covered: true, via: 'universal' };
+  }
+
+  try {
+    const data = await cloudflareApi.makeRequest(`/zones/${zone.id}/acm/total_tls`);
+    if (data.result?.enabled) {
+      return { covered: true, via: 'Total TLS' };
+    }
+  } catch {
+    // No ACM entitlement — the endpoint rejects on free zones
+  }
+
+  try {
+    const data = await cloudflareApi.makeRequest(`/zones/${zone.id}/ssl/certificate_packs`);
+    const packs = Array.isArray(data.result) ? data.result : [];
+    const pack = packs.find((p) => p.status === 'active'
+      && (p.hosts || []).some((host) => certHostMatches(host, fullDomain)));
+    if (pack) {
+      return { covered: true, via: `the ${pack.type} certificate pack` };
+    }
+  } catch {
+    // Coverage unknown — treat as uncovered
+  }
+
+  return { covered: false, via: null };
 }
 
 /**
  * One reconciliation pass over a single API domain.
  */
 async function ensureApiDomain(context, zone, apiDomain) {
-  const { firebaseApi: api, projectId, apexDomain, options = {} } = context;
+  const { firebaseApi: api, cloudflareApi, projectId, apexDomain, options = {} } = context;
   const { fullDomain, recordName } = apiDomain;
 
-  // Deep hostnames can't ride the proxy (no Universal SSL coverage)
-  const proxyEligible = universalSslCovers(fullDomain, zone.name);
+  // Can the proxy terminate TLS for this name? (No Cloudflare client → moot;
+  // the DNS helpers only print manual instructions.)
+  const tls = zone
+    ? await zoneTlsCoverage(cloudflareApi, zone, fullDomain)
+    : { covered: true, via: null };
 
   let status = await api.checkDomainStatus(projectId, projectId, fullDomain);
 
   // Fully verified — just make sure the CNAME has the right proxy state
   if (status.verified) {
     console.log(`      ${chalk.green('✓')} Domain verified: ${chalk.cyan(fullDomain)}`);
-    if (!proxyEligible) {
-      console.log(`      ${chalk.dim(`${fullDomain} is deeper than *.${zone.name} — Universal SSL can't cover it; CNAME stays DNS-only (Firebase serves the certificate)`)}`);
+    if (!tls.covered) {
+      console.log(`      ${chalk.dim(`No certificate covers ${fullDomain} at the proxy (Universal SSL stops at *.${zone.name}; no Total TLS or deeper cert pack on this zone) — CNAME stays DNS-only, Firebase serves the certificate`)}`);
+    } else if (tls.via && tls.via !== 'universal') {
+      console.log(`      ${chalk.dim(`${fullDomain} is deeper than *.${zone.name} but ${tls.via} covers it — proxying`)}`);
     }
-    await ensureCname(context, zone, recordName, { proxied: proxyEligible });
+    await ensureCname(context, zone, recordName, { proxied: tls.covered, tlsCovered: tls.covered });
     return { domain: fullDomain, status: 'verified' };
   }
 
@@ -162,14 +224,14 @@ async function ensureApiDomain(context, zone, apiDomain) {
   // Write the DNS records Firebase requires (TXT ownership + ACME challenge;
   // A/AAAA skipped — the CNAME to {projectId}.web.app replaces them)
   await ensureFirebaseDnsRecords(context, zone, status.requiredDnsUpdates, recordName);
-  await ensureCname(context, zone, recordName, { proxied: false });
+  await ensureCname(context, zone, recordName, { proxied: false, tlsCovered: tls.covered });
 
   // Interactive runs wait for Firebase to verify (DNS propagation)
   if (canPrompt(options)) {
     const verified = await waitForVerification(context, zone, fullDomain, recordName, status);
     if (verified) {
       console.log(`      ${chalk.green('✓')} Domain verified: ${chalk.cyan(fullDomain)}`);
-      await ensureCname(context, zone, recordName, { proxied: proxyEligible });
+      await ensureCname(context, zone, recordName, { proxied: tls.covered, tlsCovered: tls.covered });
       return { domain: fullDomain, status: 'verified' };
     }
   }
@@ -291,7 +353,7 @@ async function ensureFirebaseDnsRecords(context, zone, requiredDnsUpdates, recor
  * Ensure the CNAME to {projectId}.web.app exists with the desired proxy state
  * (unproxied while verification is pending, proxied once verified).
  */
-async function ensureCname(context, zone, recordName, { proxied }) {
+async function ensureCname(context, zone, recordName, { proxied, tlsCovered = true }) {
   const { cloudflareApi, projectId, apexDomain, options = {} } = context;
   const cnameTarget = `${projectId}.web.app`;
   const fullRecordName = `${recordName}.${apexDomain}`;
@@ -305,12 +367,12 @@ async function ensureCname(context, zone, recordName, { proxied }) {
     const existing = await findDnsRecord(cloudflareApi, zone.id, fullRecordName, 'CNAME');
 
     // Never un-proxy a working record (verify-cycle flapping) — EXCEPT when
-    // the name is too deep for Universal SSL, where proxied can never work
-    // and the record must come back down to DNS-only.
+    // the zone's TLS coverage can't reach the name, where proxied can never
+    // complete a handshake and the record must come back down to DNS-only.
     const needsUpdate = existing
       && (existing.content !== cnameTarget
         || (proxied === true && existing.proxied === false)
-        || (proxied === false && existing.proxied === true && !universalSslCovers(fullRecordName, zone.name)));
+        || (proxied === false && existing.proxied === true && !tlsCovered));
 
     if (existing && !needsUpdate) {
       return;
@@ -340,3 +402,4 @@ async function ensureCname(context, zone, recordName, { proxied }) {
 }
 
 module.exports.universalSslCovers = universalSslCovers;
+module.exports.certHostMatches = certHostMatches;
