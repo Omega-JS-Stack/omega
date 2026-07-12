@@ -2,6 +2,11 @@
 // `omega:theme` resolves _theme.scss through the layer chain
 // (active theme → classy) — never relatively.
 @forward 'omega:theme';
+
+// Core design tokens (C3) — emitted BEFORE the theme so any theme :root
+// block redefines tokens at equal specificity, and brand.color's inline
+// ramp (head.html) wins over both. Contract: core/css/tokens/_index.scss.
+@use 'tokens/index' as omega-tokens;
 @use 'omega:theme' as *;
 
 // Vendor styles

@@ -168,6 +168,23 @@ see the harness README for the honest before/after numbers.
   chrome/client contract is unchanged — one home per value in the config,
   same bridge pattern as the extension framework.
 
+## Design tokens (C3)
+
+[core/css/tokens/_index.scss](core/css/tokens/_index.scss) is the runtime
+contract every theme consumes: `--omega-*` CSS custom properties (color,
+radius, motion) defined light-first, redefined at the token level for
+`prefers-color-scheme: dark`, and overridden in BOTH directions by the
+`data-bs-theme` stamp appearance.js manages. Themes restyle by redefining
+tokens — components read `var(--omega-*)`, never hardcoded values. The
+sheet emits before the theme in main.scss (themes win at equal
+specificity) and is pinned to ZERO sass deprecations — the bar for all
+new core css. `brand.color` drives the accent family: the engine derives
+a ramp ([src/brand-tokens.js](src/brand-tokens.js) — hover/active shifts,
+WCAG-picked on-accent ink, subtle/ring alphas) and head.html emits it
+inline AFTER the bundles so the brand wins the cascade. No/invalid color
+→ the sheet's neutral placeholder stands. Token VALUES are C3 scaffolding
+until Ian's direction notes land; the names + plumbing are the contract.
+
 ## Pricing from config (C2)
 
 `payment.products` in omega.json5 is the ONLY pricing source. The engine

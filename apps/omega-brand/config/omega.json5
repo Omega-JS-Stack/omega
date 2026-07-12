@@ -8,6 +8,7 @@
     name: "OMEGA",
     description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
     tagline: "One config. Every target.",
+    color: "#3b5bdb", // PLACEHOLDER accent (drives --omega-accent-* ramp) — Ian picks with the C3 board notes
     url: "https://omegajs.dev",
     contact: {
       email: "support@omegajs.dev",

@@ -11,14 +11,12 @@
  * fiction (Plus/Pro/Max, fake social proof) anywhere in the output.
  */
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 const { test } = require('node:test');
 const { composePricing } = require('../src/pricing.js');
-const { configureOmega } = require('../src/index.js');
+const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 
-const PKG = path.resolve(__dirname, '..');
-const MINI = path.join(__dirname, 'fixtures', 'mini-site');
+// Namespace this file's Eleventy output dirs (test files run concurrently)
+const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'pricing-test');
 
 const CATALOG = {
   products: [
@@ -128,37 +126,6 @@ test('composePricing: untyped products default to subscription', () => {
   const pricing = composePricing({ products: [{ id: 'p', name: 'P' }] });
   assert.strictEqual(pricing.plans.length, 1);
 });
-
-/**
- * Build the mini fixture with a given siteData and index results by URL.
- * @param {object} siteData - resolved-config-shaped site data
- * @param {object} [overrides] - configureOmega option overrides
- * @returns {Promise<Map<string, string>>} url → rendered content
- */
-async function buildWith(siteData, overrides = {}) {
-  const Eleventy = require('@11ty/eleventy').default;
-  const elev = new Eleventy(MINI, path.join(PKG, '.omega', 'pricing-test-out'), {
-    quietMode: true,
-    configPath: false,
-    config: (eleventyConfig) => {
-      eleventyConfig.setUseTemplateCache(false);
-      return configureOmega(eleventyConfig, {
-        consumerDir: MINI,
-        siteData,
-        farmDir: path.join(PKG, '.omega', 'layout-farm'),
-        assetManifest: {
-          js: { main: '/assets/js/main-TEST.js', pages: {} },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
-        },
-        ...overrides,
-      });
-    },
-  });
-  const results = await elev.toJSON();
-  return new Map(results.map((r) => [r.url, r.content]));
-}
-
-const miniData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8'));
 
 for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
   test(`${theme}: /pricing renders from the catalog alone (plans, one-time, checkout wiring)`, async () => {

@@ -18,6 +18,7 @@ const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerCollections } = require('./collections.js');
 const { composePricing } = require('./pricing.js');
+const { composeBrandTokens } = require('./brand-tokens.js');
 const { PATHS } = require('./paths.js');
 
 // Data-cascade keys that are engine machinery, not page/layout data — everything
@@ -95,6 +96,11 @@ function configureOmega(eleventyConfig, options) {
   // override presentation). Lives OUTSIDE web_manager so the client
   // Configuration payload stays the raw catalog. null = honest empty state.
   site.pricing = composePricing(site.payment);
+
+  // Brand accent ramp (C3/D6): brand.color → the --omega-accent-* family,
+  // emitted by head.html after the CSS bundles. null (no/invalid color) =
+  // the token sheet's neutral placeholder stands.
+  site.brandTokens = composeBrandTokens(site.brand?.color);
 
   // ---- Theme layer chain: active theme → classy base → core
   const themeLayers = [...new Set([activeTheme, 'classy'])]

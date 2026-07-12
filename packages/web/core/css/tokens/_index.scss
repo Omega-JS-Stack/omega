@@ -1,0 +1,69 @@
+// OMEGA core design tokens — the runtime contract every theme (and, at C4,
+// every target) consumes. CSS custom properties ONLY: themes restyle by
+// redefining tokens, components read `var(--omega-*)` and never hardcode.
+//
+// VALUES here are neutral scaffolding — the C3 skin pass (Ian's direction
+// notes on the cp99 boards) replaces them. The NAMES plus the
+// light/dark/attribute plumbing below are the contract (D2: dual-theme at
+// the token level from day one).
+//
+// The accent family is a BUILD-TIME override surface: when `brand.color`
+// is set, head.html emits an inline `:root` block from composeBrandTokens
+// (src/brand-tokens.js) that wins the cascade over these placeholders.
+//
+// Theme attribute: `data-bs-theme` is what core/js/core/appearance.js
+// stamps today (Bootstrap-era name; renames alongside the appearance UI
+// when classy retires — keyed here in exactly one place on purpose).
+
+@mixin light-tokens {
+  --omega-ground: #f7f7f8;
+  --omega-surface: #ffffff;
+  --omega-ink: #191a1c;
+  --omega-ink-muted: #5f646d;
+  --omega-line: #e3e5e9;
+  --omega-accent: #3b5bdb; // placeholder — brand.color wins at build
+  --omega-accent-hover: #3450c4;
+  --omega-accent-active: #2d46ad;
+  --omega-accent-subtle: rgba(59, 91, 219, 0.12);
+  --omega-accent-ink: #ffffff;
+  --omega-accent-ring: rgba(59, 91, 219, 0.35);
+  --omega-ok: #1f9d55;
+  --omega-warn: #b7791f;
+  --omega-danger: #c53030;
+}
+
+@mixin dark-tokens {
+  --omega-ground: #131417;
+  --omega-surface: #1b1d21;
+  --omega-ink: #e8e9ec;
+  --omega-ink-muted: #979da8;
+  --omega-line: #2a2d33;
+  --omega-accent-subtle: rgba(92, 124, 250, 0.16);
+}
+
+:root {
+  @include light-tokens;
+
+  // scheme-agnostic
+  --omega-radius-s: 4px;
+  --omega-radius-m: 8px;
+  --omega-radius-l: 14px;
+  --omega-speed: 160ms;
+  --omega-ease: cubic-bezier(0.25, 0.5, 0.35, 1);
+}
+
+// OS preference carries when no explicit choice is stamped…
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include dark-tokens;
+  }
+}
+
+// …and the appearance.js stamp beats the OS in BOTH directions.
+:root[data-bs-theme='dark'] {
+  @include dark-tokens;
+}
+
+:root[data-bs-theme='light'] {
+  @include light-tokens;
+}

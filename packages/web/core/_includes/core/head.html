@@ -193,6 +193,14 @@
   <link rel="stylesheet" type="text/css" href="{{ pageAssets.themeCss }}"/>
 {% endiftruthy %}
 
+<!-- Brand accent tokens: derived from brand.color at build (src/brand-tokens.js);
+     emitted AFTER the bundles so the ramp wins the cascade over the token sheet's
+     neutral placeholder. Values are regenerated from parsed channels — config
+     strings never pass through verbatim. -->
+{% iftruthy site.brandTokens %}
+<style>:root{--omega-accent:{{ site.brandTokens.accent }};--omega-accent-hover:{{ site.brandTokens.accentHover }};--omega-accent-active:{{ site.brandTokens.accentActive }};--omega-accent-subtle:{{ site.brandTokens.accentSubtle }};--omega-accent-ink:{{ site.brandTokens.accentInk }};--omega-accent-ring:{{ site.brandTokens.accentRing }}}</style>
+{% endiftruthy %}
+
 <!-- Style - Scripts are Disabled -->
 <noscript>
   {{ page-ie-script }}

@@ -172,7 +172,11 @@ async function buildAssets(options) {
     loadPaths: [ownerRoot, path.join(ownerRoot, 'css'), ...options.layers, ...cssDirs],
     style: options.dev ? 'expanded' : 'compressed',
     quietDeps: true,
-    silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'mixed-decls', 'legacy-js-api'],
+    // Classy-era legacy patterns only — new core css (tokens/) compiles with
+    // ZERO deprecations (pinned in test/tokens.test.js); this list shrinks as
+    // the C3 reskin rewrites the theme sheets. 'mixed-decls' graduated to
+    // standard Dart Sass behavior — silencing it now WARNS (friction #16).
+    silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
   }).css;
 
   const mainScss = collectLayered(cssDirs, /^main\.scss$/).get('main.scss');
