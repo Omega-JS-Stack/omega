@@ -22,6 +22,18 @@ test('isInteractive is false for non-TTY streams', () => {
   assert.equal(prompt.isInteractive(), false);
 });
 
+test('OMEGA_NON_INTERACTIVE=1 forces isInteractive false even on TTY streams', () => {
+  prompt.setPromptStreams(makeStreams({ tty: true }));
+  assert.equal(prompt.isInteractive(), true, 'TTY baseline');
+  process.env.OMEGA_NON_INTERACTIVE = '1';
+  try {
+    assert.equal(prompt.isInteractive(), false);
+  } finally {
+    delete process.env.OMEGA_NON_INTERACTIVE;
+  }
+  assert.equal(prompt.isInteractive(), true, 'restored after env cleared');
+});
+
 test('input throws without a TTY', async () => {
   prompt.setPromptStreams(makeStreams({ tty: false }));
   await assert.rejects(

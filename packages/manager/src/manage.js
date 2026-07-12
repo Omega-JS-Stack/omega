@@ -173,6 +173,9 @@ async function runManage(startDir, options = {}) {
     status: result.status,
     output: result.output ?? null,
     error: result.error ?? null,
+    // Machine-readable WHY for skips — the pipeline command asserts on it
+    ...(result.reason ? { reason: result.reason } : {}),
+    ...(result.missingEnv ? { missingEnv: result.missingEnv } : {}),
   })));
 
   summary.printSummary();

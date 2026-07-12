@@ -36,9 +36,14 @@ function effectiveInput() {
 }
 
 /**
- * Whether prompts can run: the effective input stream is a TTY.
+ * Whether prompts can run: the effective input stream is a TTY, unless
+ * OMEGA_NON_INTERACTIVE=1 forces headless (the pipeline command sets it so
+ * a child run can never prompt, whatever terminal the parent holds).
  */
 function isInteractive() {
+  if (process.env.OMEGA_NON_INTERACTIVE === '1') {
+    return false;
+  }
   return Boolean(effectiveInput().isTTY);
 }
 

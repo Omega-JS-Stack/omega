@@ -113,6 +113,15 @@ class GoogleOAuth2Client {
    * the callback on a temporary localhost server, exchange the code.
    */
   async performOAuth2Flow() {
+    // Headless runs (pipeline, cron, background shells) must never open a
+    // consent flow or camp on the 5-minute callback wait — fail fast with
+    // the seeding instruction instead. stdout-TTY still counts as "a human
+    // is watching" (#25), but OMEGA_NON_INTERACTIVE=1 beats everything.
+    const { isInteractive } = require('@omega.js/devkit/prompt');
+    if (process.env.OMEGA_NON_INTERACTIVE === '1' || (!isInteractive() && !process.stdout.isTTY)) {
+      throw new Error(`Google consent required (scopes: ${this.scopes.join(', ')}) — run the service once interactively to grant it; headless runs work from the cached token after that`);
+    }
+
     return new Promise((resolve, reject) => {
       // RFC 8252 §7.3 loopback: bind an EPHEMERAL port (listen(0)) and read
       // the real one at listen time — Google's desktop-app client type

@@ -6,6 +6,7 @@
     "apps/*"
   ],
   "scripts": {
-    "start": "omega-manager"
+    "start": "omega-manager",
+    "pipeline": "omega-manager pipeline"
   }
 }
