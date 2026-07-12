@@ -193,3 +193,32 @@ test('translateSite: disabled config skips cleanly', async () => {
 
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('translateSite: cachedOnly never calls the provider and skips cold pages whole (friction #24)', async () => {
+  const { root, dist } = stage();
+  const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
+
+  // Everything cold → everything skipped, zero copies, zero provider calls
+  const cold = await translateSite({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+  assert.strictEqual(cold.pages, 0);
+  assert.strictEqual(cold.newStrings, 0);
+  assert.ok(cold.skippedCold.includes('es /about'), 'about is reported cold for es');
+  assert.ok(cold.skippedCold.includes('ar /'), 'home is reported cold for ar');
+  assert.ok(!fs.existsSync(path.join(dist, 'es')), 'no copies produced from a cold cache');
+
+  // Warm ONE page (the explicit `omega translate` path), wipe its copies…
+  const calls = [];
+  await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend(calls), only: 'about' });
+  assert.ok(calls.length > 0);
+  fs.rmSync(path.join(dist, 'es'), { recursive: true, force: true });
+  fs.rmSync(path.join(dist, 'ar'), { recursive: true, force: true });
+
+  // …then cachedOnly produces the warm page and still skips the cold one
+  const warm = await translateSite({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+  assert.strictEqual(warm.pages, 1, 'only the warmed page ships');
+  assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
+  assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'cold home has no copy');
+  assert.ok(warm.skippedCold.includes('es /'), 'cold home still reported');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});

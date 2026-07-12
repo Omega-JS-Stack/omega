@@ -2,8 +2,9 @@
  * `omega translate` — translate the built site (dist/) into every language in
  * `translation.languages`, using the committed per-string cache in
  * translations/ and the configured provider (claude via local Claude Code by
- * default; chatgpt via OPENAI_API_KEY). Run `omega build` first — build also
- * runs this automatically when translation is enabled.
+ * default; chatgpt via OPENAI_API_KEY). Run `omega build` first. This command
+ * OWNS live-LLM translation: build applies the committed cache only and
+ * skips cold pages with a warning (friction #24 decision).
  *
  * Env: OMEGA_TRANSLATE_ONLY=<route|file> limits the run to one page.
  */

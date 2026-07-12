@@ -177,7 +177,11 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
  * @param {object} [options.logger] - devkit logger (silent when omitted)
  * @param {Function} [options.send] - provider send override (tests)
  * @param {string} [options.only] - translate only the page whose route/relPath matches
- * @returns {Promise<object>} stats: { skipped?, pages, languages, newStrings, cachedStrings, failures, usage }
+ * @param {boolean} [options.cachedOnly] - never call the provider: pages with
+ *   any cold (uncached) string are skipped whole (listed in stats.skippedCold)
+ *   instead of shipping mixed-language copies — `omega build` runs this way;
+ *   explicit `omega translate` owns live-LLM translation (friction #24)
+ * @returns {Promise<object>} stats: { skipped?, pages, languages, newStrings, cachedStrings, failures, usage, skippedCold }
  */
 async function translateSite(options) {
   const { root, outDir, config } = options;
@@ -208,7 +212,7 @@ async function translateSite(options) {
 
   logger.log(`Translating ${files.length} pages into ${settings.languages.length} language(s): ${settings.languages.join(', ')} (provider: ${provider.name}${provider.model ? `/${provider.model}` : ''})`);
 
-  const stats = { pages: 0, languages: settings.languages, newStrings: 0, cachedStrings: 0, failures: [], usage: { input: 0, output: 0 } };
+  const stats = { pages: 0, languages: settings.languages, newStrings: 0, cachedStrings: 0, failures: [], usage: { input: 0, output: 0 }, skippedCold: [] };
   const translatedRoutes = new Map(); // relPath → langs successfully produced
   const total = files.length * settings.languages.length;
   let done = 0;
@@ -240,6 +244,15 @@ async function translateSite(options) {
           missIndices.push(i);
         }
       });
+
+      // Cold strings under cachedOnly: skip the whole page-language pair —
+      // a partially translated page is worse than none, and hreflang stays
+      // honest because only produced copies get alternates
+      if (options.cachedOnly && missIndices.length) {
+        stats.skippedCold.push(`${lang} /${route}`);
+        logger.log(`⊘ ${logTag} — ${missIndices.length} cold string(s), skipped`);
+        continue;
+      }
 
       // Translate the misses
       if (missIndices.length) {

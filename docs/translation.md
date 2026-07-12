@@ -69,9 +69,13 @@ string. Committed to git — that's the whole point:
 
 ## Web (`@omega.js/web`)
 
-`omega build` auto-translates when enabled (page failures warn, build
-continues); `omega translate` runs standalone against an existing dist/ and
-exits 1 on failures. `OMEGA_TRANSLATE_ONLY=<route>` limits either to one page
+`omega build` translates from the committed cache ONLY — it never calls a
+live provider (friction #24 decision: a routine build must not sit inside an
+LLM). A page-language pair with any cold string is skipped WHOLE (no
+mixed-language copies, hreflang stays honest) and listed in a build warning;
+`omega translate` owns live-LLM translation: it runs standalone against an
+existing dist/, translates cold strings through the provider, and exits 1 on
+failures. `OMEGA_TRANSLATE_ONLY=<route>` limits either to one page
 (canary/debug).
 
 Per page × language: text nodes/`<title>`/meta/attribute copy translate
