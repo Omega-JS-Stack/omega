@@ -15,6 +15,7 @@
  */
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { NamecheapAPI } = require('./lib/namecheap-api.js');
@@ -41,16 +42,19 @@ module.exports.run = createServiceRunner({
 
     // The zone lookup needs Cloudflare even for manual registrars — the
     // required nameserver values come from the zone
-    if (!context.cloudflareApi && !process.env.CLOUDFLARE_TOKEN) {
-      return { skip: true, reason: 'no CLOUDFLARE_TOKEN configured (needed to read the zone nameservers; set it in the brand .env)' };
+    if (!context.cloudflareApi) {
+      const gate = await ensureEnvSecrets(context, [
+        { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token (reads the zone nameservers)', url: 'https://dash.cloudflare.com/profile/api-tokens' },
+      ]);
+      if (gate) return gate;
     }
 
-    if (
-      provider === 'namecheap'
-      && !context.namecheapApi
-      && (!process.env.NAMECHEAP_USERNAME || !process.env.NAMECHEAP_API_KEY)
-    ) {
-      return { skip: true, reason: 'no NAMECHEAP_USERNAME/NAMECHEAP_API_KEY configured (set them in the brand .env)' };
+    if (provider === 'namecheap' && !context.namecheapApi) {
+      const gate = await ensureEnvSecrets(context, [
+        { name: 'NAMECHEAP_USERNAME', label: 'Namecheap account username' },
+        { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: 'https://ap.www.namecheap.com/settings/tools/apiaccess/' },
+      ]);
+      if (gate) return gate;
     }
 
     console.log(`    Provider: ${chalk.cyan(provider)}${API_PROVIDERS.has(provider) ? '' : chalk.dim(' (manual)')}`);

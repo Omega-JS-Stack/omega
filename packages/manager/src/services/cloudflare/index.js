@@ -18,6 +18,7 @@ const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('./lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
+const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 
 // Operations allowed for subdomain projects (zone-level settings are skipped)
 const SUBDOMAIN_OPERATIONS = new Set(['zone', 'dns-records']);
@@ -31,8 +32,11 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'cloudflare.enabled = false' };
     }
 
-    if (!context.cloudflareApi && !process.env.CLOUDFLARE_TOKEN) {
-      return { skip: true, reason: 'no CLOUDFLARE_TOKEN configured (set it in the brand .env)' };
+    if (!context.cloudflareApi) {
+      const gate = await ensureEnvSecrets(context, [
+        { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token', url: 'https://dash.cloudflare.com/profile/api-tokens' },
+      ]);
+      if (gate) return gate;
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '');

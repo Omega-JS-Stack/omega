@@ -13,6 +13,7 @@
  * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { BeehiivAPI } = require('./lib/beehiiv-api.js');
 
 module.exports.run = createServiceRunner({
@@ -34,8 +35,11 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    if (!context.beehiivApi && !process.env.BEEHIIV_API_KEY) {
-      return { skip: true, reason: 'no BEEHIIV_API_KEY configured (set it in the brand .env)' };
+    if (!context.beehiivApi) {
+      const gate = await ensureEnvSecrets(context, [
+        { name: 'BEEHIIV_API_KEY', label: 'Beehiiv API key', url: 'https://app.beehiiv.com/settings/workspace/api' },
+      ]);
+      if (gate) return gate;
     }
 
     // Tests inject a fake client via context.beehiivApi

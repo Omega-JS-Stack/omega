@@ -142,6 +142,23 @@ class RunSummary {
       }
     }
 
+    // Missing-secrets aggregate (cp114): services that skipped for lack of
+    // an env var name the exact keys HERE — and an interactive rerun asks
+    // for them and saves them to the brand .env
+    const missingEnv = this._getMissingEnv();
+    if (missingEnv.length > 0) {
+      const multiBrand = brandSet.size > 1;
+      console.log('');
+      console.log(`  ${chalk.yellow('🔑')} Missing secrets — add to the brand .env, or rerun interactively to paste them:`);
+      for (const item of missingEnv) {
+        const prefix = multiBrand ? `${item.brandName} · ` : '';
+        console.log(`      ${prefix}${chalk.bold(item.serviceName)}: ${item.vars.join(', ')}`);
+      }
+      for (const serviceName of [...new Set(missingEnv.map((item) => item.serviceName))]) {
+        console.log(`      ${chalk.dim(`→ npm start -- --service=${serviceName}   (from the brand root)`)}`);
+      }
+    }
+
     // Retry command
     if (hasErrors) {
       console.log('');
@@ -161,6 +178,29 @@ class RunSummary {
   _buildRetryCommand() {
     const args = this.argv.join(' ').trim();
     return args ? `npm start -- ${args}` : 'npm start';
+  }
+
+  /**
+   * Collect missing-secret skips (cp114): service results carry
+   * `missingEnv: ['CLOUDFLARE_TOKEN', …]` when setup skipped for absent
+   * env vars (ensureEnvSecrets).
+   */
+  _getMissingEnv() {
+    const items = [];
+
+    for (const entry of this.entries) {
+      const vars = entry.result?.missingEnv;
+      if (Array.isArray(vars) && vars.length > 0) {
+        items.push({
+          brandId: entry.brandId,
+          brandName: entry.brandName,
+          serviceName: entry.serviceName,
+          vars,
+        });
+      }
+    }
+
+    return items;
   }
 
   /**

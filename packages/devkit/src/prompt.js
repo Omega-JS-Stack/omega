@@ -19,7 +19,7 @@
  * drive actual keystrokes, no mocks. An input stream with isTTY = true
  * counts as interactive.
  */
-const { input: _input, select: _select, checkbox: _checkbox, confirm: _confirm } = require('@inquirer/prompts');
+const { input: _input, select: _select, checkbox: _checkbox, confirm: _confirm, password: _password } = require('@inquirer/prompts');
 
 let _streams = null;
 
@@ -70,6 +70,14 @@ function assertInteractive() {
 function input(opts) {
   assertInteractive();
   return _input(opts, _streams || undefined);
+}
+
+/**
+ * Masked secret input (echoes nothing). Throws without a TTY.
+ */
+function password(opts) {
+  assertInteractive();
+  return _password(opts, _streams || undefined);
 }
 
 /**
@@ -153,6 +161,7 @@ module.exports = {
   isInteractive,
   getPromptStreams,
   input,
+  password,
   select,
   checkbox,
   confirm,

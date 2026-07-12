@@ -14,6 +14,7 @@
  * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
+const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
 const { SendGridAPI } = require('./lib/sendgrid-api.js');
@@ -37,8 +38,11 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no brand.url configured' };
     }
 
-    if (!context.sendgridApi && !process.env.SENDGRID_API_KEY) {
-      return { skip: true, reason: 'no SENDGRID_API_KEY configured (set it in the brand .env)' };
+    if (!context.sendgridApi) {
+      const gate = await ensureEnvSecrets(context, [
+        { name: 'SENDGRID_API_KEY', label: 'SendGrid API key', url: 'https://app.sendgrid.com/settings/api_keys' },
+      ]);
+      if (gate) return gate;
     }
 
     // Tests inject fake clients via context.sendgridApi / context.cloudflareApi.

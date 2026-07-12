@@ -246,7 +246,13 @@ function createServiceRunner(options = {}) {
 
       if (setupResult?.skip) {
         console.log(`    ${chalk.dim(`⊘ Skipped (${setupResult.reason || 'setup returned skip'})`)}`);
-        return { status: 'skipped', reason: setupResult.reason };
+        return {
+          status: 'skipped',
+          reason: setupResult.reason,
+          // Machine-readable missing-secret list (cp114) — the run summary
+          // aggregates these into the 🔑 section
+          ...(setupResult.missingEnv ? { missingEnv: setupResult.missingEnv } : {}),
+        };
       }
     }
 

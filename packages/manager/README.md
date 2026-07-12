@@ -36,6 +36,8 @@ Services declare operations in [src/config.js](src/config.js) `OPERATIONS`; hand
 
 **Run-mode gates are standardized** in [src/lib/run-gates.js](src/lib/run-gates.js) — never hand-compose them: `canPrompt(options)` (TTY **and** not dry-run — the only prompt gate), `dryRunPlan(message, result?)` (the canonical `⊘ Dry run — would <message>` line, optionally passing a handler return through for one-statement gates), and `needsInteractiveSkip(key, action, note?)` (the warned step-aside carrying the `needsInteractive` marker the run summary aggregates into its ⚑ section with per-service rerun hints).
 
+**Env secrets gate through `ensureEnvSecrets`** ([src/lib/env-secrets.js](src/lib/env-secrets.js), cp114) — a service setup declares the vars its APIs need (`[{ name, label, url }]`): present → proceed; missing + interactive → masked ask, persisted to the brand `.env`, exported, run continues; missing + non-interactive → skip carrying `missingEnv`, which the run summary aggregates into its 🔑 section (exact keys + the interactive rerun command). Never hand-roll `process.env.X` skip checks in setups.
+
 ## Services (ported so far)
 
 | Service | Operations | What it ensures |

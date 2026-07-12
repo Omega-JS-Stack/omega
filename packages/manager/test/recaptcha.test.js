@@ -68,7 +68,9 @@ function runService(config, { recaptcha, options = {}, env = true, serviceData =
 test('recaptcha: skips without the shared keys in .env', async () => {
   const result = await runService(brandConfig(), { env: false });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /RECAPTCHA_SITE_KEY \+ RECAPTCHA_SECRET_KEY/);
+  assert.match(result.reason, /RECAPTCHA_SITE_KEY, RECAPTCHA_SECRET_KEY/);
+  // cp114: the skip is machine-readable — the 🔑 summary aggregates it
+  assert.deepEqual(result.missingEnv, ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
 });
 
 test('recaptcha: skip reason names only the missing key', async () => {
@@ -87,8 +89,9 @@ test('recaptcha: skip reason names only the missing key', async () => {
   });
 
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no RECAPTCHA_SECRET_KEY configured/);
+  assert.match(result.reason, /missing RECAPTCHA_SECRET_KEY/);
   assert.doesNotMatch(result.reason, /RECAPTCHA_SITE_KEY/);
+  assert.deepEqual(result.missingEnv, ['RECAPTCHA_SECRET_KEY']);
 });
 
 test('recaptcha: recaptcha.enabled = false skips the service', async () => {
