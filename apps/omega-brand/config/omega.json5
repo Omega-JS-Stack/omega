@@ -70,6 +70,14 @@
     },
   },
 
+  // Manager-side provisioning intent (the manage cycle reconciles the real
+  // project to this; projectId derives from cloud.config above — cp100).
+  // billingAccount = ITW Main Billing Account (ID only — unusable without
+  // IAM; repo is private). The billing ensure-step links it → Blaze.
+  firebase: {
+    billingAccount: "billingAccounts/01A0C2-98EAA4-A772AE",
+  },
+
   // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
   // Shapes mirror @omega.js/backend's product schema.
   payment: {

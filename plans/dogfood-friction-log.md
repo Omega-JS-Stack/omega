@@ -43,6 +43,11 @@
 18. ✅ (was 🟡, FIXED cp95c) EM defaults derive `appId` ← `com.itwcreativeworks.<brand.id>` and copyright `© {YEAR}, ITW Creative Works` — hardcoded ITW in framework derivation (omega-brand overrides explicitly: `dev.omegajs.omega`). Should derive from brand url/name. **Fixed cp95c**: `appId` ← reverse-domain of `brand.url` (`https://www.somiibo.com` → `com.somiibo`; no url → `app.<brand.id>`), copyright ← `© {YEAR}, <brand.name>`; defaults doc updated; build-config's literal fallback de-ITW'd.
 19. ✅ (was 🟡, FIXED cp95c) BXM branding pipeline: `brand.name` never reaches the manifest/locales — built extension is named "Ultimate Browser Extension - Browser Enhancer" (the defaults' locale message). Extension naming must flow from config (C4 shared-branding work). **Fixed cp95c**: the defaults' `config/messages.json` now carries `[ site.brand.name ]` tokens — the scaffold's site-token transform resolves them from the RESOLVED config (brand root included) at first seed; omega-brand's committed copy hand-converged to OMEGA.
 
+## Manage cycle (cp100 — first real `manage` run against omega-brand)
+
+22. ✅ (FOUND+FIXED cp100) Testing service working-tree check printed paths with the first character missing (`pps/omega-brand/…`) — whole-stdout `trim()` stripped the first line's leading status column before the fixed-offset porcelain slice. Parser extracted (`parseWorkingTree`) + regression test.
+23. ✅ (FOUND+FIXED cp100) Firebase service skipped framework-first brands with "no firebase.projectId" even though `cloud.config.projectId` already names the project — now derives, so brands born through `omega setup` enter the manage cycle without hand-editing; omega-brand's `firebase:` section carries only `billingAccount`.
+
 ## In-monorepo quirks (documented, not bugs)
 
 - `npm install` inside `apps/omega-brand` resolves at the MONOREPO root (root workspaces `apps/*` covers it) — deps land in the root lockfile; the resolution climb serves `@omega.js/*` to the apps with zero `--local` linking. Standalone brands (post-template) use `omega dev --local` or published deps — the arc-close template test must run OUTSIDE the monorepo.

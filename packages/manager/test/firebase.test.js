@@ -240,6 +240,15 @@ test('firebase: skips without firebase.projectId', async () => {
   assert.match(result.reason, /firebase\.projectId/);
 });
 
+test('firebase: derives projectId from cloud.config when firebase.projectId is absent (framework-first brands)', async () => {
+  const config = brandConfig();
+  config.firebase.projectId = null;
+  config.cloud = { provider: 'firebase', config: { projectId: PROJECT } };
+
+  const result = await runService(config, { firebase: fakeFirebase() });
+  assert.notEqual(result.status, 'skipped', 'cloud.config.projectId names the project — no skip');
+});
+
 test('firebase: firebase.enabled = false skips the service', async () => {
   const config = brandConfig({ firebase: { enabled: false } });
   const result = await runService(config, { firebase: fakeFirebase() });

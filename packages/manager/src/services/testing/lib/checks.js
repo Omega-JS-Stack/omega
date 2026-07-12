@@ -243,6 +243,21 @@ function checkFrameworkVersion(recorder, app, ctx) {
 }
 
 /**
+ * Parse `git status --porcelain` output into { status, file } entries.
+ * Lines must NOT be trimmed before slicing — the two status columns can
+ * legitimately start with a space (` M path`), so a leading trim shifts
+ * the path offset and eats the first character.
+ * @param {string} stdout - raw porcelain output
+ * @returns {Array<{ status: string, file: string }>}
+ */
+function parseWorkingTree(stdout) {
+  return stdout.split('\n').filter((line) => line.trim()).map((line) => ({
+    status: line.substring(0, 2).trim(),
+    file: line.substring(3),
+  }));
+}
+
+/**
  * Working tree check — uncommitted files under the brand root (scoped with
  * `-- .` so a brand nested in a larger workspace only sees its own files).
  * Silent when the brand isn't in a git repository.
@@ -255,10 +270,7 @@ function checkWorkingTree(recorder, ctx) {
     return;
   }
 
-  const files = stdout.trim().split('\n').filter(Boolean).map((line) => ({
-    status: line.substring(0, 2).trim(),
-    file: line.substring(3),
-  }));
+  const files = parseWorkingTree(stdout);
 
   if (files.length === 0) {
     recorder.pass('working tree', 'clean');
@@ -415,6 +427,7 @@ module.exports = {
   fetchWithRetry,
   compareVersions,
   installedVersion,
+  parseWorkingTree,
   checkAppFiles,
   checkFrameworkVersion,
   checkWorkingTree,

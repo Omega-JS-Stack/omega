@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **cp99 C3 STARTED — design brief + 3 direction boards OUT FOR IAN'S NOTES** ([plans/c3-design-brief.md](plans/c3-design-brief.md), artifact link inside; note via corner tags A·hero/B·type/… or D1–D10); systems track proceeds in parallel, nothing blocks on notes. omegajs.dev REGISTERED (Ian 2026-07-11) — wire at arc close. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction open: #15 Node story, #16 sass (in flight here)
+- **cp99 brief OUT for Ian's notes** ([plans/c3-design-brief.md](plans/c3-design-brief.md); note via A·hero-style tags or D1–D10) · **cp100 manage-cycle dogfood SHIPPED** (25-service dry-run wiring map; #22/#23 fixed; billingAccount set — LIVE firebase run = Ian: creds into brand .env + OAuth click → Blaze + functions proof) — next: cp101 C3 systems track. omegajs.dev REGISTERED — wire at arc close. Arc: [plans/dogfood-arc.md](plans/dogfood-arc.md); friction open: #15, #16 (C3)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **cp99a+** — C3 systems track (design-agnostic, brief already out): cross-target core token layer (D10), #16 sass modernization, app-shell mechanics, two-tier theme mechanics (toy second theme proves tiers) → Ian's notes land as the skin pass (default pages + blueprints, auth/account/payment, omega-brand showcase) → C4 sharing → arc close (template repo cut, tested OUTSIDE the monorepo)
@@ -12,7 +12,7 @@
 - Old-name publish lanes generally: every legacy framework repo is the source for old-name releases (web-manager frozen at 4.3.6, backend-manager at 5.12.0); monorepo tags `pre-{backend,client}-rename` are backup
 - Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go — a LONG way out ("everything good across the board" first)
 - PINNED per Ian (2026-07-09): B5 `omega verify` + Phase 4 migrations + ALL migrator tooling; audit port (explicit stub in the web package — translate UNPINNED by Ian 2026-07-11, shipping as cp96). MAM parked entirely.
-- omegajs-playground Blaze: ensure-step ALREADY PORTED (manager firebase/ensure/billing.js — de-ITW'd: links only when `firebase.billingAccount` configured, legacy hardcoded-card behavior removed, dry-run aware); playground never ran the manage pipeline (created directly at cp96b). Blaze = set the key + run the firebase service — one word from Ian (hosting live on Spark: omegajs-playground.web.app); live Actions runs still Ian-gated
+- omegajs-playground LIVE firebase manage run (→ Blaze via ported billing ensure-step; `firebase.billingAccount` configured cp100): needs Ian — OK the copy of GOOGLE_CLIENT_ID/SECRET from legacy omega-manager/.env into apps/omega-brand/.env (gitignored) + click the first-run OAuth URL; then the functions deploy proof unlocks. Live Actions runs still Ian-gated
 
 ## 📏 Standing rules
 - **Continuous mode (Ian 2026-07-10)**: keep iterating/building/testing autonomously, checkpoint after checkpoint — stop ONLY for serious errors or decisions that are genuinely Ian's. (Replaces one-checkpoint-per-"continue".)
@@ -43,6 +43,8 @@
 - npm 11 script-approval gating skips dep postinstalls on CI runners — puppeteer handled explicitly (70); if electron/canvas/sharp ever misbehave in CI, this is the first suspect
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 100 manage-cycle dogfood — first real manage run vs omega-brand (25-service dry-run wiring map, Ian's nudge); #22 porcelain path clip + #23 projectId-from-cloud.config FIXED; firebase.billingAccount configured (Blaze one Ian-step away); manager 584 (this commit) → CHANGELOG
+- [x] 99 C3 design brief + direction boards out for Ian (plans/c3-design-brief.md + artifact; D1–D10 checklist) (e234468) → commit msg is the record
 - [x] 98b marketing chrome restored (Ian's cp97 scope correction) — banner/badge/guarantees/enterprise/social-proof/testimonials/FAQ defaults ON again ×3 themes w/ consumer overrides + kill switches; plans stay config-only; #21 DECIDED-KEEP; live re-proof omega-brand; web 81 (this commit) → CHANGELOG
 - [x] 98 D13 deliberate deploys — devkit REST executor (7 tests, injectable), scaffolded workflows trigger-free (dispatch-only; ext zip → GH releases), `omega deploy` uniform verb ×4 targets (+dry-run; backend --only), admin post/put dispatch-on-publish; proofs: 3× dry-run exact-POST + LIVE omegajs-playground.web.app 200 on Spark; corpus 1225/desktop 761/ext 99/web 80 (this commit) → CHANGELOG + docs/deploys.md
 - [x] 97 C2 pricing/blueprints — payment.products = ONLY pricing source (engine composer → resolved.pricing; 3 themes rewritten, zero fiction; one-time section; honest empty state + build warn; #6/#7 closed), 167-file marker sweep + 3 emitters + guard test (convention DEAD); proofs: omega-brand live build + sandbox catalog; web 80/config 94/mgr 582; friction #21 logged (fake-ratings schema → C3) (this commit) → CHANGELOG
@@ -96,4 +98,4 @@
 - [x] Phase 1: devkit slices, @omega.js/account golden-master (BEM + WM adopted), BEM harmonization 1.4a–d, hard omega.json5 flips (EM/BEM/BXM), sandbox brand + 11-step cross-stack e2e → CHANGELOG
 - [x] Phase 0: monorepo bootstrap, 4 plain-copies, CI + pack-smoke (caught the live EM 1.12.0 install bug) → CHANGELOG
 
-*Last updated: 2026-07-11 6:55 PM (cp99 — C3 brief + boards out for Ian's notes; next: cp99a systems track)*
+*Last updated: 2026-07-11 7:45 PM (cp100 — manage-cycle dogfood shipped; live firebase run waits on Ian's creds+click; next: cp101 C3 systems track)*

@@ -49,9 +49,11 @@ module.exports.run = createServiceRunner({
       tokenStorePath: join(context.brandRoot, '.omega', 'auth', 'google-tokens.json'),
     });
 
-    // Missing project → offer the interactive selection/creation flow
-    // (lands firebase.projectId in omega.json5); needs credentials
-    let projectId = firebase.projectId;
+    // firebase.projectId, falling back to the client web config — a brand
+    // that ran the framework flow first (setup/dev) already names the project
+    // in cloud.config. Still missing → offer the interactive selection/
+    // creation flow (lands firebase.projectId in omega.json5); needs credentials
+    let projectId = firebase.projectId || context.brandConfig.cloud?.config?.projectId;
     if (!projectId && haveCreds) {
       projectId = await resolveFirebaseProject(context, makeApi());
     }

@@ -16,7 +16,7 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { SERVICE_ORDER, OPERATIONS, TARGET_FRAMEWORKS } = require('../src/config.js');
-const { compareVersions, installedVersion } = require('../src/services/testing/lib/checks.js');
+const { compareVersions, installedVersion, parseWorkingTree } = require('../src/services/testing/lib/checks.js');
 const service = require('../src/services/testing/index.js');
 
 const HOMEPAGE = 'https://fixture-brand.test';
@@ -372,6 +372,19 @@ test('testing: dirty working tree → warned with the file count', async () => {
   assert.equal(report.status, 'warned');
   assert.deepEqual(report.output.results.warned, [
     { name: 'working tree', warning: '2 uncommitted files' },
+  ]);
+});
+
+test('testing: porcelain paths parse intact — first line keeps its leading status space', () => {
+  // cp100 live-run regression: ` M apps/omega-brand/config/omega.json5`
+  // displayed as `pps/omega-brand/...` because a whole-stdout trim stripped
+  // the first line's leading status column before the fixed-offset slice.
+  const files = parseWorkingTree(' M apps/omega-brand/config/omega.json5\n?? notes.txt\nA  src/new.js\n');
+
+  assert.deepEqual(files, [
+    { status: 'M', file: 'apps/omega-brand/config/omega.json5' },
+    { status: '??', file: 'notes.txt' },
+    { status: 'A', file: 'src/new.js' },
   ]);
 });
 
