@@ -123,14 +123,18 @@ class Manager {
         await this._sentry.init(this.config.sentry.config);
       }
 
-      // Initialize Analytics if ID and secret are provided
-      if (this.config.analytics?.google && this.config.analytics?.googleSecret) {
+      // Initialize Analytics when the google provider is configured
+      // (canonical shape: analytics.providers.google.{id,secret} — C4 cp106a;
+      // projectId feeds the cross-surface uuidv5 identity namespace)
+      const googleAnalytics = this.config.analytics?.providers?.google;
+      if (googleAnalytics?.id && googleAnalytics?.secret) {
         this._analytics.init({
-          id: this.config.analytics.google,
-          secret: this.config.analytics.googleSecret,
+          id: googleAnalytics.id,
+          secret: googleAnalytics.secret,
+          projectId: this._resolveFirebaseConfig()?.projectId || this.config.brand?.id || null,
         });
       } else {
-        console.log('[Analytics] Skipped: missing analytics google ID or secret');
+        console.log('[Analytics] Skipped: missing analytics.providers.google id or secret');
       }
 
       // Initialize service worker if enabled
@@ -330,10 +334,11 @@ class Manager {
         }
       },
       analytics: {
-        google: '',
-        googleSecret: '',
-        meta: '',
-        tiktok: '',
+        providers: {
+          google: { id: '', secret: '' },
+          meta: { id: '' },
+          tiktok: { id: '' },
+        },
       },
     };
 
@@ -505,6 +510,9 @@ class Manager {
 
       // Let auth module handle everything including DOM updates
       this._auth._handleAuthStateChange(user);
+
+      // Analytics identity follows auth (user_id = uuidv5(uid, namespace))
+      this._analytics.setUserId(user?.uid || null);
 
       // Update Chatsy with current user
       if (this._chatsy) {

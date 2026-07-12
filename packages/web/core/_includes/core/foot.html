@@ -97,12 +97,9 @@
     buildTime: {{ site.uj.cache_breaker | default: 0 }},
     brand: {{ resolved.brand | jsonify }},
     advertising: {{ resolved.advertising | jsonify }},
-    // The client reads the flat shape; omega.json5 owns the providers shape
-    analytics: {
-      google: {{ resolved.analytics.providers.google.id | jsonify }},
-      meta: {{ resolved.analytics.providers.meta.id | jsonify }},
-      tiktok: {{ resolved.analytics.providers.tiktok.id | jsonify }},
-    },
+    // Canonical providers shape straight through (C4 cp106a — no flatten
+    // bridge; secrets never ride: omega.json5 carries ids only)
+    analytics: {{ resolved.analytics | jsonify }},
     {% for item in resolved.web_manager %}
       {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
     {% endfor %}

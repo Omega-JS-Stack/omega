@@ -1,5 +1,10 @@
+import { v5 as uuidv5 } from 'uuid';
+
 // Supported runtimes for analytics
 const SUPPORTED_RUNTIMES = ['browser-extension', 'electron'];
+
+// Raw per-install device id (a plain UUID) — client_id derives from it
+const DEVICE_ID_KEY = '_omega_device_id';
 
 class Analytics {
   constructor(manager) {
@@ -10,7 +15,11 @@ class Analytics {
     this.config = null;
     this.measurementId = null;
     this.secret = null;
+    this.projectId = null;
+    this.namespace = null;
     this.clientId = null;
+    this.userId = null;
+    this.userProperties = {};
   }
 
   // Check if runtime is supported
@@ -43,15 +52,22 @@ class Analytics {
     // fallback credentials are gone by design — C4 cp106a de-ITW).
     this.devMode = this.manager.isDevelopment();
 
-    // Get measurement ID and secret from config
+    // Canonical handoff: analytics.providers.google.{id,secret} + the
+    // brand's projectId for the cross-surface identity namespace
     this.measurementId = config.measurementId || config.id;
     this.secret = config.secret;
+    this.projectId = config.projectId || null;
 
     // Skip if no measurement ID
     if (!this.measurementId) {
       console.log('[Analytics] No measurement ID provided, skipping initialization');
       return;
     }
+
+    // Cross-surface identity (matches @omega.js/desktop + @omega.js/backend):
+    // namespace = uuidv5(projectId); client_id = uuidv5(deviceId, namespace);
+    // user_id = uuidv5(firebaseUid, namespace) — same human on every surface
+    this.namespace = this.projectId ? uuidv5(this.projectId, uuidv5.URL) : null;
 
     // Generate or retrieve client ID
     this.clientId = this._getClientId();
@@ -66,29 +82,29 @@ class Analytics {
     this.event('page_view');
   }
 
-  // Get or generate client ID
+  // Stable per-install device id, hashed into the project namespace so the
+  // same device is the same GA client across surfaces. Without a projectId
+  // the raw (still stable) device id is used as-is.
   _getClientId() {
-    const storageKey = '_ga_client_id';
-
-    // Try to get existing client ID
-    let clientId = null;
+    let deviceId = null;
     try {
-      clientId = localStorage.getItem(storageKey);
+      deviceId = localStorage.getItem(DEVICE_ID_KEY);
     } catch (e) {
       // localStorage not available
     }
 
-    // Generate new client ID if needed
-    if (!clientId) {
-      clientId = `${Math.random().toString(36).substring(2)}.${Date.now()}`;
+    if (!deviceId) {
+      deviceId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Math.random().toString(36).substring(2)}.${Date.now()}`;
       try {
-        localStorage.setItem(storageKey, clientId);
+        localStorage.setItem(DEVICE_ID_KEY, deviceId);
       } catch (e) {
         // localStorage not available
       }
     }
 
-    return clientId;
+    return this.namespace ? uuidv5(deviceId, this.namespace) : deviceId;
   }
 
   // Get page data to include with all events
@@ -142,6 +158,8 @@ class Analytics {
 
     const payload = {
       client_id: this.clientId,
+      ...(this.userId ? { user_id: this.userId } : {}),
+      ...(Object.keys(this.userProperties).length ? { user_properties: this.userProperties } : {}),
       events: [{
         name: eventName,
         params: {
@@ -201,7 +219,8 @@ class Analytics {
     return newSession.id;
   }
 
-  // Set user properties
+  // Set user properties — GA4 wraps each value as { value } — merged into
+  // every subsequent event's user_properties block
   setUserProperties(properties = {}) {
     // TODO: Add web runtime support
     if (!this._isSupported()) {
@@ -212,10 +231,16 @@ class Analytics {
       return;
     }
 
-    // TODO: Implement for Measurement Protocol
+    const wrapped = {};
+    for (const [key, value] of Object.entries(properties)) {
+      wrapped[key] = { value };
+    }
+
+    this.userProperties = { ...this.userProperties, ...wrapped };
   }
 
-  // Set user ID
+  // Set user ID — raw uid in, uuidv5 out (the same value desktop/backend
+  // emit for this uid). Without a namespace the raw uid is never sent.
   setUserId(userId) {
     // TODO: Add web runtime support
     if (!this._isSupported()) {
@@ -226,7 +251,7 @@ class Analytics {
       return;
     }
 
-    // TODO: Implement for Measurement Protocol
+    this.userId = (userId && this.namespace) ? uuidv5(userId, this.namespace) : null;
   }
 }
 

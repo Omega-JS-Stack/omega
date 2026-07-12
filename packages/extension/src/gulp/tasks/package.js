@@ -106,12 +106,17 @@ async function generateBuildJs(outputDir) {
         refreshNewVersion: { enabled: true, config: {} },
         serviceWorker: { enabled: false, config: {} },
 
-        // Analytics. The Measurement Protocol API secret comes from .env
-        // (GOOGLE_ANALYTICS_SECRET — matches @omega.js/backend/EM convention; secrets never live
-        // in omega.json5) and is baked into the snapshot here at build time.
+        // Analytics (canonical providers shape — C4 cp106a). The Measurement
+        // Protocol API secret comes from .env (GOOGLE_ANALYTICS_SECRET —
+        // matches @omega.js/backend/EM convention; secrets never live in
+        // omega.json5) and is baked into the snapshot here at build time.
         analytics: {
-          google: config.analytics?.providers?.google?.id || '',
-          googleSecret: process.env.GOOGLE_ANALYTICS_SECRET || '',
+          providers: {
+            google: {
+              id: config.analytics?.providers?.google?.id || '',
+              secret: process.env.GOOGLE_ANALYTICS_SECRET || '',
+            },
+          },
         },
 
         // Theme config

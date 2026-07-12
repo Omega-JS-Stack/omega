@@ -78,13 +78,17 @@ extension package/webpack `validRedirectHosts`.)
    projectId); the client module is the weak twin (flat `analytics.google`
    shape, **real ITW GA4 ids+API secrets hardcoded in source** as dev creds,
    no identity model). Best-implementation-wins:
-   - **cp106a** — client engine adopts desktop's semantics: canonical
-     providers shape (index.js flat handoff + web foot.html's flatten bridge
-     DIE), uuidv5 identity, secret stays env-at-build (extension package.js
-     already bakes `GOOGLE_ANALYTICS_SECRET`), and the ITW dev creds are
-     DELETED — dev mode logs events instead of posting (consumers' dev
-     traffic must not land in ITW properties). Web runtime becomes
-     shape-ready but gtag remains the web path pending Ian.
+   - **cp106a — SHIPPED (2 commits, 2026-07-12)** — client engine adopted
+     desktop's semantics: canonical providers shape everywhere (index.js flat
+     handoff DEAD, web foot.html flatten bridge DEAD — resolved.analytics
+     rides through verbatim, extension package.js emits nested
+     providers.google.{id,secret}), uuidv5 identity ported (namespace =
+     uuidv5(projectId, URL), client_id = uuidv5(deviceId, ns) with a
+     persisted `_omega_device_id`, user_id = uuidv5(uid, ns) auto-wired to
+     onAuthStateChanged; raw uids never leave the device), user_properties
+     wrapped {value}, ITW dev creds DELETED (prong 1) — dev logs, never
+     posts. Dead `itwcw-package-analytics` dep dropped; `uuid` added.
+     client 85 / web 103 / extension 102.
    - **cp106b** — desktop's lib collapses onto the client engine (main-process
      wrapper keeps the preload/renderer IPC bridge + env secret; the
      analytics-bridge suite repins).

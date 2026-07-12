@@ -385,7 +385,7 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
   const html = pages.get('/');
 
   assert.ok(html.includes('googletagmanager.com/gtag/js?id=G-COMPOSE1'), 'gtag reads analytics.providers.google.id');
-  assert.ok(html.includes('google: "G-COMPOSE1"'), 'Configuration.analytics flat bridge for the client');
+  assert.ok(html.includes('"google":{"id":"G-COMPOSE1"}'), 'Configuration.analytics carries the canonical providers shape (flat bridge dead — cp106a)');
   assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config composed into web_manager.firebase.app.config');
   assert.ok(html.includes('"site":"compose"'), 'payment composed into web_manager.payment');
 });
