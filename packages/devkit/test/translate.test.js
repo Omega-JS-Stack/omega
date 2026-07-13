@@ -229,3 +229,33 @@ test('resolveTranslationSettings: defaults + gating', () => {
 
   assert.throws(() => resolveTranslationSettings({ translation: { languages: ['nope'] } }), /nope/);
 });
+
+test('claude provider hides ANTHROPIC_API_KEY from the SDK — subscription-only auth by contract', async () => {
+  // Inject a fake SDK before sendClaude's lazy require runs
+  const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+  const seen = {};
+  require.cache[sdkPath] = {
+    id: sdkPath,
+    filename: sdkPath,
+    loaded: true,
+    exports: {
+      query: ({ options }) => {
+        seen.env = options.env;
+        return (async function* () {
+          yield { type: 'result', usage: { input_tokens: 1, output_tokens: 1 } };
+        })();
+      },
+    },
+  };
+
+  process.env.ANTHROPIC_API_KEY = 'sk-would-bill-api-credits';
+  try {
+    await resolveProvider({ provider: 'claude' }).send({ system: 's', user: 'u' });
+    assert.ok(seen.env, 'the provider passes an explicit env to the SDK');
+    assert.equal(seen.env.ANTHROPIC_API_KEY, undefined, 'the API key never reaches the SDK');
+    assert.ok(Object.keys(seen.env).length > 0, 'the rest of the environment passes through');
+  } finally {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete require.cache[sdkPath];
+  }
+});

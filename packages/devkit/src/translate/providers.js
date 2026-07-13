@@ -65,6 +65,14 @@ async function sendClaude(model, message) {
   // out of the session (they pollute mechanical output), the system prompt
   // replaces the CLI persona, and no maxTurns cap — a plain reply already
   // counts as the final turn and a cap of 1 reports error_max_turns.
+  //
+  // Subscription-only by contract: this provider rides the local Claude
+  // Code install's own login. A stray ANTHROPIC_API_KEY anywhere in the
+  // env cascade would silently flip the SDK to API-credit billing — the
+  // child env hides it so the subscription is the ONLY auth path.
+  const env = { ...process.env };
+  delete env.ANTHROPIC_API_KEY;
+
   for await (const event of query({
     prompt: message.user,
     options: {
@@ -72,6 +80,7 @@ async function sendClaude(model, message) {
       allowedTools: [],
       settingSources: [],
       systemPrompt: message.system,
+      env,
     },
   })) {
     if (event.type === 'assistant' && event.message?.content) {

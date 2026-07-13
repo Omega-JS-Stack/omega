@@ -52,6 +52,18 @@
     private: false,
   },
 
+  // No Beehiiv publication for the rehearsal brand (Ian 2026-07-12) — the
+  // service skips deliberately instead of asking for one.
+  beehiiv: {
+    enabled: false,
+  },
+
+  // Webhook parent topology: a brand names the parent whose central backend
+  // receives account-global webhooks ('self' when this brand IS that parent
+  // of sub-brands). false = opted out for the rehearsal (Ian 2026-07-12);
+  // flip to "self" to live-test the sendgrid event-webhook leg.
+  parent: false,
+
   monitoring: {
     provider: "sentry",
     dsn: null,
@@ -92,6 +104,7 @@
       messagingSenderId: "644778453321",
       appId: "1:644778453321:web:0d4f0f8774385a21671298",
       databaseURL: "https://omegajs-playground-default-rtdb.firebaseio.com",
+      measurementId: "G-0SGDR7ZPJ9",
     },
   },
 
