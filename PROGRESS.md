@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **PIPELINE CERTIFIED ✅ (2026-07-12 6:06 PM: first FULL `npm run pipeline` PASS — 24 services, zero prompts, exit 0)** — the pre-skin program is COMPLETE; the one thing on earth before the skin arc: Ian's "draft it" / cp99 notes
+- **SKIN ARC OPEN (Ian's GO 2026-07-12 7:17 PM: "can we go?" — yes)** — slice 1 = cp99a C3 systems (design-agnostic: D10 cross-target token layer, #16 sass modernization, app-shell + two-tier theme mechanics) → slice 2 = DRAFT 1 live on playground.omegajs.dev (marketing home, pricing, signin — Claude's taste + board direction; Ian reacts, we iterate); pipeline certified cp119, nothing else gates
 - **CATCH-UP PASS (Ian 2026-07-12: get us to the classy rebuild / brand rebuild / CMS)** — his gos, in order: cp102b run-gates ✅ → cp108 fontawesome ✅ → cp109 theme-once ✅ (mechanism SHIPPED — triplication dead; the skin now ships everywhere by construction; Ian ready for skin AFTER this pass; cp99 board comments still pending) → #15 Node story ✅ (cp110) → playground manage cycle (cloudflare CNAME propose-first + Google-toggle verify; payment gated) → brand rebuilds LAST (his "after we're pretty much done"). **C4 slices ALL SHIPPED** ([plans/c4-cross-target.md](plans/c4-cross-target.md)): cp104-109 ✅ — arc close waits on the skin. omegajs.dev REGISTERED — wire at arc close
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
