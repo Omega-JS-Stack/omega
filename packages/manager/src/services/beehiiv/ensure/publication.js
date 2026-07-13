@@ -72,6 +72,7 @@ module.exports = async function ensurePublication(context) {
   if (canPrompt(context.options)) {
     const result = await openBrowserAndPoll({
       url: CREATE_URL,
+      label: 'the Beehiiv workspace settings',
       promptMessage: `Create the publication for ${chalk.cyan(brandName)} with the values above.`,
       waitMessage: 'Waiting for the publication to appear',
       check: async () => {

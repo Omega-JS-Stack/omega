@@ -664,7 +664,7 @@ test('zone: pending zone with a manual registrar opens its nameserver page and p
 
   try {
     const run = ensureZone(handlerContext(config, api));
-    await tty.answer('Open browser now?', '\r');
+    await tty.answer('Press Enter to open the squarespace nameserver settings', '\r');
     const result = await run;
 
     assert.equal(result.state.zoneId, 'zone-p');
@@ -729,7 +729,7 @@ test('email-routing: interactive run opens the dashboard and retries the write o
 
   try {
     const run = ensureEmailRouting(handlerContext(config, api));
-    await tty.answer('Open browser now?', '\r');
+    await tty.answer('Press Enter to open the Cloudflare destination-addresses page', '\r');
     const result = await run;
 
     assert.equal(result.status, 'success');

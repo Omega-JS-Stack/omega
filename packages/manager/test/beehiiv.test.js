@@ -340,11 +340,13 @@ test('beehiiv: extension automation creates the missing segment and the re-verif
   process.env.OMEGA_EXTENSION_PORT = String(port);
   const ext = startFakeExtension(port);
 
+  setBrowserOpener(async () => true); // the Enter gate always opens — never a real browser in tests
   const tty = openTtyPrompt();
   try {
     const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
     await tty.answer('Create missing segments?', '\r');   // default: Automate via extension
-    await tty.answer('Open browser now?', 'n\r');         // dashboard already open — decline
+    await tty.answer('Press Enter to open the Beehiiv segments page', '\r');
+    await tty.answer('(enter)=done', '\r');               // publication selected — start the automation
     const result = await running;
 
     assert.equal(result.status, 'success');
@@ -364,6 +366,7 @@ test('beehiiv: extension automation creates the missing segment and the re-verif
   } finally {
     tty.close();
     ext.stop();
+    setBrowserOpener(null);
     delete process.env.OMEGA_EXTENSION_PORT;
   }
 });
@@ -372,11 +375,13 @@ test('beehiiv: manual choice re-verifies — still-missing segments stay warned'
   const list = convergedResponses().getSegments;
   const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) }); // never created
 
+  setBrowserOpener(async () => true);
   const tty = openTtyPrompt();
   try {
     const running = runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
     await tty.answer('Create missing segments?', '[B\r'); // ↓ to "Open dashboard (manual)"
-    await tty.answer('Open browser now?', 'n\r');
+    await tty.answer('Press Enter to open the Beehiiv segments page', '\r');
+    await tty.answer('(enter)=done', '\r');               // done (nothing actually created)
     const result = await running;
 
     assert.equal(result.status, 'warned');
@@ -385,6 +390,7 @@ test('beehiiv: manual choice re-verifies — still-missing segments stay warned'
     assert.equal(api.callsTo('getSegments').length, 2); // verified again after the manual window
   } finally {
     tty.close();
+    setBrowserOpener(null);
   }
 });
 
@@ -482,7 +488,7 @@ test('publication: interactive run opens the create page and polls until the new
 
   try {
     const run = runService(brandConfig(), { beehiiv: api, brandRoot });
-    await tty.answer('Open browser now?', '\r'); // yes (default)
+    await tty.answer('Press Enter to open the Beehiiv workspace settings', '\r');
     const result = await run;
 
     assert.equal(result.state.publicationId, PUB_ID);

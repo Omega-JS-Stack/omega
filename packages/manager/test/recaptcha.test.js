@@ -179,7 +179,7 @@ test('site-key: interactive run opens the console and stamps the confirmed domai
 
   try {
     const run = runService(brandConfig(), { recaptcha: api });
-    await tty.answer('Open browser now?', '\r');
+    await tty.answer('Press Enter to open the reCAPTCHA console', '\r');
     // ENTER = "domains saved" — nudge until the manual-only poll picks it up
     await tty.answer('(enter)=done', '\r');
     const nudge = setInterval(() => { tty.answer('(enter)=done', '\r').catch(() => {}); }, 80);

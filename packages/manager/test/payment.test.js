@@ -403,24 +403,37 @@ test('stripe-disputes: warned with settings deep-link until confirmed', async ()
   assert.deepEqual(stripe.mutations(), []);
 });
 
-test('stripe-radar + disputes: interactive confirms stamp both flags, service passes', async () => {
+test('stripe-radar + disputes: Enter-gated opens + interactive confirms stamp both flags, service passes', async () => {
   const stripe = fakeStripe(stripeConverged());
   // paypal/chargebee disabled — enabled-but-unconfigured processors would
   // offer their credential-entry flow first in an interactive run
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { processors: { paypal: false, chargebee: false } } });
+
+  // pressEnterToOpen launches via prompt's openInBrowser — stub it
+  const promptModule = require('@omega.js/devkit/prompt');
+  const opened = [];
+  const realOpen = promptModule.openInBrowser;
+  promptModule.openInBrowser = (url) => { opened.push(url); return true; };
   const tty = openTtyPrompt();
 
   try {
     const run = runService(config, { stripe });
+    await tty.answer('Press Enter to open the Stripe Radar rules page', '\r');
     await tty.answer('Radar rules added in the Dashboard?', 'y\r');
+    await tty.answer('Press Enter to open the Stripe dispute settings', '\r');
     await tty.answer('Enhanced Dispute Protection activated in the Dashboard?', 'y\r');
     const result = await run;
 
     assert.equal(result.status, 'success');
     assert.equal(result.state.radarConfirmed, true);
     assert.equal(result.state.disputesConfirmed, true);
+    assert.deepEqual(opened, [
+      'https://dashboard.stripe.com/acct_1/radar/rules',
+      'https://dashboard.stripe.com/acct_1/settings/disputes',
+    ]);
     assert.deepEqual(stripe.mutations(), []);
   } finally {
+    promptModule.openInBrowser = realOpen;
     tty.close();
   }
 });
@@ -428,16 +441,22 @@ test('stripe-radar + disputes: interactive confirms stamp both flags, service pa
 test('stripe-radar: interactive decline stays warned and unstamped', async () => {
   const stripe = fakeStripe(stripeConverged());
   const config = brandConfig({ products: makeProducts({ ids: CONVERGED_IDS }), payment: { processors: { paypal: false, chargebee: false } } });
+
+  const promptModule = require('@omega.js/devkit/prompt');
+  const realOpen = promptModule.openInBrowser;
+  promptModule.openInBrowser = () => true;
   const tty = openTtyPrompt();
 
   try {
     const run = runService(config, { stripe, serviceData: { disputesConfirmed: true } });
+    await tty.answer('Press Enter to open the Stripe Radar rules page', '\r');
     await tty.answer('Radar rules added in the Dashboard?', 'n\r');
     const result = await run;
 
     assert.equal(result.status, 'warned');
     assert.equal(result.state.radarConfirmed, false);
   } finally {
+    promptModule.openInBrowser = realOpen;
     tty.close();
   }
 });

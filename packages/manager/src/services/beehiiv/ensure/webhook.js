@@ -32,6 +32,11 @@ module.exports = async function ensureWebhook(context) {
   }
 
   const parent = brandConfig.parent;
+  if (parent === false) {
+    // Tri-state: explicit false = deliberate opt-out, no nudge
+    console.log(chalk.dim('      ⊘ parent = false — webhook opted out'));
+    return {};
+  }
   if (!parent) {
     console.log(chalk.dim('      ⊘ No parent configured — nothing to point the webhook at'));
     console.log(chalk.dim("      → Set parent in omega.json5 ('self' when this brand runs the central backend)"));

@@ -310,6 +310,37 @@ test('sendgrid: an unverified sender is recreated with the brand address', async
   });
 });
 
+test('sendgrid: a stale unverified sender squatting the nickname is deleted before create', async () => {
+  // contact.email changed → the derivation moved; the old sender holds the
+  // account-unique nickname and would 400 the create
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getVerifiedSenders: [{ id: 9376, nickname: BRAND_NAME, from_email: 'offers@old-domain.test', verified: false }],
+    deleteVerifiedSender: null,
+    createVerifiedSender: { id: 10, from_email: FROM_EMAIL, verified: true },
+  });
+
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(api.callsTo('deleteVerifiedSender')[0].args, [9376]);
+  assert.equal(api.callsTo('createVerifiedSender')[0].args[0].fromEmail, FROM_EMAIL);
+});
+
+test('sendgrid: a VERIFIED sender on the nickname with another address warns instead of deleting', async () => {
+  const api = fakeSendgrid({
+    ...convergedResponses(),
+    getVerifiedSenders: [{ id: 9376, nickname: BRAND_NAME, from_email: 'offers@old-domain.test', verified: true }],
+  });
+
+  const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' } });
+
+  assert.equal(result.status, 'warned');
+  assert.equal(result.output.senderIdentity.staleNickname, 'offers@old-domain.test');
+  assert.equal(api.callsTo('deleteVerifiedSender').length, 0);
+  assert.equal(api.callsTo('createVerifiedSender').length, 0);
+});
+
 test('sendgrid: missing sender without brand.address warns with CAN-SPAM guidance', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),

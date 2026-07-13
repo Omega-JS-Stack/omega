@@ -53,6 +53,7 @@ async function handleUnverified(api, zoneId, destination, retryWrite, options = 
   if (canPrompt(options)) {
     const result = await openBrowserAndPoll({
       url: dashboardUrl,
+      label: 'the Cloudflare destination-addresses page',
       promptMessage: `Verify ${chalk.cyan(destination)} in Cloudflare Email Routing (check the inbox).`,
       waitMessage: 'Checking verification',
       indent: '      ',

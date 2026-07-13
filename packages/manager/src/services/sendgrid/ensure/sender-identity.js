@@ -29,6 +29,10 @@ module.exports = async function ensureSenderIdentity(context) {
 
   const senders = await api.getVerifiedSenders();
   const match = senders.find((s) => s.from_email === fromEmail);
+  // The nickname is the managed handle (unique per SendGrid account) — a
+  // sender with this brand's nickname but another address is a stale
+  // derivation (contact.email changed) and would 400 the create below
+  const stale = senders.find((s) => s.nickname === brandName && s.from_email !== fromEmail);
 
   if (match && match.verified !== false) {
     console.log(`      ${chalk.green('✓')} Verified sender ${chalk.cyan(fromEmail)} ${chalk.dim(`(id: ${match.id})`)}`);
@@ -45,7 +49,7 @@ module.exports = async function ensureSenderIdentity(context) {
   }
 
   if (options.dryRun) {
-    const planned = match ? 'recreate-unverified-sender' : 'create-sender';
+    const planned = match ? 'recreate-unverified-sender' : stale ? 'replace-stale-nickname-sender' : 'create-sender';
     return dryRunPlan(`${planned} (${fromEmail})`, { output: { senderIdentity: { planned, fromEmail } } });
   }
 
@@ -54,6 +58,16 @@ module.exports = async function ensureSenderIdentity(context) {
   if (match) {
     await api.deleteVerifiedSender(match.id);
     console.log(`      ${chalk.yellow('↻')} Deleted unverified sender ${chalk.cyan(fromEmail)} for recreation`);
+  }
+
+  if (stale) {
+    if (stale.verified === false) {
+      await api.deleteVerifiedSender(stale.id);
+      console.log(`      ${chalk.yellow('↻')} Deleted stale unverified sender ${chalk.cyan(stale.from_email)} — the contact domain changed`);
+    } else {
+      console.log(`      ${chalk.yellow('⚠')} Verified sender ${chalk.cyan(stale.from_email)} already uses the nickname ${chalk.cyan(brandName)} — delete it in SendGrid or align brand.contact.email, then rerun`);
+      return { status: 'warned', output: { senderIdentity: { fromEmail, staleNickname: stale.from_email } } };
+    }
   }
 
   const sender = await api.createVerifiedSender({

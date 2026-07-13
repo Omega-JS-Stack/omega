@@ -153,24 +153,29 @@ test('openBrowserAndPoll without a TTY prints the URL and skips (no browser)', a
   assert.equal(opened, false);
 });
 
-test('openBrowserAndPoll: declining the confirm skips without opening', async () => {
+test('openBrowserAndPoll: Enter opens the URL (synonymous gate); (s) at the poll skips', async () => {
   const streams = makeStreams({ tty: true });
   prompt.setPromptStreams(streams);
-  let opened = false;
-  flows.setBrowserOpener(async () => { opened = true; return true; });
+  const opened = [];
+  flows.setBrowserOpener(async (url) => { opened.push(url); return true; });
   const running = flows.openBrowserAndPoll({
     url: 'https://example.com/setup',
     promptMessage: 'Create the thing',
+    label: 'the setup page',
     waitMessage: 'Waiting',
+    check: async () => ({ done: false }),
+    intervalMs: 60000, // only a key can end the wait
   });
-  await waitForOutput(streams, 'Open browser now?');
-  streams.input.write('n\r');
+  await waitForOutput(streams, 'Press Enter to open the setup page');
+  streams.input.write('\r');
+  await waitForOutput(streams, '(enter)=check now');
+  streams.input.write('s');
   const result = await running;
   assert.deepEqual(result, { success: false, skipped: true });
-  assert.equal(opened, false);
+  assert.deepEqual(opened, ['https://example.com/setup'], 'Enter opened the URL before the poll');
 });
 
-test('openBrowserAndPoll: accept → opens the URL and polls to success', async () => {
+test('openBrowserAndPoll: Enter → opens the URL and polls to success', async () => {
   const streams = makeStreams({ tty: true });
   prompt.setPromptStreams(streams);
   const opened = [];
@@ -182,8 +187,8 @@ test('openBrowserAndPoll: accept → opens the URL and polls to success', async 
     check: async () => ({ done: true, result: { id: 'thing_1' } }),
     intervalMs: 20,
   });
-  await waitForOutput(streams, 'Open browser now?');
-  streams.input.write('\r'); // accept the default (yes)
+  await waitForOutput(streams, 'Press Enter to open this page'); // default label
+  streams.input.write('\r');
   const result = await running;
   assert.deepEqual(result, { success: true, result: { id: 'thing_1' } });
   assert.deepEqual(opened, ['https://example.com/setup']);

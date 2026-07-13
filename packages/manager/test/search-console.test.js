@@ -296,22 +296,31 @@ test('search-console: unconfirmed GA association warns with the associations URL
   assert.equal(gsc.mutations().length, 0);
 });
 
-test('search-console: interactive GA-association confirm stamps gaLinked, service passes', async () => {
+test('search-console: interactive GA-association is Enter-gated, confirm stamps gaLinked, service passes', async () => {
   const gsc = fakeGsc({
     listSites: [{ siteUrl: PROPERTY_URL, permissionLevel: 'siteOwner' }],
     listSitemaps: [{ path: SITEMAP_URL }],
   });
+
+  // pressEnterToOpen launches via prompt's openInBrowser — stub it
+  const promptModule = require('@omega.js/devkit/prompt');
+  const opened = [];
+  const realOpen = promptModule.openInBrowser;
+  promptModule.openInBrowser = (url) => { opened.push(url); return true; };
   const tty = openTtyPrompt();
 
   try {
     const run = runService(brandConfig(), { gsc });
+    await tty.answer('Press Enter to open the Search Console associations page', '\r');
     await tty.answer(`Search Console associated with GA property ${GA_PROPERTY}?`, 'y\r');
     const result = await run;
 
     assert.equal(result.status, 'success');
     assert.equal(result.state.gaLinked, true);
+    assert.match(opened[0], /search\.google\.com\/search-console\/settings\/associations/);
     assert.equal(gsc.mutations().length, 0);
   } finally {
+    promptModule.openInBrowser = realOpen;
     tty.close();
   }
 });

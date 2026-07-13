@@ -56,6 +56,7 @@ async function waitForActiveZone(context, zone) {
   const result = registrarUrl
     ? await openBrowserAndPoll({
       url: registrarUrl,
+      label: `the ${provider} nameserver settings`,
       promptMessage: `Set the nameservers above at ${provider}.`,
       waitMessage: 'Checking nameservers',
       check,

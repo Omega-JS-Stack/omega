@@ -49,6 +49,7 @@ module.exports = async function ensureSiteKey(context) {
   if (canPrompt(options)) {
     const result = await openBrowserAndPoll({
       url: consoleUrl,
+      label: 'the reCAPTCHA console',
       promptMessage: `Add ${chalk.cyan(domains.join(' + '))} to the reCAPTCHA key's domain list.`,
       waitMessage: 'Waiting for the domains to be saved',
       manualOnly: true,

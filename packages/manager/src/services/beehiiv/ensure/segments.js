@@ -81,6 +81,7 @@ module.exports = async function ensureSegments(context) {
   if (action === 'manual') {
     await openBrowserAndPoll({
       url: SEGMENTS_URL,
+      label: 'the Beehiiv segments page',
       promptMessage: `Create ${missing.length} missing segment(s) in Beehiiv`,
       waitMessage: 'Press ENTER when done',
       manualOnly: true,
@@ -90,6 +91,7 @@ module.exports = async function ensureSegments(context) {
     // select the right publication before the automation drives the UI
     await openBrowserAndPoll({
       url: SEGMENTS_URL,
+      label: 'the Beehiiv segments page',
       promptMessage: 'Select the correct publication in Beehiiv, then confirm to start automation',
       waitMessage: 'Press ENTER when ready',
       manualOnly: true,

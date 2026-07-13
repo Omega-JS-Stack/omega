@@ -26,6 +26,11 @@ module.exports = async function ensureEventWebhook(context) {
   const { sendgridApi: api, brandConfig, domain, options = {} } = context;
 
   const parent = brandConfig.parent;
+  if (parent === false) {
+    // Tri-state: explicit false = deliberate opt-out, no nudge
+    console.log(chalk.dim('      ⊘ parent = false — Event Webhook opted out'));
+    return {};
+  }
   if (!parent) {
     console.log(chalk.dim('      ⊘ No parent configured — nothing to point the Event Webhook at'));
     console.log(chalk.dim("      → Set parent in omega.json5 ('self' when this brand runs the central backend)"));

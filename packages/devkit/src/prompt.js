@@ -142,6 +142,15 @@ function openInBrowser(url) {
 }
 
 /**
+ * The ONE wording for the Enter gate in front of every browser open —
+ * pressEnterToOpen and flows.openBrowserAndPoll both speak it, so every
+ * URL ask in the walkthrough is synonymous.
+ */
+function enterToOpenMessage(label = 'this page') {
+  return `Press Enter to open ${label} in your browser...`;
+}
+
+/**
  * The onboarding walkthrough pattern (omega-manager convention): "Press
  * Enter to open <label> in your browser". Interactive: waits for Enter,
  * opens the URL, returns true. Non-interactive: prints the URL and returns
@@ -156,7 +165,7 @@ async function pressEnterToOpen(url, label = 'this page') {
     return false;
   }
 
-  await _input({ message: `Press Enter to open ${label} in your browser...` }, _streams || undefined);
+  await _input({ message: enterToOpenMessage(label) }, _streams || undefined);
   // Via module.exports so tests can stub the actual browser launch
   module.exports.openInBrowser(url);
   return true;
@@ -171,6 +180,7 @@ module.exports = {
   checkbox,
   confirm,
   setPromptStreams,
+  enterToOpenMessage,
   pressEnterToOpen,
   openInBrowser,
   openCommand,

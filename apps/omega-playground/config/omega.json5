@@ -18,7 +18,10 @@
     // omegajs.dev site — which belongs to the future standalone OMEGA brand.
     url: "https://playground.omegajs.dev",
     contact: {
-      email: "support@omegajs.dev",
+      // Playground subdomain (never the real omegajs.dev): the sendgrid
+      // sender derives offers@<this domain> and auto-verifies off the
+      // subdomain's own domain authentication.
+      email: "support@playground.omegajs.dev",
     },
     // PLACEHOLDER address (CAN-SPAM footer) — Ian's real business address at launch.
     address: {
@@ -52,16 +55,12 @@
     private: false,
   },
 
-  // No Beehiiv publication for the rehearsal brand (Ian 2026-07-12) — the
-  // service skips deliberately instead of asking for one.
-  beehiiv: {
-    enabled: false,
-  },
-
   // Webhook parent topology: a brand names the parent whose central backend
   // receives account-global webhooks ('self' when this brand IS that parent
-  // of sub-brands). false = opted out for the rehearsal (Ian 2026-07-12);
-  // flip to "self" to live-test the sendgrid event-webhook leg.
+  // of sub-brands). false is CORRECT here (verified 2026-07-13): the SendGrid
+  // account is SHARED with the real ITW brands and its ONE per-account event
+  // webhook points at ITW's production forwarder — 'self' would hijack it.
+  // The real OMEGA brand sets 'self' on its OWN SendGrid account at launch.
   parent: false,
 
   monitoring: {
@@ -185,6 +184,11 @@
   marketing: {
     campaigns: {
       listId: "daae211b-bc50-4d57-ae5e-8e86f6abb734",
+    },
+    // No newsletter for the rehearsal brand (Ian 2026-07-12) — the beehiiv
+    // service skips deliberately instead of asking for a publication.
+    newsletter: {
+      enabled: false,
     },
   },
 }

@@ -18,7 +18,7 @@
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const chalk = require('chalk').default;
-const { confirm, isInteractive, getPromptStreams } = require('./prompt.js');
+const { input, isInteractive, getPromptStreams, enterToOpenMessage } = require('./prompt.js');
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -250,15 +250,20 @@ async function pollWithSpinner(options) {
 }
 
 /**
- * Print instructions + a URL, open the browser (after confirming), and poll
+ * Print instructions + a URL, open the browser (Enter-gated), and poll
  * until the condition is met. The core onboarding-flow shape: "create the
  * thing in this dashboard; I'll wait until I can see it via the API."
  *
  * Without a TTY the URL is printed and the flow returns skipped.
  *
+ * The open is gated behind Enter — the ONE synonymous walkthrough gate
+ * (prompt.js enterToOpenMessage); skipping the step happens at the poll
+ * via (s), never by declining the open.
+ *
  * @param {Object} options
  * @param {string} options.url - URL to open
  * @param {string} options.promptMessage - What needs to be done there
+ * @param {string} [options.label] - What the Enter gate calls the page
  * @param {string} options.waitMessage - Message shown while polling
  * @param {Function} [options.check] - Async condition (see pollWithSpinner)
  * @param {number} [options.intervalMs] - Poll interval (default: 10000)
@@ -270,6 +275,7 @@ async function openBrowserAndPoll(options) {
   const {
     url,
     promptMessage,
+    label = 'this page',
     waitMessage,
     check,
     intervalMs = 10000,
@@ -286,14 +292,7 @@ async function openBrowserAndPoll(options) {
     return { success: false, skipped: true };
   }
 
-  const shouldOpen = await confirm({
-    message: 'Open browser now?',
-    default: true,
-  });
-
-  if (!shouldOpen) {
-    return { success: false, skipped: true };
-  }
+  await input({ message: enterToOpenMessage(label) });
 
   const opened = await openBrowser(url);
   if (!opened) {

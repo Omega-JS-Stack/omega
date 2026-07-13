@@ -215,7 +215,7 @@ test('sites: interactive run opens the add-site page and polls until the site ap
 
   try {
     const run = runService(brandConfig(), { adsense: api });
-    await tty.answer('Open browser now?', '\r');
+    await tty.answer('Press Enter to open the AdSense sites page', '\r');
     const result = await run;
 
     assert.equal(result.status, 'success');

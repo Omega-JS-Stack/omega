@@ -39,6 +39,7 @@ module.exports = async function ensureSites(context) {
   if (canPrompt(options)) {
     const result = await openBrowserAndPoll({
       url: sitesUrl,
+      label: 'the AdSense sites page',
       promptMessage: `Add ${chalk.cyan(domain)} as a site in the AdSense console.`,
       waitMessage: 'Waiting for the site to appear',
       check: async () => {

@@ -8,7 +8,7 @@
  * the link is confirmed (`gaLinked` in state).
  */
 const chalk = require('chalk').default;
-const { confirm } = require('@omega.js/devkit/prompt');
+const { confirm, pressEnterToOpen } = require('@omega.js/devkit/prompt');
 const { canPrompt } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureGaLink(context) {
@@ -33,15 +33,17 @@ module.exports = async function ensureGaLink(context) {
   const associationsUrl = `https://search.google.com/search-console/settings/associations?resource_id=${encodeURIComponent(serviceData.propertyUrl)}`;
 
   console.log(`      ${chalk.yellow('⚠')} No API exists to check the Search Console ↔ GA association`);
-  console.log(`      ${chalk.dim('→')} Associate with GA property ${chalk.cyan(propertyId)} at: ${chalk.cyan(associationsUrl)}`);
+  console.log(`      ${chalk.dim('→')} Associate with GA property ${chalk.cyan(propertyId)} on the associations page`);
 
   if (canPrompt(options)) {
+    await pressEnterToOpen(associationsUrl, 'the Search Console associations page');
     const done = await confirm({ message: `Search Console associated with GA property ${propertyId}?`, default: false });
     if (done) {
       console.log(`      ${chalk.green('✓')} GA association confirmed`);
       return { state: { gaLinked: true } };
     }
   } else {
+    console.log(`      ${chalk.dim('→')} ${chalk.cyan(associationsUrl)}`);
     console.log(`      ${chalk.dim('→')} (rerun in an interactive terminal to confirm)`);
   }
 
