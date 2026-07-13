@@ -186,20 +186,18 @@
   },
 
   // ITW's REAL contact form / chat agent / email agent (ids from the legacy
-  // itw-creative-works brand — Ian 2026-07-13 "get the shit you need").
-  // update*Info: false = the itw brand owns their branding; the playground
-  // must never rename or reconfigure them (the services skip deliberately).
+  // itw-creative-works brand). Ian 2026-07-13: run them for real — "that IS
+  // the point of the playground". The ensures re-brand them to this brand;
+  // the next legacy itw manage run converges them back (its config still
+  // owns these ids). Flip update*Info: false to make them verify-only.
   slapform: {
     formId: "UlXJ49Q4C",
-    updateFormInfo: false,
   },
   chatsy: {
     agentId: "8YIsRlzAAiv03d",
-    updateAgentInfo: false,
   },
   replyify: {
     agentId: "stcbsieo7n1Lrk",
-    updateAgentInfo: false,
   },
 
   // AI brandmark via ITW's MrLogo instance (legacy production route — the
