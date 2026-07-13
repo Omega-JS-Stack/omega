@@ -73,28 +73,53 @@ async function sendClaude(model, message) {
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY;
 
-  for await (const event of query({
-    prompt: message.user,
-    options: {
-      model,
-      allowedTools: [],
-      settingSources: [],
-      systemPrompt: message.system,
-      env,
-    },
-  })) {
-    if (event.type === 'assistant' && event.message?.content) {
-      for (const block of event.message.content) {
-        if (block.type === 'text') {
-          text += block.text;
+  const consume = async () => {
+    for await (const event of query({
+      prompt: message.user,
+      options: {
+        model,
+        allowedTools: [],
+        settingSources: [],
+        systemPrompt: message.system,
+        env,
+      },
+    })) {
+      if (event.type === 'assistant' && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === 'text') {
+            text += block.text;
+          }
+        }
+      }
+
+      if (event.type === 'result') {
+        // A failed call must throw NOW — a session-limited install can
+        // otherwise stall the whole build (the 28-minute cp119 hang)
+        if (event.subtype && event.subtype !== 'success') {
+          throw new Error(`Claude translate call failed (${event.subtype})${event.result ? `: ${String(event.result).slice(0, 200)}` : ''} — if this is the session limit, wait for the 5-hour window to reset or build with --cached-only.`);
+        }
+        if (event.usage) {
+          usage.input += event.usage.input_tokens || 0;
+          usage.output += event.usage.output_tokens || 0;
         }
       }
     }
+  };
 
-    if (event.type === 'result' && event.usage) {
-      usage.input += event.usage.input_tokens || 0;
-      usage.output += event.usage.output_tokens || 0;
-    }
+  // Hard per-call ceiling — a stalled SDK call fails loud and fast instead
+  // of hanging the caller (OMEGA_TRANSLATE_TIMEOUT_MS overrides; tests use it)
+  const timeoutMs = Number(process.env.OMEGA_TRANSLATE_TIMEOUT_MS || 240000);
+  let timer = null;
+  try {
+    await Promise.race([
+      consume(),
+      new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Claude translate call exceeded ${Math.round(timeoutMs / 1000)}s — a stalled SDK call (often the session limit); wait for the window to reset or build with --cached-only.`)), timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
 
   return { text, usage };

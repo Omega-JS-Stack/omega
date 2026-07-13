@@ -33,6 +33,12 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'slapform.enabled = false' };
     }
 
+    // Shared form: another brand owns its branding (the chatsy/replyify
+    // updateAgentInfo pattern) — never rename or re-enable it from here
+    if (config?.updateFormInfo === false) {
+      return { skip: true, reason: 'form managed by another brand (slapform.updateFormInfo = false)' };
+    }
+
     // The contact form lives on the brand's website
     if (!context.brandConfig.targets?.web) {
       return { skip: true, reason: 'no web target' };

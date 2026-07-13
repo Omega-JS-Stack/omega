@@ -101,8 +101,15 @@ module.exports = async ({ brandRoot, apps, options }) => {
       console.log(`      ${chalk.yellow('⊘')} ${app.name}: would run npm run build ${chalk.dim('[dry-run]')}`);
       steps.push({ phase: 'build', success: true, skipped: true, dryRun: true });
     } else {
-      console.log(`      ${chalk.dim('→')} ${app.name}: npm run build`);
-      const result = await runCommand('npm', ['run', 'build'], app.path);
+      // Non-interactive certification runs (pipeline, CI) must be
+      // deterministic: web builds use the committed translation cache only —
+      // never a live LLM pass mid-run (the same law deploys follow).
+      const buildArgs = ['run', 'build'];
+      if (app.target === 'web' && process.env.OMEGA_NON_INTERACTIVE === '1') {
+        buildArgs.push('--', '--cached-only');
+      }
+      console.log(`      ${chalk.dim('→')} ${app.name}: npm ${buildArgs.join(' ')}`);
+      const result = await runCommand('npm', buildArgs, app.path);
       steps.push({ phase: 'build', ...result });
       if (!result.success) failed = true;
     }

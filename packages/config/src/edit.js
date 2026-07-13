@@ -534,7 +534,10 @@ function writeConfigValues(projectDir, edits, { dryRun = false } = {}) {
 
   const source = fs.readFileSync(configPath, 'utf8');
   const applied = pendingEdits(JSON5.parse(source), edits).map(([path]) => path);
-  const next = applyConfigEdits(source, edits);
+  // Every writeback also normalizes top-level key order (comments travel
+  // with their keys) — lazy require: order.js depends on this module
+  const { applyCanonicalOrder } = require('./order.js');
+  const next = applyCanonicalOrder(applyConfigEdits(source, edits));
 
   if (next !== source && !dryRun) {
     fs.writeFileSync(configPath, next);
@@ -543,4 +546,4 @@ function writeConfigValues(projectDir, edits, { dryRun = false } = {}) {
   return { path: configPath, changed: next !== source, applied };
 }
 
-module.exports = { applyConfigEdits, writeConfigValues };
+module.exports = { applyConfigEdits, writeConfigValues, parseRoot };

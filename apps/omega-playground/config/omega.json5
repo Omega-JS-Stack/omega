@@ -6,6 +6,14 @@
 // playground identity, playground subdomain — the real OMEGA brand is born
 // standalone at arc close and owns omegajs.dev.
 {
+
+  // Webhook parent topology: a brand names the parent whose central backend
+  // receives account-global webhooks ('self' when this brand IS that parent
+  // of sub-brands). false is CORRECT here (verified 2026-07-13): the SendGrid
+  // account is SHARED with the real ITW brands and its ONE per-account event
+  // webhook points at ITW's production forwarder — 'self' would hijack it.
+  // The real OMEGA brand sets 'self' on its OWN SendGrid account at launch.
+  parent: false,
   brand: {
     id: "omega-playground",
     name: "OMEGA Playground",
@@ -39,10 +47,13 @@
     },
   },
 
-  // Registrar of the PARENT omegajs.dev (subdomain project — the domain
-  // service manages the parent's nameservers at Namecheap → Cloudflare).
-  domain: {
-    provider: "namecheap",
+  // Key presence = target enabled; the value is that target's type-wide
+  // config (any shared key inside overrides it for that surface).
+  targets: {
+    web: {},
+    backend: {},
+    desktop: {},
+    extension: {},
   },
 
   // Brand repo (github service: repo + Pages). shared: the org profile
@@ -55,38 +66,10 @@
     private: false,
   },
 
-  // Webhook parent topology: a brand names the parent whose central backend
-  // receives account-global webhooks ('self' when this brand IS that parent
-  // of sub-brands). false is CORRECT here (verified 2026-07-13): the SendGrid
-  // account is SHARED with the real ITW brands and its ONE per-account event
-  // webhook points at ITW's production forwarder — 'self' would hijack it.
-  // The real OMEGA brand sets 'self' on its OWN SendGrid account at launch.
-  parent: false,
-
-  monitoring: {
-    provider: "sentry",
-    dsn: null,
-  },
-
-  analytics: {
-    providers: {
-      google: { id: null, accountId: "377753992", propertyId: "545069570" },
-      meta: { id: null },
-      tiktok: { id: null },
-    },
-  },
-
-  // Project-owned theme — seeded at onboarding, yours to change.
-  theme: {
-    id: "classy",
-    appearance: "system", // "system" | "light" | "dark"
-  },
-
-  // AI translation (web /{lang}/ copies + extension _locales) — provider
-  // "claude" (default) rides the local Claude Code install; "chatgpt" needs
-  // OPENAI_API_KEY in .env. Per-string cache commits to each app's translations/.
-  translation: {
-    languages: ["es"], // dogfood canary scope — expand at launch
+  // Registrar of the PARENT omegajs.dev (subdomain project — the domain
+  // service manages the parent's nameservers at Namecheap → Cloudflare).
+  domain: {
+    provider: "namecheap",
   },
 
   // REAL playground project (created 2026-07-11; console:
@@ -119,11 +102,24 @@
     organizationId: "1076309192968",
   },
 
+  analytics: {
+    providers: {
+      google: { id: null, accountId: "377753992", propertyId: "545069570" },
+      meta: { id: null },
+      tiktok: { id: null },
+    },
+  },
+
+  monitoring: {
+    provider: "sentry",
+    dsn: null,
+  },
+
   // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
   // Shapes mirror @omega.js/backend's product schema.
   payment: {
     processors: {
-      stripe: { publishableKey: null },
+      stripe: { publishableKey: "pk_test_51T32RbReHWMUiO2TIWCU72ATxikGDMo1a3Byl7ZiEOdDHSKsiW9v6JwRyC7BCBK8AvhTJxWpsn3dpppwdZv73lIp00oBCyjnfg" },
       paypal: { clientId: null },
       chargebee: { site: null },
       coinbase: { enabled: false },
@@ -154,7 +150,7 @@
           { id: "targets", name: "All four targets", icon: "layer-group", value: true },
           { id: "support", name: "Priority support", icon: "headset", value: true },
         ],
-        stripe: { productId: null },
+        stripe: { productId: "prod_UscSf6XFplJRS1" },
         paypal: { productId: null },
         chargebee: { itemId: null, legacyPlanIds: [] },
       },
@@ -167,19 +163,10 @@
         features: [
           { id: "templates", name: "Brand templates", icon: "palette", value: 12 },
         ],
-        stripe: { productId: null },
+        stripe: { productId: "prod_UscSbPkRMWy3Yr" },
         chargebee: { itemId: null },
       },
     ],
-  },
-
-  // Key presence = target enabled; the value is that target's type-wide
-  // config (any shared key inside overrides it for that surface).
-  targets: {
-    web: {},
-    backend: {},
-    desktop: {},
-    extension: {},
   },
   marketing: {
     campaigns: {
@@ -190,5 +177,53 @@
     newsletter: {
       enabled: false,
     },
+  },
+
+  // Shared ITW AdSense account (from legacy omega-manager — one pub id
+  // account-wide). The service reports Google's approval state read-only.
+  adsense: {
+    accountId: "pub-7372939085773564",
+  },
+
+  // ITW's REAL contact form / chat agent / email agent (ids from the legacy
+  // itw-creative-works brand — Ian 2026-07-13 "get the shit you need").
+  // update*Info: false = the itw brand owns their branding; the playground
+  // must never rename or reconfigure them (the services skip deliberately).
+  slapform: {
+    formId: "UlXJ49Q4C",
+    updateFormInfo: false,
+  },
+  chatsy: {
+    agentId: "8YIsRlzAAiv03d",
+    updateAgentInfo: false,
+  },
+  replyify: {
+    agentId: "stcbsieo7n1Lrk",
+    updateAgentInfo: false,
+  },
+
+  // AI brandmark via ITW's MrLogo instance (legacy production route — the
+  // old-world /backend-manager path is MrLogo's LIVE api). Auth rides
+  // LOGO_API_ID_TOKEN from .env when present; providerBrand+adminEmail are
+  // the company-workspace mint path for launch-era layouts.
+  assets: {
+    brandmark: {
+      apiUrl: "https://api.mrlogo.ai/backend-manager/logos",
+      providerBrand: "mrlogo",
+      adminEmail: "ian.wiedenman@gmail.com",
+    },
+  },
+
+  // Project-owned theme — seeded at onboarding, yours to change.
+  theme: {
+    id: "classy",
+    appearance: "system", // "system" | "light" | "dark"
+  },
+
+  // AI translation (web /{lang}/ copies + extension _locales) — provider
+  // "claude" (default) rides the local Claude Code install; "chatgpt" needs
+  // OPENAI_API_KEY in .env. Per-string cache commits to each app's translations/.
+  translation: {
+    languages: ["es"], // dogfood canary scope — expand at launch
   },
 }

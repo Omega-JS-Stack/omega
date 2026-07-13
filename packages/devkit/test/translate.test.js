@@ -230,6 +230,53 @@ test('resolveTranslationSettings: defaults + gating', () => {
   assert.throws(() => resolveTranslationSettings({ translation: { languages: ['nope'] } }), /nope/);
 });
 
+test('claude provider surfaces SDK error results immediately — a failed call never hangs the build', async () => {
+  const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+  require.cache[sdkPath] = {
+    id: sdkPath,
+    filename: sdkPath,
+    loaded: true,
+    exports: {
+      query: () => (async function* () {
+        yield { type: 'result', subtype: 'error_during_execution', result: 'Session limit reached · resets 6pm' };
+      })(),
+    },
+  };
+
+  try {
+    await assert.rejects(
+      resolveProvider({ provider: 'claude' }).send({ system: 's', user: 'u' }),
+      /failed \(error_during_execution\).*Session limit/s
+    );
+  } finally {
+    delete require.cache[sdkPath];
+  }
+});
+
+test('claude provider times out a stalled SDK call instead of hanging', async () => {
+  const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+  require.cache[sdkPath] = {
+    id: sdkPath,
+    filename: sdkPath,
+    loaded: true,
+    exports: {
+      // A call that never yields and never returns — the cp119 28-minute stall
+      query: () => (async function* () { await new Promise(() => {}); })(),
+    },
+  };
+
+  process.env.OMEGA_TRANSLATE_TIMEOUT_MS = '80';
+  try {
+    await assert.rejects(
+      resolveProvider({ provider: 'claude' }).send({ system: 's', user: 'u' }),
+      /exceeded .*stalled SDK call/
+    );
+  } finally {
+    delete process.env.OMEGA_TRANSLATE_TIMEOUT_MS;
+    delete require.cache[sdkPath];
+  }
+});
+
 test('claude provider hides ANTHROPIC_API_KEY from the SDK — subscription-only auth by contract', async () => {
   // Inject a fake SDK before sendClaude's lazy require runs
   const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');

@@ -7,6 +7,6 @@
   ],
   "scripts": {
     "start": "omega-manager",
-    "pipeline": "omega-manager pipeline"
+    "pipeline": "omega-manager pipeline --require=search-console,sendgrid,recaptcha,analytics,account,disperse,update,bookmark"
   }
 }

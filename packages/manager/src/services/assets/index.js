@@ -46,14 +46,19 @@ module.exports.run = createServiceRunner({
     const logoDir = join(context.brandRoot, 'assets', 'logo');
     const brandmarkPath = join(logoDir, 'brandmark.svg');
 
-    // The brandmark is the root of every derived asset — offer the AI
-    // generation flow before giving up on a brand that has none yet
+    // The brandmark is the root of every derived asset — when the brand has
+    // none and assets.brandmark is configured, generate it. Interactive runs
+    // ask for optional art direction; non-interactive runs use
+    // assets.brandmark.direction (every ask is a VALUE — configuring the
+    // spec IS the consent to spend the API call). Dry runs never mint.
     if (!jetpack.exists(brandmarkPath)) {
       const spec = resolveBrandmarkSpec(context.brandConfig);
 
-      if (spec && canPrompt(context.options)) {
+      if (spec && !context.options?.dryRun) {
         try {
-          const direction = (await input({ message: 'Logo prompt (press Enter to skip):', default: '' })).trim();
+          const direction = canPrompt(context.options)
+            ? (await input({ message: 'Logo prompt (press Enter to skip):', default: '' })).trim()
+            : (spec.direction || '');
           const token = await resolveLogoApiToken(spec, context.brandRoot);
           await withSpinner('Generating brandmark via the logo API', () =>
             generateBrandmark({ spec, brandConfig: context.brandConfig, brandmarkPath, direction, token }));

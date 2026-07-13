@@ -26,6 +26,7 @@ const { validateConfig, runSchema, formatErrors } = require('./validate.js');
 const { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS } = require('./load.js');
 const { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, COMPANY_MARKER } = require('./env.js');
 const { applyConfigEdits, writeConfigValues } = require('./edit.js');
+const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js');
 const { renderBrandAppSeed, resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
@@ -50,9 +51,11 @@ module.exports = {
   readCompanyRoot,
   COMPANY_MARKER,
 
-  // Writeback (comment-preserving edits)
+  // Writeback (comment-preserving edits + canonical top-level key order)
   applyConfigEdits,
   writeConfigValues,
+  applyCanonicalOrder,
+  CANONICAL_TOP_LEVEL_ORDER,
 
   // Layer-aware consumer seeding (brand-app = targets-only)
   renderBrandAppSeed,

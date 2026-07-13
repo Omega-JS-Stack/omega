@@ -605,25 +605,28 @@ test('brandmark: no resolvable token warns and the service skips with guidance �
   }
 });
 
-test('brandmark: non-interactive and dry runs never attempt generation', async () => {
+test('brandmark: dry runs never generate; non-interactive runs GENERATE when configured', async () => {
   const api = await startLogoApi();
   process.env.LOGO_API_ID_TOKEN = 'test-token-123';
   try {
-    // Headless: even with a token + spec, the skip guidance is the answer
-    const headless = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url } } }));
-    assert.equal(headless.status, 'skipped');
-    assert.match(headless.reason, /assets\.brandmark/);
-
-    // Dry run: interactive TTY, still no generation attempt
+    // Dry run: interactive TTY, spec + token present — still no attempt
     const tty = openTtyPrompt();
     try {
       const dry = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url } } }), { options: { dryRun: true } });
       assert.equal(dry.status, 'skipped');
+      assert.equal(api.requests.length, 0);
     } finally {
       tty.close();
     }
 
-    assert.equal(api.requests.length, 0);
+    // Headless with spec + token: configuring the spec IS the consent — the
+    // brandmark mints (spec.direction supplies the art direction) and the
+    // whole leg runs to success. This is the pipeline story.
+    const headless = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url, direction: 'geometric mark' } } }));
+    assert.equal(headless.status, 'success');
+    const mint = api.requests.find((request) => request.url === '/logos');
+    assert.ok(mint, 'the logo API was called');
+    assert.match(mint.body.description, /geometric mark/);
   } finally {
     delete process.env.LOGO_API_ID_TOKEN;
     api.server.close();
