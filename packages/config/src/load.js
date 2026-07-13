@@ -197,12 +197,17 @@ function loadConfig(projectDir, target, options) {
   }
 
   const appPath = resolveConfigPath(projectDir);
-  if (!appPath) {
+  const brandPath = findBrandConfigPath(projectDir);
+
+  // The app-layer file is OPTIONAL inside a brand monorepo (Ian 2026-07-13:
+  // the brand file's targets section IS the per-target home) — an app with
+  // no omega.json5 of its own rides the brand file alone. Standalone
+  // projects (no brand config above) still require their own file.
+  if (!appPath && !brandPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')}) — probe with hasOmegaConfig() first; legacy configs must be migrated (see docs/config.md)`);
   }
 
-  const brandPath = findBrandConfigPath(projectDir);
-  const app = readConfigFile(appPath);
+  const app = appPath ? readConfigFile(appPath) : {};
   const brand = brandPath ? readConfigFile(brandPath) : null;
 
   assertUsableRawFile(brandPath, brand);

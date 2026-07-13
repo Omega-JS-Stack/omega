@@ -1,18 +1,8 @@
-// OMEGA Playground desktop — APP-level omega.json5. Shared sections (brand,
-// cloud, payment, theme, ...) come from the BRAND file
-// (apps/omega-playground/config/omega.json5) via the loader's brand walk-up —
-// this file carries ONLY the desktop target's own settings. (cp93 friction
-// find: the framework-seeded file carried placeholder brand values that
-// shadowed the brand layer.)
-// Full knob reference: node_modules/@omega.js/desktop/src/defaults/config/omega.json5
+// App-layer config — TARGETS ONLY. Shared sections (brand, cloud, payment, …)
+// live in the brand root's config/omega.json5; any key added here OVERRIDES
+// the brand layer for THIS app only, so keep it minimal.
 {
   targets: {
-    desktop: {
-      app: {
-        // appId + copyright derive from the brand since cp95c
-        // (dev.omegajs.playground / © {YEAR}, OMEGA Playground).
-        category: 'developer-tools',
-      },
-    },
+    desktop: {},
   },
 }

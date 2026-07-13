@@ -1,9 +1,6 @@
-// OMEGA extension — APP-level omega.json5: ONLY this target's own overrides.
-// Everything shared (brand, cloud, theme, analytics, ...) lives ONCE in the
-// BRAND file (apps/omega-playground/config/omega.json5) and arrives via the
-// loader's walk-up — never restate it here (an app-layer copy SHADOWS the
-// brand value; this file carried a stale Ultimate Jekyll brand block +
-// the universal-auth Firebase project from a pre-cp95a scaffold — cp121b).
+// App-layer config — TARGETS ONLY. Shared sections (brand, cloud, payment, …)
+// live in the brand root's config/omega.json5; any key added here OVERRIDES
+// the brand layer for THIS app only, so keep it minimal.
 {
   targets: {
     extension: {},

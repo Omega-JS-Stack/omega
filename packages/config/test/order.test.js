@@ -106,3 +106,32 @@ test('writeConfigValues normalizes key order on every writeback', () => {
 test('canonical list sanity: no duplicates', () => {
   assert.strictEqual(new Set(CANONICAL_TOP_LEVEL_ORDER).size, CANONICAL_TOP_LEVEL_ORDER.length);
 });
+
+test('loadConfig: an app with no omega.json5 of its own rides the brand file alone', () => {
+  const { loadConfig } = require('../src/load.js');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-optional-app-'));
+  fs.mkdirSync(path.join(root, 'config'));
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{
+  brand: { id: "demo", name: "Demo" },
+  targets: {
+    web: { theme: { id: "classy" } },
+  },
+}
+`);
+  const appDir = path.join(root, 'apps', 'website');
+  fs.mkdirSync(appDir, { recursive: true });
+
+  const { config, enabled, files } = loadConfig(appDir, 'web');
+  assert.strictEqual(config.brand.name, 'Demo', 'brand layer resolves');
+  assert.strictEqual(config.theme.id, 'classy', 'brand target overlay resolves');
+  assert.strictEqual(enabled, true);
+  assert.strictEqual(files.app, null, 'no app-layer file — and that is fine');
+  assert.ok(files.brand.endsWith('config/omega.json5'));
+
+  // Standalone (no brand above) still requires its own file
+  const lone = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lone-'));
+  assert.throws(() => loadConfig(lone, 'web'), /No omega\.json5 found/);
+
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.rmSync(lone, { recursive: true, force: true });
+});

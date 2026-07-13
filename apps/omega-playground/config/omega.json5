@@ -48,11 +48,18 @@
   },
 
   // Key presence = target enabled; the value is that target's type-wide
-  // config (any shared key inside overrides it for that surface).
+  // config (any shared key inside overrides it for that surface). This IS
+  // the per-target override home (Ian 2026-07-13) — app-level omega.json5
+  // files are OPTIONAL (standalone/split-repo escape hatch) and the
+  // playground doesn't carry any (backend's rides the src/dist pillar).
   targets: {
     web: {},
     backend: {},
-    desktop: {},
+    desktop: {
+      app: {
+        category: "developer-tools",
+      },
+    },
     extension: {},
   },
 
