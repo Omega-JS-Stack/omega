@@ -30,6 +30,12 @@ class TestCommand extends BaseCommand {
     // src/test/fixtures/firebase-project. Mirrors BXM/UJM *_TEST_BOOT_PROJECT.
     const isSelfTest = this.setupSelfTest();
 
+    // functions/ is staged output (src/dist pillar): stage fresh so the run
+    // reads current src + composed config. The auto-start emulator path stages
+    // again inside startEmulators — idempotent and cheap; THIS call covers the
+    // existing-emulator path, where nothing else would refresh the tree.
+    this.ensureStaged();
+
     // Get test paths from CLI args (e.g., "bem test admin/" or "bem test general/generate-uuid")
     const testPaths = (argv._ || []).slice(1); // Remove 'test' from args
 
@@ -238,11 +244,13 @@ class TestCommand extends BaseCommand {
    * GOOGLE_APPLICATION_CREDENTIALS is unset (as in the functions emulator). The
    * key is a freshly-generated RSA key — emulator-only, never authenticates
    * against Google (the project is a `demo-` project), so it is generated at
-   * runtime and gitignored, never committed.
+   * runtime and gitignored, never committed. Written to the APP ROOT (the
+   * authored home under the src/dist pillar) — the stage step carries it into
+   * functions/.
    */
   ensureFixtureServiceAccount(fixture) {
     const crypto = require('crypto');
-    const saPath = path.join(fixture, 'functions', 'service-account.json');
+    const saPath = path.join(fixture, 'service-account.json');
     const projectId = 'demo-omega-backend';
     const { privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
@@ -269,14 +277,16 @@ class TestCommand extends BaseCommand {
   }
 
   /**
-   * Symlink the local framework + firebase deps into the fixture's
-   * functions/node_modules so the emulator's function workers can resolve them.
-   * Mirrors what `npx omega install dev` does in a real consumer, but for the
-   * fixture and without an npm install (firebase-admin/firebase-functions come
-   * from @omega.js/backend's own node_modules; @omega.js/backend points at the repo root).
+   * Symlink the local framework + firebase deps into the fixture's APP-ROOT
+   * node_modules so the emulator's function workers can resolve them — Node
+   * resolution walks up from the staged functions/ tree (which carries no
+   * node_modules of its own under the src/dist pillar). Mirrors what
+   * `npx omega install dev` does in a real consumer, but for the fixture and
+   * without an npm install (firebase-admin/firebase-functions come from
+   * @omega.js/backend's own node_modules; @omega.js/backend points at the repo root).
    */
   linkFixtureDeps(fixture) {
-    const fnNodeModules = path.join(fixture, 'functions', 'node_modules');
+    const fnNodeModules = path.join(fixture, 'node_modules');
     jetpack.dir(fnNodeModules);
 
     const frameworkRoot = path.resolve(__dirname, '..', '..', '..'); // src/cli/commands -> repo root

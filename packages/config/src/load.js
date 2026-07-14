@@ -1,9 +1,13 @@
 /**
  * omega.json5 discovery + loading.
  *
- * File locations under a project dir (first match wins):
- *   config/omega.json5             — every project type
- *   functions/config/omega.json5   — standalone backend repos
+ * ONE authored location per project dir: config/omega.json5. A deployed
+ * backend still resolves its staged functions/config/omega.json5 naturally —
+ * the runtime's projectDir IS the functions dir (its cwd), so the staged file
+ * is that dir's own config/omega.json5. The old second probe location
+ * (functions/config under the APP root) died with the src/dist pillar: the
+ * staged compose output must never read back as an authored app layer, or a
+ * brand edit goes stale behind the previous stage.
  *
  * Brand-monorepo hierarchy: when projectDir is an app inside a brand
  * monorepo ({brand}/apps/{app}), the brand root's config/omega.json5 is the
@@ -37,7 +41,6 @@ const { TARGETS } = require('./schema.js');
 const FILE_NAME = 'omega.json5';
 const CONFIG_LOCATIONS = [
   path.join('config', FILE_NAME),
-  path.join('functions', 'config', FILE_NAME),
 ];
 
 /**
@@ -196,7 +199,15 @@ function loadConfig(projectDir, target, options) {
     throw new Error(`Unknown target "${target}" — must be one of [${TARGETS.join(', ')}]`);
   }
 
-  const appPath = resolveConfigPath(projectDir);
+  // From a functions/ dir the app layer is its own config/omega.json5 (the
+  // STAGED compose — the deployed runtime's view). Before any stage exists,
+  // fall back to the app root's authored file one level up, so a bare
+  // emulator/loadConfig from the functions cwd sees the same layers the
+  // stage would compose.
+  let appPath = resolveConfigPath(projectDir);
+  if (!appPath && path.basename(path.resolve(projectDir)) === 'functions') {
+    appPath = resolveConfigPath(path.dirname(path.resolve(projectDir)));
+  }
   const brandPath = findBrandConfigPath(projectDir);
 
   // The app-layer file is OPTIONAL inside a brand monorepo (Ian 2026-07-13:
@@ -256,23 +267,37 @@ function loadConfig(projectDir, target, options) {
  * Framework defaults are NOT baked in: the deployed runtime applies its
  * own, so defaults evolve with the shipped package, not the deploy moment.
  *
+ * The app-layer file is OPTIONAL inside a brand monorepo (same rule as
+ * loadConfig since cp121c): an app with no omega.json5 of its own composes
+ * from the brand file alone. Standalone projects still require their file.
+ *
  * @param {string} projectDir - App root or its functions/ dir.
  * @param {string} target - Canonical target the upload serves ('backend').
- * @returns {{ config: object, files: { app: string, brand: string|null } }}
- *   `files.brand` null = no brand layer above the app (already self-contained).
+ * @returns {{ config: object, files: { app: string|null, brand: string|null } }}
+ *   `files.brand` null = no brand layer above the app (already self-contained);
+ *   `files.app` null = the app rides the brand file alone.
  */
 function composeTargetConfig(projectDir, target) {
   if (!TARGETS.includes(target)) {
     throw new Error(`Unknown target "${target}" — must be one of [${TARGETS.join(', ')}]`);
   }
 
-  const appPath = resolveConfigPath(projectDir);
-  if (!appPath) {
+  // Compose is a BUILD-time op over the AUTHORED layers: a functions/ dir
+  // normalizes up to its app root, so a previously-staged
+  // functions/config/omega.json5 (compose OUTPUT) can never read back in as
+  // an app layer — that would freeze brand edits behind the last stage.
+  let appRoot = path.resolve(projectDir);
+  if (path.basename(appRoot) === 'functions') {
+    appRoot = path.dirname(appRoot);
+  }
+
+  const appPath = resolveConfigPath(appRoot);
+  const brandPath = findBrandConfigPath(appRoot);
+  if (!appPath && !brandPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')})`);
   }
 
-  const brandPath = findBrandConfigPath(projectDir);
-  const app = readConfigFile(appPath);
+  const app = appPath ? readConfigFile(appPath) : {};
   const brand = brandPath ? readConfigFile(brandPath) : null;
 
   assertUsableRawFile(brandPath, brand);

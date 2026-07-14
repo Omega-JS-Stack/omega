@@ -45,6 +45,12 @@ class ServeCommand extends BaseCommand {
     // versions. Keeps the project tree clean across runs.
     this.sweepStaleLogs();
 
+    // functions/ is staged output (src/dist pillar): stage fresh + re-stage on
+    // src edits — firebase serve watches the functions dir, so a re-stage IS
+    // the hot reload. Closed when the firebase child exits below.
+    this.ensureStaged();
+    const stageWatch = this.startStageWatch();
+
     // Start @omega.js/backend watcher in background
     const watcher = new WatchCommand(self);
     watcher.startBackground();
@@ -156,6 +162,7 @@ class ServeCommand extends BaseCommand {
 
         child.on('close', () => {
           clearInterval(resetWatcher);
+          stageWatch.close();
           if (currentStream && !currentStream.destroyed) {
             currentStream.end();
           }

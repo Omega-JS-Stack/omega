@@ -2,7 +2,7 @@ const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const JSON5 = require('json5');
 const chalk = require('chalk').default;
-const { hasOmegaConfig, loadConfig, writeConfigValues } = require('@omega.js/config');
+const { hasOmegaConfig, loadConfig, writeConfigValues, findBrandRoot } = require('@omega.js/config');
 const { buildDemoServiceAccount } = require('./service-account');
 
 /**
@@ -99,9 +99,10 @@ class ProjectIdConsistencyTest extends BaseTest {
     const firebasercData = firebasercContent ? JSON5.parse(firebasercContent) : null;
 
     // config/omega.json5 — resolved through the loader so the projectId is
-    // found wherever the hierarchy puts it (app file or brand file)
+    // found wherever the hierarchy puts it (app file or brand file; a brand
+    // app with no file of its own still resolves via the brand root)
     let omegaProjectId = null;
-    const omegaExists = hasOmegaConfig(projectPath);
+    const omegaExists = hasOmegaConfig(projectPath) || !!findBrandRoot(projectPath);
     if (omegaExists) {
       try {
         omegaProjectId = loadConfig(projectPath, 'backend').config.cloud?.config?.projectId || null;
@@ -110,8 +111,8 @@ class ProjectIdConsistencyTest extends BaseTest {
       }
     }
 
-    // service-account.json
-    const serviceAccountPath = `${projectPath}/functions/service-account.json`;
+    // service-account.json (authored at the app root — src/dist pillar)
+    const serviceAccountPath = `${projectPath}/service-account.json`;
     const serviceAccountContent = jetpack.read(serviceAccountPath);
     const serviceAccountData = serviceAccountContent ? JSON5.parse(serviceAccountContent) : null;
 
@@ -143,12 +144,13 @@ class ProjectIdConsistencyTest extends BaseTest {
     }
 
     // Config lacks the id (only .firebaserc had one) — land it in config via
-    // the comment-preserving editor, so the config owns it from here on.
-    // (writeConfigValues edits the file resolveConfigPath finds for this app;
-    // wizard-seeded brands already carry it at the brand root and never hit this.)
+    // the comment-preserving editor, so the config owns it from here on. A
+    // brand app has no file of its own → the value belongs in the BRAND file.
     if (sources.bemConfig.exists && !sources.bemConfig.projectId) {
-      writeConfigValues(projectPath, { 'cloud.config.projectId': expectedProjectId });
+      const configHome = hasOmegaConfig(projectPath) ? projectPath : findBrandRoot(projectPath);
+      writeConfigValues(configHome, { 'cloud.config.projectId': expectedProjectId });
       console.log(chalk.green(`Fixed: config/omega.json5 → cloud.config.projectId = ${expectedProjectId}`));
+      this.restage();
     }
 
     // .firebaserc is DERIVED — rewrite it from config
@@ -164,8 +166,9 @@ class ProjectIdConsistencyTest extends BaseTest {
     // service-account.json: demo-* fakes regenerate; real ones must be downloaded
     if (sources.serviceAccount.exists && sources.serviceAccount.projectId !== expectedProjectId) {
       if (this.isDemoProject) {
-        const saPath = `${projectPath}/functions/service-account.json`;
+        const saPath = `${projectPath}/service-account.json`;
         jetpack.write(saPath, `${JSON.stringify(buildDemoServiceAccount(expectedProjectId), null, 2)}\n`);
+        this.restage();
         console.log(chalk.green(`Fixed: regenerated fake service-account.json for ${expectedProjectId}`));
       } else {
         console.log(chalk.red(`\nCannot auto-fix service-account.json`));

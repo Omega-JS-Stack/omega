@@ -16,7 +16,6 @@ const FirebaseAdminTest = require('./firebase-admin');
 const FirebaseFunctionsTest = require('./firebase-functions');
 const OmegaBackendTest = require('./omega-backend');
 const NpmProjectScriptsTest = require('./npm-project-scripts');
-const RootPackageJsonTest = require('./root-package-json');
 const OmegaConfigTest = require('./omega-config');
 const ProjectIdConsistencyTest = require('./project-id-consistency');
 const ServiceAccountTest = require('./service-account');
@@ -63,7 +62,6 @@ function getTests(context) {
     new FirebaseFunctionsTest(context),
     new OmegaBackendTest(context),
     new NpmProjectScriptsTest(context),
-    new RootPackageJsonTest(context),
     new OmegaConfigTest(context),
     new ServiceAccountTest(context),
     new ProjectIdConsistencyTest(context),

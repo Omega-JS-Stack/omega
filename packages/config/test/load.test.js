@@ -54,17 +54,24 @@ test('standalone project: config/omega.json5, JSON5 syntax (comments, trailing c
   assert.strictEqual(files.brand, null);
 });
 
-test('standalone backend: functions/config/omega.json5 is discovered; config/ wins when both exist', (t) => {
+test('backend app dir: a STAGED functions/config is never the app layer; the functions dir itself still resolves it (runtime view)', (t) => {
+  // src/dist pillar: functions/config/omega.json5 is compose OUTPUT. From the
+  // APP ROOT it must not resolve (a stale stage would shadow brand edits);
+  // from the FUNCTIONS dir (the deployed runtime's cwd/projectDir) it is that
+  // dir's own config/omega.json5 and resolves exactly like production.
   const root = makeFixture('backend-standalone', {
     'functions/config/omega.json5': `{ brand: { id: 'acme', name: 'Acme Backend' }, targets: { backend: {} } }`,
   });
   cleanup(t, root);
 
-  assert.strictEqual(resolveConfigPath(root), path.join(root, 'functions', 'config', 'omega.json5'));
-  assert.strictEqual(loadConfig(root, 'backend').enabled, true);
+  assert.strictEqual(resolveConfigPath(root), null);
+  assert.strictEqual(hasOmegaConfig(root), false);
+  assert.strictEqual(resolveConfigPath(path.join(root, 'functions')), path.join(root, 'functions', 'config', 'omega.json5'));
+  assert.strictEqual(loadConfig(path.join(root, 'functions'), 'backend').enabled, true);
 
+  // The authored standalone home is the app root — it wins the app-root view
   fs.mkdirSync(path.join(root, 'config'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'acme', name: 'Root Wins' } }`);
+  fs.writeFileSync(path.join(root, 'config', 'omega.json5'), `{ brand: { id: 'acme', name: 'Root Wins' }, targets: { backend: {} } }`);
   assert.strictEqual(resolveConfigPath(root), path.join(root, 'config', 'omega.json5'));
 });
 
@@ -180,20 +187,25 @@ test('no target: whole files merge (targets map included) — the disperse shape
 
 test('backend runtime cwd (the functions/ dir) still walks up to the brand config', (t) => {
   // @omega.js/backend's Manager boots with cwd = {brand}/apps/backend/functions — the app
-  // root is one up, and the brand layer must still resolve from there.
+  // root is one up, and the brand layer must still resolve from there. Under
+  // the src/dist pillar the app's AUTHORED file lives at the app root; the
+  // functions dir carries the STAGED compose (written by omega build).
   const root = makeFixture('functions-cwd', {
     'config/omega.json5': `{
       brand: { id: 'acme', name: 'Acme' },
       cloud: { provider: 'firebase', config: { projectId: 'acme-prod' } },
       targets: { backend: {} },
     }`,
-    'apps/backend/functions/config/omega.json5': `{
+    'apps/backend/config/omega.json5': `{
       targets: { backend: { github: { user: 'acme-org' } } },
     }`,
   });
   cleanup(t, root);
 
-  const functionsDir = path.join(root, 'apps', 'backend', 'functions');
+  const appRoot = path.join(root, 'apps', 'backend');
+  const functionsDir = path.join(appRoot, 'functions');
+
+  // Local emulator view BEFORE any stage: the walk-up alone serves everything
   const fromFunctions = loadConfig(functionsDir, 'backend');
   assert.strictEqual(fromFunctions.files.brand, path.join(root, 'config', 'omega.json5'));
   assert.strictEqual(fromFunctions.config.cloud.config.projectId, 'acme-prod');
@@ -201,8 +213,19 @@ test('backend runtime cwd (the functions/ dir) still walks up to the brand confi
   assert.strictEqual(fromFunctions.enabled, true);
 
   // Same resolution from the app root — both entry points agree
-  const fromAppRoot = loadConfig(path.join(root, 'apps', 'backend'), 'backend');
+  const fromAppRoot = loadConfig(appRoot, 'backend');
   assert.deepStrictEqual(fromAppRoot.config, fromFunctions.config);
+
+  // AFTER a stage (composed file in functions/config), the functions view
+  // resolves the staged file as its own app layer and STILL agrees
+  const { config: composed } = composeTargetConfig(appRoot, 'backend');
+  fs.mkdirSync(path.join(functionsDir, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(functionsDir, 'config', 'omega.json5'), JSON.stringify(composed, null, 2));
+  const staged = loadConfig(functionsDir, 'backend');
+  assert.strictEqual(staged.config.github.user, 'acme-org');
+  assert.strictEqual(staged.config.cloud.config.projectId, 'acme-prod');
+  // ...while the app-root view IGNORES the staged file (never an app layer)
+  assert.strictEqual(loadConfig(appRoot, 'backend').files.app, path.join(appRoot, 'config', 'omega.json5'));
 });
 
 test('an apps/ dir without a brand-level config is standalone — no walk-up', (t) => {
@@ -335,7 +358,7 @@ const COMPOSE_TREE = {
       web: {},
     },
   }`,
-  'apps/api/functions/config/omega.json5': `{
+  'apps/api/config/omega.json5': `{
     corner: 'from-app-shared',
     targets: { backend: { flavor: 'from-app-target' } },
   }`,
@@ -400,13 +423,51 @@ test('composeTargetConfig: app dir and its functions/ dir compose identically; n
   );
 
   const solo = makeFixture('compose-solo', {
-    'functions/config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: { flavor: 'solo-target' } } }`,
+    'config/omega.json5': `{ brand: { id: 'solo', name: 'Solo' }, targets: { backend: { flavor: 'solo-target' } } }`,
   });
   cleanup(t, solo);
 
   const { config, files } = composeTargetConfig(solo, 'backend');
   assert.strictEqual(files.brand, null);
   assert.strictEqual(config.flavor, 'solo-target');
+});
+
+test('composeTargetConfig: app file OPTIONAL inside a brand monorepo — brand-only compose matches loadConfig (src/dist pillar)', (t) => {
+  const brandRoot = makeFixture('compose-no-app', {
+    'config/omega.json5': COMPOSE_TREE['config/omega.json5'],
+    'apps/api/src/index.js': `// authored tree only — no app omega.json5, no functions/ yet`,
+  });
+  cleanup(t, brandRoot);
+  const appDir = path.join(brandRoot, 'apps', 'api');
+
+  const { config, files } = composeTargetConfig(appDir, 'backend');
+  assert.strictEqual(files.app, null); // rides the brand file alone
+  assert.strictEqual(config.brand.name, 'Acme Corp');
+  assert.strictEqual(config.flavor, 'from-brand-target');
+  assert.strictEqual(config.corner, 'from-brand-target'); // no app layers left to beat it
+  assert.deepStrictEqual(config.targets, { backend: {}, web: {} }); // presence-only
+
+  // The theorem holds without an app file: composed-alone ≡ local walk-up,
+  // and the app dir + its (future staged) functions/ dir agree.
+  const uploadRoot = makeFixture('compose-no-app-upload', {
+    'config/omega.json5': JSON.stringify(config, null, 2),
+  });
+  cleanup(t, uploadRoot);
+  const local = loadConfig(appDir, 'backend', { defaults: COMPOSE_DEFAULTS });
+  const viaUpload = loadConfig(uploadRoot, 'backend', { defaults: COMPOSE_DEFAULTS });
+  const { targets: localTargets, ...localConfig } = local.config;
+  const { targets: uploadTargets, ...uploadConfig } = viaUpload.config;
+  assert.deepStrictEqual(uploadConfig, localConfig);
+  assert.deepStrictEqual(Object.keys(uploadTargets).sort(), Object.keys(localTargets).sort());
+  assert.deepStrictEqual(
+    composeTargetConfig(appDir, 'backend').config,
+    composeTargetConfig(path.join(appDir, 'functions'), 'backend').config,
+  );
+
+  // Still a hard error when NOTHING exists (standalone with no file at all)
+  const empty = makeFixture('compose-empty', { 'src/index.js': `// nothing` });
+  cleanup(t, empty);
+  assert.throws(() => composeTargetConfig(empty, 'backend'), /No omega\.json5 found/);
 });
 
 test('composeTargetConfig: secrets in either layer hard-fail before any merge', (t) => {

@@ -145,11 +145,12 @@ test('targetFromDirName: exact and prefixed conventions', () => {
 test('loadBrand: declared target beats naming; unconventional dirs map via their config', () => {
   const root = stageBrand();
 
-  // apps/api declares targets.backend in functions/config/omega.json5 — the
-  // @omega.js/backend layout — and "api" matches no naming convention
-  const functionsConfig = path.join(root, 'apps', 'api', 'functions', 'config');
-  fs.mkdirSync(functionsConfig, { recursive: true });
-  fs.writeFileSync(path.join(functionsConfig, 'omega.json5'), `{ targets: { backend: {} } }`);
+  // apps/api declares targets.backend in its app-root config/omega.json5
+  // (ONE authored location for every target since the src/dist pillar —
+  // functions/config is staged output now) and "api" matches no convention
+  const apiConfig = path.join(root, 'apps', 'api', 'config');
+  fs.mkdirSync(apiConfig, { recursive: true });
+  fs.writeFileSync(path.join(apiConfig, 'omega.json5'), `{ targets: { backend: {} } }`);
 
   const brand = loadBrand(root);
   assert.equal(brand.id, 'fixture-brand');

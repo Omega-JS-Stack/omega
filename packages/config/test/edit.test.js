@@ -288,13 +288,20 @@ test('writeConfigValues edits config/omega.json5 in place and reports applied pa
   assert.equal(fs.readFileSync(report.path, 'utf8'), written);
 });
 
-test('writeConfigValues resolves the standalone-backend location and throws when no config exists', (t) => {
-  const backend = makeFixture('write-backend', { 'functions/config/omega.json5': `{\n  brand: { id: 'b' },\n}\n` });
+test('writeConfigValues resolves the app-root location (staged functions/config is never a writeback target) and throws when no config exists', (t) => {
+  // src/dist pillar: a backend app's AUTHORED config is config/omega.json5 at
+  // the app root; functions/config/omega.json5 is staged compose output and
+  // must never be edited (the next stage would overwrite it).
+  const backend = makeFixture('write-backend', {
+    'config/omega.json5': `{\n  brand: { id: 'b' },\n}\n`,
+    'functions/config/omega.json5': `// staged output — never a writeback target\n{ brand: { id: 'b' } }\n`,
+  });
   cleanup(t, backend);
 
   const report = writeConfigValues(backend, { 'brand.name': 'B' });
-  assert.equal(report.path, path.join(backend, 'functions', 'config', 'omega.json5'));
+  assert.equal(report.path, path.join(backend, 'config', 'omega.json5'));
   assert.equal(JSON5.parse(fs.readFileSync(report.path, 'utf8')).brand.name, 'B');
+  assert.ok(!fs.readFileSync(path.join(backend, 'functions', 'config', 'omega.json5'), 'utf8').includes('"B"'), 'staged file untouched');
 
   const empty = makeFixture('write-empty', { 'README.md': 'no config here' });
   cleanup(t, empty);

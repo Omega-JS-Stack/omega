@@ -34,9 +34,9 @@ class NpmProjectScriptsTest extends BaseTest {
       this.context.package.scripts[name] = command;
     }
 
-    // Write updated package.json
+    // Write the updated APP MANIFEST (app root — src/dist pillar)
     jetpack.write(
-      path.join(this.self.firebaseProjectPath, 'functions', 'package.json'),
+      path.join(this.self.firebaseProjectPath, 'package.json'),
       JSON.stringify(this.context.package, null, 2)
     );
   }

@@ -9,8 +9,10 @@ class NvmrcVersionTest extends BaseTest {
   }
 
   async run() {
+    // Authored at the APP ROOT (src/dist pillar); the stage step carries a
+    // copy into functions/ for firebase-tools' runtime detection
     const engineReqVer = this.context.packageJSON.engines.node;
-    const nvmrcVer = jetpack.read(`${this.self.firebaseProjectPath}/functions/.nvmrc`);
+    const nvmrcVer = jetpack.read(`${this.self.firebaseProjectPath}/.nvmrc`);
 
     // Check to ensure nvmrc is greater than or equal to the engine version
     return wonderfulVersion.is(nvmrcVer, '>=', engineReqVer);
@@ -19,7 +21,8 @@ class NvmrcVersionTest extends BaseTest {
   async fix() {
     const v = this.context.packageJSON.engines.node;
 
-    jetpack.write(`${this.self.firebaseProjectPath}/functions/.nvmrc`, `v${v}/*`);
+    jetpack.write(`${this.self.firebaseProjectPath}/.nvmrc`, `v${v}/*`);
+    this.restage();
 
     // #15: the pin is now correct — the fix IS complete and the run
     // continues (manage runs spawn setup under the app's own Node; only a

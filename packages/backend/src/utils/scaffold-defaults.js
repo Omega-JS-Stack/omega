@@ -9,16 +9,18 @@ const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
 // minimatch FILE_MAP (last-match-wins). @omega.js/backend's contract:
 //   - everything copies on first setup only (consumer files are never clobbered)
-//   - CLAUDE.md / .gitignore / functions/.env live-sync their Default section on
-//     every setup via the marker-section merge (the Custom section is the
-//     consumer's, preserved verbatim)
+//   - CLAUDE.md / .gitignore / .env live-sync their Default section on every
+//     setup via the marker-section merge (the Custom section is the
+//     consumer's, preserved verbatim). All three live at the APP ROOT — the
+//     .env moved up from functions/ with the src/dist pillar (functions/ is
+//     staged output; the stage step copies the app .env into it).
 // Patterns match the RAW defaults-tree path (before the `_.` strip), so the
-// mergeLines rules name `_.gitignore` / `functions/_.env`, not their outputs.
+// mergeLines rules name `_.gitignore` / `_.env`, not their outputs.
 const FILE_MAP = {
   '**/*': { overwrite: false },
   'CLAUDE.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
-  'functions/_.env': { mergeLines: true },
+  '_.env': { mergeLines: true },
 };
 
 /**

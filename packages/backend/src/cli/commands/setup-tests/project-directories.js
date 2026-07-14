@@ -15,10 +15,12 @@ class ProjectDirectoriesTest extends BaseTest {
 
   async run() {
     const self = this.self;
-    const functionsDir = `${self.firebaseProjectPath}/functions`;
+    // The AUTHORED tree (src/dist pillar): consumer code lives in src/, the
+    // stage step mirrors it into functions/
+    const srcDir = `${self.firebaseProjectPath}/src`;
 
     for (const dir of DIRS) {
-      jetpack.dir(`${functionsDir}/${dir}`);
+      jetpack.dir(`${srcDir}/${dir}`);
     }
 
     return true;

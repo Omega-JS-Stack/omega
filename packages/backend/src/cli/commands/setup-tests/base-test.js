@@ -18,6 +18,17 @@ class BaseTest {
   }
 
   /**
+   * Re-stage functions/ from the authored tree. Fixes that write STAGED
+   * INPUTS (the app manifest, .env, .nvmrc, service-account.json, config)
+   * call this so the already-staged tree reflects the fix within the same
+   * setup run — idempotent and cheap (src/dist pillar).
+   */
+  restage() {
+    const { stageFunctions } = require('../../utils/stage-functions');
+    stageFunctions({ projectDir: this.self.firebaseProjectPath });
+  }
+
+  /**
    * Override this method in each test
    * @returns {Promise<boolean>} True if test passes, false if it fails
    */

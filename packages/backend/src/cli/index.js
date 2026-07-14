@@ -22,6 +22,7 @@ if (__dirname.startsWith(path.join(_homeDir, 'node_modules'))) {
 const VersionCommand = require('./commands/version');
 const ClearCommand = require('./commands/clear');
 const CwdCommand = require('./commands/cwd');
+const BuildCommand = require('./commands/build');
 const SetupCommand = require('./commands/setup');
 const InstallCommand = require('./commands/install');
 const ServeCommand = require('./commands/serve');
@@ -72,6 +73,12 @@ Main.prototype.process = async function (args) {
   // CWD command
   if (self.options.cwd) {
     const cmd = new CwdCommand(self);
+    return await cmd.execute();
+  }
+
+  // Build command (stage src/ → functions/)
+  if (self.options.build) {
+    const cmd = new BuildCommand(self);
     return await cmd.execute();
   }
 

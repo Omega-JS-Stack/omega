@@ -9,7 +9,9 @@ class EnvFileTest extends BaseTest {
   }
 
   async run() {
-    const envPath = `${this.self.firebaseProjectPath}/functions/.env`;
+    // Authored home = the APP ROOT (src/dist pillar) — the stage step copies
+    // it into functions/.env so the deploy artifact stays self-contained
+    const envPath = `${this.self.firebaseProjectPath}/.env`;
     const existingContent = jetpack.read(envPath);
 
     if (!existingContent) {
@@ -22,7 +24,7 @@ class EnvFileTest extends BaseTest {
     }
 
     // Get the template
-    const templatePath = path.resolve(__dirname, '../../../defaults/functions/_.env');
+    const templatePath = path.resolve(__dirname, '../../../defaults/_.env');
     const templateContent = jetpack.read(templatePath);
 
     if (!templateContent) {
@@ -80,8 +82,8 @@ class EnvFileTest extends BaseTest {
   }
 
   async fix() {
-    const envPath = `${this.self.firebaseProjectPath}/functions/.env`;
-    const templatePath = path.resolve(__dirname, '../../../defaults/functions/_.env');
+    const envPath = `${this.self.firebaseProjectPath}/.env`;
+    const templatePath = path.resolve(__dirname, '../../../defaults/_.env');
 
     const templateContent = jetpack.read(templatePath);
     if (!templateContent) {
@@ -89,6 +91,12 @@ class EnvFileTest extends BaseTest {
     }
 
     let existingContent = jetpack.read(envPath) || '';
+
+    // A pre-pillar functions/.env is the same authored file in its old home —
+    // adopt its content once, then the app root owns it (functions/ is staged)
+    if (!existingContent) {
+      existingContent = jetpack.read(`${this.self.firebaseProjectPath}/functions/.env`) || '';
+    }
 
     // If file doesn't have section markers, treat existing content as custom values
     if (!hasSectionMarkers(existingContent)) {
@@ -103,6 +111,7 @@ class EnvFileTest extends BaseTest {
     }
 
     jetpack.write(envPath, existingContent);
+    this.restage();
   }
 }
 

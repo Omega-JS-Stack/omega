@@ -46,8 +46,9 @@ class InstallCommand extends BaseCommand {
       return;
     }
 
-    // Read project's package.json
-    const projectPkgPath = `${this.firebaseProjectPath}/functions/package.json`;
+    // Read the app manifest (APP ROOT under the src/dist pillar — runtime deps
+    // live there; functions/package.json is derived output)
+    const projectPkgPath = `${this.firebaseProjectPath}/package.json`;
     const projectPkg = jetpack.read(projectPkgPath, 'json');
     if (!projectPkg || !projectPkg.dependencies) {
       this.logWarning('Could not read project package.json, proceeding anyway...');

@@ -195,6 +195,13 @@ class EmulatorCommand extends BaseCommand {
   async startEmulators() {
     const projectDir = this.main.firebaseProjectPath;
 
+    // functions/ is staged output (src/dist pillar): stage fresh, then keep it
+    // fresh — the emulator watches the functions dir natively, so a re-stage
+    // IS the hot reload for consumer src edits. The watcher dies with the
+    // emulator child (exitPromise below).
+    this.ensureStaged();
+    const stageWatch = this.startStageWatch();
+
     // public/ is generated, never tracked (fresh clones don't have it) — fill in
     // the hosting boilerplate if missing; firebase-tools refuses to boot hosting
     // without the folder. Setup remains the authoritative overwrite.
@@ -423,6 +430,9 @@ class EmulatorCommand extends BaseCommand {
 
       shutdownDone = true;
     };
+
+    // The stage watcher lives exactly as long as the emulator child
+    exitPromise.then(() => stageWatch.close());
 
     return { child, shutdown, emulatorPorts, bumped, exitPromise };
   }

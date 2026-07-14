@@ -7,7 +7,9 @@ class EnvRuntimeConfigDeprecatedTest extends BaseTest {
   }
 
   async run() {
-    const envPath = `${this.self.firebaseProjectPath}/functions/.env`;
+    // The authored .env (app root — the env-file check just above adopts any
+    // pre-pillar functions/.env into this home first)
+    const envPath = `${this.self.firebaseProjectPath}/.env`;
     const existingContent = jetpack.read(envPath);
 
     // If no .env file, pass (other test will handle that)

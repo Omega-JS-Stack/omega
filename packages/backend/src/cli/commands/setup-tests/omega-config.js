@@ -2,10 +2,11 @@ const BaseTest = require('./base-test');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const path = require('path');
-const { loadConfig, resolveSeedMode, renderBrandAppSeed, hasOmegaConfig } = require('@omega.js/config');
+const { loadConfig, hasOmegaConfig, findBrandRoot } = require('@omega.js/config');
 
-// The framework template seeds STANDALONE consumers; brand apps get the
-// targets-only seed (the brand root owns shared sections — friction #1).
+// The framework template seeds STANDALONE consumers at the app root; brand
+// apps carry NO app-layer file at all — brand `targets.*` is the per-target
+// home and the stage step composes the runtime file (src/dist pillar).
 const TEMPLATES_DIR = path.resolve(__dirname, '../../../../templates');
 
 class OmegaConfigTest extends BaseTest {
@@ -22,8 +23,10 @@ class OmegaConfigTest extends BaseTest {
    * root that a raw file walk can never see.
    */
   async run() {
-    if (!hasOmegaConfig(this.self.firebaseProjectPath)) {
-      this.errors = ['config/omega.json5 is missing'];
+    // A brand app legitimately has no file of its own — the brand root's
+    // omega.json5 is the config (loadConfig rides it alone since cp121c)
+    if (!hasOmegaConfig(this.self.firebaseProjectPath) && !findBrandRoot(this.self.firebaseProjectPath)) {
+      this.errors = ['config/omega.json5 is missing (standalone apps carry config/omega.json5 at the app root)'];
       return false;
     }
 
@@ -40,18 +43,19 @@ class OmegaConfigTest extends BaseTest {
   async fix() {
     const ui = require('../../utils/ui');
 
-    // Seed the file if it's missing or empty — layer-aware, matching
-    // scaffoldConfigs (a full template inside a brand would shadow the brand root).
-    if (!this.context.hasContent(this.self.omegaConfigJSON)) {
-      const omegaConfigPath = `${this.self.firebaseProjectPath}/functions/config/omega.json5`;
+    // STANDALONE app with a missing/empty config → seed the full template at
+    // the app root (the same escape hatch every target uses). Brand apps have
+    // nothing to seed — their config IS the brand file.
+    if (!this.context.hasContent(this.self.omegaConfigJSON)
+      && !findBrandRoot(this.self.firebaseProjectPath)) {
+      jetpack.copy(
+        path.join(TEMPLATES_DIR, 'config', 'omega.json5'),
+        `${this.self.firebaseProjectPath}/config/omega.json5`,
+        { overwrite: true },
+      );
+      this.restage();
 
-      if (resolveSeedMode(this.self.firebaseProjectPath).standalone) {
-        jetpack.copy(path.join(TEMPLATES_DIR, 'config', 'omega.json5'), omegaConfigPath, { overwrite: true });
-      } else {
-        jetpack.write(omegaConfigPath, renderBrandAppSeed('backend'));
-      }
-
-      // Re-check: a fresh seed against a healthy brand root resolves clean.
+      // Re-check: a fresh seed resolves clean.
       if (await this.run()) {
         return;
       }

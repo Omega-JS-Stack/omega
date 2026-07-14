@@ -36,13 +36,14 @@ module.exports = {
         const tmp = makeTmp();
         const result = scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        // `_.gitignore` → .gitignore at root; `functions/_.env` → functions/.env.
+        // `_.gitignore` → .gitignore, `_.env` → .env — BOTH at the app root
+        // (src/dist pillar: functions/ is staged output, never scaffolded).
         const expected = [
+          '.env',
           '.gitignore',
           'CHANGELOG.md',
           'CLAUDE.md',
           'docs/README.md',
-          'functions/.env',
           'test/README.md',
           'test/_init.js',
         ];
@@ -53,7 +54,7 @@ module.exports = {
         }
 
         // Marker files ship with the protocol sections intact.
-        const env = jetpack.read(path.join(tmp, 'functions', '.env'));
+        const env = jetpack.read(path.join(tmp, '.env'));
         assert.ok(env.includes(DEFAULT_MARKER) && env.includes(CUSTOM_MARKER), '.env should carry both section markers');
       },
     },
@@ -65,7 +66,7 @@ module.exports = {
 
         // Consumer fills a default key (uncommenting its `# KEY=` placeholder)
         // and adds their own custom key + gitignore line.
-        const envPath = path.join(tmp, 'functions', '.env');
+        const envPath = path.join(tmp, '.env');
         jetpack.write(envPath, jetpack.read(envPath)
           .replace('# GH_TOKEN=', 'GH_TOKEN="ghp_mine"')
           .replace('# ...', 'MY_CUSTOM="kept"\n# ...'));
@@ -87,7 +88,7 @@ module.exports = {
 
         // Legacy consumer .env: markers present, but a key the CURRENT template
         // owns (OPENAI_API_KEY) sits in their Custom section with a value.
-        jetpack.write(path.join(tmp, 'functions', '.env'), [
+        jetpack.write(path.join(tmp, '.env'), [
           DEFAULT_MARKER,
           'GH_TOKEN=""',
           '',
@@ -98,7 +99,7 @@ module.exports = {
 
         scaffoldDefaults({ outputDir: tmp, logger: quiet });
 
-        const env = jetpack.read(path.join(tmp, 'functions', '.env'));
+        const env = jetpack.read(path.join(tmp, '.env'));
         const defaultPart = env.slice(0, env.indexOf(CUSTOM_MARKER));
         const customPart = env.slice(env.indexOf(CUSTOM_MARKER));
         assert.ok(defaultPart.includes('OPENAI_API_KEY="sk-mine"'), 'value should be promoted UP into the Default section');

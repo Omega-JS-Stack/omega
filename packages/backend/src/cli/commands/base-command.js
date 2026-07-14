@@ -88,6 +88,31 @@ class BaseCommand {
     }
   }
 
+  /**
+   * Stage the authored app tree into functions/ (the src/dist pillar's build
+   * step). Every runtime surface calls this before touching functions/ —
+   * emulator, serve, test, deploy — so the staged tree is always fresh. A
+   * full re-stage is idempotent and cheap (consumer src is small).
+   */
+  ensureStaged() {
+    const { stageFunctions } = require('../utils/stage-functions');
+    stageFunctions({ projectDir: this.main.firebaseProjectPath });
+    this.log(chalk.gray('  Staged functions/ from src/ (omega build)'));
+  }
+
+  /**
+   * Watch src/ and re-stage on change — the Firebase emulator watches the
+   * functions dir natively, so a re-stage IS the hot reload. Returns the
+   * watcher handle ({ close }) for shutdown paths.
+   */
+  startStageWatch() {
+    const { watchAndStage } = require('../utils/stage-functions');
+    return watchAndStage({
+      projectDir: this.main.firebaseProjectPath,
+      log: (message) => this.log(chalk.gray(`  ${message}`)),
+    });
+  }
+
   log(...args) {
     console.log(...args);
   }

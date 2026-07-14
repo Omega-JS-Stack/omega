@@ -46,7 +46,7 @@ const BRAND_ID = 'fixture-brand';
 const KEY_ID = 'FIXKEY123';
 
 const DESKTOP_TEMPLATE = jetpack.read(join(__dirname, '../../desktop/src/defaults/_.env'));
-const BACKEND_TEMPLATE = jetpack.read(join(__dirname, '../../backend/src/defaults/functions/_.env'));
+const BACKEND_TEMPLATE = jetpack.read(join(__dirname, '../../backend/src/defaults/_.env'));
 assert.ok(DESKTOP_TEMPLATE && BACKEND_TEMPLATE, 'framework .env templates must exist (cross-package contract)');
 
 // Full desktop signing set under .omega/certificates/apple/
@@ -319,7 +319,7 @@ test('env: appended keys land in the Default section, above the Custom marker', 
   assert.match(env, /^MY_CUSTOM="keep"$/m);
 });
 
-test('env: backend app composes functions/.env with its own stream secret', async () => {
+test('env: backend app composes its app-root .env with its own stream secret', async () => {
   setEnv({ GH_TOKEN: 'fixture-gh-token', STRIPE_SECRET_KEY: 'sk_fixture', SENDGRID_API_KEY: 'SG.fixture' });
   const brand = stageBrand({
     apps: { backend: { envFile: BACKEND_TEMPLATE } },
@@ -331,9 +331,10 @@ test('env: backend app composes functions/.env with its own stream secret', asyn
   });
 
   assert.equal(result.status, 'success');
-  const env = jetpack.read(join(brand.root, 'apps', 'backend', 'functions', '.env'));
+  // App-root .env (src/dist pillar) — `omega build` stages it into functions/
+  const env = jetpack.read(join(brand.root, 'apps', 'backend', '.env'));
   assert.match(env, /^GOOGLE_ANALYTICS_SECRET="ga-backend-secret"$/m);
-  // Backend keeps the FULL pass-through — functions/.env ships with the deploy artifact
+  // Backend keeps the FULL pass-through — its .env rides the deploy artifact
   assert.match(env, /^GH_TOKEN="fixture-gh-token"$/m);
   assert.match(env, /^STRIPE_SECRET_KEY="sk_fixture"$/m);
   assert.match(env, /^SENDGRID_API_KEY="SG\.fixture"$/m);

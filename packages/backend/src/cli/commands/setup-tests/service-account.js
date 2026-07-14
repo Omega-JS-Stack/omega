@@ -37,7 +37,9 @@ class ServiceAccountTest extends BaseTest {
   }
 
   async run() {
-    const serviceAccount = jetpack.read(`${this.self.firebaseProjectPath}/functions/service-account.json`);
+    // Authored at the APP ROOT (src/dist pillar, gitignored); the stage step
+    // carries it into functions/ so the runtime + deploy artifact see it
+    const serviceAccount = jetpack.read(`${this.self.firebaseProjectPath}/service-account.json`);
 
     // Make sure the service account exists
     if (!serviceAccount) {
@@ -53,8 +55,9 @@ class ServiceAccountTest extends BaseTest {
     // only reads the file on the PRODUCTION branch, but setup and tooling
     // expect it to exist.
     if (this.isDemoProject) {
-      const saPath = `${this.self.firebaseProjectPath}/functions/service-account.json`;
+      const saPath = `${this.self.firebaseProjectPath}/service-account.json`;
       jetpack.write(saPath, `${JSON.stringify(buildDemoServiceAccount(this.self.projectId), null, 2)}\n`);
+      this.restage();
       console.log(chalk.green(`  ✓ Generated fake service-account.json for demo project ${chalk.bold(this.self.projectId)} (throwaway local key)`));
       return;
     }

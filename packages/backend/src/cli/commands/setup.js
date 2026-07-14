@@ -53,14 +53,15 @@ class SetupCommand extends BaseCommand {
   async loadConfig() {
     const self = this.main;
 
-    // Load the .env cascade from the functions dir
-    require('@omega.js/config').loadEnv(`${self.firebaseProjectPath}/functions`);
+    // Load the .env cascade from the app root (app ← brand ← company; the
+    // staged functions/.env is a copy of the app layer, so this is the same
+    // resolution the deployed runtime sees)
+    require('@omega.js/config').loadEnv(self.firebaseProjectPath);
   }
 
   async runSetup() {
     const self = this.main;
     const ui = this.ui;
-    let cwd = jetpack.cwd();
 
     // OMEGA-style banner. Replaces the old `---- RUNNING SETUP ---- ` line.
     ui.banner(`OMEGA Backend ${chalk.dim(`v${self.default.version}`)}`);
@@ -72,27 +73,24 @@ class SetupCommand extends BaseCommand {
     // Initial load — returns {} for missing files so scaffold checks can run.
     this.loadFiles();
 
-    // Check if package exists
+    // The app manifest lives at the APP ROOT (src/dist pillar): scripts +
+    // runtime deps in one package.json; functions/ is staged output. The CLI
+    // entry normalizes a functions/ cwd up to the app root, so muscle-memory
+    // `cd functions` invocations still land here.
     if (!hasContent(self.package)) {
-      ui.status('fail', `Missing ${chalk.bold('functions/package.json')}`);
-      ui.note(`Run ${chalk.bold('npx omega setup')} from inside the ${chalk.bold('functions')} folder of a Firebase project.`);
+      ui.status('fail', `Missing ${chalk.bold('package.json')} at the app root`);
+      ui.note(`Run ${chalk.bold('npx omega setup')} from a backend app root (a package.json with the ${chalk.bold('@omega.js/backend')} dependency).`);
       process.exit(1);
     }
 
-    // Check if we're running from the functions folder
-    if (!cwd.endsWith('functions') && !cwd.endsWith('functions/')) {
-      ui.status('fail', `Wrong directory`);
-      ui.note(`Run ${chalk.bold('npx omega setup')} from the ${chalk.bold('functions')} folder. Try ${chalk.bold('cd functions')} first.`);
-      process.exit(1);
-    }
-
-    // One unified scaffold pass: config files, package.json fixes, doc defaults.
-    // Everything that creates/fixes files goes here, BEFORE any code reads from
-    // them. One reload afterwards picks up the final state.
+    // One unified scaffold pass: config files, package.json fixes, doc
+    // defaults, then the STAGE (src/ → functions/) so every check below reads
+    // the tree the runtime will. One reload afterwards picks up the final state.
     ui.section('Defaults');
     this.scaffoldConfigs();
     this.scaffoldPackageJson();
     this.copyDefaults();
+    this.ensureStaged();
     this.loadFiles();
 
     // Clean up leftover trigger files + stale log files from older @omega.js/backend versions
@@ -198,16 +196,20 @@ class SetupCommand extends BaseCommand {
 
   loadFiles() {
     const self = this.main;
-    self.package = loadJSON(`${self.firebaseProjectPath}/functions/package.json`);
+    // THE app manifest (app root — scripts + runtime deps; the staged
+    // functions/package.json derives from it at stage time)
+    self.package = loadJSON(`${self.firebaseProjectPath}/package.json`);
     self.firebaseJSON = loadJSON(`${self.firebaseProjectPath}/firebase.json`);
     self.firebaseRC = loadJSON(`${self.firebaseProjectPath}/.firebaserc`);
     self.remoteconfigJSON = loadJSON(`${self.firebaseProjectPath}/functions/remoteconfig.template.json`);
-    self.projectPackage = loadJSON(`${self.firebaseProjectPath}/package.json`);
+    self.projectPackage = self.package;
     // Resolved through @omega.js/config (app ← brand root, no framework-defaults
     // layer). Throws on secrets/parse errors (setup IS the audit — hard
     // failures are correct here). The omega-config setup test validates the
-    // resolved config against the shared schema (friction #5).
-    self.omegaConfigJSON = omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
+    // resolved config against the shared schema (friction #5). A brand app
+    // carries no file of its own — the brand root's config resolves alone.
+    self.omegaConfigJSON = (omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
+      || omegaConfig.findBrandRoot(self.firebaseProjectPath))
       ? omegaConfig.loadConfig(self.firebaseProjectPath, 'backend').config
       : {};
     self.gitignore = jetpack.read(`${self.firebaseProjectPath}/.gitignore`) || '';
@@ -217,11 +219,13 @@ class SetupCommand extends BaseCommand {
     const self = this.main;
     const ui = this.ui;
 
+    // engines.node on the APP manifest — the stage step carries it into the
+    // derived functions/package.json (Cloud Functions runtime detection)
     if (!self.package.engines || !self.package.engines.node) {
       const nodeVer = String(parseInt(process.versions.node, 10));
       self.package.engines = self.package.engines || {};
       self.package.engines.node = nodeVer;
-      jetpack.write(`${self.firebaseProjectPath}/functions/package.json`, JSON.stringify(self.package, null, 2));
+      jetpack.write(`${self.firebaseProjectPath}/package.json`, JSON.stringify(self.package, null, 2));
       ui.status('add', `Added ${chalk.cyan('engines.node')} = ${chalk.bold(nodeVer)} to package.json`, { level: 2 });
     }
   }
@@ -232,20 +236,16 @@ class SetupCommand extends BaseCommand {
     const templatesDir = path.resolve(`${__dirname}/../../../templates`);
     let touched = 0;
 
-    // config/omega.json5 FIRST — layer-aware (dogfood friction #1): inside a
-    // brand monorepo the app config is TARGETS-ONLY (the brand root owns the
-    // shared sections; a full template here would shadow them). Standalone
-    // consumers get the full template. Seeding before .firebaserc lets
-    // resolveProjectId() read the brand's cloud.config.projectId (friction #11:
-    // config → derived artifacts).
-    const omegaConfigPath = `${self.firebaseProjectPath}/functions/config/omega.json5`;
-    if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)) {
-      if (omegaConfig.resolveSeedMode(self.firebaseProjectPath).standalone) {
-        jetpack.copy(path.join(templatesDir, 'config', 'omega.json5'), omegaConfigPath);
-      } else {
-        jetpack.write(omegaConfigPath, omegaConfig.renderBrandAppSeed('backend'));
-      }
-      ui.status('add', `Created ${chalk.cyan('functions/config/omega.json5')}`, { level: 2 });
+    // Config FIRST (friction #11: config → derived artifacts, so .firebaserc
+    // below can read cloud.config.projectId). Inside a brand monorepo the app
+    // carries NO omega.json5 at all — brand `targets.*` is the per-target home
+    // (cp121c/cp122) and the stage step composes the runtime file. Standalone
+    // consumers (no brand root above) get the full template at the APP ROOT —
+    // the same escape hatch every other target uses.
+    if (!omegaConfig.hasOmegaConfig(self.firebaseProjectPath)
+      && !omegaConfig.findBrandRoot(self.firebaseProjectPath)) {
+      jetpack.copy(path.join(templatesDir, 'config', 'omega.json5'), `${self.firebaseProjectPath}/config/omega.json5`);
+      ui.status('add', `Created ${chalk.cyan('config/omega.json5')} (standalone app)`, { level: 2 });
       touched++;
     }
 
@@ -267,12 +267,13 @@ class SetupCommand extends BaseCommand {
       touched++;
     }
 
-    // index.js — entry point for Cloud Functions
-    const indexPath = `${self.firebaseProjectPath}/functions/index.js`;
+    // src/index.js — the AUTHORED Cloud Functions entry (src/dist pillar);
+    // the stage step mirrors it into functions/index.js
+    const indexPath = `${self.firebaseProjectPath}/src/index.js`;
     if (!jetpack.exists(indexPath)) {
       const templatePath = path.join(templatesDir, 'index.js');
       jetpack.copy(templatePath, indexPath);
-      ui.status('add', `Created ${chalk.cyan('functions/index.js')}`, { level: 2 });
+      ui.status('add', `Created ${chalk.cyan('src/index.js')}`, { level: 2 });
       touched++;
     }
 
@@ -306,7 +307,7 @@ class SetupCommand extends BaseCommand {
       }
     }
 
-    const saPath = `${self.firebaseProjectPath}/functions/service-account.json`;
+    const saPath = `${self.firebaseProjectPath}/service-account.json`;
     if (jetpack.exists(saPath)) {
       try {
         const sa = JSON.parse(jetpack.read(saPath));

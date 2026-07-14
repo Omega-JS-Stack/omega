@@ -3,7 +3,6 @@ const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
 const stageLocalPackages = require('../utils/stage-local-packages');
-const stageResolvedConfig = require('../utils/stage-resolved-config');
 const { ensurePublicFiles } = require('../utils/public-files');
 const path = require('path');
 const jetpack = require('fs-jetpack');
@@ -17,6 +16,12 @@ class DeployCommand extends BaseCommand {
     const logPath = this.getLogsPath('deploy.log');
     attachLogFile(logPath);
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
+
+    // functions/ is staged output (src/dist pillar): a fresh stage carries the
+    // composed brand⊕app config across the upload boundary (#31) — the old
+    // write-then-restore dance (stage-resolved-config) is gone because the
+    // staged tree is disposable, not the consumer's source.
+    this.ensureStaged();
 
     // public/ is generated, never tracked — `firebase deploy` (no --only) includes
     // hosting and fails without the folder. The blessed flow runs setup first
@@ -45,12 +50,6 @@ class DeployCommand extends BaseCommand {
       ? await stageLocalPackages({ functionsPath, log: (message) => this.log(message) })
       : null;
 
-    // The brand config layer also stops at the upload boundary (#31) —
-    // compose it into the staged app file so production serves brand values
-    const configStaging = deployingFunctions
-      ? await stageResolvedConfig({ functionsPath, log: (message) => this.log(message) })
-      : null;
-
     try {
       await powertools.execute(`firebase deploy${only}`, {
         log: false,
@@ -67,9 +66,6 @@ class DeployCommand extends BaseCommand {
       // After successful deploy, ensure HTTP functions are publicly invocable
       await this.ensurePublicInvoker();
     } finally {
-      if (configStaging) {
-        await configStaging.restore();
-      }
       if (staging) {
         await staging.restore();
       }

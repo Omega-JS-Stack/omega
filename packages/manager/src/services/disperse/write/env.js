@@ -7,11 +7,13 @@
  * @omega.js/config's env cascade (shell > app .env > brand .env > company
  * .env), so disperse no longer copies them around. What still gets written:
  *
- *   backend  — the FULL curated composition into functions/.env: that file
- *              rides the Firebase deploy artifact and the cloud can't walk
- *              up to a brand layer. Composed from brand-level process.env
- *              (manage.js already layered shell > brand > company); empty
- *              values are never written, leaving template placeholders.
+ *   backend  — the FULL curated composition into the app-root .env (the ONE
+ *              authored home since the src/dist pillar; `omega build` stages
+ *              a copy into functions/.env so the Firebase deploy artifact —
+ *              which can't walk up to a brand layer — stays self-contained).
+ *              Composed from brand-level process.env (manage.js already
+ *              layered shell > brand > company); empty values are never
+ *              written, leaving template placeholders.
  *   stream   — each app's own GA4 Measurement Protocol secret from
  *              analytics state (streams.{target}.apiSecret) — per-app
  *              derived data that exists nowhere else.
@@ -35,13 +37,15 @@ const chalk = require('chalk').default;
 const CUSTOM_MARKER = '# ========== Custom Values ==========';
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 
-// Per-target composition spec. `file` is app-relative; `env` names pass
-// through from brand-level process.env (backend ONLY — its .env ships with
-// the deploy artifact; every other target reads brand values through the
-// runtime cascade); `streamSecret` names the var that receives the app's
-// own analytics stream secret; `certPaths` are stamped only when the file
-// exists (see header). web has nothing to materialize. Deliberately NOT
-// composed: per-listing store IDs (CHROME_EXTENSION_ID,
+// Per-target composition spec. `file` is app-relative — the app-root .env
+// for EVERY target now (the backend's functions/.env exception died with the
+// src/dist pillar: the stage step copies the app .env into the artifact).
+// `env` names pass through from brand-level process.env (backend ONLY — its
+// .env ships with the deploy artifact; every other target reads brand values
+// through the runtime cascade); `streamSecret` names the var that receives
+// the app's own analytics stream secret; `certPaths` are stamped only when
+// the file exists (see header). web has nothing to materialize. Deliberately
+// NOT composed: per-listing store IDs (CHROME_EXTENSION_ID,
 // FIREFOX_EXTENSION_ID, EDGE_PRODUCT_ID — user-managed per app) and
 // developer tooling credentials (CLAUDE_CODE_OAUTH_TOKEN). Mobile gets
 // certs only — no .env contract yet.
@@ -51,7 +55,7 @@ const ENV_MAP = {
     streamSecret: 'GOOGLE_ANALYTICS_SECRET',
   },
   backend: {
-    file: 'functions/.env',
+    file: '.env',
     env: [
       'GH_TOKEN',
       'OMEGA_ADMIN_KEY', 'OMEGA_WEBHOOK_KEY', 'OMEGA_NAMESPACE',

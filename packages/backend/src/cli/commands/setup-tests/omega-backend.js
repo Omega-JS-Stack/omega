@@ -72,8 +72,9 @@ class OmegaBackendTest extends BaseTest {
     // Log
     console.log('Running ', command);
 
-    // Execute
-    await safeInstall(command);
+    // Execute at the APP ROOT — runtime deps live on the app manifest
+    // (src/dist pillar), never inside the staged functions/ tree
+    await safeInstall(command, { log: true, config: { cwd: this.self.firebaseProjectPath } });
   }
 }
 
