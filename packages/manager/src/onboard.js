@@ -31,6 +31,7 @@ const { DEFAULT_BRAND_ROOTS, resolveManageRoot, readRawConfig, stampCompanyMarke
 const { loadBrand } = require('./lib/brand.js');
 const { buildScaffoldPlan, applyScaffoldPlan } = require('./lib/scaffold.js');
 const { canPrompt } = require('./lib/run-gates.js');
+const { deriveBundleIdPrefix } = require('./lib/bundle-id.js');
 
 // New-brand ids are a conservative subset of the schema's brand.id pattern —
 // always dir-, repo-, and URL-scheme-safe.
@@ -229,6 +230,11 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
   // the brand's own account.admins
   const accountAdmins = await collectAccountAdmins(inheritedAdmins(companyRoot), interactive);
 
+  // Bundle-id prefix — reverse-DNS of the parent company's domain when
+  // onboarding into a company workspace, else the brand's own (seeded into
+  // config only for targets that sign apps)
+  const companyUrl = companyRoot ? readRawConfig(companyRoot)?.brand?.url : null;
+
   return {
     id,
     name,
@@ -238,6 +244,7 @@ async function collectAnswers(options, defaultId, interactive, companyRoot = nul
     email: deriveEmail(url),
     targets,
     accountAdmins,
+    bundleIdPrefix: deriveBundleIdPrefix(companyUrl || url),
   };
 }
 
@@ -285,6 +292,7 @@ function answersFromBrand(brandRoot) {
     tagline: brand.config.brand?.tagline || null,
     email: brand.config.brand?.contact?.email || deriveEmail(url),
     targets: brand.targets.length > 0 ? brand.targets : DEFAULT_TARGETS,
+    bundleIdPrefix: brand.config.certificates?.apple?.bundleIdPrefix || deriveBundleIdPrefix(url),
   };
 }
 

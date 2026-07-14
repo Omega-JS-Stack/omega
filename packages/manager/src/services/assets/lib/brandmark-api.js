@@ -1,103 +1,111 @@
 /**
- * AI brandmark generation via a logo API (ITW's instance is MrLogo) —
- * the interactive fallback when a brand has no assets/logo/brandmark.svg
- * yet. Config supplies the endpoint, de-ITW'd from omega-manager's
- * hardcoded mrlogo constants:
+ * AI brandmark generation via MrLogo (mrlogo.ai — a sibling ITW product) —
+ * the fallback when a brand has no assets/logo/brandmark.svg yet. MrLogo is
+ * OURS, so the endpoint is a product constant (like the Ghostii client's
+ * write URL) and auth rides the same credential ladder as the other product
+ * services (slapform/chatsy/replyify — Ian 2026-07-14: no config options,
+ * "use an API key or service account or whatever slapform, chatsy,
+ * replyify use"):
  *
- *   assets: {
- *     brandmark: {
- *       apiUrl: 'https://api.mrlogo.ai/omega/logos',
- *       providerBrand: 'mrlogo',        // sibling brand hosting the API
- *       adminEmail: 'admin@company.com' // its Firebase admin user
- *     }
- *   }
+ *   1. MRLOGO_SERVICE_ACCOUNT (path to MrLogo's service-account JSON,
+ *      absolute or brand-root-relative) — full auto: ensures the brand's
+ *      OWN MrLogo product user (email = brand.contact.email, canonical
+ *      account shape via lib/product-create) and calls the API with that
+ *      user's api.privateKey. New users land on MrLogo's basic plan
+ *      (100 credits), plenty for brandmark generation.
+ *   2. MRLOGO_API_KEY — an existing MrLogo account's api.privateKey used
+ *      directly. Verified against the live wire contract: BEM's
+ *      authenticate() resolves a non-JWT Bearer value by querying
+ *      users.api.privateKey, and MrLogo's logos route rides that auth.
+ *   3. LOGO_API_ID_TOKEN — a pasted Firebase ID token (manual escape
+ *      hatch; ID tokens expire hourly, so the durable tiers rank first).
  *
- * Auth is a Firebase ID token for the provider's admin user. Resolution
- * order: LOGO_API_ID_TOKEN from the env chain (escape hatch), else mint
- * one through the provider brand — located via the company marker →
- * discoverBrands, using its .omega/state.json web API key + its
- * .omega/secrets/service-account.json (custom token signed locally by
- * lib/auth-admin, exchanged at the public signInWithCustomToken
- * endpoint — the same chain the account service uses).
- *
- * The API returns a monochrome SVG (preferred) or color SVG URL; the
- * download lands at assets/logo/brandmark.svg as committed collateral.
+ * No credentials → the assets service skips with guidance (generate at
+ * mrlogo.ai by hand and drop the SVG in assets/logo/). The API returns a
+ * monochrome SVG (preferred) or color SVG URL; the download lands at
+ * assets/logo/brandmark.svg as committed collateral.
  */
-const { join } = require('node:path');
 const { randomUUID } = require('node:crypto');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
+const { FirestoreREST, loadServiceAccount } = require('../../../lib/firestore-rest.js');
 const { createAuthAdmin } = require('../../../lib/auth-admin.js');
-const { readCompanyMarker, discoverBrands } = require('../../../lib/company.js');
+const { ensureProductUser } = require('../../../lib/product-create.js');
+const { createPasswordResolver } = require('../../account/lib/resolve-password.js');
 
-const SIGN_IN_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken';
+// MrLogo's LIVE production route (the old-world /backend-manager path IS its
+// api). Env override is a test/staging seam, not brand config.
+const MRLOGO_API_URL = 'https://api.mrlogo.ai/backend-manager/logos';
+const MRLOGO_URL = 'https://mrlogo.ai';
 
-/**
- * The brandmark-generation spec from config, or null when not configured.
- */
-function resolveBrandmarkSpec(brandConfig) {
-  const spec = brandConfig.assets?.brandmark;
-  if (!spec?.apiUrl) {
-    return null;
-  }
-  return spec;
+function apiUrl() {
+  return process.env.MRLOGO_API_URL || MRLOGO_API_URL;
 }
 
 /**
- * Resolve the logo API's Bearer token: env override first, else mint via
- * the provider brand. Throws with the exact gap when neither works.
+ * Resolve the logo API's Bearer credential down the product ladder, or null
+ * when no tier is configured. The SA tier ensures the brand's own MrLogo
+ * product user and uses ITS api.privateKey — BEM auth accepts a privateKey
+ * and an ID token through the same Authorization header.
+ *
+ * @param {object} spec
+ * @param {object} spec.brandConfig - Merged brand config
+ * @param {string} spec.brandRoot - Brand root (SA paths + password channels)
+ * @param {object} [spec.db] - FirestoreREST test seam (with authAdmin)
+ * @param {object} [spec.authAdmin] - auth-admin test seam
+ * @param {function} spec.log - line logger
+ * @returns {Promise<{ token: string, source: string }|null>}
  */
-async function resolveLogoApiToken(spec, brandRoot) {
+async function resolveLogoAuth({ brandConfig, brandRoot, db, authAdmin, log }) {
+  // Tier 1 — operator SA: mint/reuse the brand's own product user
+  if (!db) {
+    const envPath = process.env.MRLOGO_SERVICE_ACCOUNT;
+    if (envPath) {
+      const serviceAccount = loadServiceAccount(envPath, brandRoot);
+      db = new FirestoreREST(serviceAccount);
+      authAdmin = createAuthAdmin(serviceAccount);
+    }
+  }
+
+  if (db && authAdmin) {
+    const brand = brandConfig.brand || {};
+    const email = brand.contact?.email;
+    if (!email) {
+      throw new Error('MRLOGO_SERVICE_ACCOUNT is set but brand.contact.email is missing — the brand\'s product user needs it');
+    }
+
+    const { uid } = await ensureProductUser({
+      db,
+      authAdmin,
+      email,
+      resolvePassword: createPasswordResolver({
+        brandRoot,
+        domain: new URL(brand.url || 'https://invalid.test').hostname,
+        brand,
+        dryRun: false,
+      }),
+      log,
+    });
+
+    const userDoc = await db.getDoc(`users/${uid}`);
+    const privateKey = userDoc?.api?.privateKey;
+    if (!privateKey) {
+      throw new Error(`MrLogo user ${email} (${uid}) has no api.privateKey in its user doc`);
+    }
+    return { token: privateKey, source: 'MRLOGO_SERVICE_ACCOUNT' };
+  }
+
+  // Tier 2 — an existing account's api.privateKey, used directly
+  if (process.env.MRLOGO_API_KEY) {
+    return { token: process.env.MRLOGO_API_KEY, source: 'MRLOGO_API_KEY' };
+  }
+
+  // Tier 3 — pasted Firebase ID token (expires hourly)
   if (process.env.LOGO_API_ID_TOKEN) {
-    return process.env.LOGO_API_ID_TOKEN;
+    return { token: process.env.LOGO_API_ID_TOKEN, source: 'LOGO_API_ID_TOKEN' };
   }
 
-  if (!spec.providerBrand || !spec.adminEmail) {
-    throw new Error('set LOGO_API_ID_TOKEN in the env chain, or assets.brandmark.providerBrand + adminEmail to mint one');
-  }
-
-  const marker = readCompanyMarker(brandRoot);
-  if (!marker || marker.stale) {
-    throw new Error(`provider brand "${spec.providerBrand}" needs the company workspace (no usable .omega/company.json marker)`);
-  }
-
-  const { brands } = discoverBrands(marker.companyRoot);
-  const provider = brands.find((b) => b.id === spec.providerBrand);
-  if (!provider) {
-    throw new Error(`provider brand "${spec.providerBrand}" not found in the company workspace`);
-  }
-
-  const state = jetpack.read(join(provider.root, '.omega', 'state.json'), 'json');
-  const apiKey = state?.firebase?.sdkConfig?.apiKey;
-  if (!apiKey) {
-    throw new Error(`no web API key in ${spec.providerBrand}'s state — run its firebase service first`);
-  }
-
-  const serviceAccount = jetpack.read(join(provider.root, '.omega', 'secrets', 'service-account.json'), 'json');
-  if (!serviceAccount) {
-    throw new Error(`no service account at ${spec.providerBrand}/.omega/secrets/service-account.json`);
-  }
-
-  const auth = createAuthAdmin(serviceAccount);
-  const user = await auth.getUserByEmail(spec.adminEmail);
-  if (!user) {
-    throw new Error(`admin user ${spec.adminEmail} not found on the ${spec.providerBrand} project`);
-  }
-
-  const customToken = auth.createCustomToken(user.uid);
-  const response = await fetch(`${SIGN_IN_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: customToken, returnSecureToken: true }),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`custom-token exchange failed (${response.status})`);
-  }
-
-  const { idToken } = await response.json();
-  return idToken;
+  return null;
 }
 
 /**
@@ -105,8 +113,8 @@ async function resolveLogoApiToken(spec, brandRoot) {
  *
  * @returns {boolean} whether the SVG landed
  */
-async function generateBrandmark({ spec, brandConfig, brandmarkPath, direction, token }) {
-  const response = await fetch(spec.apiUrl, {
+async function generateBrandmark({ brandConfig, brandmarkPath, direction, token }) {
+  const response = await fetch(apiUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -145,8 +153,8 @@ async function generateBrandmark({ spec, brandConfig, brandmarkPath, direction, 
   }
 
   jetpack.write(brandmarkPath, await svgResponse.text());
-  console.log(`    ${chalk.green('✓')} Generated ${chalk.cyan('assets/logo/brandmark.svg')} via the logo API`);
+  console.log(`    ${chalk.green('✓')} Generated ${chalk.cyan('assets/logo/brandmark.svg')} via MrLogo`);
   return true;
 }
 
-module.exports = { resolveBrandmarkSpec, resolveLogoApiToken, generateBrandmark };
+module.exports = { resolveLogoAuth, generateBrandmark, MRLOGO_URL };

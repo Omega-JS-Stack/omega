@@ -41,7 +41,7 @@ function brandConfig({ assets = {}, font } = {}) {
   };
 }
 
-function runService(root, config, { options = {} } = {}) {
+function runService(root, config, { options = {}, context = {} } = {}) {
   return service.run({
     brandId: 'fixture-brand',
     brandRoot: root,
@@ -52,6 +52,7 @@ function runService(root, config, { options = {} } = {}) {
     operations: OPERATIONS.assets,
     options,
     serviceData: {},
+    ...context,
   });
 }
 
@@ -515,10 +516,16 @@ test('templates: no PSDs anywhere is a quiet note, never a warn', async () => {
   assert.equal(result.output.templates.processed, 0);
 });
 
-// ─── AI brandmark generation (logo API) ──────────────────────────────────────
+// ─── AI brandmark generation (MrLogo product ladder) ────────────────────────
 
 const http = require('node:http');
 const { openTtyPrompt } = require('./lib/interactive.js');
+
+// Tests must never see real MrLogo credentials from the shell environment
+const MRLOGO_ENV_VARS = ['MRLOGO_SERVICE_ACCOUNT', 'MRLOGO_API_KEY', 'MRLOGO_API_URL', 'LOGO_API_ID_TOKEN'];
+for (const key of MRLOGO_ENV_VARS) {
+  delete process.env[key];
+}
 
 const GENERATED_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1d3557"/></svg>';
 
@@ -549,9 +556,10 @@ function startLogoApi() {
 test('brandmark: interactive generation via the logo API roots the whole derived set', async () => {
   const api = await startLogoApi();
   const root = stageBrand({ brandmark: false });
-  const config = brandConfig({ assets: { brandmark: { apiUrl: api.url } } });
+  const config = brandConfig();
   config.brand.description = 'A fixture brand';
 
+  process.env.MRLOGO_API_URL = api.url;
   process.env.LOGO_API_ID_TOKEN = 'test-token-123';
   const tty = openTtyPrompt();
   try {
@@ -577,58 +585,113 @@ test('brandmark: interactive generation via the logo API roots the whole derived
     assert.equal(colorSvg, GENERATED_SVG);
   } finally {
     tty.close();
+    delete process.env.MRLOGO_API_URL;
     delete process.env.LOGO_API_ID_TOKEN;
     api.server.close();
   }
 });
 
-test('brandmark: no resolvable token warns and the service skips with guidance — no API call', async () => {
+test('brandmark: no credentials skips with the ladder guidance — no API call', async () => {
   const api = await startLogoApi();
   const root = stageBrand({ brandmark: false });
-  // Spec without providerBrand/adminEmail and no LOGO_API_ID_TOKEN → nothing to mint with
-  const config = brandConfig({ assets: { brandmark: { apiUrl: api.url } } });
 
-  delete process.env.LOGO_API_ID_TOKEN;
+  // No MRLOGO_SERVICE_ACCOUNT / MRLOGO_API_KEY / LOGO_API_ID_TOKEN → nothing to mint with
+  process.env.MRLOGO_API_URL = api.url;
   const tty = openTtyPrompt();
   try {
-    const running = runService(root, config);
-    await tty.answer('Logo prompt', '\r');
-    const result = await running;
+    const result = await runService(root, brandConfig());
 
     assert.equal(result.status, 'skipped');
     assert.match(result.reason, /brandmark\.svg/);
+    assert.match(result.reason, /MRLOGO_SERVICE_ACCOUNT/);
     assert.equal(api.requests.length, 0);
     assert.ok(!fs.existsSync(path.join(root, 'assets', 'logo', 'brandmark.svg')));
   } finally {
     tty.close();
+    delete process.env.MRLOGO_API_URL;
     api.server.close();
   }
 });
 
-test('brandmark: dry runs never generate; non-interactive runs GENERATE when configured', async () => {
+test('brandmark: dry runs never generate; non-interactive runs GENERATE when credentialed', async () => {
   const api = await startLogoApi();
+  process.env.MRLOGO_API_URL = api.url;
   process.env.LOGO_API_ID_TOKEN = 'test-token-123';
   try {
-    // Dry run: interactive TTY, spec + token present — still no attempt
+    // Dry run: interactive TTY, credential present — still no attempt
     const tty = openTtyPrompt();
     try {
-      const dry = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url } } }), { options: { dryRun: true } });
+      const dry = await runService(stageBrand({ brandmark: false }), brandConfig(), { options: { dryRun: true } });
       assert.equal(dry.status, 'skipped');
       assert.equal(api.requests.length, 0);
     } finally {
       tty.close();
     }
 
-    // Headless with spec + token: configuring the spec IS the consent — the
-    // brandmark mints (spec.direction supplies the art direction) and the
-    // whole leg runs to success. This is the pipeline story.
-    const headless = await runService(stageBrand({ brandmark: false }), brandConfig({ assets: { brandmark: { apiUrl: api.url, direction: 'geometric mark' } } }));
+    // Headless with a credential: setting it IS the consent — the brandmark
+    // mints and the whole leg runs to success. This is the pipeline story.
+    const headless = await runService(stageBrand({ brandmark: false }), brandConfig());
     assert.equal(headless.status, 'success');
     const mint = api.requests.find((request) => request.url === '/logos');
     assert.ok(mint, 'the logo API was called');
-    assert.match(mint.body.description, /geometric mark/);
+    assert.equal(mint.body.brandName, 'AB');
   } finally {
+    delete process.env.MRLOGO_API_URL;
     delete process.env.LOGO_API_ID_TOKEN;
+    api.server.close();
+  }
+});
+
+test('brandmark: MRLOGO_API_KEY rides the same Bearer transport (BEM resolves non-JWTs by api.privateKey)', async () => {
+  const api = await startLogoApi();
+  const root = stageBrand({ brandmark: false });
+
+  process.env.MRLOGO_API_URL = api.url;
+  process.env.MRLOGO_API_KEY = 'k'.repeat(43);
+  try {
+    const result = await runService(root, brandConfig());
+
+    assert.equal(result.status, 'success');
+    const post = api.requests.find((r) => r.method === 'POST');
+    assert.equal(post.authorization, `Bearer ${'k'.repeat(43)}`);
+    assert.equal(fs.readFileSync(path.join(root, 'assets', 'logo', 'brandmark.svg'), 'utf8'), GENERATED_SVG);
+  } finally {
+    delete process.env.MRLOGO_API_URL;
+    delete process.env.MRLOGO_API_KEY;
+    api.server.close();
+  }
+});
+
+test('brandmark: operator SA ensures the brand\'s own product user and generates with ITS api key', async () => {
+  const api = await startLogoApi();
+  const root = stageBrand({ brandmark: false });
+  const config = brandConfig();
+  config.brand.contact = { email: 'support@fixture-brand.test' };
+
+  // Injected seams stand in for MRLOGO_SERVICE_ACCOUNT (the trio pattern):
+  // the user already exists on MrLogo, its doc carries the private key
+  const lookups = [];
+  const reads = [];
+  const context = {
+    mrlogoAuthAdmin: {
+      getUserByEmail: async (email) => { lookups.push(email); return { uid: 'mrlogo-uid-1' }; },
+    },
+    mrlogoDb: {
+      getDoc: async (docPath) => { reads.push(docPath); return { api: { privateKey: 'pk-fixture-brand-key' } }; },
+    },
+  };
+
+  process.env.MRLOGO_API_URL = api.url;
+  try {
+    const result = await runService(root, config, { context });
+
+    assert.equal(result.status, 'success');
+    assert.deepEqual(lookups, ['support@fixture-brand.test']);
+    assert.deepEqual(reads, ['users/mrlogo-uid-1']);
+    const post = api.requests.find((r) => r.method === 'POST');
+    assert.equal(post.authorization, 'Bearer pk-fixture-brand-key');
+  } finally {
+    delete process.env.MRLOGO_API_URL;
     api.server.close();
   }
 });

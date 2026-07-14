@@ -32,7 +32,8 @@ for (const key of APPLE_ENV_VARS) {
 const BRAND_ID = 'fixture-brand';
 const BRAND_NAME = 'Fixture Brand';
 const PREFIX = 'com.fixture';
-const BUNDLE_IDENTIFIER = `${PREFIX}.${BRAND_ID}`;
+// composeBundleId: brand-id dashes become dots (Android-safe segments)
+const BUNDLE_IDENTIFIER = 'com.fixture.fixture.brand';
 const ALL_TYPES = DEFAULTS.certificates.apple.certificates.map((c) => c.type);
 const AUTOMATED_TYPES = DEFAULTS.certificates.apple.certificates.filter((c) => !c.manual).map((c) => c.type);
 const FUTURE = new Date(Date.now() + 300 * 24 * 3600 * 1000).toISOString();
@@ -503,6 +504,18 @@ test('certificates: an unset bundleIdPrefix is a config error', async () => {
 
   assert.equal(result.status, 'error');
   assert.match(result.error, /bundleIdPrefix/);
+});
+
+test('certificates: bundle-id policy — reverse-DNS derivation + dash-to-dot composition', () => {
+  const { deriveBundleIdPrefix, composeBundleId } = require('../src/lib/bundle-id.js');
+
+  assert.equal(deriveBundleIdPrefix('https://itwcreativeworks.com'), 'com.itwcreativeworks');
+  assert.equal(deriveBundleIdPrefix('https://www.acme.io/some/path'), 'io.acme');
+  assert.equal(deriveBundleIdPrefix('https://playground.omegajs.dev'), 'dev.omegajs.playground');
+  assert.equal(deriveBundleIdPrefix('not a url'), null);
+
+  assert.equal(composeBundleId('com.itwcreativeworks', 'omega-playground'), 'com.itwcreativeworks.omega.playground');
+  assert.equal(composeBundleId(PREFIX, BRAND_ID), BUNDLE_IDENTIFIER);
 });
 
 // ─── Profiles ────────────────────────────────────────────────────────────────

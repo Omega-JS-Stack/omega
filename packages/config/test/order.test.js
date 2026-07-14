@@ -71,6 +71,18 @@ test('applyCanonicalOrder: unknown keys keep their relative order after known ke
   assert.deepStrictEqual(keys, ['brand', 'bbbUnknown', 'aaaUnknown']);
 });
 
+test('applyCanonicalOrder: targets is LAST by policy — even unknown keys never sort past it', () => {
+  const source = `{
+  targets: { web: {} },
+  theme: { id: "classy" },
+  zzzUnknown: 1,
+  brand: { id: "x" },
+}
+`;
+  const keys = Object.keys(JSON5.parse(applyCanonicalOrder(source)));
+  assert.deepStrictEqual(keys, ['brand', 'theme', 'zzzUnknown', 'targets']);
+});
+
 test('applyCanonicalOrder: missing trailing comma on the last entry is handled', () => {
   const source = `{
   marketing: { campaigns: {} },

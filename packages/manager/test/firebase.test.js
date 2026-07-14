@@ -44,10 +44,11 @@ function tmpRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'omega-manager-fb-'));
 }
 
-function brandConfig({ firebase = {}, firebaseConfig } = {}) {
+function brandConfig({ firebase = {}, gcp = {}, firebaseConfig } = {}) {
   const config = {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: `https://${DOMAIN}` },
     firebase: { ...structuredClone(DEFAULTS.firebase), projectId: PROJECT, ...firebase },
+    gcp: { ...structuredClone(DEFAULTS.gcp), ...gcp },
     targets: { web: {}, backend: {} },
   };
   if (firebaseConfig) {
@@ -441,7 +442,7 @@ test('hosting: no Cloudflare client — verified domain reports without DNS writ
 
 // ─── Billing (de-ITW'd) ──────────────────────────────────────────────────────
 
-test('billing: Spark plan with no firebase.billingAccount warns instead of linking', async () => {
+test('billing: Spark plan with no gcp.billingAccount warns instead of linking', async () => {
   const handler = require('../src/services/firebase/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });
 
@@ -453,10 +454,10 @@ test('billing: Spark plan with no firebase.billingAccount warns instead of linki
   assert.ok(result.output.billing.needsInteractive.includes('billing account'));
 });
 
-test('billing: firebase.billingAccount: false = the user chose Spark — clean success, no nagging, no link', async () => {
+test('billing: gcp.billingAccount: false = the user chose Spark — clean success, no nagging, no link', async () => {
   const handler = require('../src/services/firebase/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });
-  const config = brandConfig({ firebase: { billingAccount: false } });
+  const config = brandConfig({ gcp: { billingAccount: false } });
 
   const result = await handler(handlerContext(config, api));
 
@@ -488,14 +489,14 @@ test('billing: interactive flow lists accounts, lands the pick in omega.json5, l
 
     assert.equal(result.state.billing.enabled, true);
     assert.deepEqual(api.callsTo('linkBillingAccount')[0].args, [PROJECT, 'billingAccounts/FIXTURE-222']);
-    assert.equal(config.firebase.billingAccount, 'billingAccounts/FIXTURE-222');
+    assert.equal(config.gcp.billingAccount, 'billingAccounts/FIXTURE-222');
     assert.ok(readConfigSource(brandRoot).includes('billingAccount: "billingAccounts/FIXTURE-222"'));
   } finally {
     tty.close();
   }
 });
 
-test('billing: interactive opt-out lands firebase.billingAccount: false and stays on Spark', async () => {
+test('billing: interactive opt-out lands gcp.billingAccount: false and stays on Spark', async () => {
   const handler = require('../src/services/firebase/ensure/billing.js');
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
@@ -517,7 +518,7 @@ test('billing: interactive opt-out lands firebase.billingAccount: false and stay
 
     assert.equal(result.status, undefined); // success — an opt-out is a clean state
     assert.ok(result.output.billing.note.includes('opted out'));
-    assert.equal(config.firebase.billingAccount, false);
+    assert.equal(config.gcp.billingAccount, false);
     assert.ok(readConfigSource(brandRoot).includes('billingAccount: false'));
     assert.equal(api.mutations().length, 0);
   } finally {
@@ -531,7 +532,7 @@ test('billing: Spark plan with a configured account links it', async () => {
     getProjectBillingInfo: { billingEnabled: false },
     linkBillingAccount: {},
   });
-  const config = brandConfig({ firebase: { billingAccount: 'billingAccounts/MY-OWN' } });
+  const config = brandConfig({ gcp: { billingAccount: 'billingAccounts/MY-OWN' } });
 
   const result = await handler(handlerContext(config, api));
 
@@ -793,7 +794,7 @@ test('hosting: firebase.apiSubdomain = false skips without touching anything', a
 // ─── Dry run: drifted everywhere, zero mutations ─────────────────────────────
 
 test('firebase: dry-run on a fully drifted project performs zero mutations', async () => {
-  const config = brandConfig({ firebase: { billingAccount: 'billingAccounts/MY-OWN' } });
+  const config = brandConfig({ gcp: { billingAccount: 'billingAccounts/MY-OWN' } });
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
     listEnabledServices: [],
@@ -871,7 +872,8 @@ const { resolveFirebaseProject } = require('../src/services/firebase/lib/project
 const PROJECT_FLOW_CONFIG = `{
   // Fixture Brand — firebase writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  firebase: { organizationId: "123456789" }, // projectId lands next to this
+  firebase: {}, // projectId lands next to this
+  gcp: { organizationId: "123456789" },
 }
 `;
 
@@ -882,7 +884,8 @@ function projectFlowContext(brandRoot) {
     options: {},
     brandConfig: {
       brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-      firebase: { organizationId: '123456789' },
+      firebase: {},
+      gcp: { organizationId: '123456789' },
     },
   };
 }
@@ -958,7 +961,7 @@ test('project-flow: create-new with no org configured asks — the picked org la
   };
   const brandRoot = makeBrandRoot(PROJECT_FLOW_CONFIG);
   const context = projectFlowContext(brandRoot);
-  delete context.brandConfig.firebase.organizationId; // unset → tri-state asks
+  delete context.brandConfig.gcp.organizationId; // unset → tri-state asks
   const tty = openTtyPrompt();
 
   try {
@@ -979,7 +982,7 @@ test('project-flow: create-new with no org configured asks — the picked org la
   }
 });
 
-test('project-flow: org opt-out creates the project standalone and lands firebase.organizationId: false (#33)', async () => {
+test('project-flow: org opt-out creates the project standalone and lands gcp.organizationId: false (#33)', async () => {
   const created = [];
   const api = {
     listProjects: async () => [],
@@ -993,7 +996,7 @@ test('project-flow: org opt-out creates the project standalone and lands firebas
   };
   const brandRoot = makeBrandRoot(PROJECT_FLOW_CONFIG);
   const context = projectFlowContext(brandRoot);
-  delete context.brandConfig.firebase.organizationId;
+  delete context.brandConfig.gcp.organizationId;
   const tty = openTtyPrompt();
 
   try {
@@ -1012,7 +1015,7 @@ test('project-flow: org opt-out creates the project standalone and lands firebas
     assert.deepEqual(created, [{ projectId: 'fixture-brand', displayName: 'Fixture Brand', organizationId: null }]);
     const written = readConfigSource(brandRoot);
     assert.ok(written.includes('organizationId: false'));
-    assert.equal(context.brandConfig.firebase.organizationId, false);
+    assert.equal(context.brandConfig.gcp.organizationId, false);
   } finally {
     tty.close();
   }

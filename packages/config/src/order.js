@@ -23,13 +23,16 @@ const JSON5 = require('json5');
 
 const { parseRoot } = require('./edit.js');
 
+// `targets` goes LAST (Ian 2026-07-14) — it's the per-target override layer,
+// so it reads best after every shared section it can override.
 const CANONICAL_TOP_LEVEL_ORDER = [
-  'enabled', 'parent', 'brand', 'targets', 'local', 'github', 'domain',
-  'cloudflare', 'cloud', 'firebase', 'recaptcha', 'analytics', 'monitoring',
-  'advertising', 'payment', 'oauth2', 'sponsorships', 'marketing', 'blog',
-  'reviews', 'seo', 'testing', 'adsense', 'dataRequest', 'slapform',
-  'chatsy', 'replyify', 'server', 'assets', 'theme', 'translation',
-  'migrations',
+  'enabled', 'parent', 'brand', 'account', 'local', 'github', 'domain',
+  'cloudflare', 'cloud', 'firebase', 'gcp', 'recaptcha', 'analytics',
+  'monitoring', 'advertising', 'payment', 'oauth2', 'sponsorships',
+  'marketing', 'blog', 'devlog', 'reviews', 'seo', 'searchConsole',
+  'testing', 'adsense', 'dataRequest', 'slapform', 'chatsy', 'replyify',
+  'server', 'assets',
+  'certificates', 'theme', 'translation', 'migrations', 'targets',
 ];
 
 /**
@@ -90,6 +93,11 @@ function applyCanonicalOrder(source) {
   const tail = text.slice(cursor, Math.max(cursor, braceLineStart));
 
   const rank = (key) => {
+    // `targets` is last by POLICY — even unknown keys (which rank after the
+    // known ones, relative order kept) never sort past it.
+    if (key === 'targets') {
+      return Number.MAX_SAFE_INTEGER;
+    }
     const index = CANONICAL_TOP_LEVEL_ORDER.indexOf(key);
     return index === -1 ? CANONICAL_TOP_LEVEL_ORDER.length : index;
   };

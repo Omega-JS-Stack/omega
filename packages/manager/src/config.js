@@ -88,15 +88,21 @@ const DEFAULTS = {
   // Firebase settings. Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the
   // brand .env. projectId has no default — interactive runs offer the
   // project selection/creation flow and land it here; non-interactive runs
-  // skip until it's set. Company values omega-manager hardcoded (billing
-  // account, googlegroup support email, GCloud org) are config now — they
-  // land in company/brand config.
+  // skip until it's set. Company values omega-manager hardcoded (googlegroup
+  // support email) are config now — they land in company/brand config.
   firebase: {
     shared: false,        // true = project shared with other brands; only per-brand ops run (service-account, sdk-config)
     supportEmail: null,   // OAuth consent screen support email (defaults to the AUTHORIZING user's email — Google rejects any address the caller doesn't own; set only for an owned Google Group)
+    apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
+  },
+
+  // Google Cloud platform-level resources (the org + billing account the
+  // firebase service's project ensures consume — GCP-level, not Firebase-
+  // level, so they live under their own key). omega-manager hardcoded the
+  // company's values; they're company/brand config now.
+  gcp: {
     organizationId: null, // GCloud org ID — tri-state (#33): null = ask at project create, false = no org (standalone), value = create inside it (proper default permissions)
     billingAccount: null, // 'billingAccounts/XXXXXX-XXXXXX-XXXXXX' — tri-state: null = ask, false = stay on Spark, value = auto-upgrade to Blaze
-    apiSubdomain: true,   // false = skip the api.{domain} Firebase Hosting custom domain
   },
 
   // Analytics providers. Google auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
@@ -318,7 +324,10 @@ const DEFAULTS = {
   // company's commercial fonts and defaulted every brand to CromaSans —
   // the port has no packaged fonts, the brand owns its font choice), logo
   // variants + PNG ladders, app icons, social icons, favicons. Every
-  // operation is mtime-diffed; no brandmark → clean skip.
+  // operation is mtime-diffed; no brandmark → the AI generation flow when
+  // MrLogo credentials are in the brand .env (MRLOGO_SERVICE_ACCOUNT /
+  // MRLOGO_API_KEY / LOGO_API_ID_TOKEN — zero config options), else a
+  // clean skip.
   assets: {
     enabled: true,
   },
@@ -328,13 +337,16 @@ const DEFAULTS = {
   // Connect API. Credentials live in the brand .env (APPLE_API_ISSUER,
   // APPLE_API_KEY_ID, APPLE_TEAM_ID) plus an AuthKey_*.p8 placed in
   // .omega/certificates/apple/. bundleIdPrefix MUST be set by the brand
-  // (e.g. 'com.mycompany') — omega-manager hardcoded the company prefix
-  // and kept one shared cert set in its company-instance .output/_shared/;
-  // the port keeps everything brand-local.
+  // (reverse-DNS of the company/brand domain, e.g. 'com.mycompany' — the
+  // onboard wizard derives + seeds it) — omega-manager hardcoded the
+  // company prefix and kept one shared cert set in its company-instance
+  // .output/_shared/; the port keeps everything brand-local.
   certificates: {
     enabled: true,
     apple: {
-      // Full bundle ID = `${bundleIdPrefix}.${brand.id}`
+      // Full bundle ID = composeBundleId(prefix, brand.id) — the brand id's
+      // dashes become dots (Android-safe segments), e.g.
+      // com.itwcreativeworks + omega-playground → com.itwcreativeworks.omega.playground
       bundleIdPrefix: null,
       // Capabilities enabled on the brand's bundle ID
       capabilities: ['APPLE_ID_AUTH'],
@@ -608,7 +620,7 @@ const OPERATIONS = {
   ],
 
   firebase: [
-    { name: 'billing', ensure: true },          // Blaze plan (links firebase.billingAccount when configured)
+    { name: 'billing', ensure: true },          // Blaze plan (links gcp.billingAccount when configured)
     { name: 'services', ensure: true },         // Required Google Cloud APIs + compute deploy roles
     { name: 'project-settings', ensure: true }, // GCP display name + the 'Web App' web app
     { name: 'oauth-consent', ensure: true },    // OAuth consent screen (support email)

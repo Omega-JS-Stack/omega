@@ -48,22 +48,6 @@
     },
   },
 
-  // Key presence = target enabled; the value is that target's type-wide
-  // config (any shared key inside overrides it for that surface). This IS
-  // the per-target override home (Ian 2026-07-13) — app-level omega.json5
-  // files are OPTIONAL (standalone/split-repo escape hatch) and the
-  // playground doesn't carry any (backend's rides the src/dist pillar).
-  targets: {
-    web: {},
-    backend: {},
-    desktop: {
-      app: {
-        category: "developer-tools",
-      },
-    },
-    extension: {},
-  },
-
   // Brand repo (github service: repo + Pages). shared: the org profile
   // belongs to the OMEGA project, not this rehearsal brand. public: GitHub
   // Pages on a free org needs a public repo — only built site output lands
@@ -98,14 +82,14 @@
     },
   },
 
-  // Manager-side provisioning intent (the manage cycle reconciles the real
-  // project to this; projectId derives from cloud.config above — cp100).
-  // billingAccount = ITW Main Billing Account (ID only — unusable without
-  // IAM; repo is private). The billing ensure-step links it → Blaze.
+  // Google Cloud platform-level resources (the manage cycle's project
+  // ensures consume these; projectId derives from cloud.config above —
+  // cp100). billingAccount = ITW Main Billing Account (ID only — unusable
+  // without IAM; repo is private). The billing ensure-step links it → Blaze.
   // organizationId = ITW Creative Works GCP org — projects the manager
   // creates land inside it (org placement grants the default compute SA
   // roles; legacy omega-manager hardcoded this id, now it's config).
-  firebase: {
+  gcp: {
     billingAccount: "billingAccounts/01A0C2-98EAA4-A772AE",
     organizationId: "1076309192968",
   },
@@ -211,26 +195,14 @@
     agentId: "hkBrbPds9V4U0F",
   },
 
-  // Apple signing (certificates service): bundle IDs mint as
-  // <prefix>.<brand.id> → dev.omegajs.omega-playground — playground-scoped
-  // by construction (the real brand claims its own at launch). The leg's
-  // Apple calls currently WARN pending Ian accepting the renewed Apple
-  // Developer agreements (developer.apple.com/account).
+  // Apple signing (certificates service): reverse-DNS prefix (ITW is the
+  // real-world parent — Ian 2026-07-14); bundle IDs mint as
+  // <prefix>.<brand id with dashes as dots> →
+  // com.itwcreativeworks.omega.playground. Still playground-scoped by name
+  // (the real brand claims its own at launch).
   certificates: {
     apple: {
-      bundleIdPrefix: "dev.omegajs",
-    },
-  },
-
-  // AI brandmark via ITW's MrLogo instance (legacy production route — the
-  // old-world /backend-manager path is MrLogo's LIVE api). Auth rides
-  // LOGO_API_ID_TOKEN from .env when present; providerBrand+adminEmail are
-  // the company-workspace mint path for launch-era layouts.
-  assets: {
-    brandmark: {
-      apiUrl: "https://api.mrlogo.ai/backend-manager/logos",
-      providerBrand: "mrlogo",
-      adminEmail: "ian.wiedenman@gmail.com",
+      bundleIdPrefix: "com.itwcreativeworks",
     },
   },
 
@@ -245,5 +217,21 @@
   // OPENAI_API_KEY in .env. Per-string cache commits to each app's translations/.
   translation: {
     languages: ["es"], // dogfood canary scope — expand at launch
+  },
+
+  // Key presence = target enabled; the value is that target's type-wide
+  // config (any shared key inside overrides it for that surface). This IS
+  // the per-target override home (Ian 2026-07-13) — app-level omega.json5
+  // files are OPTIONAL (standalone/split-repo escape hatch) and the
+  // playground doesn't carry any (backend's rides the src/dist pillar).
+  targets: {
+    web: {},
+    backend: {},
+    desktop: {
+      app: {
+        category: "developer-tools",
+      },
+    },
+    extension: {},
   },
 }

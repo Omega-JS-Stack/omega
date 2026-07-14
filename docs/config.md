@@ -215,10 +215,10 @@ config-flow engine (`packages/manager/src/lib/config-flow.js`):
 
 Every ask offers the opt-out (the gate's "Disable" and, in selection flows, an inline
 "No …" choice), so `false` is always reachable; delete the line to be asked again.
-First consumers: `firebase.organizationId` (asked at project creation — pick an org or
-create standalone) and `firebase.billingAccount` (pick/create a billing account or stay
-on Spark). `firebase.supportEmail`'s null auto-derives the authorizing user's email
-instead of asking.
+First consumers: `gcp.organizationId` (asked at project creation — pick an org or
+create standalone) and `gcp.billingAccount` (pick/create a billing account or stay
+on Spark) — GCP-level resources live under `gcp`, not `firebase`. `firebase.supportEmail`'s
+null auto-derives the authorizing user's email instead of asking.
 
 ## Consumer access
 

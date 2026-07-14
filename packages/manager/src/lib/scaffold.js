@@ -40,7 +40,7 @@ const ENV_GROUPS = [
   { comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)', keys: ['META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN'] },
   { comment: 'Email marketing (sendgrid + beehiiv services)', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY'] },
   { comment: 'Payment processors (payment service; public halves live in omega.json5)', keys: ['STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY'] },
-  { comment: 'Operator service accounts (slapform/chatsy/replyify/server services) — paths to service-account JSON files', keys: ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT'] },
+  { comment: 'Operator service accounts (slapform/chatsy/replyify/server/assets services) — paths to service-account JSON files', keys: ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT', 'MRLOGO_SERVICE_ACCOUNT'] },
   { comment: 'Apple signing (certificates service — desktop/mobile targets)', keys: ['APPLE_API_ISSUER', 'APPLE_API_KEY_ID', 'APPLE_TEAM_ID'] },
 ];
 
@@ -148,6 +148,25 @@ function renderOmegaConfig(answers) {
     '  //   ],',
     '  // },',
     '',
+  );
+
+  // App-signing brands get their reverse-DNS bundle prefix derived at
+  // onboarding (parent company's domain when one exists, else the brand's)
+  if (answers.targets.includes('desktop') && answers.bundleIdPrefix) {
+    lines.push(
+      '  // Apple signing (certificates service): reverse-DNS prefix derived from',
+      '  // the company/brand domain at onboarding. Bundle IDs mint as',
+      '  // <prefix>.<brand id with dashes as dots>.',
+      '  certificates: {',
+      '    apple: {',
+      `      bundleIdPrefix: ${JSON.stringify(answers.bundleIdPrefix)},`,
+      '    },',
+      '  },',
+      '',
+    );
+  }
+
+  lines.push(
     '  // Key presence = target enabled; the value is that target\'s type-wide',
     '  // config (any shared key inside overrides it for that surface).',
     '  targets: {',

@@ -1,13 +1,16 @@
 /**
  * Ensure the brand's bundle ID exists with the required capabilities.
  *
- * Bundle ID = `${certificates.apple.bundleIdPrefix}.${brand.id}` — the
- * prefix is brand/company config (omega-manager hardcoded the company's).
- * Platforms derive from the enabled targets (desktop → MACOS, mobile →
- * IOS) and ride the returned state for the profiles handler.
+ * Bundle ID = composeBundleId(certificates.apple.bundleIdPrefix, brand.id)
+ * — reverse-DNS prefix (config; the onboard wizard derives it from the
+ * company/brand domain) + the brand id with hyphens as dots, e.g.
+ * com.itwcreativeworks.omega.playground. Platforms derive from the enabled
+ * targets (desktop → MACOS, mobile → IOS) and ride the returned state for
+ * the profiles handler.
  */
 const chalk = require('chalk').default;
 const { catchAgreements } = require('../lib/apple-api.js');
+const { composeBundleId } = require('../../../lib/bundle-id.js');
 
 const {
   listBundleIds,
@@ -26,11 +29,11 @@ module.exports = catchAgreements(async (context) => {
   if (!prefix) {
     return {
       status: 'error',
-      error: 'certificates.apple.bundleIdPrefix not set — add it to config/omega.json5 (e.g. "com.yourcompany"; the bundle ID becomes <prefix>.<brand.id>)',
+      error: 'certificates.apple.bundleIdPrefix not set — add it to config/omega.json5 (reverse-DNS of your domain, e.g. "com.yourcompany" — the onboard wizard seeds this; the bundle ID becomes <prefix>.<brand.id with dashes as dots>)',
     };
   }
 
-  const bundleIdentifier = `${prefix}.${brandId}`;
+  const bundleIdentifier = composeBundleId(prefix, brandId);
   const targets = brandConfig.targets || {};
   const platforms = [
     ...(targets.mobile ? ['IOS'] : []),

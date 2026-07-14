@@ -121,6 +121,10 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   });
   assert.deepEqual(config.theme, { id: 'classy', appearance: 'system' });
   assert.deepEqual(Object.keys(config.targets), ['web', 'backend', 'desktop']);
+  // Desktop target → the reverse-DNS bundle prefix seeds (derived from the url)
+  assert.deepEqual(config.certificates, { apple: { bundleIdPrefix: 'io.acme' } });
+  // `targets` is the LAST top-level key in the seeded config (canonical order)
+  assert.equal(Object.keys(config).at(-1), 'targets');
 
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.equal(pkg.name, 'acme');
