@@ -8,7 +8,8 @@
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **SKIN PASS — PAUSED for Ian's theme notes (2026-07-13)** — on resume: DRAFT on playground (home/pricing/signin; meridian direction drafted) → default pages + blueprints, auth/account/payment, showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES cp116's bootstrap gh-pages push by itself, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA (Ian's re-table); omegajs.dev wiring + api.playground zone-worker parent scope land at arc close
 2. **Sentry service (Ian 2026-07-14)** — manager service that creates/ensures a Sentry project PER enabled target and lands the DSNs via comment-preserving writeback (`monitoring.dsn` + per-surface `targets.<type>.monitoring.dsn` are hand-set today)
-3. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
+3. **Admin-key wire sweep (Ian 2026-07-14)** — `omega-admin-key` HEADER replaces the `backendManagerKey` body/query field; full plan + site inventory: packages/backend/TODO-ADMIN-KEY-HEADER.md (outbound Ghostii/$parent clients stay wire-pinned until their targets migrate; webhook `?key=` lane = sister TODO-WEBHOOK-KEY-UPGRADE.md)
+4. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - **Playground web deploy** — standing-authorized but SPARING; tonight's bundle (cp123 site fixes) waits on Ian naming it
@@ -43,6 +44,7 @@
 - First-paint blank flash — mechanism CORRECTED cp123: no JS gate hides content (the page-loading gate only guards buttons); the flash is render-blocking CSS/fonts on a cold cache = exactly the critical-CSS/font pass Ian re-tabled to SKIN-PASS QA (116/123)
 - devkit e2e-harness rare flake (~1-in-15, mechanism uncaptured): isolated two-pass runner + one retry that SAVES the failing output to .temp/ — the next firing names the mechanism; a real regression still fails twice (124)
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
+- @omega.js/web ships images VERBATIM — legacy UJM's imagemin (320/640/1024+webp matrix via `cache-uj-imagemin` branch) has NO successor; the migrated `web.imagemin` config key is inert and legacy pages referencing `-640px`/`.webp` variants break on the new stack (migrator scope); image-pipeline design = queued call for Ian (found 2026-07-14)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
 - [x] 129 config-truth pass — MrLogo brandmark ladder (assets.brandmark options GONE; SA→API-key→token, BEM wire verified), reverse-DNS bundle ids (wizard-derived; playground → com.itwcreativeworks), `gcp` key, targets-last SSOT; Apple terms accepted → leg ran LIVE (bundle id CREATED + 2 profiles minted); mgr 655 / config 109 / corpus 1225 (1952448) → CHANGELOG
@@ -57,4 +59,4 @@
 - [x] 116 playground website LIVE on GH Pages e2e — repo + Pages + placeholder + service wave; site/api/backend live-200 → CHANGELOG
 - [x] Phases 0–2 + cp33–115 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning → CHANGELOG + git log
 
-*Last updated: 2026-07-14 (cp129 config-truth pass; Apple terms accepted → bundle id + profiles minted live; skin waits on Ian's theme notes; deploy go awaits Ian)*
+*Last updated: 2026-07-14 (admin-key header convention decided → sweep TODO queued; imagemin gap parked; skin waits on Ian's theme notes; deploy go awaits Ian)*
