@@ -45,6 +45,22 @@ const CONFIG_BANNER = '// Staged by `omega build` (brand+app config layers flatt
 const PUBLIC_TEMPLATE_DIR = path.resolve(__dirname, '../../../templates/public');
 
 /**
+ * The authored service-account chain: app root (standalone apps own their
+ * copy) → the brand's .omega/secrets/ (the key's ONE home in a brand
+ * monorepo — the firebase manage service mints it there). Google shows SA
+ * keys once, so nothing else ever holds one.
+ * @param {string} projectDir - The app root.
+ * @returns {string|null} First existing key path, or null.
+ */
+function resolveServiceAccountPath(projectDir) {
+  const brandRoot = findBrandRoot(projectDir);
+  return [
+    path.join(projectDir, 'service-account.json'),
+    brandRoot ? path.join(brandRoot, '.omega', 'secrets', 'service-account.json') : null,
+  ].filter(Boolean).find((candidate) => jetpack.exists(candidate)) || null;
+}
+
+/**
  * Stage the authored app tree into dist/.
  * @param {object} options
  * @param {string} options.projectDir - The app root (firebaseProjectPath).
@@ -72,6 +88,12 @@ function stageFunctions(options) {
     jetpack.remove(path.join(distDir, entry));
   }
 
+  // ─── Composed config (ONE compose feeds both the staged file and the
+  //     public boilerplate's brand url). A stale stage can never feed back
+  //     in: composeTargetConfig reads only the AUTHORED layers — dist/config
+  //     is not a config location (@omega.js/config CONFIG_LOCATIONS). ───────
+  const { config } = composeTargetConfig(projectDir, 'backend');
+
   // ─── src/** → dist/** (excluding src/public — handled separately) ─────────
   jetpack.copy(srcDir, distDir, {
     overwrite: true,
@@ -80,14 +102,9 @@ function stageFunctions(options) {
   staged.push('src/** → dist/**');
 
   // ─── public/ — consumer src/public/* overrides win, defaults fill gaps ────
+  const powertools = require('node-powertools');
   const publicDir = path.join(distDir, 'public');
   jetpack.dir(publicDir);
-  let url = '';
-  try {
-    const config = composeTargetConfig(projectDir, 'backend').config;
-    url = config.brand?.url || '';
-  } catch (e) { /* compose failed — use empty url */ }
-  const powertools = require('node-powertools');
   for (const file of jetpack.list(PUBLIC_TEMPLATE_DIR) || []) {
     const consumerOverride = path.join(srcDir, 'public', file);
     const dest = path.join(publicDir, file);
@@ -95,7 +112,7 @@ function stageFunctions(options) {
       jetpack.copy(consumerOverride, dest, { overwrite: true });
     } else {
       const template = jetpack.read(path.join(PUBLIC_TEMPLATE_DIR, file));
-      jetpack.write(dest, powertools.template(template, { url: url || '' }));
+      jetpack.write(dest, powertools.template(template, { url: config.brand?.url || '' }));
     }
   }
   staged.push('public/ (defaults + consumer overrides)');
@@ -119,8 +136,7 @@ function stageFunctions(options) {
   jetpack.write(path.join(distDir, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
   staged.push('package.json (derived)');
 
-  // ─── Composed config ─────────────────────────────────────────────────────
-  const { config } = composeTargetConfig(projectDir, 'backend');
+  // ─── Composed config → the runtime's own view ────────────────────────────
   jetpack.write(
     path.join(distDir, 'config', 'omega.json5'),
     CONFIG_BANNER + JSON.stringify(config, null, 2) + '\n',
@@ -135,15 +151,8 @@ function stageFunctions(options) {
     staged.push(file);
   }
 
-  // ─── Service account: app root (standalone) → brand secrets home ──────────
-  // Google shows SA keys once — the brand's gitignored .omega/secrets/ is the
-  // ONE home (the firebase manage service mints it there); a standalone app
-  // keeps its own copy at the app root.
-  const brandRoot = findBrandRoot(projectDir);
-  const saSource = [
-    path.join(projectDir, 'service-account.json'),
-    brandRoot ? path.join(brandRoot, '.omega', 'secrets', 'service-account.json') : null,
-  ].filter(Boolean).find((candidate) => jetpack.exists(candidate));
+  // ─── Service account: the authored chain (see resolveServiceAccountPath) ──
+  const saSource = resolveServiceAccountPath(projectDir);
   if (saSource) {
     jetpack.copy(saSource, path.join(distDir, 'service-account.json'), { overwrite: true });
     staged.push('service-account.json');
@@ -154,8 +163,12 @@ function stageFunctions(options) {
 }
 
 /**
- * Watch src/ and re-stage on change. The Firebase emulator watches the dist
- * dir natively, so a re-stage IS the hot reload.
+ * Watch every STAGE INPUT and re-stage on change — src/, the app manifest,
+ * .env/.nvmrc/SA, and the config layers (app + brand omega.json5, brand
+ * secrets). The Firebase emulator watches dist/ natively, so a re-stage IS
+ * the hot reload: a brand-config edit reaches the running emulator without
+ * a restart. The app-root watch filters to named files so dist/ churn (our
+ * own output) can never feed back into a re-stage loop.
  * @param {object} options
  * @param {string} options.projectDir
  * @param {function} [options.log]
@@ -170,21 +183,37 @@ function watchAndStage(options) {
   const watchers = [];
   let timer = null;
 
-  const restage = () => {
+  const restage = (reason) => () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
       try {
         stageFunctions({ projectDir });
-        log('Re-staged dist/ (src changed)');
+        log(`Re-staged dist/ (${reason} changed)`);
       } catch (error) {
         log(`Re-stage failed: ${error.message}`);
       }
     }, debounceMs);
   };
 
-  const srcDir = path.join(projectDir, 'src');
-  if (jetpack.exists(srcDir)) {
-    watchers.push(fs.watch(srcDir, { recursive: true }, restage));
+  const watch = (dir, onChange, opts) => {
+    if (!jetpack.exists(dir)) return;
+    watchers.push(fs.watch(dir, opts || {}, onChange));
+  };
+
+  watch(path.join(projectDir, 'src'), restage('src'), { recursive: true });
+
+  // App-root stage inputs by NAME (never react to dist/ or log churn)
+  const APP_ROOT_INPUTS = new Set(['package.json', '.env', '.nvmrc', 'service-account.json']);
+  watch(projectDir, (event, filename) => {
+    if (APP_ROOT_INPUTS.has(filename)) restage(filename)();
+  });
+
+  // Config layers: the app's own config/ and the brand's config/ + secrets
+  const brandRoot = findBrandRoot(projectDir);
+  watch(path.join(projectDir, 'config'), restage('app config'));
+  if (brandRoot) {
+    watch(path.join(brandRoot, 'config'), restage('brand config'));
+    watch(path.join(brandRoot, '.omega', 'secrets'), restage('brand secrets'));
   }
 
   return {
@@ -195,4 +224,4 @@ function watchAndStage(options) {
   };
 }
 
-module.exports = { stageFunctions, watchAndStage, PRESERVE };
+module.exports = { stageFunctions, watchAndStage, resolveServiceAccountPath, PRESERVE };

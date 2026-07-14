@@ -135,7 +135,7 @@ module.exports = async (options) => {
     if (!target || target.kind !== 'framework') {
       // Only an error if this app was (or would be) addressed
       if (runAllBare || shared.length > 0) {
-        runs.push({ app, error: 'no framework dependency detected (package.json / functions/package.json)' });
+        runs.push({ app, error: 'no framework dependency detected (app-root package.json)' });
       }
       continue;
     }

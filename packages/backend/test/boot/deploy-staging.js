@@ -127,6 +127,8 @@ module.exports = {
         }, null, 2));
         jetpack.write(path.join(appRoot, 'src', 'index.js'), 'module.exports = 1;\n');
         jetpack.write(path.join(appRoot, 'src', 'routes', 'ping', 'get.js'), 'module.exports = 2;\n');
+        jetpack.write(path.join(appRoot, 'src', '.dotrc'), 'dotfiles ride the copy\n');
+        jetpack.write(path.join(appRoot, 'src', 'public', '404.html'), 'CONSUMER 404\n');
         jetpack.write(path.join(appRoot, '.env'), 'FAKE_KEY="value"\n');
         // Runtime artifacts that must SURVIVE a re-stage
         jetpack.write(path.join(appRoot, 'dist', 'node_modules', 'marker.txt'), 'kept');
@@ -138,7 +140,13 @@ module.exports = {
         // src copied, derived manifest, stale content wiped, artifacts preserved
         assert.equal(jetpack.read(path.join(distDir, 'index.js')), 'module.exports = 1;\n');
         assert.equal(jetpack.read(path.join(distDir, 'routes', 'ping', 'get.js')), 'module.exports = 2;\n');
+        assert.equal(jetpack.read(path.join(distDir, '.dotrc')), 'dotfiles ride the copy\n', 'dotfiles in src/ are copied');
         assert.equal(jetpack.exists(path.join(distDir, 'stale-old-file.js')), false, 'previous stage wiped');
+
+        // public/: consumer override wins, template default fills the gap
+        assert.equal(jetpack.read(path.join(distDir, 'public', '404.html')), 'CONSUMER 404\n', 'src/public override wins');
+        assert.ok(jetpack.exists(path.join(distDir, 'public', 'index.html')), 'template default fills the gap');
+        assert.equal(jetpack.exists(path.join(distDir, 'public', 'public')), false, 'src/public never double-nests');
         assert.equal(jetpack.read(path.join(distDir, 'node_modules', 'marker.txt')), 'kept', 'node_modules preserved');
         assert.equal(jetpack.read(path.join(distDir, 'emulator.log')), 'kept', 'logs preserved');
         assert.equal(jetpack.read(path.join(distDir, '.env')), 'FAKE_KEY="value"\n', '.env rides the artifact');

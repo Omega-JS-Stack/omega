@@ -7,8 +7,8 @@
  * There's no practical validation API for either token, so this is a
  * presence check with where-to-get guidance — interactive runs offer a
  * paste-in that saves the token to the brand .env (the disperse service
- * then carries it into the backend's functions/.env); leaving it empty
- * keeps the warned guidance.
+ * composes it into the backend's app .env; the stage step carries it into
+ * dist/); leaving it empty keeps the warned guidance.
  */
 const chalk = require('chalk').default;
 const { input } = require('@omega.js/devkit/prompt');

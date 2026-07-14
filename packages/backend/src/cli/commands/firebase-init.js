@@ -11,13 +11,15 @@ const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
  * @returns {{ admin: object, projectId: string }}
  */
 function initFirebase({ firebaseProjectPath, emulator }) {
-  const functionsDir = path.join(firebaseProjectPath, 'dist');
-
   // Load the .env cascade so env vars like GCLOUD_PROJECT are available
-  require('@omega.js/config').loadEnv(functionsDir);
+  require('@omega.js/config').loadEnv(firebaseProjectPath);
 
-  // Resolve firebase-admin from the consumer project's node_modules (peer dep)
-  const admin = require(path.join(functionsDir, 'node_modules', 'firebase-admin'));
+  // Resolve firebase-admin the way Node does from the app root — deps live
+  // on the ONE app manifest (src/dist pillar) and hoist to the app/brand/
+  // monorepo node_modules; a legacy dist/node_modules still resolves too.
+  const { createRequire } = require('node:module');
+  const appRequire = createRequire(path.join(firebaseProjectPath, 'package.json'));
+  const admin = appRequire('firebase-admin');
 
   // Already initialized
   if (admin.apps.length > 0) {
@@ -37,18 +39,19 @@ function initFirebase({ firebaseProjectPath, emulator }) {
     process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST
       || `127.0.0.1:${emulatorPorts.auth}`;
 
-    const projectId = resolveProjectId(firebaseProjectPath, functionsDir);
+    const projectId = resolveProjectId(firebaseProjectPath);
 
     admin.initializeApp({ projectId });
 
     return { admin, projectId };
   }
 
-  // Production: use service-account.json
-  const serviceAccountPath = path.join(functionsDir, 'service-account.json');
-  if (!jetpack.exists(serviceAccountPath)) {
+  // Production: use the authored service-account chain (app root → brand secrets)
+  const { resolveServiceAccountPath } = require('../utils/stage-functions');
+  const serviceAccountPath = resolveServiceAccountPath(firebaseProjectPath);
+  if (!serviceAccountPath) {
     throw new Error(
-      `Missing service-account.json at ${serviceAccountPath}\n`
+      `Missing service-account.json (app root or the brand's .omega/secrets/)\n`
       + `  Download it from Firebase Console > Project Settings > Service Accounts`,
     );
   }
@@ -64,7 +67,7 @@ function initFirebase({ firebaseProjectPath, emulator }) {
   return { admin, projectId };
 }
 
-function resolveProjectId(projectDir, functionsDir) {
+function resolveProjectId(projectDir) {
   // Try config/omega.json5 (resolved — a brand-level cloud.config counts)
   const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
   if (hasOmegaConfig(projectDir)) {

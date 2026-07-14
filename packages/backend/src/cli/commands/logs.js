@@ -318,11 +318,12 @@ class LogsCommand extends BaseCommand {
    */
   resolveProject() {
     const projectDir = this.firebaseProjectPath;
-    const functionsDir = path.join(projectDir, 'dist');
 
-    // Try service-account.json first (most reliable for production)
-    const serviceAccountPath = path.join(functionsDir, 'service-account.json');
-    if (jetpack.exists(serviceAccountPath)) {
+    // Try the authored service-account chain first (app root → brand
+    // secrets — most reliable for production; no stage required)
+    const { resolveServiceAccountPath } = require('../utils/stage-functions');
+    const serviceAccountPath = resolveServiceAccountPath(projectDir);
+    if (serviceAccountPath) {
       try {
         const sa = JSON.parse(jetpack.read(serviceAccountPath));
         if (sa.project_id) {
@@ -334,7 +335,7 @@ class LogsCommand extends BaseCommand {
     }
 
     // Fall back to shared resolver
-    return resolveProjectId(projectDir, functionsDir);
+    return resolveProjectId(projectDir);
   }
 
   /**

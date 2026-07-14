@@ -58,18 +58,19 @@ function stageWebApp(root, { dist = true, declared = null, installed = null } = 
   return { name: 'website', dir: 'apps/website', path: appPath, target: 'web' };
 }
 
-/** Stage apps/backend — firebase.json + functions with a file: framework dep. */
+/** Stage apps/backend — src/dist pillar shape: framework dep on the ONE app
+ * manifest, staged dist/ as build output. */
 function stageBackendApp(root, { installed = '5.9.0' } = {}) {
   const appPath = join(root, 'apps', 'backend');
-  jetpack.write(join(appPath, 'package.json'), { name: 'fixture-backend', private: true });
-  jetpack.write(join(appPath, 'firebase.json'), {});
-  jetpack.write(join(appPath, 'functions', 'package.json'), {
-    name: 'fixture-functions',
+  jetpack.write(join(appPath, 'package.json'), {
+    name: 'fixture-backend',
     private: true,
     dependencies: { '@omega.js/backend': 'file:../../../../packages/backend' },
   });
+  jetpack.write(join(appPath, 'firebase.json'), {});
+  jetpack.write(join(appPath, 'dist', 'package.json'), { name: 'fixture-backend-functions', private: true });
   if (installed) {
-    jetpack.write(join(appPath, 'functions', 'node_modules', '@omega.js/backend', 'package.json'), {
+    jetpack.write(join(appPath, 'node_modules', '@omega.js/backend', 'package.json'), {
       name: '@omega.js/backend',
       version: installed,
     });
@@ -201,7 +202,7 @@ test('testing: web + backend all green — exact pass set, single npm view per p
         'website: homepage',
         'backend: package.json',
         'backend: firebase.json',
-        'backend: functions/package.json',
+        'backend: staged dist/',
         'backend: @omega.js/backend',
         'backend: API health',
         'backend: deployed backend',
@@ -506,7 +507,7 @@ test('testing: dry-run — zero network, local checks still run', async () => {
     'website: build output',
     'backend: package.json',
     'backend: firebase.json',
-    'backend: functions/package.json',
+    'backend: staged dist/',
     'working tree',
   ]);
 });

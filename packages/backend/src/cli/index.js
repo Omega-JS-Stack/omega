@@ -44,8 +44,9 @@ Main.prototype.process = async function (args) {
   const self = this;
   self.options = {};
   self.argv = argv;
-  self.firebaseProjectPath = process.cwd();
-  self.firebaseProjectPath = self.firebaseProjectPath.match(/\/functions$/) ? self.firebaseProjectPath.replace(/\/functions$/, '') : self.firebaseProjectPath;
+  // Commands run from the APP ROOT. Muscle-memory cwds normalize up: dist/
+  // is the staged output (src/dist pillar), functions/ its pre-pillar name.
+  self.firebaseProjectPath = process.cwd().replace(/\/(functions|dist)$/, '');
   self.testCount = 0;
   self.testTotal = 0;
   self.warnCount = 0;

@@ -4,10 +4,10 @@
  * update service (npm install / npm run build) and the brand-root test
  * fan-out (per-app `omega test`).
  *
- * Every command runs under the APP'S OWN Node (friction #15): the dir's
- * .nvmrc (or functions/.nvmrc) picks the nvm install whose bin is
- * prepended to PATH — one brand can span Node majors (web 24, backend 22)
- * without a single nvm switch. A pinned-but-missing major fails fast with
+ * Every command runs under the APP'S OWN Node (friction #15): the app
+ * root's .nvmrc picks the nvm install whose bin is prepended to PATH — one
+ * brand can span Node majors (web 24, backend 22) without a single nvm
+ * switch. A pinned-but-missing major fails fast with
  * the `nvm install` to run. If a command rewrites the .nvmrc and THEN
  * fails (EM setup bumps the pin when Electron's bundled Node moved), it is
  * re-resolved and retried once — one run self-heals instead of two.

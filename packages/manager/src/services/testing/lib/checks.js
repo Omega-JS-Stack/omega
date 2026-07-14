@@ -195,10 +195,12 @@ function checkAppFiles(recorder, app) {
     } else {
       recorder.fail(`${app.name}: firebase.json`, 'missing');
     }
-    if (fs.existsSync(path.join(app.path, 'functions', 'package.json'))) {
-      recorder.pass(`${app.name}: functions/package.json`);
+    // Staged output (src/dist pillar) — the backend's build-output twin of
+    // web's dist/index.html check
+    if (fs.existsSync(path.join(app.path, 'dist', 'package.json'))) {
+      recorder.pass(`${app.name}: staged dist/`);
     } else {
-      recorder.fail(`${app.name}: functions/package.json`, 'missing');
+      recorder.fail(`${app.name}: staged dist/`, 'dist/package.json missing — run the update service (omega build)');
     }
   }
 }
@@ -212,8 +214,8 @@ function checkFrameworkVersion(recorder, app, ctx) {
   const framework = TARGET_FRAMEWORKS[app.target];
   if (!framework) return;
 
-  // Backends keep their deps in functions/ (Cloud Functions convention)
-  const pkgDir = app.target === 'backend' ? path.join(app.path, 'functions') : app.path;
+  // Deps live on the ONE app manifest for every target (src/dist pillar)
+  const pkgDir = app.path;
   const pkg = jetpack.read(path.join(pkgDir, 'package.json'), 'json');
   const declared = pkg?.dependencies?.[framework] || pkg?.devDependencies?.[framework];
   if (!declared) return;

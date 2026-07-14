@@ -9,7 +9,7 @@
  *
  *   backend  — the FULL curated composition into the app-root .env (the ONE
  *              authored home since the src/dist pillar; `omega build` stages
- *              a copy into functions/.env so the Firebase deploy artifact —
+ *              a copy into dist/.env so the Firebase deploy artifact —
  *              which can't walk up to a brand layer — stays self-contained).
  *              Composed from brand-level process.env (manage.js already
  *              layered shell > brand > company); empty values are never
@@ -38,8 +38,8 @@ const CUSTOM_MARKER = '# ========== Custom Values ==========';
 const DEFAULT_MARKER = '# ========== Default Values ==========';
 
 // Per-target composition spec. `file` is app-relative — the app-root .env
-// for EVERY target now (the backend's functions/.env exception died with the
-// src/dist pillar: the stage step copies the app .env into the artifact).
+// for EVERY target now (the backend's staged-tree exception died with the
+// src/dist pillar: the stage step copies the app .env into dist/).
 // `env` names pass through from brand-level process.env (backend ONLY — its
 // .env ships with the deploy artifact; every other target reads brand values
 // through the runtime cascade); `streamSecret` names the var that receives

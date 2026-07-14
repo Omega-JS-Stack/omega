@@ -612,7 +612,7 @@ const OPERATIONS = {
     { name: 'services', ensure: true },         // Required Google Cloud APIs + compute deploy roles
     { name: 'project-settings', ensure: true }, // GCP display name + the 'Web App' web app
     { name: 'oauth-consent', ensure: true },    // OAuth consent screen (support email)
-    { name: 'service-account', ensure: true },  // Admin SDK service account + key → .omega/secrets + backend functions/
+    { name: 'service-account', ensure: true },  // Admin SDK service account + key → .omega/secrets (the ONE home; omega build stages it)
     { name: 'hosting', ensure: true },          // Hosting site + api.{domain} custom domains (DNS via Cloudflare)
     { name: 'firestore', ensure: true },        // Firestore database + PITR
     { name: 'database', ensure: true },         // Realtime Database

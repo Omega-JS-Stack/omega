@@ -7,7 +7,7 @@
  * Checks by app target:
  *   web      → package.json, dist/index.html, installed framework vs npm
  *              latest, homepage fetch
- *   backend  → package.json, firebase.json, functions/package.json,
+ *   backend  → package.json, firebase.json, staged dist/ (build output),
  *              installed framework vs npm latest, API health + deployed
  *              version (skipped for shared Firebase projects)
  *   (all)    → package.json, framework version when declared
