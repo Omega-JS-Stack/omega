@@ -1,3 +1,15 @@
+# Testing
+
+## The three verification tiers (what runs when)
+
+| Tier | What | Command | When |
+|------|------|---------|------|
+| 1 — Package suites | Each package's own `node --test` (config, devkit, manager, web, client, backend boot, …) | `npm test` in the package, or `npm run test:packages` at the root | Every checkpoint |
+| 2 — Sandbox brand (automated consumer) | The backend **corpus** (framework routes/events/rules through a REAL consumer + real emulator) + the **cross-stack e2e** (browser → website → backend) | `npm run test:corpus` / `npm run test:e2e` at the root | Every checkpoint that touches runtime behavior |
+| 3 — Playground (live rehearsal) | The 24-service manage pipeline against REAL cloud (Firebase, Cloudflare, SendGrid, …) | `npm run pipeline` in `apps/omega-playground` | SPARINGLY — Ian-authorized (real infra, real cost) |
+
+**Root `npm test` runs tiers 1 + 2 in one shot** (all workspace suites → sandbox e2e → backend corpus, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the playground is the only tier that touches real cloud.
+
 # Test scoping (`omega test`) — the C5 grammar
 
 One grammar, every framework (parser: `@omega.js/devkit/test/scope`, adopted by the devkit runner-core → desktop + extension, the backend runner, and web's test command). Decided by Ian 2026-07-11 (core-changes inbox C5): **a bare test run from a brand/app never drags the framework's suite in** — the framework suite is always an explicit choice.

@@ -13,7 +13,10 @@
   },
   "scripts": {
     "start": "node scripts/watch-all.js",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present && npm run test:backend -w sandbox-brand",
+    "test:packages": "npm run test --workspaces --if-present",
+    "test:corpus": "npm run test:backend -w sandbox-brand",
+    "test:e2e": "npm run test -w sandbox-brand"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
