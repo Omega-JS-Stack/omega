@@ -119,6 +119,18 @@ class ServeCommand extends BaseCommand {
 
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
 
+    // demo-* projects are emulator-only by convention: `firebase serve`'s
+    // hosting upstream fetches LIVE site config and 403s (there is no live
+    // project to reach — BEM 1.4b residue; the serve mechanics themselves
+    // are fine, cp90). Functions still serve, so warn-and-continue and point
+    // at the hosting EMULATOR for the full surface.
+    const { resolveProjectId } = require('./firebase-init');
+    const serveProjectId = resolveProjectId(projectDir);
+    if (String(serveProjectId || '').startsWith('demo-')) {
+      this.log(chalk.yellow(`  ⚠ ${serveProjectId} is a demo-* (emulator-only) project — the hosting upstream will 403 here.`));
+      this.log(chalk.yellow(`    Use ${chalk.cyan('omega emulator')} for demo-* hosting (its hosting emulator serves it fine).\n`));
+    }
+
     // Execute with tee to log file
     const firebasePort = httpsReady ? internalPort : port;
     const firebaseEnv = {

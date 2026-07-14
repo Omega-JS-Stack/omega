@@ -62,6 +62,26 @@ KEY2=v2
       },
     },
     {
+      name: 'effectiveValue: cascade value (process.env) rescues an app-empty key (D15)',
+      run: (ctx) => {
+        process.env.EM_TEST_CASCADE_KEY = 'brand-level-value';
+        try {
+          const out = pushSecrets.effectiveValue({ key: 'EM_TEST_CASCADE_KEY', value: '' });
+          ctx.expect(out).toBe('brand-level-value');
+        } finally {
+          delete process.env.EM_TEST_CASCADE_KEY;
+        }
+      },
+    },
+    {
+      name: 'effectiveValue: app literal stands when the cascade has nothing',
+      run: (ctx) => {
+        delete process.env.EM_TEST_CASCADE_NONE;
+        const out = pushSecrets.effectiveValue({ key: 'EM_TEST_CASCADE_NONE', value: 'app-literal' });
+        ctx.expect(out).toBe('app-literal');
+      },
+    },
+    {
       name: 'resolveSecretValue: returns string as-is when value is not a path',
       run: async (ctx) => {
         const out = await pushSecrets.resolveSecretValue({ value: 'plain-string-value' }, '/tmp');
@@ -115,6 +135,25 @@ KEY2=v2
         try {
           const out = await pushSecrets.resolveSecretValue({ value: relName }, tmpDir);
           ctx.expect(out).toBe(Buffer.from('REL').toString('base64'));
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      },
+    },
+    {
+      name: 'resolveSecretValue: falls back to the brand root when the app-relative path is missing',
+      run: async (ctx) => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const appRoot = path.join(tmpDir, 'apps', 'desktop');
+        fs.mkdirSync(appRoot, { recursive: true });
+        const relName = '.omega/secrets/brand-cert.p8';
+        const fullPath = path.join(tmpDir, relName);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, Buffer.from('BRAND'));
+
+        try {
+          const out = await pushSecrets.resolveSecretValue({ value: relName }, appRoot, tmpDir);
+          ctx.expect(out).toBe(Buffer.from('BRAND').toString('base64'));
         } finally {
           fs.rmSync(tmpDir, { recursive: true, force: true });
         }

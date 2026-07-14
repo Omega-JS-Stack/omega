@@ -47,6 +47,10 @@ async function writeArticle({ brandConfig, description, links = [], sourceConten
   const { brand } = brandConfig;
 
   const body = {
+    // Ghostii's LIVE wire contract: its production backend runs legacy BEM,
+    // whose auth reads exactly this payload field. Renames to the omega
+    // spelling only when Ghostii itself migrates to the new stack — never
+    // "fix" unilaterally (it would break devlog publishing).
     backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     keywords: overrides.keywords || [],
     description: description.slice(0, MAX_DESCRIPTION_LENGTH),

@@ -60,3 +60,8 @@ At a **brand root** (a directory carrying `config/omega.json5` with no framework
 - Apps run **sequentially** with streamed output; any failing app makes the whole run exit 1 (per-app summary at the end).
 - **Flags are not fanned out** (`--layer`, `--extended`, …) — flagged runs are app-level invocations; run them from the app dir.
 - Other manager commands ride the same handoff: bare `omega` at a brand root now means `omega-manager manage`, `omega onboard` reaches the wizard.
+
+## CI runner notes
+
+- **npm 11 script-approval gating skips dependency postinstalls on CI runners.** Puppeteer's Chrome download is handled explicitly in ci.yml (`npx puppeteer browsers install chrome`); if a native-postinstall dep (electron, canvas, sharp, …) ever misbehaves in CI, this gating is the first suspect — add an explicit install step like puppeteer's rather than disabling the gate.
+- **Post-mortem steps use `if: always()`**, not `if: failure()` — runner-level cancellation (OOM, watchdog) is NOT `failure()`, and cancelled runs are exactly the ones that need the diagnostics.

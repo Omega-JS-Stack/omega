@@ -119,9 +119,10 @@ jobs:
 
       # Catch the resource spike in the act — the baseline only shows the
       # BEFORE picture; if the worker-respawn spiral eats the memory, this
-      # shows it (when the step fails but the runner survives).
+      # shows it. always(): runner-level cancellation is NOT failure(), and
+      # the cancelled runs are exactly the ones needing a post-mortem (run 7).
       - name: Post-mortem headroom
-        if: failure()
+        if: always()
         run: |
           free -m
           ps aux --sort=-rss | head -15
@@ -161,11 +162,12 @@ jobs:
         working-directory: apps/sandbox-brand
         run: npx puppeteer browsers install chrome
 
-      # functions/ is a standalone install (not a workspace) — it owns its own lockfile,
-      # with @omega.js/backend linked via file: to packages/backend
+      # The backend APP ROOT owns the install (src/dist pillar: dist/ is staged
+      # output; the ONE app manifest carries @omega.js/backend via file: to
+      # packages/backend). Standalone install, no lockfile → npm install.
       - name: Sandbox backend deps
-        working-directory: apps/sandbox-brand/apps/backend/functions
-        run: npm ci
+        working-directory: apps/sandbox-brand/apps/backend
+        run: npm install
 
       # Runner headroom snapshot — the corpus keeps dying runner-level on CI
       # (suspected memory exhaustion); this makes the next death diagnosable.
@@ -185,9 +187,11 @@ jobs:
         working-directory: apps/sandbox-brand
         run: npm test
 
-      # Catch the resource spike in the act (see the suites job's twin step)
+      # Catch the resource spike in the act (see the suites job's twin step) —
+      # always(), because cancellation ≠ failure() and cancelled runs are the
+      # ones that need the post-mortem
       - name: Post-mortem headroom
-        if: failure()
+        if: always()
         run: |
           free -m
           ps aux --sort=-rss | head -15

@@ -30,7 +30,7 @@
     "./omega-bin": "./src/omega-bin.js"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node scripts/run-tests.js"
   },
   "engines": {
     "node": ">=22"

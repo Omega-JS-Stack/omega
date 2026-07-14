@@ -1,9 +1,14 @@
 // Push secrets from local .env to GitHub Actions repo secrets.
 //
-// Reads .env at the repo root, encrypts each value with the repo's libsodium public key,
-// pushes via Octokit. For env vars whose value is a path to an existing file (e.g.
-// CSC_LINK=config/certs/dev-id.p12), the secret value is the base64-encoded file contents
-// — the workflow then decodes back to a temp file at job start.
+// The app .env's Default section names the framework's secret KEYS; the
+// VALUES push from the composed .env cascade (company ← brand ← app, shell
+// wins — D15), so a key whose value lives at the brand or company level
+// still reaches the repo secrets. Each value is encrypted with the repo's
+// libsodium public key and pushed via Octokit. For env vars whose value is a
+// path to an existing file (e.g. CSC_LINK=config/certs/dev-id.p12 — app-root
+// relative, falling back to the brand root), the secret value is the
+// base64-encoded file contents — the workflow then decodes back to a temp
+// file at job start.
 //
 // Usage:
 //   npx omega push-secrets                       # push all keys from .env Default section
@@ -28,9 +33,12 @@ module.exports = async function (options) {
   if (!jetpack.exists(envPath)) {
     throw new Error(`.env not found at ${envPath}. Create one based on .env.example.`);
   }
-  // Also resolve the .env cascade into process.env so the GH_TOKEN we use to
-  // push is available (it may live at the brand or company level).
-  require('@omega.js/config').loadEnv(projectRoot);
+  // Also resolve the .env cascade into process.env — both for the GH_TOKEN we
+  // push WITH and for the values we push (they may live at the brand or
+  // company level rather than in the app file).
+  const { loadEnv, findBrandRoot } = require('@omega.js/config');
+  loadEnv(projectRoot);
+  const brandRoot = findBrandRoot(projectRoot);
 
   const ghToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (!ghToken) {
@@ -49,6 +57,11 @@ module.exports = async function (options) {
     const only = String(options.only).split(',').map((s) => s.trim()).filter(Boolean);
     entries = entries.filter((e) => only.includes(e.key));
   }
+
+  // D15: overlay the composed cascade — an app-empty key whose value lives in
+  // the brand/company .env is still a secret the workflow needs. Runs BEFORE
+  // the skip-empty filter so cascade-supplied values rescue app-empty keys.
+  entries = entries.map((entry) => ({ ...entry, value: effectiveValue(entry) }));
 
   const skipEmpty = options.skipEmpty !== false && options['skip-empty'] !== 'false';
   if (skipEmpty) {
@@ -76,7 +89,7 @@ module.exports = async function (options) {
   // 6. Push each.
   let successCount = 0;
   for (const entry of entries) {
-    const secretValue = await resolveSecretValue(entry, projectRoot);
+    const secretValue = await resolveSecretValue(entry, projectRoot, brandRoot);
     if (secretValue == null) {
       logger.warn(`Skipping ${entry.key} (could not resolve value).`);
       continue;
@@ -131,10 +144,19 @@ function parseEnv(content) {
   return entries;
 }
 
+// The effective value of a Default-section key: the composed .env cascade
+// (already resolved into process.env by loadEnv — company ← brand ← app,
+// shell wins) when it carries a non-empty value, else the app-file literal.
+function effectiveValue(entry) {
+  const composed = process.env[entry.key];
+  return composed && composed.trim() ? composed : entry.value;
+}
+
 // Determine the secret value to push:
 //   - If value looks like a path AND the file exists → base64-encoded file contents
+//     (app-root relative first; brand-root fallback for brand-level cert values)
 //   - Otherwise → value as-is
-async function resolveSecretValue(entry, projectRoot) {
+async function resolveSecretValue(entry, projectRoot, brandRoot) {
   const v = entry.value;
   if (!v) return v;
 
@@ -143,14 +165,16 @@ async function resolveSecretValue(entry, projectRoot) {
   const looksLikePath = /[/\\]/.test(v) || /\.(p12|pem|cer|p8|provisionprofile|crt|key|json)$/i.test(v);
   if (!looksLikePath) return v;
 
-  const absolute = path.isAbsolute(v) ? v : path.join(projectRoot, v);
-  if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
-    return v; // value contains slashes but doesn't exist — push as-is
+  const roots = path.isAbsolute(v) ? [''] : [projectRoot, brandRoot].filter(Boolean);
+  for (const root of roots) {
+    const absolute = path.isAbsolute(v) ? v : path.join(root, v);
+    if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) {
+      entry.isFilePath = true;
+      return fs.readFileSync(absolute).toString('base64');
+    }
   }
 
-  entry.isFilePath = true;
-  const buf = fs.readFileSync(absolute);
-  return buf.toString('base64');
+  return v; // value contains slashes but doesn't exist anywhere — push as-is
 }
 
 function encryptSecret(sodium, publicKey, value) {
@@ -162,5 +186,6 @@ function encryptSecret(sodium, publicKey, value) {
 
 // Exported for tests.
 module.exports.parseEnv = parseEnv;
+module.exports.effectiveValue = effectiveValue;
 module.exports.resolveSecretValue = resolveSecretValue;
 module.exports.discoverRepo = discoverRepo;

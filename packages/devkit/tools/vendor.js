@@ -33,9 +33,14 @@
 // vendoring: re-copied from the resolved source on every prepare.
 //
 // Notes:
-//   - prepare-package `after` hooks are non-blocking (a failure warns but doesn't
-//     stop prepare). The hard gate is CI's pack→scratch-install smoke plus its
-//     "no @omega.js refs in shipped dist" check.
+//   - prepare-package `after` hooks are non-blocking AT THE RUNNER (a failure
+//     warns but doesn't stop prepare — third-party prepare-package behavior).
+//     This tool is therefore TRANSACTIONAL: the dep guard runs before any dist
+//     file is touched, rewrites are computed fully in memory and written last,
+//     and a mid-write failure restores every file already written — a failed
+//     run never leaves a part-rewritten dist. The hard gate is CI's
+//     pack→scratch-install smoke plus its "no @omega.js refs in shipped dist"
+//     check.
 //   - Watch mode's single-file copies skip hooks, so a freshly-saved file can hold
 //     a raw @omega.js specifier in dist. That's fine wherever dist is consumed from
 //     the monorepo (workspace + file: installs resolve the packages up the tree); a
@@ -348,41 +353,27 @@ function vendorPackages(options) {
   }
 
   // 2. Selective copy per package: seeds + transitive relative deps, nothing else.
+  // A failure here (e.g. a require of a module that doesn't exist) removes the
+  // partial vendor dir — dist JS is still untouched at this point.
   const vendored = {};
-  for (const [name, seeds] of seedsByPackage) {
-    const packageRoot = rootFor(name);
-    const needed = resolveNeededFiles(name, packageRoot, seeds);
-    for (const relative of needed) {
-      jetpack.copy(path.join(packageRoot, relative), path.join(vendorRoot, name, relative));
+  try {
+    for (const [name, seeds] of seedsByPackage) {
+      const packageRoot = rootFor(name);
+      const needed = resolveNeededFiles(name, packageRoot, seeds);
+      for (const relative of needed) {
+        jetpack.copy(path.join(packageRoot, relative), path.join(vendorRoot, name, relative));
+      }
+      vendored[name] = [...needed].sort();
     }
-    vendored[name] = [...needed].sort();
+  } catch (error) {
+    jetpack.remove(vendorRoot);
+    throw error;
   }
 
-  // 3. Rewrite the @omega.js references to relative paths into the vendor dirs.
-  let rewritten = 0;
-  filesToRewrite.forEach((abs) => {
-    const contents = jetpack.read(abs);
-    let updated = contents;
-    for (const pattern of REFERENCE_PATTERNS) {
-      updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
-        if (neverVendor(name)) return match;
-        const target = path.join(vendorRoot, name, subpathToFile(subpath, rootFor(name)));
-        let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
-        if (!relative.startsWith('.')) {
-          relative = `./${relative}`;
-        }
-        return `${prefix}${quote}${relative}${quote}`;
-      });
-    }
-    if (updated !== contents) {
-      jetpack.write(abs, updated);
-      rewritten += 1;
-    }
-  });
-
-  // 4. Guard: every bare specifier in the vendored modules must resolve from the
-  // host at consumer runtime — i.e. live in its dependencies/peerDependencies/
-  // optionalDependencies.
+  // 3. Guard BEFORE touching any dist file (the after-hook runner can't block,
+  // so a guard failure must leave dist exactly as prepare wrote it): every bare
+  // specifier in the vendored modules must resolve from the host at consumer
+  // runtime — i.e. live in its dependencies/peerDependencies/optionalDependencies.
   const hostRuntimeDeps = {
     ...(hostPackage.dependencies || {}),
     ...(hostPackage.peerDependencies || {}),
@@ -406,8 +397,47 @@ function vendorPackages(options) {
     }
   });
   if (missing.size > 0) {
+    jetpack.remove(vendorRoot); // leave zero half-state: dist JS is untouched, so the unreferenced vendor dir goes too
     throw new Error(`[devkit vendor] ${hostPackage.name} must declare runtime dependencies used by vendored modules: ${[...missing].join(', ')}`);
   }
+
+  // 4. Rewrite the @omega.js references to relative paths into the vendor dirs.
+  // Two-phase so a failure can never leave dist part-rewritten: every updated
+  // file is computed in memory first, then the batch writes — and a mid-batch
+  // write failure restores the originals already written before rethrowing.
+  const rewrites = [];
+  filesToRewrite.forEach((abs) => {
+    const contents = jetpack.read(abs);
+    let updated = contents;
+    for (const pattern of REFERENCE_PATTERNS) {
+      updated = updated.replace(pattern, (match, prefix, quote, name, subpath) => {
+        if (neverVendor(name)) return match;
+        const target = path.join(vendorRoot, name, subpathToFile(subpath, rootFor(name)));
+        let relative = path.relative(path.dirname(abs), target).split(path.sep).join('/');
+        if (!relative.startsWith('.')) {
+          relative = `./${relative}`;
+        }
+        return `${prefix}${quote}${relative}${quote}`;
+      });
+    }
+    if (updated !== contents) {
+      rewrites.push({ abs, contents, updated });
+    }
+  });
+
+  const written = [];
+  try {
+    for (const rewrite of rewrites) {
+      jetpack.write(rewrite.abs, rewrite.updated);
+      written.push(rewrite);
+    }
+  } catch (error) {
+    for (const rewrite of written) {
+      jetpack.write(rewrite.abs, rewrite.contents);
+    }
+    throw new Error(`[devkit vendor] Rewrite failed mid-batch (${error.message}) — ${written.length} already-written file(s) restored, dist is unchanged`);
+  }
+  const rewritten = rewrites.length;
 
   const summary = Object.entries(vendored).map(([name, files]) => `${name} (${files.length})`).join(', ');
   logger.log(`Vendored ${summary} into ${path.relative(cwd, vendorRoot)}, rewrote ${rewritten} file(s) in ${hostPackage.name}`);

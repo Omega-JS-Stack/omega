@@ -157,6 +157,15 @@ test('throws when the host is missing a runtime dep the vendored modules need', 
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   assert.throws(() => vendorDevkit({ cwd: root }), /node-powertools/);
+
+  // Transactional: the after-hook runner can't block prepare, so a guard
+  // failure must leave ZERO half-state — dist JS unrewritten, vendor dir gone
+  assert.equal(
+    fs.readFileSync(path.join(root, 'dist', 'a.js'), 'utf8'),
+    `module.exports = require('@omega.js/devkit/safe-install');`,
+    'dist stays exactly as prepare wrote it'
+  );
+  assert.ok(!fs.existsSync(path.join(root, 'dist', 'vendor')), 'no orphaned vendor dir');
 });
 
 test('throws on a require of a devkit module that does not exist', (t) => {

@@ -204,9 +204,18 @@ class EmulatorCommand extends BaseCommand {
     // N7 port allocation: firebase.json values (classic defaults) when free,
     // bump-if-taken — a second brand's stack relocates instead of the old
     // behavior of KILLING the incumbent. Explicit config `ports` pins never
-    // bump (busy pin = hard error). Crash-leftover orphans on a default port
-    // simply get bumped around; the shutdown sweep still reaps them.
+    // bump (busy pin = hard error).
     const wanted = loadEmulatorPorts(projectDir);
+
+    // Crash leftovers first: a run that died without teardown leaves java
+    // emulator grandchildren squatting the classic ports FOREVER — the
+    // shutdown sweep only covers that run's RESOLVED map, and allocation
+    // just bumps around squatters (95a: two stale generations cross-talking
+    // with a live run's functions emulator). Reap by the one signature that
+    // can't be a sibling's live stack: an emulator process whose parent is
+    // gone. Live listeners stay untouched and bump as before.
+    this.reapOrphanedEmulators(Object.values(wanted));
+
     const { ports: emulatorPorts, bumped } = await resolvePorts({
       wanted,
       pins: this.loadPortPins(projectDir),
@@ -540,6 +549,43 @@ class EmulatorCommand extends BaseCommand {
 
     if (killed > 0) {
       this.log(chalk.gray(`  Cleaned up ${killed} orphaned emulator process${killed > 1 ? 'es' : ''}.`));
+    }
+  }
+
+  /**
+   * Pre-boot reaper for CRASHED-run leftovers: kill processes squatting the
+   * wanted ports (plus the shared hub/storage ports) that look like emulator
+   * machinery AND are reparented to PID 1 — the firebase parent that spawned
+   * them is gone, so nothing will ever tear them down. A sibling brand's
+   * LIVE emulator keeps its firebase parent alive and never matches; the
+   * allocator bumps around it exactly as before.
+   */
+  reapOrphanedEmulators(ports) {
+    const { execSync } = require('child_process');
+    let reaped = 0;
+
+    for (const port of [...new Set([...(ports || []), 4400, 9199])]) {
+      try {
+        const pids = execSync(`lsof -ti TCP:${port} -sTCP:LISTEN 2>/dev/null`, { encoding: 'utf8' })
+          .trim().split('\n').filter(Boolean);
+        for (const pid of pids) {
+          try {
+            const info = execSync(`ps -o ppid=,command= -p ${pid} 2>/dev/null`, { encoding: 'utf8' }).trim();
+            const match = info.match(/^\s*(\d+)\s+(.*)$/s);
+            if (!match) continue;
+            const parentGone = Number(match[1]) === 1;
+            const looksLikeEmulator = /emulator|firebase/i.test(match[2]);
+            if (parentGone && looksLikeEmulator) {
+              process.kill(Number(pid), 'SIGKILL');
+              reaped++;
+            }
+          } catch (e) { /* vanished mid-check */ }
+        }
+      } catch (e) { /* port free */ }
+    }
+
+    if (reaped > 0) {
+      this.log(chalk.gray(`  Reaped ${reaped} orphaned emulator process${reaped > 1 ? 'es' : ''} left by a previous crashed run.`));
     }
   }
 }

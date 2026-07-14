@@ -187,4 +187,4 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/test-boot-layer.md](docs/test-boot-layer.md) — the `boot/` smoke layer: framework self-test from the repo via the bundled fixture project + `OMEGA_TEST_BOOT_PROJECT` (@omega.js/backend's analog of BXM/UJM `*_TEST_BOOT_PROJECT`)
 - [docs/cli-firestore-auth.md](docs/cli-firestore-auth.md) — `npx omega firestore:*` and `auth:*` commands, shared flags, examples
 - [docs/cli-logs.md](docs/cli-logs.md) — `npx omega logs:read` / `logs:tail` with full flag reference and built-in Cloud Function names
-- [docs/logging.md](docs/logging.md) — `functions/*.log` file table (the `functions/` location exception), `production.log`
+- [docs/logging.md](docs/logging.md) — `dist/*.log` file table (the `dist/` location exception — co-located with firebase-tools' debug logs), `production.log`
