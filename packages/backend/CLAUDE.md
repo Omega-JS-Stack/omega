@@ -8,7 +8,7 @@
 
 OMEGA Backend (@omega.js/backend) is a comprehensive framework for building modern Firebase Cloud Functions backends. Sister project to Electron Manager (EM), Browser Extension Manager (BXM), and Ultimate Jekyll Manager (UJM). Provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, marketing campaign automation, an MCP server, and a CLI for emulator/deploy/logs/auth/Firestore operations.
 
-**This repository** is the @omega.js/backend library itself. **Consumer projects** are Firebase projects that `require('@omega.js/backend')` in their `functions/index.js`, with `config/omega.json5` + `service-account.json` alongside, plus optional `routes/`, `schemas/`, and `hooks/` directories for custom endpoints. Config is loaded via `@omega.js/config` (shared sections top-level, backend settings under `targets.backend`; brand-monorepo hierarchy supported).
+**This repository** is the @omega.js/backend library itself. **Consumer projects** are src-first Firebase apps: `require('@omega.js/backend')` in `src/index.js`, with optional `src/routes/`, `src/schemas/`, and `src/hooks/` for custom endpoints; `omega build` stages everything into `dist/` (the tree `firebase.json` points at). Config is loaded via `@omega.js/config` (shared sections top-level, backend settings under `targets.backend`; brand-monorepo hierarchy supported — brand apps carry NO config file of their own).
 
 ## Recommended skills
 
@@ -19,8 +19,8 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 ### For Consuming Projects
 
-1. `npm install @omega.js/backend --save-dev` (inside `functions/`)
-2. `npx omega setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `config/omega.json5`, `engines.node`, plus the defaults tree via the shared devkit engine: CLAUDE.md, CHANGELOG.md, docs/, test/, `.gitignore`, `functions/.env` — the last three live-sync their `Default Values` section on every setup), validates config, provisions Firestore indexes
+1. `npm install @omega.js/backend` (at the app root — it's a runtime dependency; the staged `dist/package.json` derives from the app manifest)
+2. `npx omega setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `src/index.js`, `engines.node`, plus the defaults tree via the shared devkit engine: CLAUDE.md, CHANGELOG.md, docs/, test/, `.gitignore`, `.env` — the last three live-sync their `Default Values` section on every setup), validates config, stages `dist/`, provisions Firestore indexes
 3. `npx omega emulator` — start Firebase emulators (auth/firestore/functions/database/storage)
 4. `npx omega serve` — local serve with Stripe webhook forwarding (if `STRIPE_SECRET_KEY` is set)
 5. `npx omega test` — runs framework + project test suites against an emulator. Positional target(s) select which test FILES run, by source + path (multiple space-separated targets compose):
@@ -37,11 +37,11 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 `npx omega-backend <cmd>` works as an alias for `npx omega <cmd>`.
 
-> **Important:** All `npx omega ...` commands run from the consumer project's **app root** (the directory with `package.json` + `src/`). `functions/` is staged output — never edit it. The CLI also accepts a `functions/` cwd for muscle memory (it normalizes up).
+> **Important:** All `npx omega ...` commands run from the consumer project's **app root** (the directory with `package.json` + `src/`). `dist/` is staged output — never edit it. The CLI also accepts a `functions/` cwd for muscle memory (it normalizes up).
 
 ### For Framework Development (This Repository)
 
-> **🚫 NEVER use `npx omega ...` from the framework repo.** `npx omega` is for CONSUMER projects (where the bin is linked in `functions/node_modules/.bin/`). From the framework repo, use `npm test`, `npm run prepare`, etc. — the `scripts` in `package.json` call the local `bin/` directly.
+> **🚫 NEVER use `npx omega ...` from the framework repo.** `npx omega` is for CONSUMER projects (where the bin is linked in the app's `node_modules/.bin/`). From the framework repo, use `npm test`, `npm run prepare`, etc. — the `scripts` in `package.json` call the local `bin/` directly.
 
 1. `npm install` — install @omega.js/backend's own deps
 2. `npm run prepare` — build once: copies `src/` → `dist/` via prepare-package
@@ -94,9 +94,9 @@ See [docs/cli-firestore-auth.md](docs/cli-firestore-auth.md) and [docs/cli-logs.
 
 ## Development Workflow
 
-- **🚫 NEVER use `npx omega ...` from the framework repo** — `npx omega` is for CONSUMER projects only (where the bin lives in `functions/node_modules/.bin/`). From the framework repo, use `npm test`, `npm run prepare`, etc. — the `scripts` in `package.json` call `node bin/omega-backend` directly. This applies to ALL four OMEGA frameworks (@omega.js/backend/UJM/BXM/EM).
-- **🚫 NEVER run `npx omega serve` / `npx omega emulator`** (consumer projects) — they're the user's long-running dev processes. Assume they're already running; if they aren't, **instruct the user to run them** rather than running them yourself (running them again kills theirs). To see output, **read the `functions/*.log` files** (`dev.log`, `emulator.log`, `test.log`) — never tail/attach to the process. Running `npx omega test` is fine (it auto-starts its own emulator if needed).
-- **Where the output logs live:** @omega.js/backend CLI commands tee output to `<projectDir>/functions/` (not `logs/` — @omega.js/backend's deliberate exception, co-located with firebase-tools' `*-debug.log`): `dev.log` (`npx omega serve`), `deploy.log` (`npx omega deploy`), `emulator.log` (`npx omega emulator` / test with own emulator), `test.log` (`npx omega test`), `production.log` (`npx omega logs`). The `dev`/`test` names match EM/BXM/UJM; see [docs/logging.md](docs/logging.md).
+- **🚫 NEVER use `npx omega ...` from the framework repo** — `npx omega` is for CONSUMER projects only (where the bin lives in the app's `node_modules/.bin/`). From the framework repo, use `npm test`, `npm run prepare`, etc. — the `scripts` in `package.json` call `node bin/omega-backend` directly. This applies to ALL four OMEGA frameworks (@omega.js/backend/UJM/BXM/EM).
+- **🚫 NEVER run `npx omega serve` / `npx omega emulator`** (consumer projects) — they're the user's long-running dev processes. Assume they're already running; if they aren't, **instruct the user to run them** rather than running them yourself (running them again kills theirs). To see output, **read the `dist/*.log` files** (`dev.log`, `emulator.log`, `test.log`) — never tail/attach to the process. Running `npx omega test` is fine (it auto-starts its own emulator if needed).
+- **Where the output logs live:** @omega.js/backend CLI commands tee output to `<projectDir>/dist/` (not `logs/` — @omega.js/backend's deliberate exception, co-located with firebase-tools' `*-debug.log`): `dev.log` (`npx omega serve`), `deploy.log` (`npx omega deploy`), `emulator.log` (`npx omega emulator` / test with own emulator), `test.log` (`npx omega test`), `production.log` (`npx omega logs`). The `dev`/`test` names match EM/BXM/UJM; see [docs/logging.md](docs/logging.md).
 - **If the user reports an error**, check the emulator/test output for the root cause before guessing.
 - **Live-test UI changes via CDP.** When working on admin dashboards or browser-facing endpoints, use the `chrome-devtools` MCP tools (screenshots, click, evaluate JS, console logs) to verify the change works in the running browser — your session auto-launches its own private Chrome on the first tool call (no setup, no ports). See [docs/cdp-debugging.md](docs/cdp-debugging.md) + `~/.claude/mcp-server/servers/chrome-devtools/CLAUDE.md`.
 
@@ -156,7 +156,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 
 ### Building Routes & Components
 
-- [docs/routes.md](docs/routes.md) — recipes for new API commands, routes (context-object handlers, CRUD method files, ownership checks, firebase.json rewrites + ordering, functions/index.js entry), event handlers, cron jobs
+- [docs/routes.md](docs/routes.md) — recipes for new API commands, routes (context-object handlers, CRUD method files, ownership checks, firebase.json rewrites + ordering, src/index.js entry), event handlers, cron jobs
 - [docs/schemas.md](docs/schemas.md) — schema contract (context object → flat schema, in-function plan branching), field properties, ID generation + path extraction, required-vs-default footgun
 - [docs/firestore.md](docs/firestore.md) — path style, NO subcollections, batch reads (~500 cursor pagination), `metadata.{created,updated}` timestamps, response format + redaction
 - [docs/migration.md](docs/migration.md) — legacy-project migration: runtime config → top-level env vars, `Manager.config.*` → `process.env.*`, constructor routes / tiered schemas → current format
@@ -170,7 +170,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 - [docs/payment-system.md](docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, processor interface, product config, test processor
 - [docs/marketing-campaigns.md](docs/marketing-campaigns.md) — campaign CRUD routes, recurring campaigns, generator pipeline (newsletter), newsletter-driven blog article (`content.article.enabled`), template-owned schemas, asset hosting, seed campaigns
 - [docs/consent.md](docs/consent.md) — marketing consent capture: canonical `consent.{legal,marketing}` user-doc shape, signup-form capture, account-page toggle, HMAC unsub link (cross-provider unsub + re-add on resubscribe), admin contact-DELETE revoke mirror, SendGrid+Beehiiv webhook receivers, parent forwarder (`/marketing/webhook/forward`), library-level consent gate in `email.add()`/`email.sync()` (revoked-only skip), migration script template
-- [docs/mcp.md](docs/mcp.md) — Model Context Protocol server: 25 tools with role-based scoping (22 admin / 2 user / 1 public), tool annotations (title, read/write hints), OAuth 2.1 with PKCE + dynamic client registration + consumer website sign-in, consumer MCP tools (`functions/mcp.js`), HTTPS local dev (mkcert), Claude Desktop/Chat/Code configuration
+- [docs/mcp.md](docs/mcp.md) — Model Context Protocol server: 25 tools with role-based scoping (22 admin / 2 user / 1 public), tool annotations (title, read/write hints), OAuth 2.1 with PKCE + dynamic client registration + consumer website sign-in, consumer MCP tools (`src/mcp.js`), HTTPS local dev (mkcert), Claude Desktop/Chat/Code configuration
 
 ### Subsystems & Libraries
 

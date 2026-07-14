@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **BACKEND SRC/DIST PILLAR SHIPPED (cp122a+b; docs pass = cp122c)** — consumers src-first, functions/ staged, sandbox 1225/e2e PASS, last app omega.json5 dead; **2b create-on-missing queues right behind**, skin waits on Ian's theme notes
+- **BACKEND SRC/DIST PILLAR SHIPPED (cp122a–g)** — consumers src-first, dist/ staged (public/ inside it), SA one-home, zero app-layer configs anywhere; **2b create-on-missing is NEXT**, skin waits on Ian's theme notes
 - **CATCH-UP PASS (Ian 2026-07-12: get us to the classy rebuild / brand rebuild / CMS)** — his gos, in order: cp102b run-gates ✅ → cp108 fontawesome ✅ → cp109 theme-once ✅ (mechanism SHIPPED — triplication dead; the skin now ships everywhere by construction; Ian ready for skin AFTER this pass; cp99 board comments still pending) → #15 Node story ✅ (cp110) → playground manage cycle (cloudflare CNAME propose-first + Google-toggle verify; payment gated) → brand rebuilds LAST (his "after we're pretty much done"). **C4 slices ALL SHIPPED** ([plans/c4-cross-target.md](plans/c4-cross-target.md)): cp104-109 ✅ — arc close waits on the skin. omegajs.dev REGISTERED — wire at arc close
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
@@ -53,7 +53,7 @@
 - prepare-package after-hooks are NON-BLOCKING: a vendor failure mid-rewrite leaves a part-rewritten dist behind a one-line warning (cp104 hit this live; the publishable-ref throw now fails the common cause loud, and CI's no-@omega.js-refs check remains the hard gate)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
-- [x] 122 BACKEND SRC/DIST PILLAR (Ian: "MAJOR PILLARS") — consumers src-first, `functions/` staged output; `omega build` verb + ensureStaged on emulator/serve/test/deploy; composeTargetConfig brand-only + CONFIG_LOCATIONS loses the staged path (stale-brand-edit class dead); sandbox + playground migrated (LAST app omega.json5 deleted); devkit local/omega-bin re-anchored; corpus 1225 / e2e PASS; boot 11 / config 108 / devkit 197 / mgr 641 (cp122a–b) → CHANGELOG
+- [x] 122 BACKEND SRC/DIST PILLAR (Ian: "MAJOR PILLARS" / "humans write in src") — consumers src-first, `dist/` staged output (firebase.json source+hosting point at it; dist/public boilerplate, src/public overrides win); `omega build` verb + ensureStaged everywhere; SA one-home = brand .omega/secrets; wizard scaffolds runtime dep on the ONE app manifest; ZERO app-layer omega.json5 files remain; corpus 1225 / e2e PASS; boot 11 / config 108 / devkit 199 / mgr 641 (cp122a–f) → CHANGELOG
 - [x] 121c app-layer file OPTIONAL — loadConfig rides the brand file alone; 3 app files DELETED; backend file = last → dies with 122 (this commit) → CHANGELOG
 - [x] 121b app-layer truth + shared legs LIVE — extension carried wrong-world data; slapform/chatsy/replyify RAN; 4 SAs → brand .omega/secrets (this commit) → CHANGELOG
 - [x] 121 seed-everything + brandmark LIVE — canonical key order, legacy seeds, brandmark MINTED, payment first light, translate timeout, pipeline mirror law; backend pillar BOARDED (this commit) → CHANGELOG

@@ -1,10 +1,10 @@
 # Logging
 
-@omega.js/backend CLI commands automatically save all output to log files while still streaming to the console. **@omega.js/backend's logs live in `<projectDir>/functions/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit beside firebase-tools' own `*-debug.log` files and everything can be grepped from one directory.
+@omega.js/backend CLI commands automatically save all output to log files while still streaming to the console. **@omega.js/backend's logs live in `<projectDir>/dist/`, not `logs/`** — a deliberate exception to the cross-framework convention so they sit inside the staged tree (which the stage step PRESERVES across re-stages) and can be grepped alongside the runtime it drove.
 
 ## Log files
 
-All in `<projectDir>/functions/`:
+All in `<projectDir>/dist/`:
 
 | File | Source | Lifetime |
 |---|---|---|

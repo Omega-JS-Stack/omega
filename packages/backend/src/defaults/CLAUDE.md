@@ -16,9 +16,11 @@ This project consumes **OMEGA Backend** (@omega.js/backend) — a comprehensive 
 
 ## Quick start
 
+All commands run from the **app root** (this directory). `dist/` is staged build output — never edit it.
+
 ```bash
-cd functions
-npx omega setup             # validate config + scaffold defaults + run checks
+npx omega setup             # validate config + scaffold defaults + stage dist/ + run checks
+npx omega build             # stage src/ → dist/ (the tree firebase.json points at)
 npx omega emulator          # start Firebase emulators (auth/firestore/functions/database/storage)
 npx omega test              # run framework + project test suites (project: → your tests only, mgr:/backend: → framework only)
 npx omega test --extended   # opt into REAL external APIs (shorthand for the shared TEST_EXTENDED_MODE; default: skipped)
@@ -37,27 +39,31 @@ npx omega install live      # restore the published @omega.js/backend from npm
 
 ## Where things live
 
-- `functions/index.js` — entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
-- `functions/config/omega.json5` — OMEGA config: shared sections (brand, cloud, analytics, payment, monitoring, oauth2) top-level, backend settings under `targets.backend`. In a brand monorepo, shared sections can live in the brand root's `config/omega.json5` instead.
-- `functions/.env` — secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored.
-- `functions/service-account.json` — Firebase Admin credentials. Gitignored.
-- `functions/routes/<verb>/<path>.js` — custom routes mounted at runtime (e.g. `routes/get/hello.js` → `GET /hello`).
-- `functions/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
-- `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Some fields managed by `npx omega setup`.
+- `package.json` — THE app manifest: scripts + runtime deps (`@omega.js/backend`, firebase-admin, firebase-functions). The staged `dist/package.json` derives from it.
+- `src/index.js` — entry point. Must call `Manager.init(exports, { ... })` to register all built-in + custom endpoints.
+- `src/routes/<verb>/<path>.js` — custom routes mounted at runtime (e.g. `src/routes/get/hello.js` → `GET /hello`).
+- `src/schemas/<name>.js` — schema definitions for `Manager.Settings()` validation.
+- `src/hooks/<area>/<event>.js` — auth/cron hooks.
+- `src/public/` — OPTIONAL overrides for the hosting boilerplate (`index.html`, `404.html`); defaults are generated into `dist/public/`.
+- `config/omega.json5` — STANDALONE apps only. In a brand monorepo the brand root's `config/omega.json5` is the config (`targets.backend` = this app's settings) and this app carries NO config file.
+- `.env` — secrets (OMEGA_ADMIN_KEY, third-party API keys). Gitignored; staged into `dist/` for the deploy artifact.
+- `service-account.json` — Firebase Admin credentials (STANDALONE apps; brand apps keep it in the brand's `.omega/secrets/`). Gitignored.
+- `firebase.json` — Firebase config (hosting, rewrites, emulator ports). Points `functions.source` + `hosting.public` at `dist/`. Some fields managed by `npx omega setup`.
 - `.firebaserc` — Firebase project ID alias.
 - `firestore.rules` / `database.rules.json` — security rules. @omega.js/backend owns a `// ========== OMEGA Rules ==========` block inside each; everything outside is yours.
+- `dist/` — GENERATED staged output (`omega build`): src copy + derived manifest + composed config + hosting boilerplate. Never edit; gitignored.
 
 ## Per-context imports
 
 ```js
-// functions/index.js — the entire backend bootstrap
+// src/index.js — the entire backend bootstrap
 const Manager = require('@omega.js/backend');
 Manager.init(exports, {
   projectType: 'firebase',
   // ...your config
 });
 
-// In a custom route (functions/routes/get/hello.js):
+// In a custom route (src/routes/get/hello.js):
 module.exports = async function(Manager, assistant) {
   // assistant.req, assistant.res, assistant.user, etc.
 };
@@ -71,12 +77,12 @@ After `Manager.init()`, the Manager instance exposes factory methods:
 - `Manager.Analytics({ assistant })` — GA4 event tracking
 - `Manager.Usage()` — rate-limiting
 - `Manager.Middleware(req, res)` — request pipeline
-- `Manager.Settings()` — schema validation against `functions/schemas/*`
+- `Manager.Settings()` — schema validation against `src/schemas/*`
 - `Manager.Utilities()` — batch operations + helpers
 - `Manager.Metadata(doc)` — timestamps + tag helpers
 - `Manager.storage({ name })` — local JSON storage (lowdb)
 
-Auth events, payment-webhook transitions, and cron jobs are wired automatically — hook into them by exporting from `functions/hooks/<area>/<event>.js`.
+Auth events, payment-webhook transitions, and cron jobs are wired automatically — hook into them by exporting from `src/hooks/<area>/<event>.js`.
 
 ## Dependency resolution
 
