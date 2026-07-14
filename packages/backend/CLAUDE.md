@@ -37,7 +37,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 `npx omega-backend <cmd>` works as an alias for `npx omega <cmd>`.
 
-> **Important:** All `npx omega ...` commands MUST be run from the consumer project's `functions/` subdirectory. The binary lives in `functions/node_modules/.bin/`.
+> **Important:** All `npx omega ...` commands run from the consumer project's **app root** (the directory with `package.json` + `src/`). `functions/` is staged output — never edit it. The CLI also accepts a `functions/` cwd for muscle memory (it normalizes up).
 
 ### For Framework Development (This Repository)
 
