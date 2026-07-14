@@ -200,10 +200,11 @@ class E2eHarness {
     fs.mkdirSync(this.logDir, { recursive: true });
     const emulatorLog = path.join(this.logDir, 'emulator.log');
     const logStream = fs.createWriteStream(emulatorLog);
-    const functionsDir = path.join(this.targets.backend, 'functions');
 
+    // Backend commands run from the APP ROOT (src/dist pillar) — the CLI
+    // stages dist/ itself before booting the emulator.
     const child = spawn('npx', ['mgr', 'emulator'], {
-      cwd: functionsDir,
+      cwd: this.targets.backend,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,

@@ -11,7 +11,8 @@
  *   .env                  → dist/.env               (verbatim copy — disperse
  *                           composes brand-level values into the APP .env now)
  *   .nvmrc                → dist/.nvmrc
- *   service-account.json  → dist/service-account.json
+ *   service-account.json  → dist/service-account.json (app root, else the
+ *                           brand's .omega/secrets/ — the key's ONE home)
  *   src/public/** OR      → dist/public/**          (consumer overrides win;
  *   templates/public/**                               defaults fill the gaps)
  *
@@ -33,7 +34,7 @@
  */
 const path = require('path');
 const jetpack = require('fs-jetpack');
-const { composeTargetConfig } = require('@omega.js/config');
+const { composeTargetConfig, findBrandRoot } = require('@omega.js/config');
 
 // dist/ entries that survive a re-stage (runtime artifacts, never authored)
 const PRESERVE = [/^node_modules$/, /\.log$/];
@@ -127,11 +128,25 @@ function stageFunctions(options) {
   staged.push('config/omega.json5 (composed)');
 
   // ─── App-root files that ride the artifact ────────────────────────────────
-  for (const file of ['.env', '.nvmrc', 'service-account.json']) {
+  for (const file of ['.env', '.nvmrc']) {
     const source = path.join(projectDir, file);
     if (!jetpack.exists(source)) continue;
     jetpack.copy(source, path.join(distDir, file), { overwrite: true });
     staged.push(file);
+  }
+
+  // ─── Service account: app root (standalone) → brand secrets home ──────────
+  // Google shows SA keys once — the brand's gitignored .omega/secrets/ is the
+  // ONE home (the firebase manage service mints it there); a standalone app
+  // keeps its own copy at the app root.
+  const brandRoot = findBrandRoot(projectDir);
+  const saSource = [
+    path.join(projectDir, 'service-account.json'),
+    brandRoot ? path.join(brandRoot, '.omega', 'secrets', 'service-account.json') : null,
+  ].filter(Boolean).find((candidate) => jetpack.exists(candidate));
+  if (saSource) {
+    jetpack.copy(saSource, path.join(distDir, 'service-account.json'), { overwrite: true });
+    staged.push('service-account.json');
   }
 
   log(`Staged dist/ from src/ (${staged.length} steps)`);

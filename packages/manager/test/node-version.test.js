@@ -63,7 +63,7 @@ test('node-version: findInstalledNode picks the highest patch of the major', () 
   jetpack.remove(base);
 });
 
-test('node-version: resolveAppNode — no .nvmrc, current-major match, functions/ lookup, missing install', () => {
+test('node-version: resolveAppNode — no .nvmrc, current-major match, pinned major, missing install', () => {
   const base = path.join(os.tmpdir(), `omega-nvm-${process.pid}-b`);
   const appDir = path.join(os.tmpdir(), `omega-app-${process.pid}-b`);
   jetpack.remove(base);
@@ -72,7 +72,7 @@ test('node-version: resolveAppNode — no .nvmrc, current-major match, functions
   makeFakeNvm(base, 'v99.0.1', '#!/bin/sh\nexit 0\n');
 
   withEnv({ NVM_DIR: base }, () => {
-    // no .nvmrc anywhere → inherited PATH
+    // no .nvmrc → inherited PATH
     assert.equal(resolveAppNode(appDir), null);
 
     // current major → resolved but binDir null (no PATH override needed)
@@ -83,16 +83,16 @@ test('node-version: resolveAppNode — no .nvmrc, current-major match, functions
     assert.equal(same.major, Number(currentMajor));
     assert.deepEqual(nodeEnvFor(same), {});
 
-    // functions/.nvmrc is honored (backend convention) when the root has none
-    jetpack.remove(path.join(appDir, '.nvmrc'));
-    jetpack.write(path.join(appDir, 'functions', '.nvmrc'), 'v99/*');
-    const viaFunctions = resolveAppNode(appDir);
-    assert.equal(viaFunctions.major, 99);
-    assert.ok(viaFunctions.binDir.includes('v99.0.1'));
-    assert.ok(nodeEnvFor(viaFunctions).PATH.startsWith(viaFunctions.binDir));
+    // pinned different major → resolved from the nvm install (the app root
+    // is the ONE .nvmrc home — src/dist pillar; dist/.nvmrc is a staged copy)
+    jetpack.write(path.join(appDir, '.nvmrc'), 'v99/*');
+    const pinned = resolveAppNode(appDir);
+    assert.equal(pinned.major, 99);
+    assert.ok(pinned.binDir.includes('v99.0.1'));
+    assert.ok(nodeEnvFor(pinned).PATH.startsWith(pinned.binDir));
 
     // pinned major with no install → hard error naming nvm install
-    jetpack.write(path.join(appDir, 'functions', '.nvmrc'), 'v97/*');
+    jetpack.write(path.join(appDir, '.nvmrc'), 'v97/*');
     const missing = resolveAppNode(appDir);
     assert.match(missing.error, /nvm install 97/);
   });

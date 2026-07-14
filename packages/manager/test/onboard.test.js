@@ -102,7 +102,6 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
     '.env',
     '.gitignore',
     'README.md',
-    'apps/backend/functions/package.json',
     'apps/backend/package.json',
     'apps/desktop/package.json',
     'apps/website/package.json',
@@ -131,14 +130,14 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   const appPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'website', 'package.json'), 'utf8'));
   assert.equal(appPkg.name, 'acme-website');
 
-  // cp95a seeds: framework devDependency per app (backend's lives in
-  // functions/dependencies — its shell stays dep-less), a bootable demo-*
-  // cloud project, and the starter catalog shipped as a comment
+  // cp95a seeds: framework dep per app — the backend's is a RUNTIME
+  // dependency on its ONE app manifest (src/dist pillar: the stage derives
+  // dist/package.json from it), every other target's is a devDependency —
+  // plus a bootable demo-* cloud project and the starter catalog as a comment
   assert.deepEqual(appPkg.devDependencies, { '@omega.js/web': '*' });
-  const fnPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'backend', 'functions', 'package.json'), 'utf8'));
-  assert.deepEqual(fnPkg.dependencies, { '@omega.js/backend': '*' });
-  const backendShell = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'backend', 'package.json'), 'utf8'));
-  assert.equal(backendShell.devDependencies, undefined, 'backend shell stays dep-less');
+  const backendPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'backend', 'package.json'), 'utf8'));
+  assert.deepEqual(backendPkg.dependencies, { '@omega.js/backend': '*' });
+  assert.equal(backendPkg.devDependencies, undefined, 'backend framework is a runtime dep, not dev');
   assert.deepEqual(config.cloud, { provider: 'firebase', config: { projectId: 'demo-acme' } });
   const rawConfig = fs.readFileSync(path.join(root, 'config', 'omega.json5'), 'utf8');
   assert.match(rawConfig, /\/\/ payment: \{/, 'starter catalog ships commented');
@@ -369,7 +368,9 @@ test('fresh scaffold runs the workspace service green', async () => {
 test('full manage on a fresh brand: services skip cleanly, testing honestly nudges toward the frameworks', async () => {
   const root = tempDir();
   await runOnboard(root, { id: 'nudge', targets: 'web,backend', manage: false });
-  stubFrameworks(root, ['@omega.js/web']);
+  // Both declared frameworks stubbed (the backend's is a runtime dep on its
+  // app manifest since the src/dist pillar) — mirrors a post-`mgr i local` brand
+  stubFrameworks(root, ['@omega.js/web', '@omega.js/backend']);
 
   const report = await runManage(root, { ...FAKE_FETCH_200 });
 

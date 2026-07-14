@@ -3,9 +3,10 @@
  * needs, and its key is downloaded.
  *
  * Google shows service account keys ONCE at creation — they can't be
- * re-downloaded. The key's source of truth is the brand's gitignored
- * .omega/secrets/service-account.json; it's copied into the backend app's
- * functions/ dir (where @omega.js/backend expects it) whenever missing there.
+ * re-downloaded. The key's ONE home is the brand's gitignored
+ * .omega/secrets/service-account.json — the backend's stage step (`omega
+ * build`, src/dist pillar) reads it from there and carries it into the
+ * staged dist/ tree; no per-app copy exists anymore.
  *
  * The IAM role grant diffs the policy first (omega-manager PUT the policy on
  * every run) — a converged account is a zero-mutation no-op.
@@ -58,29 +59,18 @@ async function ensureRoles(api, projectId, serviceAccountEmail, options) {
 }
 
 module.exports = async function ensureServiceAccount(context) {
-  const { firebaseApi: api, brandConfig, brandRoot, apps = [], projectId, options = {} } = context;
+  const { firebaseApi: api, brandConfig, brandRoot, projectId, options = {} } = context;
   const brandName = brandConfig.brand?.name || context.brandId;
 
-  // Source of truth + the backend copy @omega.js/backend reads
+  // The key's ONE home — the backend stage step reads it from here
   const sourceKeyPath = join(brandRoot, '.omega', 'secrets', 'service-account.json');
-  const backendApp = apps.find((app) => app.target === 'backend');
-  const destKeyPath = backendApp ? join(backendApp.path, 'functions', 'service-account.json') : null;
 
-  // === Key already downloaded — verify roles, sync the backend copy ===
+  // === Key already downloaded — verify roles ===
   if (jetpack.exists(sourceKeyPath)) {
     const existingKey = jetpack.read(sourceKeyPath, 'json');
     const serviceAccountEmail = existingKey?.client_email;
 
     console.log(`      ${chalk.green('✓')} Service account key exists`);
-
-    if (destKeyPath && !jetpack.exists(destKeyPath)) {
-      if (options.dryRun) {
-        dryRunPlan('copy key to the backend app');
-      } else {
-        jetpack.copy(sourceKeyPath, destKeyPath);
-        console.log(`      ${chalk.green('✓')} Copied key to ${chalk.cyan(`${backendApp.dir}/functions/`)}`);
-      }
-    }
 
     try {
       await ensureRoles(api, projectId, serviceAccountEmail, options);
@@ -143,11 +133,6 @@ module.exports = async function ensureServiceAccount(context) {
 
     jetpack.write(sourceKeyPath, keyData);
     console.log(`      ${chalk.green('✓')} Saved key to ${chalk.cyan('.omega/secrets/')}`);
-
-    if (destKeyPath) {
-      jetpack.copy(sourceKeyPath, destKeyPath, { overwrite: true });
-      console.log(`      ${chalk.green('✓')} Copied key to ${chalk.cyan(`${backendApp.dir}/functions/`)}`);
-    }
 
     return { state: { serviceAccount: { email: serviceAccountEmail } } };
   } catch (error) {

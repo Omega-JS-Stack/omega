@@ -111,8 +111,13 @@ class ProjectIdConsistencyTest extends BaseTest {
       }
     }
 
-    // service-account.json (authored at the app root — src/dist pillar)
-    const serviceAccountPath = `${projectPath}/service-account.json`;
+    // service-account.json — source chain: app root (standalone) → brand
+    // .omega/secrets/ (src/dist pillar; the stage step reads the same chain)
+    const brandRoot = findBrandRoot(projectPath);
+    const serviceAccountPath = [
+      `${projectPath}/service-account.json`,
+      brandRoot ? `${brandRoot}/.omega/secrets/service-account.json` : null,
+    ].filter(Boolean).find((candidate) => jetpack.exists(candidate)) || `${projectPath}/service-account.json`;
     const serviceAccountContent = jetpack.read(serviceAccountPath);
     const serviceAccountData = serviceAccountContent ? JSON5.parse(serviceAccountContent) : null;
 

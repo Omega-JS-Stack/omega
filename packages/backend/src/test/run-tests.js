@@ -53,7 +53,9 @@ async function main() {
     const BackendManager = require('../manager/index.js');
     Manager = new BackendManager();
     Manager.init(null, {
-      cwd: path.join(projectDir, 'functions'),
+      // The staged output tree (src/dist pillar) — same cwd the emulator's
+      // function workers boot with, so config/SA resolve identically
+      cwd: path.join(projectDir, 'dist'),
       log: false,
     });
     assistant = Manager.Assistant({}, { functionName: 'backend-test-runner', accept: 'json' });

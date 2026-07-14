@@ -10,8 +10,8 @@
  * reads, no mirror to disperse.
  *
  * App → target mapping, first match wins:
- *   1. Declared — the app's own omega.json5 (config/ or functions/config/)
- *      lists exactly the target under `targets` (key presence = enabled).
+ *   1. Declared — the app's own config/omega.json5 lists exactly the target
+ *      under `targets` (key presence = enabled).
  *   2. Directory convention — apps/website* → web, apps/backend* → backend,
  *      apps/desktop* → desktop, apps/extension* → extension, apps/mobile* → mobile.
  * Unmapped apps surface as workspace-service warnings, never silent skips.

@@ -32,19 +32,17 @@ function parseNvmrcMajor(content) {
 }
 
 /**
- * Find the app's .nvmrc — the app dir first, then its `functions/` (the
- * backend convention pins Node where the Firebase runtime reads it).
+ * Find the app's .nvmrc — the app root is the ONE authored home (the
+ * backend's stage step copies it into dist/ for the Firebase runtime).
  *
  * @param {string} appDir - The app directory commands run in.
  * @returns {{ spec: string, file: string }|null} The trimmed spec + its file.
  */
 function findNvmrc(appDir) {
-  for (const dir of [appDir, path.join(appDir, 'functions')]) {
-    const file = path.join(dir, '.nvmrc');
-    const content = jetpack.read(file);
-    if (content && content.trim()) {
-      return { spec: content.trim(), file };
-    }
+  const file = path.join(appDir, '.nvmrc');
+  const content = jetpack.read(file);
+  if (content && content.trim()) {
+    return { spec: content.trim(), file };
   }
   return null;
 }

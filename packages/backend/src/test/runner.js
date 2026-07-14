@@ -390,8 +390,11 @@ class TestRunner {
 
     try {
       const searchPaths = [
-        path.join(this.options.projectDir, 'functions'),
-        path.join(this.options.projectDir, 'functions', 'node_modules'),
+        // The app root + its install — deps live on the ONE app manifest
+        // (src/dist pillar); dist/node_modules covers legacy installs
+        this.options.projectDir,
+        path.join(this.options.projectDir, 'node_modules'),
+        path.join(this.options.projectDir, 'dist', 'node_modules'),
         path.resolve(__dirname, '../../'),
       ];
       const origResolve = Module._resolveFilename.bind(Module);

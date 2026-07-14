@@ -575,7 +575,7 @@ test('project-settings: drifted name is patched, matching web app untouched', as
 
 // ─── Service account key lifecycle ───────────────────────────────────────────
 
-test('service-account: missing key is created, saved to .omega/secrets, and copied to the backend app', async () => {
+test('service-account: missing key is created and saved to .omega/secrets (the ONE home — the backend stage reads it from there)', async () => {
   const handler = require('../src/services/firebase/ensure/service-account.js');
   const api = fakeFirebase({
     ...convergedResponses(),
@@ -584,7 +584,6 @@ test('service-account: missing key is created, saved to .omega/secrets, and copi
 
   const brandRoot = tmpRoot(); // no key staged
   const backendPath = path.join(brandRoot, 'apps', 'backend');
-  jetpack.dir(path.join(backendPath, 'functions'));
 
   const result = await handler(handlerContext(brandConfig(), api, {
     brandRoot,
@@ -595,7 +594,9 @@ test('service-account: missing key is created, saved to .omega/secrets, and copi
   assert.equal(api.callsTo('createServiceAccountKey').length, 1);
   assert.equal(api.callsTo('createServiceAccount').length, 0); // account existed
   assert.equal(jetpack.read(path.join(brandRoot, '.omega', 'secrets', 'service-account.json'), 'json').client_email, SA_EMAIL);
-  assert.equal(jetpack.read(path.join(backendPath, 'functions', 'service-account.json'), 'json').client_email, SA_EMAIL);
+  // No per-app copy: dist/ staging pulls from .omega/secrets at build time
+  assert.equal(jetpack.exists(path.join(backendPath, 'functions', 'service-account.json')), false);
+  assert.equal(jetpack.exists(path.join(backendPath, 'service-account.json')), false);
 });
 
 // ─── Authentication (manual flows → warned, config diffs → PATCH) ────────────

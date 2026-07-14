@@ -62,8 +62,10 @@ function stageBrand() {
   }));
   write(path.join(brand, 'apps', 'website', 'config', 'omega.json5'), '{ targets: { web: {} } }\n');
 
-  write(path.join(brand, 'apps', 'backend', 'functions', 'package.json'), JSON.stringify({
-    name: 'backend-functions', private: true, dependencies: { '@omega.js/backend': '*' },
+  // App-root manifest (src/dist pillar): the backend's framework dep is a
+  // RUNTIME dependency on the ONE app package.json — no functions/ manifest.
+  write(path.join(brand, 'apps', 'backend', 'package.json'), JSON.stringify({
+    name: 'backend', private: true, dependencies: { '@omega.js/backend': '*' },
   }));
   write(path.join(brand, 'apps', 'backend', 'config', 'omega.json5'), '{ targets: { backend: {} } }\n');
 
