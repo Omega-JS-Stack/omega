@@ -102,16 +102,22 @@ function cleanCSR(csrContent) {
 /**
  * Export the .cer + private.key pair to a Keychain-importable .p12.
  *
- * No-ops when either input is missing (e.g. a manual cert whose CSR was
- * never generated locally) or when the .p12 is already fresher than the
- * .cer (mtime diff — a converged brand runs zero openssl execs).
+ * No-ops when the .cer is missing or when the .p12 is already fresher than
+ * the .cer (mtime diff — a converged brand runs zero openssl execs). A cert
+ * WITHOUT its paired key warns instead of silently skipping: that cert
+ * can't sign anything until csr/{TYPE}/private.key arrives from the machine
+ * whose CSR created it.
  */
 function exportToP12(type, appleDir, certificatePassword = '') {
   const certPath = `${appleDir}/certificates/${type}.cer`;
   const keyPath = `${appleDir}/csr/${type}/private.key`;
   const p12Path = `${appleDir}/certificates/${type}.p12`;
 
-  if (!jetpack.exists(certPath) || !jetpack.exists(keyPath)) {
+  if (!jetpack.exists(certPath)) {
+    return;
+  }
+  if (!jetpack.exists(keyPath)) {
+    console.log(`        ${chalk.yellow('⚠')} No local private key for ${type} — .p12 not exported (copy csr/${type}/private.key from the machine that created the CSR, then re-run)`);
     return;
   }
   if (!isStale(certPath, p12Path)) {
@@ -184,6 +190,47 @@ function validateManualCertificate(certPath) {
   }
 }
 
+/**
+ * Common Name of a certificate's subject (openssl auto-detects DER/PEM).
+ * Apple stamps the portal type into the CN ("Developer ID Installer: Team
+ * Name (TEAMID)") — how a downloaded .cer is matched to the expected type.
+ *
+ * @returns {string|null}
+ */
+function getCertificateCommonName(certPath) {
+  try {
+    const subject = execSync(
+      `openssl x509 -subject -noout -in "${certPath}"`,
+      { encoding: 'utf8', stdio: 'pipe' },
+    );
+    const match = subject.match(/CN\s*=\s*([^,]+)/);
+    return match ? match[1].trim() : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Whether the certificate's public key pairs with the private key (modulus
+ * comparison) — proof a portal-downloaded .cer was issued from the
+ * pipeline's own CSR, so the .p12 export has its pair.
+ */
+function certificateMatchesKey(certPath, keyPath) {
+  try {
+    const certModulus = execSync(
+      `openssl x509 -modulus -noout -in "${certPath}"`,
+      { encoding: 'utf8', stdio: 'pipe' },
+    ).trim();
+    const keyModulus = execSync(
+      `openssl rsa -modulus -noout -in "${keyPath}"`,
+      { encoding: 'utf8', stdio: 'pipe' },
+    ).trim();
+    return certModulus.length > 0 && certModulus === keyModulus;
+  } catch (error) {
+    return false;
+  }
+}
+
 module.exports = {
   listCertificates,
   downloadCertificate,
@@ -193,4 +240,6 @@ module.exports = {
   exportToP12,
   findValidCertificate,
   validateManualCertificate,
+  getCertificateCommonName,
+  certificateMatchesKey,
 };

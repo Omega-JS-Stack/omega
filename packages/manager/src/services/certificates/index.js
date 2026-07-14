@@ -12,10 +12,14 @@
  * De-ITW'd from omega-manager: certs lived in the company instance's shared
  * .output/_shared/ tree (one set for all brands) and the bundle-ID prefix
  * was hardcoded to the company — the port keeps everything brand-local and
- * reads certificates.apple.bundleIdPrefix from config. Interactive rescue
- * paths (auto-opening the Apple portal and Keychain Access) became printed
- * guidance, and the --force-recreate CLI flag was not ported (delete the
- * local .cer to force a re-download; expired certs recreate automatically).
+ * reads certificates.apple.bundleIdPrefix from config. The interactive
+ * rescue for portal-only certs is restored and upgraded (Ian 2026-07-14,
+ * lib/manual-walkthrough.js): the pipeline stages the CSR itself — legacy
+ * sent users to Keychain Access — opens the portal create page Enter-gated,
+ * and watches Downloads for the issued .cer; non-interactive runs keep
+ * printed guidance + converge-on-rerun. The --force-recreate CLI flag was
+ * not ported (delete the local .cer to force a re-download; expired certs
+ * recreate automatically).
  *
  * Env (brand .env): APPLE_API_ISSUER, APPLE_API_KEY_ID, APPLE_TEAM_ID
  * required; CSC_KEY_PASSWORD auto-generated + persisted to the brand .env

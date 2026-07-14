@@ -19,6 +19,8 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 const { catchAgreements } = require('../lib/apple-api.js');
+const { canPrompt } = require('../../../lib/run-gates.js');
+const { runManualCertWalkthrough } = require('../lib/manual-walkthrough.js');
 
 const {
   listCertificates,
@@ -102,7 +104,25 @@ module.exports = catchAgreements(async (context) => {
     }
 
     if (manual) {
-      const validation = validateManualCertificate(certPath);
+      let validation = validateManualCertificate(certPath);
+
+      // Interactive rescue: only the Account Holder can CREATE Developer ID
+      // certs (portal-only — no API path), but the CSR, the download, and
+      // the install are ours to automate. Non-interactive runs keep the
+      // print-and-warn + converge-on-rerun contract below.
+      if (!validation.valid && canPrompt(context.options)) {
+        const { installed } = await runManualCertWalkthrough({
+          type,
+          certPath,
+          appleDir,
+          teamId: appleSecrets.teamId,
+          ...(context.downloadsDir ? { downloadsDir: context.downloadsDir } : {}),
+        });
+        if (installed) {
+          validation = validateManualCertificate(certPath);
+        }
+      }
+
       if (validation.valid) {
         const expDate = validation.expirationDate.toISOString().split('T')[0];
         console.log(`        ${chalk.green('✓')} Local file valid ${chalk.dim(`(expires ${expDate})`)}`);

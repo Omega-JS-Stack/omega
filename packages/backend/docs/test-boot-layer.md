@@ -40,9 +40,9 @@ module.exports = {
 - `firebase.json` + `.firebaserc` — a **`demo-` project** (`demo-omega-backend`) so the emulator NEVER touches real Firebase; emulator ports from `DEFAULT_EMULATOR_PORTS`; hosting rewrite to `omega_api`.
 - `functions/index.js` — the one-line `Manager.init()` bootstrap (mirrors a real consumer).
 - `functions/package.json` + `functions/config/omega.json5` — fake brand/config (no real secrets).
-- `firestore.rules` / `storage.rules` / `database.rules.json` / `firestore.indexes.json` — minimal locked rules (`omega_api` uses the Admin SDK, which bypasses rules).
+- `storage.rules` / `database.rules.json` / `firestore.indexes.json` — minimal locked rules (`omega_api` uses the Admin SDK, which bypasses rules). `firestore.rules` is NOT committed — it boot-syncs from the setup SSOT (`templates/firestore.rules`, version-stamped) so the full `rules/` suite exercises exactly what `omega setup` ships to consumers.
 
-**Runtime-only, gitignored** (never committed): before boot, the test command symlinks the local `@omega.js/backend` (+ `firebase-admin`/`firebase-functions` from @omega.js/backend's own `node_modules`) into the fixture's `functions/node_modules`, injects the fixture admin keys into the env, and generates a **throwaway RSA `service-account.json`** (emulator-only — a `demo-` project never authenticates against Google). All of this lives in `setupSelfTest()` / `linkFixtureDeps()` / `ensureFixtureServiceAccount()` in [src/cli/commands/test.js](../src/cli/commands/test.js).
+**Runtime-only, gitignored** (never committed): before boot, the test command symlinks the local `@omega.js/backend` (+ `firebase-admin`/`firebase-functions` from @omega.js/backend's own `node_modules`) into the fixture's `functions/node_modules`, injects the fixture admin keys + `OMEGA_NAMESPACE` into the env, generates a **throwaway RSA `service-account.json`** (emulator-only — a `demo-` project never authenticates against Google), and stages the canonical `firestore.rules` from the setup template. All of this lives in `setupSelfTest()` / `linkFixtureDeps()` / `ensureFixtureServiceAccount()` / `ensureFixtureRules()` in [src/cli/commands/test.js](../src/cli/commands/test.js).
 
 Two packaging details keep the fixture sound: the fixture's `.firebaserc` is **re-included over the repo's global `.firebaserc` ignore** (the emulator boots with no `--project` flag, so it resolves `demo-omega-backend` from that file — a fresh clone needs it), and a `prepublishOnly` script **removes the runtime symlinks before `npm publish`** (the `@omega.js/backend` symlink points back at the repo root, which would loop prepare-package's publish-time tree walk; the next self-test run relinks them).
 
@@ -58,7 +58,7 @@ The `boot/` smoke is **excluded from real-consumer runs** (`runner.js` `discover
 
 ## Why this exists
 
-@omega.js/backend has no pure-logic test layer — every `routes`/`events`/`rules` suite needs a live emulator + a real project, so they run against a real consumer. The boot layer fills the remaining gap: a fast, self-contained smoke proving the framework still boots a consumer backend from the repo itself. It's the @omega.js/backend analog of "does the extension load?" (BXM) / "does the site boot?" (UJM).
+@omega.js/backend has no pure-logic test layer — every `routes`/`events`/`rules` suite needs a live emulator + a real project. The boot layer is the fast, self-contained smoke proving the framework still boots a consumer backend from the repo itself — the @omega.js/backend analog of "does the extension load?" (BXM) / "does the site boot?" (UJM) — and it stays the bare-`npm test` default for speed. The FULL framework suite also passes against the fixture (`npm test -- backend:`): the fixture carries corpus-parity payment config and boot-syncs the canonical rules exactly for that (cp131), so a consumer context is no longer required to run everything.
 
 ## See also
 

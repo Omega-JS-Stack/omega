@@ -21,6 +21,9 @@ const jetpack = require('fs-jetpack');
 const { SERVICE_ORDER, OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { signJwt } = require('../src/lib/jwt.js');
 const { API_BASE } = require('../src/services/certificates/lib/apple-api.js');
+const { PORTAL_CREATE_URL } = require('../src/services/certificates/lib/manual-walkthrough.js');
+const { setBrowserOpener } = require('@omega.js/devkit/flows');
+const { openTtyPrompt } = require('./lib/interactive.js');
 const service = require('../src/services/certificates/index.js');
 
 // Tests must never see real credentials from the shell environment
@@ -164,7 +167,7 @@ function stageLocalCert(root, type, { key = true, p12 = true } = {}) {
   }
 }
 
-function runService(config, { root, client, options = {}, keychain, secrets, operations = OPERATIONS.certificates, serviceData = {} } = {}) {
+function runService(config, { root, client, options = {}, keychain, secrets, operations = OPERATIONS.certificates, serviceData = {}, downloadsDir } = {}) {
   return service.run({
     brandId: BRAND_ID,
     brandRoot: root,
@@ -179,6 +182,8 @@ function runService(config, { root, client, options = {}, keychain, secrets, ope
     appleSecrets: client ? (secrets ?? fakeSecrets()) : undefined,
     // Default to a silent fake so no test can ever touch the real keychain
     keychainImport: keychain || (() => ({ imported: 0, skipped: 0, failed: 0 })),
+    // The manual-cert walkthrough scans this instead of ~/Downloads
+    ...(downloadsDir ? { downloadsDir } : {}),
   });
 }
 
@@ -441,6 +446,137 @@ test('certificates: a valid local manual cert passes openssl validation and sync
   assert.equal(result.output.certificates.synced, 6);
   assert.equal(result.state.certificateMap.DEVELOPER_ID_APPLICATION_G2.id, 'manual');
   assert.match(result.state.certificateMap.DEVELOPER_ID_APPLICATION_G2.expirationDate, /^\d{4}-/);
+});
+
+// ─── Manual-cert interactive walkthrough ─────────────────────────────────────
+// Real prompts on fake TTY streams, a stubbed browser opener playing Apple
+// (issuing a cert against the CSR the SERVICE staged), and a temp dir as
+// Downloads — the whole rescue path runs for real except the portal itself.
+
+const MANUAL_ONLY_CONFIG = { apple: { certificates: [{ type: 'DEVELOPER_ID_INSTALLER_G2', manual: true }] } };
+
+function issueCert({ keyPath, cn, outPath, newKeyPath = null }) {
+  const keyArgs = newKeyPath
+    ? `-nodes -newkey rsa:2048 -keyout "${newKeyPath}"`
+    : `-key "${keyPath}"`;
+  execSync(
+    `openssl req -x509 ${keyArgs} -days 365 -subj "/CN=${cn}/C=US" -outform DER -out "${outPath}"`,
+    { stdio: 'pipe' },
+  );
+}
+
+test('certificates: walkthrough stages the CSR, opens the portal, and installs the paired download', async () => {
+  const root = stageBrand();
+  const downloads = mkdtempSync(join(tmpdir(), 'omega-certs-downloads-'));
+  const client = fakeApple({ certificates: [] });
+  const keychain = fakeKeychain();
+  const certPath = join(appleDirOf(root), 'certificates', 'DEVELOPER_ID_INSTALLER_G2.cer');
+
+  const tty = openTtyPrompt();
+  const opened = [];
+  setBrowserOpener(async (url) => {
+    opened.push(url);
+    // Play Apple: issue the cert from the CSR key the service just staged
+    issueCert({
+      keyPath: join(appleDirOf(root), 'csr', 'DEVELOPER_ID_INSTALLER_G2', 'private.key'),
+      cn: 'Developer ID Installer: Fixture (TEAMTEST12)',
+      outPath: join(downloads, 'developerID_installer.cer'),
+    });
+    return true;
+  });
+
+  try {
+    const run = runService(brandConfig(MANUAL_ONLY_CONFIG), {
+      root, client, keychain: keychain.fn, operations: ONLY('certificates'), downloadsDir: downloads,
+    });
+    await tty.answer('Press Enter to open the Apple Developer portal', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.output.certificates.synced, 1);
+    assert.equal(result.output.certificates.manualMissing, undefined);
+    assert.equal(result.state.certificateMap.DEVELOPER_ID_INSTALLER_G2.id, 'manual');
+    assert.deepEqual(opened, [PORTAL_CREATE_URL]);
+    // The picker-friendly CSR copy was staged into Downloads
+    assert.ok(jetpack.exists(join(downloads, 'omega-DEVELOPER_ID_INSTALLER_G2.certSigningRequest')));
+    // Installed + REAL .p12 export from the paired key + keychain import
+    assert.ok(jetpack.exists(certPath));
+    assert.ok(jetpack.exists(join(appleDirOf(root), 'certificates', 'DEVELOPER_ID_INSTALLER_G2.p12')));
+    assert.equal(keychain.calls.length, 1);
+    // Portal-only stays portal-only: nothing was ever POSTed to Apple
+    assert.deepEqual(client.mutations(), []);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('certificates: walkthrough rejects a download of the wrong type and (s) keeps the warn contract', async () => {
+  const root = stageBrand();
+  const downloads = mkdtempSync(join(tmpdir(), 'omega-certs-downloads-'));
+  const client = fakeApple({ certificates: [] });
+  const certPath = join(appleDirOf(root), 'certificates', 'DEVELOPER_ID_INSTALLER_G2.cer');
+
+  const tty = openTtyPrompt();
+  setBrowserOpener(async () => {
+    // Right CSR, wrong portal choice: the CN says Developer ID APPLICATION
+    issueCert({
+      keyPath: join(appleDirOf(root), 'csr', 'DEVELOPER_ID_INSTALLER_G2', 'private.key'),
+      cn: 'Developer ID Application: Fixture (TEAMTEST12)',
+      outPath: join(downloads, 'developerID_application.cer'),
+    });
+    return true;
+  });
+
+  try {
+    const run = runService(brandConfig(MANUAL_ONLY_CONFIG), {
+      root, client, operations: ONLY('certificates'), downloadsDir: downloads,
+    });
+    await tty.answer('Press Enter to open the Apple Developer portal', '\r');
+    await tty.answer('(s)=skip', 's');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.output.certificates.manualMissing, 1);
+    assert.ok(!jetpack.exists(certPath));
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
+});
+
+test('certificates: walkthrough rejects a cert that does not pair with the staged CSR key', async () => {
+  const root = stageBrand();
+  const downloads = mkdtempSync(join(tmpdir(), 'omega-certs-downloads-'));
+  const client = fakeApple({ certificates: [] });
+  const certPath = join(appleDirOf(root), 'certificates', 'DEVELOPER_ID_INSTALLER_G2.cer');
+
+  const tty = openTtyPrompt();
+  setBrowserOpener(async () => {
+    // Right CN, WRONG key — e.g. a cert issued from a Keychain Access CSR
+    issueCert({
+      newKeyPath: join(downloads, 'throwaway.key'),
+      cn: 'Developer ID Installer: Fixture (TEAMTEST12)',
+      outPath: join(downloads, 'developerID_installer.cer'),
+    });
+    return true;
+  });
+
+  try {
+    const run = runService(brandConfig(MANUAL_ONLY_CONFIG), {
+      root, client, operations: ONLY('certificates'), downloadsDir: downloads,
+    });
+    await tty.answer('Press Enter to open the Apple Developer portal', '\r');
+    await tty.answer('(s)=skip', 's');
+    const result = await run;
+
+    assert.equal(result.status, 'warned');
+    assert.equal(result.output.certificates.manualMissing, 1);
+    assert.ok(!jetpack.exists(certPath));
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+  }
 });
 
 // ─── Bundle IDs ──────────────────────────────────────────────────────────────

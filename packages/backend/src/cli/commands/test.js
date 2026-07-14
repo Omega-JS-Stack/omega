@@ -39,9 +39,10 @@ class TestCommand extends BaseCommand {
     // Get test paths from CLI args (e.g., "bem test admin/" or "bem test general/generate-uuid")
     const testPaths = (argv._ || []).slice(1); // Remove 'test' from args
 
-    // On self-test with no explicit target, run only the boot smoke suite — the
-    // full routes/events/rules suites need a real consumer backend, not the
-    // minimal fixture.
+    // On self-test with no explicit target, run only the boot smoke suite —
+    // the fast inner loop. The FULL suite also passes against the fixture
+    // (`npm test -- backend:`): it carries corpus-parity payment config and
+    // boot-syncs the canonical rules for exactly that.
     if (isSelfTest && testPaths.length === 0) {
       testPaths.push('backend:boot');
     }
@@ -220,11 +221,14 @@ class TestCommand extends BaseCommand {
     // The test HTTP client authenticates with the fixture's admin keys (the
     // server reads the same keys from config/omega.json5). Inject them from
     // the fixture config so loadProjectConfig finds them — no committed .env
-    // needed (single source = the fixture config).
+    // needed (single source = the fixture config). The namespace rides the
+    // same mechanism: the uuid route's v5 default reads OMEGA_NAMESPACE in
+    // the emulated functions, which inherit this process env.
     try {
       const cfg = require('@omega.js/config').loadConfig(fixture, 'backend').config;
       process.env.OMEGA_ADMIN_KEY = process.env.OMEGA_ADMIN_KEY || cfg.omega?.key;
       process.env.OMEGA_WEBHOOK_KEY = process.env.OMEGA_WEBHOOK_KEY || cfg.omega?.webhookKey;
+      process.env.OMEGA_NAMESPACE = process.env.OMEGA_NAMESPACE || cfg.omega?.namespace;
     } catch (_) { /* fixture config unreadable — let the normal key check report it */ }
 
     // Anonymous HMAC unsubscribe tests sign links with this shared secret; the
@@ -233,6 +237,7 @@ class TestCommand extends BaseCommand {
     process.env.UNSUBSCRIBE_HMAC_KEY = process.env.UNSUBSCRIBE_HMAC_KEY || '_test-unsubscribe-hmac-key';
 
     this.ensureFixtureServiceAccount(fixture);
+    this.ensureFixtureRules(fixture);
     this.linkFixtureDeps(fixture);
     this.log(chalk.cyan(`  Self-test: booting bundled fixture project (${fixture})`));
     return true;
@@ -274,6 +279,20 @@ class TestCommand extends BaseCommand {
     } catch (e) {
       this.logWarning(`Could not write fixture service-account.json: ${e.message}`);
     }
+  }
+
+  /**
+   * Stage the framework's canonical firestore.rules into the fixture — the
+   * SAME template `omega setup` ships to consumers (templates/firestore.rules,
+   * marker version stamped), so the rules suite exercises the real ruleset.
+   * Runtime-derived and gitignored like the service account: the fixture
+   * commits no rules copy that could drift from the template. A running
+   * emulator hot-reloads the file, so re-writing it every run is safe.
+   */
+  ensureFixtureRules(fixture) {
+    const template = jetpack.read(path.resolve(__dirname, '..', '..', '..', 'templates', 'firestore.rules'));
+    const version = require('../../../package.json').version;
+    jetpack.write(path.join(fixture, 'firestore.rules'), template.replace('(v0.0.0)', `(v${version})`));
   }
 
   /**

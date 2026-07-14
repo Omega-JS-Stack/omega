@@ -15,6 +15,96 @@
     webhookKey: 'fixture-webhook-key',
     namespace: '00000000-0000-0000-0000-000000000000',
   },
+  // Corpus-parity payment config (same offline shape as the sandbox-brand
+  // consumer) so the FULL framework suite — payment journeys + intent/
+  // cancel/refund routes — passes against the fixture, not just boot.
+  payment: {
+    processors: {
+      stripe: {
+        publishableKey: null,
+      },
+      paypal: {
+        clientId: null,
+      },
+      chargebee: {
+        site: null,
+      },
+      coinbase: {
+        enabled: false,
+      },
+    },
+    products: [
+      {
+        id: 'basic',
+        name: 'Basic',
+        type: 'subscription',
+        limits: {
+          requests: 100,
+        },
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        type: 'subscription',
+        limits: {
+          requests: 1000,
+        },
+        trial: {
+          days: 14,
+        },
+        prices: {
+          monthly: 4.99,
+          annually: 49.99,
+        },
+        stripe: {
+          productId: null,
+        },
+        paypal: {
+          productId: null,
+        },
+        chargebee: {
+          itemId: null,
+          legacyPlanIds: [],
+        },
+      },
+      {
+        id: 'ultimate',
+        name: 'Ultimate',
+        type: 'subscription',
+        limits: {
+          requests: 10000,
+        },
+        prices: {
+          monthly: 19.99,
+          annually: 199.99,
+        },
+        stripe: {
+          productId: null,
+        },
+        paypal: {
+          productId: null,
+        },
+        chargebee: {
+          itemId: null,
+          legacyPlanIds: [],
+        },
+      },
+      {
+        id: 'credits-100',
+        name: '100 Credits',
+        type: 'one-time',
+        prices: {
+          once: 9.99,
+        },
+        stripe: {
+          productId: null,
+        },
+        chargebee: {
+          itemId: null,
+        },
+      },
+    ],
+  },
   cloud: {
     provider: 'firebase',
     config: {

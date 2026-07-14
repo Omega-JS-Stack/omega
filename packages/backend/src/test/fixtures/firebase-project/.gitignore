@@ -10,5 +10,9 @@ node_modules/
 # Runtime-generated throwaway RSA service account (emulator-only). Never committed.
 service-account.json
 
+# Boot-written copy of the setup rules SSOT (templates/firestore.rules) — see
+# ensureFixtureRules in src/cli/commands/test.js. Never committed.
+firestore.rules
+
 # Per-run port-bumped emulator config (N7 auto-allocation)
 firebase.resolved.json
