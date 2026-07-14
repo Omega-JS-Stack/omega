@@ -620,3 +620,46 @@ test('jwt: RS256 tokens verify (the firestore-rest service-account grant path)',
     true,
   );
 });
+
+// ─── Apple agreements ladder (live find, 2026-07-14 first exercise) ─────────
+
+test('certificates: Apple\'s agreements-expired 403 downgrades to WARNED with guidance (live message shape, no code)', async () => {
+  // The LIVE failure: message carried only title+detail — no
+  // FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED code — and errored raw.
+  const client = fakeApple({
+    certificates: [], // list is empty — the failure fires on CREATE, the live shape
+    'POST certificates': () => {
+      throw new Error('Apple API request failed (POST https://api.appstoreconnect.apple.com/v1/certificates): A required agreement is missing or has expired.: This request requires an in-effect agreement that has not been signed or has expired.');
+    },
+  });
+
+  const result = await runService(brandConfig(), {
+    root: stageBrand(),
+    client,
+    operations: ONLY('certificates'),
+  });
+
+  assert.equal(result.status, 'warned', 'human-gated prerequisite = warn ladder, not service error');
+  assert.match(JSON.stringify(result.output), /developer\.apple\.com\/account/, 'guidance rides the output');
+  assert.match(JSON.stringify(result.output), /"agreements":"pending"/);
+});
+
+test('certificates: the code-carrying agreements variant warns too, and other Apple errors still fail', async () => {
+  const coded = fakeApple({
+    certificates: [],
+    'POST certificates': () => {
+      throw new Error('Apple API request failed (POST …/certificates): [FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED] Forbidden: agreements');
+    },
+  });
+  const warned = await runService(brandConfig(), { root: stageBrand(), client: coded, operations: ONLY('certificates') });
+  assert.equal(warned.status, 'warned');
+
+  const broken = fakeApple({
+    certificates: [],
+    'POST certificates': () => {
+      throw new Error('Apple API request failed (POST …/certificates): [INTERNAL_SERVER_ERROR] boom');
+    },
+  });
+  const failed = await runService(brandConfig(), { root: stageBrand(), client: broken, operations: ONLY('certificates') });
+  assert.equal(failed.status, 'error', 'only the agreements 403 downgrades');
+});

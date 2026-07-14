@@ -101,21 +101,20 @@ module.exports = {
       },
     },
     {
-      name: 'brand-app seed (friction #1): targets-only config inside a brand monorepo, every-build merge stays out',
+      name: 'brand app scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; app file = standalone escape hatch)',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const appDir = path.join(tmp, 'brand', 'apps', 'extension');
         jetpack.dir(appDir);
 
+        // Fresh scaffold AND every-build reruns: the app config never appears
+        // (the old targets-only seed kept resurrecting deleted app files)
         scaffoldDefaults({ outputDir: appDir });
-        const seeded = jetpack.read(path.join(appDir, 'config', 'omega.json5'));
-        ctx.expect(seeded).toContain('targets');
-        ctx.expect(seeded.includes('my-brand')).toBe(false);
+        ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
 
-        // The defaults task runs on EVERY build — the merge rule must stay off.
         scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.read(path.join(appDir, 'config', 'omega.json5'))).toBe(seeded);
+        ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
       },
     },
   ],

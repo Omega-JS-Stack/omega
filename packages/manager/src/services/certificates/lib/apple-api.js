@@ -27,10 +27,52 @@ const TOKEN_REFRESH_BUFFER_SECONDS = 5 * 60; // Refresh 5 min before expiry
 let agreementsNoticePrinted = false;
 
 /**
- * Detect Apple's "agreements expired" 403 from an error message.
+ * Detect Apple's "agreements expired" 403 from an error message. Matches
+ * BOTH the error code and the human title — live 2026-07-14: the message
+ * carried only title+detail (no code) and the code-only detector missed it,
+ * so the first certificates exercise errored raw instead of warning.
  */
 function isAgreementsError(errorMessage) {
-  return /FORBIDDEN\.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED/i.test(errorMessage || '');
+  return /FORBIDDEN\.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED|required agreement is missing or has expired/i.test(errorMessage || '');
+}
+
+/**
+ * Wrap an ensure operation so Apple's agreements 403 downgrades to a WARNED
+ * result with the fix-it guidance — a pending agreement is a human-gated
+ * prerequisite (the AdSense-approval pattern), not a service failure.
+ * Anything else rethrows untouched.
+ */
+function catchAgreements(operation) {
+  const warnedResult = () => {
+    printAgreementsNotice();
+    return {
+      status: 'warned',
+      output: {
+        agreements: 'pending',
+        warning: `Apple Developer agreements need acceptance — visit ${APPLE_AGREEMENTS_URL} (Paid Apps / Free Apps / Program License), then re-run`,
+      },
+    };
+  };
+
+  return async function agreementsGuarded(context) {
+    let result;
+    try {
+      result = await operation(context);
+    } catch (error) {
+      if (!isAgreementsError(error?.message)) {
+        throw error;
+      }
+      return warnedResult();
+    }
+
+    // The ensures also catch internally and RETURN error statuses — an
+    // agreements 403 must downgrade on that path too
+    if (result?.status === 'error' && isAgreementsError(result.error)) {
+      return warnedResult();
+    }
+
+    return result;
+  };
 }
 
 function printAgreementsNotice() {
@@ -102,8 +144,10 @@ function createAppleClient(secrets) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
+      // Keep Apple's error CODE in the message — detectors and humans both
+      // need it (title+detail alone hid REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED)
       const message = (data?.errors || [])
-        .map((e) => `${e.title}: ${e.detail || e.code || ''}`.trim())
+        .map((e) => `${e.code ? `[${e.code}] ` : ''}${e.title}: ${e.detail || ''}`.trim())
         .join('; ')
         || `HTTP ${response.status}`;
 
@@ -135,4 +179,4 @@ function createAppleClient(secrets) {
   return { request, paginate };
 }
 
-module.exports = { API_BASE, createAppleClient, isAgreementsError };
+module.exports = { API_BASE, createAppleClient, isAgreementsError, catchAgreements };

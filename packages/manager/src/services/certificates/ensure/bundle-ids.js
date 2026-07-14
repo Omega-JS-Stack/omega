@@ -7,6 +7,7 @@
  * IOS) and ride the returned state for the profiles handler.
  */
 const chalk = require('chalk').default;
+const { catchAgreements } = require('../lib/apple-api.js');
 
 const {
   listBundleIds,
@@ -16,7 +17,7 @@ const {
   enableCapabilities,
 } = require('../lib/identifier-manager.js');
 
-module.exports = async (context) => {
+module.exports = catchAgreements(async (context) => {
   const { appleClient, brandConfig, brandId } = context;
   const dryRun = context.options?.dryRun || false;
 
@@ -90,4 +91,4 @@ module.exports = async (context) => {
     },
     output: { bundleIds: output },
   };
-};
+});

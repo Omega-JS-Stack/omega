@@ -211,6 +211,17 @@
     agentId: "hkBrbPds9V4U0F",
   },
 
+  // Apple signing (certificates service): bundle IDs mint as
+  // <prefix>.<brand.id> → dev.omegajs.omega-playground — playground-scoped
+  // by construction (the real brand claims its own at launch). The leg's
+  // Apple calls currently WARN pending Ian accepting the renewed Apple
+  // Developer agreements (developer.apple.com/account).
+  certificates: {
+    apple: {
+      bundleIdPrefix: "dev.omegajs",
+    },
+  },
+
   // AI brandmark via ITW's MrLogo instance (legacy production route — the
   // old-world /backend-manager path is MrLogo's LIVE api). Auth rides
   // LOGO_API_ID_TOKEN from .env when present; providerBrand+adminEmail are

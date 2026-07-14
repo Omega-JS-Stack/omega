@@ -131,17 +131,15 @@ function scaffoldDefaults(options) {
   options = options || {};
   const outputDir = options.outputDir || path.resolve('./');
 
-  // Layer-aware seed (dogfood friction #1): inside a brand monorepo the app
-  // config is TARGETS-ONLY — the full template (placeholder brand) would
-  // shadow the brand root, and this task's every-build merge would keep
-  // re-adding template keys under it. Standalone consumers keep the template.
+  // Layer-aware config (cp121c/cp122d): brand apps carry NO app-layer
+  // omega.json5 — the brand file's `targets.*` is the per-target home, and
+  // the app file is the STANDALONE escape hatch only. Inside a brand
+  // monorepo the template's config must not scaffold at all (the old
+  // targets-only seed kept resurrecting deleted app files on every setup).
   const fileMap = { ...FILE_MAP };
-  const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
+  const { resolveSeedMode } = require('@omega.js/config');
   if (!resolveSeedMode(outputDir).standalone) {
-    if (!resolveConfigPath(outputDir)) {
-      jetpack.write(path.join(outputDir, 'config', 'omega.json5'), renderBrandAppSeed('extension'));
-    }
-    fileMap['config/omega.json5'] = { overwrite: false };
+    fileMap['config/omega.json5'] = { skip: true };
   }
 
   return applyDefaults({

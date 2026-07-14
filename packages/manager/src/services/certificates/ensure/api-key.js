@@ -4,8 +4,9 @@
  * the downstream operations act on.
  */
 const chalk = require('chalk').default;
+const { catchAgreements } = require('../lib/apple-api.js');
 
-module.exports = async (context) => {
+module.exports = catchAgreements(async (context) => {
   const { appleClient, appleSecrets } = context;
 
   if (!appleClient || !appleSecrets) {
@@ -18,4 +19,4 @@ module.exports = async (context) => {
   console.log(`        ${chalk.dim(`Key:    ${appleSecrets.keyId}`)}`);
 
   return {};
-};
+});

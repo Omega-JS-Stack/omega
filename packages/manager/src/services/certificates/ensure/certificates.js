@@ -18,6 +18,7 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+const { catchAgreements } = require('../lib/apple-api.js');
 
 const {
   listCertificates,
@@ -40,7 +41,7 @@ function trimCert(cert) {
   };
 }
 
-module.exports = async (context) => {
+module.exports = catchAgreements(async (context) => {
   const { appleClient, appleSecrets, appleDir, brandConfig, keychainImport } = context;
   const dryRun = context.options?.dryRun || false;
 
@@ -162,4 +163,4 @@ module.exports = async (context) => {
   }
 
   return { state: { certificateMap }, output: { certificates: summary } };
-};
+});

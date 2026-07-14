@@ -11,6 +11,7 @@
 const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+const { catchAgreements } = require('../lib/apple-api.js');
 
 const {
   listProfiles,
@@ -22,7 +23,7 @@ const {
   certAppliesToPlatform,
 } = require('../lib/profile-manager.js');
 
-module.exports = async (context) => {
+module.exports = catchAgreements(async (context) => {
   const { appleClient, appleDir, brandConfig, brandId, serviceData } = context;
   const dryRun = context.options?.dryRun || false;
 
@@ -137,4 +138,4 @@ module.exports = async (context) => {
 
   const summary = dryRun ? { planned } : { synced, downloaded, created };
   return { state: { profiles: profileMap }, output: { profiles: summary } };
-};
+});

@@ -283,14 +283,14 @@ async function copyDefaults(targetDir) {
   // write-only-if-changed.
   const { applyDefaults } = require('@omega.js/devkit/defaults-engine');
 
-  // Layer-aware seed (dogfood friction #1): inside a brand monorepo the app
-  // config is TARGETS-ONLY — the full template's placeholder identity would
-  // shadow the brand root. Pre-writing it wins over the engine's copy-if-missing.
+  // Layer-aware config (cp121c/cp122d): brand apps carry NO app-layer
+  // omega.json5 — the brand file's `targets.*` is the per-target home, and
+  // the app file is the STANDALONE escape hatch only. Inside a brand
+  // monorepo the template's config must not scaffold at all (the old
+  // targets-only seed kept resurrecting deleted app files on every setup).
   const outputDir = targetDir || rootPathProject;
-  const { resolveSeedMode, renderBrandAppSeed, resolveConfigPath } = require('@omega.js/config');
-  if (!resolveSeedMode(outputDir).standalone && !resolveConfigPath(outputDir)) {
-    jetpack.write(path.join(outputDir, 'config', 'omega.json5'), renderBrandAppSeed('desktop'));
-  }
+  const { resolveSeedMode } = require('@omega.js/config');
+  const isBrandApp = !resolveSeedMode(outputDir).standalone;
 
   applyDefaults({
     defaultsDir,
@@ -298,6 +298,7 @@ async function copyDefaults(targetDir) {
     fileMap: {
       // Consumers own their files — never overwrite what exists.
       '**/*': { overwrite: false },
+      ...(isBrandApp ? { 'config/omega.json5': { skip: true } } : {}),
       // Marker-section merges: framework owns the Default section, consumer owns
       // everything below the Custom marker. Re-running `npx omega setup` keeps the
       // framework section live-synced without clobbering the consumer's values.

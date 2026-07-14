@@ -4,7 +4,7 @@
   "description": "Bake-off candidate 2: Astro building the shared corpus with @omega.js/template-kit as direct helper imports — validates theme layering via an omega: Vite resolver, content collections, and the full A1 slice",
   "private": true,
   "scripts": {
-    "test": "node --test --test-concurrency=1",
+    "test:spike": "node --test --test-concurrency=1",
     "build": "node src/build.js",
     "build:ssg": "npx astro build",
     "dev": "npx astro dev",
