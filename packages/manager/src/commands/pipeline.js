@@ -20,11 +20,13 @@
  *  - `--service=<name>` narrows the child run to one service; the
  *    core-presence check only applies to full runs.
  *  - `--dry-run` forwards to the child (plan-only pass, still asserted).
- *  - `--deploy=web,backend` runs the DEPLOY legs after the service cycle
- *    (web = `omega deploy --direct` gh-pages push; backend = the target's
- *    own `omega deploy` — a REAL functions deploy). Off by default; each
- *    leg lands in the scorecard as `deploy:<target>` and an exit-nonzero
- *    leg fails the pipeline.
+ *  - `--deploy=web,backend,desktop,extension` runs the DEPLOY legs after
+ *    the service cycle (web = `omega deploy --direct` gh-pages push;
+ *    backend = a REAL functions deploy). Off by default; each leg lands in
+ *    the scorecard as `deploy:<target>` and an exit-nonzero leg fails the
+ *    pipeline. desktop/extension are PUBLISH legs (GH release flow / store
+ *    CI dispatch — both Ian-gated): without `--publish` they record as a
+ *    gated skip instead of running.
  *
  * This spends real API calls and reconciles real infrastructure — run it
  * on demand, SPARINGLY. It is deliberately NOT part of `npm test` or CI.
@@ -36,15 +38,29 @@ const chalk = require('chalk').default;
 
 const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
 
-// deploy target → the command run in that target's app dir
+// deploy target → the command run in that target's app dir (desktop/
+// extension apps carry no deploy script — their D13 verb is the local bin)
 const DEPLOY_LEGS = {
   web: ['npm', 'run', 'deploy', '--', '--direct'],
   backend: ['npm', 'run', 'deploy'],
+  desktop: ['npx', 'omega', 'deploy'],
+  extension: ['npx', 'omega', 'deploy'],
 };
+
+// Legs that PUBLISH (desktop → the GH release flow, extension → the store
+// CI workflow dispatch). Releases and Actions dispatches are Ian-gated, so
+// these run only with the explicit `--publish` flag — otherwise the leg
+// records a gated skip.
+const PUBLISH_LEGS = new Set(['desktop', 'extension']);
 
 // Services that must RUN green on a full pipeline pass — these are the
 // provisioning spine; a skip here means a seed is missing, not a choice.
-const CORE_SERVICES = ['workspace', 'github', 'cloudflare', 'domain', 'firebase', 'testing'];
+// search-console/sendgrid/account/recaptcha graduated into the spine once
+// their seeds converged (cp116–120): a skip there is a regression now.
+const CORE_SERVICES = [
+  'workspace', 'github', 'cloudflare', 'domain', 'firebase', 'testing',
+  'search-console', 'sendgrid', 'account', 'recaptcha',
+];
 
 const STATUS_ICONS = { success: chalk.green('✓'), warned: chalk.yellow('⚠'), skipped: chalk.dim('⊘'), error: chalk.red('✗') };
 
@@ -179,6 +195,20 @@ module.exports = async (argv = {}) => {
       continue;
     }
 
+    // Publish legs stay behind their own flag: running them means a GH
+    // release / store CI dispatch, and both are gated until Ian opens them.
+    if (PUBLISH_LEGS.has(target) && !argv.publish) {
+      console.log(chalk.yellow(`\n⊘ Deploy leg ${target}: publish leg gated — pass --publish to run it (releases/dispatches are gated)`));
+      found.record.services.push({
+        service: `deploy:${target}`,
+        status: 'skipped',
+        output: null,
+        error: null,
+        reason: 'publish leg gated — pass --publish (releases/dispatches are gated)',
+      });
+      continue;
+    }
+
     console.log(chalk.bold(`\n🧪 Deploy leg: ${target} ${chalk.dim(`(${leg.join(' ')} in ${app.dir})`)}`));
     const legExit = await new Promise((resolve) => {
       const child = spawn(leg[0], leg.slice(1), {
@@ -226,3 +256,4 @@ module.exports = async (argv = {}) => {
 module.exports.evaluatePipeline = evaluatePipeline;
 module.exports.findRunRecord = findRunRecord;
 module.exports.CORE_SERVICES = CORE_SERVICES;
+module.exports.PUBLISH_LEGS = PUBLISH_LEGS;

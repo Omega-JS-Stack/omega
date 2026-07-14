@@ -60,12 +60,40 @@ test('pipeline: full run missing a core service fails; --service scoping waives 
 });
 
 test('pipeline: --require promotes a service into the core set', () => {
-  const record = greenRecord([{ service: 'sendgrid', status: 'skipped', output: null, error: null, reason: 'missing SENDGRID_API_KEY' }]);
+  const record = greenRecord([{ service: 'seo', status: 'skipped', output: null, error: null, reason: 'awaiting the public-repo go' }]);
 
   assert.equal(evaluatePipeline(record).pass, true, 'skip tolerated by default');
-  const strict = evaluatePipeline(record, { require: ['sendgrid'] });
+  const strict = evaluatePipeline(record, { require: ['seo'] });
   assert.equal(strict.pass, false);
-  assert.match(strict.failures[0], /sendgrid: CORE service skipped/);
+  assert.match(strict.failures[0], /seo: CORE service skipped/);
+});
+
+test('pipeline: the graduated seeds are core now — a sendgrid/search-console skip fails a full run', () => {
+  for (const service of ['sendgrid', 'search-console', 'account', 'recaptcha']) {
+    assert.ok(CORE_SERVICES.includes(service), `${service} graduated into the core spine`);
+  }
+
+  const record = greenRecord();
+  record.services.find((s) => s.service === 'sendgrid').status = 'skipped';
+  record.services.find((s) => s.service === 'sendgrid').reason = 'missing SENDGRID_API_KEY';
+
+  const verdict = evaluatePipeline(record);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.failures[0], /sendgrid: CORE service skipped/);
+});
+
+test('pipeline: a gated publish leg records a tolerated (non-core) skip', () => {
+  const record = greenRecord([{
+    service: 'deploy:desktop',
+    status: 'skipped',
+    output: null,
+    error: null,
+    reason: 'publish leg gated — pass --publish (releases/dispatches are gated)',
+  }]);
+
+  const verdict = evaluatePipeline(record);
+  assert.equal(verdict.pass, true, 'gated publish skip never fails the run');
+  assert.match(verdict.skips[0], /deploy:desktop — publish leg gated/);
 });
 
 test('pipeline: deploy legs ride the same rules — an error leg fails, a green leg passes as non-core', () => {
