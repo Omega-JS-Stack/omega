@@ -9,6 +9,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const JSON5 = require('json5');
 const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
@@ -143,7 +144,9 @@ function configureOmega(eleventyConfig, options) {
       let node = dataIncludes;
       for (const segment of segments.slice(0, -1)) node = node[segment] = node[segment] || {};
       try {
-        node[segments[segments.length - 1]] = JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
+        // JSON5 — the packaged section files (nav/footer/sidebar) use
+        // unquoted keys, comments, and trailing commas
+        node[segments[segments.length - 1]] = JSON5.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
       } catch { /* malformed data file — leave the slot empty */ }
     }
   }

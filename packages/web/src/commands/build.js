@@ -10,8 +10,10 @@
  */
 const path = require('node:path');
 const Logger = require('@omega.js/devkit/logger');
+const { findBrandRoot } = require('@omega.js/config');
 const { buildSite } = require('../build.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
+const { resolveStaticDirs } = require('../static-assets.js');
 const { resolveClientEntry } = require('../paths.js');
 const { translateSite } = require('../translate/index.js');
 
@@ -36,6 +38,10 @@ module.exports = async function (options) {
     clientEntry: resolveClientEntry(),
     environment: 'production',
     manifestPath: paths.manifest,
+    staticDirs: resolveStaticDirs({
+      brandRoot: findBrandRoot(paths.root),
+      imagesDir: path.join(paths.assets, 'images'),
+    }),
     onPhase: (name, seconds) => logger.log(`${name}: ${seconds.toFixed(2)}s`),
   });
 

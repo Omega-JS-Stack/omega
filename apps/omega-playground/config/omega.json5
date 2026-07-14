@@ -41,9 +41,10 @@
       country: "United States",
     },
     images: {
-      wordmark: "https://playground.omegajs.dev/wordmark.png",
-      brandmark: "https://playground.omegajs.dev/brandmark.png",
-      combomark: "https://playground.omegajs.dev/combomark.png",
+      // Served by the web build's static channel: the minted set under
+      // .omega/assets is bridged to /assets/images/{favicon,brand} at build
+      brandmark: "https://playground.omegajs.dev/assets/images/brand/brandmark.png",
+      social: "https://playground.omegajs.dev/assets/images/brand/social.png",
     },
   },
 

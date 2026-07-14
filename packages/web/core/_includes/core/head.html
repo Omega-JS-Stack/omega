@@ -48,6 +48,13 @@
   {% assign page-og-type = "profile" %}
 {% endiftruthy %}
 
+<!-- Fallbacks: a value that LIQUIFIES to empty (nothing configured) still needs
+     the brand default — `default:` only sees the raw string (footer.html pattern) -->
+{% assign page-title = page-title | strip %}
+{% if page-title == '' or page-title == 'null' %}{% assign page-title = site.brand.name %}{% endif %}
+{% assign page-image = page-image | strip %}
+{% if page-image == '' or page-image == 'null' %}{% assign page-image = site.brand.images.social | default: site.brand.images.brandmark %}{% endif %}
+
 <!-- Resolve Image -->
 {% capture page-image %}{% uj_external page-image %}{% endcapture %}
 
@@ -113,8 +120,8 @@
 <!-- Keywords -->
 <meta name="keywords" content="{{ page-keywords }}"/>
 
-<!-- Manifest.json -->
-<link rel="manifest" href="{{ site.url }}/manifest.json"/>
+<!-- Web app manifest (part of the minted favicon set — static-assets channel) -->
+<link rel="manifest" href="{{ favicon-path | append: '/site.webmanifest' | uj_cachebreak }}"/>
 
 <!-- Title -->
 <title>{{ page-title }}</title>
@@ -159,14 +166,12 @@
 <link rel="alternate" href="{{ site.url }}{{ page.url }}" hreflang="x-default"/>
 <link rel="alternate" href="{{ site.url }}{{ page.url }}" hreflang="{{ page-translation-default }}"/>
 
-<!-- Favicon -->
+<!-- Favicon — exactly the minted set (manager assets service → .omega/assets/favicon,
+     bridged to /assets/images/favicon by the static-assets channel) -->
 <link rel="apple-touch-icon" sizes="180x180" href="{{ favicon-path | append: '/apple-touch-icon.png' | uj_cachebreak }}"/>
 <link rel="icon" type="image/png" sizes="32x32" href="{{ favicon-path | append: '/favicon-32x32.png' | uj_cachebreak }}"/>
 <link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | uj_cachebreak }}"/>
-<link rel="mask-icon" href="{{ favicon-path | append: '/safari-pinned-tab.svg' | uj_cachebreak }}" color="{{ resolved.favicon.safari-pinned-tab }}"/>
 <link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | uj_cachebreak }}"/>
-<meta name="msapplication-TileColor" content="{{ resolved.favicon.msapp-tile-color }}"/>
-<meta name="msapplication-config" content="{{ favicon-path | append: '/browserconfig.xml' | uj_cachebreak }}"/>
 <meta name="theme-color" content="{{ resolved.favicon.theme-color }}"/>
 
 <!-- Browser Support -->

@@ -20,9 +20,10 @@
       country: 'United States',
     },
     images: {
-      wordmark: 'https://sandbox-brand.example.com/wordmark.png',
-      brandmark: 'https://sandbox-brand.example.com/brandmark.png',
-      combomark: 'https://sandbox-brand.example.com/combomark.png',
+      // Served by the web build's static channel (minted set bridged from
+      // .omega/assets to /assets/images/{favicon,brand} at build)
+      brandmark: 'https://sandbox-brand.example.com/assets/images/brand/brandmark.png',
+      social: 'https://sandbox-brand.example.com/assets/images/brand/social.png',
     },
   },
   monitoring: {

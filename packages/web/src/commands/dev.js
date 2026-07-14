@@ -27,6 +27,7 @@ const {
   findBrandRoot, hasOmegaConfig, loadConfig,
 } = require('@omega.js/config');
 const { buildAssets } = require('../assets.js');
+const { resolveStaticDirs, copyStaticAssets } = require('../static-assets.js');
 const { configureOmega } = require('../engine.js');
 const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -73,6 +74,16 @@ module.exports = async function (options) {
   const manifest = await build();
   jetpack.write(paths.manifest, JSON.stringify(manifest, null, 2));
   logger.log('Assets built (dev mode: stable names, no minify)');
+
+  // Static images (minted brand identity + src/assets/images) — copied once
+  // at boot; they change rarely, so no watcher (restart to pick up new ones)
+  copyStaticAssets({
+    staticDirs: resolveStaticDirs({
+      brandRoot: findBrandRoot(paths.root),
+      imagesDir: path.join(paths.assets, 'images'),
+    }),
+    outDir: paths.out,
+  });
 
   // ---- Rebuild assets in place on source changes
   const watchDirs = [

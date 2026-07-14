@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
+const { copyStaticAssets } = require('./static-assets.js');
 const { configureOmega } = require('./engine.js');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { resolveThemeLayers } = require('./layers.js');
@@ -25,6 +26,7 @@ const { PATHS } = require('./paths.js');
  * @param {string} [options.coreDir] - default: packaged core
  * @param {string} [options.defaultsDir] - default: packaged default pages
  * @param {string} [options.activeTheme] - default: siteData.theme.id
+ * @param {Array<{src: string, dest: string}>} [options.staticDirs] - verbatim image copies (resolveStaticDirs), later entries win
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {boolean} [options.skipPurge] - skip the PurgeCSS pass
@@ -76,6 +78,11 @@ async function buildSite(options) {
     outDir: options.outDir,
     coreIconsDir: path.join(coreDir, 'icons'),
   }));
+
+  // ---- static images: minted brand identity bridge + consumer src/assets/images
+  if (options.staticDirs && options.staticDirs.length) {
+    await phase('static', () => copyStaticAssets({ staticDirs: options.staticDirs, outDir: options.outDir }));
+  }
 
   // ---- Eleventy
   await phase('eleventy', async () => {
