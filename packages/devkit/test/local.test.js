@@ -113,10 +113,10 @@ test('frameworkPackagesOf finds deps and devDeps with placement flags', () => {
   ]);
 });
 
-test('frameworkPackagesOf reaches into functions/ for backend apps', () => {
+test('frameworkPackagesOf reads the app-root manifest (src/dist pillar — no functions/ probe)', () => {
   const backendApp = path.join(FIXTURES, 'brand', 'apps', 'backend-app');
   assert.deepEqual(local.frameworkPackagesOf(backendApp), [
-    { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: path.join(backendApp, 'functions') },
+    { name: '@omega.js/backend', spec: '^6.0.0', dev: false, dir: backendApp },
   ]);
 });
 

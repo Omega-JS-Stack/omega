@@ -69,10 +69,11 @@ function isBrandRoot(dir) {
 
 /**
  * Walk up from startDir to the nearest dispatch context. At each level, in
- * order: the dir's own package.json declaring a framework, the backend's
- * functions/ layout one directory DOWN, then brand-root-ness. Framework
- * checks come first so a standalone consumer (framework dep AND its own
- * config/omega.json5 in one dir) dispatches as an app, not a brand.
+ * order: the dir's own package.json declaring a framework, then
+ * brand-root-ness. Framework checks come first so a standalone consumer
+ * (framework dep AND its own config/omega.json5 in one dir) dispatches as
+ * an app, not a brand. The CLI entry normalizes a functions/ cwd up to the
+ * app root (muscle-memory `cd functions` still works).
  *
  * @returns {{ kind: 'framework', name: string, dir: string }
  *   | { kind: 'brand', dir: string } | null} dir = where the framework dep is
@@ -83,11 +84,6 @@ function findTarget(startDir) {
   while (true) {
     const own = frameworkOf(readPackage(dir));
     if (own) return { kind: 'framework', name: own, dir };
-
-    const fnDir = path.join(dir, 'functions');
-    if (frameworkOf(readPackage(fnDir)) === '@omega.js/backend') {
-      return { kind: 'framework', name: '@omega.js/backend', dir: fnDir };
-    }
 
     if (isBrandRoot(dir)) {
       return { kind: 'brand', dir };

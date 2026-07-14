@@ -163,33 +163,26 @@ function discoverApps(brandRoot) {
 }
 
 /**
- * Collect an app's @omega.js dependencies from its package.json — and, for
- * backend apps, from functions/package.json (where the framework dep lives).
+ * Collect an app's @omega.js dependencies from its package.json (the ONE
+ * app manifest at the app root — scripts + runtime deps; src/dist pillar).
  * @param {string} appDir - App directory.
  * @returns {Array<{name: string, spec: string, dev: boolean, dir: string}>}
  */
 function frameworkPackagesOf(appDir) {
   const entries = [];
 
-  const collect = (dir) => {
-    let pkg;
-    try {
-      pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    } catch (e) {
-      return;
-    }
-    for (const [depKey, dev] of [['dependencies', false], ['devDependencies', true]]) {
-      for (const [name, spec] of Object.entries(pkg[depKey] || {})) {
-        if (name.startsWith(SCOPE)) {
-          entries.push({ name, spec, dev, dir });
-        }
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+  } catch (e) {
+    return entries;
+  }
+  for (const [depKey, dev] of [['dependencies', false], ['devDependencies', true]]) {
+    for (const [name, spec] of Object.entries(pkg[depKey] || {})) {
+      if (name.startsWith(SCOPE)) {
+        entries.push({ name, spec, dev, dir: appDir });
       }
     }
-  };
-
-  collect(appDir);
-  if (fs.existsSync(path.join(appDir, 'functions', 'package.json'))) {
-    collect(path.join(appDir, 'functions'));
   }
 
   return entries;

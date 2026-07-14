@@ -30,18 +30,19 @@ test('findTarget: web app via devDependency', () => {
   assert.deepEqual(hit, { kind: 'framework', name: '@omega.js/web', dir: path.join(BRAND, 'apps', 'site') });
 });
 
-test('findTarget: backend app via the functions/ peek from the app dir', () => {
+test('findTarget: backend app via app-root manifest (src/dist pillar — no functions/ peek)', () => {
   const hit = findTarget(path.join(BRAND, 'apps', 'backend-app'));
   assert.deepEqual(hit, {
     kind: 'framework',
     name: '@omega.js/backend',
-    dir: path.join(BRAND, 'apps', 'backend-app', 'functions'),
+    dir: path.join(BRAND, 'apps', 'backend-app'),
   });
 });
 
-test('findTarget: inside functions/ finds backend directly', () => {
+test('findTarget: inside functions/ walks up to the app root', () => {
   const hit = findTarget(path.join(BRAND, 'apps', 'backend-app', 'functions'));
   assert.equal(hit.name, '@omega.js/backend');
+  assert.equal(hit.dir, path.join(BRAND, 'apps', 'backend-app'));
 });
 
 test('findTarget: a deep (even nonexistent) dir inside an app walks up to the app', () => {

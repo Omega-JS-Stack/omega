@@ -1,7 +1,0 @@
-{
-  "name": "fixture-brand-backend-functions",
-  "private": true,
-  "dependencies": {
-    "@omega.js/backend": "^6.0.0"
-  }
-}
