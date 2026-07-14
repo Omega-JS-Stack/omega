@@ -318,7 +318,7 @@ class LogsCommand extends BaseCommand {
    */
   resolveProject() {
     const projectDir = this.firebaseProjectPath;
-    const functionsDir = path.join(projectDir, 'functions');
+    const functionsDir = path.join(projectDir, 'dist');
 
     // Try service-account.json first (most reliable for production)
     const serviceAccountPath = path.join(functionsDir, 'service-account.json');

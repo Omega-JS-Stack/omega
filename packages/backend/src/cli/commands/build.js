@@ -14,7 +14,7 @@ class BuildCommand extends BaseCommand {
 
     const { staged } = stageFunctions({ projectDir: self.firebaseProjectPath });
 
-    this.log(chalk.bold('\n  Staged functions/ from the authored tree:'));
+    this.log(chalk.bold('\n  Staged dist/ from the authored tree:'));
     for (const step of staged) {
       this.log(`  ${chalk.green('✓')} ${step}`);
     }

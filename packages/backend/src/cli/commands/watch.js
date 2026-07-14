@@ -10,7 +10,7 @@ class WatchCommand extends BaseCommand {
    */
   getConfig() {
     const projectDir = this.main.firebaseProjectPath;
-    const functionsDir = path.join(projectDir, 'functions');
+    const functionsDir = path.join(projectDir, 'dist');
     const bemDir = path.resolve(__dirname, '..', '..', '..');
     const bemSrcDir = path.join(bemDir, 'src');
     const triggerFile = path.join(functionsDir, 'omega-reload-trigger.js');

@@ -26,7 +26,7 @@ class BaseCommand {
    * (*.log.reset), the watch command's reload trigger, and `test-mode.json`.
    *
    * For human-readable log files, use `getLogsPath()` instead — those live in
-   * `functions/` next to firebase-tools' own *-debug.log files so all log
+   * `dist/` next to firebase-tools' own *-debug.log files so all log
    * output can be grepped from one directory.
    *
    * Ensures the directory exists.
@@ -42,7 +42,7 @@ class BaseCommand {
 
   /**
    * Resolve a path for a human-readable log file. @omega.js/backend-owned logs (dev.log,
-   * emulator.log, test.log, production.log) live in `functions/` alongside
+   * emulator.log, test.log, production.log) live in `dist/` alongside
    * firebase-tools' own *-debug.log files so all log output is grep-able from
    * one place. Reset sentinels and other internal-only artifacts use
    * `getTempPath()` instead.
@@ -52,12 +52,12 @@ class BaseCommand {
    */
   getLogsPath(filename) {
     const projectDir = this.main.firebaseProjectPath;
-    const logsDir = path.join(projectDir, 'functions');
+    const logsDir = path.join(projectDir, 'dist');
     return filename ? path.join(logsDir, filename) : logsDir;
   }
 
   /**
-   * Sweep stale @omega.js/backend-owned logs out of `functions/`. Catches `.log` files
+   * Sweep stale @omega.js/backend-owned logs out of `dist/`. Catches `.log` files
    * from previous runs so each emulator/serve/test boot starts with a clean
    * slate. Also catches stale `.reset` sentinels in `.temp/` that a crashed
    * process may have left behind.
@@ -89,21 +89,21 @@ class BaseCommand {
   }
 
   /**
-   * Stage the authored app tree into functions/ (the src/dist pillar's build
-   * step). Every runtime surface calls this before touching functions/ —
-   * emulator, serve, test, deploy — so the staged tree is always fresh. A
-   * full re-stage is idempotent and cheap (consumer src is small).
+  /**
+   * Stage the authored app tree into dist/ (the src/dist pillar's build step).
+   * Every runtime surface calls this before touching dist/ — emulator, serve,
+   * test, deploy — so the staged tree is always fresh.
    */
   ensureStaged() {
     const { stageFunctions } = require('../utils/stage-functions');
     stageFunctions({ projectDir: this.main.firebaseProjectPath });
-    this.log(chalk.gray('  Staged functions/ from src/ (omega build)'));
+    this.log(chalk.gray('  Staged dist/ from src/ (omega build)'));
   }
 
   /**
-   * Watch src/ and re-stage on change — the Firebase emulator watches the
-   * functions dir natively, so a re-stage IS the hot reload. Returns the
-   * watcher handle ({ close }) for shutdown paths.
+   * Watch src/ and re-stage on change — the Firebase emulator watches dist/
+   * natively, so a re-stage IS the hot reload. Returns the watcher handle
+   * ({ close }) for shutdown paths.
    */
   startStageWatch() {
     const { watchAndStage } = require('../utils/stage-functions');
@@ -305,7 +305,7 @@ class BaseCommand {
    */
   startStripeWebhookForwarding(forwardPort) {
     const projectDir = this.main.firebaseProjectPath;
-    const functionsDir = path.join(projectDir, 'functions');
+    const functionsDir = path.join(projectDir, 'dist');
 
     // Quit early here because its not supported yet
     this.log(chalk.gray('  (Stripe webhook forwarding is currently disabled - coming soon!)\n'));

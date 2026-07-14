@@ -10,7 +10,6 @@ const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
 const { resolvePorts, writePortsFile, clearPortsFile, portsToEnv } = require('@omega.js/config');
 const { EXTENDED_MODE_WARNING } = require('../../test/utils/extended-mode-warning');
 const { writeTestMode, captureSyncedEnv } = require('../../test/utils/test-mode-file');
-const { ensurePublicFiles } = require('../utils/public-files');
 const { seed } = require('../../test/seed.js');
 
 // Used by both `npx omega emulator` and `npx omega test` auto-start path.
@@ -129,7 +128,7 @@ class EmulatorCommand extends BaseCommand {
       this.log(chalk.cyan('\n  Seeding test personas...\n'));
 
       const projectDir = this.main.firebaseProjectPath;
-      const functionsDir = path.join(projectDir, 'functions');
+      const functionsDir = path.join(projectDir, 'dist');
 
       // Load project config (same pattern as test.js loadProjectConfig)
       const { hasOmegaConfig, loadConfig, loadEnv } = require('@omega.js/config');
@@ -195,17 +194,12 @@ class EmulatorCommand extends BaseCommand {
   async startEmulators() {
     const projectDir = this.main.firebaseProjectPath;
 
-    // functions/ is staged output (src/dist pillar): stage fresh, then keep it
-    // fresh — the emulator watches the functions dir natively, so a re-stage
-    // IS the hot reload for consumer src edits. The watcher dies with the
-    // emulator child (exitPromise below).
+    // dist/ is staged output (src/dist pillar): stage fresh (including
+    // dist/public/ for hosting), then keep it fresh — the emulator watches
+    // dist/ natively, so a re-stage IS the hot reload. The watcher dies with
+    // the emulator child (exitPromise below).
     this.ensureStaged();
     const stageWatch = this.startStageWatch();
-
-    // public/ is generated, never tracked (fresh clones don't have it) — fill in
-    // the hosting boilerplate if missing; firebase-tools refuses to boot hosting
-    // without the folder. Setup remains the authoritative overwrite.
-    ensurePublicFiles(projectDir);
 
     // N7 port allocation: firebase.json values (classic defaults) when free,
     // bump-if-taken — a second brand's stack relocates instead of the old
@@ -494,7 +488,7 @@ class EmulatorCommand extends BaseCommand {
   loadPortPins(projectDir) {
     try {
       const { hasOmegaConfig, loadConfig } = require('@omega.js/config');
-      const functionsDir = path.join(projectDir, 'functions');
+      const functionsDir = path.join(projectDir, 'dist');
       if (!hasOmegaConfig(functionsDir)) {
         return {};
       }

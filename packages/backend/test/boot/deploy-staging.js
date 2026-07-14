@@ -122,41 +122,41 @@ module.exports = {
           private: true,
           engines: { node: '22' },
           // The relative file: dep is spelled from the APP ROOT — the staged
-          // manifest must respell it one level deeper (functions/)
+          // manifest must respell it one level deeper (dist/)
           dependencies: { 'firebase-admin': '^13.0.0', '@acme/lib': 'file:../../libs/lib' },
         }, null, 2));
         jetpack.write(path.join(appRoot, 'src', 'index.js'), 'module.exports = 1;\n');
         jetpack.write(path.join(appRoot, 'src', 'routes', 'ping', 'get.js'), 'module.exports = 2;\n');
         jetpack.write(path.join(appRoot, '.env'), 'FAKE_KEY="value"\n');
         // Runtime artifacts that must SURVIVE a re-stage
-        jetpack.write(path.join(appRoot, 'functions', 'node_modules', 'marker.txt'), 'kept');
-        jetpack.write(path.join(appRoot, 'functions', 'emulator.log'), 'kept');
-        jetpack.write(path.join(appRoot, 'functions', 'stale-old-file.js'), 'wiped');
+        jetpack.write(path.join(appRoot, 'dist', 'node_modules', 'marker.txt'), 'kept');
+        jetpack.write(path.join(appRoot, 'dist', 'emulator.log'), 'kept');
+        jetpack.write(path.join(appRoot, 'dist', 'stale-old-file.js'), 'wiped');
 
-        const { functionsDir } = stageFunctions({ projectDir: appRoot });
+        const { distDir } = stageFunctions({ projectDir: appRoot });
 
         // src copied, derived manifest, stale content wiped, artifacts preserved
-        assert.equal(jetpack.read(path.join(functionsDir, 'index.js')), 'module.exports = 1;\n');
-        assert.equal(jetpack.read(path.join(functionsDir, 'routes', 'ping', 'get.js')), 'module.exports = 2;\n');
-        assert.equal(jetpack.exists(path.join(functionsDir, 'stale-old-file.js')), false, 'previous stage wiped');
-        assert.equal(jetpack.read(path.join(functionsDir, 'node_modules', 'marker.txt')), 'kept', 'node_modules preserved');
-        assert.equal(jetpack.read(path.join(functionsDir, 'emulator.log')), 'kept', 'logs preserved');
-        assert.equal(jetpack.read(path.join(functionsDir, '.env')), 'FAKE_KEY="value"\n', '.env rides the artifact');
-        const manifest = jetpack.read(path.join(functionsDir, 'package.json'), 'json');
+        assert.equal(jetpack.read(path.join(distDir, 'index.js')), 'module.exports = 1;\n');
+        assert.equal(jetpack.read(path.join(distDir, 'routes', 'ping', 'get.js')), 'module.exports = 2;\n');
+        assert.equal(jetpack.exists(path.join(distDir, 'stale-old-file.js')), false, 'previous stage wiped');
+        assert.equal(jetpack.read(path.join(distDir, 'node_modules', 'marker.txt')), 'kept', 'node_modules preserved');
+        assert.equal(jetpack.read(path.join(distDir, 'emulator.log')), 'kept', 'logs preserved');
+        assert.equal(jetpack.read(path.join(distDir, '.env')), 'FAKE_KEY="value"\n', '.env rides the artifact');
+        const manifest = jetpack.read(path.join(distDir, 'package.json'), 'json');
         assert.equal(manifest.name, 'acme-backend-functions');
         assert.equal(manifest.main, 'index.js');
         assert.equal(manifest.engines.node, '22');
         assert.deepEqual(manifest.dependencies, {
           'firebase-admin': '^13.0.0',
-          '@acme/lib': 'file:../../../libs/lib', // app-root-relative → functions-relative
+          '@acme/lib': 'file:../../../libs/lib', // app-root-relative → dist-relative
         });
         assert.equal(manifest.scripts, undefined, 'scripts never ship in the artifact');
 
         // Simulate the upload: the staged folder ALONE, no brand parent —
         // the real loader must resolve brand values, not defaults
-        assert.ok(jetpack.read(path.join(functionsDir, 'config', 'omega.json5')).startsWith('// Staged by `omega build`'), 'staged config carries the banner');
+        assert.ok(jetpack.read(path.join(distDir, 'config', 'omega.json5')).startsWith('// Staged by `omega build`'), 'staged config carries the banner');
         const uploadDir = path.join(tmp, 'upload');
-        jetpack.copy(functionsDir, uploadDir);
+        jetpack.copy(distDir, uploadDir);
         const uploaded = loadConfig(uploadDir, 'backend', {
           defaults: { brand: { id: 'my-app', name: 'My Brand' } },
         });
@@ -171,7 +171,7 @@ module.exports = {
           targets: { backend: { flavor: 'api' }, web: {} },
         }`);
         stageFunctions({ projectDir: appRoot });
-        const restaged = loadConfig(functionsDir, 'backend');
+        const restaged = loadConfig(distDir, 'backend');
         assert.equal(restaged.config.brand.name, 'Acme Corp RENAMED', 'brand edit reflected on re-stage');
 
         jetpack.remove(tmp);

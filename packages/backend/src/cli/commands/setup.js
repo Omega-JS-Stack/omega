@@ -258,17 +258,36 @@ class SetupCommand extends BaseCommand {
       touched++;
     }
 
-    // firebase.json
+    // firebase.json — scaffold or migrate
     const firebaseJsonPath = `${self.firebaseProjectPath}/firebase.json`;
     if (!hasContent(self.firebaseJSON)) {
       const templatePath = path.join(templatesDir, 'firebase.json');
       jetpack.copy(templatePath, firebaseJsonPath);
       ui.status('add', `Created ${chalk.cyan('firebase.json')}`, { level: 2 });
       touched++;
+    } else {
+      // Migrate legacy `functions` → `dist` (src/dist pillar): the functions
+      // source and hosting public dir must point at the staged output tree.
+      const fbJson = self.firebaseJSON;
+      let fbDirty = false;
+      const fnBlock = Array.isArray(fbJson.functions) ? fbJson.functions[0] : fbJson.functions;
+      if (fnBlock && fnBlock.source === 'functions') {
+        fnBlock.source = 'dist';
+        fbDirty = true;
+      }
+      if (fbJson.hosting && fbJson.hosting.public === 'public') {
+        fbJson.hosting.public = 'dist/public';
+        fbDirty = true;
+      }
+      if (fbDirty) {
+        jetpack.write(firebaseJsonPath, JSON.stringify(fbJson, null, 2) + '\n');
+        ui.status('change', `Migrated ${chalk.cyan('firebase.json')} → functions source + hosting public → dist/`, { level: 2 });
+        touched++;
+      }
     }
 
     // src/index.js — the AUTHORED Cloud Functions entry (src/dist pillar);
-    // the stage step mirrors it into functions/index.js
+    // the stage step mirrors it into dist/index.js
     const indexPath = `${self.firebaseProjectPath}/src/index.js`;
     if (!jetpack.exists(indexPath)) {
       const templatePath = path.join(templatesDir, 'index.js');

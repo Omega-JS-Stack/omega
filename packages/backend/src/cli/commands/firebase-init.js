@@ -11,7 +11,7 @@ const { loadEmulatorPorts } = require('./setup-tests/emulator-config');
  * @returns {{ admin: object, projectId: string }}
  */
 function initFirebase({ firebaseProjectPath, emulator }) {
-  const functionsDir = path.join(firebaseProjectPath, 'functions');
+  const functionsDir = path.join(firebaseProjectPath, 'dist');
 
   // Load the .env cascade so env vars like GCLOUD_PROJECT are available
   require('@omega.js/config').loadEnv(functionsDir);

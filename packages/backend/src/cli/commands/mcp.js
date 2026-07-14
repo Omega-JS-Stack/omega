@@ -4,7 +4,7 @@ const BaseCommand = require('./base-command');
 class McpCommand extends BaseCommand {
   async execute() {
     const self = this;
-    const functionsDir = path.join(self.firebaseProjectPath, 'functions');
+    const functionsDir = path.join(self.firebaseProjectPath, 'dist');
 
     // Load the .env cascade from the functions dir so OMEGA_ADMIN_KEY is available
     require('@omega.js/config').loadEnv(functionsDir);

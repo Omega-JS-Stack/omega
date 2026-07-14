@@ -3,7 +3,6 @@ const chalk = require('chalk').default;
 const powertools = require('node-powertools');
 const attachLogFile = require('../utils/attach-log-file');
 const stageLocalPackages = require('../utils/stage-local-packages');
-const { ensurePublicFiles } = require('../utils/public-files');
 const path = require('path');
 const jetpack = require('fs-jetpack');
 
@@ -17,16 +16,9 @@ class DeployCommand extends BaseCommand {
     attachLogFile(logPath);
     this.log(chalk.gray(`  Logs saving to: ${logPath}\n`));
 
-    // functions/ is staged output (src/dist pillar): a fresh stage carries the
-    // composed brand⊕app config across the upload boundary (#31) — the old
-    // write-then-restore dance (stage-resolved-config) is gone because the
-    // staged tree is disposable, not the consumer's source.
+    // dist/ is staged output (src/dist pillar): a fresh stage carries the
+    // composed config + public/ hosting boilerplate across the upload boundary.
     this.ensureStaged();
-
-    // public/ is generated, never tracked — `firebase deploy` (no --only) includes
-    // hosting and fails without the folder. The blessed flow runs setup first
-    // (authoritative overwrite); this covers a bare `npx omega deploy`.
-    ensurePublicFiles(self.firebaseProjectPath);
 
     // --only pass-through (e.g. `omega deploy --only hosting` — deploys
     // hosting on Spark plans where functions would demand Blaze)
@@ -36,7 +28,7 @@ class DeployCommand extends BaseCommand {
     // followed by Cloud Build — stage them into the upload as packed tarballs
     const firebaseJSON = jetpack.read(path.join(self.firebaseProjectPath, 'firebase.json'), 'json') || {};
     const functionsBlock = Array.isArray(firebaseJSON.functions) ? firebaseJSON.functions[0] : firebaseJSON.functions;
-    const functionsPath = path.join(self.firebaseProjectPath, functionsBlock?.source || 'functions');
+    const functionsPath = path.join(self.firebaseProjectPath, functionsBlock?.source || 'dist');
     const deployingFunctions = !self.argv?.only || String(self.argv.only).split(',').some((t) => t.trim().startsWith('functions'));
 
     // Without an Artifact Registry cleanup policy, firebase deploy EXITS 1

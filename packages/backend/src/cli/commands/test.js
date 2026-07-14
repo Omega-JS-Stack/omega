@@ -48,7 +48,7 @@ class TestCommand extends BaseCommand {
 
     // Determine the project directory
     const projectDir = self.firebaseProjectPath;
-    const functionsDir = path.join(projectDir, 'functions');
+    const functionsDir = path.join(projectDir, 'dist');
 
     // Pre-flight: write the allowlisted env subset to a shared state file
     // (`<projectDir>/.temp/test-mode.json`). The running emulator watches this
