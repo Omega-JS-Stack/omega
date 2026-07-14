@@ -43,16 +43,34 @@ module.exports = {
       },
     },
 
-    // Test 4: Admin (backendManagerKey) authentication
+    // Test 4: Admin (admin key) authentication
     {
-      name: 'backend-manager-key',
+      name: 'admin-key-header',
       auth: 'admin',
       async run({ http, assert }) {
         const response = await http.as('admin').get('backend-manager/test/authenticate');
 
-        assert.isSuccess(response, 'Should succeed with backendManagerKey');
+        assert.isSuccess(response, 'Should succeed with admin key');
         assert.equal(response.data.user.authenticated, true, 'User should be authenticated');
         assert.equal(response.data.user.roles?.admin, true, 'Should have admin role');
+      },
+    },
+
+    // Test 5: The RETIRED wire — the real admin key as a request parameter
+    // must NOT grant admin (only the omega-admin-key header does). Query and
+    // body merge into the SAME request.data object authenticate() used to
+    // read, so the query variant kills both lanes (the route is GET-only).
+    {
+      name: 'legacy-key-field-dead',
+      auth: 'none',
+      async run({ http, assert, config }) {
+        const viaQuery = await http.as('none').get('backend-manager/test/authenticate', {
+          backendManagerKey: config.adminKey,
+        });
+
+        assert.isSuccess(viaQuery, 'Request itself should succeed');
+        assert.equal(viaQuery.data.user.authenticated, false, 'Legacy backendManagerKey param must NOT authenticate');
+        assert.equal(viaQuery.data.user.roles?.admin ?? false, false, 'Legacy backendManagerKey param must NOT grant admin');
       },
     },
   ],

@@ -19,7 +19,7 @@ class McpCommand extends BaseCommand {
       || 'http://localhost:5002';
 
     // Resolve auth credentials
-    const backendManagerKey = self.argv.key
+    const adminKey = self.argv.key
       || process.env.OMEGA_ADMIN_KEY
       || '';
     const userToken = self.argv.token || '';
@@ -28,7 +28,7 @@ class McpCommand extends BaseCommand {
 
     await startServer({
       baseUrl,
-      backendManagerKey: userToken ? '' : backendManagerKey,
+      adminKey: userToken ? '' : adminKey,
       userToken,
       cwd: functionsDir,
     });

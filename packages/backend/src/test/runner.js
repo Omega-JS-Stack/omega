@@ -148,14 +148,14 @@ class TestRunner {
       return false;
     }
 
-    if (!this.options.backendManagerKey) {
-      console.log(chalk.red('  ✗ Missing backendManagerKey'));
+    if (!this.options.adminKey) {
+      console.log(chalk.red('  ✗ Missing adminKey'));
       console.log(chalk.gray('    Set OMEGA_ADMIN_KEY environment variable or pass --key flag'));
       return false;
     }
 
-    if (!this.options.backendManagerWebhookKey) {
-      console.log(chalk.red('  ✗ Missing backendManagerWebhookKey'));
+    if (!this.options.webhookKey) {
+      console.log(chalk.red('  ✗ Missing webhookKey'));
       console.log(chalk.gray('    Set OMEGA_WEBHOOK_KEY environment variable or pass --webhook-key flag'));
       return false;
     }
@@ -683,13 +683,13 @@ class TestRunner {
       apiUrl: this.options.apiUrl,
       timeout: this.options.timeout,
       accounts: this.accounts,
-      backendManagerKey: this.options.backendManagerKey,
-      backendManagerWebhookKey: this.options.backendManagerWebhookKey,
+      adminKey: this.options.adminKey,
+      webhookKey: this.options.webhookKey,
     });
 
     // Set default auth
     if (auth === 'admin') {
-      http.setAuth('backendManagerKey', { key: this.options.backendManagerKey });
+      http.setAuth('adminKey', { key: this.options.adminKey });
     } else if (auth === 'none') {
       http.setAuth('none');
     } else if (auth === 'user') {

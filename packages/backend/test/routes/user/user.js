@@ -81,7 +81,7 @@ module.exports = {
       },
     },
 
-    // Test 4: backendManagerKey only - shell account with admin role, no real user
+    // Test 4: admin key only - shell account with admin role, no real user
     {
       name: 'backend-manager-key-shell-account',
       auth: 'admin',
@@ -90,12 +90,12 @@ module.exports = {
       async run({ http, assert, accounts }) {
         const response = await http.get('backend-manager/user', {});
 
-        assert.isSuccess(response, 'Resolve should succeed with backendManagerKey');
+        assert.isSuccess(response, 'Resolve should succeed with admin key');
 
         const user = response.data.user;
 
-        // Verify roles - backendManagerKey grants admin role
-        assert.equal(user.roles.admin, true, 'backendManagerKey should grant admin role');
+        // Verify roles - admin key grants admin role
+        assert.equal(user.roles.admin, true, 'admin key should grant admin role');
         assert.equal(user.authenticated, true, 'Should be authenticated');
 
         // Should NOT have the real admin account's UID (it's a shell account)

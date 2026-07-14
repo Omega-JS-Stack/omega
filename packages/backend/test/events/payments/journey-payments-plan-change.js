@@ -62,7 +62,7 @@ module.exports = {
         state.eventId = `_test-evt-journey-plan-change-${Date.now()}`;
 
         // Send subscription.updated with product B's Stripe product ID (or test sentinel)
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.backendManagerWebhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'customer.subscription.updated',
           data: {

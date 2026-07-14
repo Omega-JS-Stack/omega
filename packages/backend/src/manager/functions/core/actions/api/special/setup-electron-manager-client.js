@@ -22,7 +22,7 @@ Module.prototype.main = function () {
 
     let signInToken = null;
 
-    if (payload.data.authenticationToken || payload.data.backendManagerKey) {
+    if (payload.data.authenticationToken || assistant.request.user?.roles?.admin) {
       await self.Api.resolveUser({adminRequired: true})
       .then(async (user) => {
         uid = user?.auth?.uid ?? null;
@@ -62,7 +62,7 @@ Module.prototype.main = function () {
       return reject(error)
     }
 
-    if (config.backendManagerKey === process.env.OMEGA_ADMIN_KEY && process.env.OMEGA_ADMIN_KEY) {
+    if (assistant.request.user?.roles?.admin) {
       assistant.log('Validated config', config)
     } else {
       config = {};

@@ -87,7 +87,7 @@ class DeployCommand extends BaseCommand {
    *
    * Firebase CLI used to set this automatically but stopped around the Node 10
    * runtime transition. Without it, HTTP requests get a 403 at the IAM level
-   * before @omega.js/backend's application-level auth (backendManagerKey) can run.
+   * before @omega.js/backend's application-level auth (the omega-admin-key header) can run.
    *
    * Dynamically discovers all deployed functions via gcloud and fixes any
    * HTTP-triggered function missing the allUsers invoker binding.

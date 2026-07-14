@@ -213,6 +213,11 @@ async function loadParentPool(state) {
   for (const category of categoriesToFetch) {
     const query = {
       limit: PARENT_SOURCES_PER_CATEGORY,
+      // Mixed-fleet wire: $parent points at the PARENT brand's backend, whose
+      // generation we don't control. New-stack parents read the
+      // omega-admin-key header (sent below); legacy-BEM parents read exactly
+      // this query field. DUAL-SEND until every parent runs the new stack,
+      // then delete this field — never "fix" unilaterally.
       backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     };
 
@@ -224,6 +229,9 @@ async function loadParentPool(state) {
       method: 'get',
       response: 'json',
       timeout: 60000,
+      headers: {
+        'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+      },
       query: query,
     }).catch((e) => {
       state.assistant.error(`loadParentPool(): Failed to fetch sources for category=${category}: ${e.message}`);

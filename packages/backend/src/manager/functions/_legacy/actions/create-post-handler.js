@@ -54,8 +54,10 @@ let Module = {
         await fetch(`${self.Manager.getApiUrl()}/omega`, {
           method: 'POST',
           response: 'json',
+          headers: {
+            'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+          },
           body: {
-            backendManagerKey: process.env.OMEGA_ADMIN_KEY,
             command: 'admin:send-notification',
             payload: {
               notification: {

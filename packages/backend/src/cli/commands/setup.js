@@ -401,8 +401,8 @@ class SetupCommand extends BaseCommand {
       method: 'GET',
       timeout: 30000,
       response: 'json',
-      query: {
-        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
+      headers: {
+        'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
       },
     })
     .then(json => json)

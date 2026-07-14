@@ -371,7 +371,7 @@ async function handleMcpProtocol(req, res, options) {
   const apiUrl = Manager.getApiUrl();
   const client = new BEMClient({
     baseUrl: apiUrl,
-    backendManagerKey: authInfo.role === 'admin' ? token : '',
+    adminKey: authInfo.role === 'admin' ? token : '',
     userToken: authInfo.role === 'user' ? token : '',
   });
 

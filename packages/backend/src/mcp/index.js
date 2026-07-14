@@ -27,7 +27,7 @@ const packageJSON = require('../../package.json');
  * Start the MCP server
  * @param {object} options
  * @param {string} options.baseUrl - @omega.js/backend server URL
- * @param {string} options.backendManagerKey - Admin API key
+ * @param {string} options.adminKey - Admin API key
  * @param {string} options.userToken - User API key (for user-level connections)
  * @param {string} options.cwd - Consumer project functions directory (for consumer tool discovery)
  */
@@ -37,13 +37,13 @@ async function startServer(options) {
   const baseUrl = options.baseUrl
     || process.env.OMEGA_BACKEND_URL
     || 'http://localhost:5002';
-  const backendManagerKey = options.backendManagerKey
+  const adminKey = options.adminKey
     || process.env.OMEGA_ADMIN_KEY
     || '';
   const userToken = options.userToken || '';
 
   // Determine auth role
-  const token = backendManagerKey || userToken || '';
+  const token = adminKey || userToken || '';
   const authInfo = resolveAuthInfo(token);
 
   if (authInfo.role === 'public') {
@@ -53,7 +53,7 @@ async function startServer(options) {
   // Build client with appropriate auth
   const client = new BEMClient({
     baseUrl,
-    backendManagerKey: authInfo.role === 'admin' ? token : '',
+    adminKey: authInfo.role === 'admin' ? token : '',
     userToken: authInfo.role === 'user' ? token : '',
   });
 

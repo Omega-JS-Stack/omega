@@ -21,13 +21,13 @@ class HttpClient {
 
     // Store accounts reference for as() method
     this.accounts = options.accounts || null;
-    this.backendManagerKey = options.backendManagerKey || '';
-    this.backendManagerWebhookKey = options.backendManagerWebhookKey || '';
+    this.adminKey = options.adminKey || '';
+    this.webhookKey = options.webhookKey || '';
   }
 
   /**
    * Set authentication for subsequent requests
-   * @param {string} type - 'none', 'privateKey', 'backendManagerKey', 'bearer'
+   * @param {string} type - 'none', 'privateKey', 'adminKey', 'bearer'
    * @param {object} credentials - Credentials object
    */
   setAuth(type, credentials) {
@@ -38,9 +38,10 @@ class HttpClient {
         this.defaultHeaders['Authorization'] = `Bearer ${credentials.privateKey}`;
         this.defaultAuthParams = {};
         break;
-      case 'backendManagerKey':
+      case 'adminKey':
         delete this.defaultHeaders['Authorization'];
-        this.defaultAuthParams = { backendManagerKey: credentials.key };
+        this.defaultHeaders['omega-admin-key'] = credentials.key;
+        this.defaultAuthParams = {};
         break;
       case 'bearer':
         this.defaultHeaders['Authorization'] = `Bearer ${credentials.token}`;
@@ -66,8 +67,8 @@ class HttpClient {
 
     if (accountType === 'admin') {
       return {
-        headers: {},
-        authParams: { backendManagerKey: this.backendManagerKey },
+        headers: { 'omega-admin-key': this.adminKey },
+        authParams: {},
       };
     }
 

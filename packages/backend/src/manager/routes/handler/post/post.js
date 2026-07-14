@@ -32,6 +32,10 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   // Create and send invoice if email and price are provided
   if (settings.invoiceEmail && settings.invoicePrice) {
     // Create invoice
+    // ITW wrapper wire contract: the wrapper Cloud Function runs legacy BEM,
+    // whose auth reads exactly this payload field. Flips to the
+    // omega-admin-key header only when ITW's wrapper migrates to the new
+    // stack — never "fix" unilaterally.
     const createdInvoice = await fetch('https://us-central1-itw-creative-works.cloudfunctions.net/wrapper', {
       method: 'POST',
       response: 'json',
@@ -75,6 +79,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
 
     // Send invoice
     const createdInvoiceId = (createdInvoice?.href ?? '').split('/').pop();
+    // Send invoice — same ITW-wrapper wire pin as the create call above
     const sentInvoice = await fetch('https://us-central1-itw-creative-works.cloudfunctions.net/wrapper', {
       method: 'POST',
       response: 'json',

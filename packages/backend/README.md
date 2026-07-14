@@ -748,10 +748,11 @@ storage.set('nested.path', { data: true }).write();
    { authenticationToken: 'user-private-key' }
    ```
 
-3. **OMEGA Backend Key** (Admin access)
-   ```javascript
-   { backendManagerKey: 'your-backend-manager-key' }
+3. **OMEGA Admin Key** (Admin access — header only, never query/body)
    ```
+   omega-admin-key: <OMEGA_ADMIN_KEY>
+   ```
+   A separate lane from `Authorization` (which stays user-only), so one request can be admin-authenticated AND carry a user token at the same time.
 
 4. **Session Cookie**
    ```

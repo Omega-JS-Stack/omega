@@ -48,14 +48,14 @@ module.exports = {
       },
     },
 
-    // Test 4: Admin (backendManagerKey) authentication
+    // Test 4: Admin (admin key) authentication
     {
       name: 'backend-manager-key',
       auth: 'admin',
       async run({ http, assert }) {
         const response = await http.command('test:authenticate', {});
 
-        assert.isSuccess(response, 'Should succeed with backendManagerKey');
+        assert.isSuccess(response, 'Should succeed with admin key');
         assert.equal(response.data.user.authenticated, true, 'User should be authenticated');
         assert.equal(response.data.user.roles?.admin, true, 'Should have admin role');
       },

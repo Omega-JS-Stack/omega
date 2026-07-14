@@ -630,12 +630,12 @@ BackendAssistant.prototype.authenticate = async function (options) {
   const res = self.ref.res;
   const data = self.request.data;
 
-  // Get stored backendManagerKey
+  // Get stored admin key
   const OMEGA_ADMIN_KEY = process.env.OMEGA_ADMIN_KEY || '';
 
   // Build the ID token from the request
   let idToken;
-  let backendManagerKey;
+  let adminKey;
   // let user;
 
   // Set options
@@ -651,7 +651,7 @@ BackendAssistant.prototype.authenticate = async function (options) {
       : user.authenticated;
 
     // Validate OMEGA_ADMIN_KEY
-    if (backendManagerKey && backendManagerKey === OMEGA_ADMIN_KEY) {
+    if (adminKey && adminKey === OMEGA_ADMIN_KEY) {
       // Update roles
       user.roles = user.roles || {};
       user.roles.admin = true;
@@ -673,14 +673,15 @@ BackendAssistant.prototype.authenticate = async function (options) {
   // Get shortcuts
   const authHeader = req?.headers?.authorization || '';
 
-  // Extract the @omega.js/backend token
-  // Having this is separate from the ID token allows for the user to be authenticated as an ADMIN
-  if (options.backendManagerKey || data.backendManagerKey) {
-    // Read token from backendManagerKey or authenticationToken or apiKey
-    backendManagerKey = options.backendManagerKey || data.backendManagerKey;
+  // Extract the admin key — a separate lane from the ID token so one request
+  // can be admin-authenticated AND target a user at the same time.
+  // Wire: the `omega-admin-key` request header ONLY (query/body keys leak into
+  // access logs and payload schemas). In-process callers pass options.adminKey.
+  if (options.adminKey || req?.headers?.['omega-admin-key']) {
+    adminKey = options.adminKey || req.headers['omega-admin-key'];
 
     // Log the token
-    self.log('Found "backendManagerKey" parameter', backendManagerKey);
+    self.log('Found "omega-admin-key" header', adminKey);
   }
 
   // Extract the token / API key

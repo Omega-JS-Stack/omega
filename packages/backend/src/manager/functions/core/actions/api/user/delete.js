@@ -35,8 +35,10 @@ Module.prototype.main = function () {
         response: 'json',
         tries: 2,
         log: true,
+        headers: {
+          'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+        },
         body: {
-          backendManagerKey: process.env.OMEGA_ADMIN_KEY,
           command: 'user:sign-out-all-sessions',
           payload: {
             uid: uid,

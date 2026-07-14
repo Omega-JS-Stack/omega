@@ -25,7 +25,6 @@ Module.prototype.main = function () {
       },
       delay: 1,
       payload: {
-        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
         brand: Manager.config.brand.id,
       },
     }
@@ -87,8 +86,10 @@ Module.prototype.main = function () {
       method: 'post',
       response: 'json',
       log: true,
+      headers: {
+        'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+      },
       body: {
-        backendManagerKey: process.env.OMEGA_ADMIN_KEY,
         command: 'admin:send-email',
         payload: emailPayload.payload,
       },

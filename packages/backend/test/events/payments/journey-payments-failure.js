@@ -63,7 +63,7 @@ module.exports = {
 
         // Send invoice.payment_failed with subscription billing reason
         // This tests the new parseWebhook routing: billing_reason=subscription_cycle → subscription category
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.backendManagerWebhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
           id: state.eventId,
           type: 'invoice.payment_failed',
           data: {

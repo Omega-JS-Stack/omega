@@ -182,11 +182,9 @@ Module.prototype.import = function (command, payload, user, response) {
         response: response ? response : self.payload.response,
       });
 
-      // 11/27/2024 - Separated this IF/ELSE into two separate IFs
-      // Set backendManagerKey and authenticationToken if it's provided
-      if (self.payload.data.backendManagerKey) {
-        lib.payload.data.backendManagerKey = self.payload.data.backendManagerKey;
-      }
+      // Set authenticationToken if it's provided (admin rides the
+      // omega-admin-key header and is resolved once by authenticate() —
+      // nothing to re-carry between chained actions)
       if (self.payload.data.authenticationToken) {
         lib.payload.data.authenticationToken = self.payload.data.authenticationToken;
       }

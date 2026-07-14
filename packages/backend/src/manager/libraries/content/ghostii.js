@@ -41,6 +41,10 @@ async function writeArticle({ brand, description, links, sourceContent, override
   const o = overrides || {};
 
   const body = {
+    // Ghostii's LIVE wire contract: its production backend runs legacy BEM,
+    // whose auth reads exactly this payload field. Renames to the
+    // omega-admin-key header only when Ghostii itself migrates to the new
+    // stack — never "fix" unilaterally (it would break article generation).
     backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     keywords: o.keywords || [],
     description: description,
@@ -142,7 +146,6 @@ async function publishArticle(assistant, { brand, article, id, author, postPath,
   const body = article.json ? post.body : article.body;
 
   const postBody = {
-    backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     title: title,
     url: title,
     description: article.description,
@@ -165,6 +168,9 @@ async function publishArticle(assistant, { brand, article, id, author, postPath,
     timeout: 90000,
     tries: 1,
     response: 'json',
+    headers: {
+      'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+    },
     body: postBody,
   });
 

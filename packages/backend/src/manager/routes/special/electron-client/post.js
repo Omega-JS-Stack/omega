@@ -36,8 +36,9 @@ module.exports = async ({ assistant, Manager, settings, analytics, libraries }) 
     uuid = uuidLib.v5(uid, NAMESPACE);
   }
 
-  // Validate config
-  if (config.backendManagerKey === process.env.OMEGA_ADMIN_KEY && process.env.OMEGA_ADMIN_KEY) {
+  // Validate config — kept only when the REQUEST is admin-authenticated (the
+  // omega-admin-key header); the config payload itself never carries a secret
+  if (user.roles?.admin) {
     assistant.log('Validated config', config);
   } else {
     config = {};

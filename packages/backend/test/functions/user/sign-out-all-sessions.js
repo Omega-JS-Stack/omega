@@ -48,7 +48,7 @@ module.exports = {
     },
 
     // Test 3: Premium user can sign out all sessions
-    // Note: backendManagerKey admin doesn't have auth.uid, so we test with premium user instead
+    // Note: admin key admin doesn't have auth.uid, so we test with premium user instead
     {
       name: 'premium-user-succeeds',
       auth: 'premium-active',

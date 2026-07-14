@@ -662,10 +662,13 @@ async function uploadDraftToBeehiiv({ html, structure, config, runDir }) {
  */
 async function peekSources({ parentUrl, categories, limit, key }) {
   if (!categories.length) {
+    // Dual-send like source-resolver: header for new-stack parents, legacy
+    // query field for BEM parents
     const data = await fetch(`${parentUrl}/newsletter-sources`, {
       method: 'get',
       response: 'json',
       timeout: 15000,
+      headers: { 'omega-admin-key': key },
       query: { limit, backendManagerKey: key },
     });
 
@@ -678,6 +681,7 @@ async function peekSources({ parentUrl, categories, limit, key }) {
       method: 'get',
       response: 'json',
       timeout: 15000,
+      headers: { 'omega-admin-key': key },
       query: { category, limit, backendManagerKey: key },
     });
 
@@ -753,6 +757,7 @@ async function fetchSourcesForRun({ parentUrl, newsletterConfig, brandId, source
       method: 'get',
       response: 'json',
       timeout: 15000,
+      headers: { 'omega-admin-key': key },
       query,
     });
     all.push(...(data.sources || []));

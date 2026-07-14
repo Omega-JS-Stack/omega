@@ -136,8 +136,8 @@ class TestCommand extends BaseCommand {
     }
 
     // Derive computed values (not in config file)
-    const backendManagerKey = argv.key || process.env.OMEGA_ADMIN_KEY;
-    const backendManagerWebhookKey = argv.webhookKey || process.env.OMEGA_WEBHOOK_KEY;
+    const adminKey = argv.key || process.env.OMEGA_ADMIN_KEY;
+    const webhookKey = argv.webhookKey || process.env.OMEGA_WEBHOOK_KEY;
     const contactEmail = config.brand?.contact?.email || '';
     const domain = contactEmail.includes('@') ? contactEmail.split('@')[1] : '';
 
@@ -147,14 +147,14 @@ class TestCommand extends BaseCommand {
       return null;
     }
 
-    if (!backendManagerKey) {
-      this.logError('Error: Missing backend manager key');
+    if (!adminKey) {
+      this.logError('Error: Missing admin key');
       this.log(chalk.gray('  Set OMEGA_ADMIN_KEY in your .env file or pass --key flag'));
       return null;
     }
 
-    if (!backendManagerWebhookKey) {
-      this.logError('Error: Missing backend manager webhook key');
+    if (!webhookKey) {
+      this.logError('Error: Missing webhook key');
       this.log(chalk.gray('  Set OMEGA_WEBHOOK_KEY in your .env file or pass --webhook-key flag'));
       return null;
     }
@@ -172,8 +172,8 @@ class TestCommand extends BaseCommand {
     // Pass entire config + computed values not in config file
     return {
       ...config,
-      backendManagerKey,
-      backendManagerWebhookKey,
+      adminKey,
+      webhookKey,
       domain,
     };
   }

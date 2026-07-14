@@ -2,7 +2,8 @@
  * @omega.js/backend HTTP Client
  *
  * Makes authenticated HTTP calls to a running @omega.js/backend server (local or production).
- * Supports admin key auth (backendManagerKey) and user token auth (API key from OAuth flow).
+ * Supports admin key auth (the omega-admin-key header) and user token auth
+ * (API key from OAuth flow, via Authorization: Bearer).
  */
 const fetch = require('wonderful-fetch');
 
@@ -11,7 +12,7 @@ class BEMClient {
     options = options || {};
 
     this.baseUrl = (options.baseUrl || '').replace(/\/+$/, '');
-    this.backendManagerKey = options.backendManagerKey || '';
+    this.adminKey = options.adminKey || '';
     this.userToken = options.userToken || '';
   }
 
@@ -37,11 +38,12 @@ class BEMClient {
       timeout: 120000,
     };
 
-    if (this.backendManagerKey) {
-      // Admin key auth — key in query/body (existing behavior)
-      if (method === 'GET') {
-        url.searchParams.set('backendManagerKey', this.backendManagerKey);
+    if (this.adminKey) {
+      // Admin key auth — the omega-admin-key header on every method (never
+      // the query string or body)
+      fetchOptions.headers['omega-admin-key'] = this.adminKey;
 
+      if (method === 'GET') {
         for (const [key, value] of Object.entries(params)) {
           if (value === undefined || value === null) {
             continue;
@@ -50,10 +52,7 @@ class BEMClient {
           url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : value);
         }
       } else {
-        fetchOptions.body = JSON.stringify({
-          backendManagerKey: this.backendManagerKey,
-          ...params,
-        });
+        fetchOptions.body = JSON.stringify(params);
       }
     } else if (this.userToken) {
       // User token auth — Bearer header + authenticationToken param

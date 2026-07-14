@@ -167,10 +167,8 @@ Middleware.prototype.run = function (libPath, options) {
         return assistant.respond(new Error(`Unable to resolve schema ${options.schema}: ${e.message}`), {code: e.code || 500, sentry: true});
       }
 
-      // // Here we need to include IF it exists the backendManagerKey and the apiKey
-      // if (data.backendManagerKey) {
-      //   assistant.settings.backendManagerKey = data.backendManagerKey;
-      // }
+      // // Here we need to include IF it exists the apiKey (admin rides the
+      // // omega-admin-key header — never settings)
       // if (data.apiKey) {
       //   assistant.settings.apiKey = data.apiKey;
       // }

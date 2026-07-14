@@ -122,7 +122,7 @@ module.exports = {
 
         state.eventId2 = `_test-evt-journey-trial-active-${Date.now()}`;
 
-        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.backendManagerWebhookKey}`, {
+        const response = await http.as('none').post(`backend-manager/payments/webhook?processor=test&key=${config.webhookKey}`, {
           id: state.eventId2,
           type: 'customer.subscription.updated',
           data: {

@@ -43,7 +43,7 @@ module.exports = {
     },
 
     // Test 3: Premium user can create custom token
-    // Note: Admin via backendManagerKey can't create tokens without a UID since it's not a real user
+    // Note: Admin via admin key can't create tokens without a UID since it's not a real user
     {
       name: 'premium-user-succeeds',
       auth: 'premium-active',

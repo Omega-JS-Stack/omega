@@ -100,7 +100,7 @@ module.exports = {
     {
       name: 'admin-can-delete-other-user',
       async run({ http, assert, state }) {
-        // Auth as admin (using backendManagerKey) and delete another user
+        // Auth as admin (using admin key) and delete another user
         const deleteResponse = await http.as('admin').delete('backend-manager/user', {
           uid: state.adminDeleteUid,
         });

@@ -52,9 +52,11 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     response: 'json',
     tries: 2,
     log: true,
+    headers: {
+      'omega-admin-key': process.env.OMEGA_ADMIN_KEY,
+    },
     body: {
       uid,
-      backendManagerKey: process.env.OMEGA_ADMIN_KEY,
     },
   })
     .then((json) => {
