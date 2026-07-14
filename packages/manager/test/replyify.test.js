@@ -427,3 +427,49 @@ test('setup: interactive run lands the pasted agent id in omega.json5 and procee
     setOpener(null);
   }
 });
+
+// ─── 2b create-on-missing (operator SA mints the brand's own agent) ──────────
+
+test('replyify 2b: missing agentId + SA + template donor mints the brand-owned agent', async (t) => {
+  process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST = 'fixture-password-123';
+  t.after(() => delete process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST);
+
+  const docs = { 'agents/tmplAgent1': { name: 'Donor Agent', owner: 'uid_donor', filter: { query: 'to:(donor)' } } };
+  const store = {
+    getDoc: async (p) => structuredClone(docs[p] ?? null),
+    setDoc: async (p, d) => { docs[p] = structuredClone(d); return {}; },
+    patchDoc: async () => ({}),
+  };
+  const authAdmin = {
+    getUserByEmail: async () => null,
+    createUser: async ({ email }) => ({ uid: 'uid_minted3', email }),
+  };
+  const config = brandConfig({ replyify: { agentId: null, templateAgentId: 'tmplAgent1' } });
+  config.brand.contact = { email: 'support@fixture-brand.test' };
+  const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  replyify: { enabled: true, templateAgentId: "tmplAgent1" },
+}
+`);
+
+  const result = await service.run({
+    brandId: 'fixture-brand',
+    brandRoot,
+    brandConfig: config,
+    brand: { id: 'fixture-brand', config: {}, targets: ['web', 'backend'], apps: [] },
+    brandState: {},
+    apps: [],
+    operations: OPERATIONS.replyify,
+    options: {},
+    serviceData: {},
+    replyifyDb: store,
+    replyifyAuthAdmin: authAdmin,
+  });
+
+  assert.equal(result.status, 'success');
+  const agentId = result.state.agentId;
+  assert.match(agentId, /^[A-Za-z0-9]{14}$/, 'minted id matches the product convention');
+  assert.equal(docs[`agents/${agentId}`].owner, 'uid_minted3', 'minted agent owned by the new user');
+  assert.ok(docs['users/uid_minted3'], 'product user doc written');
+  assert.ok(readSource(brandRoot).includes(`agentId: "${agentId}"`), 'minted id written back');
+});

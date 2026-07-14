@@ -7,21 +7,30 @@
  * Replyify's own Firestore, so this service is for the Replyify operator:
  * it needs a service account for Replyify's Firebase project.
  *
- * Auth: REPLYIFY_SERVICE_ACCOUNT in the brand .env — a path to the
- * service-account JSON (absolute, or relative to the brand root, e.g.
- * `.omega/secrets/replyify-service-account.json`). omega-manager read the
- * company-mode `.output/replyify/secrets/service-account.json` instead.
- *
- * The agent id comes from config (replyify.agentId) — agents are created
- * in the Replyify dashboard. Interactive runs offer the setup flow when
- * it's missing (open replyify.app, paste the agent id back —
- * comment-preserving writeback into omega.json5, with a Disable option
- * that sets `replyify: false`); non-interactive and dry runs skip cleanly.
+ * Auth tiers (2b, Ian 2026-07-13):
+ *   1. Operator SA — REPLYIFY_SERVICE_ACCOUNT in the brand .env (path to
+ *      the service-account JSON, absolute or brand-root-relative). Full
+ *      create + manage: a missing agentId with `replyify.templateAgentId`
+ *      configured (the company layer's shape donor) MINTS the brand's own
+ *      agent — product user (email = brand contact email, password via the
+ *      account service's owner channels) + doc shape-templated from the
+ *      donor — and writes the new id back into omega.json5. The ensures
+ *      then converge filter/knowledge/plan in the same run.
+ *   2. User API key — REPLYIFY_API_KEY (the product accepts
+ *      user.api.privateKey): recognized, management via the product's
+ *      public API lands when those routes are verified.
+ *   3. Dashboard — interactive runs offer the setup flow (open
+ *      replyify.app, paste the agent id back — comment-preserving
+ *      writeback, with a Disable option that sets `replyify: false`).
+ *      Non-interactive and dry runs skip cleanly.
  */
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
-const { resolveConfigValue } = require('../../lib/config-flow.js');
+const { createAuthAdmin } = require('../../lib/auth-admin.js');
+const { resolveConfigValue, landValue } = require('../../lib/config-flow.js');
+const { createProductAsset } = require('../../lib/product-create.js');
+const { createPasswordResolver } = require('../account/lib/resolve-password.js');
 
 const REPLYIFY_URL = 'https://replyify.app';
 
@@ -44,31 +53,75 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no backend target' };
     }
 
+    // Operator credentials first — create-on-missing needs them before the
+    // id resolution. Tests inject fakes via context.replyifyDb/-AuthAdmin.
+    let db = context.replyifyDb;
+    let authAdmin = context.replyifyAuthAdmin;
+    if (!db) {
+      const envPath = process.env.REPLYIFY_SERVICE_ACCOUNT;
+      if (envPath) {
+        const serviceAccount = loadServiceAccount(envPath, context.brandRoot);
+        db = new FirestoreREST(serviceAccount);
+        authAdmin = createAuthAdmin(serviceAccount);
+      }
+    }
+
+    const brand = context.brandConfig.brand || {};
+    const dryRun = context.options?.dryRun || false;
     let agentId = config?.agentId;
+
+    // 2b create-on-missing: operator SA + a template donor → a missing agent
+    // means MINT the brand's own (product user + doc), write the id back,
+    // and let the ensures below converge it in this same run.
+    if (!agentId && db && authAdmin && config?.templateAgentId && brand.contact?.email) {
+      const created = await createProductAsset({
+        db,
+        authAdmin,
+        collection: 'agents',
+        templateId: config.templateAgentId,
+        email: brand.contact.email,
+        resolvePassword: createPasswordResolver({
+          brandRoot: context.brandRoot,
+          domain: new URL(brand.url || 'https://invalid.test').hostname,
+          brand,
+          dryRun,
+        }),
+        dryRun,
+        log: (line) => console.log(`      ${line}`),
+      });
+
+      if (!created) {
+        return { skip: true, reason: 'dry run — agent creation planned (from replyify.templateAgentId)' };
+      }
+
+      landValue(context, 'replyify.agentId', created.id);
+      console.log(`      ${chalk.green('✓')} replyify.agentId = ${chalk.cyan(created.id)} written to omega.json5`);
+      agentId = created.id;
+    }
+
     if (!agentId) {
       agentId = await resolveConfigValue(context, {
         path: 'replyify.agentId',
         label: 'Replyify email agent',
         instructions: [
           `1. Create an account at ${chalk.cyan(REPLYIFY_URL)} (if you haven't already)`,
-          `2. Create an email agent for ${chalk.cyan(context.brandConfig.brand?.name || context.brandId)}`,
+          `2. Create an email agent for ${chalk.cyan(brand.name || context.brandId)}`,
         ],
         entry: { url: REPLYIFY_URL, message: 'Replyify agent ID:' },
         disablePath: 'replyify',
       });
     }
     if (!agentId) {
-      return { skip: true, reason: 'no replyify.agentId configured (create an agent at https://replyify.app, then set it in omega.json5 — or rerun interactively)' };
+      return { skip: true, reason: 'no replyify.agentId configured — set replyify.templateAgentId + the operator SA to mint one automatically, create one at https://replyify.app (paste back interactively), or set it in omega.json5' };
     }
 
-    // Tests inject a fake client via context.replyifyDb
-    let db = context.replyifyDb;
     if (!db) {
-      const envPath = process.env.REPLYIFY_SERVICE_ACCOUNT;
-      if (!envPath) {
-        return { skip: true, reason: 'no REPLYIFY_SERVICE_ACCOUNT configured (path to Replyify\'s service-account JSON, set it in the brand .env)' };
-      }
-      db = new FirestoreREST(loadServiceAccount(envPath, context.brandRoot));
+      return {
+        skip: true,
+        reason: process.env.REPLYIFY_API_KEY
+          ? 'REPLYIFY_API_KEY recognized, but product-API management is not wired yet — use the operator SA (REPLYIFY_SERVICE_ACCOUNT) or the dashboard'
+          : 'no REPLYIFY_SERVICE_ACCOUNT configured (path to Replyify\'s service-account JSON, set it in the brand .env)',
+      };
     }
 
     return { db, agentId };

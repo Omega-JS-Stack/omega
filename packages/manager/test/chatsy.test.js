@@ -433,3 +433,50 @@ test('setup: interactive Disable writes chatsy: false and skips the service', as
     tty.close();
   }
 });
+
+// ─── 2b create-on-missing (operator SA mints the brand's own agent) ──────────
+
+test('chatsy 2b: missing agentId + SA + template donor mints the brand-owned agent', async (t) => {
+  process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST = 'fixture-password-123';
+  t.after(() => delete process.env.OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST);
+
+  const docs = { 'agents/tmplAgent1': { name: 'Donor Agent', owner: 'uid_donor', settings: { welcomeMessage: 'hi' } } };
+  const store = {
+    getDoc: async (p) => structuredClone(docs[p] ?? null),
+    setDoc: async (p, d) => { docs[p] = structuredClone(d); return {}; },
+    patchDoc: async () => ({}),
+  };
+  const authAdmin = {
+    getUserByEmail: async () => null,
+    createUser: async ({ email }) => ({ uid: 'uid_minted2', email }),
+  };
+  const config = brandConfig({ chatsy: { agentId: null, templateAgentId: 'tmplAgent1' } });
+  config.brand.contact = { email: 'support@fixture-brand.test' };
+  const brandRoot = makeBrandRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  chatsy: { enabled: true, templateAgentId: "tmplAgent1" },
+}
+`);
+
+  const result = await service.run({
+    brandId: 'fixture-brand',
+    brandRoot,
+    brandConfig: config,
+    brand: { id: 'fixture-brand', config: {}, targets: ['web', 'backend'], apps: [] },
+    brandState: {},
+    apps: [],
+    operations: OPERATIONS.chatsy,
+    options: {},
+    serviceData: {},
+    chatsyDb: store,
+    chatsyAuthAdmin: authAdmin,
+  });
+
+  assert.equal(result.status, 'success');
+  const agentId = result.state.agentId;
+  assert.match(agentId, /^[A-Za-z0-9]{14}$/, 'minted id matches the product convention');
+  assert.equal(docs[`agents/${agentId}`].owner, 'uid_minted2', 'minted agent owned by the new user');
+  assert.ok(docs['users/uid_minted2'], 'product user doc written');
+  assert.match(docs['users/uid_minted2'].api.privateKey, /^[A-Za-z0-9]{43}$/, 'real api key generated');
+  assert.ok(readConfigSource(brandRoot).includes(`agentId: "${agentId}"`), 'minted id written back');
+});

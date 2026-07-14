@@ -328,6 +328,220 @@ test('firestore-rest: typed-value encode/decode round-trips a nested document', 
   assert.deepEqual(decodeFields(encoded), doc);
 });
 
+// ─── 2b create-on-missing (operator SA mints the brand's own form) ───────────
+
+/** Stateful doc-store fake: setDoc lands, getDoc reads back — the mint +
+ *  same-run convergence needs real read-your-writes. */
+function fakeStore(initialDocs = {}) {
+  const docs = structuredClone(initialDocs);
+  const calls = [];
+
+  return {
+    calls,
+    docs,
+    getDoc: async (docPath) => {
+      calls.push({ method: 'getDoc', args: [docPath] });
+      return structuredClone(docs[docPath] ?? null);
+    },
+    setDoc: async (docPath, data) => {
+      calls.push({ method: 'setDoc', args: [docPath, structuredClone(data)] });
+      docs[docPath] = structuredClone(data);
+      return {};
+    },
+    patchDoc: async (docPath, data, fieldPaths) => {
+      calls.push({ method: 'patchDoc', args: [docPath, structuredClone(data), fieldPaths] });
+      return {};
+    },
+    sets: () => calls.filter((c) => c.method === 'setDoc'),
+    patches: () => calls.filter((c) => c.method === 'patchDoc'),
+  };
+}
+
+function fakeAuthAdmin({ existing = null } = {}) {
+  const calls = [];
+  return {
+    calls,
+    getUserByEmail: async (email) => {
+      calls.push({ method: 'getUserByEmail', email });
+      return existing;
+    },
+    createUser: async ({ email, password }) => {
+      calls.push({ method: 'createUser', email, password });
+      return { uid: 'uid_minted1', email };
+    },
+  };
+}
+
+const PASSWORD_PIN_VAR = 'OMEGA_ACCOUNT_PASSWORD__SUPPORT_FIXTURE_BRAND_TEST';
+const TEMPLATE_FORM = {
+  id: 'tmplForm1', // BEM docs mirror their doc id — the mint must re-point it
+  name: 'Contact Form - Donor Brand',
+  owner: 'uid_donor',
+  settings: { enabled: false },
+  fields: ['email', 'message'],
+};
+
+function createConfig() {
+  const config = brandConfig({ slapform: { formId: null, templateFormId: 'tmplForm1' } });
+  config.brand.contact = { email: 'support@fixture-brand.test' };
+  return config;
+}
+
+test('slapform 2b: missing formId + SA + template donor mints the brand-owned form end to end', async (t) => {
+  process.env[PASSWORD_PIN_VAR] = 'fixture-password-123';
+  t.after(() => delete process.env[PASSWORD_PIN_VAR]);
+
+  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+  const authAdmin = fakeAuthAdmin();
+  const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  slapform: { enabled: true, templateFormId: "tmplForm1" }, // formId lands here
+}
+`);
+
+  const result = await service.run({
+    brandId: 'fixture-brand',
+    brandRoot,
+    brandConfig: createConfig(),
+    brand: { id: 'fixture-brand', config: {}, targets: ['web', 'backend'], apps: [] },
+    brandState: {},
+    apps: [],
+    operations: OPERATIONS.slapform,
+    options: {},
+    serviceData: {},
+    slapformDb: store,
+    slapformAuthAdmin: authAdmin,
+  });
+
+  assert.equal(result.status, 'success');
+
+  // The product user: looked up, created with the pinned password, doc = the
+  // canonical account shape with REAL generated credentials
+  assert.deepEqual(authAdmin.calls.map((c) => c.method), ['getUserByEmail', 'createUser']);
+  assert.equal(authAdmin.calls[1].password, 'fixture-password-123');
+  const userSet = store.sets().find((c) => c.args[0] === 'users/uid_minted1');
+  assert.ok(userSet, 'users/{uid} doc written');
+  assert.equal(userSet.args[1].auth.uid, 'uid_minted1');
+  assert.equal(userSet.args[1].auth.email, 'support@fixture-brand.test');
+  assert.match(userSet.args[1].api.privateKey, /^[A-Za-z0-9]{43}$/, 'real api key generated');
+
+  // The form: shape-templated from the donor, owned by the new user
+  const formId = result.state.formId;
+  assert.match(formId, /^[A-Za-z0-9]{14}$/, 'minted id matches the product convention');
+  const formSet = store.sets().find((c) => c.args[0] === `forms/${formId}`);
+  assert.ok(formSet, 'form doc written');
+  assert.equal(formSet.args[1].owner, 'uid_minted1');
+  assert.deepEqual(formSet.args[1].fields, ['email', 'message'], 'donor shape copied');
+  assert.equal(formSet.args[1].id, formId, 'embedded id field re-pointed at the minted doc, not the donor');
+
+  // Same-run convergence: the ensures patched the donor name + enabled flag
+  const formPatch = store.patches().find((c) => c.args[0] === `forms/${formId}`);
+  assert.ok(formPatch, 'form converged in the same run');
+  assert.equal(formPatch.args[1].name, FORM_NAME);
+
+  // Writeback: the minted id landed in omega.json5, comments intact
+  const written = readSource(brandRoot);
+  assert.ok(written.includes(`formId: "${formId}"`), 'minted id written back');
+  assert.ok(written.includes('// formId lands here'));
+});
+
+test('slapform 2b: dry run plans the mint — zero writes, no user creation, no writeback', async () => {
+  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+  const authAdmin = fakeAuthAdmin();
+  const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  slapform: { enabled: true, templateFormId: "tmplForm1" },
+}
+`);
+
+  const result = await service.run({
+    brandId: 'fixture-brand',
+    brandRoot,
+    brandConfig: createConfig(),
+    brand: { id: 'fixture-brand', config: {}, targets: ['web', 'backend'], apps: [] },
+    brandState: {},
+    apps: [],
+    operations: OPERATIONS.slapform,
+    options: { dryRun: true },
+    serviceData: {},
+    slapformDb: store,
+    slapformAuthAdmin: authAdmin,
+  });
+
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /creation planned/);
+  assert.deepEqual(store.sets(), []);
+  assert.deepEqual(store.patches(), []);
+  assert.deepEqual(authAdmin.calls, []);
+  assert.ok(!readSource(brandRoot).includes('formId:'), 'no writeback on dry run');
+});
+
+test('slapform 2b: an existing product user is reused — no createUser, no users write', async (t) => {
+  process.env[PASSWORD_PIN_VAR] = 'fixture-password-123';
+  t.after(() => delete process.env[PASSWORD_PIN_VAR]);
+
+  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+  const authAdmin = fakeAuthAdmin({ existing: { uid: 'uid_existing9', email: 'support@fixture-brand.test' } });
+  const brandRoot = makeRoot(`{
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  slapform: { enabled: true },
+}
+`);
+
+  const result = await service.run({
+    brandId: 'fixture-brand',
+    brandRoot,
+    brandConfig: createConfig(),
+    brand: { id: 'fixture-brand', config: {}, targets: ['web', 'backend'], apps: [] },
+    brandState: {},
+    apps: [],
+    operations: OPERATIONS.slapform,
+    options: {},
+    serviceData: {},
+    slapformDb: store,
+    slapformAuthAdmin: authAdmin,
+  });
+
+  assert.equal(result.status, 'success');
+  assert.deepEqual(authAdmin.calls.map((c) => c.method), ['getUserByEmail']);
+  assert.equal(store.sets().length, 1, 'only the form doc written');
+  assert.equal(store.sets()[0].args[1].owner, 'uid_existing9');
+});
+
+test('slapform 2b: a missing template doc fails loud instead of minting garbage', async () => {
+  const store = fakeStore({}); // no template
+  const authAdmin = fakeAuthAdmin();
+
+  await assert.rejects(
+    service.run({
+      brandId: 'fixture-brand',
+      brandRoot: '/tmp/omega-manager-slapform-unused',
+      brandConfig: createConfig(),
+      brand: { id: 'fixture-brand', config: {}, targets: ['web', 'backend'], apps: [] },
+      brandState: {},
+      apps: [],
+      operations: OPERATIONS.slapform,
+      options: {},
+      serviceData: {},
+      slapformDb: store,
+      slapformAuthAdmin: authAdmin,
+    }),
+    /template doc forms\/tmplForm1 not found/,
+  );
+});
+
+test('slapform 2b: no brand contact email → no mint attempt, normal missing-id skip', async () => {
+  const config = brandConfig({ slapform: { formId: null, templateFormId: 'tmplForm1' } });
+  // no config.brand.contact
+  const store = fakeStore({ 'forms/tmplForm1': TEMPLATE_FORM });
+
+  const result = await runService(config, { db: store });
+
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /slapform\.formId/);
+  assert.deepEqual(store.sets(), []);
+});
+
 // ─── Interactive setup flow (config-landing) ─────────────────────────────────
 
 const { setBrowserOpener: setOpener } = require('@omega.js/devkit/flows');

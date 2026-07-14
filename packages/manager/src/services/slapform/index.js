@@ -6,21 +6,30 @@
  * the Slapform operator: it needs a service account for Slapform's Firebase
  * project.
  *
- * Auth: SLAPFORM_SERVICE_ACCOUNT in the brand .env — a path to the
- * service-account JSON (absolute, or relative to the brand root, e.g.
- * `.omega/secrets/slapform-service-account.json`). omega-manager read the
- * company-mode `.output/slapform/secrets/service-account.json` instead.
- *
- * The form id comes from config (slapform.formId) — forms are created in
- * the Slapform dashboard. Interactive runs offer the setup flow when it's
- * missing (open slapform.com, paste the form id back — comment-preserving
- * writeback into omega.json5, with a Disable option that sets
- * `slapform: false`); non-interactive and dry runs skip cleanly.
+ * Auth tiers (2b, Ian 2026-07-13):
+ *   1. Operator SA — SLAPFORM_SERVICE_ACCOUNT in the brand .env (path to
+ *      the service-account JSON, absolute or brand-root-relative). Full
+ *      create + manage: a missing formId with `slapform.templateFormId`
+ *      configured (the company layer's shape donor) MINTS the brand's own
+ *      form — product user (email = brand contact email, password via the
+ *      account service's owner channels) + doc shape-templated from the
+ *      donor — and writes the new id back into omega.json5. The ensures
+ *      then converge name/settings/plan in the same run.
+ *   2. User API key — SLAPFORM_API_KEY (the product accepts
+ *      user.api.privateKey): recognized, management via the product's
+ *      public API lands when those routes are verified.
+ *   3. Dashboard — interactive runs offer the setup flow (open
+ *      slapform.com, paste the form id back — comment-preserving
+ *      writeback, with a Disable option that sets `slapform: false`).
+ *      Non-interactive and dry runs skip cleanly.
  */
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { FirestoreREST, loadServiceAccount } = require('../../lib/firestore-rest.js');
-const { resolveConfigValue } = require('../../lib/config-flow.js');
+const { createAuthAdmin } = require('../../lib/auth-admin.js');
+const { resolveConfigValue, landValue } = require('../../lib/config-flow.js');
+const { createProductAsset } = require('../../lib/product-create.js');
+const { createPasswordResolver } = require('../account/lib/resolve-password.js');
 
 const SLAPFORM_URL = 'https://slapform.com';
 
@@ -44,31 +53,75 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no web target' };
     }
 
+    // Operator credentials first — create-on-missing needs them before the
+    // id resolution. Tests inject fakes via context.slapformDb/-AuthAdmin.
+    let db = context.slapformDb;
+    let authAdmin = context.slapformAuthAdmin;
+    if (!db) {
+      const envPath = process.env.SLAPFORM_SERVICE_ACCOUNT;
+      if (envPath) {
+        const serviceAccount = loadServiceAccount(envPath, context.brandRoot);
+        db = new FirestoreREST(serviceAccount);
+        authAdmin = createAuthAdmin(serviceAccount);
+      }
+    }
+
+    const brand = context.brandConfig.brand || {};
+    const dryRun = context.options?.dryRun || false;
     let formId = config?.formId;
+
+    // 2b create-on-missing: operator SA + a template donor → a missing form
+    // means MINT the brand's own (product user + doc), write the id back,
+    // and let the ensures below converge it in this same run.
+    if (!formId && db && authAdmin && config?.templateFormId && brand.contact?.email) {
+      const created = await createProductAsset({
+        db,
+        authAdmin,
+        collection: 'forms',
+        templateId: config.templateFormId,
+        email: brand.contact.email,
+        resolvePassword: createPasswordResolver({
+          brandRoot: context.brandRoot,
+          domain: new URL(brand.url || 'https://invalid.test').hostname,
+          brand,
+          dryRun,
+        }),
+        dryRun,
+        log: (line) => console.log(`      ${line}`),
+      });
+
+      if (!created) {
+        return { skip: true, reason: 'dry run — form creation planned (from slapform.templateFormId)' };
+      }
+
+      landValue(context, 'slapform.formId', created.id);
+      console.log(`      ${chalk.green('✓')} slapform.formId = ${chalk.cyan(created.id)} written to omega.json5`);
+      formId = created.id;
+    }
+
     if (!formId) {
       formId = await resolveConfigValue(context, {
         path: 'slapform.formId',
         label: 'Slapform contact form',
         instructions: [
           `1. Create an account at ${chalk.cyan(SLAPFORM_URL)} (if you haven't already)`,
-          `2. Create a contact form for ${chalk.cyan(context.brandConfig.brand?.name || context.brandId)}`,
+          `2. Create a contact form for ${chalk.cyan(brand.name || context.brandId)}`,
         ],
         entry: { url: SLAPFORM_URL, message: 'Slapform form ID:' },
         disablePath: 'slapform',
       });
     }
     if (!formId) {
-      return { skip: true, reason: 'no slapform.formId configured (create a form at https://slapform.com, then set it in omega.json5 — or rerun interactively)' };
+      return { skip: true, reason: 'no slapform.formId configured — set slapform.templateFormId + the operator SA to mint one automatically, create one at https://slapform.com (paste back interactively), or set it in omega.json5' };
     }
 
-    // Tests inject a fake client via context.slapformDb
-    let db = context.slapformDb;
     if (!db) {
-      const envPath = process.env.SLAPFORM_SERVICE_ACCOUNT;
-      if (!envPath) {
-        return { skip: true, reason: 'no SLAPFORM_SERVICE_ACCOUNT configured (path to Slapform\'s service-account JSON, set it in the brand .env)' };
-      }
-      db = new FirestoreREST(loadServiceAccount(envPath, context.brandRoot));
+      return {
+        skip: true,
+        reason: process.env.SLAPFORM_API_KEY
+          ? 'SLAPFORM_API_KEY recognized, but product-API management is not wired yet — use the operator SA (SLAPFORM_SERVICE_ACCOUNT) or the dashboard'
+          : 'no SLAPFORM_SERVICE_ACCOUNT configured (path to Slapform\'s service-account JSON, set it in the brand .env)',
+      };
     }
 
     return { db, formId };

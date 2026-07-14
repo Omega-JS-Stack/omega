@@ -193,19 +193,22 @@
     accountId: "pub-7372939085773564",
   },
 
-  // ITW's REAL contact form / chat agent / email agent (ids from the legacy
-  // itw-creative-works brand). Ian 2026-07-13: run them for real — "that IS
-  // the point of the playground". The ensures re-brand them to this brand;
-  // the next legacy itw manage run converges them back (its config still
-  // owns these ids). Flip update*Info: false to make them verify-only.
+  // 2b create-on-missing (Ian 2026-07-13/14): the playground mints its OWN
+  // form/agents via the operator SAs — template*Id names ITW's real doc as
+  // the SHAPE DONOR only (read once at mint, never written). The minted ids
+  // land here via comment-preserving writeback; ITW's originals return to
+  // ITW's own convergence entirely (no more cross-brand re-branding).
   slapform: {
-    formId: "UlXJ49Q4C",
+    templateFormId: "UlXJ49Q4C",
+    formId: "POZXbmsFFHOW1I",
   },
   chatsy: {
-    agentId: "8YIsRlzAAiv03d",
+    templateAgentId: "8YIsRlzAAiv03d",
+    agentId: "KJT3xUjlQQVuaC",
   },
   replyify: {
-    agentId: "stcbsieo7n1Lrk",
+    templateAgentId: "stcbsieo7n1Lrk",
+    agentId: "hkBrbPds9V4U0F",
   },
 
   // AI brandmark via ITW's MrLogo instance (legacy production route — the

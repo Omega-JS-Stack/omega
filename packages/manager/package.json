@@ -20,6 +20,7 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@omega.js/account": "*",
     "@omega.js/config": "*",
     "@omega.js/devkit": "*",
     "ag-psd": "^31.0.2",
