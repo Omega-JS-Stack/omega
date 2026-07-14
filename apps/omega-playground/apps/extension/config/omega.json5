@@ -1,8 +1,0 @@
-// App-layer config — TARGETS ONLY. Shared sections (brand, cloud, payment, …)
-// live in the brand root's config/omega.json5; any key added here OVERRIDES
-// the brand layer for THIS app only, so keep it minimal.
-{
-  targets: {
-    extension: {},
-  },
-}
