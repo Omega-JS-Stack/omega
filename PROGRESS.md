@@ -6,7 +6,7 @@
 - Skin pass still also waits on Ian's theme notes (meridian direction drafted; systems prerequisites shipped)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **Web parity gaps, remainder (gap-audit 2026-07-14 → CHANGELOG cp130; meta-files SHIPPED cp139)** — minifyHtml transform, cloudflare-purge post-deploy, blogify/optimize commands, dev live-reload narrowing
+1. **Web parity remainder (gap-audit → cp130; meta-files cp139, minifyHtml+purge cp140, blogify/optimize parked)** — dev live-reload narrowing is the LAST item
 2. **Full-deployment rehearsal (Ian 2026-07-14: "I do wanna try this soon")** — one pass shipping EVERY playground target for real: web deploy + backend deploy + desktop build SIGNED (needs the Apple key copies in Blocked) + extension build; proves the whole `omega deploy` story end-to-end
 3. **SKIN PASS — after the above + Ian's theme notes** — DRAFT on playground (home/pricing/signin) → default pages + blueprints, auth/account/payment + dashboard/admin remake, showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close
 4. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
@@ -39,11 +39,13 @@
 - Local-first (Ian 2026-07-09): zero npm publishes until Ian finalizes versions; migrators/verifiers pinned.
 
 ## ⚠ Parked findings (detail: the named task's CHANGELOG entry)
+- blogify/optimize NOT ported (cp140 verdict): blogify = fake-post test generator (the corpus generator covers it), optimize = GPT content-rewrite authoring tool — revisit post-launch if Ian wants them (140)
 - First-paint blank flash — mechanism CORRECTED cp123: no JS gate hides content (the page-loading gate only guards buttons); the flash is render-blocking CSS/fonts on a cold cache = exactly the critical-CSS/font pass Ian re-tabled to SKIN-PASS QA (116/123)
 - devkit e2e-harness rare flake (~1-in-15, mechanism uncaptured): isolated two-pass runner + one retry that SAVES the failing output to .temp/ — the next firing names the mechanism; a real regression still fails twice (124)
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 140 minifyHtml + cf-purge — production Eleventy transform (Rust minifier + legacy extraction dance, esbuild for inline js) + de-ITW'd direct-API purge (`omega purge`, auto post --direct, guarded CI step); playground: 11-newline index.html, 4 ld+json valid, dry-run resolved the real omegajs.dev zone; web 139 → CHANGELOG
 - [x] 139 site meta-files — 9 default pages (sitemap, RSS+JSON feeds, robots, ads, humans, opensearch, pages.json, security.txt); head's dangling /feeds/posts.xml link resolves; JSON valid-by-construction; playground: all 9 in dist, zero-posts edge parses; web 130 → CHANGELOG
 - [x] 138 imagemin successor — sharp matrix (320/640/1024 + webp q80, upscale = the @srcset no-404 contract) as a buildSite phase; `web.imagemin` LIVE (schema-known, enabled:false opts out); content-addressed cache at brand .omega + actions/cache in scaffolded CI; dev fallback middleware curl-proven; playground: 3 images → 24 outputs, warm rerun 0.03s; web 122 / config 109 → CHANGELOG
 - [x] 137 canonical .env order — env-order.js SSOT (scaffold stub + writeEnvValue + workspace `env-order` op render from ONE group list); machine comments regenerate, hand comments travel, dups collapse last-wins, loss-proof; playground normalized live (3 dups collapsed, stale comments healed); mgr 681 → CHANGELOG
@@ -55,4 +57,4 @@
 - [x] 129 config-truth pass — MrLogo brandmark ladder (assets.brandmark options GONE; SA→API-key→token, BEM wire verified), reverse-DNS bundle ids (wizard-derived; playground → com.itwcreativeworks), `gcp` key, targets-last SSOT; Apple terms accepted → leg ran LIVE (bundle id CREATED + 2 profiles minted); mgr 655 / config 109 / corpus 1225 (1952448) → CHANGELOG
 - [x] Phases 0–2 + cp33–128 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning (116 site LIVE · 119 first full pipeline PASS · 121–123 seeds/brandmark/src-dist pillar/live-site gaps · 124–126 findings sweep + 2b mints + core graduations · 128 board-clear + sound root `npm test`) → CHANGELOG + git log
 
-*Last updated: 2026-07-14 (cp139: site meta-files live — 9 default pages, feed link resolves; next: parity remainder (minifyHtml, cf-purge, blogify) → full-deploy rehearsal)*
+*Last updated: 2026-07-15 (cp140: minifyHtml + cf-purge live — gap-audit parity done except live-reload narrowing; next: full-deploy rehearsal)*

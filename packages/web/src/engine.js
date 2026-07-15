@@ -384,6 +384,19 @@ function configureOmega(eleventyConfig, options) {
   });
   eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: { pages: {} }, css: { pages: {}, themePages: {} } });
 
+  // ---- Production HTML minification (the UJM minifyHtml successor). Only
+  // .html outputs — the meta-files (sitemap.xml, feeds, robots.txt, …) ship
+  // exactly as their templates render them.
+  if (options.environment === 'production') {
+    const { minifyHtml } = require('./minify-html.js');
+    eleventyConfig.addTransform('omega-minify-html', function (content) {
+      if (this.page.outputPath && this.page.outputPath.endsWith('.html')) {
+        return minifyHtml(content);
+      }
+      return content;
+    });
+  }
+
   return { site, layers, layoutMap, frontmatter, suppressed, collectionsHolder };
 }
 

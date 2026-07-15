@@ -66,6 +66,8 @@ see the harness README for the honest before/after numbers.
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
 | [build.js](src/build.js) | `buildSite()` — assets → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [imagemin.js](src/imagemin.js) | Responsive image matrix (the UJM imagemin successor): 320/640/1024 + original × source-format + webp @ q80 over `dist/assets/images` (favicon dir exempt), content-addressed cache at the brand `.omega`, `devImageFallback()` dev-server middleware |
+| [minify-html.js](src/minify-html.js) | Production HTML minification (UJM minifyHtml successor) — Rust minifier with the legacy extraction dance (JSON-LD minified as JSON, inline scripts esbuild-minified, IE conditionals preserved); engine mounts it as a transform for `environment: 'production'`, .html outputs only |
+| [purge.js](src/purge.js) | Cloudflare cache purge (UJM cloudflare-purge successor, de-ITW'd — direct API, brand's own `CLOUDFLARE_TOKEN`): zone from config `cloudflare.zone` or brand-url apex lookup; `omega purge` command, auto after `omega deploy --direct`, CI workflow step when the secret exists |
 | [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime) + `resolveClientEntry()` |
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
@@ -321,8 +323,7 @@ latent copies) AND forward in consumer files by the codemod.
 migration gate; the real somiibo URL-set diff, 2,556 vs Jekyll's 2,608 files,
 is its first job) · audit subsystem port (command exists as an explicit
 not-ported-yet stub — translate shipped in cp96) · UJM-setup extras (CNAME, firebase auth
-handler fetch, GitHub secret publishing, post dedupe) ·
-minifyHtml-as-transform, named css
+handler fetch, GitHub secret publishing, post dedupe) · named css
 bundles, full icon set (B-phase pipeline) · engine consumption of
 `targets.web.collections`/`defaults`/`generators` (migrate carries the config;
 custom collections land with the sweet-saucy wave) · dev-loop re-render

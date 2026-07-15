@@ -97,6 +97,27 @@ function deployDirect({ dryRun }) {
   }
 
   logger.log(`Deployed — https://${plan.cname} serves once Pages picks up the push.`);
+  return purgeAfterPublish(config);
+}
+
+/**
+ * Post-publish Cloudflare purge (the content just changed — clear the
+ * zone's edge cache). Skips cleanly without a token; a purge FAILURE is a
+ * warning, never a failed deploy — the site is already live.
+ * @param {object} config - composed web config
+ */
+async function purgeAfterPublish(config) {
+  const { purgeZoneCache } = require('../purge.js');
+  try {
+    const result = await purgeZoneCache({ config });
+    if (result.status === 'purged') {
+      logger.log(`Cloudflare cache purged (zone ${result.zoneName || result.zone}).`);
+    } else {
+      logger.log(`Cloudflare purge skipped — ${result.reason}.`);
+    }
+  } catch (error) {
+    logger.warn(`Cloudflare purge failed (site is live; run \`omega purge\` to retry): ${error.message}`);
+  }
 }
 
 module.exports = async function (options) {

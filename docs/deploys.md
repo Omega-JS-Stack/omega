@@ -40,7 +40,7 @@ engines treat workflow files as framework-owned overwrites).
 
 | Target | Behavior | Flags |
 |--------|----------|-------|
-| web | sync (commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact POST, send nothing; bypasses the `file:` guard since nothing publishes), `--local` (build only), `--no-sync` |
+| web | sync (commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact POST, send nothing; bypasses the `file:` guard since nothing publishes), `--local` (build only), `--no-sync`, `--direct` (build + push dist to gh-pages, then Cloudflare purge) |
 | extension | sync → dispatch `publish.yml` | `--dry-run`, `--no-sync` |
 | desktop | `--dry-run` prints the dispatch; otherwise delegates to `omega release` (dispatch + live CI log streaming) | `--dry-run`, `--platforms` |
 | backend | artifact cleanup-policy pre-step → local-package staging → `firebase deploy` → public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
