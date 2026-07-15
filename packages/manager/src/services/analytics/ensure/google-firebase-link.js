@@ -37,7 +37,7 @@ module.exports = async function ensureGoogleFirebaseLink(context) {
   }
 
   // Links can reference the project by ID or number
-  const projectNumber = brandState.firebase?.sdkConfig?.messagingSenderId || null;
+  const projectNumber = brandState.cloud?.sdkConfig?.messagingSenderId || null;
   const isOurProject = (linkedProject) => linkedProject === projectId
     || (projectNumber && linkedProject === projectNumber);
 

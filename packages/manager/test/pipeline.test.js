@@ -30,10 +30,10 @@ test('pipeline: all-green full run passes', () => {
 });
 
 test('pipeline: any service error fails, naming the service and error', () => {
-  const record = greenRecord([{ service: 'sendgrid', status: 'error', output: null, error: 'SendGrid API error (429): Too Many Requests' }]);
+  const record = greenRecord([{ service: 'campaigns', status: 'error', output: null, error: 'SendGrid API error (429): Too Many Requests' }]);
   const verdict = evaluatePipeline(record);
   assert.equal(verdict.pass, false);
-  assert.match(verdict.failures[0], /sendgrid: error — SendGrid API error \(429\)/);
+  assert.match(verdict.failures[0], /campaigns: error — SendGrid API error \(429\)/);
 });
 
 test('pipeline: core service skipped = seed missing = fail; non-core skip is listed, not failed', () => {
@@ -53,7 +53,7 @@ test('pipeline: full run missing a core service fails; --service scoping waives 
 
   const full = evaluatePipeline(record);
   assert.equal(full.pass, false);
-  assert.ok(full.failures.some((f) => /firebase: CORE service missing/.test(f)));
+  assert.ok(full.failures.some((f) => /cloud: CORE service missing/.test(f)));
 
   const scoped = evaluatePipeline(record, { scoped: true });
   assert.equal(scoped.pass, true);
@@ -68,18 +68,18 @@ test('pipeline: --require promotes a service into the core set', () => {
   assert.match(strict.failures[0], /seo: CORE service skipped/);
 });
 
-test('pipeline: the graduated seeds are core now — a sendgrid/search-console skip fails a full run', () => {
-  for (const service of ['sendgrid', 'search-console', 'account', 'recaptcha']) {
+test('pipeline: the graduated seeds are core now — a campaigns/search-console skip fails a full run', () => {
+  for (const service of ['campaigns', 'search-console', 'account', 'recaptcha']) {
     assert.ok(CORE_SERVICES.includes(service), `${service} graduated into the core spine`);
   }
 
   const record = greenRecord();
-  record.services.find((s) => s.service === 'sendgrid').status = 'skipped';
-  record.services.find((s) => s.service === 'sendgrid').reason = 'missing SENDGRID_API_KEY';
+  record.services.find((s) => s.service === 'campaigns').status = 'skipped';
+  record.services.find((s) => s.service === 'campaigns').reason = 'missing SENDGRID_API_KEY';
 
   const verdict = evaluatePipeline(record);
   assert.equal(verdict.pass, false);
-  assert.match(verdict.failures[0], /sendgrid: CORE service skipped/);
+  assert.match(verdict.failures[0], /campaigns: CORE service skipped/);
 });
 
 test('pipeline: a gated publish leg records a tolerated (non-core) skip', () => {

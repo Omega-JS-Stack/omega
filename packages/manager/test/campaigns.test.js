@@ -13,8 +13,8 @@ const assert = require('node:assert/strict');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { fieldsFor, segmentsFor } = require('../src/lib/backend-marketing.js');
-const { buildQueryDsl } = require('../src/services/sendgrid/lib/segment-query.js');
-const service = require('../src/services/sendgrid/index.js');
+const { buildQueryDsl } = require('../src/services/campaigns/lib/segment-query.js');
+const service = require('../src/services/campaigns/index.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.SENDGRID_API_KEY;
@@ -163,7 +163,7 @@ function runService(config, { sendgrid, cloudflare = null, options = {}, service
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
     apps: [],
-    operations: OPERATIONS.sendgrid,
+    operations: OPERATIONS.campaigns,
     options,
     serviceData,
     sendgridApi: sendgrid,
@@ -173,31 +173,31 @@ function runService(config, { sendgrid, cloudflare = null, options = {}, service
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('sendgrid: skips without SENDGRID_API_KEY in .env', async () => {
+test('campaigns: skips without SENDGRID_API_KEY in .env', async () => {
   const result = await runService(brandConfig()); // no injected api → the creds check applies
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /SENDGRID_API_KEY/);
 });
 
-test('sendgrid: marketing.campaigns.enabled = false skips the service', async () => {
+test('campaigns: marketing.campaigns.enabled = false skips the service', async () => {
   const result = await runService(brandConfig({ campaigns: { enabled: false } }), { sendgrid: fakeSendgrid() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /marketing\.campaigns\.enabled/);
 });
 
-test('sendgrid: a different campaigns provider skips the service', async () => {
+test('campaigns: a different campaigns provider skips the service', async () => {
   const result = await runService(brandConfig({ campaigns: { provider: 'other' } }), { sendgrid: fakeSendgrid() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /provider = 'other'/);
 });
 
-test('sendgrid: skips without brand.url', async () => {
+test('campaigns: skips without brand.url', async () => {
   const result = await runService(brandConfig({ url: '' }), { sendgrid: fakeSendgrid() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /brand\.url/);
 });
 
-test('sendgrid: the defaults carry no company parent URL', () => {
+test('campaigns: the defaults carry no company parent URL', () => {
   // omega-manager defaulted parent to the company's brand URL — the manager
   // defaults layer must leave the choice to config
   assert.equal(DEFAULTS.parent, null);
@@ -207,7 +207,7 @@ test('sendgrid: the defaults carry no company parent URL', () => {
 
 // ─── Converged no-op ─────────────────────────────────────────────────────────
 
-test('sendgrid: fully converged brand is a zero-mutation no-op across all 6 operations', async () => {
+test('campaigns: fully converged brand is a zero-mutation no-op across all 6 operations', async () => {
   const api = fakeSendgrid(convergedResponses());
 
   const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' } });
@@ -222,7 +222,7 @@ test('sendgrid: fully converged brand is a zero-mutation no-op across all 6 oper
 
 // ─── domain-auth ─────────────────────────────────────────────────────────────
 
-test('sendgrid: missing domain auth is created, DNS written, validated once — pending warns', async () => {
+test('campaigns: missing domain auth is created, DNS written, validated once — pending warns', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getAuthenticatedDomains: [],
@@ -247,7 +247,7 @@ test('sendgrid: missing domain auth is created, DNS written, validated once — 
   assert.equal(result.output.domainAuth.valid, false);
 });
 
-test('sendgrid: invalid domain auth with a wrong DNS record patches it and converges when validation passes', async () => {
+test('campaigns: invalid domain auth with a wrong DNS record patches it and converges when validation passes', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getAuthenticatedDomains: [{ id: 111, domain: DOMAIN, valid: false, dns: DNS_FIXTURE }],
@@ -270,7 +270,7 @@ test('sendgrid: invalid domain auth with a wrong DNS record patches it and conve
   assert.equal(result.output.domainAuth.valid, true);
 });
 
-test('sendgrid: no Cloudflare token → manual records + validation still attempted', async () => {
+test('campaigns: no Cloudflare token → manual records + validation still attempted', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getAuthenticatedDomains: [],
@@ -288,7 +288,7 @@ test('sendgrid: no Cloudflare token → manual records + validation still attemp
 
 // ─── sender-identity ─────────────────────────────────────────────────────────
 
-test('sendgrid: an unverified sender is recreated with the brand address', async () => {
+test('campaigns: an unverified sender is recreated with the brand address', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getVerifiedSenders: [{ id: 9, from_email: FROM_EMAIL, verified: false }],
@@ -310,7 +310,7 @@ test('sendgrid: an unverified sender is recreated with the brand address', async
   });
 });
 
-test('sendgrid: a stale unverified sender squatting the nickname is deleted before create', async () => {
+test('campaigns: a stale unverified sender squatting the nickname is deleted before create', async () => {
   // contact.email changed → the derivation moved; the old sender holds the
   // account-unique nickname and would 400 the create
   const api = fakeSendgrid({
@@ -327,7 +327,7 @@ test('sendgrid: a stale unverified sender squatting the nickname is deleted befo
   assert.equal(api.callsTo('createVerifiedSender')[0].args[0].fromEmail, FROM_EMAIL);
 });
 
-test('sendgrid: a VERIFIED sender on the nickname with another address warns instead of deleting', async () => {
+test('campaigns: a VERIFIED sender on the nickname with another address warns instead of deleting', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getVerifiedSenders: [{ id: 9376, nickname: BRAND_NAME, from_email: 'offers@old-domain.test', verified: true }],
@@ -341,7 +341,7 @@ test('sendgrid: a VERIFIED sender on the nickname with another address warns ins
   assert.equal(api.callsTo('createVerifiedSender').length, 0);
 });
 
-test('sendgrid: missing sender without brand.address warns with CAN-SPAM guidance', async () => {
+test('campaigns: missing sender without brand.address warns with CAN-SPAM guidance', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getVerifiedSenders: [],
@@ -356,7 +356,7 @@ test('sendgrid: missing sender without brand.address warns with CAN-SPAM guidanc
 
 // ─── list ────────────────────────────────────────────────────────────────────
 
-test('sendgrid: a configured listId is verified and kept', async () => {
+test('campaigns: a configured listId is verified and kept', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getList: { id: 'lst_cfg', name: 'Renamed In SendGrid' },
@@ -369,7 +369,7 @@ test('sendgrid: a configured listId is verified and kept', async () => {
   assert.equal(result.state.listId, 'lst_cfg');
 });
 
-test('sendgrid: a stale known id falls back to name lookup', async () => {
+test('campaigns: a stale known id falls back to name lookup', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getList: () => null,
@@ -387,7 +387,7 @@ test('sendgrid: a stale known id falls back to name lookup', async () => {
   assert.ok(written.includes("id: 'fixture-brand', // stays single-quoted"));
 });
 
-test('sendgrid: no list anywhere → created and stored in state', async () => {
+test('campaigns: no list anywhere → created and stored in state', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getListByName: () => undefined,
@@ -406,7 +406,7 @@ test('sendgrid: no list anywhere → created and stored in state', async () => {
   assert.ok(written.includes('// Fixture Brand — hand-edited writeback target'));
 });
 
-test('sendgrid: config-known id writes nothing; a state-known id is promoted into omega.json5', async () => {
+test('campaigns: config-known id writes nothing; a state-known id is promoted into omega.json5', async () => {
   // Config already carries the id — the file stays byte-identical
   const configuredRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const before = readConfigSource(configuredRoot);
@@ -421,7 +421,7 @@ test('sendgrid: config-known id writes nothing; a state-known id is promoted int
 
 // ─── custom-fields ───────────────────────────────────────────────────────────
 
-test('sendgrid: missing and type-mismatched fields are created/recreated from the SSOT', async () => {
+test('campaigns: missing and type-mismatched fields are created/recreated from the SSOT', async () => {
   const converged = convergedResponses().getCustomFields;
   const initial = converged.slice(1); // first field missing
   initial[0] = { ...initial[0], field_type: 'Text' === initial[0].field_type ? 'Number' : 'Text' }; // second mismatched
@@ -445,7 +445,7 @@ test('sendgrid: missing and type-mismatched fields are created/recreated from th
 
 // ─── segments ────────────────────────────────────────────────────────────────
 
-test('sendgrid: stale segments PATCH in place, missing ones are created, __temp_ orphans are swept', async () => {
+test('campaigns: stale segments PATCH in place, missing ones are created, __temp_ orphans are swept', async () => {
   const list = convergedResponses().getSegments;
   const initial = [{ id: 'tmp1', name: '__temp_leak' }, ...list.slice(1)]; // segment 0 missing
   const staleId = 'seg1';
@@ -471,7 +471,7 @@ test('sendgrid: stale segments PATCH in place, missing ones are created, __temp_
   assert.deepEqual(api.callsTo('createSegment')[0].args, [SENDGRID_SEGMENTS[0].name, expectedDsl(0)]);
 });
 
-test('sendgrid: a rejected segment PATCH falls back to delete + recreate', async () => {
+test('campaigns: a rejected segment PATCH falls back to delete + recreate', async () => {
   const list = convergedResponses().getSegments;
   const staleId = 'seg2';
 
@@ -496,7 +496,7 @@ test('sendgrid: a rejected segment PATCH falls back to delete + recreate', async
 
 // ─── event-webhook ───────────────────────────────────────────────────────────
 
-test('sendgrid: missing OMEGA_WEBHOOK_KEY warns', async () => {
+test('campaigns: missing OMEGA_WEBHOOK_KEY warns', async () => {
   const api = fakeSendgrid(convergedResponses());
 
   const result = await runService(brandConfig(), { sendgrid: api, serviceData: { listId: 'lst_1' }, webhookKey: false });
@@ -506,7 +506,7 @@ test('sendgrid: missing OMEGA_WEBHOOK_KEY warns', async () => {
   assert.equal(api.callsTo('getEventWebhookSettings').length, 0);
 });
 
-test('sendgrid: no parent configured → nothing to point the webhook at', async () => {
+test('campaigns: no parent configured → nothing to point the webhook at', async () => {
   const api = fakeSendgrid(convergedResponses());
 
   const result = await runService(brandConfig({ parent: null }), { sendgrid: api, serviceData: { listId: 'lst_1' } });
@@ -516,7 +516,7 @@ test('sendgrid: no parent configured → nothing to point the webhook at', async
   assert.equal(result.output.eventWebhook, undefined);
 });
 
-test('sendgrid: webhook drift is patched with the minimum diff against the parent forwarder', async () => {
+test('campaigns: webhook drift is patched with the minimum diff against the parent forwarder', async () => {
   const parentUrl = `https://api.parent-brand.test/omega/marketing/webhook/forward?provider=sendgrid&key=${WEBHOOK_KEY}`;
   const api = fakeSendgrid({
     ...convergedResponses(),
@@ -535,7 +535,7 @@ test('sendgrid: webhook drift is patched with the minimum diff against the paren
 
 // ─── Dry-run ─────────────────────────────────────────────────────────────────
 
-test('sendgrid: dry-run on a fully drifted brand performs zero mutations', async () => {
+test('campaigns: dry-run on a fully drifted brand performs zero mutations', async () => {
   const api = fakeSendgrid({
     ...convergedResponses(),
     getAuthenticatedDomains: [],
@@ -564,7 +564,7 @@ test('sendgrid: dry-run on a fully drifted brand performs zero mutations', async
 
 const { openTtyPrompt } = require('./lib/interactive.js');
 
-test('sendgrid: interactive run polls validation until DNS propagates', async () => {
+test('campaigns: interactive run polls validation until DNS propagates', async () => {
   let validations = 0;
   const api = fakeSendgrid({
     ...convergedResponses(),

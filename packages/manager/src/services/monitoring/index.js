@@ -1,5 +1,5 @@
 /**
- * Sentry service — one error-monitoring project per enabled target
+ * Monitoring service (Sentry provider) — one error-monitoring project per enabled target
  * (web/backend/desktop/extension), with each project's DSN landed in
  * targets.<type>.monitoring.dsn via the comment-preserving writeback — the
  * exact key every framework's runtime reads through the config merge chain.

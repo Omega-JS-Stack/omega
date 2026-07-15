@@ -1,5 +1,5 @@
 /**
- * Firebase service — reconciles the brand's Firebase/GCP project to
+ * Cloud service (Firebase provider) — reconciles the brand's Firebase/GCP project to
  * `firebase: {}` in omega.json5: Blaze billing, required Google Cloud APIs,
  * project identity, OAuth consent screen, Admin SDK service account + key,
  * Hosting api.{domain} custom domains (DNS via Cloudflare), Firestore (+PITR),

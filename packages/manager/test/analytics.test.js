@@ -56,9 +56,9 @@ const CLEAN_SECRET = {
 };
 const OUR_LINK = { name: `properties/${PROPERTY}/firebaseLinks/fl1`, project: `projects/${PROJECT_NUMBER}` };
 
-// State the firebase service leaves behind (messagingSenderId IS the project number)
+// State the cloud service leaves behind (messagingSenderId IS the project number)
 const FIREBASE_STATE = {
-  firebase: { sdkConfig: { measurementId: 'G-FIREBASE1', messagingSenderId: PROJECT_NUMBER } },
+  cloud: { sdkConfig: { measurementId: 'G-FIREBASE1', messagingSenderId: PROJECT_NUMBER } },
 };
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────

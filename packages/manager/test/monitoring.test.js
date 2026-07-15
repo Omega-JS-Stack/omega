@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
 
 const { SERVICE_ORDER, OPERATIONS } = require('../src/config.js');
 const { makeBrandRoot, readConfigSource } = require('./lib/config-fixture.js');
-const service = require('../src/services/sentry/index.js');
+const service = require('../src/services/monitoring/index.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.SENTRY_AUTH_TOKEN;
@@ -95,7 +95,7 @@ function runService(config, { sentry, options = {}, serviceData = {}, brandRoot 
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
     apps: [],
-    operations: OPERATIONS.sentry,
+    operations: OPERATIONS.monitoring,
     options,
     serviceData,
     sentryApi: sentry,
@@ -104,13 +104,13 @@ function runService(config, { sentry, options = {}, serviceData = {}, brandRoot 
 
 // ─── Registry / skip semantics ───────────────────────────────────────────────
 
-test('sentry: registered between adsense and sendgrid with the two operations', () => {
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('adsense') + 1], 'sentry');
-  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('sentry') + 1], 'sendgrid');
-  assert.deepEqual(OPERATIONS.sentry.map((op) => op.name), ['projects', 'dsn']);
+test('monitoring: registered between adsense and sendgrid with the two operations', () => {
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('adsense') + 1], 'monitoring');
+  assert.equal(SERVICE_ORDER[SERVICE_ORDER.indexOf('monitoring') + 1], 'campaigns');
+  assert.deepEqual(OPERATIONS.monitoring.map((op) => op.name), ['projects', 'dsn']);
 });
 
-test('sentry: skips without a monitoring section, when disabled, and on another provider', async () => {
+test('monitoring: skips without a monitoring section, when disabled, and on another provider', async () => {
   const none = await runService(brandConfig({ monitoring: null }), { sentry: fakeSentry() });
   assert.equal(none.status, 'skipped');
   assert.match(none.reason, /no monitoring config/);
@@ -124,7 +124,7 @@ test('sentry: skips without a monitoring section, when disabled, and on another 
   assert.match(other.reason, /other/);
 });
 
-test('sentry: skips without SENTRY_AUTH_TOKEN in .env (machine-readable missingEnv)', async () => {
+test('monitoring: skips without SENTRY_AUTH_TOKEN in .env (machine-readable missingEnv)', async () => {
   const result = await runService(brandConfig()); // no injected api → the creds check applies
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /SENTRY_AUTH_TOKEN/);
@@ -133,7 +133,7 @@ test('sentry: skips without SENTRY_AUTH_TOKEN in .env (machine-readable missingE
 
 // ─── Create-on-missing ───────────────────────────────────────────────────────
 
-test('sentry: empty org — team + one project per target created, org and DSNs written back', async () => {
+test('monitoring: empty org — team + one project per target created, org and DSNs written back', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const api = fakeSentry({
     getOrganizations: [ORG],
@@ -171,7 +171,7 @@ test('sentry: empty org — team + one project per target created, org and DSNs 
   assert.match(written, /\/\/ stays single-quoted/);
 });
 
-test('sentry: only enabled targets get projects', async () => {
+test('monitoring: only enabled targets get projects', async () => {
   const api = fakeSentry({
     getOrganizations: [ORG],
     getTeams: [{ slug: 'fixture-brand' }],
@@ -188,7 +188,7 @@ test('sentry: only enabled targets get projects', async () => {
 
 // ─── Convergence ─────────────────────────────────────────────────────────────
 
-test('sentry: a fully converged brand is a zero-mutation no-op and the file stays byte-identical', async () => {
+test('monitoring: a fully converged brand is a zero-mutation no-op and the file stays byte-identical', async () => {
   const configured = `// Converged fixture
 {
   brand: { id: 'fixture-brand' },
@@ -218,7 +218,7 @@ test('sentry: a fully converged brand is a zero-mutation no-op and the file stay
   assert.equal(readConfigSource(brandRoot), configured);
 });
 
-test('sentry: a hand-set stale DSN is drift and gets patched', async () => {
+test('monitoring: a hand-set stale DSN is drift and gets patched', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const config = brandConfig({
     monitoring: { provider: 'sentry', org: 'fixture-org' },
@@ -239,7 +239,7 @@ test('sentry: a hand-set stale DSN is drift and gets patched', async () => {
 
 // ─── Org resolution ──────────────────────────────────────────────────────────
 
-test('sentry: multiple orgs without monitoring.org warns and mutates nothing', async () => {
+test('monitoring: multiple orgs without monitoring.org warns and mutates nothing', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const api = fakeSentry({
     getOrganizations: [{ slug: 'org-a' }, { slug: 'org-b' }],
@@ -253,7 +253,7 @@ test('sentry: multiple orgs without monitoring.org warns and mutates nothing', a
   assert.equal(readConfigSource(brandRoot), WRITEBACK_CONFIG);
 });
 
-test('sentry: a configured org the token cannot see warns honestly', async () => {
+test('monitoring: a configured org the token cannot see warns honestly', async () => {
   const config = brandConfig({ monitoring: { provider: 'sentry', org: 'someone-elses-org' } });
   const api = fakeSentry({ getOrganizations: [ORG] });
 
@@ -265,7 +265,7 @@ test('sentry: a configured org the token cannot see warns honestly', async () =>
 
 // ─── Dry run ─────────────────────────────────────────────────────────────────
 
-test('sentry: dry run on an empty org plans everything and mutates nothing', async () => {
+test('monitoring: dry run on an empty org plans everything and mutates nothing', async () => {
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
   const api = fakeSentry({
     getOrganizations: [ORG],

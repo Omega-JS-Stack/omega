@@ -14,7 +14,7 @@ const path = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
-const service = require('../src/services/firebase/index.js');
+const service = require('../src/services/cloud/index.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
 
 // Tests must never see real credentials from the shell environment
@@ -148,7 +148,7 @@ function runService(config, { firebase, cloudflare, options = {}, serviceData = 
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps },
     brandState: {},
     apps,
-    operations: OPERATIONS.firebase,
+    operations: OPERATIONS.cloud,
     options,
     serviceData,
     firebaseApi: firebase,
@@ -251,7 +251,7 @@ function stagedRoot() {
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('firebase: skips without firebase.projectId', async () => {
+test('cloud: skips without firebase.projectId', async () => {
   const config = brandConfig();
   config.firebase.projectId = null;
 
@@ -260,7 +260,7 @@ test('firebase: skips without firebase.projectId', async () => {
   assert.match(result.reason, /firebase\.projectId/);
 });
 
-test('firebase: derives projectId from cloud.config when firebase.projectId is absent (framework-first brands)', async () => {
+test('cloud: derives projectId from cloud.config when firebase.projectId is absent (framework-first brands)', async () => {
   const config = brandConfig();
   config.firebase.projectId = null;
   config.cloud = { provider: 'firebase', config: { projectId: PROJECT } };
@@ -269,19 +269,19 @@ test('firebase: derives projectId from cloud.config when firebase.projectId is a
   assert.notEqual(result.status, 'skipped', 'cloud.config.projectId names the project — no skip');
 });
 
-test('firebase: firebase.enabled = false skips the service', async () => {
+test('cloud: firebase.enabled = false skips the service', async () => {
   const config = brandConfig({ firebase: { enabled: false } });
   const result = await runService(config, { firebase: fakeFirebase() });
   assert.equal(result.status, 'skipped');
 });
 
-test('firebase: skips without GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET', async () => {
+test('cloud: skips without GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET', async () => {
   const result = await runService(brandConfig());
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /GOOGLE_CLIENT_ID/);
 });
 
-test('firebase: shared project only runs service-account + sdk-config', async () => {
+test('cloud: shared project only runs service-account + sdk-config', async () => {
   const config = brandConfig({
     firebase: { shared: true },
     firebaseConfig: { ...EXPECTED_SDK },
@@ -304,7 +304,7 @@ test('firebase: shared project only runs service-account + sdk-config', async ()
 
 // ─── The flagship: converged project = zero-mutation no-op ───────────────────
 
-test('firebase: fully converged project is a zero-mutation no-op across all 13 operations', async () => {
+test('cloud: fully converged project is a zero-mutation no-op across all 13 operations', async () => {
   const config = brandConfig({ firebaseConfig: { ...EXPECTED_SDK } });
   const api = fakeFirebase(convergedResponses());
   const cf = fakeCf({
@@ -357,7 +357,7 @@ function verifiedDomainFirebase() {
 }
 
 test('hosting: deep subdomain-project api domain comes back to DNS-only (Universal SSL limit)', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
 
   // Universal SSL: apex + one label ride the proxy, deeper never does
   assert.equal(handler.universalSslCovers(DOMAIN, DOMAIN), true);
@@ -386,7 +386,7 @@ test('hosting: deep subdomain-project api domain comes back to DNS-only (Univers
 });
 
 test('hosting: deep api domain rides the proxy when the zone has Total TLS', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
 
   // Converged DNS-only from a free-era run; the zone since gained Total TLS,
   // which mints a certificate for every proxied hostname → PATCH up.
@@ -404,7 +404,7 @@ test('hosting: deep api domain rides the proxy when the zone has Total TLS', asy
 });
 
 test('hosting: deep api domain rides the proxy only once a covering cert pack is ACTIVE', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
   const universalPack = { type: 'universal', status: 'active', hosts: [DOMAIN, `*.${DOMAIN}`] };
   const deepPack = (status) => ({ type: 'advanced', status, hosts: [`*.play.${DOMAIN}`] });
 
@@ -422,7 +422,7 @@ test('hosting: deep api domain rides the proxy only once a covering cert pack is
 });
 
 test('hosting: TLS-coverage lookups failing falls back to DNS-only', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
   const cf = fakeCf({ totalTls: new Error('boom'), certPacks: new Error('boom') });
 
   const result = await handler(deepProjectContext(verifiedDomainFirebase(), cf));
@@ -433,7 +433,7 @@ test('hosting: TLS-coverage lookups failing falls back to DNS-only', async () =>
 });
 
 test('hosting: no Cloudflare client — verified domain reports without DNS writes', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
 
   const result = await handler(deepProjectContext(verifiedDomainFirebase(), null));
 
@@ -443,7 +443,7 @@ test('hosting: no Cloudflare client — verified domain reports without DNS writ
 // ─── Billing (de-ITW'd) ──────────────────────────────────────────────────────
 
 test('billing: Spark plan with no gcp.billingAccount warns instead of linking', async () => {
-  const handler = require('../src/services/firebase/ensure/billing.js');
+  const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });
 
   const result = await handler(handlerContext(brandConfig(), api));
@@ -455,7 +455,7 @@ test('billing: Spark plan with no gcp.billingAccount warns instead of linking', 
 });
 
 test('billing: gcp.billingAccount: false = the user chose Spark — clean success, no nagging, no link', async () => {
-  const handler = require('../src/services/firebase/ensure/billing.js');
+  const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({ getProjectBillingInfo: { billingEnabled: false } });
   const config = brandConfig({ gcp: { billingAccount: false } });
 
@@ -467,7 +467,7 @@ test('billing: gcp.billingAccount: false = the user chose Spark — clean succes
 });
 
 test('billing: interactive flow lists accounts, lands the pick in omega.json5, links it', async () => {
-  const handler = require('../src/services/firebase/ensure/billing.js');
+  const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
     listBillingAccounts: [
@@ -497,7 +497,7 @@ test('billing: interactive flow lists accounts, lands the pick in omega.json5, l
 });
 
 test('billing: interactive opt-out lands gcp.billingAccount: false and stays on Spark', async () => {
-  const handler = require('../src/services/firebase/ensure/billing.js');
+  const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
     listBillingAccounts: [
@@ -527,7 +527,7 @@ test('billing: interactive opt-out lands gcp.billingAccount: false and stays on 
 });
 
 test('billing: Spark plan with a configured account links it', async () => {
-  const handler = require('../src/services/firebase/ensure/billing.js');
+  const handler = require('../src/services/cloud/ensure/billing.js');
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
     linkBillingAccount: {},
@@ -543,7 +543,7 @@ test('billing: Spark plan with a configured account links it', async () => {
 // ─── Services (diff-first — omega-manager batch-enabled every run) ───────────
 
 test('services: only the missing APIs are enabled', async () => {
-  const handler = require('../src/services/firebase/ensure/services.js');
+  const handler = require('../src/services/cloud/ensure/services.js');
   const converged = convergedResponses();
   const api = fakeFirebase({
     ...converged,
@@ -560,7 +560,7 @@ test('services: only the missing APIs are enabled', async () => {
 });
 
 test('project-settings: drifted name is patched, matching web app untouched', async () => {
-  const handler = require('../src/services/firebase/ensure/project-settings.js');
+  const handler = require('../src/services/cloud/ensure/project-settings.js');
   const api = fakeFirebase({
     ...convergedResponses(),
     getGcpProject: { displayName: 'Old Name' },
@@ -577,7 +577,7 @@ test('project-settings: drifted name is patched, matching web app untouched', as
 // ─── Service account key lifecycle ───────────────────────────────────────────
 
 test('service-account: missing key is created and saved to .omega/secrets (the ONE home — the backend stage reads it from there)', async () => {
-  const handler = require('../src/services/firebase/ensure/service-account.js');
+  const handler = require('../src/services/cloud/ensure/service-account.js');
   const api = fakeFirebase({
     ...convergedResponses(),
     createServiceAccountKey: { type: 'service_account', client_email: SA_EMAIL, private_key: 'FAKE' },
@@ -603,7 +603,7 @@ test('service-account: missing key is created and saved to .omega/secrets (the O
 // ─── Authentication (manual flows → warned, config diffs → PATCH) ────────────
 
 test('authentication: disabled email sign-in is enabled; missing Google sign-in warns', async () => {
-  const handler = require('../src/services/firebase/ensure/authentication.js');
+  const handler = require('../src/services/cloud/ensure/authentication.js');
   const converged = convergedResponses();
   const identityConfig = structuredClone(converged.getIdentityConfig);
   identityConfig.signIn.email.enabled = false;
@@ -625,7 +625,7 @@ test('authentication: disabled email sign-in is enabled; missing Google sign-in 
 });
 
 test('authentication: wrong-project OAuth client is flagged, credentials not saved', async () => {
-  const handler = require('../src/services/firebase/ensure/authentication.js');
+  const handler = require('../src/services/cloud/ensure/authentication.js');
   const api = fakeFirebase({
     ...convergedResponses(),
     getIdpConfig: { enabled: true, clientId: '999999-other.apps.googleusercontent.com', clientSecret: 's' },
@@ -639,7 +639,7 @@ test('authentication: wrong-project OAuth client is flagged, credentials not sav
 });
 
 test('authentication: interactive redirect-URI confirm records completion in state', async () => {
-  const handler = require('../src/services/firebase/ensure/authentication.js');
+  const handler = require('../src/services/cloud/ensure/authentication.js');
   const prompt = require('@omega.js/devkit/prompt');
   const api = fakeFirebase(convergedResponses());
   const tty = openTtyPrompt();
@@ -667,7 +667,7 @@ test('authentication: interactive redirect-URI confirm records completion in sta
 // ─── Cloud messaging ─────────────────────────────────────────────────────────
 
 test('cloud-messaging: missing VAPID key pair warns with console guidance', async () => {
-  const handler = require('../src/services/firebase/ensure/cloud-messaging.js');
+  const handler = require('../src/services/cloud/ensure/cloud-messaging.js');
   const api = fakeFirebase({ isServiceEnabled: () => true });
 
   const result = await handler(handlerContext(brandConfig(), api));
@@ -677,7 +677,7 @@ test('cloud-messaging: missing VAPID key pair warns with console guidance', asyn
 });
 
 test('cloud-messaging: interactive paste-back validates lengths and lands both keys in state', async () => {
-  const handler = require('../src/services/firebase/ensure/cloud-messaging.js');
+  const handler = require('../src/services/cloud/ensure/cloud-messaging.js');
   const prompt = require('@omega.js/devkit/prompt');
   const api = fakeFirebase({ isServiceEnabled: () => true });
   const tty = openTtyPrompt();
@@ -709,7 +709,7 @@ test('cloud-messaging: interactive paste-back validates lengths and lands both k
 // ─── SDK config drift check ──────────────────────────────────────────────────
 
 test('sdk-config: missing omega.json5 cloud.config is written back, comments intact', async () => {
-  const handler = require('../src/services/firebase/ensure/sdk-config.js');
+  const handler = require('../src/services/cloud/ensure/sdk-config.js');
   const api = fakeFirebase(convergedResponses());
   const brandRoot = makeBrandRoot(FIREBASE_WRITEBACK_CONFIG);
 
@@ -727,7 +727,7 @@ test('sdk-config: missing omega.json5 cloud.config is written back, comments int
 });
 
 test('sdk-config: dry run warns with the paste block and leaves omega.json5 untouched', async () => {
-  const handler = require('../src/services/firebase/ensure/sdk-config.js');
+  const handler = require('../src/services/cloud/ensure/sdk-config.js');
   const api = fakeFirebase(convergedResponses());
   const brandRoot = makeBrandRoot(FIREBASE_WRITEBACK_CONFIG);
   const before = readConfigSource(brandRoot);
@@ -742,7 +742,7 @@ test('sdk-config: dry run warns with the paste block and leaves omega.json5 unto
 // ─── Hosting (one-pass converge) ─────────────────────────────────────────────
 
 test('hosting: missing domain is created, ownership TXT + unproxied CNAME written, warned pending', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
   let created = false;
   const api = fakeFirebase({
     ...convergedResponses(),
@@ -781,7 +781,7 @@ test('hosting: missing domain is created, ownership TXT + unproxied CNAME writte
 });
 
 test('hosting: firebase.apiSubdomain = false skips without touching anything', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
   const api = fakeFirebase({});
   const config = brandConfig({ firebase: { apiSubdomain: false } });
 
@@ -793,7 +793,7 @@ test('hosting: firebase.apiSubdomain = false skips without touching anything', a
 
 // ─── Dry run: drifted everywhere, zero mutations ─────────────────────────────
 
-test('firebase: dry-run on a fully drifted project performs zero mutations', async () => {
+test('cloud: dry-run on a fully drifted project performs zero mutations', async () => {
   const config = brandConfig({ gcp: { billingAccount: 'billingAccounts/MY-OWN' } });
   const api = fakeFirebase({
     getProjectBillingInfo: { billingEnabled: false },
@@ -830,7 +830,7 @@ test('firebase: dry-run on a fully drifted project performs zero mutations', asy
 
 // ─── OAuth consent: supportEmail must be OWNABLE by the caller (#29) ─────────
 
-const ensureOAuthConsent = require('../src/services/firebase/ensure/oauth-consent.js');
+const ensureOAuthConsent = require('../src/services/cloud/ensure/oauth-consent.js');
 
 test('oauth-consent: defaults supportEmail to the AUTHORIZING user, never support@domain (#29)', async () => {
   const api = fakeFirebase({
@@ -867,7 +867,7 @@ test('oauth-consent: config supportEmail (owned Google Group) wins; no email at 
 
 // ─── Interactive project selection/creation (config-landing flow) ────────────
 
-const { resolveFirebaseProject } = require('../src/services/firebase/lib/project-flow.js');
+const { resolveFirebaseProject } = require('../src/services/cloud/lib/project-flow.js');
 
 const PROJECT_FLOW_CONFIG = `{
   // Fixture Brand — firebase writeback target
@@ -1024,7 +1024,7 @@ test('project-flow: org opt-out creates the project standalone and lands gcp.org
 // ─── Hosting: interactive verification poll ──────────────────────────────────
 
 test('hosting: interactive run polls until verified, writing the mid-poll ACME record and proxying the CNAME', async () => {
-  const handler = require('../src/services/firebase/ensure/hosting.js');
+  const handler = require('../src/services/cloud/ensure/hosting.js');
   const OWNERSHIP = { type: 'TXT', rdata: `hosting-site=${PROJECT}` };
   const ACME = { type: 'TXT', rdata: 'acme-validation-token' };
   const updates = (records, domainName = `api.${DOMAIN}`) => [{ domainName, desired: { records } }];

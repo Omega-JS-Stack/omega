@@ -8,7 +8,7 @@
  *   dns.dmarcReports   — { rua: [...], ruf: [...] } report addresses (no default)
  *   dns.bimiLogo       — BIMI logo URL (no default; record only emitted when set)
  *   dns.sendgrid       — { id, whitelabel } domain-auth CNAMEs (no default;
- *                        the sendgrid service port will own these values)
+ *                        the campaigns service (SendGrid) owns these values)
  *   dns.records        — custom records (verification TXTs like Ahrefs go here)
  */
 const chalk = require('chalk').default;

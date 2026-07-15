@@ -258,7 +258,7 @@ test('migrations: unknown --migration name skips with the available list', async
 test('migrations: missing service account skips with firebase-service guidance', async () => {
   const result = await runService(brandConfig());
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /\.omega\/secrets\/service-account\.json.*firebase service/);
+  assert.match(result.reason, /\.omega\/secrets\/service-account\.json.*cloud service/);
 });
 
 test('migrations: --migration=<name> runs only that migration', async () => {

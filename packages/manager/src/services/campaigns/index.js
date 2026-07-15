@@ -1,5 +1,5 @@
 /**
- * SendGrid service — the brand's email-marketing infrastructure: domain
+ * Campaigns service (SendGrid provider) — the brand's email-marketing infrastructure: domain
  * authentication (DKIM/SPF CNAMEs written via Cloudflare), a verified sender
  * for Single Sends, the brand's marketing list, @omega.js/backend's custom fields and
  * segments (from @omega.js/backend's SSOT), and the account-global Event

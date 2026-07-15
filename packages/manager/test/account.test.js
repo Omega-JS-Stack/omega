@@ -133,7 +133,7 @@ async function runService(config, { root, auth, firestore, backend, options = {}
       brandId: 'fixture-brand',
       brandRoot: root || stageBrand(),
       brandConfig: config,
-      brandState: brandState !== undefined ? brandState : { firebase: { sdkConfig: { apiKey: 'fixture-api-key' } } },
+      brandState: brandState !== undefined ? brandState : { cloud: { sdkConfig: { apiKey: 'fixture-api-key' } } },
       operations: OPERATIONS.account,
       options,
       serviceData: {},
@@ -261,7 +261,7 @@ test('account: missing service account skips with firebase-service guidance', as
   const root = stageBrand();
   const result = await runService(brandConfig(), { root });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /\.omega\/secrets\/service-account\.json.*firebase service/);
+  assert.match(result.reason, /\.omega\/secrets\/service-account\.json.*cloud service/);
   // The skip happened before seed resolution — nothing written
   assert.equal(jetpack.exists(join(root, '.env')), false);
 });

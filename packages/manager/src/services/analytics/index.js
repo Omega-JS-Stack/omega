@@ -7,7 +7,7 @@
  *
  * Google auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env
  * (OAuth2; tokens cache to .omega/auth/google-analytics-tokens.json — the
- * analytics.edit scope is separate from the firebase service's tokens).
+ * analytics.edit scope is separate from the cloud service's tokens).
  * The GA4 property itself is required config (`analytics.providers.google.
  * propertyId`): interactive runs offer the account + property
  * selection/creation flow (lib/property-flow.js) and land the ids in

@@ -189,7 +189,7 @@ module.exports = async function ensureGoogleStreams(context) {
   // A Firebase web app measures through its OWN measurementId — if this GA
   // property has no stream carrying it, Firebase is linked to a different
   // property (expected for shared projects, a real misconfig otherwise)
-  const firebaseMeasurementId = brandState.firebase?.sdkConfig?.measurementId;
+  const firebaseMeasurementId = brandState.cloud?.sdkConfig?.measurementId;
   if (firebaseMeasurementId && brandConfig.firebase?.shared !== true) {
     const covered = existing.some((s) => s.webStreamData?.measurementId === firebaseMeasurementId)
       || Object.values(streams).some((s) => s.measurementId === firebaseMeasurementId);

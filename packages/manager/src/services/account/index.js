@@ -62,7 +62,7 @@ module.exports.run = createServiceRunner({
 
     // Firebase web API key from firebase state — without it, password
     // verification and backend calls degrade (handled per-operation)
-    const apiKey = context.brandState?.firebase?.sdkConfig?.apiKey || null;
+    const apiKey = context.brandState?.cloud?.sdkConfig?.apiKey || null;
     const apiBaseUrl = `https://api.${domain}`;
 
     // Tests inject fakes via context
@@ -71,7 +71,7 @@ module.exports.run = createServiceRunner({
     let accountBackend = context.accountBackend;
     if (!authAdmin) {
       if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_PATH))) {
-        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the firebase service first)` };
+        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the cloud service first)` };
       }
 
       const serviceAccount = loadServiceAccount(SERVICE_ACCOUNT_PATH, context.brandRoot);

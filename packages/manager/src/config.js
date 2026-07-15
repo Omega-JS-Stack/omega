@@ -19,6 +19,13 @@
  * the beehiiv segment automation talk to the companion Chrome extension
  * in extension/ (the last piece, ported with it). Onboarding is the
  * `onboard` wizard and company mode rides runCompany.
+ *
+ * Provider-named services renamed to their config ROLE key (cp134, Ian:
+ * "rename services so they match the config key"): firebase→cloud,
+ * sendgrid→campaigns, beehiiv→newsletter, sentry→monitoring. Provider
+ * STRINGS in config (cloud.provider: 'firebase', marketing.campaigns
+ * .provider: 'sendgrid', …) are unchanged — the service is the role, the
+ * provider is a value. Legacy state keys migrate on read (lib/state.js).
  */
 
 // =============================================================================
@@ -97,7 +104,7 @@ const DEFAULTS = {
   },
 
   // Google Cloud platform-level resources (the org + billing account the
-  // firebase service's project ensures consume — GCP-level, not Firebase-
+  // cloud service's project ensures consume — GCP-level, not Firebase-
   // level, so they live under their own key). omega-manager hardcoded the
   // company's values; they're company/brand config now.
   gcp: {
@@ -181,7 +188,7 @@ const DEFAULTS = {
   },
 
   // Marketing. campaigns = the email-marketing provider (the sendgrid
-  // service); newsletter = the newsletter provider (the beehiiv service).
+  // service); newsletter = the newsletter provider (the newsletter service (Beehiiv)).
   // listId/publicationId are resolved by the services and written back here
   // (comment-preserving writeback), with a state mirror as the resolution
   // cache. Auth: SENDGRID_API_KEY / BEEHIIV_API_KEY in the brand .env
@@ -561,14 +568,14 @@ const SERVICE_ORDER = [
   'github',          // the brand repo must exist before services that write to it
   'cloudflare',      // zone must exist before DNS-dependent services
   'domain',          // registrar nameservers point at the zone cloudflare just created/verified
-  'firebase',        // project must exist before analytics/backend-dependent services
+  'cloud',           // cloud project (Firebase provider) must exist before analytics/backend-dependent services
   'recaptcha',       // validates the shared keys the frontend/backend consume from .env
   'analytics',       // GA4 streams need the firebase link; search-console links to analytics next
   'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
   'adsense',         // domain present in the AdSense account + approval state (read-only API)
-  'sentry',          // error-monitoring project per target + DSN writeback (own API, no cross-service deps)
-  'sendgrid',        // email marketing: domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
-  'beehiiv',         // newsletter publication: access, fields, segments (verify-only), webhook
+  'monitoring',      // error-monitoring project per target + DSN writeback (Sentry provider; own API, no cross-service deps)
+  'campaigns',       // email marketing (SendGrid provider): domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
+  'newsletter',      // newsletter publication (Beehiiv provider): access, fields, segments (verify-only), webhook
   'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
   'slapform',        // brand's Slapform contact form settings + owner-account plan (Slapform operator only)
   'chatsy',          // brand's Chatsy chat agent settings + knowledge + owner-account plan (Chatsy operator only)
@@ -620,7 +627,7 @@ const OPERATIONS = {
     { name: 'nameservers', ensure: true }, // Registrar nameservers → Cloudflare (namecheap via API, manual registrars get instructions)
   ],
 
-  firebase: [
+  cloud: [
     { name: 'billing', ensure: true },          // Blaze plan (links gcp.billingAccount when configured)
     { name: 'services', ensure: true },         // Required Google Cloud APIs + compute deploy roles
     { name: 'project-settings', ensure: true }, // GCP display name + the 'Web App' web app
@@ -657,12 +664,12 @@ const OPERATIONS = {
     { name: 'sites', ensure: true }, // Domain present in AdSense + approval state (read-only API — adding is manual)
   ],
 
-  sentry: [
+  monitoring: [
     { name: 'projects', ensure: true }, // Org/team resolution + one Sentry project per enabled target (monitoring.org written back)
     { name: 'dsn', ensure: true },      // Client-key DSNs → targets.<type>.monitoring.dsn (comment-preserving writeback)
   ],
 
-  sendgrid: [
+  campaigns: [
     { name: 'domain-auth', ensure: true },     // Domain authentication (DKIM CNAMEs via Cloudflare, one-pass validate)
     { name: 'sender-identity', ensure: true }, // Verified sender for Single Sends (offers@{contact domain})
     { name: 'list', ensure: true },            // The brand's marketing list (id written back to omega.json5)
@@ -671,7 +678,7 @@ const OPERATIONS = {
     { name: 'event-webhook', ensure: true },   // Account-global Event Webhook → parent @omega.js/backend forwarder (min-diff PATCH)
   ],
 
-  beehiiv: [
+  newsletter: [
     { name: 'publication', ensure: true },   // Publication access (config/state id, auto-match by name; creation is manual)
     { name: 'custom-fields', ensure: true }, // @omega.js/backend custom fields (@omega.js/backend's marketing SSOT, diffed by display)
     { name: 'segments', ensure: true },      // @omega.js/backend segments verified (no create API — instructions when missing)

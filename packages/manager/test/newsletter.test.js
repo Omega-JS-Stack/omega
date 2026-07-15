@@ -18,7 +18,7 @@ const WebSocket = require('ws');
 const { OPERATIONS, DEFAULTS } = require('../src/config.js');
 const { fieldsFor, segmentsFor } = require('../src/lib/backend-marketing.js');
 const { openTtyPrompt } = require('./lib/interactive.js');
-const service = require('../src/services/beehiiv/index.js');
+const service = require('../src/services/newsletter/index.js');
 
 // Tests must never see real credentials from the shell environment
 delete process.env.BEEHIIV_API_KEY;
@@ -109,7 +109,7 @@ function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKe
     brand: { id: 'fixture-brand', config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
     apps: [],
-    operations: OPERATIONS.beehiiv,
+    operations: OPERATIONS.newsletter,
     options,
     serviceData,
     beehiivApi: beehiiv,
@@ -118,38 +118,38 @@ function runService(config, { beehiiv, options = {}, serviceData = {}, webhookKe
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
 
-test('beehiiv: skips without BEEHIIV_API_KEY in .env', async () => {
+test('newsletter: skips without BEEHIIV_API_KEY in .env', async () => {
   const result = await runService(brandConfig()); // no injected api → the creds check applies
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /BEEHIIV_API_KEY/);
 });
 
-test('beehiiv: marketing.newsletter.enabled = false skips the service', async () => {
+test('newsletter: marketing.newsletter.enabled = false skips the service', async () => {
   const result = await runService(brandConfig({ newsletter: { enabled: false } }), { beehiiv: fakeBeehiiv() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /marketing\.newsletter\.enabled/);
 });
 
-test('beehiiv: a different newsletter provider skips the service', async () => {
+test('newsletter: a different newsletter provider skips the service', async () => {
   const result = await runService(brandConfig({ newsletter: { provider: 'other' } }), { beehiiv: fakeBeehiiv() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /provider = 'other'/);
 });
 
-test('beehiiv: skips without brand.url', async () => {
+test('newsletter: skips without brand.url', async () => {
   const result = await runService(brandConfig({ url: '' }), { beehiiv: fakeBeehiiv() });
   assert.equal(result.status, 'skipped');
   assert.match(result.reason, /brand\.url/);
 });
 
-test('beehiiv: the newsletter defaults carry no company values', () => {
+test('newsletter: the newsletter defaults carry no company values', () => {
   assert.equal(DEFAULTS.marketing.newsletter.provider, 'beehiiv');
   assert.equal(DEFAULTS.marketing.newsletter.publicationId, null);
 });
 
 // ─── Converged no-op ─────────────────────────────────────────────────────────
 
-test('beehiiv: fully converged brand is a zero-mutation no-op across all 4 operations', async () => {
+test('newsletter: fully converged brand is a zero-mutation no-op across all 4 operations', async () => {
   const api = fakeBeehiiv(convergedResponses());
 
   const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api });
@@ -164,7 +164,7 @@ test('beehiiv: fully converged brand is a zero-mutation no-op across all 4 opera
 
 // ─── publication ─────────────────────────────────────────────────────────────
 
-test('beehiiv: an inaccessible configured publication warns and gates the downstream operations', async () => {
+test('newsletter: an inaccessible configured publication warns and gates the downstream operations', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     getPublication: () => null,
@@ -180,7 +180,7 @@ test('beehiiv: an inaccessible configured publication warns and gates the downst
   assert.equal(api.callsTo('listWebhooks').length, 0);
 });
 
-test('beehiiv: no configured id auto-matches a publication by brand name into state', async () => {
+test('newsletter: no configured id auto-matches a publication by brand name into state', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     listPublications: [{ id: 'pub_other', name: 'Unrelated' }, { id: PUB_ID, name: 'Fixture Brand News' }],
@@ -199,7 +199,7 @@ test('beehiiv: no configured id auto-matches a publication by brand name into st
   assert.ok(written.includes('enabled: true, // the resolved id lands next to this'));
 });
 
-test('beehiiv: a state-known id is promoted into omega.json5 on verify', async () => {
+test('newsletter: a state-known id is promoted into omega.json5 on verify', async () => {
   const api = fakeBeehiiv(convergedResponses());
   const brandRoot = makeBrandRoot(WRITEBACK_CONFIG);
 
@@ -209,7 +209,7 @@ test('beehiiv: a state-known id is promoted into omega.json5 on verify', async (
   assert.ok(readConfigSource(brandRoot).includes(`publicationId: "${PUB_ID}",`));
 });
 
-test('beehiiv: no matching publication warns with the values to copy into the dashboard', async () => {
+test('newsletter: no matching publication warns with the values to copy into the dashboard', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     listPublications: [{ id: 'pub_other', name: 'Unrelated' }],
@@ -224,7 +224,7 @@ test('beehiiv: no matching publication warns with the values to copy into the da
 
 // ─── custom-fields ───────────────────────────────────────────────────────────
 
-test('beehiiv: missing and kind-mismatched fields are created/recreated, diffed by display', async () => {
+test('newsletter: missing and kind-mismatched fields are created/recreated, diffed by display', async () => {
   const converged = convergedResponses().getCustomFields;
   const initial = converged.slice(1); // first field missing
   initial[0] = { ...initial[0], kind: initial[0].kind === 'string' ? 'integer' : 'string' }; // second mismatched
@@ -251,7 +251,7 @@ test('beehiiv: missing and kind-mismatched fields are created/recreated, diffed 
 
 // ─── segments (verify-only — no create API) ──────────────────────────────────
 
-test('beehiiv: missing segments warn with instructions and NEVER mutate', async () => {
+test('newsletter: missing segments warn with instructions and NEVER mutate', async () => {
   const list = convergedResponses().getSegments;
   const api = fakeBeehiiv({
     ...convergedResponses(),
@@ -308,7 +308,7 @@ function startFakeExtension(port) {
   return { commands, stop: () => { stopped = true; ws?.terminate(); } };
 }
 
-test('beehiiv: interactive Skip choice leaves the segments warned', async () => {
+test('newsletter: interactive Skip choice leaves the segments warned', async () => {
   const list = convergedResponses().getSegments;
   const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) });
 
@@ -326,7 +326,7 @@ test('beehiiv: interactive Skip choice leaves the segments warned', async () => 
   }
 });
 
-test('beehiiv: extension automation creates the missing segment and the re-verify confirms it', async () => {
+test('newsletter: extension automation creates the missing segment and the re-verify confirms it', async () => {
   const full = convergedResponses().getSegments;
   let segmentsCalls = 0;
   const api = fakeBeehiiv({
@@ -371,7 +371,7 @@ test('beehiiv: extension automation creates the missing segment and the re-verif
   }
 });
 
-test('beehiiv: manual choice re-verifies — still-missing segments stay warned', async () => {
+test('newsletter: manual choice re-verifies — still-missing segments stay warned', async () => {
   const list = convergedResponses().getSegments;
   const api = fakeBeehiiv({ ...convergedResponses(), getSegments: list.slice(1) }); // never created
 
@@ -396,7 +396,7 @@ test('beehiiv: manual choice re-verifies — still-missing segments stay warned'
 
 // ─── webhook ─────────────────────────────────────────────────────────────────
 
-test('beehiiv: webhook drift is patched with the minimum diff (matched by managed description)', async () => {
+test('newsletter: webhook drift is patched with the minimum diff (matched by managed description)', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     listWebhooks: [{ id: 'wh_1', url: 'https://api.old-parent.test/hook', event_types: ['subscription.unsubscribed'], description: WEBHOOK_DESCRIPTION, enabled: true }],
@@ -409,7 +409,7 @@ test('beehiiv: webhook drift is patched with the minimum diff (matched by manage
   assert.deepEqual(api.callsTo('updateWebhook')[0].args, [PUB_ID, 'wh_1', { url: WEBHOOK_URL, event_types: EVENT_TYPES }]);
 });
 
-test('beehiiv: no webhook yet → created with the exact consent-pipeline payload', async () => {
+test('newsletter: no webhook yet → created with the exact consent-pipeline payload', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     listWebhooks: [],
@@ -427,7 +427,7 @@ test('beehiiv: no webhook yet → created with the exact consent-pipeline payloa
   assert.equal(result.output.webhook.created, true);
 });
 
-test('beehiiv: missing OMEGA_WEBHOOK_KEY warns', async () => {
+test('newsletter: missing OMEGA_WEBHOOK_KEY warns', async () => {
   const api = fakeBeehiiv(convergedResponses());
 
   const result = await runService(brandConfig({ publicationId: PUB_ID }), { beehiiv: api, webhookKey: false });
@@ -437,7 +437,7 @@ test('beehiiv: missing OMEGA_WEBHOOK_KEY warns', async () => {
   assert.equal(api.callsTo('listWebhooks').length, 0);
 });
 
-test('beehiiv: no parent configured → nothing to point the webhook at', async () => {
+test('newsletter: no parent configured → nothing to point the webhook at', async () => {
   const api = fakeBeehiiv(convergedResponses());
 
   const result = await runService(brandConfig({ publicationId: PUB_ID, parent: null }), { beehiiv: api });
@@ -449,7 +449,7 @@ test('beehiiv: no parent configured → nothing to point the webhook at', async 
 
 // ─── Dry-run ─────────────────────────────────────────────────────────────────
 
-test('beehiiv: dry-run on a fully drifted brand performs zero mutations', async () => {
+test('newsletter: dry-run on a fully drifted brand performs zero mutations', async () => {
   const api = fakeBeehiiv({
     ...convergedResponses(),
     getCustomFields: [],

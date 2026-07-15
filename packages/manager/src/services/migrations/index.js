@@ -69,7 +69,7 @@ module.exports.run = createServiceRunner({
     let firestore = context.firestore;
     if (!authAdmin) {
       if (!jetpack.exists(join(context.brandRoot, SERVICE_ACCOUNT_PATH))) {
-        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the firebase service first)` };
+        return { skip: true, reason: `no service account at ${SERVICE_ACCOUNT_PATH} (run the cloud service first)` };
       }
 
       const serviceAccount = loadServiceAccount(SERVICE_ACCOUNT_PATH, context.brandRoot);

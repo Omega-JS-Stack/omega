@@ -55,11 +55,11 @@ const PUBLISH_LEGS = new Set(['desktop', 'extension']);
 
 // Services that must RUN green on a full pipeline pass — these are the
 // provisioning spine; a skip here means a seed is missing, not a choice.
-// search-console/sendgrid/account/recaptcha graduated into the spine once
+// search-console/campaigns/account/recaptcha graduated into the spine once
 // their seeds converged (cp116–120): a skip there is a regression now.
 const CORE_SERVICES = [
-  'workspace', 'github', 'cloudflare', 'domain', 'firebase', 'testing',
-  'search-console', 'sendgrid', 'account', 'recaptcha',
+  'workspace', 'github', 'cloudflare', 'domain', 'cloud', 'testing',
+  'search-console', 'campaigns', 'account', 'recaptcha',
 ];
 
 const STATUS_ICONS = { success: chalk.green('✓'), warned: chalk.yellow('⚠'), skipped: chalk.dim('⊘'), error: chalk.red('✗') };

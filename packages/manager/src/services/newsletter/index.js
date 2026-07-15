@@ -1,5 +1,5 @@
 /**
- * Beehiiv service — the brand's newsletter publication: access verified (or
+ * Newsletter service (Beehiiv provider) — the brand's newsletter publication: access verified (or
  * auto-matched by name), @omega.js/backend's custom fields provisioned, @omega.js/backend's segments
  * ensured (Beehiiv has no segment-create API — missing ones get readable
  * instructions, and interactive runs offer to create them by driving the
