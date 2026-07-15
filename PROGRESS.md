@@ -14,7 +14,7 @@
 
 ## ⏸ Blocked / Waiting (Ian-owned)
 - **Apple signing keys — one copy command (cp131 finding: EVERYTHING is on this Mac)**: all 5 downloaded certs modulus-pair with legacy omega-manager's `.output/_shared/certificates/apple/csr/*` keys (same team), and legacy holds a VALID-to-2030 DEVELOPER_ID_INSTALLER_G2 .cer+key pair — copy the csr dirs + installer .cer into the playground's `.omega/certificates/apple/`, rerun certificates, everything exports/imports (command in the cp131 report; credential copies stay Ian-run). Interactive walkthrough shipped cp131 as the fallback if Apple has revoked that installer cert (rerun tells)
-- **Monitoring (Sentry) live mint — needs `SENTRY_AUTH_TOKEN` (an org auth token: sentry.io/settings/auth-tokens) in the playground .env** — then `npm start -- --service=monitoring` from the brand root (interactive runs now OPEN that exact page and take a paste — cp133) mints the team + 4 projects and lands every DSN in `targets.<type>.monitoring.dsn` (service shipped cp132, renamed cp134)
+- **Monitoring (Sentry) live mint — needs `SENTRY_AUTH_TOKEN` (a PERSONAL token with project+team write scopes — org tokens can't create projects, cp136) in the playground .env** — then `npm start -- --service=monitoring` from the brand root (interactive runs now OPEN that exact page and take a paste — cp133) mints the team + 4 projects and lands every DSN in `targets.<type>.monitoring.dsn` (service shipped cp132, renamed cp134)
 - **AdSense — TABLED until omega publishes (Ian 2026-07-14: "i cant do this until we publish omega")**; when live: console site-add + the (currently missing) ads.txt from the web parity gaps item
 - Payment-adjacent (Ian's named wariness / launch-era): Stripe radar+disputes latches, real Stripe account for account-info. **PayPal + Chargebee legs SKIPPED (Ian 2026-07-14: stop suggesting them)**
 - Releases FULLY gated (Ian 2026-07-10, reaffirmed): zero npm publishes AND zero GitHub releases until he says go; old-name releases ship from the LEGACY repos (monorepo `pre-*-rename` tags are backup)
@@ -62,4 +62,4 @@
 - [x] 116 playground website LIVE on GH Pages e2e — repo + Pages + placeholder + service wave; site/api/backend live-200 → CHANGELOG
 - [x] Phases 0–2 + cp33–115 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning → CHANGELOG + git log
 
-*Last updated: 2026-07-14 (cp135: company-shared signing tree + p8 rescue; cp133/134: guided secret asks + role renames; monitoring mint awaits Ian's token; next: imagemin → parity gaps → full-deploy rehearsal)*
+*Last updated: 2026-07-14 (cp136: Sentry guide → personal-token page + scopes hint; cp135: company-shared signing tree + p8 rescue; monitoring mint awaits Ian's token; next: imagemin → parity gaps → full-deploy rehearsal)*

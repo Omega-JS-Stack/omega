@@ -38,7 +38,7 @@ const ENV_GROUPS = [
   { comment: 'Google OAuth client (cloud, analytics, search-console, adsense services)', keys: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] },
   { comment: 'Classic reCAPTCHA keys, shared across brands (recaptcha service)', keys: ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY'] },
   { comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)', keys: ['META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN'] },
-  { comment: 'Error monitoring (monitoring service, Sentry provider) — an ORG auth token', keys: ['SENTRY_AUTH_TOKEN'] },
+  { comment: 'Error monitoring (monitoring service, Sentry provider) — a personal auth token with project+team write scopes', keys: ['SENTRY_AUTH_TOKEN'] },
   { comment: 'Email marketing (campaigns + newsletter services: SendGrid + Beehiiv)', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY'] },
   { comment: 'Payment processors (payment service; public halves live in omega.json5)', keys: ['STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY'] },
   { comment: 'Operator service accounts (slapform/chatsy/replyify/server/assets services) — paths to service-account JSON files', keys: ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT', 'MRLOGO_SERVICE_ACCOUNT'] },

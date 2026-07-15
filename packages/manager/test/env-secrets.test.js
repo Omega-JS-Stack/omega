@@ -100,9 +100,12 @@ test('env-secrets: a url\'d secret walks the user to the exact mint page before 
   const brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-env-'));
 
   const events = [];
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
   try {
     const gate = await withStreams(true, () =>
-      ensureEnvSecrets({ brandRoot, options: {} }, [{ name: VAR, label: 'Fake token', url: 'https://example.com/mint' }], {
+      ensureEnvSecrets({ brandRoot, options: {} }, [{ name: VAR, label: 'Fake token', url: 'https://example.com/mint', hint: 'Create one with scopes: fake:write' }], {
         prompt: {
           pressEnterToOpen: async (url, label) => { events.push(['open', url, label]); return true; },
           password: async () => { events.push(['paste']); return 'v'; },
@@ -112,8 +115,11 @@ test('env-secrets: a url\'d secret walks the user to the exact mint page before 
     assert.equal(gate, null);
     // Guide first (the exact page), paste second
     assert.deepEqual(events, [['open', 'https://example.com/mint', 'the Fake token page'], ['paste']]);
+    // The hint says what to create on that page (scopes, token type)
+    assert.match(lines.join('\n'), /Create one with scopes: fake:write/);
     assert.equal(process.env[VAR], 'v');
   } finally {
+    console.log = original;
     cleanup(VAR);
     fs.rmSync(brandRoot, { recursive: true, force: true });
   }

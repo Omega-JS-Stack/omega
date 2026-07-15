@@ -7,9 +7,12 @@
  * secret.
  *
  * Gates: a monitoring section with provider 'sentry' (the only provider
- * today) + SENTRY_AUTH_TOKEN in the brand .env (an ORG auth token — it
- * names its org, which the projects operation resolves and writes back to
- * monitoring.org).
+ * today) + SENTRY_AUTH_TOKEN in the brand .env — a PERSONAL auth token
+ * with org:read, project:read, project:write, team:read, team:write
+ * (Sentry's "organization tokens" are CI-scoped and cannot create teams
+ * or projects, cp136). The projects operation resolves the org (config
+ * wins, else the token's lone visible org) and writes it back to
+ * monitoring.org.
  */
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
@@ -34,7 +37,12 @@ module.exports.run = createServiceRunner({
 
     if (!context.sentryApi) {
       const gate = await ensureEnvSecrets(context, [
-        { name: 'SENTRY_AUTH_TOKEN', label: 'Sentry organization auth token', url: 'https://sentry.io/settings/auth-tokens/' },
+        {
+          name: 'SENTRY_AUTH_TOKEN',
+          label: 'Sentry personal auth token',
+          url: 'https://sentry.io/settings/account/api/auth-tokens/',
+          hint: 'Create a personal token with scopes: org:read, project:read, project:write, team:read, team:write — organization tokens cannot create projects',
+        },
       ]);
       if (gate) return gate;
     }

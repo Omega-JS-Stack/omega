@@ -19,8 +19,9 @@ const { writeEnvValue } = require('./env-secret.js');
  * Ensure the named secrets exist in the environment, asking when possible.
  *
  * @param {object} context - Service context ({ brandRoot, options }).
- * @param {Array<{ name: string, label?: string, url?: string }>} secrets -
- *   Required env vars — label for the ask, url = where to mint one.
+ * @param {Array<{ name: string, label?: string, url?: string, hint?: string }>} secrets -
+ *   Required env vars — label for the ask, url = where to mint one,
+ *   hint = what exactly to create there (scopes, token type).
  * @param {object} [deps] - Test seam: { prompt } replaces devkit/prompt.
  * @returns {Promise<object|null>} null to proceed, or the setup skip shape
  *   ({ skip, reason, missingEnv }).
@@ -46,6 +47,9 @@ async function ensureEnvSecrets(context, secrets, deps = {}) {
   for (const secret of missing) {
     const label = secret.label || secret.name;
     console.log(`    ${chalk.yellow('🔑')} ${label} is not in the brand .env yet`);
+    if (secret.hint) {
+      console.log(`      ${chalk.dim(secret.hint)}`);
+    }
 
     // The exact-page guide: Enter opens the page that mints the value
     // (pressEnterToOpen always prints the URL, so it stays clickable when
