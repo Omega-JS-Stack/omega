@@ -10,12 +10,15 @@ const chalk = require('chalk').default;
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 const { writeBrandConfig } = require('../../../lib/config-write.js');
 
-// Sentry platform slugs per target type — cosmetic (icon + onboarding docs)
-// but worth getting right. Unlisted target types are not monitored.
+// Sentry platform slugs per target type — validated server-side against the
+// integration-docs index (Project.is_valid_platform), so only ids that exist
+// there work: Electron's is the top-level 'electron', NOT the frontend-UI
+// alias 'javascript-electron' (400 Invalid platform — cp136b, live find).
+// Unlisted target types are not monitored.
 const TARGET_PLATFORMS = {
   web: 'javascript',
   backend: 'node',
-  desktop: 'javascript-electron',
+  desktop: 'electron',
   extension: 'javascript',
 };
 

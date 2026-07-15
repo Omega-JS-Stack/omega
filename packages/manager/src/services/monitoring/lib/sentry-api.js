@@ -2,10 +2,11 @@
  * Sentry API client (api/0) — organizations, teams, projects, client keys.
  * Named-method surface so tests can fake it method-for-method.
  *
- * Auth: SENTRY_AUTH_TOKEN in the brand .env (an ORGANIZATION auth token —
- * it lists exactly the org it belongs to). Multi-region SaaS: every org
- * carries links.regionUrl; setRegionUrl() repoints the client so all
- * org-scoped calls hit the org's home region.
+ * Auth: SENTRY_AUTH_TOKEN in the brand .env (a PERSONAL auth token with
+ * project+team write scopes — org tokens are CI-scoped and cannot create
+ * teams/projects, cp136). Multi-region SaaS: every org carries
+ * links.regionUrl; setRegionUrl() repoints the client so all org-scoped
+ * calls hit the org's home region.
  */
 const SENTRY_API_BASE = 'https://sentry.io/api/0';
 
@@ -40,9 +41,12 @@ class SentryAPI {
     const data = text ? JSON.parse(text) : null;
 
     if (!response.ok) {
+      // DRF validation errors have no detail/message — they're field-keyed
+      // ({"platform": ["Invalid platform"]}); serialize so the failure names
+      // its field instead of reading as a bare statusText.
       const message = data?.detail
         || data?.message
-        || response.statusText;
+        || (data ? JSON.stringify(data) : response.statusText);
       throw new Error(`Sentry API error (${response.status}): ${message}`);
     }
 

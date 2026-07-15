@@ -105,6 +105,7 @@
   monitoring: {
     provider: "sentry",
     dsn: null,
+    org: "itw-creative-works",
   },
 
   // PLACEHOLDER catalog (dogfood) — real OMEGA pricing is Ian's call (L10).
@@ -225,13 +226,28 @@
   // files are OPTIONAL (standalone/split-repo escape hatch) and the
   // playground doesn't carry any (backend's rides the src/dist pillar).
   targets: {
-    web: {},
-    backend: {},
+    web: {
+      monitoring: {
+        dsn: "https://540bf2f968075df6713fe325c7cb8c1c@o192327.ingest.us.sentry.io/4511736919293952",
+      },
+    },
+    backend: {
+      monitoring: {
+        dsn: "https://e26b3772587e083a28ee960d632d3e16@o192327.ingest.us.sentry.io/4511736919359488",
+      },
+    },
     desktop: {
       app: {
         category: "developer-tools",
       },
+      monitoring: {
+        dsn: "https://4633c36db8db53a298e05cea9cce611e@o192327.ingest.us.sentry.io/4511736953831424",
+      },
     },
-    extension: {},
+    extension: {
+      monitoring: {
+        dsn: "https://20e47afec67def6cd86e215dc106cb74@o192327.ingest.us.sentry.io/4511736953896960",
+      },
+    },
   },
 }

@@ -19,7 +19,7 @@ delete process.env.SENTRY_AUTH_TOKEN;
 
 const ORG = { slug: 'fixture-org', links: { regionUrl: 'https://us.sentry.io' } };
 const ALL_TARGETS = { web: {}, backend: {}, desktop: {}, extension: {} };
-const PLATFORMS = { web: 'javascript', backend: 'node', desktop: 'javascript-electron', extension: 'javascript' };
+const PLATFORMS = { web: 'javascript', backend: 'node', desktop: 'electron', extension: 'javascript' };
 
 function dsnOf(target) {
   return `https://key-${target}@o1.ingest.us.sentry.io/${target.length}00`;
