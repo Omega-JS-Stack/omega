@@ -90,7 +90,14 @@ see the harness README for the honest before/after numbers.
   contact, auth, legal, payment, portal, team, updates, alternatives, admin,
   test pages) + the blog set: paginated index (`/blog/page/N.html`, size 6),
   category/tag index pages, and per-category/per-tag generator pages
-  (pagination over the aggregated taxonomy — replaces dynamic-pages.rb).
+  (pagination over the aggregated taxonomy — replaces dynamic-pages.rb) + the
+  site meta-files (sitemap.xml, `/feeds/posts.{xml,json}` RSS + JSON feeds,
+  robots.txt, ads.txt, humans.txt, opensearch.xml, the pages.json search
+  index, `/.well-known/security.txt`) — default pages like any other, so a
+  consumer file at the same URL overrides. JSON outputs are valid by
+  construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
+  renders the configured `advertising.providers.google-adsense.client` or an
+  honest comment.
 
 ## Architecture
 
@@ -315,7 +322,7 @@ migration gate; the real somiibo URL-set diff, 2,556 vs Jekyll's 2,608 files,
 is its first job) · audit subsystem port (command exists as an explicit
 not-ported-yet stub — translate shipped in cp96) · UJM-setup extras (CNAME, firebase auth
 handler fetch, GitHub secret publishing, post dedupe) ·
-minifyHtml-as-transform, sitemap/feeds, named css
+minifyHtml-as-transform, named css
 bundles, full icon set (B-phase pipeline) · engine consumption of
 `targets.web.collections`/`defaults`/`generators` (migrate carries the config;
 custom collections land with the sweet-saucy wave) · dev-loop re-render

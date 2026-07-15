@@ -365,11 +365,12 @@ function configureOmega(eleventyConfig, options) {
   }
 
   // ---- Globals. site.uj carries UJM-runtime site values the core includes
-  // read (cache_breaker in the @omega.js/client Configuration, date.year in the
-  // copyright meta, placeholder.src in lazy-loaded imgs).
+  // read (cache_breaker in the @omega.js/client Configuration, date.year in
+  // the copyright meta, date.iso as the sitemap/feed build stamp — legacy
+  // site.time, placeholder.src in lazy-loaded imgs).
   site.uj = {
     cache_breaker: 0,
-    date: { year: new Date().getFullYear() },
+    date: { year: new Date().getFullYear(), iso: new Date().toISOString() },
     placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
     ...(site.uj || {}),
   };

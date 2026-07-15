@@ -1,0 +1,38 @@
+---
+permalink: /feeds/posts.xml
+sitemap:
+  include: false
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<rss
+  version="2.0"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:atom="http://www.w3.org/2005/Atom"
+  >
+  <channel>
+    <atom:link
+      href="{{ site.url }}/feeds/posts.xml"
+      rel="self"
+      type="application/rss+xml"
+    />
+    <title><![CDATA[ {{ site.brand.name }} Blog ]]></title>
+    <description><![CDATA[ {{ site.brand.description }} ]]></description>
+    <link>{{ site.url }}/blog</link>
+    <generator>OMEGA (@omega.js/web)</generator>
+    <lastBuildDate>{{ site.uj.date.iso | date: "%a, %d %b %Y %H:%M:%S" }} GMT</lastBuildDate>
+    <language><![CDATA[ en ]]></language>
+    {%- for post in collections.posts limit: 25 %}
+    <item>
+      <title><![CDATA[ {{ post.data.post.title | default: post.data.meta.title }} ]]></title>
+      <link>{{ site.url }}{{ post.url }}</link>
+      <guid isPermaLink="true">{{ site.url }}{{ post.url }}</guid>
+      <pubDate>{{ post.date | date: "%a, %d %b %Y %H:%M:%S" }} GMT</pubDate>
+      <description><![CDATA[ {{ post.data.post.description | default: post.data.meta.description }} ]]></description>
+      <content:encoded><![CDATA[ {{ post.templateContent | uj_strip_ads }} ]]></content:encoded>
+      <dc:creator><![CDATA[ {{ site.brand.name }} ]]></dc:creator>
+      <category><![CDATA[ {{ post.data.post.categories | first }} ]]></category>
+    </item>
+    {%- endfor %}
+  </channel>
+</rss>

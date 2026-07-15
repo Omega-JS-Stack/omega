@@ -1,0 +1,25 @@
+---
+permalink: /humans.txt
+sitemap:
+  include: false
+---
+/* TEAM */
+Website: {{ site.brand.name }}
+Site: {{ site.url }}
+{%- if site.socials.twitter %}
+Twitter: {{ site.socials.twitter }}
+{%- endif %}
+{%- if site.brand.location %}
+Location: {{ site.brand.location }}
+{%- endif %}
+
+/* THANKS */
+Framework: OMEGA (@omega.js/web)
+Built with: Eleventy, Bootstrap, Font Awesome
+Hosting: Various
+
+/* SITE */
+Last update: {{ site.uj.date.iso | date: "%Y/%m/%d" }}
+Standards: HTML5, CSS3, JavaScript ES6+
+Components: Eleventy, LiquidJS, SCSS, esbuild
+IDE: Visual Studio Code

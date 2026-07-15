@@ -1,0 +1,38 @@
+---
+permalink: /pages.json
+sitemap:
+  include: false
+meta:
+  index: false
+---
+[
+  {%- assign first = true -%}
+  {%- for item in collections.all -%}
+    {%- unless item.url -%}{%- continue -%}{%- endunless -%}
+    {%- assign prefix5 = item.url | slice: 0, 5 -%}
+    {%- if prefix5 == '/test' -%}{%- continue -%}{%- endif -%}
+    {%- assign prefix7 = item.url | slice: 0, 7 -%}
+    {%- if prefix7 == '/admin/' -%}{%- continue -%}{%- endif -%}
+    {%- if item.data.layout contains 'redirect' -%}{%- continue -%}{%- endif -%}
+    {%- if item.data.search.include == false -%}{%- continue -%}{%- endif -%}
+    {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
+    {%- if item.data.post.id -%}
+      {%- assign page_type = 'post' -%}
+    {%- else -%}
+      {%- assign page_type = item.data.settings['page-type'] -%}
+    {%- endif -%}
+    {%- comment -%} A post's own title beats cascaded meta (dir data can
+        shadow meta.title for posts, which never set their own) {%- endcomment -%}
+    {%- assign entry_title = item.data.post.title | default: item.data.meta.title -%}
+    {%- assign entry_desc = item.data.post.description | default: item.data.meta.description -%}
+    {%- unless first %},{% endunless -%}{%- assign first = false %}
+  {
+    "url": "{{ site.url }}{{ item.url }}",
+    "title": "{{ entry_title | default: '' | uj_json_escape }}",
+    "desc": "{{ entry_desc | default: '' | uj_json_escape }}",
+    "breadcrumb": "{{ item.data.meta.breadcrumb | default: '' | uj_json_escape }}",
+    "category": "{{ item.data.search.category | default: item.data.post.category | default: '' | uj_json_escape }}",
+    "type": "{{ page_type | default: '' | uj_json_escape }}"
+  }
+  {%- endfor %}
+]

@@ -1,0 +1,11 @@
+---
+permalink: /ads.txt
+sitemap:
+  include: false
+---
+{%- assign adsense = site.advertising.providers['google-adsense'] -%}
+{%- if adsense.client %}
+google.com, {{ adsense.client | remove: "ca-" }}, DIRECT, f08c47fec0942fa0
+{%- else %}
+# No advertising providers configured
+{%- endif %}

@@ -1,0 +1,36 @@
+---
+permalink: /robots.txt
+sitemap:
+  include: false
+---
+User-agent: *
+#
+# Admin Pages
+#
+Disallow: /admin/
+Noindex: /admin/
+
+#
+# Test Pages
+#
+Disallow: /test/
+Noindex: /test/
+
+#
+# Protection
+#
+Disallow: /search
+Disallow: /index.html?
+Disallow: /?
+Disallow: *page=
+Disallow: *?page=
+
+#
+# Wayback Machine (Internet Archive)
+#
+User-agent: ia_archiver
+Disallow: /terms
+Disallow: /privacy
+Disallow: /cookies
+
+Sitemap: {{ site.url }}/sitemap.xml
