@@ -45,6 +45,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 137 canonical .env order — env-order.js SSOT (scaffold stub + writeEnvValue + workspace `env-order` op render from ONE group list); machine comments regenerate, hand comments travel, dups collapse last-wins, loss-proof; playground normalized live (3 dups collapsed, stale comments healed); mgr 681 → CHANGELOG
 - [x] 136+136b monitoring MINTED LIVE — cp136: token guide → PERSONAL token page + scopes `hint` at the ONE gate (org tokens can't create projects — caught pre-run); cp136b: desktop platform is `electron` not `javascript-electron` (Ian's live 400 — Sentry validates against the integration-docs index; API errors now carry field detail); converged: team + 4 projects under `itw-creative-works`, all 4 DSNs in playground omega.json5, rerun idempotent; mgr 672 → CHANGELOG
 - [x] 135 company-shared signing tree — certificates + disperse resolve `{companyRoot||brandRoot}/.omega/certificates/apple/` via the company marker (manage threads context.companyRoot); CSC_KEY_PASSWORD → the signing root's .env; NEW interactive .p8 rescue (Enter-opens the ASC keys page, files the Downloads AuthKey_*.p8); playground stays brand-local until the OMEGA company workspace is born, then the material just moves; mgr 672 → CHANGELOG
 - [x] 133+134 secrets guide + role renames — every env-secret ask now Enter-opens its exact mint page (ONE gate upgrade); services renamed to their config ROLE key (firebase→cloud, sentry→monitoring, sendgrid→campaigns, beehiiv→newsletter; provider strings unchanged; legacy state keys migrate on read); mgr 669 / playground `--service=monitoring` smoke ✓ → CHANGELOG
@@ -62,4 +63,4 @@
 - [x] 116 playground website LIVE on GH Pages e2e — repo + Pages + placeholder + service wave; site/api/backend live-200 → CHANGELOG
 - [x] Phases 0–2 + cp33–115 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning → CHANGELOG + git log
 
-*Last updated: 2026-07-14 (cp136b: monitoring MINTED LIVE — 4 projects + 4 DSNs in playground config; next: env canonical order → imagemin → parity gaps → full-deploy rehearsal)*
+*Last updated: 2026-07-14 (cp137: canonical .env order live; cp136b: monitoring MINTED — 4 DSNs in playground config; next: imagemin → parity gaps → full-deploy rehearsal)*

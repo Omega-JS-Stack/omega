@@ -22,28 +22,15 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const jetpack = require('fs-jetpack');
 
 const { TARGET_APP_DIRS, TARGET_FRAMEWORKS } = require('../config.js');
+// The canonical group list + renderer live in env-order.js (the ordering
+// SSOT, cp137) — the stub is just a canonical render with generated Omega
+// keys, so a scaffolded .env and a reordered one have the same shape.
+const { renderCanonicalEnv } = require('./env-order.js');
 
 // The backend framework is a Cloud Functions RUNTIME dependency — the stage
 // step derives dist/package.json from the app manifest's `dependencies`
 // (src/dist pillar). Every other target's framework is build-time only.
 const RUNTIME_DEP_TARGETS = ['backend'];
-
-// Secret names each service reads from the brand .env — the stub documents
-// every entry point so "where do credentials go" has one obvious answer.
-// The names are owned by the services (see each service's README row).
-const ENV_GROUPS = [
-  { comment: 'GitHub (github + seo services) — `gh auth login` works instead of a token', keys: ['GH_TOKEN'] },
-  { comment: 'Cloudflare (cloudflare service + every DNS-writing flow) — API token with Zone edit', keys: ['CLOUDFLARE_TOKEN'] },
-  { comment: 'Namecheap registrar (domain service)', keys: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] },
-  { comment: 'Google OAuth client (cloud, analytics, search-console, adsense services)', keys: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] },
-  { comment: 'Classic reCAPTCHA keys, shared across brands (recaptcha service)', keys: ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY'] },
-  { comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)', keys: ['META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN'] },
-  { comment: 'Error monitoring (monitoring service, Sentry provider) — a personal auth token with project+team write scopes', keys: ['SENTRY_AUTH_TOKEN'] },
-  { comment: 'Email marketing (campaigns + newsletter services: SendGrid + Beehiiv)', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY'] },
-  { comment: 'Payment processors (payment service; public halves live in omega.json5)', keys: ['STRIPE_SECRET_KEY', 'PAYPAL_CLIENT_SECRET', 'CHARGEBEE_API_KEY'] },
-  { comment: 'Operator service accounts (slapform/chatsy/replyify/server/assets services) — paths to service-account JSON files', keys: ['SLAPFORM_SERVICE_ACCOUNT', 'CHATSY_SERVICE_ACCOUNT', 'REPLYIFY_SERVICE_ACCOUNT', 'SERVER_SERVICE_ACCOUNT', 'MRLOGO_SERVICE_ACCOUNT'] },
-  { comment: 'Apple signing (certificates service — desktop/mobile targets)', keys: ['APPLE_API_ISSUER', 'APPLE_API_KEY_ID', 'APPLE_TEAM_ID'] },
-];
 
 /**
  * Render the brand-level config/omega.json5 (fresh brands only — an existing
@@ -215,34 +202,20 @@ function renderGitignore() {
 }
 
 function renderEnvStub(answers) {
-  const lines = [
-    `# ${answers.name} — brand secrets (gitignored; loaded before every omega-manager run).`,
-    '# Uncomment and fill what this brand uses. Services without their credentials',
-    '# skip cleanly, so add these as the brand adopts each service.',
-    '',
-    '# ── Omega keys (auto-generated at scaffold — rotate by replacing the value) ──',
-    '# Admin key: grants admin on your backend. Webhook key: authenticates third-party',
-    '# webhook deliveries. Namespace: the brand UUID namespace for deterministic ids.',
-    `OMEGA_ADMIN_KEY=${randomBytes(32).toString('base64url')}`,
-    `OMEGA_WEBHOOK_KEY=${randomBytes(32).toString('base64url')}`,
-    `OMEGA_NAMESPACE=${randomUUID()}`,
-  ];
+  const generated = {
+    OMEGA_ADMIN_KEY: randomBytes(32).toString('base64url'),
+    OMEGA_WEBHOOK_KEY: randomBytes(32).toString('base64url'),
+    OMEGA_NAMESPACE: randomUUID(),
+  };
 
-  for (const group of ENV_GROUPS) {
-    lines.push('', `# ── ${group.comment} ──`);
-    for (const key of group.keys) {
-      lines.push(`# ${key}=`);
-    }
-  }
-
-  lines.push(
-    '',
-    '# Auto-generated and persisted here on the first real run — leave unset:',
-    '# ACCOUNT_PASSWORD_SEED, CSC_KEY_PASSWORD',
-    '',
-  );
-
-  return lines.join('\n');
+  return renderCanonicalEnv({
+    header: [
+      `# ${answers.name} — brand secrets (gitignored; loaded before every omega-manager run).`,
+      '# Uncomment and fill what this brand uses. Services without their credentials',
+      '# skip cleanly, so add these as the brand adopts each service.',
+    ],
+    entries: new Map(Object.entries(generated).map(([key, value]) => [key, { raw: `${key}=${value}` }])),
+  });
 }
 
 function renderReadme(answers) {

@@ -207,15 +207,18 @@ test('account: custom tokens carry the Firebase audience and uid, signed by the 
 test('env-secret: writeEnvValue appends to a fresh .env and replaces in place on rerun', () => {
   const root = stageBrand();
 
+  // Writes are canonically ordered since cp137 (env-order.test.js owns the
+  // layout contract) — this test pins the value semantics only
   writeEnvValue(root, 'FIXTURE_SECRET', 'first');
-  assert.equal(jetpack.read(join(root, '.env')), 'FIXTURE_SECRET="first"\n');
+  assert.match(jetpack.read(join(root, '.env')), /^FIXTURE_SECRET="first"$/m);
 
   jetpack.write(join(root, '.env'), 'OTHER_VAR="keep"\nFIXTURE_SECRET="first"\nTRAILING_VAR="keep"\n');
   writeEnvValue(root, 'FIXTURE_SECRET', 'second');
-  assert.equal(
-    jetpack.read(join(root, '.env')),
-    'OTHER_VAR="keep"\nFIXTURE_SECRET="second"\nTRAILING_VAR="keep"\n',
-  );
+  const env = jetpack.read(join(root, '.env'));
+  assert.match(env, /^FIXTURE_SECRET="second"$/m);
+  assert.doesNotMatch(env, /"first"/);
+  assert.match(env, /^OTHER_VAR="keep"$/m);
+  assert.match(env, /^TRAILING_VAR="keep"$/m);
 });
 
 // ─── Setup / skip semantics ──────────────────────────────────────────────────
