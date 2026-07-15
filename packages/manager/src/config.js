@@ -566,6 +566,7 @@ const SERVICE_ORDER = [
   'analytics',       // GA4 streams need the firebase link; search-console links to analytics next
   'search-console',  // needs the cloudflare zone (DNS verification) + the GA property (association)
   'adsense',         // domain present in the AdSense account + approval state (read-only API)
+  'sentry',          // error-monitoring project per target + DSN writeback (own API, no cross-service deps)
   'sendgrid',        // email marketing: domain auth (DNS via cloudflare), sender, list, fields, segments, webhook
   'beehiiv',         // newsletter publication: access, fields, segments (verify-only), webhook
   'payment',         // Stripe/PayPal/Chargebee products + prices + webhooks reconciled to payment.products
@@ -654,6 +655,11 @@ const OPERATIONS = {
 
   adsense: [
     { name: 'sites', ensure: true }, // Domain present in AdSense + approval state (read-only API — adding is manual)
+  ],
+
+  sentry: [
+    { name: 'projects', ensure: true }, // Org/team resolution + one Sentry project per enabled target (monitoring.org written back)
+    { name: 'dsn', ensure: true },      // Client-key DSNs → targets.<type>.monitoring.dsn (comment-preserving writeback)
   ],
 
   sendgrid: [

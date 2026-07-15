@@ -204,6 +204,12 @@ const SHARED_SCHEMA = [
     description: "Error-monitoring provider. Only 'sentry' today.",
   },
   {
+    path:        'monitoring.org',
+    type:        'string',
+    required:    false,
+    description: 'Sentry organization slug (public). Auto-detected when the auth token sees exactly one org — the sentry service writes it back here.',
+  },
+  {
     path:        'monitoring.dsn',
     type:        'string',
     required:    false,
