@@ -2,7 +2,9 @@
  * Service gate for .env secrets (cp114, Ian: "check that it asks for
  * them") — the ONE way a service declares the env vars its APIs need.
  *
- * All present → proceed. Missing + interactive → ask for each value
+ * All present → proceed. Missing + interactive → walk the user to the
+ * exact page that mints the value (the Enter-gated browser open — Ian
+ * 2026-07-14: every secret ask is a guide, not a demand), then ask for it
  * (masked paste), persist it to the brand .env (writeEnvValue), export it
  * for THIS run, proceed — a fresh brand configures itself mid-run.
  * Missing + non-interactive → skip with a machine-readable `missingEnv`
@@ -39,12 +41,20 @@ async function ensureEnvSecrets(context, secrets, deps = {}) {
     };
   }
 
-  const { password } = deps.prompt || require('@omega.js/devkit/prompt');
+  const prompt = deps.prompt || require('@omega.js/devkit/prompt');
 
   for (const secret of missing) {
-    console.log(`    ${chalk.yellow('🔑')} ${secret.label || secret.name} is not in the brand .env yet${secret.url ? chalk.dim(` — mint one: ${secret.url}`) : ''}`);
+    const label = secret.label || secret.name;
+    console.log(`    ${chalk.yellow('🔑')} ${label} is not in the brand .env yet`);
 
-    const value = (await password({ message: `Paste ${secret.name}:` }) || '').trim();
+    // The exact-page guide: Enter opens the page that mints the value
+    // (pressEnterToOpen always prints the URL, so it stays clickable when
+    // the user would rather not open a browser).
+    if (secret.url && prompt.pressEnterToOpen) {
+      await prompt.pressEnterToOpen(secret.url, `the ${label} page`);
+    }
+
+    const value = (await prompt.password({ message: `Paste ${secret.name}:` }) || '').trim();
     if (!value) {
       return {
         skip: true,

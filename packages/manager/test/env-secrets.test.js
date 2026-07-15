@@ -95,6 +95,30 @@ test('env-secrets: interactive ask saves to the brand .env, exports, proceeds', 
   }
 });
 
+test('env-secrets: a url\'d secret walks the user to the exact mint page before the paste', async () => {
+  cleanup(VAR);
+  const brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-env-'));
+
+  const events = [];
+  try {
+    const gate = await withStreams(true, () =>
+      ensureEnvSecrets({ brandRoot, options: {} }, [{ name: VAR, label: 'Fake token', url: 'https://example.com/mint' }], {
+        prompt: {
+          pressEnterToOpen: async (url, label) => { events.push(['open', url, label]); return true; },
+          password: async () => { events.push(['paste']); return 'v'; },
+        },
+      }));
+
+    assert.equal(gate, null);
+    // Guide first (the exact page), paste second
+    assert.deepEqual(events, [['open', 'https://example.com/mint', 'the Fake token page'], ['paste']]);
+    assert.equal(process.env[VAR], 'v');
+  } finally {
+    cleanup(VAR);
+    fs.rmSync(brandRoot, { recursive: true, force: true });
+  }
+});
+
 test('env-secrets: empty paste → skip (no writeback, no export)', async () => {
   cleanup(VAR);
   const brandRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-env-'));
