@@ -167,10 +167,11 @@ function stageLocalCert(root, type, { key = true, p12 = true } = {}) {
   }
 }
 
-function runService(config, { root, client, options = {}, keychain, secrets, operations = OPERATIONS.certificates, serviceData = {}, downloadsDir } = {}) {
+function runService(config, { root, client, options = {}, keychain, secrets, operations = OPERATIONS.certificates, serviceData = {}, downloadsDir, companyRoot = null } = {}) {
   return service.run({
     brandId: BRAND_ID,
     brandRoot: root,
+    companyRoot,
     brandConfig: config,
     brand: { id: BRAND_ID, config, targets: Object.keys(config.targets || {}), apps: [] },
     brandState: {},
@@ -403,6 +404,82 @@ test('certificates: a first-time cert generates a fresh CSR whose content matche
   assert.ok(jetpack.exists(join(dir, 'csr', 'DEVELOPMENT', 'private.key')));
   assert.equal(client.mutations()[0].body.data.attributes.csrContent, cleanCSR(csrOnDisk));
   assert.equal(result.output.certificates.created, 1);
+});
+
+// ─── Company-shared signing tree ─────────────────────────────────────────────
+// One Apple account signs everything a company ships: a company-managed
+// brand (context.companyRoot from the .omega/company.json marker) resolves
+// the WHOLE signing tree — CSRs, certs, .p12s, the .p8, CSC_KEY_PASSWORD —
+// at the company workspace; standalone brands stay brand-local (every other
+// test in this file, which passes no companyRoot).
+
+test('certificates: a company-managed brand signs from the COMPANY workspace tree', async () => {
+  const root = stageBrand();
+  const companyRoot = mkdtempSync(join(tmpdir(), 'omega-certs-company-'));
+  const companyDir = appleDirOf(companyRoot);
+
+  // The company tree already holds the preserved CSR (a sibling brand — or
+  // this one, last run — generated it); the issued cert pairs with ITS key
+  jetpack.write(join(companyDir, 'csr', 'DEVELOPMENT', 'private.key'), FIXTURE_KEY);
+  jetpack.write(join(companyDir, 'csr', 'DEVELOPMENT', 'request.csr'), FIXTURE_CSR);
+
+  const client = fakeApple({
+    certificates: [],
+    'POST certificates': { data: certRecord('DEVELOPMENT', 'cert-dev') },
+    'GET certificates/cert-dev': { data: { attributes: { certificateContent: FIXTURE_CERT_DER.toString('base64') } } },
+  });
+
+  const config = brandConfig({ apple: { certificates: [{ type: 'DEVELOPMENT' }] } });
+  const result = await runService(config, { root, client, operations: ONLY('certificates'), companyRoot });
+
+  assert.equal(result.status, 'success');
+  // The COMPANY tree's CSR was reused (not regenerated) and everything
+  // lands beside it; the brand tree is never created
+  assert.equal(jetpack.read(join(companyDir, 'csr', 'DEVELOPMENT', 'private.key')), FIXTURE_KEY);
+  assert.ok(jetpack.exists(join(companyDir, 'certificates', 'DEVELOPMENT.cer')));
+  assert.ok(jetpack.exists(join(companyDir, 'certificates', 'DEVELOPMENT.p12')));
+  assert.equal(jetpack.exists(appleDirOf(root)), false);
+});
+
+test('certificates: interactive p8 rescue files the download into the signing tree and lands CSC in its .env', async () => {
+  const root = stageBrand();
+  const companyRoot = mkdtempSync(join(tmpdir(), 'omega-certs-company-'));
+  const downloads = mkdtempSync(join(tmpdir(), 'omega-certs-downloads-'));
+
+  process.env.APPLE_API_ISSUER = 'ISSUER-TEST';
+  process.env.APPLE_API_KEY_ID = 'TEST123AB';
+  process.env.APPLE_TEAM_ID = 'TEAMTEST12';
+  delete process.env.CSC_KEY_PASSWORD;
+
+  const tty = openTtyPrompt();
+  setBrowserOpener(async () => {
+    // Play the browser download: the fresh .p8 lands in Downloads
+    jetpack.write(join(downloads, 'AuthKey_TEST123AB.p8'), 'fixture-p8-key');
+    return true;
+  });
+
+  try {
+    const run = runService(brandConfig(MANUAL_ONLY_CONFIG), {
+      root, operations: [], companyRoot, downloadsDir: downloads,
+    });
+    await tty.answer('Press Enter to open the App Store Connect API keys page', '\r');
+    const result = await run;
+
+    assert.equal(result.status, 'success');
+    // The .p8 MOVED out of Downloads into the COMPANY signing tree
+    assert.equal(jetpack.read(join(appleDirOf(companyRoot), 'AuthKey_TEST123AB.p8')), 'fixture-p8-key');
+    assert.equal(jetpack.exists(join(downloads, 'AuthKey_TEST123AB.p8')), false);
+    // The shared .p12 password landed in the COMPANY .env (the env chain
+    // loads it under every sibling brand's own .env)
+    assert.match(jetpack.read(join(companyRoot, '.env')) || '', /CSC_KEY_PASSWORD="/);
+    assert.equal(jetpack.exists(join(root, '.env')), false);
+  } finally {
+    tty.close();
+    setBrowserOpener(null);
+    for (const key of APPLE_ENV_VARS) {
+      delete process.env[key];
+    }
+  }
 });
 
 // ─── Manual certificates ─────────────────────────────────────────────────────

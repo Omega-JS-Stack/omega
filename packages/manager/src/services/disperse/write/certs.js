@@ -1,9 +1,11 @@
 /**
  * Copy signing artifacts into desktop/mobile apps.
  *
- * Sources are the certificates service's outputs under
- * {brandRoot}/.omega/certificates/apple/; destinations are each app's certs
- * dir (desktop: config/certs/ per EM v1.4.1+, mobile: build/certs/). Copies
+ * Sources are the certificates service's outputs under the signing tree —
+ * {companyRoot||brandRoot}/.omega/certificates/apple/ (company-managed
+ * brands share the company workspace's material); destinations are each
+ * app's certs dir (desktop: config/certs/ per EM v1.4.1+, mobile:
+ * build/certs/). Copies
  * are byte-compared first so a converged run rewrites nothing. Every certs
  * dir gets a self-protecting .gitignore (`*`) so signing material can never
  * be committed, even in an app the framework's `mgr setup` hasn't touched.
@@ -100,7 +102,7 @@ function ensureCertsIgnore(destDir) {
 }
 
 module.exports = async (context) => {
-  const { brandRoot, brandConfig, targetApps, options = {} } = context;
+  const { brandRoot, companyRoot, brandConfig, targetApps, options = {} } = context;
 
   const certConfig = brandConfig.certificates;
   if (certConfig === false || certConfig?.enabled === false) {
@@ -114,7 +116,9 @@ module.exports = async (context) => {
     return { output: { certs: { reason: 'no desktop or mobile apps' } } };
   }
 
-  const appleDir = join(brandRoot, '.omega', 'certificates', 'apple');
+  // The certificates service's signing tree — company-shared when the brand
+  // is company-managed, brand-local otherwise (the same resolution rule)
+  const appleDir = join(companyRoot || brandRoot, '.omega', 'certificates', 'apple');
   if (!jetpack.exists(appleDir)) {
     console.log(`      ${chalk.dim('⊘ no signing artifacts yet (.omega/certificates/apple is empty — the certificates service produces them)')}`);
     return { output: { certs: { reason: 'no signing artifacts yet' } } };

@@ -50,10 +50,13 @@ async function runService(serviceName, brand, brandState, options = {}) {
     }
 
     // Pass service-specific state as initial serviceData; full brandState for
-    // cross-service access (e.g. analytics checking firebase.sdkConfig)
+    // cross-service access (e.g. analytics checking cloud.sdkConfig)
     return await serviceModule.run({
       brandId: brand.id,
       brandRoot: brand.root,
+      // Company workspace root when the brand carries a valid company marker
+      // — company-shared resources (Apple signing material) live there
+      companyRoot: brand.companyRoot || null,
       brandConfig: brand.config,
       brand,
       brandState,
@@ -107,6 +110,10 @@ async function runManage(startDir, options = {}) {
   ]);
 
   const brand = loadBrand(brandRoot, { companyConfig });
+
+  // Company-shared resources (Apple signing material) live at the company
+  // workspace root — services resolve it via context.companyRoot
+  brand.companyRoot = companyConfig ? marker.companyRoot : null;
 
   console.log('');
   console.log(chalk.bold.cyan('🚀 Omega Manager'));

@@ -92,10 +92,11 @@ function brandConfig({ targets = { desktop: {} }, certificates } = {}) {
   };
 }
 
-function runService({ root, apps }, { config = brandConfig(), brandState = {}, options = {} } = {}) {
+function runService({ root, apps }, { config = brandConfig(), brandState = {}, options = {}, companyRoot = null } = {}) {
   return service.run({
     brandId: BRAND_ID,
     brandRoot: root,
+    companyRoot,
     brandConfig: config,
     brand: { id: BRAND_ID, config, targets: Object.keys(config.targets || {}), apps },
     brandState,
@@ -120,6 +121,21 @@ test('disperse: skips without target-mapped apps', async () => {
 });
 
 // ─── certs ───────────────────────────────────────────────────────────────────
+
+test('certs: a company-managed brand disperses from the COMPANY signing tree', async () => {
+  setEnv({ APPLE_API_KEY_ID: KEY_ID });
+  const brand = stageBrand(); // no brand-local artifacts at all
+  const companyRoot = mkdtempSync(join(tmpdir(), 'omega-disperse-company-'));
+  for (const [rel, contents] of Object.entries(APPLE_FIXTURES)) {
+    jetpack.write(join(companyRoot, '.omega', 'certificates', 'apple', rel), contents);
+  }
+
+  const result = await runService(brand, { companyRoot });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.output.certs.copied, 4);
+  assert.equal(jetpack.read(certsPath(brand, 'developer-id-application.p12')), 'dev-id-application-p12-bytes');
+});
 
 test('certs: desktop app receives the full signing set + a self-protecting .gitignore', async () => {
   setEnv({ APPLE_API_KEY_ID: KEY_ID });
