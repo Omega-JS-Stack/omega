@@ -102,3 +102,17 @@ test('merges live sibling maps, skips own app dir and dead pids, empty without b
   const standalone = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-standalone-'));
   assert.deepEqual(readSiblingPorts(standalone), {});
 });
+
+test('devServerOptions: image fallback middleware + live-reload watch on the built asset trees', () => {
+  const { devServerOptions } = require('../src/commands/dev.js');
+  const options = devServerOptions('/tmp/site-out');
+
+  assert.equal(options.middleware.length, 1);
+  assert.equal(typeof options.middleware[0], 'function');
+  // The dev server chokidars the OUT-dir asset trees our watcher rebuilds
+  // into — css changes hot-swap, js changes reload; no hand refresh
+  assert.deepEqual(options.watch, [
+    path.join('/tmp/site-out', 'assets', 'css'),
+    path.join('/tmp/site-out', 'assets', 'js'),
+  ]);
+});

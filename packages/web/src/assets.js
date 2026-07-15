@@ -61,6 +61,10 @@ function pageKey(rel) {
  * @param {string} options.clientEntry - path to @omega.js/client's entry (aliased as `@omega.js/client`)
  * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
  *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
+ * @param {'css'|'js'} [options.only] - rebuild just one half (dev watcher
+ *   narrowing: a css-only rebuild writes no js files, so the dev server
+ *   hot-swaps stylesheets instead of full-reloading; dev's stable names make
+ *   the partial manifest harmless). Omit for the full build.
  * @returns {Promise<{ js: object, css: object }>}
  */
 async function buildAssets(options) {
@@ -69,93 +73,99 @@ async function buildAssets(options) {
   // be recognized by its parent dir, so callers name the theme roots.
   const themeRoots = options.themeRoots;
 
-  // ---- JS entries: layered union of page modules + the main bundle
-  const jsDirs = options.layers.map((layer) => path.join(layer, 'js')).filter((dir) => fs.existsSync(dir));
-  const entryPoints = {};
-  const keyBySpecifier = new Map();
+  if (options.only !== 'css') {
+    // ---- JS entries: layered union of page modules + the main bundle
+    const jsDirs = options.layers.map((layer) => path.join(layer, 'js')).filter((dir) => fs.existsSync(dir));
+    const entryPoints = {};
+    const keyBySpecifier = new Map();
 
-  for (const [rel, abs] of collectLayered(jsDirs, /^pages\/.*\.js$/)) {
-    if (!isPageEntry(rel)) continue;
-    const key = pageKey(rel);
-    entryPoints[`pages/${key}`] = `omega-boot:${abs}`;
-    keyBySpecifier.set(abs, ['pages', key]);
+    for (const [rel, abs] of collectLayered(jsDirs, /^pages\/.*\.js$/)) {
+      if (!isPageEntry(rel)) continue;
+      const key = pageKey(rel);
+      entryPoints[`pages/${key}`] = `omega-boot:${abs}`;
+      keyBySpecifier.set(abs, ['pages', key]);
+    }
+    const mainJs = collectLayered(jsDirs, /^main\.js$/).get('main.js');
+    if (mainJs) {
+      entryPoints.main = `omega-boot:${mainJs}`;
+      keyBySpecifier.set(mainJs, ['main']);
+    }
+
+    const bootRuntime = path.resolve(__dirname, '..', 'runtime', 'boot.js');
+
+    const bootPlugin = {
+      name: 'omega-boot',
+      setup(build) {
+        // Boot stubs: main → bootMain (initialize + global module), pages →
+        // bootPage (awaits the main boot). The runtime import is what pulls
+        // @omega.js/client into the shared chunk.
+        build.onResolve({ filter: /^omega-boot:/ }, (args) => ({
+          path: args.path.slice('omega-boot:'.length),
+          namespace: 'omega-boot',
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'omega-boot' }, (args) => {
+          const isMain = args.path === mainJs;
+          return {
+            resolveDir: path.dirname(args.path),
+            contents: [
+              `import { ${isMain ? 'bootMain' : 'bootPage'} } from ${JSON.stringify(bootRuntime)};`,
+              `import mod from ${JSON.stringify(args.path)};`,
+              `${isMain ? 'bootMain' : 'bootPage'}(mod);`,
+            ].join('\n'),
+          };
+        });
+
+        // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (classy fallback)
+        build.onResolve({ filter: /^__main_assets__\// }, (args) => {
+          const rest = args.path.slice('__main_assets__/'.length);
+          const target = rest.startsWith('themes/')
+            ? path.join(options.themesDir, rest.slice('themes/'.length))
+            : path.join(options.coreDir, rest);
+          return { path: target };
+        });
+        build.onResolve({ filter: /^__theme__\// }, (args) => {
+          const rest = args.path.slice('__theme__/'.length);
+          for (const root of themeRoots) {
+            if (fs.existsSync(path.join(root, rest))) return { path: path.join(root, rest) };
+          }
+          return { path: path.join(themeRoots[0] || options.themesDir, rest) };
+        });
+      },
+    };
+
+    const result = await esbuild.build({
+      entryPoints,
+      bundle: true,
+      minify: !options.dev,
+      // ESM + splitting is load-bearing: shared modules (@omega.js/client, the boot
+      // runtime) go into one chunk the browser evaluates once — the singleton
+      // survives across the main and page bundles.
+      format: 'esm',
+      splitting: true,
+      outdir: path.join(options.outDir, 'assets', 'js'),
+      entryNames: options.dev ? '[dir]/[name]' : '[dir]/[name]-[hash]',
+      chunkNames: 'chunks/[name]-[hash]',
+      metafile: true,
+      // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js)
+      alias: { '@omega.js/client': path.dirname(options.clientEntry) },
+      plugins: [bootPlugin],
+      logLevel: 'silent',
+      define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
+    });
+
+    for (const [outFile, meta] of Object.entries(result.metafile.outputs)) {
+      if (!meta.entryPoint) continue;
+      const abs = meta.entryPoint.replace(/^omega-boot:/, '');
+      const spec = keyBySpecifier.get(path.resolve(abs)) || keyBySpecifier.get(abs);
+      if (!spec) continue;
+      const url = `/${path.relative(options.outDir, outFile)}`;
+      if (spec[0] === 'main') manifest.js.main = url;
+      else manifest.js.pages[spec[1]] = url;
+    }
   }
-  const mainJs = collectLayered(jsDirs, /^main\.js$/).get('main.js');
-  if (mainJs) {
-    entryPoints.main = `omega-boot:${mainJs}`;
-    keyBySpecifier.set(mainJs, ['main']);
-  }
 
-  const bootRuntime = path.resolve(__dirname, '..', 'runtime', 'boot.js');
-
-  const bootPlugin = {
-    name: 'omega-boot',
-    setup(build) {
-      // Boot stubs: main → bootMain (initialize + global module), pages →
-      // bootPage (awaits the main boot). The runtime import is what pulls
-      // @omega.js/client into the shared chunk.
-      build.onResolve({ filter: /^omega-boot:/ }, (args) => ({
-        path: args.path.slice('omega-boot:'.length),
-        namespace: 'omega-boot',
-      }));
-      build.onLoad({ filter: /.*/, namespace: 'omega-boot' }, (args) => {
-        const isMain = args.path === mainJs;
-        return {
-          resolveDir: path.dirname(args.path),
-          contents: [
-            `import { ${isMain ? 'bootMain' : 'bootPage'} } from ${JSON.stringify(bootRuntime)};`,
-            `import mod from ${JSON.stringify(args.path)};`,
-            `${isMain ? 'bootMain' : 'bootPage'}(mod);`,
-          ].join('\n'),
-        };
-      });
-
-      // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (classy fallback)
-      build.onResolve({ filter: /^__main_assets__\// }, (args) => {
-        const rest = args.path.slice('__main_assets__/'.length);
-        const target = rest.startsWith('themes/')
-          ? path.join(options.themesDir, rest.slice('themes/'.length))
-          : path.join(options.coreDir, rest);
-        return { path: target };
-      });
-      build.onResolve({ filter: /^__theme__\// }, (args) => {
-        const rest = args.path.slice('__theme__/'.length);
-        for (const root of themeRoots) {
-          if (fs.existsSync(path.join(root, rest))) return { path: path.join(root, rest) };
-        }
-        return { path: path.join(themeRoots[0] || options.themesDir, rest) };
-      });
-    },
-  };
-
-  const result = await esbuild.build({
-    entryPoints,
-    bundle: true,
-    minify: !options.dev,
-    // ESM + splitting is load-bearing: shared modules (@omega.js/client, the boot
-    // runtime) go into one chunk the browser evaluates once — the singleton
-    // survives across the main and page bundles.
-    format: 'esm',
-    splitting: true,
-    outdir: path.join(options.outDir, 'assets', 'js'),
-    entryNames: options.dev ? '[dir]/[name]' : '[dir]/[name]-[hash]',
-    chunkNames: 'chunks/[name]-[hash]',
-    metafile: true,
-    // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js)
-    alias: { '@omega.js/client': path.dirname(options.clientEntry) },
-    plugins: [bootPlugin],
-    logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
-  });
-
-  for (const [outFile, meta] of Object.entries(result.metafile.outputs)) {
-    if (!meta.entryPoint) continue;
-    const abs = meta.entryPoint.replace(/^omega-boot:/, '');
-    const spec = keyBySpecifier.get(path.resolve(abs)) || keyBySpecifier.get(abs);
-    if (!spec) continue;
-    const url = `/${path.relative(options.outDir, outFile)}`;
-    if (spec[0] === 'main') manifest.js.main = url;
-    else manifest.js.pages[spec[1]] = url;
+  if (options.only === 'js') {
+    return manifest;
   }
 
   // ---- CSS: the main bundle + page styles. `omega:` imports resolve through

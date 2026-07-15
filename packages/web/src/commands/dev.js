@@ -4,7 +4,9 @@
  *   2. programmatic Eleventy watch + serve over src/
  *   3. asset-source watchers (consumer src/assets + packaged theme/core
  *      layers) rebuild bundles IN PLACE — URLs are stable in dev, so the
- *      rendered HTML stays valid without a re-render; refresh to pick up.
+ *      rendered HTML stays valid without a re-render; the dev server
+ *      watches the built asset trees and live-reloads the browser (css
+ *      hot-swaps, js reloads — no hand refresh).
  *
  * Port (N7): the website convention is 4000, resolved through the allocator —
  * taken ports bump +1. `omega dev --port=4001` (or a config `ports.website`
@@ -62,7 +64,7 @@ module.exports = async function (options) {
   // ---- Fresh output + dev assets
   fs.rmSync(paths.out, { recursive: true, force: true });
 
-  const build = () => buildAssets({
+  const build = (only) => buildAssets({
     layers,
     themeRoots: themeLayerDirs,
     themesDir: PATHS.themes,
@@ -70,6 +72,7 @@ module.exports = async function (options) {
     outDir: paths.out,
     clientEntry,
     dev: true,
+    only,
   });
 
   const manifest = await build();
@@ -94,13 +97,27 @@ module.exports = async function (options) {
     path.join(PATHS.core, 'css'),
   ].filter((dir) => fs.existsSync(dir));
 
+  // Narrowed rebuilds: a css-only change set rebuilds just the stylesheets —
+  // no js files are rewritten, so the dev server HOT-SWAPS the css without a
+  // page reload. js changes rebuild js (full reload — scripts need one), and
+  // an unknown/mixed set rebuilds everything.
   let timer = null;
+  let pendingKinds = new Set();
+  const kindOf = (file) => {
+    if (/\.(scss|css)$/.test(file || '')) return 'css';
+    if (/\.(js|mjs)$/.test(file || '')) return 'js';
+    return 'other';
+  };
   for (const dir of watchDirs) {
-    fs.watch(dir, { recursive: true }, () => {
+    fs.watch(dir, { recursive: true }, (event, file) => {
+      pendingKinds.add(kindOf(file));
       clearTimeout(timer);
       timer = setTimeout(() => {
-        build()
-          .then(() => logger.log('Assets rebuilt — refresh the browser'))
+        const kinds = pendingKinds;
+        pendingKinds = new Set();
+        const only = kinds.size === 1 && !kinds.has('other') ? kinds.values().next().value : undefined;
+        build(only)
+          .then(() => logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`))
           .catch((error) => logger.error('Asset rebuild failed:', error));
       }, WATCH_DEBOUNCE_MS);
     });
@@ -112,10 +129,7 @@ module.exports = async function (options) {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
-      // Dev never runs the responsive image matrix — this middleware
-      // rewrites missing -NNNpx/.webp variant URLs to the verbatim original,
-      // so build-time `@srcset` markup resolves in dev too
-      eleventyConfig.setServerOptions({ middleware: [devImageFallback(paths.out)] });
+      eleventyConfig.setServerOptions(devServerOptions(paths.out));
       return configureOmega(eleventyConfig, {
         consumerDir: paths.src,
         siteData,
@@ -142,6 +156,27 @@ module.exports = async function (options) {
   }
   logger.log(`Dev server: http://localhost:${port}`);
 };
+
+/**
+ * Dev-server options: the image-variant fallback middleware (dev never runs
+ * the responsive matrix — missing -NNNpx/.webp URLs rewrite to the verbatim
+ * original) + live-reload on ASSET rebuilds. Eleventy's dev server only
+ * reloads on its own template re-renders; our asset watcher writes bundles
+ * straight into the out dir, so the server chokidars those trees too — css
+ * changes hot-swap without a full reload, js changes reload the page. Kills
+ * the "refresh the browser" hand step.
+ * @param {string} outDir
+ * @returns {object} setServerOptions() payload
+ */
+function devServerOptions(outDir) {
+  return {
+    middleware: [devImageFallback(outDir)],
+    watch: [
+      path.join(outDir, 'assets', 'css'),
+      path.join(outDir, 'assets', 'js'),
+    ],
+  };
+}
 
 /**
  * Resolve the website port through the allocator (N7). An explicit `--port`
@@ -223,6 +258,7 @@ function readSiblingPorts(root) {
 // Exposed for tests (the command function stays the main export)
 module.exports.resolveWebsitePort = resolveWebsitePort;
 module.exports.readSiblingPorts = readSiblingPorts;
+module.exports.devServerOptions = devServerOptions;
 
 async function linkBrandToMonorepo() {
   const local = require('@omega.js/devkit/local');

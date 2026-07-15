@@ -155,3 +155,29 @@ test('PurgeCSS strips selectors unused by the rendered HTML', async () => {
   assert.ok(!purged.includes('.carousel-inner'), 'unused selector stripped');
   assert.ok(sizes.after < sizes.before, `size shrank (${sizes.before} → ${sizes.after})`);
 });
+
+test('only-half rebuilds (dev watcher narrowing): css writes no js, js writes no css', async () => {
+  const outDir = path.join(PKG, '.omega', 'assets-only-out');
+  fs.rmSync(outDir, { recursive: true, force: true });
+  const themeRoots = [path.join(PKG, 'themes', 'classy')];
+  const base = {
+    layers: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots, path.join(PKG, 'core')],
+    themeRoots,
+    themesDir: path.join(PKG, 'themes'),
+    coreDir: path.join(PKG, 'core'),
+    outDir,
+    clientEntry: path.join(ROOT, 'packages', 'client', 'src', 'index.js'),
+    dev: true,
+  };
+
+  const cssOnly = await buildAssets({ ...base, only: 'css' });
+  assert.ok(cssOnly.css.main, 'css half built');
+  assert.ok(!cssOnly.js.main, 'no js in the manifest');
+  assert.ok(!fs.existsSync(path.join(outDir, 'assets', 'js')), 'no js files written — the dev server can hot-swap');
+
+  fs.rmSync(outDir, { recursive: true, force: true });
+  const jsOnly = await buildAssets({ ...base, only: 'js' });
+  assert.ok(jsOnly.js.main, 'js half built');
+  assert.ok(!jsOnly.css.main, 'no css in the manifest');
+  assert.ok(!fs.existsSync(path.join(outDir, 'assets', 'css')), 'no css files written');
+});
