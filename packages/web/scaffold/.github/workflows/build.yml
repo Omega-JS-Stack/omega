@@ -64,6 +64,18 @@ jobs:
           echo "NPM: $(npm -v)"
           echo "Omega: $(npx omega version)"
 
+      # Optimized-image cache (the cache-uj-imagemin branch successor):
+      # content-addressed, reproducible binaries — never committed. An exact
+      # key hit skips all image processing; a prefix hit re-processes only
+      # changed images.
+      - name: Restore optimized-image cache
+        uses: actions/cache@v4
+        with:
+          path: .omega/cache/imagemin
+          key: omega-imagemin-${{ hashFiles('src/assets/images/**') }}
+          restore-keys: |
+            omega-imagemin-
+
       - name: Build
         run: |
           npx omega setup && npm run build

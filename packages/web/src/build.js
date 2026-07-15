@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
 const { copyStaticAssets } = require('./static-assets.js');
+const { processImages } = require('./imagemin.js');
 const { configureOmega } = require('./engine.js');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { resolveThemeLayers } = require('./layers.js');
@@ -27,6 +28,7 @@ const { PATHS } = require('./paths.js');
  * @param {string} [options.defaultsDir] - default: packaged default pages
  * @param {string} [options.activeTheme] - default: siteData.theme.id
  * @param {Array<{src: string, dest: string}>} [options.staticDirs] - verbatim image copies (resolveStaticDirs), later entries win
+ * @param {{ cacheDir: string, log?: function }} [options.imagemin] - responsive image matrix over the copied images (omit to skip — dev and `web.imagemin.enabled: false`)
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {boolean} [options.skipPurge] - skip the PurgeCSS pass
@@ -84,6 +86,16 @@ async function buildSite(options) {
     await phase('static', () => copyStaticAssets({ staticDirs: options.staticDirs, outDir: options.outDir }));
   }
 
+  // ---- responsive image matrix over the shipped images (build-time only)
+  let imagemin = null;
+  if (options.imagemin) {
+    imagemin = await phase('imagemin', () => processImages({
+      imagesDir: path.join(options.outDir, 'assets', 'images'),
+      cacheDir: options.imagemin.cacheDir,
+      log: options.imagemin.log,
+    }));
+  }
+
   // ---- Eleventy
   await phase('eleventy', async () => {
     const Eleventy = require('@11ty/eleventy').default;
@@ -113,7 +125,7 @@ async function buildSite(options) {
   }
 
   timings.total = Number(process.hrtime.bigint() - started) / 1e9;
-  return { timings, htmlCount: countHtml(options.outDir), manifest };
+  return { timings, htmlCount: countHtml(options.outDir), manifest, imagemin };
 }
 
 /**

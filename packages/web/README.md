@@ -64,7 +64,8 @@ see the harness README for the honest before/after numbers.
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
-| [build.js](src/build.js) | `buildSite()` — assets → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
+| [build.js](src/build.js) | `buildSite()` — assets → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
+| [imagemin.js](src/imagemin.js) | Responsive image matrix (the UJM imagemin successor): 320/640/1024 + original × source-format + webp @ q80 over `dist/assets/images` (favicon dir exempt), content-addressed cache at the brand `.omega`, `devImageFallback()` dev-server middleware |
 | [paths.js](src/paths.js) | Packaged content locations (themes/core/defaults/scaffold/runtime) + `resolveClientEntry()` |
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
@@ -242,6 +243,26 @@ Consumer page frontmatter still overrides presentation per-page (hero copy,
 fictional defaults (the dispersal-era `### ALL PAGES ###` marker convention
 is dead — pinned by a contract test).
 
+## Responsive images (the imagemin successor)
+
+`omega build` re-encodes every jpg/jpeg/png under `dist/assets/images` into
+the legacy UJM matrix — widths 320/640/1024 + the original size, each in the
+source format AND webp, quality 80, metadata stripped, upscaling allowed so
+every variant name always exists (`hero.jpg` → `hero-320px.jpg`,
+`hero-320px.webp`, … `hero.webp` — `@srcset` markup never 404s). The original
+NAME survives (re-encoded, so URL contracts hold), svg/gif/webp pass through
+verbatim, the minted `favicon/` dir is exempt (exact-name mint contract), and
+an undecodable file warns and ships verbatim — never a failed build.
+`targets.web.imagemin.enabled: false` opts a brand out.
+
+Outputs are reproducible binaries and NEVER commit: the content-addressed
+cache lives at the brand's `.omega/cache/imagemin` (source or settings
+changes re-process exactly what changed; stale entries prune every run), and
+CI restores it via `actions/cache` in the scaffolded build workflow — the
+`cache-uj-imagemin` branch successor. Dev never processes: `omega dev`
+middleware rewrites missing `-NNNpx`/`.webp` variant URLs to the verbatim
+original, so build-time markup resolves in dev too.
+
 ## Engine facts worth knowing (test-pinned)
 
 1. LiquidJS has NO `forloop.parentloop` (renders empty) — hoist outer-loop
@@ -293,8 +314,8 @@ latent copies) AND forward in consumer files by the codemod.
 migration gate; the real somiibo URL-set diff, 2,556 vs Jekyll's 2,608 files,
 is its first job) · audit subsystem port (command exists as an explicit
 not-ported-yet stub — translate shipped in cp96) · UJM-setup extras (CNAME, firebase auth
-handler fetch, GitHub secret publishing, post dedupe) · imagemin w/
-content-hash cache, minifyHtml-as-transform, sitemap/feeds, named css
+handler fetch, GitHub secret publishing, post dedupe) ·
+minifyHtml-as-transform, sitemap/feeds, named css
 bundles, full icon set (B-phase pipeline) · engine consumption of
 `targets.web.collections`/`defaults`/`generators` (migrate carries the config;
 custom collections land with the sweet-saucy wave) · dev-loop re-render

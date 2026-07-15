@@ -23,6 +23,7 @@ module.exports = async function (options) {
   options = options || {};
   const paths = consumerPaths();
   const siteData = loadSiteData(paths.root);
+  const brandRoot = findBrandRoot(paths.root);
 
   // C2: payment.products is the only pricing source — surface the honest
   // empty state loudly so a bare catalog is a choice, not a surprise
@@ -39,11 +40,25 @@ module.exports = async function (options) {
     environment: 'production',
     manifestPath: paths.manifest,
     staticDirs: resolveStaticDirs({
-      brandRoot: findBrandRoot(paths.root),
+      brandRoot,
       imagesDir: path.join(paths.assets, 'images'),
     }),
+    // Responsive image matrix (the UJM imagemin successor) — on unless the
+    // brand opts out via `web.imagemin.enabled: false`. The cache is
+    // machine-owned at the brand's .omega (never committed); CI restores it
+    // via actions/cache in the scaffolded build workflow.
+    imagemin: siteData.imagemin && siteData.imagemin.enabled === false ? null : {
+      cacheDir: path.join(brandRoot || paths.root, '.omega', 'cache', 'imagemin'),
+      log: (message) => logger.log(message),
+    },
     onPhase: (name, seconds) => logger.log(`${name}: ${seconds.toFixed(2)}s`),
   });
+
+  if (result.imagemin) {
+    result.imagemin.warnings.forEach((warning) => logger.warn(`imagemin: ${warning} — shipped verbatim`));
+  } else if (siteData.imagemin && siteData.imagemin.enabled === false) {
+    logger.log('imagemin: disabled via web.imagemin.enabled — images ship verbatim');
+  }
 
   logger.log(`Built ${result.htmlCount} pages in ${result.timings.total.toFixed(2)}s → ${path.relative(paths.root, paths.out)}/`);
 

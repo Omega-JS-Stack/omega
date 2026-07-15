@@ -323,9 +323,16 @@ const SHARED_SCHEMA = [
 // Per-target refinements — validated against the RESOLVED config (the target
 // section's keys land at the top level).
 const TARGET_SCHEMAS = {
-  // Filled in Phase 2 with @omega.js/web's design: distribute, purgecss
-  // safelist, imagemin, workflows.
-  web: [],
+  // Grows with @omega.js/web's design: distribute, purgecss safelist,
+  // workflows land as their features do.
+  web: [
+    {
+      path:        'imagemin',
+      type:        'object',
+      required:    false,
+      description: 'Responsive image matrix (build-time 320/640/1024 + webp, quality 80). `enabled: false` ships images verbatim.',
+    },
+  ],
 
   // Seeded from the sandbox brand's real @omega.js/backend config (backend-manager-config.json).
   backend: [

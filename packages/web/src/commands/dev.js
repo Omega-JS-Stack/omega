@@ -28,6 +28,7 @@ const {
 } = require('@omega.js/config');
 const { buildAssets } = require('../assets.js');
 const { resolveStaticDirs, copyStaticAssets } = require('../static-assets.js');
+const { devImageFallback } = require('../imagemin.js');
 const { configureOmega } = require('../engine.js');
 const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
@@ -110,15 +111,20 @@ module.exports = async function (options) {
   const elev = new Eleventy(paths.src, paths.out, {
     quietMode: true,
     configPath: false,
-    config: (eleventyConfig) =>
-      configureOmega(eleventyConfig, {
+    config: (eleventyConfig) => {
+      // Dev never runs the responsive image matrix — this middleware
+      // rewrites missing -NNNpx/.webp variant URLs to the verbatim original,
+      // so build-time `@srcset` markup resolves in dev too
+      eleventyConfig.setServerOptions({ middleware: [devImageFallback(paths.out)] });
+      return configureOmega(eleventyConfig, {
         consumerDir: paths.src,
         siteData,
         activeTheme,
         assetManifest: manifest,
         environment: 'development',
         dev: { ports: devPorts },
-      }),
+      });
+    },
   });
 
   await elev.init();
