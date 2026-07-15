@@ -78,8 +78,15 @@ async function purgeZoneCache(options) {
   });
 
   if (!result || result.success !== true) {
-    const detail = result && result.errors ? JSON.stringify(result.errors) : 'unknown error';
-    throw new Error(`Cloudflare purge failed: ${detail}`);
+    const errors = (result && result.errors) || [];
+    const detail = errors.length ? JSON.stringify(errors) : 'unknown error';
+    // Code 10000 on purge_cache with a token that could READ the zone =
+    // missing permission (DNS-scoped tokens hit this — the exact live
+    // rehearsal failure): purging needs Zone → Cache Purge → Purge.
+    const hint = errors.some((error) => error.code === 10000)
+      ? ' — the token lacks the Cache Purge permission: edit it at https://dash.cloudflare.com/profile/api-tokens and add Zone → Cache Purge → Purge'
+      : '';
+    throw new Error(`Cloudflare purge failed: ${detail}${hint}`);
   }
 
   return { status: 'purged', zone, zoneName };

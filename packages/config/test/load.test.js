@@ -483,3 +483,20 @@ test('composeTargetConfig: secrets in either layer hard-fail before any merge', 
   );
   assert.throws(() => composeTargetConfig(brandRoot, 'nope'), /Unknown target/);
 });
+
+test('hasOmegaConfig is brand-aware: an app with NO app-layer file counts when the brand has one', (t) => {
+  const brandRoot = makeFixture('probe-brand-aware', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, targets: { desktop: {} } }`,
+    // the app dir exists but carries NO config/omega.json5 (cp121c: optional)
+    'apps/desktop/package.json': `{ "name": "acme-desktop" }`,
+  });
+  cleanup(t, brandRoot);
+
+  const appDir = path.join(brandRoot, 'apps', 'desktop');
+  assert.strictEqual(hasOmegaConfig(appDir), true, 'the brand file IS the app config');
+  // and loadConfig agrees — the gate and the loader can never disagree again
+  assert.strictEqual(loadConfig(appDir, 'desktop').config.brand.id, 'acme');
+
+  // a dir with no brand above it stays false (fail-soft in non-consumer dirs)
+  assert.strictEqual(hasOmegaConfig(path.join(brandRoot, 'apps')), false);
+});

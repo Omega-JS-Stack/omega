@@ -45,6 +45,18 @@ module.exports = function buildConfig(done) {
     // Build the full config object from @omega.js/desktop defaults + consumer overrides.
     let builderConfig = baseConfig(config, { entitlementsPath, icons, distRoot, projectRoot });
 
+    // Pin the exact electron version for electron-builder. It refuses semver
+    // ranges and resolves node_modules only from the project dir — in a brand
+    // monorepo electron hoists to the workspace root, so the lookup fails
+    // (the cp142 rehearsal catch). The framework resolves the INSTALLED
+    // electron from its own module context instead.
+    try {
+      builderConfig.electronVersion = Manager.require('electron/package.json').version;
+      logger.log(`electronVersion → ${builderConfig.electronVersion} (resolved from the installed electron)`);
+    } catch (error) {
+      logger.log('electronVersion not injected (electron unresolved) — electron-builder falls back to its own detection');
+    }
+
     // Mode-dependent injections. LSUIElement=true in Info.plist → on macOS the
     // app launches with no dock icon, no Cmd+Tab presence, completely invisible.
     // Tray/notifications/networking still work; every window-surface path calls
@@ -60,10 +72,14 @@ module.exports = function buildConfig(done) {
       logger.log(`${startupMode === 'hidden' ? 'startup.mode' : 'startup.openAtLogin.mode'}=hidden → injected mac.extendInfo.LSUIElement=true`);
     }
 
-    // Inject `publish` from `releases` config.
+    // Inject `publish` from `releases` config. Owner: explicit releases.owner
+    // → the brand's github.org (config-first — a brand-monorepo app has no
+    // git remote of its own, the cp142 rehearsal catch) → git discovery.
+    // Without a publish block electron-builder's update-info step crashes on
+    // a null publish config, so resolving from config isn't cosmetic.
     if (config.releases?.enabled !== false) {
       const releases = config.releases || {};
-      let releaseOwner = releases.owner;
+      let releaseOwner = releases.owner || config.github?.org;
       if (!releaseOwner) {
         try {
           const { discoverRepo } = require('../../utils/github.js');

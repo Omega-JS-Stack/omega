@@ -259,8 +259,12 @@ function renderAppPackageJson(answers, target, dir) {
   // and the npm registry once @omega.js/* publish.
   const depKey = RUNTIME_DEP_TARGETS.includes(target) ? 'dependencies' : 'devDependencies';
 
+  // version + author: electron-builder hard-requires version and warns on
+  // author (the cp142 rehearsal catch) — every app gets both, they're healthy
   return `${JSON.stringify({
     name: `${answers.id}-${dir}`,
+    version: '0.0.1',
+    author: answers.name,
     private: true,
     description: `${answers.name} ${target} app`,
     ...(framework ? { [depKey]: { [framework]: '*' } } : {}),

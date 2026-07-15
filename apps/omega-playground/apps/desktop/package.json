@@ -1,5 +1,7 @@
 {
   "name": "omega-desktop",
+  "version": "0.0.1",
+  "author": "OMEGA Playground",
   "private": true,
   "description": "OMEGA desktop app",
   "devDependencies": {
@@ -18,7 +20,7 @@
     "publish": "npx cross-env OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true npm run gulp -- publish",
     "release": "npx omega release",
     "release:local": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true npm run gulp -- publish",
-    "postinstall": "node node_modules/@omega.js/desktop/scripts/sync-nvmrc.js",
+    "postinstall": "node -e \"try { require('@omega.js/desktop/scripts/sync-nvmrc') } catch (e) {}\"",
     "test": "npx omega test",
     "electron": "electron ."
   },

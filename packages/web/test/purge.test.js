@@ -93,3 +93,11 @@ test('purge: a Cloudflare error surfaces with the API detail', async () => {
     /Invalid access token/
   );
 });
+
+test('purge: the DNS-scoped-token failure (code 10000) names the missing Cache Purge permission', async () => {
+  const { fetcher } = recorder([{ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }]);
+  await assert.rejects(
+    purgeZoneCache({ config: { cloudflare: { zone: 'z' } }, token: 'dns-only', fetcher }),
+    /Cache Purge permission.*dash\.cloudflare\.com/
+  );
+});

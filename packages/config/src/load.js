@@ -59,12 +59,17 @@ function resolveConfigPath(projectDir) {
 /**
  * Cheap probe: does this project have an omega.json5 at all? Frameworks use it
  * to fail soft in non-consumer dirs (seeded-empty config); tooling uses it as
- * the "is this project migrated yet?" signal.
+ * the "is this project migrated yet?" signal. Brand-aware like loadConfig:
+ * an app inside a brand monorepo has a config even when its OPTIONAL
+ * app-layer file is absent (the brand file is the config) — an app-dir-only
+ * probe made every framework gate fail soft with an EMPTY config there
+ * (desktop audit hard-failed loud; the extension build silently baked a
+ * bundle with no brand config — the cp142 rehearsal catch).
  * @param {string} projectDir
  * @returns {boolean}
  */
 function hasOmegaConfig(projectDir) {
-  return resolveConfigPath(projectDir) !== null;
+  return resolveConfigPath(projectDir) !== null || findBrandConfigPath(projectDir) !== null;
 }
 
 function readConfigFile(absolutePath) {
