@@ -164,18 +164,19 @@
   }
 
   .classy-price-card__name {
-    font-size: 1.03125rem;
+    font-size: 1.1875rem;
     font-weight: 650;
     letter-spacing: -0.01em;
     color: var(--omega-ink);
+    margin-bottom: 0.25rem;
   }
 
   // Fixed two-line slot — keeps every card's price on the same baseline
   .classy-price-card__tagline {
     min-height: 2.6em;
-    margin-bottom: 1rem;
-    font-size: 0.8125rem;
-    line-height: 1.3;
+    margin-bottom: 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
     color: var(--omega-ink-muted);
   }
 
@@ -221,14 +222,15 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 0.875rem;
+    font-size: 0.90625rem;
+    line-height: 1.5;
     color: var(--omega-ink-muted);
 
     li {
       display: flex;
       align-items: flex-start;
-      gap: 0.625rem;
-      padding-block: 0.4375rem;
+      gap: 0.6875rem;
+      padding-block: 0.5rem;
 
       .classy-price-card__check {
         color: var(--omega-accent);

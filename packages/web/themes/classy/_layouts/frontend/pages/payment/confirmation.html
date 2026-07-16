@@ -1,92 +1,83 @@
 ---
 layout: frontend/core/cover
+
+# ═══ Payment confirmation — reimagined 2026-07-16: the receipt moment.
+# Serif headline + ok-chip, the order as a RECEIPT panel (mono order id,
+# hairline rows), next steps as the numbered ritual, quiet support foot.
+# All web-manager bindings preserved (confirmation.order.*, subscription.*);
+# the celebration confetti rides the page JS as before.
 ---
 
 <!-- Confirmation Section -->
 <section class="col-12 col-md-10 col-lg-8 col-xl-6 mw-md">
-  <div class="card">
-    <div class="card-body p-3 p-md-5">
-      <!-- Success Icon -->
+  <div class="card classy-receipt">
+    <div class="card-body p-4 p-md-5">
+      <!-- The moment -->
       <div class="text-center mb-5">
-        <div class="bg-success avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
-          {% uj_icon "check", "fs-2 text-light" %}
-        </div>
-        <h1 class="classy-display classy-display--section mb-3">You're <em>in</em> — thank you!</h1>
-        <p class="text-muted">Your order has been successfully processed.</p>
+        <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg classy-receipt__check mb-3">
+          {% uj_icon "check", "fa-md" %}
+        </span>
+        <h1 class="classy-display classy-display--section mb-2">You're <em>in</em> — thank you!</h1>
+        <p class="classy-quiet mb-0">Payment received. A receipt is on its way to your inbox.</p>
       </div>
 
-      <!-- Order summary -->
-      <div class="mb-5">
-        <h4 class="fw-bold mb-3">Order summary</h4>
-
-        <div class="d-flex justify-content-between mb-3 wm-binding-skeleton" data-wm-bind="@show confirmation">
-          <span class="text-muted">Order Number:</span>
-          <span class="fw-semibold" data-wm-bind="@text confirmation.order.id">Loading...</span>
+      <!-- The receipt -->
+      <div class="classy-receipt__panel mb-5">
+        <div class="classy-receipt__row wm-binding-skeleton" data-wm-bind="@show confirmation">
+          <span class="classy-micro">Order</span>
+          <span class="font-monospace fw-semibold" data-wm-bind="@text confirmation.order.id">Loading...</span>
         </div>
 
-        <hr>
+        <div class="classy-receipt__row wm-binding-skeleton" data-wm-bind="@show confirmation">
+          <span class="classy-micro">Plan</span>
+          <span class="fw-semibold" data-wm-bind="@text confirmation.order.productName">Loading...</span>
+        </div>
 
-        <div class="mb-0 wm-binding-skeleton" data-wm-bind="@show confirmation">
-          <h6 class="fw-semibold mb-2" data-wm-bind="@text confirmation.order.productName">Loading...</h6>
-          <div class="d-flex justify-content-between">
-            <span class="text-muted">Total Paid:</span>
-            <span class="fw-bold fs-5" data-wm-bind="@text confirmation.order.total">$--</span>
-          </div>
+        <div class="classy-receipt__row classy-receipt__row--total wm-binding-skeleton" data-wm-bind="@show confirmation">
+          <span class="classy-micro">Total paid</span>
+          <span class="classy-receipt__total" data-wm-bind="@text confirmation.order.total">$--</span>
         </div>
 
         <div data-wm-bind="@show confirmation.subscription.show" hidden>
-          <hr>
-          <div class="alert alert-info mb-0">
-            <p class="mb-0 small" data-wm-bind="@text confirmation.subscription.infoText"></p>
-          </div>
+          <div class="classy-receipt__note small" data-wm-bind="@text confirmation.subscription.infoText"></div>
         </div>
       </div>
 
-      <!-- Next Steps -->
-      <div class="mb-4">
-        <h5 class="mb-3">What's Next?</h5>
-        <div class="mb-0">
-          <div class="d-flex mb-2">
-            <div class="text-success me-3">{% uj_icon "check-circle" %}</div>
-            <div>Check your email for the order confirmation and receipt</div>
+      <!-- What happens now -->
+      <div class="mb-5">
+        <span class="classy-micro d-block mb-3">What happens now</span>
+        <div class="classy-rowlist">
+          <div class="classy-rowlist__item">
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "envelope", "fa-sm" %}</span>
+              <span><strong>Your receipt lands by email</strong> — order confirmation included.</span>
+            </span>
           </div>
-          <div class="d-flex mb-2">
-            <div class="text-success me-3">{% uj_icon "check-circle" %}</div>
-            <div>Access your purchase from your <a href="/account">account dashboard</a></div>
+          <div class="classy-rowlist__item">
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "unlock", "fa-sm" %}</span>
+              <span><strong>Everything's unlocked</strong> — your plan is live in <a href="/account">your account</a>.</span>
+            </span>
           </div>
-          <div class="d-flex mb-2">
-            <div class="text-success me-3">{% uj_icon "check-circle" %}</div>
-            <div>If you have any questions, <a href="/contact">contact our support team</a></div>
+          <div class="classy-rowlist__item">
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "headset", "fa-sm" %}</span>
+              <span><strong>Questions?</strong> <a href="/contact">Support</a> answers fast — bring your order number.</span>
+            </span>
           </div>
         </div>
       </div>
 
       <!-- Action Buttons -->
       <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-        <a href="/account" class="btn btn-adaptive btn-lg w-100 w-sm-auto">
-          {% uj_icon "user", "me-2" %}
-          Go to dashboard
+        <a href="/account" class="btn btn-adaptive btn-lg w-100 w-sm-auto omega-hover-nudge">
+          Go to your account
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
         <a href="/" class="btn btn-outline-adaptive btn-lg w-100 w-sm-auto">
-          {% uj_icon "home", "me-2" %}
+          {% uj_icon "house", "fa-sm me-2" %}
           Back to home
         </a>
-      </div>
-
-      <!-- Support Section -->
-      <div class="text-center mt-5 pt-4 border-top">
-        <h5 class="mb-3">Need help?</h5>
-        <p class="text-muted mb-2">Our support team is here to assist you</p>
-        <div class="d-flex flex-column flex-sm-row justify-content-center gap-3">
-          <a href="/contact" class="text-decoration-none link-primary">
-            {% uj_icon "envelope", "me-2" %}
-            <span>Email us</span>
-          </a>
-          <a href="/contact" class="text-decoration-none link-primary">
-            {% uj_icon "comments", "me-2" %}
-            <span>Live chat</span>
-          </a>
-        </div>
       </div>
     </div>
   </div>

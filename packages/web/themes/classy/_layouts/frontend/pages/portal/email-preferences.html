@@ -37,36 +37,36 @@ prerender_icons:
       <!-- Form (hidden until params are validated by JS) -->
       <div id="email-preferences-content" hidden>
         <!-- Email display -->
-        <div class="bg-body-tertiary rounded-3 p-3 mb-4 text-center">
-          <small class="text-muted d-block mb-1">Managing preferences for</small>
+        <div class="hairline rounded-3 p-3 mb-4 text-center">
+          <span class="classy-micro d-block mb-1">Managing preferences for</span>
           <strong id="email-preferences-address" class="text-break"></strong>
         </div>
 
         <!-- Email preferences Form -->
         <form id="email-preferences-form" autocomplete="off" data-form-state="initializing" onsubmit="return false">
-          <!-- Action selector -->
+          <!-- Action selector — segmented (gliding thumb rides .active) -->
           <div class="mb-4">
-            <div class="d-flex gap-2">
-              <button type="button" class="btn btn-outline-adaptive flex-fill active" data-action="unsubscribe">
-                {% uj_icon "bell-slash", "me-1" %}
+            <div class="d-flex" role="group" aria-label="Email preference action" data-omega-segmented>
+              <button type="button" class="btn flex-fill active" data-action="unsubscribe">
+                {% uj_icon "bell-slash", "fa-sm me-1" %}
                 Unsubscribe
               </button>
-              <button type="button" class="btn btn-outline-adaptive flex-fill" data-action="resubscribe">
-                {% uj_icon "bell", "me-1" %}
+              <button type="button" class="btn flex-fill" data-action="resubscribe">
+                {% uj_icon "bell", "fa-sm me-1" %}
                 Resubscribe
               </button>
             </div>
           </div>
 
-          <!-- Info message (changes based on action) -->
-          <div class="alert alert-warning small mb-4" id="email-preferences-info-unsubscribe">
-            {% uj_icon "circle-info", "me-1" %}
-            You will stop receiving emails of this type. Other important account emails may still be sent.
-          </div>
-          <div class="alert alert-success small mb-4" id="email-preferences-info-resubscribe" hidden>
-            {% uj_icon "circle-info", "me-1" %}
-            You will start receiving these emails again.
-          </div>
+          <!-- Info note (changes based on action) -->
+          <p class="classy-quiet small mb-4 d-flex align-items-start gap-2" id="email-preferences-info-unsubscribe">
+            <span class="classy-dot mt-1 flex-shrink-0"></span>
+            <span>You'll stop receiving emails of this type. Important account emails (receipts, security) still arrive.</span>
+          </p>
+          <p class="classy-quiet small mb-4 d-flex align-items-start gap-2" id="email-preferences-info-resubscribe" hidden>
+            <span class="classy-dot classy-dot--ok mt-1 flex-shrink-0"></span>
+            <span>You'll start receiving these emails again.</span>
+          </p>
 
           <div class="mb-4 text-start">
             <label for="email_confirm" class="form-label fw-semibold">
@@ -85,16 +85,16 @@ prerender_icons:
             <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
           </div>
 
-          <button type="submit" class="btn btn-danger w-100 mb-4" id="email-preferences-submit">
+          <button type="submit" class="btn btn-adaptive w-100 mb-4" id="email-preferences-submit">
             {% uj_icon "bell-slash", "fa-sm me-2" %}
             <span class="button-text">Unsubscribe</span>
           </button>
         </form>
 
         <!-- Back to Home -->
-        <div class="mt-3 pt-3 border-top text-center">
+        <div class="mt-3 pt-3 hairline-top text-center">
           <a href="/" class="btn btn-outline-adaptive btn-sm">
-            {% uj_icon "arrow-left", "me-1" %}
+            {% uj_icon "arrow-left", "fa-xs me-1" %}
             Back to home
           </a>
         </div>

@@ -108,12 +108,12 @@ function setupForm() {
       $infoUnsubscribe.hidden = currentAction !== 'unsubscribe';
       $infoResubscribe.hidden = currentAction !== 'resubscribe';
 
-      // Update submit button
+      // Update submit button — one adaptive voice; the icon + label carry
+      // the action (the old danger/success repaint fought the theme)
+      $submit.className = 'btn btn-adaptive w-100 mb-4';
       if (currentAction === 'unsubscribe') {
-        $submit.className = 'btn btn-danger w-100 mb-4';
         $submit.querySelector('.button-text').innerHTML = `${getPrerenderedIcon('bell-slash', 'me-2')}Unsubscribe`;
       } else {
-        $submit.className = 'btn btn-success w-100 mb-4';
         $submit.querySelector('.button-text').innerHTML = `${getPrerenderedIcon('bell', 'me-2')}Resubscribe`;
       }
     });
