@@ -31,8 +31,26 @@
     }
   }
 
-  // Logo lockups (Ian 2026-07-16: real marks, not text): inlined FA brand
-  // mark + name, muted like a proper logo wall
+  // Real combomarks (Ian 2026-07-16: the legacy UJM wordmark set, ported to
+  // core/logos): full-color originals inlined, muted to a uniform wall by the
+  // item's grayscale — dark mode luminance-flips them so ink-dark marks stay
+  // legible on charcoal. Hover restores the brand color (the item drops its
+  // filter; the invert must go with it).
+  .classy-logos__mark {
+    display: inline-flex;
+    align-items: center;
+
+    svg {
+      height: 1.625rem;
+      width: auto;
+    }
+  }
+
+  [data-bs-theme='dark'] & .omega-marquee__item:not(:hover) {
+    filter: grayscale(1) invert(1);
+  }
+
+  // Logo lockups: inlined FA brand mark + name, muted like a proper logo wall
   .classy-logos__lockup {
     display: inline-flex;
     align-items: center;
@@ -168,20 +186,15 @@
     min-height: 3rem;
     color: var(--omega-ink);
 
+    // ONE amount voice — serif marketing display for numbers AND words
+    // (Ian 2026-07-16: "$29" rendered sans beside serif "Free"/"Custom")
     .classy-price-card__amount {
+      font-family: var(--omega-font-marketing);
       font-size: 2.625rem;
-      font-weight: 600;
-      letter-spacing: -0.03em;
+      font-weight: 500;
+      letter-spacing: -0.02em;
       font-variant-numeric: tabular-nums;
       line-height: 1;
-
-      // Enterprise / custom pricing — the serif voice
-      // Word amounts ("Free", "Custom") take the serif marketing voice
-      &.classy-price-card__amount--word {
-        font-family: var(--omega-font-marketing);
-        font-weight: 500;
-        letter-spacing: -0.02em;
-      }
     }
 
     .classy-price-card__currency {

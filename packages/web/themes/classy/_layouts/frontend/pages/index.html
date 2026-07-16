@@ -49,25 +49,28 @@ hero:
         text: "Start free trial"
         class: "btn-adaptive"
 
-# Trusted By Section — logo marquee. `icon` = FA brands slug (inlined mark);
+# Trusted By Section — logo marquee. `logo` = combomark slug (core/logos —
+# the REAL wordmark lockups); `icon` = FA brands slug (mark + name lockup);
 # `src` = custom image; name-only falls back to the typographic word.
 trusted_by:
   headline: "Trusted by teams at"
   logos:
     - name: "Amazon"
-      icon: "amazon"
+      logo: "amazon"
     - name: "Google"
-      icon: "google"
+      logo: "google"
     - name: "HubSpot"
-      icon: "hubspot"
+      logo: "hubspot"
     - name: "PayPal"
-      icon: "paypal"
+      logo: "paypal"
     - name: "Slack"
-      icon: "slack"
+      logo: "slack"
     - name: "Shopify"
-      icon: "shopify"
+      logo: "shopify"
     - name: "Stripe"
-      icon: "stripe-s"
+      logo: "stripe"
+    - name: "GitHub"
+      logo: "github"
 
 # Bento Section — the hairline feature grid
 bento:
@@ -351,12 +354,17 @@ cta:
   <section class="classy-logos overflow-hidden pt-0">
     <div class="container-fluid px-0" data-omega-reveal="fade">
       <span class="classy-micro">{{ resolved.trusted_by.headline }}</span>
-      <div class="omega-marquee" data-omega-marquee>
+      <!-- 60 px/s — unhurried logo wall (Ian 2026-07-16: 75% of the 80px/s default) -->
+      <div class="omega-marquee" data-omega-marquee="60">
         <div class="omega-marquee__track">
           {% for logo in resolved.trusted_by.logos %}
             <div class="omega-marquee__item">
               {% if logo.src %}
                 <img src="{{ logo.src | uj_cachebreak }}" alt="{{ logo.name }}" loading="lazy"/>
+              {% elsif logo.logo %}
+                <span class="classy-logos__mark" role="img" aria-label="{{ logo.name }}">
+                  {% uj_logo logo.logo, "combomarks" %}
+                </span>
               {% elsif logo.icon %}
                 <span class="classy-logos__lockup">
                   {% uj_icon logo.icon %}

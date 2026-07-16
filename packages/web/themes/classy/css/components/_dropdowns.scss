@@ -9,12 +9,16 @@
   --bs-dropdown-link-active-color: var(--omega-ink);
   --bs-dropdown-link-active-bg: var(--omega-surface-2);
   --bs-dropdown-divider-bg: var(--omega-line);
+  --bs-dropdown-padding-x: 0.375rem;
 
   box-shadow: var(--omega-shadow-2);
 
   .dropdown-item {
     border-radius: var(--omega-radius-s);
     font-weight: 500;
+    // Breathing room between rows — an active item and a hovered neighbor
+    // must never render as two touching filled blocks.
+    margin-block: 0.125rem;
 
     // Semantic text colors keep their hue on hover
     &.text-danger:hover {

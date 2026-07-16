@@ -203,7 +203,7 @@ faqs:
                 <!-- Price -->
                 {% if plan.free %}
                   <div class="classy-price-card__price">
-                    <span class="classy-price-card__amount classy-price-card__amount--word">Free</span>
+                    <span class="classy-price-card__amount">Free</span>
                   </div>
                 {% else %}
                   {% if _default_annual and plan.prices.annually > 0 %}
@@ -340,7 +340,7 @@ faqs:
                 <p class="classy-price-card__tagline">{{ resolved.pricing.enterprise.tagline | default: "Larger teams & organizations" }}</p>
 
                 <div class="classy-price-card__price">
-                  <span class="classy-price-card__amount classy-price-card__amount--word">{{ resolved.pricing.enterprise.price_label | default: "Custom" }}</span>
+                  <span class="classy-price-card__amount">{{ resolved.pricing.enterprise.price_label | default: "Custom" }}</span>
                 </div>
 
                 <p class="classy-price-card__billing">
@@ -387,7 +387,7 @@ faqs:
           {% endif %}
         </div>
 
-        <p class="small text-center classy-quiet mb-0">
+        <p class="small text-center classy-quiet mb-0" data-omega-reveal>
           <span class="classy-guarantee-icon me-1">{% uj_icon "shield-halved" %}</span>
           {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
         </p>
