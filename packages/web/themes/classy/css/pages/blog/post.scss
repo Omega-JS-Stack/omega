@@ -1,0 +1,56 @@
+// classy blog article — the bronn-grade editorial extras: reading progress
+// hairline + the sticky meta rail that travels with the reader (xl+).
+
+// Reading progress: an accent hairline pinned to the very top
+.classy-read-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  z-index: 1035; // above content, below modals
+  pointer-events: none;
+
+  span {
+    display: block;
+    height: 100%;
+    background: var(--omega-accent);
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+  }
+}
+
+// Sticky byline rail — quiet, hairline-separated, travels with the reader
+.classy-article-rail {
+  position: sticky;
+  top: 6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-inline-end: 1.5rem;
+}
+
+.classy-article-rail__author {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--omega-ink);
+  text-decoration: none;
+
+  .classy-post-card__avatar {
+    flex-shrink: 0;
+  }
+}
+
+.classy-article-rail__name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.classy-article-rail__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-block: 0.875rem;
+  border-block: 1px solid var(--omega-line);
+}

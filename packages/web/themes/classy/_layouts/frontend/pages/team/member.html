@@ -83,3 +83,43 @@ layout: frontend/core/base
     </div>
   </div>
 </section>
+
+<!-- ═══ The rest of the team ═══ -->
+{% assign _others_count = 0 %}
+{% for other in site.team %}
+  {% unless other.url == page.url %}{% assign _others_count = _others_count | plus: 1 %}{% endunless %}
+{% endfor %}
+{% if _others_count > 0 %}
+  <section class="pt-0">
+    <div class="container">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4" data-omega-reveal>
+        <h2 class="classy-panel-head justify-content-start h5 mb-0">More of the team</h2>
+        <a href="/team" class="text-decoration-none small">
+          Everyone
+          {% uj_icon "arrow-right", "fa-xs ms-1" %}
+        </a>
+      </div>
+
+      <div class="row g-4" data-omega-reveal-stagger="70">
+        {% assign _shown = 0 %}
+        {% for other in site.team %}
+          {% if other.url == page.url or _shown >= 4 %}{% continue %}{% endif %}
+          {% assign _shown = _shown | plus: 1 %}
+          <div class="col-lg-3 col-md-4 col-6" data-omega-reveal>
+            <div class="classy-person">
+              <a href="{{ other.url }}" class="classy-person__portrait">
+                {%- uj_member other.id, "image-tag", class="" -%}
+              </a>
+              <div class="classy-person__body">
+                <h3 class="classy-person__name">
+                  <a href="{{ other.url }}">{%- uj_member other.id, "name" -%}</a>
+                </h3>
+                <span class="classy-micro classy-person__role">{{ other.member.position }}</span>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}

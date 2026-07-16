@@ -8,11 +8,39 @@ export default () => {
     await omega.dom().ready();
 
     insertBlogPostAds();
+    setupReadingProgress();
 
     // Resolve after initialization
     return resolve();
   });
 };
+
+// Reading progress — fill [data-read-progress] as the article scrolls by.
+// rAF-throttled; no element (a theme without the bar) = no-op.
+function setupReadingProgress() {
+  const $bar = document.querySelector('[data-read-progress]');
+  const $article = document.querySelector('article');
+  if (!$bar || !$article) {
+    return;
+  }
+
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const rect = $article.getBoundingClientRect();
+    const total = rect.height - window.innerHeight;
+    const progress = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 1;
+    $bar.style.transform = `scaleX(${progress})`;
+  };
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+  }, { passive: true });
+  update();
+}
 
 // Insert ads into blog post content
 function insertBlogPostAds() {

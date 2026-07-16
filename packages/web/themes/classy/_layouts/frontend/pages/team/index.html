@@ -10,6 +10,22 @@ hero:
 # Mission quote (rendered as the serif quote; attributed to the CEO/owner)
 mission_quote: "To empower individuals and businesses with <em>innovative technology</em> that simplifies complex challenges and unlocks new possibilities."
 
+# How we work — quiet principles band (override per brand)
+principles:
+  superheadline: "How we work"
+  headline: "Small team,"
+  headline_accent: "strong opinions"
+  items:
+    - title: "We ship weekly"
+      description: "Small releases, every week — momentum beats ceremony."
+      icon: "rocket"
+    - title: "Everyone talks to users"
+      description: "Support isn't a department. The person who built it answers for it."
+      icon: "comments"
+    - title: "Writing over meetings"
+      description: "Decisions get written down where everyone can read them."
+      icon: "pen-nib"
+
 # Join CTA
 join_cta:
   headline: "Want to join the team?"
@@ -32,13 +48,20 @@ join_cta:
     {% iftruthy resolved.hero.description %}
       <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
     {% endiftruthy %}
+
+    {% assign _team_count = site.team | size %}
+    {% if _team_count > 0 %}
+      <p class="classy-quiet small mt-3" data-omega-reveal>
+        {% uj_icon "users", "fa-xs me-1" %}
+        All {{ _team_count }} of us — real people, no stock photos.
+      </p>
+    {% endif %}
   </div>
 </section>
 
 <!-- ═══ Portrait grid ═══ -->
 <section class="pt-0">
   <div class="container">
-    {% assign _team_count = site.team | size %}
     {% if _team_count == 0 %}
       <div class="row justify-content-center">
         <div class="col-lg-6">
@@ -86,6 +109,35 @@ join_cta:
     </div>
   </div>
 </section>
+
+<!-- ═══ How we work — quiet principles ═══ -->
+{% if _team_count > 0 %}
+<section>
+  <div class="container">
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        <span class="classy-micro">{{ resolved.principles.superheadline }}</span>
+        <h2 class="classy-display classy-display--section">
+          {{ resolved.principles.headline }}
+          {% iftruthy resolved.principles.headline_accent %}<em>{{ resolved.principles.headline_accent }}</em>{% endiftruthy %}
+        </h2>
+      </div>
+
+      <div class="classy-rowlist" data-omega-reveal-stagger="60">
+        {% for item in resolved.principles.items %}
+          <div class="classy-rowlist__item" data-omega-reveal>
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon item.icon, "fa-sm" %}</span>
+              <strong>{{ item.title }}</strong>
+            </span>
+            <span class="classy-rowlist__meta">{{ item.description }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 <!-- ═══ Mission quote ═══ -->
 {% if _team_count > 0 %}

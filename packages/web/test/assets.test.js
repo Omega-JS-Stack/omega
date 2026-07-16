@@ -121,7 +121,9 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
   // Page css namespaces: base pages from core, theme pages from the theme
   assert.ok(classy.css.pages['blog/post'], 'core page css entry (blog/post)');
   assert.ok(newsflash.css.themePages['blog/post'], 'newsflash theme page css for blog/post');
-  assert.ok(!classy.css.themePages['blog/post'], 'classy ships no page css');
+  // classy ships blog/post theme css since the cp170 editorial extras
+  // (reading progress + article rail) — both namespaces live side by side
+  assert.ok(classy.css.themePages['blog/post'], 'classy theme page css for blog/post');
 });
 
 test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () => {

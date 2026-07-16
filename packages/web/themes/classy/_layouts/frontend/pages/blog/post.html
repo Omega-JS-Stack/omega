@@ -31,6 +31,9 @@ newsletter:
     placeholder: "jonsnow@gmail.com"
 ---
 
+<!-- Reading progress — accent hairline pinned under the nav (post JS drives width) -->
+<div class="classy-read-progress" aria-hidden="true"><span data-read-progress></span></div>
+
 <!-- ═══ Article — left-aligned editorial header (bronn pattern) ═══ -->
 <article class="classy-dotgrid">
   <div class="container">
@@ -95,9 +98,35 @@ newsletter:
     {% endunless %}
 
     <div class="row justify-content-center mt-5">
+      <!-- Sticky meta rail (xl+): the byline travels with the reader -->
+      <div class="col-xl-2 d-none d-xl-block">
+        <aside class="classy-article-rail" aria-label="Article meta">
+          {% if _author_name != '' %}
+            <a href="{%- uj_member resolved.post.author, "url" -%}" class="classy-article-rail__author">
+              <span class="classy-post-card__avatar">{%- uj_member resolved.post.author, "image-tag", class="" -%}</span>
+              <span class="classy-article-rail__name">{{ _author_name }}</span>
+            </a>
+          {% endif %}
+          <div class="classy-article-rail__meta classy-quiet small">
+            <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%b %d, %Y" }}</time>
+            <span>{% uj_readtime content %} min read</span>
+          </div>
+          <div data-social-share
+                data-platforms=""
+                data-title=""
+                data-description=""
+                data-url=""
+                data-size="sm"
+                data-labels="false">
+          </div>
+        </aside>
+      </div>
+
       <div class="blog-post-content classy-prose col-xl-7 col-lg-8 col-md-12 col-12">
         {{ content | uj_content_format }}
       </div>
+
+      <div class="col-xl-2 d-none d-xl-block"><!-- optical balance --></div>
     </div>
 
     <!-- Ad -->
@@ -145,11 +174,12 @@ newsletter:
                 <a href="{% uj_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
                   <div class="fw-semibold">{{ _author_name }}</div>
                 </a>
-                {% iftruthy resolved.author_section.author_position %}
-                  <div class="text-muted small">
-                    {{ resolved.author_section.author_position }}
-                  </div>
-                {% endiftruthy %}
+                {%- capture _author_position -%}{%- uj_member resolved.post.author, "position" -%}{%- endcapture -%}
+                {% if _author_position != '' %}
+                  <div class="text-muted small">{{ _author_position }}</div>
+                {% elsif resolved.author_section.author_position %}
+                  <div class="text-muted small">{{ resolved.author_section.author_position }}</div>
+                {% endif %}
               </div>
             </div>
           {% else %}

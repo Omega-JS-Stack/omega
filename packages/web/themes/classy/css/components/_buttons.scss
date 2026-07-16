@@ -187,3 +187,20 @@
   --bs-nav-pills-link-active-bg: var(--omega-accent);
   --bs-nav-pills-link-active-color: var(--omega-accent-ink);
 }
+
+// Social share buttons (core builds them with inline platform colors):
+// classy quiets the rainbow at rest — the platform hue returns on hover.
+[data-social-share] .social-share-btn {
+  filter: saturate(0.3) brightness(0.92);
+  opacity: 0.85;
+  transition:
+    filter var(--omega-speed) var(--omega-ease),
+    opacity var(--omega-speed) var(--omega-ease),
+    transform var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    filter: none;
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
