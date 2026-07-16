@@ -1,0 +1,113 @@
+// Classy v2 app panels — the App-DNA surfaces inside .omega-shell
+// (dashboard/admin content): the merged stat card, panel heads, quiet
+// activity rows. Everything paints through tokens.
+
+// ── Merged stat card — ONE card, hairline column dividers ───────────────────
+.classy-statgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  overflow: hidden;
+
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(var(--classy-statgrid-cols, 4), minmax(0, 1fr));
+  }
+
+  .classy-statgrid__cell {
+    padding: 1.125rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--omega-line);
+    border-inline-start: 1px solid var(--omega-line);
+
+    &:nth-child(2n + 1) {
+      border-inline-start: 0;
+    }
+
+    &:nth-child(-n + 2) {
+      border-top: 0;
+    }
+
+    @media (min-width: 1200px) {
+      border-top: 0;
+
+      &:nth-child(2n + 1) {
+        border-inline-start: 1px solid var(--omega-line);
+      }
+
+      &:first-child {
+        border-inline-start: 0;
+      }
+    }
+  }
+
+  .classy-statgrid__label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.625rem;
+
+    svg {
+      color: var(--omega-ink-faint);
+    }
+  }
+
+  .classy-statgrid__value {
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    color: var(--omega-ink);
+    margin-bottom: 0.5rem;
+  }
+}
+
+// ── Panel head — the 14/650 card title voice ────────────────────────────────
+.classy-panel-title {
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--omega-ink);
+}
+
+// ── Activity rows — hairline-divided, neutral icon chips ────────────────────
+.classy-activity {
+  .classy-activity__row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+    padding: 0.875rem 0;
+    border-top: 1px solid var(--omega-line);
+
+    &:first-child {
+      border-top: 0;
+    }
+  }
+
+  .classy-activity__body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .classy-activity__title {
+    margin-bottom: 0.125rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--omega-ink);
+  }
+
+  .classy-activity__desc {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--omega-ink-muted);
+  }
+
+  .classy-activity__time {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--omega-ink-faint);
+  }
+}

@@ -31,6 +31,9 @@
 @import 'css/layout/footer';
 @import 'css/layout/shell';
 
+// App panels (App DNA — dashboard/admin content inside the shell)
+@import 'css/app/panels';
+
 // Marketing surfaces
 @import 'css/marketing/hero';
 @import 'css/marketing/bento';

@@ -48,52 +48,37 @@ prerender_icons:
   </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="row g-3 mb-4">
-  <!-- Total Users -->
-  <div class="col-lg-4 col-md-6">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-primary bg-opacity-10 mx-auto mb-2">
-          {% uj_icon "users", "fa-xl text-primary" %}
-        </div>
-        <h6 class="text-muted mb-1">Total users</h6>
-        <h3 class="mb-0" id="stat-total-users">
-          <span class="spinner-border spinner-border-sm fs-6"></span>
-        </h3>
-        <small class="text-muted" id="stat-new-users"></small>
-      </div>
+<!-- Merged stat card (App DNA) -->
+<div class="classy-statgrid mb-4" style="--classy-statgrid-cols: 3;">
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Total users</span>
+      {% uj_icon "users", "fa-sm" %}
     </div>
+    <h3 class="classy-statgrid__value" id="stat-total-users">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+    <small class="text-muted" id="stat-new-users"></small>
   </div>
 
-  <!-- Active Subscriptions -->
-  <div class="col-lg-4 col-md-6">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-success bg-opacity-10 mx-auto mb-2">
-          {% uj_icon "credit-card", "fa-xl text-success" %}
-        </div>
-        <h6 class="text-muted mb-1">Active subscriptions</h6>
-        <h3 class="mb-0" id="stat-active-subs">
-          <span class="spinner-border spinner-border-sm fs-6"></span>
-        </h3>
-      </div>
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Active subscriptions</span>
+      {% uj_icon "credit-card", "fa-sm" %}
     </div>
+    <h3 class="classy-statgrid__value" id="stat-active-subs">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
   </div>
 
-  <!-- Active users (30d) -->
-  <div class="col-lg-4 col-md-6">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-info bg-opacity-10 mx-auto mb-2">
-          {% uj_icon "user-plus", "fa-xl text-info" %}
-        </div>
-        <h6 class="text-muted mb-1">Active users (30d)</h6>
-        <h3 class="mb-0" id="stat-active-users">
-          <span class="spinner-border spinner-border-sm fs-6"></span>
-        </h3>
-      </div>
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Active users (30d)</span>
+      {% uj_icon "user-plus", "fa-sm" %}
     </div>
+    <h3 class="classy-statgrid__value" id="stat-active-users">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
   </div>
 </div>
 

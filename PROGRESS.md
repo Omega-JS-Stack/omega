@@ -3,6 +3,7 @@
 
 ## 🎯 Now
 - **SKIN PASS — REFERENCE BAR (bronn/manus)** — shipped through cp151 (content 5667e22 · product 22ce4ec · utility 326c9cb · auth/signup ce4efa0); remaining: account/payment/portal (cp152) → dashboard/admin content (cp153) → full-suite milestone run + playground redeploy on Ian's word
+- **Playground brandmark v2 (Ian 2026-07-16)** — parametric rebuild in-tree (band 236→310, star 166→205 centered 68.7px/side, gap 34°→48°, chisel tips; params in the SVG comment); rides the next checkpoint commit
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **SKIN PASS remainder (after DRAFT 1)** — default pages + blueprints → auth/account/payment + dashboard/admin remake → showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close; D5 vendored-webfont picks are Ian's call mid-arc

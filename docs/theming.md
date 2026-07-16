@@ -112,6 +112,17 @@ rules; classy's `status` and `feedback` entries repaint the JS-toggled `bg-*`
 state classes (a class contract — never rename them) into the hairline
 language there.
 
+## App panels (App DNA — dashboard/admin content)
+
+`themes/classy/css/app/_panels.scss`: `classy-statgrid` (the DIRECTION
+merged stat card — ONE card, hairline column dividers, micro-label +
+tabular value + delta chip per cell; `--classy-statgrid-cols` sets the
+lg column count), `classy-panel-title` (the 14/650 card-title voice), and
+`classy-activity` (hairline-divided feed rows with neutral icon chips).
+The backend dashboard layout and the admin dashboard/users blueprints
+render on these; every JS-populated id (`stat-*`, tables, charts) is a
+contract and stays.
+
 ## Motion library
 
 CSS: `core/css/motion/_index.scss`. Engine: `@omega.js/client/modules/motion.js`
