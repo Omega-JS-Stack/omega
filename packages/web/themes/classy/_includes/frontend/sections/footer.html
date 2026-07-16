@@ -1,6 +1,6 @@
 {% comment %} Section data: json-in-_includes (a consumer src/_includes/frontend/sections/footer.json overrides the packaged one) — same binding pattern as admin/sections/sidebar {% endcomment %}
 {% assign data = site.data._includes.frontend.sections.footer %}
-<footer class="pt-5 pb-4 border-top bg-body-secondary mt-auto" role="contentinfo" aria-label="Site footer">
+<footer class="classy-footer mt-auto" role="contentinfo" aria-label="Site footer">
   <div class="container">
     <!-- Logo Row -->
     <div class="row mb-4">
@@ -15,20 +15,16 @@
         {% if logo_description == '' or logo_description == 'null' %}{% assign logo_description = site.brand.description %}{% endif %}
         {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
 
-        <div class="h5 mb-3">
-          <a class="d-flex align-items-center text-decoration-none text-body" href="{{ logo_href }}">
-            {% if logo_src and logo_src != '' and logo_src != 'null' %}
-              <div class="avatar avatar-md me-2 {{ logo_class }}">
-                <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo"/>
-              </div>
-            {% endif %}
-            {% if logo_text and logo_text != '' and logo_text != 'null' %}
-              <span>{{ logo_text }}</span>
-            {% endif %}
-          </a>
-        </div>
+        <a class="classy-nav__brand mb-3" href="{{ logo_href }}">
+          {% if logo_src and logo_src != '' and logo_src != 'null' %}
+            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.625rem; width: auto;"/>
+          {% endif %}
+          {% if logo_text and logo_text != '' and logo_text != 'null' %}
+            <span>{{ logo_text }}</span>
+          {% endif %}
+        </a>
         {% if logo_description and logo_description != '' and logo_description != 'null' %}
-          <p class="mb-0">{{ logo_description }}</p>
+          <p class="classy-footer__desc mb-0">{{ logo_description }}</p>
         {% endif %}
       </div>
 
@@ -52,21 +48,21 @@
             {% for link_group in data.links %}
               {% capture group_label %}{{ link_group.label | default: 'Links' }}{% endcapture %}
               <div class="{{ col_class }}">
-            <div class="h6 mb-4 fw-semibold">{{ group_label }}</div>
-            <ul class="list-unstyled">
-              {% for link in link_group.links %}
-                {% capture link_classes %}link-muted text-decoration-none{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
-                {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
-                {% capture link_icon %}{% if link.icon %}{{ site.icons[link.icon] }}{% endif %}{% endcapture %}
-                {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-                <li class="mb-1">
-                  <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
-                    {{ link_icon }}
-                    {{ link.label }}
-                  </a>
-                </li>
-              {% endfor %}
-            </ul>
+                <div class="classy-micro classy-footer__group">{{ group_label }}</div>
+                <ul class="list-unstyled">
+                  {% for link in link_group.links %}
+                    {% capture link_classes %}classy-footer__link{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
+                    {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                    {% capture link_icon %}{% if link.icon %}{{ site.icons[link.icon] }}{% endif %}{% endcapture %}
+                    {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+                    <li class="mb-2">
+                      <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
+                        {{ link_icon }}
+                        {{ link.label }}
+                      </a>
+                    </li>
+                  {% endfor %}
+                </ul>
               </div>
             {% endfor %}
           {% endif %}
@@ -75,44 +71,42 @@
     </div>
 
     <!-- Bottom Section -->
-    <div class="row mt-4 pt-3 border-top align-items-center">
+    <div class="row classy-footer__bottom align-items-center">
       <div class="col-md-6 d-flex align-items-center">
         <!-- Language Dropdown -->
-        <div class="d-flex align-items-center me-3">
-            <div class="dropup uj-language-dropdown">
-              <button class="btn btn-sm btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                {% uj_icon "language", "fa-sm me-1" %}
-                <span class="_text-body">
-                  Language
-                </span>
-              </button>
-              <ul class="dropdown-menu">
-                {% assign default_language = site.translation.default | default: "en" %}
-                {% assign page_excluded_from_translation = false %}
-                {% for exclude in site.translation.exclude %}
-                  {% assign exclude_folder = "/" | append: exclude | append: "/" %}
-                  {% assign exclude_page = "/" | append: exclude %}
-                  {% if page.url == exclude_page or page.url contains exclude_folder %}
-                    {% assign page_excluded_from_translation = true %}
-                  {% endif %}
-                {% endfor %}
-                {% if site.translation.enabled and site.translation.languages.size > 0 and page_excluded_from_translation != true %}
-                  {% assign all_languages = site.translation.languages | push: default_language %}
-                {% else %}
-                  {% assign all_languages = "" | split: "" | push: default_language %}
+        <div class="d-flex align-items-center me-2">
+          <div class="dropup uj-language-dropdown">
+            <button class="btn btn-sm btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              {% uj_icon "language", "fa-sm me-1" %}
+              <span>Language</span>
+            </button>
+            <ul class="dropdown-menu">
+              {% assign default_language = site.translation.default | default: "en" %}
+              {% assign page_excluded_from_translation = false %}
+              {% for exclude in site.translation.exclude %}
+                {% assign exclude_folder = "/" | append: exclude | append: "/" %}
+                {% assign exclude_page = "/" | append: exclude %}
+                {% if page.url == exclude_page or page.url contains exclude_folder %}
+                  {% assign page_excluded_from_translation = true %}
                 {% endif %}
-                {% for language in all_languages %}
-                  <li>
-                    {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
-                    <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
-                      {% uj_icon language, "fa-sm me-2" %}
-                      {{ lang_name | capitalize }}
-                    </a>
-                  </li>
-                {% endfor %}
-              </ul>
-            </div>
+              {% endfor %}
+              {% if site.translation.enabled and site.translation.languages.size > 0 and page_excluded_from_translation != true %}
+                {% assign all_languages = site.translation.languages | push: default_language %}
+              {% else %}
+                {% assign all_languages = "" | split: "" | push: default_language %}
+              {% endif %}
+              {% for language in all_languages %}
+                <li>
+                  {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
+                  <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
+                    {% uj_icon language, "fa-sm me-2" %}
+                    {{ lang_name | capitalize }}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
           </div>
+        </div>
 
         <!-- Appearance Dropdown (logic handled framework-side via data-appearance-* attributes — see docs/appearance.md) -->
         <div class="d-flex align-items-center me-3">
@@ -146,8 +140,8 @@
                 {% else %}
                   {% assign spacing_class = 'me-2' %}
                 {% endif %}
-                <a href="{% uj_social social %}" class="link-muted text-decoration-none {{ spacing_class }}" aria-label="{{ social | capitalize }}">
-                  {% uj_icon social, "fa-xl" %}
+                <a href="{% uj_social social %}" class="classy-footer__link {{ spacing_class }}" aria-label="{{ social | capitalize }}">
+                  {% uj_icon social, "fa-lg" %}
                 </a>
               {% endiftruthy %}
             {% endfor %}
@@ -157,12 +151,12 @@
 
       <!-- Legal Links -->
       {% if data.legal.enabled %}
-        <div class="col-md-6 text-md-end">
-          <a href="/terms" class="link-muted text-decoration-none">Terms</a>
-          <span class="text-body-secondary mx-2"> / </span>
-          <a href="/privacy" class="link-muted text-decoration-none">Privacy</a>
-          <span class="text-body-secondary mx-2"> / </span>
-          <a href="/cookies" class="link-muted text-decoration-none">Cookies</a>
+        <div class="col-md-6 text-md-end classy-footer__legal mt-3 mt-md-0">
+          <a href="/terms">Terms</a>
+          <span class="mx-2">/</span>
+          <a href="/privacy">Privacy</a>
+          <span class="mx-2">/</span>
+          <a href="/cookies">Cookies</a>
         </div>
       {% endif %}
     </div>
@@ -180,7 +174,7 @@
               By using this site and our services, you agree to our <a href="/terms">Terms</a> & <a href="/privacy">Privacy Policy</a>.
             {% endcapture %}
           {% endif %}
-          <span class="text-body-secondary">{{ copyright_text | uj_liquify }}</span>
+          <span class="classy-footer__copyright">{{ copyright_text | uj_liquify }}</span>
         </div>
       </div>
     {% endif %}

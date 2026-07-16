@@ -13,133 +13,17 @@ theme:
       # class: ""
       # content: ""
     breadcrumbs:
+      # items render in the app topbar (global/sections/app-topbar.html)
       enabled: true
-      # class: ""
     actions:
       enabled: true
-      # class: ""
-      # content: ""
+      # items: []
   main:
     class: "page-viewport-locked"
 ---
 
-<!-- Page Header with Title and Actions -->
-{% unless resolved.theme.header.enabled == false %}
-  <div class="page-header pb-3 mb-4 border-bottom">
-    <div class="row align-items-center">
-      <div class="col">
-        <!-- Page Title -->
-        {% unless resolved.theme.header.title.enabled == false %}
-          <h1 class="fs-3 fw-semibold mb-2 d-flex align-items-center {{ resolved.theme.header.title.class }}">
-            {% if resolved.theme.header.title.icon %}
-              {% uj_icon resolved.theme.header.title.icon, "me-2" %}
-            {% endif %}
-            {{- resolved.theme.header.title.content | default: resolved.meta.title | uj_liquify -}}
-          </h1>
-        {% endunless %}
-
-        <!-- Breadcrumbs -->
-        {% unless resolved.theme.header.breadcrumbs.enabled == false %}
-          {% if resolved.theme.header.breadcrumbs.items %}
-            <nav aria-label="breadcrumb">
-              <ol class="breadcrumb mb-0">
-                {% for crumb in resolved.theme.header.breadcrumbs.items %}
-                  {% if forloop.last %}
-                    <li class="breadcrumb-item active" aria-current="page">
-                      {% if crumb.icon %}
-                        {% uj_icon crumb.icon, "fa-sm me-1" %}
-                      {% endif %}
-                      {{ crumb.label }}
-                    </li>
-                  {% else %}
-                    <li class="breadcrumb-item">
-                      {% if crumb.href %}
-                        <a href="{{ crumb.href }}" class="text-decoration-none">
-                          {% if crumb.icon %}
-                            {% uj_icon crumb.icon, "fa-sm me-1" %}
-                          {% endif %}
-                          {{ crumb.label }}
-                        </a>
-                      {% else %}
-                        {% if crumb.icon %}
-                          {% uj_icon crumb.icon, "fa-sm me-1" %}
-                        {% endif %}
-                        {{ crumb.label }}
-                      {% endif %}
-                    </li>
-                  {% endif %}
-                {% endfor %}
-              </ol>
-            </nav>
-          {% endif %}
-        {% endunless %}
-      </div>
-
-      <!-- Page Actions (Right Side) -->
-      {% unless resolved.theme.header.actions.enabled == false %}
-        {% if resolved.theme.header.actions.items %}
-          <div class="col-auto">
-            <div class="d-flex gap-2">
-              {% for action in resolved.theme.header.actions.items %}
-                {% if action.dropdown %}
-                  <!-- Dropdown Button -->
-                  <div class="dropdown">
-                    <button class="btn btn-{{ action.color | default: 'primary' }} {% if action.size %}btn-{{ action.size }}{% endif %} dropdown-toggle"
-                            type="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false">
-                      {% if action.icon %}
-                        {% uj_icon action.icon, "fa-md me-2" %}
-                      {% endif %}
-                      {{ action.label }}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      {% for item in action.dropdown %}
-                        {% if item.divider %}
-                          <li><hr class="dropdown-divider"></li>
-                        {% else %}
-                          <li>
-                            <a class="dropdown-item" href="{{ item.href | default: '#' }}">
-                              {% if item.icon %}
-                                {% uj_icon item.icon, "fa-md me-2" %}
-                              {% endif %}
-                              {{ item.label }}
-                            </a>
-                          </li>
-                        {% endif %}
-                      {% endfor %}
-                    </ul>
-                  </div>
-                {% else %}
-                  <!-- Regular Button -->
-                  {% capture action_class %}btn btn-{{ action.color | default: 'primary' }} {% if action.size %}btn-{{ action.size }}{% endif %} {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
-                  {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
-                  {% capture action_content %}
-                    {% if action.icon %}
-                      {% uj_icon action.icon, "fa-md me-2" %}
-                    {% endif %}
-                    {{ action.label }}
-                  {% endcapture %}
-
-                  {% iftruthy action.href %}
-                    <a class="{{ action_class }}" href="{{ action.href }}" {{ action_attributes }}>
-                      {{ action_content }}
-                    </a>
-                  {% endiftruthy %}
-                  {% iffalsy action.href %}
-                    <button class="{{ action_class }}" type="button" {{ action_attributes }}>
-                      {{ action_content }}
-                    </button>
-                  {% endiffalsy %}
-                {% endif %}
-              {% endfor %}
-            </div>
-          </div>
-        {% endif %}
-      {% endunless %}
-    </div>
-  </div>
-{% endunless %}
+<!-- Page Header with Title and Actions (breadcrumbs live in the topbar) -->
+{% include global/sections/page-header.html %}
 
 <!-- Page Content (viewport-locked: fills remaining height, no page scroll) -->
 <div class="page-content page-content-viewport-locked d-flex flex-column flex-grow-1">

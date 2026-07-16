@@ -229,14 +229,16 @@ class Manager {
       cookieConsent: {
         enabled: true,
         config: {
+          // Token-aware defaults (classy v2): the banner rides the --omega-*
+          // sheet wherever it exists; fallbacks cover surfaces without it.
           palette: {
             popup: {
-              background: '#237afc',
-              text: '#fff'
+              background: 'var(--omega-surface, #ffffff)',
+              text: 'var(--omega-ink, #1a1a19)'
             },
             button: {
-              background: '#fff',
-              text: '#237afc'
+              background: 'var(--omega-ink, #1a1a19)',
+              text: 'var(--omega-ground, #ffffff)'
             }
           },
           theme: 'classic',

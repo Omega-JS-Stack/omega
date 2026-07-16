@@ -69,7 +69,9 @@ test('token sheet compiles clean — modern sass, ZERO deprecations, full plumbi
 
   assert.deepEqual(warnings, [], 'new core css never warns — the #16 bar');
   assert.match(result.css, /--omega-ground/);
-  assert.match(result.css, /--omega-accent: #3b5bdb/, 'neutral placeholder present');
+  assert.match(result.css, /--omega-accent: #5b47fb/, 'classy v2 placeholder accent (light)');
+  assert.match(result.css, /--omega-accent: #8577ff/, 'classy v2 placeholder accent (dark variant)');
+  assert.match(result.css, /--omega-font-marketing/, 'type pairing slots present (D5 seam)');
   assert.match(result.css, /prefers-color-scheme: dark/, 'OS preference carries (D2)');
   assert.match(result.css, /data-bs-theme=['"]?dark/, 'appearance.js stamp beats OS — dark');
   assert.match(result.css, /data-bs-theme=['"]?light/, 'appearance.js stamp beats OS — light');
@@ -99,6 +101,30 @@ test('brand.color → inline --omega-accent ramp in <head>, after the css bundle
     html.indexOf('--omega-accent:') > html.indexOf('main-TEST.css'),
     'inline ramp comes after the bundles so it wins the cascade',
   );
+
+  // The dark-variant ramp rides the same stamp plumbing as the token sheet.
+  const darkRamp = composeBrandTokens('#d6336c').dark;
+  assert.ok(html.includes(`--omega-accent:${darkRamp.accent}`), 'dark ramp emitted');
+  assert.match(html, /prefers-color-scheme: dark[\s\S]*?--omega-accent:/, 'dark ramp carries the OS preference');
+  assert.match(html, /data-bs-theme='dark'[\s\S]*?--omega-accent:/, 'dark ramp behind the explicit stamp');
+});
+
+test('composeBrandTokens: dark variant lifts dark accents, passes light ones through', () => {
+  const mid = composeBrandTokens('#3b5bdb');
+  assert.ok(
+    relativeLuminance(parseHex(mid.dark.accent)) > relativeLuminance(parseHex(mid.accent)),
+    'mid accents lift for the charcoal ground',
+  );
+
+  const nearBlack = composeBrandTokens('#101014');
+  assert.ok(
+    relativeLuminance(parseHex(nearBlack.dark.accent)) > 0.15,
+    'near-black accents reach a visible dark-mode lightness',
+  );
+
+  const alreadyLight = composeBrandTokens('#8577ff'); // l ≈ 0.73, above the keep threshold
+  assert.equal(alreadyLight.dark.accent, alreadyLight.accent, 'light accents pass through unchanged');
+  assert.equal(alreadyLight.dark.accentInk, '#111213', 'dark ramp keeps the WCAG ink pick');
 });
 
 test('no brand.color → no inline ramp (the sheet placeholder stands)', async () => {

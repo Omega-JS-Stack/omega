@@ -1,58 +1,93 @@
-// Classy Theme CSS Custom Properties
-// Converts SCSS variables to CSS custom properties for runtime theming
-// These override Bootstrap's CSS variables and allow dynamic theme switching
+// Classy v2 root bridge — Bootstrap's CSS variables re-pointed at the shared
+// --omega-* token contract, so light/dark switching, brand.color ramps, and
+// consumer token overrides (main.scss) restyle every Bootstrap component with
+// ZERO recompilation. The `:root[data-bs-theme]` arm outranks Bootstrap's own
+// compiled [data-bs-theme='dark'] block, so the bridge wins in both modes.
 
-// ============================================
-// Light Mode (Default)
-// ============================================
 :root,
-[data-bs-theme="light"] {
-  // Background colors
-  --bs-body-bg: #{$classy-bg-light};
-  --bs-body-bg-rgb: #{red($classy-bg-light)}, #{green($classy-bg-light)}, #{blue($classy-bg-light)};
+:root[data-bs-theme] {
+  // Surfaces + text
+  --bs-body-bg: var(--omega-ground);
+  --bs-body-color: var(--omega-ink);
+  --bs-emphasis-color: var(--omega-ink);
+  --bs-secondary-color: var(--omega-ink-muted);
+  --bs-tertiary-color: var(--omega-ink-faint);
+  --bs-secondary-bg: var(--omega-surface-2);
+  --bs-tertiary-bg: var(--omega-surface);
+  --bs-heading-color: var(--omega-ink);
 
-  --bs-secondary-bg: #{$classy-bg-light-secondary};
-  --bs-secondary-bg-rgb: #{red($classy-bg-light-secondary)}, #{green($classy-bg-light-secondary)}, #{blue($classy-bg-light-secondary)};
+  // Lines
+  --bs-border-color: var(--omega-line);
+  --bs-border-color-translucent: var(--omega-line);
 
-  --bs-tertiary-bg: #{$classy-bg-light-tertiary};
-  --bs-tertiary-bg-rgb: #{red($classy-bg-light-tertiary)}, #{green($classy-bg-light-tertiary)}, #{blue($classy-bg-light-tertiary)};
+  // Type
+  --bs-body-font-family: var(--omega-font-ui);
+  --bs-font-monospace: var(--omega-font-mono);
 
-  // Component backgrounds - use secondary bg for elevated surfaces
-  // --bs-card-bg: #{$classy-bg-light-secondary};
-  // --bs-dropdown-bg: #{$classy-bg-light-secondary};
-  // --bs-modal-bg: #{$classy-bg-light-secondary};
-  // --bs-popover-bg: #{$classy-bg-light-secondary};
-  // --bs-offcanvas-bg: #{$classy-bg-light-secondary};
-  // --bs-accordion-bg: #{$classy-bg-light-secondary};
+  // Focus
+  --bs-focus-ring-color: var(--omega-accent-ring);
 
-  // Add more Bootstrap overrides here as needed
-  // Examples:
-  // --bs-body-color: #212529;
-  // --bs-border-color: #dee2e6;
-  // --bs-link-color: #{$primary};
+  // Code
+  --bs-code-color: var(--omega-ink);
 }
 
-// ============================================
-// Dark Mode
-// ============================================
-[data-bs-theme="dark"] {
-  // Background colors
-  --bs-body-bg: #{$classy-bg-dark};
-  --bs-body-bg-rgb: #{red($classy-bg-dark)}, #{green($classy-bg-dark)}, #{blue($classy-bg-dark)};
+// RGB triplets (Bootstrap's translucency utilities need raw channels, which
+// var() can't provide) — same three-stamp plumbing as the token sheet.
+@mixin light-rgb {
+  --bs-body-bg-rgb: 245, 245, 244;
+  --bs-body-color-rgb: 26, 26, 25;
+  --bs-emphasis-color-rgb: 26, 26, 25;
+  --bs-secondary-bg-rgb: 246, 246, 245;
+  --bs-tertiary-bg-rgb: 255, 255, 255;
+}
 
-  --bs-secondary-bg: #{$classy-bg-dark-secondary};
-  --bs-secondary-bg-rgb: #{red($classy-bg-dark-secondary)}, #{green($classy-bg-dark-secondary)}, #{blue($classy-bg-dark-secondary)};
+@mixin dark-rgb {
+  --bs-body-bg-rgb: 13, 13, 14;
+  --bs-body-color-rgb: 235, 235, 234;
+  --bs-emphasis-color-rgb: 235, 235, 234;
+  --bs-secondary-bg-rgb: 29, 29, 31;
+  --bs-tertiary-bg-rgb: 21, 21, 22;
+}
 
-  --bs-tertiary-bg: #{$classy-bg-dark-tertiary};
-  --bs-tertiary-bg-rgb: #{red($classy-bg-dark-tertiary)}, #{green($classy-bg-dark-tertiary)}, #{blue($classy-bg-dark-tertiary)};
+:root {
+  @include light-rgb;
+}
 
-  // Component backgrounds - use secondary bg for elevated surfaces
-  // --bs-card-bg: #{$classy-bg-dark-secondary};
-  // --bs-dropdown-bg: #{$classy-bg-dark-secondary};
-  // --bs-modal-bg: #{$classy-bg-dark-secondary};
-  // --bs-popover-bg: #{$classy-bg-dark-secondary};
-  // --bs-offcanvas-bg: #{$classy-bg-dark-secondary};
-  // --bs-accordion-bg: #{$classy-bg-dark-secondary};
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include dark-rgb;
+  }
+}
 
-  // Add more Bootstrap overrides here as needed
+:root[data-bs-theme='dark'] {
+  @include dark-rgb;
+}
+
+:root[data-bs-theme='light'] {
+  @include light-rgb;
+}
+
+// Component surfaces ride the tokens too.
+.card,
+.modal-content,
+.offcanvas,
+.toast,
+.popover {
+  --bs-card-bg: var(--omega-surface);
+  --bs-card-border-color: var(--omega-line);
+  --bs-modal-bg: var(--omega-surface);
+  --bs-offcanvas-bg: var(--omega-surface);
+  --bs-toast-bg: var(--omega-surface);
+  --bs-popover-bg: var(--omega-surface);
+}
+
+// Selection + smoothing: the whole surface reads crisp.
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizelegibility;
+}
+
+::selection {
+  background: var(--omega-accent-subtle);
 }

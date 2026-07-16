@@ -79,3 +79,11 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 ## Utilities (`utilities.js`)
 
 - **Exports**: `clipboardCopy()`, `escapeHTML()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`, `getContext()`
+
+## Motion (`motion.js`)
+
+- **Exports**: `createMotion()`, `parseCountTarget(text)`, `formatCount(target, value)`
+- **Pattern**: transport-free factory like icon-renderer — not a singleton module; each embedding framework boots it (`@omega.js/web` does in `core/js/core/motion.js`)
+- **Engine surface**: `start(doc?)` (idempotent scan + IntersectionObserver + MutationObserver + scroll watcher), `stop()`, `scan(root)` for manually rendered roots
+- **Attribute contract** (styled by the embedding framework's motion stylesheet): `data-omega-reveal[="up|fade|left|right|scale"]`, `data-omega-reveal-stagger`, `data-omega-countup`, `data-omega-rotate`, `data-omega-marquee` (+ `.omega-marquee__track`), `data-omega-scroll-watch`
+- **Resilience**: no-JS pages render visible (the hiding styles are gated on an inline `html[data-omega-motion]` stamp); `prefers-reduced-motion` renders final states with no animation; missing observers (exotic embeds) degrade to instant reveal

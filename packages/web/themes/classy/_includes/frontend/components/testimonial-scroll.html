@@ -1,84 +1,38 @@
 {% comment %}
-  Testimonial Scroll Component
-  A scrolling masonry-style testimonial display inspired by modern SaaS landing pages.
-  Uses the generic infinite-scroll component for animation.
-
-  Usage:
-    {% include frontend/components/testimonial-scroll.html
-       testimonials=resolved.testimonials %}
-
-  Required data structure:
-    testimonials:
-      superheadline:
-        icon: "megaphone"
-        text: "Testimonials"
-      headline: "What people are saying"
-      headline_accent: "about us"
-      subheadline: "Hear from real customers"
-      items:
-        - quote: "..."
-          author: "Name"
-          role: "Title"
-          company: "Company"
-          initial: "N"
-          handle: "@username" (optional)
+  Classy v2 testimonial quote — one large serif quote with italic emphasis
+  (draft-2 marketing DNA). Multiple items cycle via the shared word-rotator
+  mechanic; a single item renders static. Consumers pass the same data as
+  ever: include with testimonials=resolved.testimonials
+  (items: quote / author / role / company / initial).
 {% endcomment %}
-
-<!-- Testimonials Section -->
-<section class="testimonial-scroll-section overflow-hidden">
+{% assign _t = include.testimonials %}
+{% if _t.items and _t.items.size > 0 %}
+<section>
   <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-      {% iftruthy include.testimonials.superheadline.text %}
-        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-          {% iftruthy include.testimonials.superheadline.icon %}
-            {% uj_icon include.testimonials.superheadline.icon, "me-1" %}
-          {% endiftruthy %}
-          {{ include.testimonials.superheadline.text }}
-        </span>
+    <div class="classy-quote" data-omega-reveal>
+      {% iftruthy _t.superheadline %}
+        {% if _t.superheadline.text %}
+          <span class="classy-micro d-block mb-4">{{ _t.superheadline.text }}</span>
+        {% else %}
+          <span class="classy-micro d-block mb-4">{{ _t.superheadline }}</span>
+        {% endif %}
       {% endiftruthy %}
-      <h2 class="h2 mb-2">
-        {{ include.testimonials.headline }}
-        {% iftruthy include.testimonials.headline_accent %}
-          <span class="text-accent">{{ include.testimonials.headline_accent }}</span>
-        {% endiftruthy %}
-      </h2>
-      {% iftruthy include.testimonials.subheadline %}
-        <p class="fs-5 text-muted">{{ include.testimonials.subheadline }}</p>
-      {% endiftruthy %}
-    </div>
-  </div>
 
-  {% if include.testimonials.items %}
-    <div class="infinite-scroll-wrapper infinite-scroll-fade-edges" data-lazy="@class animation-fade-in">
-      <div class="infinite-scroll-track gap-md" data-scroll-speed="30">
-        {% for testimonial in include.testimonials.items %}
-          <div class="infinite-scroll-item infinite-scroll-item--card">
-            <div class="card border-0 shadow-sm">
-              <div class="card-body p-4">
-                <!-- Header with avatar and info -->
-                <div class="d-flex align-items-center mb-3">
-                  <div class="avatar avatar-md rounded-circle bg-primary text-light d-flex align-items-center justify-content-center flex-shrink-0">
-                    <span class="fw-bold">{{ testimonial.initial }}</span>
-                  </div>
-                  <div class="ms-3">
-                    <div class="fw-semibold text-body">{{ testimonial.author }}</div>
-                    <div class="small text-muted">
-                      {% iftruthy testimonial.handle %}
-                        {{ testimonial.handle }}
-                      {% endiftruthy %}
-                      {% iffalsy testimonial.handle %}
-                        {{ testimonial.role }}{% iftruthy testimonial.company %} at {{ testimonial.company }}{% endiftruthy %}
-                      {% endiffalsy %}
-                    </div>
-                  </div>
-                </div>
-                <!-- Quote -->
-                <p class="mb-0 text-body">{{ testimonial.quote }}</p>
-              </div>
+      <div data-omega-rotate="5200" class="w-100">
+        {% for item in _t.items %}
+          <div class="w-100" style="white-space: normal;">
+            <p class="classy-quote__text">&ldquo;{{ item.quote }}&rdquo;</p>
+            <div class="classy-quote__attr">
+              <span class="classy-quote__avatar">{{ item.initial | default: item.author | slice: 0 }}</span>
+              <span class="classy-quote__name">{{ item.author }}</span>
+              <span class="classy-quote__role">
+                {{ item.role }}{% if item.company %}{% if item.role %}, {% endif %}{{ item.company }}{% endif %}
+              </span>
             </div>
           </div>
         {% endfor %}
       </div>
     </div>
-  {% endif %}
+  </div>
 </section>
+{% endif %}

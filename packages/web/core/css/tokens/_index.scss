@@ -2,54 +2,112 @@
 // every target) consumes. CSS custom properties ONLY: themes restyle by
 // redefining tokens, components read `var(--omega-*)` and never hardcode.
 //
-// VALUES here are neutral scaffolding — the C3 skin pass (Ian's direction
-// notes on the cp99 boards) replaces them. The NAMES plus the
-// light/dark/attribute plumbing below are the contract (D2: dual-theme at
-// the token level from day one).
+// VALUES are the classy v2 sheet (plans/classy-v2/DIRECTION.md, Ian-approved
+// draft-2 comps): warm-paper light neutrals, de-blued charcoal dark, a single
+// brand accent slot, reserved status hues, and the Manus-split type stacks.
+// The NAMES plus the light/dark/attribute plumbing below are the contract
+// (D2: dual-theme at the token level from day one).
 //
 // The accent family is a BUILD-TIME override surface: when `brand.color`
-// is set, head.html emits an inline `:root` block from composeBrandTokens
-// (src/brand-tokens.js) that wins the cascade over these placeholders.
+// is set, head.html emits inline `:root` ramps from composeBrandTokens
+// (src/brand-tokens.js) — a light ramp AND a dark-variant ramp stamped with
+// this same plumbing — that win the cascade over these placeholders.
 //
 // Theme attribute: `data-bs-theme` is what core/js/core/appearance.js
 // stamps today (Bootstrap-era name; renames alongside the appearance UI
 // when classy retires — keyed here in exactly one place on purpose).
+//
+// Type presets: `data-omega-type` on <html> re-pairs the font tokens
+// (mix is the default pairing — serif marketing display over sans UI).
 
 @mixin light-tokens {
-  --omega-ground: #f7f7f8;
+  --omega-ground: #f5f5f4;
   --omega-surface: #ffffff;
-  --omega-ink: #191a1c;
-  --omega-ink-muted: #5f646d;
-  --omega-line: #e3e5e9;
-  --omega-accent: #3b5bdb; // placeholder — brand.color wins at build
-  --omega-accent-hover: #3450c4;
-  --omega-accent-active: #2d46ad;
-  --omega-accent-subtle: rgba(59, 91, 219, 0.12);
+  --omega-surface-2: #f6f6f5;
+  --omega-ink: #1a1a19;
+  --omega-ink-muted: #6d6d6c;
+  --omega-ink-faint: #a1a19e;
+  --omega-line: #e8e8e6;
+  --omega-line-strong: #d8d8d5;
+  --omega-accent: #5b47fb; // placeholder — brand.color wins at build
+  --omega-accent-hover: #3c24fa;
+  --omega-accent-active: #2a10fa;
+  --omega-accent-subtle: rgba(91, 71, 251, 0.12);
   --omega-accent-ink: #ffffff;
-  --omega-accent-ring: rgba(59, 91, 219, 0.35);
-  --omega-ok: #1f9d55;
-  --omega-warn: #b7791f;
-  --omega-danger: #c53030;
+  --omega-accent-ring: rgba(91, 71, 251, 0.35);
+  --omega-ok: #12925c;
+  --omega-warn: #c47206;
+  --omega-danger: #d92d20;
+  --omega-chart-2: #0f8fa9;
+  --omega-shadow-1: 0 1px 2px rgb(24 23 21 / 5%);
+  --omega-shadow-2: 0 18px 44px rgb(24 23 21 / 10%);
 }
 
 @mixin dark-tokens {
-  --omega-ground: #131417;
-  --omega-surface: #1b1d21;
-  --omega-ink: #e8e9ec;
-  --omega-ink-muted: #979da8;
-  --omega-line: #2a2d33;
-  --omega-accent-subtle: rgba(92, 124, 250, 0.16);
+  --omega-ground: #0d0d0e;
+  --omega-surface: #151516;
+  --omega-surface-2: #1d1d1f;
+  --omega-ink: #ebebea;
+  --omega-ink-muted: #9f9fa0;
+  --omega-ink-faint: #6c6c6e;
+  --omega-line: #262628;
+  --omega-line-strong: #333336;
+  --omega-accent: #8577ff; // placeholder — brand.color's dark ramp wins at build
+  --omega-accent-hover: #6553ff;
+  --omega-accent-active: #533fff;
+  --omega-accent-subtle: rgba(133, 119, 255, 0.16);
+  --omega-accent-ink: #111213;
+  --omega-accent-ring: rgba(133, 119, 255, 0.35);
+  --omega-ok: #3ecf8e;
+  --omega-warn: #f5a524;
+  --omega-danger: #f0574d;
+  --omega-chart-2: #1f9fb4;
+  --omega-shadow-1: 0 1px 2px rgb(0 0 0 / 30%);
+  --omega-shadow-2: 0 18px 44px rgb(0 0 0 / 45%);
 }
 
 :root {
   @include light-tokens;
 
   // scheme-agnostic
-  --omega-radius-s: 4px;
-  --omega-radius-m: 8px;
+  --omega-radius-xs: 6px;
+  --omega-radius-s: 8px;
+  --omega-radius-m: 10px;
   --omega-radius-l: 14px;
+  --omega-radius-xl: 20px;
   --omega-speed: 160ms;
+  --omega-speed-slow: 550ms;
   --omega-ease: cubic-bezier(0.25, 0.5, 0.35, 1);
+
+  // Type stacks (D5: system stacks until Ian picks vendored faces — the
+  // token seam makes that swap a values-only change).
+  --omega-font-ui: -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, 'Helvetica Neue', arial, sans-serif;
+  --omega-font-serif: ui-serif, georgia, 'Times New Roman', times, serif;
+  --omega-font-mono: ui-monospace, 'SF Mono', sfmono-regular, menlo, consolas, 'Liberation Mono', monospace;
+
+  // Pairing slots components actually read: marketing display vs app display.
+  // Default = the "mix" pairing (serif marketing, sans app).
+  --omega-font-marketing: var(--omega-font-serif);
+  --omega-font-display: var(--omega-font-ui);
+
+  // Chart series-1 rides the accent; series-2 is the CVD-validated teal above.
+  --omega-chart-1: var(--omega-accent);
+}
+
+// Consumer type presets — one attribute (or a token override in main.scss)
+// re-pairs the display faces everywhere.
+:root[data-omega-type='sans'] {
+  --omega-font-marketing: var(--omega-font-ui);
+}
+
+:root[data-omega-type='serif'] {
+  --omega-font-marketing: var(--omega-font-serif);
+  --omega-font-display: var(--omega-font-serif);
+}
+
+:root[data-omega-type='mono'] {
+  --omega-font-marketing: var(--omega-font-mono);
+  --omega-font-display: var(--omega-font-mono);
 }
 
 // OS preference carries when no explicit choice is stamped…

@@ -1,0 +1,32 @@
+{
+  logo: {
+    href: '/dashboard',
+    class: 'filter-adaptive',
+  },
+  links: [
+    {
+      label: 'Dashboard',
+      href: '/dashboard',
+      icon: 'gauge-high'
+    },
+    {
+      header: true,
+      label: 'General'
+    },
+    {
+      label: 'Account',
+      href: '/account',
+      icon: 'user-gear'
+    },
+    {
+      label: 'Pricing',
+      href: '/pricing',
+      icon: 'credit-card'
+    },
+    {
+      label: 'Contact support',
+      href: '/contact',
+      icon: 'circle-question'
+    },
+  ]
+}

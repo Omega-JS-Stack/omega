@@ -1,12 +1,12 @@
 ---
 layout: core/root
 
+# D5: system type stacks for now — no webfont request. When Ian picks the
+# vendored faces, they load here (theme.head.content) and the --omega-font-*
+# tokens re-point; nothing else changes.
 theme:
   # html:
   #   class: ""
-  head:
-    content: |
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" media="print" onload="this.media='all'">
   body:
     class: "d-flex flex-column min-vh-100"
   # main:

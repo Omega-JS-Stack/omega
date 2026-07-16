@@ -1,0 +1,118 @@
+// Classy v2 auth surfaces — the signin/signup/reset cards on the cover
+// layout. App-family type on a quiet surface card.
+
+.classy-auth {
+  width: 100%;
+  max-width: 26rem;
+  margin-inline: auto;
+
+  .classy-auth__card {
+    padding: 2rem 1.75rem;
+    background: var(--omega-surface);
+    border: 1px solid var(--omega-line);
+    border-radius: var(--omega-radius-xl);
+    box-shadow: var(--omega-shadow-1);
+  }
+
+  .classy-auth__brand {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+
+    img {
+      width: 2.5rem;
+      height: 2.5rem;
+      object-fit: contain;
+      border-radius: var(--omega-radius-s);
+    }
+  }
+
+  .classy-auth__title {
+    font-size: 1.375rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    text-align: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .classy-auth__sub {
+    font-size: 0.875rem;
+    color: var(--omega-ink-muted);
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  // Social provider button: neutral ghost with the provider logo
+  .classy-auth__social {
+    img {
+      width: 1.125rem;
+      height: 1.125rem;
+      object-fit: contain;
+    }
+  }
+
+  // OR divider
+  .classy-auth__divider {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    margin-block: 1.25rem;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--omega-ink-faint);
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid var(--omega-line);
+    }
+  }
+
+  .classy-auth__foot {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--omega-ink-muted);
+
+    a {
+      font-weight: 600;
+      text-decoration: none;
+    }
+  }
+
+  // Password visibility toggle button inside the input group
+  .uj-password-toggle {
+    border: 1px solid var(--omega-line-strong);
+    background: var(--omega-surface);
+    color: var(--omega-ink-muted);
+
+    &:hover {
+      color: var(--omega-ink);
+      background: var(--omega-surface-2);
+    }
+  }
+}
+
+// Feature bullets on the cover page's side column (signup)
+.classy-auth-features {
+  .classy-auth-features__item {
+    display: flex;
+    gap: 0.875rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .classy-auth-features__title {
+    font-size: 0.9375rem;
+    font-weight: 650;
+    color: var(--omega-ink);
+  }
+
+  .classy-auth-features__desc {
+    font-size: 0.84375rem;
+    color: var(--omega-ink-muted);
+    margin-bottom: 0;
+  }
+}

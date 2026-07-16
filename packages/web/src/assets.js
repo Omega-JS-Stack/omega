@@ -230,10 +230,11 @@ async function purgeCss(options) {
   const results = await new PurgeCSS().purge({
     content: [path.join(options.outDir, '**/*.html')],
     css: [cssFile],
-    // App-shell mechanics are runtime-stamped (app-shell.js sets the
-    // data-shell-* state attributes client-side), so the content scan can
-    // never see them — keep every shell rule.
-    safelist: { greedy: [/omega-shell/] },
+    // The omega namespace is runtime-driven — app-shell.js stamps data-shell-*
+    // and the motion engine stamps data-omega-inview / data-omega-scrolled /
+    // data-omega-active client-side — so the content scan can never see those
+    // states. Keep every omega-namespaced rule.
+    safelist: { greedy: [/omega-/] },
   });
 
   fs.writeFileSync(cssFile, results[0].css);

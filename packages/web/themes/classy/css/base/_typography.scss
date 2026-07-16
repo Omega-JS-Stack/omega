@@ -1,32 +1,16 @@
-// Classy Typography
-// Modern font system with responsive headings and utilities
+// Classy v2 typography — Manus-calibrated scale on the split type system:
+// app/UI text reads --omega-font-ui, app display reads --omega-font-display,
+// marketing display reads --omega-font-marketing (serif by default; the
+// data-omega-type presets re-pair them).
 
-// ============================================
-// CSS Custom Properties
-// ============================================
-:root {
-  --bs-font-sans-serif: #{$font-family-sans-serif};
-  --bs-font-monospace: #{$classy-font-mono};
-
-  // Custom CSS variables for easy access
-  --classy-font-primary: #{$font-family-sans-serif};
-  --classy-font-mono: #{$classy-font-mono};
-}
-
-// ============================================
-// Base Typography
-// ============================================
 body {
-  font-family: $font-family-sans-serif;
-  font-size: $classy-font-size-base;
-  font-weight: 400;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--omega-font-ui);
+  letter-spacing: -0.006em;
+  line-height: 1.55;
 }
 
 // ============================================
-// Heading Styles
+// Headings — app display face, tight metrics
 // ============================================
 h1, .h1,
 h2, .h2,
@@ -34,115 +18,127 @@ h3, .h3,
 h4, .h4,
 h5, .h5,
 h6, .h6 {
-  font-family: $font-family-sans-serif;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 1rem;
+  font-family: var(--omega-font-display);
   letter-spacing: -0.02em;
 }
 
-h1, .h1 {
-  font-size: clamp(2.5rem, 5vw, $classy-font-size-6xl);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-
-  @media (max-width: $classy-breakpoint-md) {
-    font-size: $classy-font-size-4xl;
-  }
+// ============================================
+// Marketing display — the serif voice
+// ============================================
+.classy-display {
+  font-family: var(--omega-font-marketing);
+  font-weight: 560;
+  letter-spacing: -0.022em;
+  line-height: 1.04;
 }
 
-h2, .h2 {
-  font-size: clamp(2rem, 4vw, $classy-font-size-5xl);
-  font-weight: 700;
-
-  @media (max-width: $classy-breakpoint-md) {
-    font-size: $classy-font-size-3xl;
-  }
+.classy-display--hero {
+  font-size: clamp(2.75rem, 6.2vw, 4.625rem);
 }
 
-h3, .h3 {
-  font-size: clamp(1.5rem, 3vw, $classy-font-size-4xl);
-  font-weight: 600;
-
-  @media (max-width: $classy-breakpoint-md) {
-    font-size: $classy-font-size-2xl;
-  }
+.classy-display--section {
+  font-size: clamp(1.875rem, 3.4vw, 2.625rem);
+  line-height: 1.08;
 }
 
-h4, .h4 {
-  font-size: $classy-font-size-2xl;
-  font-weight: 600;
+.classy-display em,
+.classy-display i {
+  font-style: italic;
 }
 
-h5, .h5 {
-  font-size: $classy-font-size-xl;
-  font-weight: 500;
-}
-
-h6, .h6 {
-  font-size: $classy-font-size-lg;
-  font-weight: 500;
+// Serif voice on arbitrary elements (quotes, stats numbers)
+.text-marketing {
+  font-family: var(--omega-font-marketing);
 }
 
 // ============================================
-// Display Typography
+// Micro labels — the uppercase 11px voice
 // ============================================
-.display-1 {
-  font-size: clamp(3rem, 7vw, 5rem);
-  font-weight: 900;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.display-2 {
-  font-size: clamp(2.5rem, 6vw, 4rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+.classy-micro {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--omega-ink-faint);
 }
 
 // ============================================
-// Lead Text
+// Lead / muted body
 // ============================================
 .lead {
-  font-size: $classy-font-size-xl;
+  font-size: 1.09375rem;
   font-weight: 400;
   line-height: 1.6;
+  color: var(--omega-ink-muted);
+}
+
+.text-muted {
+  color: var(--omega-ink-muted) !important;
 }
 
 // ============================================
-// Code Blocks
+// Links — accent-driven (brand.color aware)
 // ============================================
-code, kbd, pre, samp {
-  font-family: $classy-font-mono;
+a {
+  color: var(--omega-accent);
+
+  &:hover {
+    color: var(--omega-accent-hover);
+  }
+}
+
+// ============================================
+// Code + kbd
+// ============================================
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--omega-font-mono);
 }
 
 code {
   padding: 0.125rem 0.375rem;
-  font-size: 0.875em;
-  border-radius: $classy-radius-sm;
+  font-size: 0.85em;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-xs);
 }
 
 pre {
-  padding: $classy-spacing-lg;
-  border-radius: $classy-radius-lg;
+  padding: 1rem 1.25rem;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
   overflow-x: auto;
 
   code {
     padding: 0;
     font-size: inherit;
+    background: transparent;
+    border: 0;
     border-radius: 0;
   }
 }
 
-// ============================================
-// Blockquotes
-// ============================================
-blockquote {
-  padding-left: $classy-spacing-lg;
-  border-left-width: 4px;
-  border-left-style: solid;
-  font-size: $classy-font-size-lg;
-  font-style: italic;
+kbd {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--omega-ink-muted);
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--omega-radius-xs);
 }
 
+// ============================================
+// Blockquotes — the serif quote voice
+// ============================================
+blockquote {
+  font-family: var(--omega-font-marketing);
+  font-size: 1.25rem;
+  line-height: 1.45;
+  padding-inline-start: 1.25rem;
+  border-inline-start: 2px solid var(--omega-line-strong);
+}

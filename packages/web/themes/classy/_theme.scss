@@ -1,41 +1,41 @@
+// Classy v2 — SCSS entry point.
+// Order matters: config (loads Bootstrap with our tokens) → root bridge
+// (Bootstrap CSS vars ← --omega-* tokens, both modes) → base → components →
+// layout → marketing → pages → universal Bootstrap overrides (shared across
+// all themes; last so @extend works).
+
 // Forward theme configuration (allows consuming project to override)
 @forward 'config';
 @use 'config' as *;
 
-// Import root overrides (CSS custom properties)
+// Token bridge + root defaults
 @import 'css/base/root';
 
-// Import base styles
-@import 'css/base/animations';
-@import 'css/base/backgrounds';
-@import 'css/base/borders';
-@import 'css/base/soft-colors';
-@import 'css/base/spacing';
+// Base styles
 @import 'css/base/typography';
 @import 'css/base/utilities';
 
-// Import layout styles
-@import 'css/layout/backend';
-@import 'css/layout/blog';
-@import 'css/layout/general';
-@import 'css/layout/navigation';
-@import 'css/layout/team';
-
-// Import component styles
-@import 'css/components/accordion';
-@import 'css/components/avatars';
-@import 'css/components/badges';
+// Components
 @import 'css/components/buttons';
 @import 'css/components/cards';
-@import 'css/components/carousel';
 @import 'css/components/forms';
-@import 'css/components/infinite-scroll';
-@import 'css/components/links';
-@import 'css/components/logo-scroll';
-@import 'css/components/spinners';
-@import 'css/components/text';
-@import 'css/components/titlebar';
+@import 'css/components/badges';
+@import 'css/components/dropdowns';
 
-// Import universal Bootstrap overrides (shared across all UJ themes)
+// Layout
+@import 'css/layout/general';
+@import 'css/layout/nav';
+@import 'css/layout/footer';
+@import 'css/layout/shell';
+
+// Marketing surfaces
+@import 'css/marketing/hero';
+@import 'css/marketing/bento';
+@import 'css/marketing/sections';
+
+// Pages
+@import 'css/pages/auth';
+
+// Universal Bootstrap overrides (shared across all UJ themes)
 // Must come AFTER Bootstrap is loaded via config to use @extend
 @import '../bootstrap/overrides';

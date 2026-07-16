@@ -1,0 +1,93 @@
+{% comment %}
+  Classy v2 in-card page header — title + actions. Breadcrumbs moved to the
+  app topbar (global/sections/app-topbar.html) but keep their frontmatter API:
+  resolved.theme.header.{title, actions} render here.
+{% endcomment %}
+{% unless resolved.theme.header.enabled == false %}
+  <div class="page-header pb-3 mb-4 hairline-bottom">
+    <div class="row align-items-center">
+      <div class="col">
+        <!-- Page Title -->
+        {% unless resolved.theme.header.title.enabled == false %}
+          <h1 class="page-title mb-0 d-flex align-items-center {{ resolved.theme.header.title.class }}">
+            {% if resolved.theme.header.title.icon %}
+              <span class="classy-icon-chip classy-icon-chip--neutral me-2">{% uj_icon resolved.theme.header.title.icon, "fa-sm" %}</span>
+            {% endif %}
+            {{- resolved.theme.header.title.content | default: resolved.meta.title | uj_liquify -}}
+          </h1>
+        {% endunless %}
+      </div>
+
+      <!-- Page Actions (Right Side) -->
+      {% unless resolved.theme.header.actions.enabled == false %}
+        {% if resolved.theme.header.actions.items %}
+          <div class="col-auto">
+            <div class="d-flex gap-2">
+              {% for action in resolved.theme.header.actions.items %}
+                {% capture action_color %}{{ action.color | default: 'adaptive' }}{% endcapture %}
+                {% if action_color == 'primary' %}
+                  {% assign action_btn = 'btn-adaptive' %}
+                {% elsif action_color == 'adaptive' %}
+                  {% assign action_btn = 'btn-outline-adaptive' %}
+                {% else %}
+                  {% capture action_btn %}btn-{{ action_color }}{% endcapture %}
+                {% endif %}
+                {% if action.dropdown %}
+                  <!-- Dropdown Button -->
+                  <div class="dropdown">
+                    <button class="btn {{ action_btn }} {% if action.size %}btn-{{ action.size }}{% endif %} dropdown-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                      {% if action.icon %}
+                        {% uj_icon action.icon, "fa-sm me-2" %}
+                      {% endif %}
+                      {{ action.label }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% for item in action.dropdown %}
+                        {% if item.divider %}
+                          <li><hr class="dropdown-divider"></li>
+                        {% else %}
+                          <li>
+                            <a class="dropdown-item" href="{{ item.href | default: '#' }}">
+                              {% if item.icon %}
+                                {% uj_icon item.icon, "fa-sm me-2" %}
+                              {% endif %}
+                              {{ item.label }}
+                            </a>
+                          </li>
+                        {% endif %}
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% else %}
+                  <!-- Regular Button -->
+                  {% capture action_class %}btn {{ action_btn }} {% if action.size %}btn-{{ action.size }}{% endif %} {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
+                  {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                  {% capture action_content %}
+                    {% if action.icon %}
+                      {% uj_icon action.icon, "fa-sm me-2" %}
+                    {% endif %}
+                    {{ action.label }}
+                  {% endcapture %}
+
+                  {% iftruthy action.href %}
+                    <a class="{{ action_class }}" href="{{ action.href }}" {{ action_attributes }}>
+                      {{ action_content }}
+                    </a>
+                  {% endiftruthy %}
+                  {% iffalsy action.href %}
+                    <button class="{{ action_class }}" type="button" {{ action_attributes }}>
+                      {{ action_content }}
+                    </button>
+                  {% endiffalsy %}
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endunless %}
+    </div>
+  </div>
+{% endunless %}

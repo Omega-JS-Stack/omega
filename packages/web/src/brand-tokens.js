@@ -19,6 +19,12 @@ const INK_LUMINANCE_THRESHOLD = 0.1791;
 // Accents darker than this lightness brighten on hover instead of darkening
 const HOVER_LIGHTEN_THRESHOLD = 0.25;
 
+// Dark-mode variant: accents at/above this lightness are already legible on
+// charcoal and pass through; darker ones lift into the floor..ceil band.
+const DARK_KEEP_THRESHOLD = 0.66;
+const DARK_LIGHTNESS_FLOOR = 0.55;
+const DARK_LIGHTNESS_CEIL = 0.78;
+
 /**
  * Parse a 3- or 6-digit hex color.
  * @param {*} value - candidate color
@@ -140,10 +146,33 @@ function shiftLightness(hsl, amount) {
 }
 
 /**
- * Compose the accent token family from a brand color.
+ * Compose one accent ramp from resolved channels.
+ * @param {{ r: number, g: number, b: number }} rgb - accent channels
+ * @param {{ h: number, s: number, l: number }} hsl - same accent in HSL
+ * @param {number} subtleAlpha - alpha for the subtle wash (mode-specific)
+ * @returns {object} { accent, accentHover, accentActive, accentSubtle, accentInk, accentRing }
+ */
+function composeRamp(rgb, hsl, subtleAlpha) {
+  const luminance = relativeLuminance(rgb);
+
+  return {
+    accent: toHex(rgb),
+    accentHover: shiftLightness(hsl, 0.07),
+    accentActive: shiftLightness(hsl, 0.11),
+    accentSubtle: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${subtleAlpha})`,
+    accentInk: luminance > INK_LUMINANCE_THRESHOLD ? INK_DARK : INK_LIGHT,
+    accentRing: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`,
+  };
+}
+
+/**
+ * Compose the accent token families from a brand color: the light ramp plus
+ * a dark-mode variant (darker brand colors lift so they stay legible on the
+ * charcoal ground — the classy v2 per-mode accent).
  * @param {string} color - brand color (#rgb or #rrggbb)
- * @returns {object|null} ramp for the head emitter, or null when unusable:
- *   { accent, accentHover, accentActive, accentSubtle, accentInk, accentRing }
+ * @returns {object|null} ramps for the head emitter, or null when unusable:
+ *   { accent, accentHover, accentActive, accentSubtle, accentInk, accentRing,
+ *     dark: { …same shape… } }
  */
 function composeBrandTokens(color) {
   const rgb = parseHex(color);
@@ -152,15 +181,14 @@ function composeBrandTokens(color) {
   }
 
   const hsl = rgbToHsl(rgb);
-  const luminance = relativeLuminance(rgb);
+  const darkHsl = hsl.l >= DARK_KEEP_THRESHOLD
+    ? hsl
+    : { ...hsl, l: Math.min(Math.max(hsl.l + 0.1, DARK_LIGHTNESS_FLOOR), DARK_LIGHTNESS_CEIL) };
+  const darkRgb = hslToRgb(darkHsl);
 
   return {
-    accent: toHex(rgb),
-    accentHover: shiftLightness(hsl, 0.07),
-    accentActive: shiftLightness(hsl, 0.11),
-    accentSubtle: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`,
-    accentInk: luminance > INK_LUMINANCE_THRESHOLD ? INK_DARK : INK_LIGHT,
-    accentRing: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`,
+    ...composeRamp(rgb, hsl, 0.12),
+    dark: composeRamp(darkRgb, darkHsl, 0.16),
   };
 }
 

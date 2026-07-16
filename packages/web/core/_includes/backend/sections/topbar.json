@@ -1,0 +1,16 @@
+{
+  search: {
+    action: '/search',
+    name: 'q',
+    placeholder: 'Search…',
+  },
+  actions: [
+    {
+      type: 'account',
+      attributes: [
+        ['data-wm-bind', '@show auth.user'],
+        ['hidden', '']
+      ],
+    }
+  ]
+}

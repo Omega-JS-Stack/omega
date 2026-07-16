@@ -1,0 +1,446 @@
+// Classy v2 app shell skin — the GitBook/Laravel-Cloud pattern over the core
+// .omega-shell mechanics (core/css/shell/_index.scss): naked sidebar on the
+// gray canvas, and the ENTIRE content area (topbar + main) reading as ONE big
+// rounded surface card. The card is composed from matching margins + radii on
+// the two grid children — the core markup contract is untouched.
+
+$card-inset: 14px;
+$shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
+
+// ── Canvas + sidebar ─────────────────────────────────────────────────────────
+
+.omega-shell__sidebar {
+  background: transparent;
+  border-inline-end: 0;
+  padding: 0.75rem 0.75rem 0.875rem;
+}
+
+// ── The big content card (topbar = its cap, main = its body) ────────────────
+
+.omega-shell__topbar {
+  margin: $card-inset $card-inset 0 0;
+  padding-inline: 1.125rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-xl) var(--omega-radius-xl) 0 0;
+}
+
+.omega-shell__main {
+  margin: 0 $card-inset $card-inset 0;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-top: 0;
+  border-radius: 0 0 var(--omega-radius-xl) var(--omega-radius-xl);
+}
+
+@media (max-width: ($shell-breakpoint - 0.02px)) {
+  // Drawer mode: the sidebar floats over the page, so it needs a real surface;
+  // the content card gets inset on all sides.
+  .omega-shell__sidebar {
+    background: var(--omega-surface);
+    border-inline-end: 1px solid var(--omega-line);
+  }
+
+  .omega-shell__topbar {
+    margin-inline-start: $card-inset;
+  }
+
+  .omega-shell__main {
+    margin-inline-start: $card-inset;
+  }
+}
+
+// Inside the card, panels sit on the surface — hairlines only.
+.omega-shell__main .card {
+  --bs-card-bg: var(--omega-surface);
+}
+
+// ── Sidebar internals ────────────────────────────────────────────────────────
+
+.classy-side__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.625rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--omega-ink);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--omega-ink);
+  }
+
+  img {
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: var(--omega-radius-xs);
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+}
+
+// Project selector module (optional)
+.classy-side__selector {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  margin-bottom: 0.5rem;
+  text-align: start;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  transition: border-color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    border-color: var(--omega-line-strong);
+  }
+
+  .classy-side__selector-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: var(--omega-accent-ink);
+    background: var(--omega-accent);
+    border-radius: var(--omega-radius-s);
+    flex-shrink: 0;
+  }
+
+  .classy-side__selector-name {
+    font-size: 0.84375rem;
+    font-weight: 600;
+    color: var(--omega-ink);
+    line-height: 1.2;
+  }
+
+  .classy-side__selector-env {
+    font-size: 0.71875rem;
+    color: var(--omega-ink-faint);
+    line-height: 1.2;
+  }
+
+  .classy-side__selector-chevron {
+    margin-inline-start: auto;
+    color: var(--omega-ink-faint);
+  }
+}
+
+// Section micro-labels
+.classy-side__label {
+  display: block;
+  margin: 1.125rem 0 0.375rem;
+  padding-inline: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--omega-ink-faint);
+}
+
+// Nav items — transparent border at rest so the ACTIVE state never shifts
+// geometry (binding constraint #5).
+.classy-side__item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  min-height: 2.125rem;
+  padding: 0.34375rem 0.625rem;
+  font-size: 0.84375rem;
+  font-weight: 550;
+  color: var(--omega-ink-muted);
+  text-align: start;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--omega-radius-s);
+  transition:
+    color var(--omega-speed) var(--omega-ease),
+    background-color var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease);
+
+  .classy-side__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    color: var(--omega-ink-faint);
+    flex-shrink: 0;
+    transition: color var(--omega-speed) var(--omega-ease);
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--omega-ink);
+    background: color-mix(in srgb, var(--omega-surface) 72%, transparent);
+
+    .classy-side__icon {
+      color: var(--omega-ink-muted);
+    }
+  }
+
+  &.active {
+    color: var(--omega-ink);
+    background: var(--omega-surface);
+    border-color: var(--omega-line);
+
+    .classy-side__icon {
+      color: var(--omega-accent);
+    }
+  }
+
+  .classy-side__chip {
+    margin-inline-start: auto;
+  }
+
+  // Group chevron (rotates when expanded)
+  .classy-side__chevron {
+    margin-inline-start: auto;
+    color: var(--omega-ink-faint);
+    transition: transform var(--omega-speed) var(--omega-ease);
+  }
+
+  &[aria-expanded='true'] .classy-side__chevron {
+    transform: rotate(90deg);
+  }
+}
+
+// Nested group children — tree hairline under the parent icon column
+.classy-side__children {
+  margin: 0.125rem 0 0.25rem 1.0625rem;
+  padding-inline-start: 0.625rem;
+  border-inline-start: 1px solid var(--omega-line);
+  list-style: none;
+
+  .classy-side__item {
+    min-height: 1.875rem;
+    font-size: 0.8125rem;
+  }
+}
+
+// Sponsored slot (optional; sits above the user row)
+.classy-side__ad {
+  padding: 0.625rem;
+  margin-top: 0.75rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  font-size: 0.78125rem;
+  color: var(--omega-ink-muted);
+}
+
+// User row (bottom)
+.classy-side__user {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.625rem 0;
+  border-top: 1px solid var(--omega-line);
+
+  .classy-side__user-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--omega-ink);
+    line-height: 1.2;
+  }
+
+  .classy-side__user-email {
+    font-size: 0.71875rem;
+    color: var(--omega-ink-faint);
+    line-height: 1.2;
+  }
+}
+
+// ── Rail collapse ────────────────────────────────────────────────────────────
+// Core hides every .omega-shell__label; classy centers what remains.
+
+.omega-shell[data-shell-collapsed='true'] {
+  .classy-side__brand,
+  .classy-side__item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .classy-side__selector {
+    justify-content: center;
+    padding: 0.5rem 0;
+  }
+
+  .classy-side__selector-chevron,
+  .classy-side__chevron,
+  .classy-side__chip,
+  .classy-side__ad,
+  .classy-side__children {
+    display: none;
+  }
+
+  .classy-side__user {
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+
+// The drawer always shows at full width with labels (mirrors the core rule).
+@media (max-width: ($shell-breakpoint - 0.02px)) {
+  .omega-shell[data-shell-collapsed='true'] {
+    .classy-side__brand,
+    .classy-side__item {
+      justify-content: flex-start;
+      padding-inline: 0.625rem;
+    }
+
+    .classy-side__selector {
+      justify-content: flex-start;
+      padding: 0.5rem 0.625rem;
+    }
+
+    .classy-side__selector-chevron,
+    .classy-side__chevron,
+    .classy-side__chip,
+    .classy-side__ad,
+    .classy-side__children {
+      display: revert;
+    }
+
+    .classy-side__children {
+      display: block;
+    }
+
+    .classy-side__user {
+      justify-content: flex-start;
+      padding-inline: 0.625rem;
+    }
+  }
+}
+
+// ── Topbar internals ─────────────────────────────────────────────────────────
+
+.classy-topbar__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--omega-ink);
+  white-space: nowrap;
+
+  .classy-topbar__crumb-sep {
+    color: var(--omega-ink-faint);
+    font-weight: 400;
+  }
+
+  a {
+    color: var(--omega-ink-muted);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--omega-ink);
+    }
+  }
+}
+
+.classy-topbar__center {
+  display: none;
+  flex: 1;
+  justify-content: center;
+  padding-inline: 1rem;
+
+  @media (min-width: 768px) {
+    display: flex;
+  }
+}
+
+// ── In-card page header (backend/core/minimal) ──────────────────────────────
+
+.page-header {
+  .page-title {
+    font-size: 1.375rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+
+  .breadcrumb {
+    --bs-breadcrumb-divider-color: var(--omega-ink-faint);
+
+    margin-bottom: 0;
+    font-size: 0.8125rem;
+
+    .breadcrumb-item {
+      color: var(--omega-ink-muted);
+
+      a {
+        color: var(--omega-ink-muted);
+        text-decoration: none;
+
+        &:hover {
+          color: var(--omega-ink);
+        }
+      }
+
+      &.active {
+        color: var(--omega-ink);
+        font-weight: 550;
+      }
+    }
+  }
+}
+
+// Iframe embedding: hide the app chrome entirely (kept from v1)
+html[data-iframed='true'] {
+  .omega-shell__sidebar,
+  .omega-shell__topbar,
+  .omega-shell__scrim,
+  .page-header {
+    display: none !important;
+  }
+
+  .omega-shell__main {
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+// Viewport-locked pages manage their own interior scroll (kept from v1)
+#main-content.page-viewport-locked {
+  overflow: hidden !important;
+}
+
+.page-content-viewport-locked {
+  min-height: 0;
+  overflow: hidden;
+
+  > * {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  > * > .tab-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+
+    > .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+  }
+}

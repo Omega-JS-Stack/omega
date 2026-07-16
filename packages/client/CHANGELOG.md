@@ -15,6 +15,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Security` in case of vulnerabilities.
 
 ---
+## [Unreleased]
+
+### Added
+- **`modules/motion.js` — the shared animation engine (classy v2, C3).** Icon-renderer-pattern factory (`createMotion()` → `start/stop/scan`) driving the `data-omega-*` motion attributes: scroll reveals (+ parent stagger), count-ups (final value lives in markup; parser handles `$`, `%`, commas, decimals, suffixes), word rotators, seamless marquee track duplication, and scroll-position watchers. Resilient by contract: no-JS pages render visible, `prefers-reduced-motion` gets static final states, missing observers degrade to instant reveal. Booted by @omega.js/web's `core/js/core/motion.js`; desktop/extension pick it up at C4.
+
+### Changed
+- **Cookie-consent default palette rides the `--omega-*` tokens** (surface/ink with hard fallbacks) instead of the legacy electric-blue `#237afc` — the banner now matches whatever theme the page runs. Consumer `cookieConsent.config.palette` overrides behave exactly as before.
+
 ## [5.0.0] - 2026-07-10
 
 ### BREAKING

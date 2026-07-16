@@ -1,0 +1,215 @@
+// Classy v2 bento — the hairline feature grid. Neutral tiles, one ink code
+// panel, a light/dark split demo, a terminal row. Accent only in icon chips
+// and small signals.
+
+.classy-bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.875rem;
+}
+
+.classy-tile {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 12;
+  padding: 1.25rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  transition:
+    transform var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--omega-line-strong);
+  }
+
+  @media (min-width: 768px) {
+    grid-column: span 6;
+  }
+
+  @media (min-width: 992px) {
+    grid-column: span 4;
+
+    &.classy-tile--wide {
+      grid-column: span 8;
+    }
+
+    &.classy-tile--tall {
+      grid-column: span 4;
+      grid-row: span 2;
+    }
+
+    &.classy-tile--big {
+      grid-column: span 8;
+      grid-row: span 2;
+    }
+  }
+
+  .classy-tile__head {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.625rem;
+  }
+
+  .classy-tile__title {
+    font-size: 0.9375rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--omega-ink);
+  }
+
+  .classy-tile__desc {
+    font-size: 0.84375rem;
+    line-height: 1.55;
+    color: var(--omega-ink-muted);
+    margin-bottom: 0;
+  }
+
+  .classy-tile__demo {
+    margin-top: auto;
+    padding-top: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .classy-tile,
+  .classy-tile:hover {
+    transform: none;
+    transition: none;
+  }
+}
+
+// ── Code tile (ink panel + omega.json5) ──────────────────────────────────────
+
+.classy-tile__code {
+  flex: 1;
+  margin-top: 1rem;
+  padding: 1rem 1.125rem;
+  font-family: var(--omega-font-mono);
+  font-size: 0.78125rem;
+  line-height: 1.75;
+  border-radius: var(--omega-radius-m);
+  overflow-x: auto;
+
+  .tok-c {
+    color: var(--omega-ink-faint); // comments
+  }
+
+  .tok-k {
+    color: var(--omega-ink-muted); // keys
+  }
+
+  .tok-v {
+    color: var(--omega-ink); // values
+  }
+
+  .tok-a {
+    color: var(--omega-accent); // the one highlighted value
+  }
+}
+
+// ── Light/dark split tile ────────────────────────────────────────────────────
+
+.classy-tile__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  overflow: hidden;
+
+  .classy-tile__split-pane {
+    padding: 0.875rem;
+
+    &:first-child {
+      background: #faf9f8;
+      border-inline-end: 1px solid var(--omega-line);
+    }
+
+    &:last-child {
+      background: #131315;
+    }
+  }
+
+  .classy-tile__split-card {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.65625rem;
+    border-radius: var(--omega-radius-s);
+  }
+
+  .classy-tile__split-pane:first-child .classy-tile__split-card {
+    color: #6d6d6c;
+    background: #fff;
+    border: 1px solid #e8e8e6;
+  }
+
+  .classy-tile__split-pane:last-child .classy-tile__split-card {
+    color: #9f9fa0;
+    background: #1d1d1f;
+    border: 1px solid #313134;
+  }
+
+  .classy-tile__split-num {
+    display: block;
+    font-size: 0.9375rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .classy-tile__split-pane:first-child .classy-tile__split-num {
+    color: #1a1a19;
+  }
+
+  .classy-tile__split-pane:last-child .classy-tile__split-num {
+    color: #ebebea;
+  }
+}
+
+// ── Terminal tile ────────────────────────────────────────────────────────────
+
+.classy-tile__term {
+  flex: 1;
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  font-family: var(--omega-font-mono);
+  font-size: 0.78125rem;
+  line-height: 1.9;
+  border-radius: var(--omega-radius-m);
+
+  .classy-term__prompt {
+    color: var(--omega-accent);
+    user-select: none;
+  }
+
+  .classy-term__out {
+    color: var(--omega-ink-muted);
+  }
+
+  .classy-term__ok {
+    color: var(--omega-ok);
+  }
+}
+
+// ── Brand-dot demo tile ──────────────────────────────────────────────────────
+
+.classy-tile__brandrow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-top: 1rem;
+
+  .classy-tile__swatch {
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 50%;
+    border: 1px solid var(--omega-line);
+    flex-shrink: 0;
+
+    &.active {
+      outline: 2px solid var(--omega-accent-ring);
+      outline-offset: 2px;
+    }
+  }
+}

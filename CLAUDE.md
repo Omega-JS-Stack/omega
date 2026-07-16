@@ -41,6 +41,10 @@ Commits never auto-publish: scaffolded workflows carry NO push triggers (workflo
 
 One Font Awesome mechanism everywhere: plain `fa-*` markup (static or set via JS — the shared `@omega.js/client` icon-renderer watches both), `uj_icon` for build-time inlining, best-first asset chain with brand-supplied Pro (never redistributed). Full contract: [docs/icons.md](docs/icons.md).
 
+## Theming (classy v2)
+
+One design-system contract: the `--omega-*` token sheet (names = stable API; light+dark plumbing built in), `brand.color` → light + dark accent ramps emitted into every head, the `.omega-shell` app chrome, and the shared motion library (`@omega.js/client` motion engine + `data-omega-*` attributes; no-JS and reduced-motion safe). classy v2 is the flagship skin: warm-paper/charcoal neutrals, zero gradients, ink primaries, serif marketing display; consumers customize colors/vibe/type from their main.scss (or fork `themes/_template`). Full contract: [docs/theming.md](docs/theming.md). Visual spec: [plans/classy-v2/DIRECTION.md](plans/classy-v2/DIRECTION.md).
+
 ## The plan
 
 The full redesign plan (context, architecture, phases, gates, amendments): [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) — vendored in-repo so it survives chat resets. Live status: [PROGRESS.md](PROGRESS.md).

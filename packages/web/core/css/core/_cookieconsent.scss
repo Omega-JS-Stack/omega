@@ -8,12 +8,13 @@
 .cookie-consent-banner {
   position: fixed;
   z-index: 9999;
-  padding: 0.75rem;
-  max-width: 450px;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-size: 1rem;
-  line-height: 1.6;
+  padding: 1rem;
+  max-width: 420px;
+  border: 1px solid var(--omega-line, rgba(0, 0, 0, 0.1));
+  border-radius: var(--omega-radius-l, 0.75rem);
+  box-shadow: var(--omega-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.15));
+  font-size: 0.875rem;
+  line-height: 1.55;
   opacity: 0;
   transform: translateY(1rem);
   transition: all 0.3s ease;
@@ -99,11 +100,11 @@
 }
 
 .cookie-consent-button {
-  padding: 0.5rem 1.25rem;
+  padding: 0.4375rem 1.125rem;
   border: none;
-  border-radius: 0.25rem;
-  font-size: 1rem;
-  font-weight: 500;
+  border-radius: var(--omega-radius-m, 0.5rem);
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;

@@ -1,264 +1,173 @@
-// Classy Button Components
-// Modern button styles inspired by premium SaaS websites
+// Classy v2 buttons — ink primaries (Manus/ElevenLabs), hairline ghosts,
+// accent reserved for the brand-aware .btn-primary. Zero gradients, zero
+// glow; feedback is motion (lift/press) and line emphasis.
+//
+// .btn-adaptive IS the ink button: the shared bootstrap-overrides layer
+// builds it from $dark/$light, which classy's config points at the ink/paper
+// neutrals — so it flips correctly in both modes with no extra rules here.
 
 // ============================================
-// Base Button Styles
+// Base
 // ============================================
 .btn {
-  font-weight: 600;
-  border-radius: $classy-radius-lg;
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
   letter-spacing: -0.01em;
-
-  &:focus {
-    box-shadow: 0 0 0 0.25rem rgba($primary, 0.25);
-  }
-
-  // // Slot machine hover effect
-  // // Works on direct text nodes when wrapped in any inline element
-  // > * {
-  //   position: relative;
-  //   display: inline-block;
-  //   transition: transform 0.3s ease;
-
-  //   // Create duplicate text below using the same content
-  //   &::before {
-  //     content: attr(data-hover);
-  //     position: absolute;
-  //     top: 100%;
-  //     left: 0;
-  //     width: max-content;
-  //     transform: translate3d(0, 0, 0);
-  //   }
-  // }
-
-  // // On hover, slide the content upward
-  // &:hover > * {
-  //   transform: translateY(-100%);
-  // }
-}
-
-// ============================================
-// Primary Button Enhancement
-// ============================================
-.btn-primary {
-  box-shadow: $classy-shadow-md, inset 0 1px 0 rgba(255, 255, 255, 0.15);
-
-  &:hover {
-    box-shadow: $classy-shadow-lg, inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  }
+  transition:
+    color var(--omega-speed) var(--omega-ease),
+    background-color var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease),
+    transform var(--omega-speed) var(--omega-ease),
+    box-shadow var(--omega-speed) var(--omega-ease);
 
   &:active {
-    box-shadow: $classy-shadow-sm, inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: scale(0.985);
   }
 }
 
-// ============================================
-// Glass Morphism Buttons
-// ============================================
-.btn-glass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: var(--bs-body-color);
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: var(--bs-body-color);
-    box-shadow: $classy-shadow-lg;
-  }
-
-  &.btn-glass-dark {
-    background: rgba(0, 0, 0, 0.1);
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.2);
-    }
-  }
-}
-
-// ============================================
-// Glow Effect Button
-// ============================================
-.btn-glow {
-  background: $primary;
-  color: white;
-  box-shadow: 0 0 20px rgba($primary, 0.4);
-
-  &:hover {
-    background: darken($primary, 5%);
-    color: white;
-    box-shadow: 0 0 30px rgba($primary, 0.6);
-    transform: translateY(-2px);
-  }
-}
-
-// ============================================
-// Secondary Button
-// ============================================
-.btn-secondary {
-  &:hover {
-    box-shadow: $classy-shadow-md;
-  }
-}
-
-// ============================================
-// Outline Button Overrides
-// ============================================
-[class*="btn-outline-"] {
-  border-width: 2px !important;
-  border-style: solid !important;
-
-  &:not(:hover):not(:active):not(.active) {
-    background: transparent !important;
-  }
-
-  // btn-check checked state needs active background, not transparent
-  // Extra :checked specificity to beat the :not(:hover):not(:active):not(.active) rule above (0,4,0)
-  .btn-check:checked:checked + & {
-    background: var(--bs-btn-active-bg) !important;
-  }
-}
-
-.btn-outline-primary {
-  border-color: $primary !important;
-  color: $primary !important;
-
-  &:hover {
-    background: $primary !important;
-    border-color: $primary !important;
-    color: white !important;
-    box-shadow: $classy-shadow-md;
-  }
-}
-
-.btn-outline-secondary {
-  border-color: $secondary !important;
-  color: $secondary !important;
-
-  &:hover {
-    background: $secondary !important;
-    border-color: $secondary !important;
-    color: white !important;
-  }
-}
-
-.btn-outline-success {
-  border-color: $success !important;
-  color: $success !important;
-
-  &:hover {
-    background: $success !important;
-    border-color: $success !important;
-    color: white !important;
-  }
-}
-
-.btn-outline-danger {
-  border-color: $danger !important;
-  color: $danger !important;
-
-  &:hover {
-    background: $danger !important;
-    border-color: $danger !important;
-    color: white !important;
-  }
-}
-
-.btn-outline-warning {
-  border-color: $warning !important;
-  color: $warning !important;
-
-  &:hover {
-    background: $warning !important;
-    border-color: $warning !important;
-    color: white !important;
-  }
-}
-
-.btn-outline-info {
-  border-color: $info !important;
-  color: $info !important;
-
-  &:hover {
-    background: $info !important;
-    border-color: $info !important;
-    color: white !important;
-  }
-}
-
-.btn-outline-light {
-  border-color: $light !important;
-  color: $light !important;
-
-  &:hover {
-    background: $light !important;
-    border-color: $light !important;
-    color: $dark !important;
-  }
-}
-
-.btn-outline-dark {
-  border-color: $dark !important;
-  color: $dark !important;
-
-  &:hover {
-    background: $dark !important;
-    border-color: $dark !important;
-    color: white !important;
-  }
-}
-
-// ============================================
-// Button Groups
-// ============================================
-.btn-group {
+@media (prefers-reduced-motion: reduce) {
   .btn {
-    border-radius: 0;
+    transition: none;
 
-    &:first-child {
-      border-top-left-radius: $classy-radius-lg;
-      border-bottom-left-radius: $classy-radius-lg;
-    }
-
-    &:last-child {
-      border-top-right-radius: $classy-radius-lg;
-      border-bottom-right-radius: $classy-radius-lg;
-    }
-  }
-
-  &.btn-group-pill .btn {
-    &:first-child {
-      border-top-left-radius: $classy-radius-full;
-      border-bottom-left-radius: $classy-radius-full;
-    }
-
-    &:last-child {
-      border-top-right-radius: $classy-radius-full;
-      border-bottom-right-radius: $classy-radius-full;
+    &:active {
+      transform: none;
     }
   }
 }
 
 // ============================================
-// Gradient Rainbow Button
+// Accent bridge — .btn-primary follows brand.color at RUNTIME
 // ============================================
-.btn-gradient-rainbow {
-  border-width: 0 !important;
-  border-color: transparent !important;
-  background-color: transparent !important;
-  background-image: $classy-gradient-rainbow !important;
-  background-size: 300% 300% !important;
-  text-transform: none !important;
-  color: rgba(255, 255, 255, 1) !important;
-  box-shadow: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  transition-duration: 0.3s !important;
+// Bootstrap compiles $primary literals into the component vars; re-pointing
+// them at the accent tokens keeps every primary button on the brand ramp
+// (and its WCAG-picked ink) without recompiling.
+.btn-primary {
+  --bs-btn-color: var(--omega-accent-ink);
+  --bs-btn-bg: var(--omega-accent);
+  --bs-btn-border-color: var(--omega-accent);
+  --bs-btn-hover-color: var(--omega-accent-ink);
+  --bs-btn-hover-bg: var(--omega-accent-hover);
+  --bs-btn-hover-border-color: var(--omega-accent-hover);
+  --bs-btn-active-color: var(--omega-accent-ink);
+  --bs-btn-active-bg: var(--omega-accent-active);
+  --bs-btn-active-border-color: var(--omega-accent-active);
+  --bs-btn-disabled-color: var(--omega-accent-ink);
+  --bs-btn-disabled-bg: var(--omega-accent);
+  --bs-btn-disabled-border-color: var(--omega-accent);
+  --bs-btn-focus-shadow-rgb: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 0.1875rem var(--omega-accent-ring);
+  }
+}
+
+.btn.btn-outline-primary {
+  --bs-btn-color: var(--omega-accent);
+  --bs-btn-border-color: var(--omega-accent);
+  --bs-btn-hover-color: var(--omega-accent-ink);
+  --bs-btn-hover-bg: var(--omega-accent);
+  --bs-btn-hover-border-color: var(--omega-accent);
+  --bs-btn-active-color: var(--omega-accent-ink);
+  --bs-btn-active-bg: var(--omega-accent-active);
+  --bs-btn-active-border-color: var(--omega-accent-active);
+}
+
+// ============================================
+// Ghost — the hairline neutral (draft-2 secondary voice)
+// ============================================
+// Outranks the shared overrides layer (which loads after the theme) via the
+// extra .btn in the selector.
+.btn.btn-outline-adaptive {
+  --bs-btn-color: var(--omega-ink);
+  --bs-btn-bg: var(--omega-surface);
+  --bs-btn-border-color: var(--omega-line-strong);
+  --bs-btn-hover-color: var(--omega-ink);
+  --bs-btn-hover-bg: var(--omega-surface-2);
+  --bs-btn-hover-border-color: var(--omega-line-strong);
+  --bs-btn-active-color: var(--omega-ink);
+  --bs-btn-active-bg: var(--omega-surface-2);
+  --bs-btn-active-border-color: var(--omega-line-strong);
+
+  color: var(--omega-ink);
+  background: var(--omega-surface);
+  border-color: var(--omega-line-strong);
+
+  &:not(:hover, :active, .active) {
+    background: var(--omega-surface) !important;
+  }
+}
+
+// ============================================
+// Command button — the mono terminal CTA ($ npx omega setup)
+// ============================================
+.btn-cmd {
+  --bs-btn-color: var(--omega-ink);
+  --bs-btn-bg: var(--omega-surface);
+  --bs-btn-border-color: var(--omega-line-strong);
+  --bs-btn-hover-color: var(--omega-ink);
+  --bs-btn-hover-bg: var(--omega-surface-2);
+  --bs-btn-hover-border-color: var(--omega-line-strong);
+  --bs-btn-active-color: var(--omega-ink);
+  --bs-btn-active-bg: var(--omega-surface-2);
+  --bs-btn-active-border-color: var(--omega-line-strong);
+
+  font-family: var(--omega-font-mono);
+  font-size: 0.845em;
+  font-weight: 500;
+  letter-spacing: 0;
+
+  .classy-cmd-prompt {
+    color: var(--omega-accent);
+    margin-inline-end: 0.5em;
+    user-select: none;
+  }
+}
+
+// ============================================
+// Icon button — square ghost (topbar, toolbars)
+// ============================================
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  padding: 0;
+  color: var(--omega-ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--omega-radius-s);
 
   &:hover {
-    opacity: 0.70;
+    color: var(--omega-ink);
+    background: var(--omega-surface-2);
+    border-color: var(--omega-line);
   }
+}
+
+// ============================================
+// Utility accent bridge (text/bg/borders follow brand.color)
+// ============================================
+.text-primary {
+  color: var(--omega-accent) !important;
+}
+
+.bg-primary {
+  background-color: var(--omega-accent) !important;
+}
+
+.border-primary {
+  border-color: var(--omega-accent) !important;
+}
+
+.form-check-input:checked {
+  background-color: var(--omega-accent);
+  border-color: var(--omega-accent);
+}
+
+.progress-bar {
+  background-color: var(--omega-accent);
+}
+
+.nav-pills {
+  --bs-nav-pills-link-active-bg: var(--omega-accent);
+  --bs-nav-pills-link-active-color: var(--omega-accent-ink);
 }

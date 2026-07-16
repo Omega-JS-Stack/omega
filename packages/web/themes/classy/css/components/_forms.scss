@@ -1,55 +1,72 @@
-// Classy Form Components
-// Modern form styling with consistent rounded corners
+// Classy v2 forms — surface fields, hairline borders, brand-aware focus.
+// Carries v1's battle-tested input-group radius + validation-layout fixes.
 
 // ============================================
-// Input Groups
+// Form controls
+// ============================================
+.form-control,
+.form-select {
+  color: var(--omega-ink);
+  background-color: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
+  transition:
+    border-color var(--omega-speed) var(--omega-ease),
+    box-shadow var(--omega-speed) var(--omega-ease);
+
+  &::placeholder {
+    color: var(--omega-ink-faint);
+  }
+
+  &:focus {
+    color: var(--omega-ink);
+    background-color: var(--omega-surface);
+    border-color: var(--omega-accent);
+    box-shadow: 0 0 0 0.1875rem var(--omega-accent-ring);
+  }
+
+  // Keep danger styling visible when an invalid field is focused — without
+  // this the classy :focus rule wins on specificity and the user sees the
+  // brand ring instead of the red one.
+  &.is-invalid:focus {
+    border-color: var(--omega-danger);
+    box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--omega-danger) 30%, transparent);
+  }
+
+  // Override Chrome/Safari autofill background with token-true colors
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px var(--omega-surface) inset !important;
+    -webkit-text-fill-color: var(--omega-ink) !important;
+    caret-color: var(--omega-ink);
+    border-color: var(--omega-accent) !important;
+    box-shadow: 0 0 0 1000px var(--omega-surface) inset, 0 0 0 2px var(--omega-accent-subtle) !important;
+  }
+}
+
+// ============================================
+// Labels & helper text
+// ============================================
+.form-label {
+  font-size: 0.84375rem;
+  font-weight: 550;
+  margin-bottom: 0.375rem;
+}
+
+.form-text {
+  font-size: 0.8125rem;
+  color: var(--omega-ink-muted);
+}
+
+// ============================================
+// Input groups — consistent radius across compositions
 // ============================================
 .input-group {
   > .form-control,
-  > .form-control.is-invalid {
-    border-radius: $classy-radius-lg;
-
-    &:not(:last-child) {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-
-    &:not(:first-child) {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-    }
-  }
-
-  // Buttons in input groups
-  > .btn {
-    border-radius: $classy-radius-lg;
-
-    &:not(:last-child) {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-
-    &:not(:first-child) {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-    }
-
-    // Last button in group
-    &:last-child {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-    }
-
-    // First button in group
-    &:first-child {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-  }
-
-  // Input group text
+  > .form-control.is-invalid,
+  > .btn,
   > .input-group-text {
-    border-radius: $classy-radius-lg;
+    border-radius: $border-radius;
 
     &:not(:last-child) {
       border-top-right-radius: 0;
@@ -60,115 +77,114 @@
       border-top-left-radius: 0;
       border-bottom-left-radius: 0;
     }
+  }
+
+  > .input-group-text {
+    background: var(--omega-surface-2);
+    border-color: var(--omega-line-strong);
+    color: var(--omega-ink-muted);
   }
 
   // When FormManager appends a sibling `.invalid-feedback` inside the
-  // input-group, the trailing button/input-group-text is no longer
-  // `:last-child` and the rules above strip its right border-radius.
-  // Bootstrap signals this layout with `.has-validation` on the input-group;
-  // restore the rounded right corners for the visually-last interactive
-  // element (the `:nth-last-child(2)` — i.e. the element before the feedback).
+  // input-group, the trailing element is no longer `:last-child` and loses
+  // its right radius. Bootstrap signals this layout with `.has-validation`;
+  // restore the rounded right corners for the visually-last element.
   &.has-validation {
     > .btn:nth-last-child(2),
     > .input-group-text:nth-last-child(2),
     > .form-control:nth-last-child(2) {
-      border-top-right-radius: $classy-radius-lg;
-      border-bottom-right-radius: $classy-radius-lg;
+      border-top-right-radius: $border-radius;
+      border-bottom-right-radius: $border-radius;
     }
   }
 }
 
 // ============================================
-// Form Controls
-// ============================================
-.form-control,
-.form-select {
-  border-radius: $classy-radius-lg;
-  border: 1px solid var(--bs-border-color);
-  background-color: var(--bs-body-bg);
-  transition: all 0.2s ease;
-
-  &:focus {
-    border-color: $primary;
-    box-shadow: 0 0 0 0.25rem rgba($primary, 0.25);
-    background-color: var(--bs-body-bg);
-  }
-
-  // Keep danger styling visible when an invalid field is focused. Without this
-  // override the classy `:focus` rule above wins on specificity and the user
-  // sees the brand-blue ring instead of the red one Bootstrap normally applies.
-  &.is-invalid:focus {
-    border-color: $danger;
-    box-shadow: 0 0 0 0.25rem rgba($danger, 0.25);
-  }
-
-  // // Override Chrome/Safari autofill background color with subtle indicator
-  &:-webkit-autofill,
-  &:-webkit-autofill:hover,
-  &:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 1000px var(--bs-body-bg) inset !important;
-    -webkit-text-fill-color: var(--bs-body-color) !important;
-    caret-color: var(--bs-body-color);
-    border-color: $primary !important;
-    box-shadow: 0 0 0 1000px var(--bs-body-bg) inset, 0 0 0 2px rgba($primary, 0.15) !important;
-  }
-}
-
-// ============================================
-// Form Labels & Text
-// ============================================
-.form-label {
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-}
-
-// Form text
-.form-text {
-  font-size: 0.875rem;
-  color: $classy-gray;
-}
-
-// ============================================
-// Custom Checkboxes & Radios
+// Checks & radios
 // ============================================
 .form-check-input {
-  border-radius: $classy-radius-sm;
-
-  &[type="radio"] {
-    border-radius: 50%;
-  }
-
-  &:checked {
-    background-color: $primary;
-    border-color: $primary;
-  }
+  background-color: var(--omega-surface);
+  border-color: var(--omega-line-strong);
 
   &:focus {
-    border-color: $primary;
-    box-shadow: 0 0 0 0.25rem rgba($primary, 0.25);
+    border-color: var(--omega-accent);
+    box-shadow: 0 0 0 0.1875rem var(--omega-accent-ring);
+  }
+}
+
+.form-switch .form-check-input:checked {
+  background-color: var(--omega-accent);
+  border-color: var(--omega-accent);
+}
+
+// ============================================
+// Search pill — the topbar ⌘K field
+// ============================================
+.classy-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 26rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.84375rem;
+  color: var(--omega-ink-faint);
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  cursor: text;
+  transition:
+    border-color var(--omega-speed) var(--omega-ease),
+    background-color var(--omega-speed) var(--omega-ease);
+
+  &:hover,
+  &:focus-within {
+    background: var(--omega-surface);
+    border-color: var(--omega-line-strong);
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    font-size: inherit;
+    color: var(--omega-ink);
+    background: transparent;
+    border: 0;
+    outline: 0;
+
+    &::placeholder {
+      color: var(--omega-ink-faint);
+    }
+  }
+
+  kbd {
+    margin-inline-start: auto;
   }
 }
 
 // ============================================
-// File Drop Zones
+// File drop zones (FormManager)
 // ============================================
 [data-file-drop] {
   cursor: pointer;
-  border: 2px dashed var(--bs-border-color) !important;
-  border-radius: $classy-radius-lg;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  border: 2px dashed var(--omega-line-strong) !important;
+  border-radius: var(--omega-radius-l);
+  transition:
+    border-color var(--omega-speed) var(--omega-ease),
+    background-color var(--omega-speed) var(--omega-ease);
 
   &.file-drop-active {
-    border-color: $primary !important;
-    background-color: rgba($primary, 0.05);
+    border-color: var(--omega-accent) !important;
+    background-color: var(--omega-accent-subtle);
   }
 
   &.file-drop-has-file {
-    border-color: $success !important;
+    border-color: var(--omega-ok) !important;
     border-style: solid !important;
   }
 
   &.file-drop-error {
-    border-color: $danger !important;
+    border-color: var(--omega-danger) !important;
   }
 }

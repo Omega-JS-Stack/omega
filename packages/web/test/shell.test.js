@@ -32,7 +32,7 @@ test('shell sheet compiles clean — zero deprecations, regions, states, breakpo
   // Regions painted by tokens, never hardcoded
   assert.match(result.css, /\.omega-shell\s*\{[^}]*var\(--omega-ground\)/s, 'shell ground from tokens');
   assert.match(result.css, /\.omega-shell__sidebar\s*\{[^}]*var\(--omega-surface\)/s, 'sidebar surface from tokens');
-  assert.match(result.css, /--omega-shell-sidebar-w: 260px/, 'shell dimension tokens declared');
+  assert.match(result.css, /--omega-shell-sidebar-w: 264px/, 'shell dimension tokens declared (classy v2 geometry)');
 
   // States
   assert.match(result.css, /\.omega-shell\[data-shell-collapsed=['"]?true['"]?\] \.omega-shell__sidebar/, 'rail collapse state');
@@ -130,10 +130,11 @@ test('a theme expresses the shell through the engine — toy backend base render
   assert.ok(app.includes('id="app-page-content"'), 'page content lands inside the shell');
 });
 
-test('the same page falls through to classy when the active theme has no shell layout', async () => {
+test('the same page falls through to classy — v2 rides the shell contract too', async () => {
   const pages = await buildWith(miniData);
   const app = pages.get('/app/');
 
   assert.ok(app && app.includes('id="app-page-content"'), 'classy backend base still renders the page');
-  assert.ok(!app.includes('data-omega-shell'), 'classy keeps its Bootstrap shell — no contract markup');
+  assert.ok(app.includes('data-omega-shell'), 'classy v2 expresses the omega-shell contract');
+  assert.ok(app.includes('classy-side__brand'), 'classy skin chrome present in the shell');
 });

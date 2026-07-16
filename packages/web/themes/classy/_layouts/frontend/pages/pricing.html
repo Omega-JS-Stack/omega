@@ -18,32 +18,25 @@ social_proof:
     - number: "4.8"
       label: "Capterra"
       show_stars: true
-      star_color: "primary"
     - number: "4.8"
       label: "G2"
       show_stars: true
-      star_color: "danger"
 
 # Testimonials Section
 testimonials:
-  superheadline:
-    icon: "megaphone"
-    text: "Testimonials"
-  headline: "People {% uj_icon \"heart\", \"text-danger\" %} "
-  headline_accent: "{{ site.brand.name }}"
-  subheadline: "Hear from real people who have transformed their business with us"
+  superheadline: "Testimonials"
   items:
-    - quote: "This platform transformed my business. The support is incredible!"
+    - quote: "This platform <em>transformed</em> my business. The support is incredible!"
       author: "Sarah Johnson"
       role: "CEO"
       company: "TechStart Inc"
       initial: "S"
-    - quote: "Best investment I've made. Achieved more here than with any consultant."
+    - quote: "Best investment I've made. Achieved more here than with <em>any</em> consultant."
       author: "Michael Chen"
       role: "Founder"
       company: "DataFlow"
       initial: "M"
-    - quote: "The community support made all the difference in our growth journey."
+    - quote: "The community support made all the difference in our <em>growth journey</em>."
       author: "Emily Davis"
       role: "Director"
       company: "Creative Studio"
@@ -52,10 +45,8 @@ testimonials:
 # FAQs Section
 faqs:
   superheadline:
-    icon: "messages-question"
     text: "FAQs"
-  headline: "Frequently asked"
-  headline_accent: "questions"
+  headline: "Frequently asked <em>questions</em>"
   subheadline: "Everything you need to know about {{ site.brand.name }} billing & subscriptions."
   items:
     - question: "Can I cancel at any time?"
@@ -87,22 +78,22 @@ faqs:
 
 <!-- Promo Banner — ON by default; pricing.promo overrides badge/text/code, pricing.promo: false kills it -->
 {% unless resolved.pricing.promo == false %}
-  <div id="pricing-promo-banner" class="position-fixed top-0 start-0 w-100 text-light text-center bg-body animation-slide-down" style="z-index: 1050;" hidden>
-    <div class="bg-primary-soft py-2 position-relative">
-      <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 mt-2 me-2" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;document.querySelector('.navbar-wrapper').style.marginTop='';document.querySelector('main > section:first-of-type').style.paddingTop=''"></button>
+  <div id="pricing-promo-banner" class="classy-promo position-fixed top-0 start-0 w-100" style="z-index: 1050;" hidden>
+    <div class="py-2 position-relative">
+      <button type="button" class="btn-close position-absolute top-50 end-0 translate-middle-y me-3" aria-label="Close" onclick="this.closest('#pricing-promo-banner').hidden=true;var n=document.querySelector('.classy-nav');if(n)n.style.marginTop='';var s=document.querySelector('main > section:first-of-type');if(s)s.style.paddingTop=''"></button>
       <div class="container-fluid">
-        <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-4">
-          <span id="pricing-promo-badge" class="badge bg-gradient-rainbow px-2 py-1 fs-6 animation-wiggle">
+        <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap pe-5">
+          <span id="pricing-promo-badge" class="classy-chip classy-chip--accent">
             {{ resolved.pricing.promo.badge | default: "15% OFF!" }}
           </span>
-          <span id="pricing-promo-text" class="fw-semibold">
+          <span id="pricing-promo-text" class="fw-semibold text-body">
             {{ resolved.pricing.promo.text | default: "Flash sale" }}
           </span>
-          <span class="text-white-50">
-            Ending in <span id="pricing-promo-countdown" class="fw-semibold text-white">--</span>
+          <span>
+            Ending in <span id="pricing-promo-countdown" class="classy-promo__countdown">--</span>
           </span>
-          <span class="text-white-50">
-            Use code <span id="pricing-promo-code" class="badge bg-white bg-opacity-25 px-2 py-1 fs-6">{{ resolved.pricing.promo.code | default: "WELCOME15" }}</span>
+          <span>
+            Use code <span id="pricing-promo-code" class="classy-promo__code classy-chip">{{ resolved.pricing.promo.code | default: "WELCOME15" }}</span>
           </span>
         </div>
       </div>
@@ -111,14 +102,14 @@ faqs:
 {% endunless %}
 
 <!-- Hero Section -->
-<section>
+<section class="classy-dotgrid pb-4">
   <div class="container">
     <div class="row justify-content-center text-center">
-      <div class="col-lg-10">
-        <h1 class="h1 mb-3">
-          {{ resolved.hero.headline | default: "The right plans," }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent | default: "for the right price" }}</span>
+      <div class="col-lg-10" data-omega-reveal>
+        <h1 class="classy-display mb-3" style="font-size: clamp(2.375rem, 4.6vw, 3.5rem);">
+          {{ resolved.hero.headline | default: "The right plans," }} <em>{{ resolved.hero.headline_accent | default: "for the right price" }}</em>
         </h1>
-        <p class="fs-5 text-muted mb-0">
+        <p class="classy-hero__sub mx-auto">
           {{ resolved.hero.subheadline | default: "Simple and affordable pricing. No hidden fees, no surprises." }}
         </p>
       </div>
@@ -132,11 +123,11 @@ faqs:
     <div class="container">
       <div class="row justify-content-center text-center">
         <div class="col-lg-8">
-          <div id="pricing-empty" class="card border-0 bg-body-tertiary p-5" data-lazy="@class animation-slide-up">
+          <div id="pricing-empty" class="card p-5" data-omega-reveal>
             <h2 class="h3 mb-3">Pricing isn't published yet</h2>
             <p class="text-muted mb-4">We're putting the finishing touches on our plans. Reach out and we'll get you set up in the meantime.</p>
             <div>
-              <a href="/contact" class="btn btn-primary btn-lg px-4">
+              <a href="/contact" class="btn btn-adaptive btn-lg px-4">
                 {% uj_icon "envelope", "me-2" %}
                 Contact us
               </a>
@@ -155,31 +146,26 @@ faqs:
     <div class="row justify-content-center">
       <div class="col-12">
         {% if _show_toggle %}
-          <div class="text-center mb-5">
-            <div class="btn-group" role="group" aria-label="Billing toggle" data-lazy="@class animation-popup">
+          <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap mb-3" data-omega-reveal>
+            <div class="classy-billing-toggle" role="group" aria-label="Billing toggle">
               <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly" {% unless _default_annual %}checked{% endunless %}>
-              <label class="btn {% unless _default_annual %}btn-primary{% else %}btn-outline-adaptive{% endunless %} rounded-start-pill" for="monthly">Monthly</label>
+              <label class="btn" for="monthly">Monthly</label>
 
               <input type="radio" class="btn-check" name="billing" id="annually" autocomplete="off" {% if _default_annual %}checked{% endif %} data-billing="annually">
-              <label class="btn {% if _default_annual %}btn-primary{% else %}btn-outline-adaptive{% endif %} rounded-end-pill position-relative" for="annually">
-                Annually
-              </label>
-
-              {% if resolved.pricing.savingsPercent > 0 %}
-                {% assign _savings = resolved.pricing.savingsPercent %}
-              {% else %}
-                {% assign _savings = 20 %}
-              {% endif %}
-              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-adaptive-inverse text-adaptive">
-                  🎁 up to {{ _savings }}% off!
-                  <span class="visually-hidden">discount</span>
-              </span>
+              <label class="btn" for="annually">Annually</label>
             </div>
+
+            {% if resolved.pricing.savingsPercent > 0 %}
+              {% assign _savings = resolved.pricing.savingsPercent %}
+            {% else %}
+              {% assign _savings = 20 %}
+            {% endif %}
+            <span class="classy-chip classy-chip--accent">Save up to {{ _savings }}%</span>
           </div>
         {% endif %}
 
         <p class="small text-muted text-center mb-4">
-          {% uj_icon "shield-check", "me-1 text-success" %}
+          {% uj_icon "shield-check", "me-1" %}
           {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
         </p>
 
@@ -198,82 +184,52 @@ faqs:
           {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2" %}
         {% endif %}
 
-        <div class="row g-4 mb-5 justify-content-center">
+        <div class="row g-4 mb-4 justify-content-center" data-omega-reveal-stagger="80">
           {% for plan in _plans %}
-            {% if plan.popular %}
-              {% assign border_classes = "border-gradient-rainbow border-3" %}
-            {% else %}
-              {% assign border_classes = "" %}
-            {% endif %}
-
-            <div class="{{ col_classes }}">
-              <div class="card h-100 {{ border_classes }} position-relative hover-flex" data-lazy="@class animation-slide-up">
+            <div class="{{ col_classes }}" data-omega-reveal>
+              <div class="card classy-price-card {% if plan.popular %}classy-price-card--popular{% endif %} h-100">
                 {% if plan.popular %}
-                  <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill bg-gradient-rainbow px-3 py-2">
-                    Most Popular
-                  </span>
+                  <span class="classy-chip classy-chip--ink classy-price-card__popular">Most popular</span>
                 {% endif %}
 
-                <div class="card-body d-flex flex-column justify-content-between p-4">
+                <div class="d-flex flex-column justify-content-between h-100">
                   <div>
                     <!-- Header -->
-                    <h3 class="card-title h2 mb-1">{{ plan.name }}</h3>
-                    <p class="text-muted small mb-3">{{ plan.tagline }}</p>
+                    <h3 class="card-title classy-price-card__name mb-0">{{ plan.name }}</h3>
+                    <p class="classy-price-card__tagline">{{ plan.tagline }}</p>
 
                     <!-- Price -->
                     {% if plan.free %}
-                      <p class="display-6 fw-bold mb-0">Free</p>
+                      <div class="classy-price-card__price">
+                        <span class="classy-price-card__amount">Free</span>
+                      </div>
                     {% else %}
                       {% if _default_annual and plan.prices.annually > 0 %}
                         {% assign _initial_amount = plan.prices.annuallyPerMonth %}
                       {% else %}
                         {% assign _initial_amount = plan.prices.monthly %}
                       {% endif %}
-                      <p class="mb-0">
-                        <span class="display-6 fw-bold">
-                          <span class="fs-3">$</span><span class="amount" data-monthly="{{ plan.prices.monthly }}" data-annually="{{ plan.prices.annuallyPerMonth }}">{{ _initial_amount }}</span>
-                        </span>
-                        <small class="text-muted">/month</small>
-                      </p>
+                      <div class="classy-price-card__price">
+                        <span class="classy-price-card__currency">$</span>
+                        <span class="classy-price-card__amount amount" data-monthly="{{ plan.prices.monthly }}" data-annually="{{ plan.prices.annuallyPerMonth }}">{{ _initial_amount }}</span>
+                        <span class="classy-price-card__per">/month</span>
+                      </div>
                     {% endif %}
 
                     <!-- Price per unit (consumer knob: pricing.price_per_unit) -->
                     {% if resolved.pricing.price_per_unit.enabled %}
                       {% include core/pricing/price-per-unit.html plan=plan %}
-                      <p class="text-muted small mb-4">
+                      <p class="classy-price-card__billing mb-0">
                         {% if monthly_price_per_unit %}
                           <span class="price-per-unit" data-monthly="${{ monthly_price_per_unit }}" data-annually="${{ annual_price_per_unit }}">${{ annual_price_per_unit }}</span> per {{ resolved.pricing.price_per_unit.label }}
                         {% elsif plan.free %}
-                          <!-- Placeholder text for free plan to maintain consistent height -->
                           Perfect for trying out
                         {% endif %}
                       </p>
                     {% endif %}
 
-                    <!-- Button -->
-                    <div class="d-grid mb-3 {% unless resolved.pricing.price_per_unit.enabled %}mt-3{% endunless %}">
-                      {% iftruthy plan.url %}
-                        <a href="{{ plan.url }}" class="btn {% if plan.free %}btn-adaptive{% else %}btn-primary{% endif %} btn-md fw-semibold px-2 fs-5">
-                          {% if plan.trialDays > 0 %}
-                            Get free trial
-                          {% else %}
-                            Get started
-                          {% endif %}
-                        </a>
-                      {% endiftruthy %}
-                      {% iffalsy plan.url %}
-                        <button class="btn btn-primary btn-md fw-semibold px-2 fs-5" data-plan-id="{{ plan.id }}" data-plan-type="subscription">
-                          {% if plan.trialDays > 0 %}
-                            Get free trial
-                          {% else %}
-                            Get started
-                          {% endif %}
-                        </button>
-                      {% endiffalsy %}
-                    </div>
-
                     <!-- Billing info -->
-                    <p class="text-center text-muted small mb-1">
+                    <p class="classy-price-card__billing">
                       {% if plan.free %}
                         <span>No credit card required</span>
                       {% else %}
@@ -288,28 +244,55 @@ faqs:
                       {% endif %}
                     </p>
 
+                    <!-- Button -->
+                    <div class="d-grid classy-price-card__cta">
+                      {% if plan.popular %}
+                        {% assign _plan_btn = "btn-adaptive" %}
+                      {% else %}
+                        {% assign _plan_btn = "btn-outline-adaptive" %}
+                      {% endif %}
+                      {% iftruthy plan.url %}
+                        <a href="{{ plan.url }}" class="btn {{ _plan_btn }} fw-semibold">
+                          {% if plan.trialDays > 0 %}
+                            Get free trial
+                          {% else %}
+                            Get started
+                          {% endif %}
+                        </a>
+                      {% endiftruthy %}
+                      {% iffalsy plan.url %}
+                        <button class="btn {{ _plan_btn }} fw-semibold" data-plan-id="{{ plan.id }}" data-plan-type="subscription">
+                          {% if plan.trialDays > 0 %}
+                            Get free trial
+                          {% else %}
+                            Get started
+                          {% endif %}
+                        </button>
+                      {% endiffalsy %}
+                    </div>
+
                     {% if plan.free %}
-                      <p class="text-center text-muted small mb-3">
-                        {% uj_icon "rocket", "me-1 text-success" %}
+                      <p class="classy-price-card__note">
+                        {% uj_icon "rocket", "me-1" %}
                         Upgrade any time
                       </p>
                     {% else %}
-                      <p class="text-center text-muted small mb-3">
-                        {% uj_icon "shield-check", "me-1 text-success" %}
+                      <p class="classy-price-card__note">
+                        {% uj_icon "shield-check", "me-1" %}
                         {{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
                       </p>
                     {% endif %}
 
                     {% if plan.features.size > 0 %}
-                      <hr class="border-1">
+                      <hr>
 
                       <!-- Features -->
                       <div>
                         <!-- Features common to every plan, with this plan's values -->
-                        <ul class="list-unstyled mb-3">
+                        <ul class="classy-price-card__features mb-3">
                           {% for feature in plan.commonFeatures %}
-                            <li class="d-flex align-items-start mb-2">
-                              <span class="me-3">{% uj_icon feature.icon, "fa-md" %}</span>
+                            <li>
+                              <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
                               <span>
                                 {% if feature.value == 'Unlimited' %}
                                   Unlimited
@@ -329,21 +312,20 @@ faqs:
 
                         {% if plan.extraFeatures.size > 0 %}
                           {% if forloop.first %}
-                            <div class="text-muted small mb-2">
-                              <em>What you get:</em>
+                            <div class="classy-price-card__tier-note">
+                              What you get:
                             </div>
                           {% else %}
                             {% assign _prev_index = forloop.index0 | minus: 1 %}
                             {% assign _prev_plan = _plans[_prev_index] %}
-                            <div class="text-muted small mb-2">
-                              <em>Everything in</em>
-                              <em><strong>{{ _prev_plan.name }}</strong>, and more:</em>
+                            <div class="classy-price-card__tier-note">
+                              Everything in <strong>{{ _prev_plan.name }}</strong>, and more:
                             </div>
                           {% endif %}
-                          <ul class="list-unstyled mb-0">
+                          <ul class="classy-price-card__features mb-0">
                             {% for feature in plan.extraFeatures %}
-                              <li class="d-flex align-items-start mb-2 {% if forloop.last %}mb-0{% endif %}">
-                                <span class="me-3">{% uj_icon feature.icon, "fa-md" %}</span>
+                              <li{% if forloop.last %} class="mb-0"{% endif %}>
+                                <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
                                 <span>
                                   {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
                                     {{ feature.value }}
@@ -363,9 +345,8 @@ faqs:
                         {% elsif forloop.first == false %}
                           {% assign _prev_index = forloop.index0 | minus: 1 %}
                           {% assign _prev_plan = _plans[_prev_index] %}
-                          <div class="text-muted small mb-2">
-                            <em>Everything in</em>
-                            <em><strong>{{ _prev_plan.name }}</strong></em>
+                          <div class="classy-price-card__tier-note mb-0">
+                            Everything in <strong>{{ _prev_plan.name }}</strong>
                           </div>
                         {% endif %}
                       </div>
@@ -379,15 +360,15 @@ faqs:
 
         <!-- Enterprise card — ON by default; pricing.enterprise overrides copy, pricing.enterprise: false kills it -->
         {% unless resolved.pricing.enterprise == false %}
-          <div class="row g-4 mt-3 justify-content-center">
+          <div class="row g-4 mt-2 justify-content-center">
             <div class="col-12 col-md-8 col-lg-6">
-              <div class="card border-0" data-lazy="@class animation-slide-up">
-                <div class="card-body p-4 text-center">
-                  <h3 class="h2 mb-3">{{ resolved.pricing.enterprise.name | default: "Enterprise" }}</h3>
-                  <h4 class="mb-4">{{ resolved.pricing.enterprise.price_label | default: "Custom pricing" }}</h4>
-                  <p class="mb-4">{{ resolved.pricing.enterprise.description | default: "Custom solutions for large organizations. Advanced security and flexible pricing based on your needs." }}</p>
-                  <button class="btn btn-primary btn-lg" data-plan-id="enterprise">
-                    {% uj_icon "envelope", "fa-lg me-2" %}
+              <div class="card classy-price-card text-center" data-omega-reveal>
+                <h3 class="classy-price-card__name mb-1">{{ resolved.pricing.enterprise.name | default: "Enterprise" }}</h3>
+                <p class="classy-price-card__tagline mb-3">{{ resolved.pricing.enterprise.price_label | default: "Custom pricing" }}</p>
+                <p class="text-muted mb-4">{{ resolved.pricing.enterprise.description | default: "Custom solutions for large organizations. Advanced security and flexible pricing based on your needs." }}</p>
+                <div>
+                  <button class="btn btn-outline-adaptive px-4" data-plan-id="enterprise">
+                    {% uj_icon "envelope", "me-2" %}
                     <span class="button-text">
                       {{ resolved.pricing.enterprise.button_text | default: "Contact us" }}
                     </span>
@@ -408,49 +389,48 @@ faqs:
 <!-- One-time Purchases Section (friction #7: presented per type, no billing cadence) -->
 <section class="pt-0">
   <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-      <h2 class="h2 mb-2">
+    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+      <h2 class="classy-display classy-display--section">
         {{ resolved.pricing.one_time_headline | default: "One-time" }}
-        <span class="text-accent">{{ resolved.pricing.one_time_headline_accent | default: "purchases" }}</span>
+        <em>{{ resolved.pricing.one_time_headline_accent | default: "purchases" }}</em>
       </h2>
-      <p class="fs-5 text-muted">
+      <p>
         {{ resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever — no subscription required." }}
       </p>
     </div>
 
-    <div class="row g-4 justify-content-center">
+    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="80">
       {% for product in _onetime %}
-        <div class="col-12 col-md-6 col-lg-5 col-xl-4">
-          <div class="card h-100 position-relative hover-flex" data-lazy="@class animation-slide-up">
-            <div class="card-body d-flex flex-column justify-content-between p-4">
+        <div class="col-12 col-md-6 col-lg-5 col-xl-4" data-omega-reveal>
+          <div class="card classy-price-card h-100">
+            <div class="d-flex flex-column justify-content-between h-100">
               <div>
-                <h3 class="card-title h2 mb-1">{{ product.name }}</h3>
-                <p class="text-muted small mb-3">{{ product.tagline }}</p>
+                <h3 class="card-title classy-price-card__name mb-0">{{ product.name }}</h3>
+                <p class="classy-price-card__tagline">{{ product.tagline }}</p>
 
-                <p class="mb-0">
-                  <span class="display-6 fw-bold">
-                    <span class="fs-3">$</span>{{ product.price | uj_commaify }}
-                  </span>
-                  <small class="text-muted">one-time</small>
-                </p>
+                <div class="classy-price-card__price">
+                  <span class="classy-price-card__currency">$</span>
+                  <span class="classy-price-card__amount">{{ product.price | uj_commaify }}</span>
+                  <span class="classy-price-card__per">one-time</span>
+                </div>
 
-                <div class="d-grid mb-3 mt-3">
-                  <button class="btn btn-primary btn-md fw-semibold px-2 fs-5" data-plan-id="{{ product.id }}" data-plan-type="one-time">
+                <div class="d-grid classy-price-card__cta">
+                  <button class="btn btn-adaptive fw-semibold" data-plan-id="{{ product.id }}" data-plan-type="one-time">
                     Buy now
                   </button>
                 </div>
 
-                <p class="text-center text-muted small mb-3">
-                  {% uj_icon "circle-check", "me-1 text-success" %}
+                <p class="classy-price-card__note">
+                  {% uj_icon "circle-check", "me-1" %}
                   Yours forever — pay once
                 </p>
 
                 {% if product.features.size > 0 %}
-                  <hr class="border-1">
-                  <ul class="list-unstyled mb-0">
+                  <hr>
+                  <ul class="classy-price-card__features mb-0">
                     {% for feature in product.features %}
-                      <li class="d-flex align-items-start mb-2 {% if forloop.last %}mb-0{% endif %}">
-                        <span class="me-3">{% uj_icon feature.icon, "fa-md" %}</span>
+                      <li{% if forloop.last %} class="mb-0"{% endif %}>
+                        <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
                         <span>
                           {% if feature.value == 'Unlimited' %}
                             Unlimited
@@ -477,35 +457,29 @@ faqs:
 {% assign _comparison_count = _comparison_features | size %}
 {% if _plan_count > 1 and _comparison_count > 0 %}
 <!-- Feature Comparison Grid -->
-<section>
+<section class="classy-compare">
   <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-      {% assign _fc_super = resolved.feature_comparison.superheadline.text | default: "Features" %}
-      <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-        {% uj_icon "sparkles", "me-1" %}
-        {{ _fc_super }}
-      </span>
-      <h2 class="h2 mb-2">
+    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+      <span class="classy-micro">{{ resolved.feature_comparison.superheadline.text | default: "Compare" }}</span>
+      <h2 class="classy-display classy-display--section">
         {{ resolved.feature_comparison.headline | default: "Compare all" }}
-        <span class="text-accent">{{ resolved.feature_comparison.headline_accent | default: "plans" }}</span>
+        <em>{{ resolved.feature_comparison.headline_accent | default: "plans" }}</em>
       </h2>
-      <p class="fs-5 text-muted">
+      <p>
         {{ resolved.feature_comparison.subheadline | default: "See exactly what's included in each plan" }}
       </p>
       <!-- Mobile scroll indicator -->
       <div class="d-md-none">
         <small class="text-muted">
           <span class="me-2">Swipe to see more</span>
-          <span class="animation-pulse-right d-inline-block">
-            {% uj_icon "arrow-right", "text-primary" %}
-          </span>
+          {% uj_icon "arrow-right", "fa-sm" %}
         </small>
       </div>
     </div>
   </div>
 
   <div class="container">
-    <div class="table-responsive" data-lazy="@class animation-slide-up">
+    <div class="table-responsive" data-omega-reveal>
       <table class="table caption-top">
         <caption>Compare features</caption>
         <thead>
@@ -531,13 +505,13 @@ faqs:
                 {% assign _cell = feature.values[plan.id] %}
                 <td>
                   {% if _cell == true %}
-                    {% uj_icon "check-circle", "text-success fs-5" %}
+                    <span class="classy-price-card__check">{% uj_icon "check-circle", "fa-md" %}</span>
                   {% elsif _cell == 'Unlimited' %}
                     Unlimited
                   {% elsif _cell %}
                     {{ _cell | uj_commaify }}
                   {% else %}
-                    {% uj_icon "times-circle", "text-muted fs-5 opacity-25" %}
+                    <span class="text-muted opacity-25">{% uj_icon "minus", "fa-sm" %}</span>
                   {% endif %}
                 </td>
               {% endfor %}
@@ -554,21 +528,20 @@ faqs:
 {% iftruthy resolved.social_proof.items %}
 <section>
   <div class="container">
-    <div class="row text-center g-4">
+    <div class="classy-stats" data-omega-reveal-stagger="80">
       {% for item in resolved.social_proof.items %}
-        <div class="col-6 col-md-3" data-lazy="@class animation-slide-up">
-          <h2 class="display-5 fw-bold mb-0">{{ item.number }}</h2>
+        <div class="classy-stat" data-omega-reveal>
+          <div class="classy-stat__num" data-omega-countup>{{ item.number }}</div>
           {% iftruthy item.show_stars %}
-            <div class="mb-0">
+            <div class="mt-1" style="color: var(--omega-accent);">
               {% for i in (1..5) %}
-                {% capture uj_migrate_arg_1 %}text-{{ item.star_color }}{% endcapture %}
-                {% uj_icon "star", uj_migrate_arg_1 %}
+                {% uj_icon "star", "fa-xs" %}
               {% endfor %}
             </div>
           {% endiftruthy %}
-          <p class="text-muted mb-0">{{ item.label }}</p>
+          <div class="classy-stat__label">{{ item.label }}</div>
           {% iftruthy item.sublabel %}
-            <p class="small text-muted {% if forloop.last %}mb-0{% endif %}">{{ item.sublabel }}</p>
+            <div class="classy-stat__sub">{{ item.sublabel }}</div>
           {% endiftruthy %}
         </div>
       {% endfor %}
@@ -580,36 +553,16 @@ faqs:
 <!-- CTA Section -->
 <section>
   <div class="container">
-    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
-      <!-- Decorative icon - top right -->
-      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
-        {% uj_icon "messages-question", "text-white" %}
-      </div>
-
-      <!-- Decorative icon - bottom left -->
-      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
-        {% uj_icon "shield-check", "text-white" %}
-      </div>
-
-      <div class="position-relative">
-        <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
-          {% uj_icon "comments", "me-1" %}
-          {{ resolved.cta.superheadline.text | default: "Support" }}
-        </span>
-
-        <h2 class="h3 fw-bold mb-3">
-          {{ resolved.cta.headline | default: "Need help finding the right plan for your" }}
-          <span class="text-accent">{{ resolved.cta.headline_accent | default: "needs?" }}</span>
-        </h2>
-
-        <p class="lead mb-4">{{ resolved.cta.subheadline | default: "Talk to our support team" }}</p>
-
-        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-          <a href="{{ resolved.cta.button.href | default: '/contact' }}" class="btn btn-light btn-lg px-4">
-            {% uj_icon "headset", "me-2" %}
-            {{ resolved.cta.button.text | default: "Talk to us" }}
-          </a>
-        </div>
+    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
+      <h2 class="classy-cta__headline">
+        {{ resolved.cta.headline | default: "Need help finding the right plan?" }}
+      </h2>
+      <p class="classy-cta__sub">{{ resolved.cta.subheadline | default: "Talk to our support team — we'll point you to exactly what you need." }}</p>
+      <div class="classy-cta__ctas">
+        <a href="{{ resolved.cta.button.href | default: '/contact' }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+          {{ resolved.cta.button.text | default: "Talk to us" }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
       </div>
     </div>
   </div>
@@ -625,34 +578,28 @@ faqs:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+        <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
           {% iftruthy resolved.faqs.superheadline.text %}
-            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-              {% iftruthy resolved.faqs.superheadline.icon %}
-                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
-              {% endiftruthy %}
-              {{ resolved.faqs.superheadline.text }}
-            </span>
+            <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
           {% endiftruthy %}
-          <h2 class="h2 mb-2">
-            {{ resolved.faqs.headline | default: "Frequently asked" }}
-            <span class="text-accent">{{ resolved.faqs.headline_accent | default: "questions" }}</span>
+          <h2 class="classy-display classy-display--section">
+            {{ resolved.faqs.headline | default: "Frequently asked <em>questions</em>" }}
           </h2>
           {% iftruthy resolved.faqs.subheadline %}
-            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+            <p>{{ resolved.faqs.subheadline }}</p>
           {% endiftruthy %}
         </div>
 
-        <div class="accordion" id="faqAccordion" data-lazy="@class animation-slide-up">
+        <div class="accordion classy-faq" id="faqAccordion" data-omega-reveal>
           {% for faq in resolved.faqs.items %}
-            <div class="accordion-item border-0 mb-3">
+            <div class="accordion-item">
               <h2 class="accordion-header">
-                <button class="accordion-button collapsed py-4" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
-                  <span class="fw-semibold">{{ faq.question }}</span>
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                  <span>{{ faq.question }}</span>
                 </button>
               </h2>
               <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                <div class="accordion-body text-muted">
+                <div class="accordion-body">
                   {{ faq.answer }}
                 </div>
               </div>

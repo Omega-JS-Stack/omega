@@ -1,45 +1,60 @@
-// Classy General Layout
-// Standard spacing and layout rules
+// Classy v2 general layout — section rhythm + breakout utilities.
 
 // ============================================
-// Section Spacing
+// Section rhythm
 // ============================================
-// First section gets extra top padding to account for fixed navbar
-// This keeps section backgrounds flush with navbar (no gap/line)
+// Every frontend page is a stack of <section>s; the first one absorbs the
+// fixed-nav height so backgrounds run flush behind the transparent nav.
 main {
   > section {
     padding-top: 4rem;
     padding-bottom: 4rem;
 
     @media (min-width: 992px) {
-      padding-top: 7rem;
-      padding-bottom: 7rem;
+      padding-top: 5.5rem;
+      padding-bottom: 5.5rem;
     }
 
-    // First section: add navbar height to top padding
-    // Using :first-of-type so it works even if other elements (like banners) come before
     &:first-of-type {
-      padding-top: 10rem; // 6rem navbar + 4rem section
+      padding-top: 8.5rem; // 4rem nav clearance + section
 
       @media (min-width: 992px) {
-        padding-top: 10.5rem; // 3.5rem navbar + 7rem section
+        padding-top: 10rem;
       }
     }
   }
 }
 
-// ============================================
-// Section Breakout Utilities
-// ============================================
+// Shared section header (micro label + display headline + sub)
+.classy-section-head {
+  max-width: 44rem;
 
-// Horizontal breakout - full width (edge-to-edge)
+  .classy-micro {
+    display: block;
+    margin-bottom: 0.875rem;
+  }
+
+  p {
+    margin-top: 1rem;
+    color: var(--omega-ink-muted);
+    font-size: 1.03125rem;
+  }
+}
+
+.classy-section-head--center {
+  margin-inline: auto;
+  text-align: center;
+}
+
+// ============================================
+// Section breakout utilities (edge-to-edge helpers, kept from v1)
+// ============================================
 .section-breakout-x {
   margin-left: calc(-50vw + 50%);
   margin-right: calc(-50vw + 50%);
   width: 100vw;
 }
 
-// Horizontal breakout - nearly full width (with padding on left/right)
 .section-breakout-x-nearly {
   margin-left: calc(-50vw + 50% + 0.25rem);
   margin-right: calc(-50vw + 50% + 0.25rem);
@@ -58,14 +73,13 @@ main {
   }
 }
 
-// Responsive breakout classes (Bootstrap-style breakpoints)
-// Small and up (576px+)
 @media (min-width: 576px) {
   .section-breakout-x-sm {
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
     width: 100vw;
   }
+
   .section-breakout-x-nearly-sm {
     margin-left: calc(-50vw + 50% + 0.25rem);
     margin-right: calc(-50vw + 50% + 0.25rem);
@@ -73,13 +87,13 @@ main {
   }
 }
 
-// Medium and up (768px+)
 @media (min-width: 768px) {
   .section-breakout-x-md {
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
     width: 100vw;
   }
+
   .section-breakout-x-nearly-md {
     margin-left: calc(-50vw + 50% + 1rem);
     margin-right: calc(-50vw + 50% + 1rem);
@@ -87,13 +101,13 @@ main {
   }
 }
 
-// Large and up (992px+)
 @media (min-width: 992px) {
   .section-breakout-x-lg {
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
     width: 100vw;
   }
+
   .section-breakout-x-nearly-lg {
     margin-left: calc(-50vw + 50% + 1rem);
     margin-right: calc(-50vw + 50% + 1rem);
@@ -101,13 +115,13 @@ main {
   }
 }
 
-// Extra large and up (1200px+)
 @media (min-width: 1200px) {
   .section-breakout-x-xl {
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
     width: 100vw;
   }
+
   .section-breakout-x-nearly-xl {
     margin-left: calc(-50vw + 50% + 1.5rem);
     margin-right: calc(-50vw + 50% + 1.5rem);
@@ -115,13 +129,13 @@ main {
   }
 }
 
-// XXL and up (1400px+)
 @media (min-width: 1400px) {
   .section-breakout-x-xxl {
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
     width: 100vw;
   }
+
   .section-breakout-x-nearly-xxl {
     margin-left: calc(-50vw + 50% + 1.5rem);
     margin-right: calc(-50vw + 50% + 1.5rem);
@@ -129,14 +143,12 @@ main {
   }
 }
 
-// Vertical breakout - top (pull section up behind navbar)
-// Use this when you want the section to extend behind the transparent navbar
+// Pull a section up behind the transparent nav
 .section-breakout-top {
-  margin-top: -6rem;
-  padding-top: 10rem !important; // 6rem navbar + 4rem section
+  margin-top: -4rem;
+  padding-top: 8.5rem !important;
 
   @media (min-width: 992px) {
-    margin-top: -3.5rem;
-    padding-top: 10.5rem !important; // 3.5rem navbar + 7rem section
+    padding-top: 10rem !important;
   }
 }

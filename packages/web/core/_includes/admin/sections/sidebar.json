@@ -3,6 +3,18 @@
     href: '/',
     class: 'filter-adaptive',
   },
+  selector: {
+    enabled: true,
+    name: '{{ site.brand.name }}',
+    env: 'Production',
+    dropdown: [
+      {
+        label: '{{ site.brand.name }}',
+        href: '/admin/dashboard',
+        icon: 'circle-check'
+      },
+    ]
+  },
   links: [
     {
       label: 'Dashboard',

@@ -335,7 +335,7 @@ function setupCurrentPlanIndicator() {
     if ($currentButton) {
       $currentButton.disabled = true;
       $currentButton.textContent = 'Current Plan';
-      $currentButton.classList.remove('btn-primary', 'btn-gradient-rainbow', 'gradient-animated');
+      $currentButton.classList.remove('btn-primary', 'btn-outline-adaptive');
       $currentButton.classList.add('btn-adaptive');
     }
 
@@ -352,10 +352,11 @@ function setupCurrentPlanIndicator() {
 
 function adjustNavbarOffset() {
   const $promoBanner = document.getElementById('pricing-promo-banner');
-  const $navbarWrapper = document.querySelector('.navbar-wrapper');
+  // The fixed nav the banner pushes down (classy v2's .classy-nav; .navbar-wrapper for legacy themes)
+  const $nav = document.querySelector('.classy-nav, .navbar-wrapper');
   const $firstSection = document.querySelector('main > section:first-of-type');
 
-  if (!$promoBanner || !$navbarWrapper) {
+  if (!$promoBanner || !$nav) {
     return;
   }
 
@@ -366,7 +367,7 @@ function adjustNavbarOffset() {
   const bannerOffset = bannerHeight - 10;
 
   // Push navbar down to make room for banner
-  $navbarWrapper.style.marginTop = `${bannerOffset}px`;
+  $nav.style.marginTop = `${bannerOffset}px`;
 
   // Also increase first section padding to account for banner
   if ($firstSection) {

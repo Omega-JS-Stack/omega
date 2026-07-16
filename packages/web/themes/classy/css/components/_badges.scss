@@ -1,25 +1,72 @@
-// Classy Badge Components
-// Badges and labels that can extend outside their containers
+// Classy v2 badges + chips — quiet neutrals, status told by dot + label
+// (never color alone). Accent enters only as the small signal chip.
 
-// ============================================
-// Badge Soft Colors & Gradient
-// ============================================
-.badge-gradient {
-  background: $classy-gradient-primary;
-}
-
-.badge-soft-primary {
-  background: $classy-primary-soft;
-}
-
-// Global fix - any element containing a badge should not clip
-// * {
-//   &:has(.badge) {
-//     overflow: visible !important;
-//   }
-// }
-
-// Base badge styling improvements
+// Base badge behavior (kept from v1: never clipped by parents)
 .badge {
-  z-index: 100; // Ensure badge is always on top
+  z-index: 100;
+}
+
+// ============================================
+// Chip — the hairline micro-pill (counts, SPONSORED, NEW, env tags)
+// ============================================
+.classy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.5625rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--omega-ink-muted);
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-pill, 50rem);
+  white-space: nowrap;
+}
+
+.classy-chip--accent {
+  color: var(--omega-accent);
+  background: var(--omega-accent-subtle);
+  border-color: transparent;
+}
+
+.classy-chip--ink {
+  color: var(--omega-ground);
+  background: var(--omega-ink);
+  border-color: var(--omega-ink);
+}
+
+// ============================================
+// Status pill — dot + label
+// ============================================
+.classy-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 550;
+  color: var(--omega-ink-muted);
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-pill, 50rem);
+  white-space: nowrap;
+
+  .classy-dot {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+.classy-status--ok {
+  color: var(--omega-ok);
+}
+
+.classy-status--warn {
+  color: var(--omega-warn);
+}
+
+.classy-status--danger {
+  color: var(--omega-danger);
 }

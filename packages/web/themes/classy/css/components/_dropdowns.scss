@@ -1,0 +1,44 @@
+// Classy v2 dropdowns — solid surface, hairline, soft float shadow.
+
+.dropdown-menu {
+  --bs-dropdown-bg: var(--omega-surface);
+  --bs-dropdown-border-color: var(--omega-line);
+  --bs-dropdown-link-color: var(--omega-ink);
+  --bs-dropdown-link-hover-color: var(--omega-ink);
+  --bs-dropdown-link-hover-bg: var(--omega-surface-2);
+  --bs-dropdown-link-active-color: var(--omega-ink);
+  --bs-dropdown-link-active-bg: var(--omega-surface-2);
+  --bs-dropdown-divider-bg: var(--omega-line);
+
+  box-shadow: var(--omega-shadow-2);
+
+  .dropdown-item {
+    border-radius: var(--omega-radius-s);
+    font-weight: 500;
+
+    // Semantic text colors keep their hue on hover
+    &.text-danger:hover {
+      background: color-mix(in srgb, var(--omega-danger) 10%, transparent);
+    }
+
+    &.text-success:hover {
+      background: color-mix(in srgb, var(--omega-ok) 10%, transparent);
+    }
+
+    &.text-warning:hover {
+      background: color-mix(in srgb, var(--omega-warn) 10%, transparent);
+    }
+  }
+
+  .dropdown-divider {
+    opacity: 1;
+  }
+
+  .dropdown-header {
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--omega-ink-faint);
+  }
+}

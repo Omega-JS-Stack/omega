@@ -1,15 +1,180 @@
-// Classy Utility Classes
-// Custom helper classes and theme-specific utilities
+// Classy v2 utilities — the small shared vocabulary the marketing + app
+// surfaces compose from. Paint comes from tokens; zero gradients anywhere
+// (the only permitted fades are alpha masks and monotone chart fills).
 
 // ============================================
-// Shadow Utilities (Classy-specific)
+// Hairlines
 // ============================================
-.shadow-xs { box-shadow: $classy-shadow-xs !important; }
-.shadow-sm { box-shadow: $classy-shadow-sm !important; }
-.shadow-md { box-shadow: $classy-shadow-md !important; }
-.shadow-lg { box-shadow: $classy-shadow-lg !important; }
-.shadow-xl { box-shadow: $classy-shadow-xl !important; }
-.shadow-2xl { box-shadow: $classy-shadow-2xl !important; }
-.shadow-glow { box-shadow: $classy-shadow-glow !important; }
-.shadow-none { box-shadow: none !important; }
+.hairline {
+  border: 1px solid var(--omega-line);
+}
 
+.hairline-top {
+  border-top: 1px solid var(--omega-line);
+}
+
+.hairline-bottom {
+  border-bottom: 1px solid var(--omega-line);
+}
+
+// ============================================
+// Ink panel — the always-dark slab (CTA band, code tiles). Deliberately
+// near-constant across modes: in light it's the contrast moment, in dark it
+// reads as a lifted surface. Redefines the local token scope so anything
+// inside paints correctly.
+// ============================================
+.classy-ink-panel {
+  --omega-surface: #1d1d20;
+  --omega-surface-2: #26262a;
+  --omega-ink: #f2f1ef;
+  --omega-ink-muted: #a5a4a1;
+  --omega-ink-faint: #777673;
+  --omega-line: #313134;
+  --omega-line-strong: #3f3f43;
+
+  color: var(--omega-ink);
+  background: #161618;
+  border-radius: var(--omega-radius-xl);
+}
+
+[data-bs-theme='dark'] .classy-ink-panel {
+  background: #131315;
+  border: 1px solid var(--omega-line);
+}
+
+// ============================================
+// Dotted grid backdrop (hero) — masked so it breathes out at the edges
+// ============================================
+.classy-dotgrid {
+  position: relative;
+}
+
+.classy-dotgrid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--omega-line-strong) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 72% 62% at 50% 32%, #000 30%, transparent 72%);
+  pointer-events: none;
+}
+
+.classy-dotgrid > * {
+  position: relative;
+}
+
+// ============================================
+// Glassy surface (scrolled nav, floating chrome) — blur + translucent
+// surface, hairline edge. No gradient, no glow.
+// ============================================
+.bg-glassy {
+  background: color-mix(in srgb, var(--omega-surface) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+// ============================================
+// Brand dot — the accent signature mark
+// ============================================
+.classy-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--omega-accent);
+  flex-shrink: 0;
+}
+
+.classy-dot--ok {
+  background: var(--omega-ok);
+}
+
+.classy-dot--warn {
+  background: var(--omega-warn);
+}
+
+.classy-dot--danger {
+  background: var(--omega-danger);
+}
+
+// ============================================
+// Icon chip — small rounded icon tiles (bento, lists)
+// ============================================
+.classy-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: var(--omega-radius-m);
+  background: var(--omega-accent-subtle);
+  color: var(--omega-accent);
+  flex-shrink: 0;
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.classy-icon-chip--neutral {
+  background: var(--omega-surface-2);
+  color: var(--omega-ink-muted);
+  border: 1px solid var(--omega-line);
+}
+
+// ============================================
+// Adaptive helpers kept from v1 (shared layouts reference them)
+// ============================================
+.bg-adaptive-inverse {
+  background: var(--omega-ink) !important;
+  color: var(--omega-ground) !important;
+}
+
+.text-adaptive {
+  color: var(--omega-ink) !important;
+}
+
+// Accent text (used across marketing headlines)
+.text-accent {
+  color: var(--omega-accent) !important;
+}
+
+// Legacy interaction/soft-color names still referenced by pages awaiting
+// their skin-arc remake — mapped onto the v2 language.
+.hover-flex {
+  transition: transform var(--omega-speed) var(--omega-ease), border-color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--omega-line-strong);
+  }
+}
+
+.bg-primary-soft {
+  background: var(--omega-accent-subtle) !important;
+}
+
+// Legacy gradient class names — neutralized to flat token paint so any
+// straggler markup renders clean while its surface awaits the skin-arc
+// remake. New surfaces must NOT use these.
+.bg-gradient-rainbow,
+.bg-gradient-primary,
+.bg-gradient-aurora,
+.bg-gradient-sunset,
+.bg-gradient-dark {
+  background: #161618 !important;
+  color: #f2f1ef;
+}
+
+.bg-gradient-light {
+  background: var(--omega-surface-2) !important;
+}
+
+.text-gradient-rainbow {
+  color: var(--omega-accent) !important;
+}
+
+.border-gradient-rainbow {
+  border-color: var(--omega-line-strong) !important;
+}

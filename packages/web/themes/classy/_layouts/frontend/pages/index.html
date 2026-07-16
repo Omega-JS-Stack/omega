@@ -6,12 +6,33 @@ theme:
   main:
     class: "pt-0"
 
-# Hero Section
+# Hero Section — serif display + rotating italic second line, ink CTA + mono
+# command, floating product frame. Every key is consumer-overridable.
 hero:
-  tagline: "Introducing {{ site.brand.name }}"
-  headline: "The #1 platform <br> for business"
-  headline_accent: "success"
-  description: "AI automation for modern businesses made simple"
+  badge:
+    text: "Introducing {{ site.brand.name }}"
+    href: null
+  headline: "The platform for"
+  rotating:
+    - "modern business"
+    - "shipping faster"
+    - "scaling your team"
+  description: "Everything you need to launch, measure, and grow — auth, payments, analytics, and every surface of your product in one place."
+  primary_button:
+    text: "Get started free"
+    href: "/signup"
+  command: "npx omega setup"
+  command_href: "/download"
+  secondary_button:
+    enabled: false
+    text: "See pricing"
+    href: "/pricing"
+  meta:
+    - "Free plan"
+    - "No credit card required"
+    - "Set up in minutes"
+  frame:
+    enabled: true
   demo:
     enabled: false
     type: "input"
@@ -26,46 +47,51 @@ hero:
       subtext: "No credit card required"
       button:
         text: "Start free trial"
-        icon: "rocket"
-        class: "btn-adaptive-inverse"
-  primary_button:
-    text: "Get started free"
-    icon: "rocket"
-    href: "/dashboard"
-    class: "btn-light"
-  secondary_button:
-    text: "See pricing"
-    icon: "book-open"
-    href: "/pricing"
-    class: "btn-outline-light"
-  badge:
-    title: "Industry leader"
-    subtitle: "2024 award"
-    icon: "trophy"
+        class: "btn-adaptive"
 
-# Trusted By Section
+# Trusted By Section — masked logo marquee
 trusted_by:
-  headline: "Trusted by the best"
+  headline: "Trusted by teams at"
   logos:
-    # - name: "airbnb"
     - name: "amazon"
     - name: "google"
     - name: "hubspot"
     - name: "paypal"
-    # - name: "netflix"
-    # - name: "spotify"
     - name: "slack"
     - name: "shopify"
     - name: "stripe"
-    # - name: "uber"
 
-# Product Demo Section
+# Bento Section — the hairline feature grid
+bento:
+  superheadline: "Why {{ site.brand.name }}"
+  headline: "Everything you need. <em>Nothing you don't.</em>"
+  subheadline: "A complete foundation that stays out of your way — configure once, ship everywhere."
+  items:
+    - type: "code"
+      span: "big"
+      title: "One config, every surface"
+      description: "A single file drives your brand, targets, and integrations — change it once and every page follows."
+    - type: "split"
+      span: "tall"
+      title: "Light & dark, born together"
+      description: "Every component ships in both modes from day one — no bolted-on dark theme."
+    - type: "terminal"
+      title: "Deploy in one verb"
+      description: "Build, verify, and publish from a single command."
+    - type: "brand"
+      title: "Your brand, everywhere"
+      description: "One brand color recolors every accent surface — buttons, links, focus rings, charts."
+    - type: "default"
+      icon: "shield-halved"
+      title: "Auth & accounts built in"
+      description: "Sign-in, subscriptions, and billing flows ready on day one."
+
+# Product Demo Section (optional video tabs — off by default)
 product_demo:
+  enabled: false
   superheadline:
-    icon: "rocket"
     text: "Demo"
-  headline: "See {{ site.brand.name }} in"
-  headline_accent: "action"
+  headline: "See {{ site.brand.name }} in action"
   subheadline: "Explore powerful features that help you succeed"
   tabs:
     - id: "dashboard"
@@ -75,9 +101,7 @@ product_demo:
       features:
         - "Easy setup"
         - "Powerful tools"
-        - "Fast performance"
         - "Real-time updates"
-        - "Simple interface"
     - id: "analytics"
       label: "Analytics"
       icon: "chart-line"
@@ -86,153 +110,82 @@ product_demo:
         - "Advanced analytics"
         - "Custom reports"
         - "Data insights"
-        - "Export options"
-        - "Team collaboration"
-    - id: "security"
-      label: "Security"
-      icon: "shield-halved"
-      video: "https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-3.webm"
-      features:
-        - "Enterprise security"
-        - "Access control"
-        - "Audit trails"
-        - "Compliance tools"
-        - "Data protection"
 
-# Showcase Section
+# Showcase Section (optional alternating rows — off by default)
 showcase:
+  enabled: false
   superheadline:
-    icon: "cubes"
     text: "Showcase"
-  headline: "What makes {{ site.brand.name }}"
-  headline_accent: "different"
+  headline: "What makes {{ site.brand.name }} different"
   subheadline: "Powerful features designed to accelerate your success"
-  image_ratio: "4x3" # Options: 1x1, 4x3, 16x9, 21x9
-  image_object_position: "center" # Options: center, top, bottom, left, right
+  image_ratio: "4x3"
+  image_object_position: "center"
   items:
     - title: "Seamless integration"
-      description: "Connect with your existing tools and platforms effortlessly. Our system automatically syncs data and streamlines your workflow for maximum efficiency."
+      description: "Connect with your existing tools and platforms effortlessly."
       image: "https://cdn.itwcreativeworks.com/assets/sample/images/demos/1x1/sample-demo-1.svg"
     - title: "Data-driven insights"
-      description: "Make informed decisions with real-time analytics and actionable insights that help you understand what matters most to your business."
+      description: "Make informed decisions with real-time analytics and actionable insights."
       image: "https://cdn.itwcreativeworks.com/assets/sample/images/demos/1x1/sample-demo-2.svg"
-    - title: "Smart automation"
-      description: "Focus on what matters while our intelligent platform handles routine tasks automatically, working 24/7 to keep your business running smoothly."
-      image: "https://cdn.itwcreativeworks.com/assets/sample/images/demos/1x1/sample-demo-3.svg"
 
-# Features Section
-features:
-  superheadline:
-    icon: "sparkles"
-    text: "Features"
-  headline: "Design made"
-  headline_accent: "simple"
-  subheadline: "Get unlimited design requests delivered fast with our streamlined process."
-  cta_button:
-    text: "Get started"
-    icon: "rocket"
-    href: "/dashboard"
-  items:
-    - title: "Subscribe"
-      description: "Choose your plan and submit unlimited design requests."
-      icon: "rotate"
-    - title: "Receive"
-      description: "Get your designs delivered in as fast as two business days."
-      icon: "bolt"
-    - title: "Revise"
-      description: "Request unlimited revisions until it's perfect."
-      icon: "thumbs-up"
-
-# Testimonials Section
-testimonials:
-  superheadline:
-    icon: "megaphone"
-    text: "Testimonials"
-  headline: "People {% uj_icon \"heart\", \"text-danger\" %} "
-  headline_accent: "{{ site.brand.name }}"
-  subheadline: "Hear from real people who have transformed their business with us"
-  items:
-    - quote: "This platform transformed my business. The support is incredible!"
-      author: "Sarah Johnson"
-      role: "CEO"
-      company: "TechStart Inc"
-      initial: "S"
-    - quote: "Best investment I've made. Achieved more here than with any consultant."
-      author: "Michael Chen"
-      role: "Founder"
-      company: "DataFlow"
-      initial: "M"
-    - quote: "The community support made all the difference in our growth journey."
-      author: "Emily Davis"
-      role: "Director"
-      company: "Creative Studio"
-      initial: "E"
-
-# Stats Section
+# Stats Section — serif numbers, count-up on reveal
 stats:
   - number: "50,000+"
     label: "Active users"
     sublabel: "From 120+ countries"
-    icon: "users"
-    color: "primary"
+  - number: "99.98%"
+    label: "Uptime"
+    sublabel: "Last 12 months"
   - number: "200+"
-    label: "Solutions"
-    sublabel: "Industry-leading"
-    icon: "book"
-    color: "success"
+    label: "Releases shipped"
+    sublabel: "And counting"
   - number: "4.9"
     label: "Average rating"
-    icon: "star"
-    color: "warning"
-    show_stars: true
-  - number: "98%"
-    label: "Success rate"
-    sublabel: "Business growth"
-    icon: "certificate"
-    color: "info"
+    sublabel: "Across review platforms"
 
-# CTA Section
+# Testimonials Section — rendered as the serif quote rotator
+testimonials:
+  superheadline: "Testimonials"
+  items:
+    - quote: "This platform <em>transformed</em> how we ship. We went from idea to production in a weekend."
+      author: "Sarah Johnson"
+      role: "CEO, TechStart Inc"
+      initial: "S"
+    - quote: "Best investment we've made. Everything just works — <em>together</em>."
+      author: "Michael Chen"
+      role: "Founder, DataFlow"
+      initial: "M"
+    - quote: "The kind of foundation you usually spend a year building. We got it on <em>day one</em>."
+      author: "Emily Davis"
+      role: "Director, Creative Studio"
+      initial: "E"
+
+# CTA Section — the ink band
 cta:
-  superheadline:
-    icon: "rocket"
-    text: "Launch"
-  headline: "Ready to transform your"
-  headline_accent: "business?"
-  description: "Join thousands of successful companies who have already accelerated their growth with {{ site.brand.name }}"
+  headline: "Ready to build something people remember?"
+  description: "Join thousands of teams already shipping with {{ site.brand.name }}."
   primary_button:
-    text: "Start today"
-    icon: "rocket"
-    href: "/dashboard"
-  secondary_button:
-    text: "Talk to an expert"
-    icon: "comments"
-    href: "/contact"
+    text: "Start free today"
+    href: "/signup"
+  command: "npx omega setup"
+  command_href: "/download"
 ---
 
-<!-- Hero Section -->
+{% comment %} ── Hero demo capture (input/form/video/custom — optional conversion module) {% endcomment %}
 {% assign demo = resolved.hero.demo %}
-{% assign demo_placement = demo.placement | default: "bottom" %}
-{% assign is_side_layout = false %}
-{% if demo.enabled and demo_placement == "side" %}
-  {% assign is_side_layout = true %}
-{% endif %}
-
-{% comment %} Capture demo content once to avoid duplication {% endcomment %}
 {% capture hero_demo_content %}
   {% if demo.type == "input" %}
-    <!-- Input Demo: Single input with button -->
-    <div class="card bg-glassy border-0 {% unless is_side_layout %}mx-auto{% endunless %} {{ demo.options.class }}">
-      <div class="card-body">
-        <form id="hero-demo-form" class="d-flex flex-column {% unless is_side_layout %}flex-sm-row justify-content-center{% endunless %} gap-3" {% iftruthy demo.options.redirect %}data-redirect="{{ demo.options.redirect }}"{% endiftruthy %} data-form-state="initializing" onsubmit="return false">
+    <div class="card {% if demo.options.class %}{{ demo.options.class }}{% endif %} mx-auto">
+      <div class="card-body p-3">
+        <form id="hero-demo-form" class="d-flex flex-column flex-sm-row justify-content-center gap-2" {% iftruthy demo.options.redirect %}data-redirect="{{ demo.options.redirect }}"{% endiftruthy %} data-form-state="initializing" onsubmit="return false">
           <input
             type="{{ demo.options.input_type | default: 'text' }}"
             name="{{ demo.options.name | default: 'input' }}"
-            class="form-control form-control-lg border-0"
+            class="form-control form-control-lg"
             placeholder="{{ demo.options.placeholder }}"
             {% iftruthy demo.options.required %}required{% endiftruthy %}
-            autofocus
           >
-          {% assign demo_btn_class = demo.options.button.class | default: "btn-adaptive-inverse" %}
+          {% assign demo_btn_class = demo.options.button.class | default: "btn-adaptive" %}
           <button type="submit" class="btn {{ demo_btn_class }} btn-lg text-nowrap flex-shrink-0">
             {% iftruthy demo.options.button.icon %}
               {% uj_icon demo.options.button.icon, "me-2" %}
@@ -242,219 +195,256 @@ cta:
         </form>
       </div>
     </div>
-
-  {% elsif demo.type == "form" %}
-    <!-- Form Demo: Multiple fields with card styling -->
-    <div class="{% unless is_side_layout %}mx-auto{% endunless %} {{ demo.options.class }}">
-      <form id="hero-demo-form" {% iftruthy demo.options.redirect %}data-redirect="{{ demo.options.redirect }}"{% endiftruthy %} data-form-state="initializing" onsubmit="return false">
-        <div class="row g-3 {% unless is_side_layout %}justify-content-center{% endunless %}">
-          {% assign autofocus_set = false %}
-          {% for field in demo.options.fields %}
-            {% assign field_size = field.size | default: "half" %}
-            <div class="col-12 {% if field_size == 'half' %}col-sm-6{% endif %}">
-              <div class="card bg-glassy border-0">
-                <div class="card-body p-3">
-                  {% iftruthy field.label %}
-                    <label for="hero-demo-{{ field.name }}" class="form-label d-flex align-items-center mb-2">
-                      {% iftruthy field.icon %}
-                        {% uj_icon field.icon, "me-2" %}
-                      {% endiftruthy %}
-                      {{ field.label }}
-                      {% iftruthy field.required %}<span class="text-danger ms-1">*</span>{% endiftruthy %}
-                    </label>
-                  {% endiftruthy %}
-                  {% if field.type == "select" %}
-                    <select
-                      id="hero-demo-{{ field.name }}"
-                      name="{{ field.name }}"
-                      class="form-select form-select-lg border-0"
-                      {% iftruthy field.required %}required{% endiftruthy %}
-                    >
-                      <option value="" disabled selected>{{ field.placeholder }}</option>
-                      {% for option in field.options %}
-                        <option value="{{ option.value }}">{{ option.label }}</option>
-                      {% endfor %}
-                    </select>
-                  {% elsif field.type == "textarea" %}
-                    <textarea
-                      id="hero-demo-{{ field.name }}"
-                      name="{{ field.name }}"
-                      class="form-control form-control-lg border-0"
-                      placeholder="{{ field.placeholder }}"
-                      rows="{{ field.rows | default: 3 }}"
-                      {% iftruthy field.required %}required{% endiftruthy %}
-                      {% unless autofocus_set %}autofocus{% assign autofocus_set = true %}{% endunless %}
-                    ></textarea>
-                  {% else %}
-                    <input
-                      id="hero-demo-{{ field.name }}"
-                      type="{{ field.type | default: 'text' }}"
-                      name="{{ field.name }}"
-                      class="form-control form-control-lg border-0"
-                      placeholder="{{ field.placeholder }}"
-                      {% iftruthy field.required %}required{% endiftruthy %}
-                      {% unless autofocus_set %}autofocus{% assign autofocus_set = true %}{% endunless %}
-                    >
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-          {% endfor %}
-          {% assign form_btn_class = demo.options.button.class | default: "btn-adaptive-inverse" %}
-          <div class="col-12 {% if demo.options.button.full_width != true %}col-sm-auto{% endif %}">
-            <button type="submit" class="btn {{ form_btn_class }} btn-lg w-100 h-100">
-              {% iftruthy demo.options.button.icon %}
-                {% uj_icon demo.options.button.icon, "me-2" %}
-              {% endiftruthy %}
-              {{ demo.options.button.text }}
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
-
-  {% elsif demo.type == "video" %}
-    <!-- Video Demo: Embedded video player -->
-    <div class="{% unless is_side_layout %}mx-auto{% endunless %} {{ demo.options.class }}">
-      <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-        <div class="ratio ratio-16x9">
-          {% capture uj_migrate_arg_1 %}{{ demo.options.controls }}{% endcapture %}
-          {% capture uj_migrate_arg_2 %}{{ demo.options.loop }}{% endcapture %}
-          {% capture uj_migrate_arg_3 %}{{ demo.options.autoplay }}{% endcapture %}
-          {% capture uj_migrate_arg_4 %}{{ demo.options.muted }}{% endcapture %}
-          {% uj_video demo.options.src, class="w-100 d-block object-fit-cover border-0", controls=uj_migrate_arg_1, loop=uj_migrate_arg_2, autoplay=uj_migrate_arg_3, playsinline="true", muted=uj_migrate_arg_4, preload="metadata" %}
-        </div>
-      </div>
-    </div>
-
   {% elsif demo.type == "custom" %}
-    <!-- Custom Demo: Renders content block -->
-    <div id="hero-demo-custom" class="{% unless is_side_layout %}mx-auto{% endunless %} {{ demo.options.class }}">
+    <div id="hero-demo-custom" class="mx-auto {{ demo.options.class }}">
       {{ demo.options.content }}
     </div>
-
   {% endif %}
 
   {% iftruthy demo.options.subtext %}
-    <p class="small mt-3 opacity-70 {% if is_side_layout %}text-center mb-0{% endif %}">{{ demo.options.subtext }}</p>
+    <p class="classy-hero__meta justify-content-center mt-3 mb-0">{{ demo.options.subtext }}</p>
   {% endiftruthy %}
 {% endcapture %}
 
-{% comment %} Capture CTA buttons {% endcomment %}
-{% capture hero_cta_buttons %}
-  {% assign primary_btn_class = resolved.hero.primary_button.class | default: "btn-adaptive" %}
-  {% assign secondary_btn_class = resolved.hero.secondary_button.class | default: "btn-outline-adaptive" %}
-  {% assign show_primary = resolved.hero.primary_button.enabled %}
-  {% assign show_secondary = resolved.hero.secondary_button.enabled %}
-  {% if show_primary == nil %}{% assign show_primary = true %}{% endif %}
-  {% if show_secondary == nil %}{% assign show_secondary = true %}{% endif %}
-  {% if show_primary or show_secondary %}
-    <div class="d-flex flex-row flex-wrap gap-3 justify-content-center {% if is_side_layout %}justify-content-lg-start{% endif %}">
-      {% if show_primary %}
-        <a href="{{ resolved.hero.primary_button.href }}" class="btn {{ primary_btn_class }} btn-lg py-3 {% if is_side_layout %}px-4{% else %}px-5{% endif %}">
-          {% uj_icon resolved.hero.primary_button.icon, "me-2" %}
-          {{ resolved.hero.primary_button.text }}
+<!-- ═══ Hero ═══ -->
+<section class="classy-hero classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    {% iftruthy resolved.hero.badge.text %}
+      {% if resolved.hero.badge.href %}
+        <a class="classy-hero__badge" href="{{ resolved.hero.badge.href }}" data-omega-reveal>
+          <span class="classy-dot"></span>
+          {{ resolved.hero.badge.text }}
+          {% uj_icon "arrow-right", "fa-xs" %}
         </a>
+      {% else %}
+        <div data-omega-reveal>
+          <span class="classy-hero__badge">
+            <span class="classy-dot"></span>
+            {{ resolved.hero.badge.text }}
+          </span>
+        </div>
       {% endif %}
-      {% if show_secondary %}
-        <a href="{{ resolved.hero.secondary_button.href }}" class="btn {{ secondary_btn_class }} btn-lg py-3 {% if is_side_layout %}px-4{% else %}px-5{% endif %}">
-          {% uj_icon resolved.hero.secondary_button.icon, "me-2" %}
+    {% endiftruthy %}
+
+    <h1 class="classy-display classy-display--hero" data-omega-reveal>
+      {{ resolved.hero.headline }}<br>
+      {% if resolved.hero.rotating and resolved.hero.rotating.size > 0 %}
+        <span class="classy-hero__rotator" data-omega-rotate="2600">
+          {%- for word in resolved.hero.rotating -%}
+            <span>{{ word }}</span>
+          {%- endfor -%}
+        </span>
+      {% else %}
+        <em>{{ resolved.hero.headline_accent }}</em>
+      {% endif %}
+    </h1>
+
+    {% iftruthy resolved.hero.description %}
+      <p class="classy-hero__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+    {% endiftruthy %}
+
+    <div class="classy-hero__ctas" data-omega-reveal>
+      {% iftruthy resolved.hero.primary_button.text %}
+        <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+          {{ resolved.hero.primary_button.text }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      {% endiftruthy %}
+      {% iftruthy resolved.hero.command %}
+        <a href="{{ resolved.hero.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
+          <span class="classy-cmd-prompt">$</span>{{ resolved.hero.command }}
+        </a>
+      {% endiftruthy %}
+      {% if resolved.hero.secondary_button.enabled != false and resolved.hero.secondary_button.text %}
+        <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
           {{ resolved.hero.secondary_button.text }}
         </a>
       {% endif %}
     </div>
-  {% endif %}
-{% endcapture %}
 
-<section class="bg-gradient-rainbow gradient-animated gradient-grain text-light overflow-hidden position-relative min-vh-80 d-flex align-items-center rounded-bottom-4 shadow-lg">
-  <div class="container py-5">
-    <div class="row justify-content-center {% if is_side_layout %}align-items-center{% endif %}">
-      <!-- Text Column -->
-      <div class="{% if is_side_layout %}col-lg-6 text-center text-lg-start{% else %}col-lg-10 text-center py-5{% endif %}">
-        <div data-lazy="@class animation-slide-up">
-          <p class="text-uppercase fw-semibold mb-3 opacity-80">{{ resolved.hero.tagline }}</p>
-
-          <h1 class="h1 fw-900 mb-4">
-            {{ resolved.hero.headline }} <span class="text-accent">{{ resolved.hero.headline_accent }}</span>
-          </h1>
-
-          <p class="fs-4 mb-4 opacity-80">
-            {{ resolved.hero.description }}
-          </p>
-
-          {% if is_side_layout %}
-            <!-- Side layout: CTA buttons go here, demo goes in right column -->
-            {{ hero_cta_buttons }}
-          {% else %}
-            <!-- Bottom layout: CTA buttons, then demo below -->
-            {{ hero_cta_buttons }}
-            {% if demo.enabled %}
-              <div class="mt-5">
-                {{ hero_demo_content }}
-              </div>
-            {% endif %}
-          {% endif %}
-        </div>
+    {% if resolved.hero.meta and resolved.hero.meta.size > 0 %}
+      <div class="classy-hero__meta" data-omega-reveal>
+        {% for item in resolved.hero.meta %}
+          <span>{% uj_icon "check", "fa-xs me-1" %}{{ item }}</span>
+        {% endfor %}
       </div>
+    {% endif %}
 
-      {% if is_side_layout %}
-        <!-- Demo Column (Side Placement) -->
-        <div class="col-lg-6 mt-5 mt-lg-0">
-          <div data-lazy="@class animation-slide-up">
-            {{ hero_demo_content }}
+    {% if demo.enabled %}
+      <div class="mt-4" data-omega-reveal>
+        {{ hero_demo_content }}
+      </div>
+    {% endif %}
+
+    {% if resolved.hero.frame.enabled != false %}
+      <!-- Floating product frame (pure-CSS product mock; ambient float + tilt) -->
+      <div class="classy-hero__frame omega-float" data-omega-reveal="scale" aria-hidden="true">
+        <div class="classy-hero__frame-inner">
+          <div class="classy-mock">
+            <div class="classy-mock__topbar">
+              <span class="classy-mock__dots"><span></span><span></span><span></span></span>
+              <span>{{ site.brand.name }} · Overview</span>
+              <span class="classy-status classy-status--ok ms-auto"><span class="classy-dot classy-dot--ok"></span>Production</span>
+            </div>
+            <div class="classy-mock__body">
+              <div class="classy-mock__side">
+                <div class="classy-mock__side-item active"><span class="classy-mock__side-ico"></span>Overview</div>
+                <div class="classy-mock__side-item"><span class="classy-mock__side-ico"></span>Analytics</div>
+                <div class="classy-mock__side-item"><span class="classy-mock__side-ico"></span>Deploys</div>
+                <div class="classy-mock__side-item"><span class="classy-mock__side-ico"></span>Domains</div>
+                <div class="classy-mock__side-item"><span class="classy-mock__side-ico"></span>Settings</div>
+              </div>
+              <div class="classy-mock__main">
+                <div class="classy-mock__tiles">
+                  <div class="classy-mock__tile">
+                    <div class="classy-mock__tile-label">Requests</div>
+                    <div class="classy-mock__tile-value">128.4k</div>
+                    <div class="classy-mock__tile-delta">▲ 12.4%</div>
+                  </div>
+                  <div class="classy-mock__tile">
+                    <div class="classy-mock__tile-label">Active users</div>
+                    <div class="classy-mock__tile-value">8,912</div>
+                    <div class="classy-mock__tile-delta">▲ 3.1%</div>
+                  </div>
+                  <div class="classy-mock__tile">
+                    <div class="classy-mock__tile-label">p95 latency</div>
+                    <div class="classy-mock__tile-value">142ms</div>
+                    <div class="classy-mock__tile-delta">▼ 8ms</div>
+                  </div>
+                </div>
+                <div class="classy-mock__chart">
+                  <svg viewBox="0 0 560 150" preserveAspectRatio="none" role="img" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="classy-hero-fade" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="currentColor" stop-opacity="0.16"/>
+                        <stop offset="1" stop-color="currentColor" stop-opacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    <line x1="0" y1="40" x2="560" y2="40" style="stroke: var(--omega-line);" stroke-width="1"/>
+                    <line x1="0" y1="85" x2="560" y2="85" style="stroke: var(--omega-line);" stroke-width="1"/>
+                    <line x1="0" y1="130" x2="560" y2="130" style="stroke: var(--omega-line);" stroke-width="1"/>
+                    <path d="M0,112 C40,104 70,92 110,96 C150,100 180,74 220,70 C260,66 290,80 330,64 C370,48 400,54 440,40 C480,28 520,34 560,22 L560,150 L0,150 Z" fill="url(#classy-hero-fade)"/>
+                    <path d="M0,120 C48,116 84,108 124,110 C164,112 204,96 244,94 C284,92 316,98 356,88 C396,80 436,84 476,72 C516,62 536,60 560,52" fill="none" style="stroke: var(--omega-chart-2);" stroke-width="1.5" stroke-dasharray="4 5"/>
+                    <path d="M0,112 C40,104 70,92 110,96 C150,100 180,74 220,70 C260,66 290,80 330,64 C370,48 400,54 440,40 C480,28 520,34 560,22" fill="none" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      {% endif %}
-    </div>
+      </div>
+    {% endif %}
   </div>
 </section>
 
-<!-- Trusted By Section -->
-<section class="overflow-hidden pt-7">
-  <div class="container-fluid px-0">
-    <div class="text-center mb-3" data-lazy="@class animation-slide-up">
-      <h3 class="fs-4">{{ resolved.trusted_by.headline }}</h3>
+<!-- ═══ Trusted-by marquee ═══ -->
+{% if resolved.trusted_by.logos and resolved.trusted_by.logos.size > 0 %}
+  <section class="classy-logos overflow-hidden pt-0">
+    <div class="container-fluid px-0" data-omega-reveal="fade">
+      <span class="classy-micro">{{ resolved.trusted_by.headline }}</span>
+      <div class="omega-marquee" data-omega-marquee>
+        <div class="omega-marquee__track">
+          {% for logo in resolved.trusted_by.logos %}
+            <div class="omega-marquee__item">
+              {% if logo.src %}
+                <img src="{{ logo.src | uj_cachebreak }}" alt="{{ logo.name }}" loading="lazy"/>
+              {% else %}
+                <span class="classy-logos__word">{{ logo.name }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
+  </section>
+{% endif %}
 
-    <div class="infinite-scroll-wrapper" data-lazy="@class animation-slide-up">
-      <div class="infinite-scroll-track">
-        {% for logo in resolved.trusted_by.logos %}
-          <div class="infinite-scroll-item infinite-scroll-item--logo filter-adaptive hover-opacity">
-            {% uj_logo logo.name, "combomarks", "original" %}
+<!-- ═══ Bento ═══ -->
+{% if resolved.bento.items and resolved.bento.items.size > 0 %}
+  <section>
+    <div class="container">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+        {% iftruthy resolved.bento.superheadline %}
+          <span class="classy-micro">{{ resolved.bento.superheadline }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ resolved.bento.headline }}</h2>
+        {% iftruthy resolved.bento.subheadline %}
+          <p>{{ resolved.bento.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+
+      <div class="classy-bento" data-omega-reveal-stagger="70">
+        {% for item in resolved.bento.items %}
+          {% capture span_class %}{% if item.span == 'big' %}classy-tile--big{% elsif item.span == 'tall' %}classy-tile--tall{% elsif item.span == 'wide' %}classy-tile--wide{% endif %}{% endcapture %}
+          <div class="classy-tile {{ span_class }}" data-omega-reveal>
+            <div class="classy-tile__head">
+              {% iftruthy item.icon %}
+                <span class="classy-icon-chip">{% uj_icon item.icon, "fa-sm" %}</span>
+              {% endiftruthy %}
+              <span class="classy-tile__title">{{ item.title }}</span>
+            </div>
+            <p class="classy-tile__desc">{{ item.description }}</p>
+
+            {% case item.type %}
+              {% when 'code' %}
+                <div class="classy-tile__code classy-ink-panel"><span class="tok-c">// omega.json5 — one file, every target</span>
+{ brand: { name: <span class="tok-v">'{{ site.brand.name }}'</span>,
+           color: <span class="tok-a">'{{ site.brand.color | default: "#5B47FB" }}'</span> },
+  targets: { <span class="tok-k">web</span>: {…}, <span class="tok-k">backend</span>: {…},
+             <span class="tok-k">desktop</span>: {…}, <span class="tok-k">extension</span>: {…} } }</div>
+              {% when 'terminal' %}
+                <div class="classy-tile__term classy-ink-panel">
+                  <div><span class="classy-term__prompt">$</span> omega deploy</div>
+                  <div class="classy-term__out">→ building 42 pages · hashing assets</div>
+                  <div class="classy-term__out"><span class="classy-term__ok">✓</span> live in 38s<span class="omega-caret"></span></div>
+                </div>
+              {% when 'split' %}
+                <div class="classy-tile__demo">
+                  <div class="classy-tile__split">
+                    <div class="classy-tile__split-pane">
+                      <div class="classy-tile__split-card">Revenue<span class="classy-tile__split-num">$24.3k</span></div>
+                    </div>
+                    <div class="classy-tile__split-pane">
+                      <div class="classy-tile__split-card">Revenue<span class="classy-tile__split-num">$24.3k</span></div>
+                    </div>
+                  </div>
+                </div>
+              {% when 'brand' %}
+                <div class="classy-tile__brandrow">
+                  <span class="classy-tile__swatch active" style="background: var(--omega-accent);"></span>
+                  <span class="classy-tile__swatch" style="background: #d6336c;"></span>
+                  <span class="classy-tile__swatch" style="background: #0f8fa9;"></span>
+                  <span class="classy-tile__swatch" style="background: #c47206;"></span>
+                  <span class="classy-tile__swatch" style="background: #12925c;"></span>
+                </div>
+            {% endcase %}
           </div>
         {% endfor %}
       </div>
     </div>
-  </div>
-</section>
+  </section>
+{% endif %}
 
-<!-- Product Demo Section -->
-<section>
-  <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.product_demo.superheadline.text %}
-        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-          {% iftruthy resolved.product_demo.superheadline.icon %}
-            {% uj_icon resolved.product_demo.superheadline.icon, "me-1" %}
-          {% endiftruthy %}
-          {{ resolved.product_demo.superheadline.text }}
-        </span>
-      {% endiftruthy %}
+<!-- ═══ Product demo (optional video tabs) ═══ -->
+{% if resolved.product_demo.enabled %}
+  <section>
+    <div class="container">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+        {% iftruthy resolved.product_demo.superheadline.text %}
+          <span class="classy-micro">{{ resolved.product_demo.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ resolved.product_demo.headline }}</h2>
+        {% iftruthy resolved.product_demo.subheadline %}
+          <p>{{ resolved.product_demo.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
 
-      <h2 class="h2 mb-2">
-        {{ resolved.product_demo.headline }}
-        <span class="text-accent">{{ resolved.product_demo.headline_accent }}</span>
-      </h2>
-      <p class="fs-5 text-muted">{{ resolved.product_demo.subheadline }}</p>
-    </div>
-
-    <!-- Tab Buttons -->
-    <div class="d-flex flex-wrap justify-content-center gap-2 gap-sm-3 mb-4" data-lazy="@class animation-slide-up">
-      <ul class="nav nav-pills gap-2 gap-sm-3 border-0 w-100 justify-content-center" role="tablist">
-        {% for tab in resolved.product_demo.tabs %}
-          <li class="nav-item" role="presentation">
+      <!-- Tab Buttons -->
+      <div class="d-flex flex-wrap justify-content-center mb-4" data-omega-reveal>
+        <div class="classy-billing-toggle" role="tablist">
+          {% for tab in resolved.product_demo.tabs %}
             <button
-              class="btn btn-lg btn-outline-adaptive w-100 {% if forloop.first %}active{% endif %}"
+              class="btn {% if forloop.first %}active{% endif %}"
               id="{{ tab.id }}-tab"
               data-bs-toggle="tab"
               data-bs-target="#{{ tab.id }}-pane"
@@ -464,233 +454,139 @@ cta:
               aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
             >
               {% iftruthy tab.icon %}
-                {% uj_icon tab.icon, "me-2" %}
+                {% uj_icon tab.icon, "fa-sm me-2" %}
               {% endiftruthy %}
               {{ tab.label }}
             </button>
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-
-    <!-- Tab Content -->
-    <div class="tab-content" data-lazy="@class animation-slide-up">
-      {% for tab in resolved.product_demo.tabs %}
-        <div
-          class="tab-pane fade {% if forloop.first %}show active{% endif %}"
-          id="{{ tab.id }}-pane"
-          role="tabpanel"
-          aria-labelledby="{{ tab.id }}-tab"
-          tabindex="0"
-        >
-          <!-- Feature Checkmarks -->
-          <div class="d-flex flex-wrap justify-content-center gap-3 gap-md-4 mb-4">
-            {% for feature in tab.features %}
-              <div class="d-flex align-items-center">
-                {% uj_icon "check", "text-success me-2" %}
-                <span class="text-body">{{ feature }}</span>
-              </div>
-            {% endfor %}
-          </div>
-
-          <!-- Video Player -->
-          <div class="card border-gradient-rainbow shadow-lg rounded">
-            <div class="ratio ratio-16x9">
-              {% uj_video tab.video, class="w-100 d-block object-fit-cover rounded border-0", style="", controls="false", loop="true", autoplay="true", playsinline="true", muted="true", preload="metadata" %}
-            </div>
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- Showcase Section -->
-<section class="bg-body-secondary rounded-4">
-  <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.showcase.superheadline.text %}
-        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-          {% iftruthy resolved.showcase.superheadline.icon %}
-            {% uj_icon resolved.showcase.superheadline.icon, "me-1" %}
-          {% endiftruthy %}
-          {{ resolved.showcase.superheadline.text }}
-        </span>
-      {% endiftruthy %}
-      <h2 class="h2 mb-2">
-        {{ resolved.showcase.headline }}
-        <span class="text-accent">{{ resolved.showcase.headline_accent }}</span>
-      </h2>
-      <p class="fs-5 text-muted">{{ resolved.showcase.subheadline }}</p>
-    </div>
-
-    {% for item in resolved.showcase.items %}
-      {% assign is_even = forloop.index | modulo: 2 %}
-
-      <!-- Set classes based on position -->
-      {% if is_even == 0 %}
-        {% assign image_col_class = "col-lg-6 order-lg-2" %}
-        {% assign text_col_class = "col-lg-6 order-lg-1 pe-lg-5" %}
-      {% else %}
-        {% assign image_col_class = "col-lg-6" %}
-        {% assign text_col_class = "col-lg-6 ps-lg-5" %}
-      {% endif %}
-
-      <!-- Common content -->
-      {% capture image_content %}
-        {% assign ratio = resolved.showcase.image_ratio | default: "4x3" %}
-        {% assign object_position = resolved.showcase.image_object_position | default: "center" %}
-        <div class="card border-0 shadow-sm ratio ratio-{{ ratio }}">
-          {% capture uj_migrate_arg_5 %}object-position: {{ object_position }};{% endcapture %}
-          {% uj_image item.image, class="w-100 h-100 object-fit-cover rounded", style=uj_migrate_arg_5, alt=item.title %}
-        </div>
-      {% endcapture %}
-
-      {% capture text_content %}
-        <h3 class="h2 mb-4">{{ item.title }}</h3>
-        <p class="fs-5 text-muted mb-0">{{ item.description }}</p>
-      {% endcapture %}
-
-      <div class="row align-items-center g-3 g-lg-5 {% unless forloop.last %} mb-5 pb-5 {% endunless %}">
-        <div class="{{ image_col_class }}" data-lazy="@class animation-slide-up">
-          {{ image_content }}
-        </div>
-        <div class="{{ text_col_class }}" data-lazy="@class animation-slide-up">
-          {{ text_content }}
+          {% endfor %}
         </div>
       </div>
-    {% endfor %}
-  </div>
-</section>
 
-<!-- Features Section -->
-<section>
-  <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.features.superheadline.text %}
-        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-          {% iftruthy resolved.features.superheadline.icon %}
-            {% uj_icon resolved.features.superheadline.icon, "me-1" %}
-          {% endiftruthy %}
-          {{ resolved.features.superheadline.text }}
-        </span>
-      {% endiftruthy %}
-      <h2 class="h2 mb-2">
-        {{ resolved.features.headline }}
-        {% iftruthy resolved.features.headline_accent %}
-          <span class="text-accent">{{ resolved.features.headline_accent }}</span>
-        {% endiftruthy %}
-      </h2>
-      {% iftruthy resolved.features.subheadline %}
-        <p class="fs-5 text-muted">{{ resolved.features.subheadline }}</p>
-      {% endiftruthy %}
-    </div>
-
-    <div class="row g-4">
-      {% for feature in resolved.features.items %}
-        <div class="col-lg-4 col-md-6" data-lazy="@class animation-slide-up">
-          <div class="text-center">
-            <div class="mb-4">
-              {% uj_icon feature.icon, "display-4" %}
-            </div>
-            <h3 class="h3 mb-3 fw-bold">{{ feature.title }}</h3>
-            <p class="text-muted mb-0">{{ feature.description }}</p>
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-
-    {% iftruthy resolved.features.cta_button %}
-      <div class="text-center mt-5" data-lazy="@class animation-slide-up">
-        <a href="{{ resolved.features.cta_button.href }}" class="btn btn-primary btn-lg px-5 py-3">
-          {% iftruthy resolved.features.cta_button.icon %}
-            {% uj_icon resolved.features.cta_button.icon, "me-2" %}
-          {% endiftruthy %}
-          {{ resolved.features.cta_button.text }}
-        </a>
-      </div>
-    {% endiftruthy %}
-  </div>
-</section>
-
-{% include frontend/components/testimonial-scroll.html testimonials=resolved.testimonials %}
-
-<!-- Stats Section -->
-<section>
-  <div class="container">
-    <div class="row text-center g-4">
-      {% for stat in resolved.stats %}
-        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
-          <div class="mb-3">
-            {% capture uj_migrate_arg_6 %}text-{{ stat.color }} display-4{% endcapture %}
-            {% uj_icon stat.icon, uj_migrate_arg_6 %}
-          </div>
-          <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
-          {% iftruthy stat.show_stars %}
-            <div class="mb-0">
-              {% for i in (1..5) %}
-                {% capture uj_migrate_arg_7 %}text-{{ stat.color }}{% endcapture %}
-                {% uj_icon "star", uj_migrate_arg_7 %}
+      <!-- Tab Content -->
+      <div class="tab-content" data-omega-reveal>
+        {% for tab in resolved.product_demo.tabs %}
+          <div
+            class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+            id="{{ tab.id }}-pane"
+            role="tabpanel"
+            aria-labelledby="{{ tab.id }}-tab"
+            tabindex="0"
+          >
+            <!-- Feature Checkmarks -->
+            <div class="d-flex flex-wrap justify-content-center gap-3 gap-md-4 mb-4">
+              {% for feature in tab.features %}
+                <div class="d-flex align-items-center">
+                  {% uj_icon "check", "text-success me-2" %}
+                  <span>{{ feature }}</span>
+                </div>
               {% endfor %}
             </div>
-          {% endiftruthy %}
-          <p class="text-muted mb-0">{{ stat.label }}</p>
-          {% iftruthy stat.sublabel %}
-            <p class="small text-muted">{{ stat.sublabel }}</p>
-          {% endiftruthy %}
+
+            <!-- Video Player -->
+            <div class="card overflow-hidden">
+              <div class="ratio ratio-16x9">
+                {% uj_video tab.video, class="w-100 d-block object-fit-cover border-0", style="", controls="false", loop="true", autoplay="true", playsinline="true", muted="true", preload="metadata" %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- ═══ Showcase (optional alternating rows) ═══ -->
+{% if resolved.showcase.enabled %}
+  <section>
+    <div class="container">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+        {% iftruthy resolved.showcase.superheadline.text %}
+          <span class="classy-micro">{{ resolved.showcase.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ resolved.showcase.headline }}</h2>
+        {% iftruthy resolved.showcase.subheadline %}
+          <p>{{ resolved.showcase.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+
+      {% for item in resolved.showcase.items %}
+        {% assign is_even = forloop.index | modulo: 2 %}
+        {% if is_even == 0 %}
+          {% assign image_col_class = "col-lg-6 order-lg-2" %}
+          {% assign text_col_class = "col-lg-6 order-lg-1 pe-lg-5" %}
+        {% else %}
+          {% assign image_col_class = "col-lg-6" %}
+          {% assign text_col_class = "col-lg-6 ps-lg-5" %}
+        {% endif %}
+
+        <div class="row align-items-center g-3 g-lg-5 {% unless forloop.last %} mb-5 pb-5 {% endunless %}">
+          <div class="{{ image_col_class }}" data-omega-reveal>
+            {% assign ratio = resolved.showcase.image_ratio | default: "4x3" %}
+            {% assign object_position = resolved.showcase.image_object_position | default: "center" %}
+            <div class="card overflow-hidden ratio ratio-{{ ratio }}">
+              {% capture image_style %}object-position: {{ object_position }};{% endcapture %}
+              {% uj_image item.image, class="w-100 h-100 object-fit-cover", style=image_style, alt=item.title %}
+            </div>
+          </div>
+          <div class="{{ text_col_class }}" data-omega-reveal>
+            <h3 class="classy-display classy-display--section mb-3">{{ item.title }}</h3>
+            <p class="text-muted fs-6 mb-0">{{ item.description }}</p>
+          </div>
         </div>
       {% endfor %}
     </div>
-  </div>
-</section>
+  </section>
+{% endif %}
 
-<!-- CTA Section -->
+<!-- ═══ Stats band ═══ -->
+{% if resolved.stats and resolved.stats.size > 0 %}
+  <section>
+    <div class="container">
+      <div class="classy-stats" data-omega-reveal-stagger="80">
+        {% for stat in resolved.stats %}
+          <div class="classy-stat" data-omega-reveal>
+            <div class="classy-stat__num" data-omega-countup>{{ stat.number }}</div>
+            <div class="classy-stat__label">{{ stat.label }}</div>
+            {% iftruthy stat.sublabel %}
+              <div class="classy-stat__sub">{{ stat.sublabel }}</div>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+<!-- ═══ Quote ═══ -->
+{% iftruthy resolved.testimonials.items %}
+  {% include frontend/components/testimonial-scroll.html testimonials=resolved.testimonials %}
+{% endiftruthy %}
+
+<!-- ═══ CTA band ═══ -->
 <section>
   <div class="container">
-    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
-      <!-- Decorative icon - top right -->
-      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
-        {% uj_icon "rocket", "text-white" %}
-      </div>
-
-      <!-- Decorative icon - bottom left -->
-      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
-        {% uj_icon "sparkles", "text-white" %}
-      </div>
-
-      <div class="position-relative">
-        {% iftruthy resolved.cta.superheadline.text %}
-          <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
-            {% iftruthy resolved.cta.superheadline.icon %}
-              {% uj_icon resolved.cta.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
-            {{ resolved.cta.superheadline.text }}
-          </span>
-        {% endiftruthy %}
-
-        <h2 class="h3 fw-bold mb-3">
-          {{ resolved.cta.headline }}
-          {% iftruthy resolved.cta.headline_accent %}
-            <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
-          {% endiftruthy %}
-        </h2>
-
-        {% iftruthy resolved.cta.description %}
-          <p class="lead mb-4">{{ resolved.cta.description }}</p>
-        {% endiftruthy %}
-
-        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-          <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-light btn-lg px-4">
-            {% uj_icon resolved.cta.primary_button.icon, "me-2" %}
+    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
+      <h2 class="classy-cta__headline">{{ resolved.cta.headline }}</h2>
+      {% iftruthy resolved.cta.description %}
+        <p class="classy-cta__sub">{{ resolved.cta.description }}</p>
+      {% endiftruthy %}
+      <div class="classy-cta__ctas">
+        {% iftruthy resolved.cta.primary_button.text %}
+          <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
             {{ resolved.cta.primary_button.text }}
+            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
           </a>
-          {% iftruthy resolved.cta.secondary_button %}
-            <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-light btn-lg px-4">
-              {% uj_icon resolved.cta.secondary_button.icon, "me-2" %}
-              {{ resolved.cta.secondary_button.text }}
-            </a>
-          {% endiftruthy %}
-        </div>
+        {% endiftruthy %}
+        {% iftruthy resolved.cta.command %}
+          <a href="{{ resolved.cta.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
+            <span class="classy-cmd-prompt">$</span>{{ resolved.cta.command }}
+          </a>
+        {% endiftruthy %}
+        {% iftruthy resolved.cta.secondary_button.text %}
+          <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+            {{ resolved.cta.secondary_button.text }}
+          </a>
+        {% endiftruthy %}
       </div>
     </div>
   </div>

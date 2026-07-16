@@ -1,5 +1,5 @@
 // Import the theme entry point
-// __main_assets__ is a webpack alias that resolves to UJM's dist/assets
+// __main_assets__ is a build alias that resolves to the framework's core assets
 import bootstrap from '__main_assets__/themes/bootstrap/js/index.umd.js';
 import { ready as domReady } from '@omega.js/client/modules/dom.js';
 
@@ -13,10 +13,9 @@ window.bootstrap = bootstrap;
 }
 /* @dev-only:end */
 
-// Import navbar scroll functionality
-import setupNavbarScroll from './js/navbar-scroll.js';
-// Import infinite scroll functionality (used by logo scroll, testimonials, etc.)
-import { setupInfiniteScroll } from './js/infinite-scroll.js';
+// Nav glassiness, marquees, reveals, count-ups, and rotators all ride the
+// shared motion engine (core/js/core/motion.js) — no theme JS needed.
+
 // Import tooltip initialization
 import initializeTooltips from './js/initialize-tooltips.js';
 // Import hero demo form initialization
@@ -24,10 +23,6 @@ import initHeroDemoForm from './js/hero-demo-form.js';
 
 // Initialize theme components when DOM is ready
 domReady().then(() => {
-  // Classy Theme Initializations
-  setupNavbarScroll();
-  setupInfiniteScroll();
-
   // Generic Bootstrap initializations
   initializeTooltips();
 

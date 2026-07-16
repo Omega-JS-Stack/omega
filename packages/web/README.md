@@ -77,17 +77,22 @@ see the harness README for the honest before/after numbers.
 
 ## Packaged content (the real UJM port, B2)
 
-- `themes/classy/` — the full flagship theme (frontend + backend + admin
-  layouts, includes, css, js); `themes/neobrutalism/` and `themes/newsflash/`
-  — partial themes that fall back to classy per file; `themes/bootstrap/` —
-  the vendored Bootstrap 5 scss/js the themes build on (sibling imports);
-  `themes/_template/` — the theme-starter skeleton.
+- `themes/classy/` — the full flagship theme, classy v2 (frontend + backend +
+  admin layouts, includes, css, js): warm-paper/charcoal token-driven skin,
+  zero gradients, ink primaries, serif marketing display, `.omega-shell` app
+  chrome — see [docs/theming.md](../../docs/theming.md);
+  `themes/neobrutalism/` and `themes/newsflash/` — partial themes that fall
+  back to classy per file; `themes/bootstrap/` — the vendored Bootstrap 5
+  scss/js the themes build on (sibling imports); `themes/_template/` — the
+  theme-starter skeleton.
 - `core/` — the theme-agnostic layer: `_layouts/blueprint/**` (45 page-type
   contracts), `_layouts/core/root.html` (the document shell),
   `_layouts/modules/` (redirect utility), `_includes/` (head/body/foot chrome,
-  adsense/promo adunits, price-per-unit pricing math, default nav/footer/account
-  data JSONs), `css/` (main.scss + core styles + per-page css), `js/` (the UJM
-  runtime: main module, core modules, libs, per-page modules), `icons/`.
+  adsense/promo adunits, price-per-unit pricing math, default
+  nav/footer/account + app sidebar/topbar data JSONs), `css/` (main.scss +
+  the `--omega-*` token sheet, `.omega-shell` mechanics, the motion library,
+  core styles, per-page css), `js/` (the UJM runtime: main module, core
+  modules incl. the motion boot, libs, per-page modules), `icons/`.
 - `defaults/pages/**` — ~60 default pages at their real URLs (about, pricing,
   contact, auth, legal, payment, portal, team, updates, alternatives, admin,
   test pages) + the blog set: paginated index (`/blog/page/N.html`, size 6),

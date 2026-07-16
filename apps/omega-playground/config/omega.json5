@@ -19,7 +19,7 @@
     name: "OMEGA Playground",
     description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
     tagline: "One config. Every target.",
-    color: "#3b5bdb", // PLACEHOLDER accent (drives --omega-accent-* ramp) — Ian picks with the C3 board notes
+    color: "#5b47fb", // classy v2 default accent (draft-2, Ian-approved) — drives the --omega-accent-* ramps
     // PLAYGROUND scope (Ian 2026-07-11): this rehearsal brand lives on a
     // SUBDOMAIN of the real domain, so every derived surface (authDomain,
     // api.playground.omegajs.dev, canonicals) stays clear of the REAL

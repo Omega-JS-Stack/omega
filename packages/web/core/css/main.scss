@@ -12,6 +12,10 @@
 // theme rules can override at equal-or-later cascade position.
 @use 'shell/index' as omega-shell;
 
+// Motion library (C3) — reveals, hover effects, marquee, rotator, caret;
+// driven by the shared @omega.js/client motion engine. Same position rule.
+@use 'motion/index' as omega-motion;
+
 @use 'omega:theme' as *;
 
 // Vendor styles

@@ -1,16 +1,9 @@
 ---
 layout: core/root
 
-theme:
-  # html:
-  #   class: ""
-  head:
-    content: |
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" media="print" onload="this.media='all'">
-  body:
-    class: "d-flex flex-column min-vh-100"
-  # main:
-  #   class: ""
+# Classy v2 app shell: rides the core .omega-shell mechanics
+# (core/css/shell/_index.scss + core/js/core/app-shell.js). The classy skin
+# (css/layout/_shell.scss) paints the gray canvas + big rounded content card.
 
 web_manager:
   auth:
@@ -22,9 +15,9 @@ web_manager:
     enabled: false
 ---
 
-<!-- Backend Layout: Sidebar + (Top Bar + Content) -->
-<div class="d-flex vh-100">
-  <!-- Sidebar Navigation (full height, controlled by page/layout front matter) -->
+<!-- Backend Layout: omega-shell (sidebar + topbar + main + drawer scrim) -->
+<div class="omega-shell" data-omega-shell>
+  <!-- Sidebar (full height, controlled by page/layout front matter) -->
   {% unless resolved.theme.sidebar.enabled == false %}
     {% if page.url contains "/admin" %}
       {%- include admin/sections/sidebar.html -%}
@@ -33,20 +26,20 @@ web_manager:
     {% endif %}
   {% endunless %}
 
-  <!-- Right Side: Top Bar + Main Content -->
-  <div class="d-flex flex-column flex-fill overflow-hidden">
-    <!-- Top Bar (controlled by page/layout front matter) -->
-    {% unless resolved.theme.topbar.enabled == false %}
-      {% if page.url contains "/admin" %}
-        {%- include admin/sections/topbar.html -%}
-      {% else %}
-        {%- include backend/sections/topbar.html -%}
-      {% endif %}
-    {% endunless %}
+  <!-- Top Bar (controlled by page/layout front matter) -->
+  {% unless resolved.theme.topbar.enabled == false %}
+    {% if page.url contains "/admin" %}
+      {%- include admin/sections/topbar.html -%}
+    {% else %}
+      {%- include backend/sections/topbar.html -%}
+    {% endif %}
+  {% endunless %}
 
-    <!-- Main Content -->
-    <main id="main-content" class="d-flex flex-column flex-fill overflow-auto p-3 p-lg-4 {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
-      {{ content | uj_content_format }}
-    </main>
-  </div>
+  <!-- Main Content -->
+  <main id="main-content" class="omega-shell__main d-flex flex-column {{ resolved.theme.main.class | uj_liquify }}" aria-label="Main content">
+    {{ content | uj_content_format }}
+  </main>
+
+  <!-- Drawer scrim (mobile) -->
+  <div class="omega-shell__scrim" data-shell-dismiss></div>
 </div>

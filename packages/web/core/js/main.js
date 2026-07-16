@@ -6,6 +6,7 @@ import queryStringsModule from '__main_assets__/js/core/query-strings.js';
 import serviceWorkerModule from '__main_assets__/js/core/service-worker.js';
 import appearanceModule from '__main_assets__/js/core/appearance.js';
 import appShellModule from '__main_assets__/js/core/app-shell.js';
+import motionModule from '__main_assets__/js/core/motion.js';
 import completeModule from '__main_assets__/js/core/complete.js';
 
 import omega from '@omega.js/client';
@@ -36,6 +37,7 @@ export default async function ({ manager, options } = {}) {
   serviceWorkerModule({ manager, options });
   appearanceModule({ manager, options });
   appShellModule({ manager, options });
+  motionModule({ manager, options });
 
   // Conditionally loaded modules based on config. Static import paths (no
   // template literals) — esbuild resolves and inlines each dynamic import;

@@ -101,6 +101,11 @@
 
 <!-- Meta -->
 <meta charset="utf-8"/>
+
+<!-- Motion gate: reveal styles (core/css/motion) only hide content under this
+     stamp, so no-JS pages render fully visible. Inline + first so the stamp
+     beats first paint. -->
+<script>document.documentElement.setAttribute('data-omega-motion', 'true');</script>
 <meta name="viewport" content="{{ page-viewport }}"/>
 <meta name="HandheldFriendly" content="True"/>
 <meta name="MobileOptimized" content="320"/>
@@ -199,11 +204,21 @@
 {% endiftruthy %}
 
 <!-- Brand accent tokens: derived from brand.color at build (src/brand-tokens.js);
-     emitted AFTER the bundles so the ramp wins the cascade over the token sheet's
-     neutral placeholder. Values are regenerated from parsed channels — config
-     strings never pass through verbatim. -->
+     emitted AFTER the bundles so the ramps win the cascade over the token sheet's
+     placeholders. Two ramps — light plus a legibility-lifted dark variant —
+     stamped with the SAME plumbing as the token sheet (OS preference carries,
+     the appearance.js data-bs-theme stamp beats it both ways). Values are
+     regenerated from parsed channels — config strings never pass through
+     verbatim. -->
 {% iftruthy site.brandTokens %}
-<style>:root{--omega-accent:{{ site.brandTokens.accent }};--omega-accent-hover:{{ site.brandTokens.accentHover }};--omega-accent-active:{{ site.brandTokens.accentActive }};--omega-accent-subtle:{{ site.brandTokens.accentSubtle }};--omega-accent-ink:{{ site.brandTokens.accentInk }};--omega-accent-ring:{{ site.brandTokens.accentRing }}}</style>
+{% capture brand-ramp-light %}--omega-accent:{{ site.brandTokens.accent }};--omega-accent-hover:{{ site.brandTokens.accentHover }};--omega-accent-active:{{ site.brandTokens.accentActive }};--omega-accent-subtle:{{ site.brandTokens.accentSubtle }};--omega-accent-ink:{{ site.brandTokens.accentInk }};--omega-accent-ring:{{ site.brandTokens.accentRing }}{% endcapture %}
+{% capture brand-ramp-dark %}--omega-accent:{{ site.brandTokens.dark.accent }};--omega-accent-hover:{{ site.brandTokens.dark.accentHover }};--omega-accent-active:{{ site.brandTokens.dark.accentActive }};--omega-accent-subtle:{{ site.brandTokens.dark.accentSubtle }};--omega-accent-ink:{{ site.brandTokens.dark.accentInk }};--omega-accent-ring:{{ site.brandTokens.dark.accentRing }}{% endcapture %}
+<style>
+  :root { {{ brand-ramp-light }} }
+  @media (prefers-color-scheme: dark) { :root { {{ brand-ramp-dark }} } }
+  :root[data-bs-theme='dark'] { {{ brand-ramp-dark }} }
+  :root[data-bs-theme='light'] { {{ brand-ramp-light }} }
+</style>
 {% endiftruthy %}
 
 <!-- Style - Scripts are Disabled -->

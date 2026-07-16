@@ -1,0 +1,62 @@
+// Classy v2 footer — quiet ground, hairline top, muted link columns.
+
+.classy-footer {
+  padding: 3.5rem 0 2rem;
+  background: var(--omega-ground);
+  border-top: 1px solid var(--omega-line);
+  font-size: 0.875rem;
+
+  .classy-footer__desc {
+    max-width: 21rem;
+    color: var(--omega-ink-muted);
+    font-size: 0.84375rem;
+    line-height: 1.6;
+  }
+
+  .classy-footer__group {
+    margin-bottom: 1rem;
+  }
+
+  .classy-footer__link {
+    color: var(--omega-ink-muted);
+    text-decoration: none;
+    transition: color var(--omega-speed) var(--omega-ease);
+
+    &:hover {
+      color: var(--omega-ink);
+    }
+  }
+
+  .classy-footer__bottom {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--omega-line);
+  }
+
+  .classy-footer__legal {
+    color: var(--omega-ink-faint);
+
+    a {
+      color: var(--omega-ink-muted);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--omega-ink);
+      }
+    }
+  }
+
+  .classy-footer__copyright {
+    color: var(--omega-ink-faint);
+    font-size: 0.8125rem;
+
+    a {
+      color: var(--omega-ink-muted);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--omega-ink);
+      }
+    }
+  }
+}

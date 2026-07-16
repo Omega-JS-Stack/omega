@@ -1,0 +1,233 @@
+// OMEGA motion — the shared animation / hover-effect library (C3, classy v2).
+// Token-driven (--omega-speed*, --omega-ease, --omega-shadow-*), gradient-free,
+// and reusable by every theme; at C4 the same sheet serves desktop/extension.
+//
+// Two kinds of surface:
+//   data-omega-* ATTRIBUTES — behaviors driven by the motion engine
+//     (@omega.js/client modules/motion.js, booted by core/js/core/motion.js):
+//     [data-omega-reveal="up|fade|left|right|scale"]  scroll-reveal (once)
+//     [data-omega-reveal-stagger="60"]                parent staggers child reveals
+//     [data-omega-countup]                            number counts up on first view
+//     [data-omega-rotate="2600"]                      children cycle (word rotator)
+//     [data-omega-marquee]                            seamless loop (track duplicated)
+//     [data-omega-scroll-watch="24"]                  stamps data-omega-scrolled
+//   .omega-* CLASSES — pure-CSS effects (hover lift/raise, pressable, float,
+//     caret) that need no JS at all.
+//
+// Resilience rules (load-bearing):
+//   - Reveals hide ONLY under html[data-omega-motion] (stamped by an inline
+//     head script) AND (prefers-reduced-motion: no-preference). No JS or
+//     reduced motion → everything renders visible and static.
+//   - The PurgeCSS safelist keeps every omega-* selector (src/assets.js):
+//     runtime-stamped state (data-omega-inview, data-omega-scrolled) never
+//     appears in rendered HTML for the content scan to find.
+
+// ─── Scroll reveal ───────────────────────────────────────────────────────────
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-omega-motion] [data-omega-reveal] {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity var(--omega-speed-slow) var(--omega-ease),
+      transform var(--omega-speed-slow) var(--omega-ease);
+    transition-delay: var(--omega-reveal-delay, 0ms);
+  }
+
+  html[data-omega-motion] [data-omega-reveal='fade'] {
+    transform: none;
+  }
+
+  html[data-omega-motion] [data-omega-reveal='left'] {
+    transform: translateX(-18px);
+  }
+
+  html[data-omega-motion] [data-omega-reveal='right'] {
+    transform: translateX(18px);
+  }
+
+  html[data-omega-motion] [data-omega-reveal='scale'] {
+    transform: scale(0.96);
+  }
+
+  html[data-omega-motion] [data-omega-reveal][data-omega-inview] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// ─── Hover effects (pure CSS) ────────────────────────────────────────────────
+
+.omega-hover-lift {
+  transition:
+    transform var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease),
+    box-shadow var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.omega-hover-raise {
+  transition:
+    transform var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease),
+    box-shadow var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--omega-shadow-2);
+  }
+}
+
+.omega-hover-dim {
+  transition: opacity var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    opacity: 0.6;
+  }
+}
+
+// Press feedback for anything clickable.
+.omega-pressable {
+  transition: transform var(--omega-speed) var(--omega-ease);
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// Icon-nudge microinteraction: the child .omega-nudge slides on parent hover
+// (arrows in buttons/links).
+.omega-hover-nudge .omega-nudge {
+  display: inline-block;
+  transition: transform var(--omega-speed) var(--omega-ease);
+}
+
+.omega-hover-nudge:hover .omega-nudge {
+  transform: translateX(3px);
+}
+
+// ─── Ambient float (hero frames, decorative cards) ──────────────────────────
+
+@keyframes omega-float {
+  from {
+    transform: translateY(-5px);
+  }
+
+  to {
+    transform: translateY(6px);
+  }
+}
+
+.omega-float {
+  animation: omega-float 7s var(--omega-ease) infinite alternate;
+}
+
+// ─── Marquee (seamless loop; engine duplicates the track once) ───────────────
+
+.omega-marquee {
+  overflow: hidden;
+
+  // Alpha edge mask (a mask, not a visual gradient — the approved comp's
+  // masked-edges treatment).
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.omega-marquee__track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  animation: omega-marquee var(--omega-marquee-speed, 36s) linear infinite;
+}
+
+// Items own their spacing — flex `gap` would break the -50% loop math.
+.omega-marquee__item {
+  flex-shrink: 0;
+  margin-inline-end: var(--omega-marquee-gap, 56px);
+}
+
+.omega-marquee:hover .omega-marquee__track {
+  animation-play-state: paused;
+}
+
+@keyframes omega-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+// ─── Word rotator (children stack; engine cycles data-omega-active) ─────────
+
+[data-omega-rotate] {
+  display: inline-grid;
+
+  > * {
+    grid-area: 1 / 1;
+    white-space: nowrap;
+  }
+}
+
+// No engine → a static first word, never stacked/invisible text.
+html:not([data-omega-motion]) [data-omega-rotate] > :not(:first-child) {
+  display: none;
+}
+
+html[data-omega-motion] [data-omega-rotate] > * {
+  opacity: 0;
+  transform: translateY(0.35em);
+  transition:
+    opacity var(--omega-speed-slow) var(--omega-ease),
+    transform var(--omega-speed-slow) var(--omega-ease);
+}
+
+html[data-omega-motion] [data-omega-rotate] > [data-omega-active] {
+  opacity: 1;
+  transform: none;
+}
+
+// ─── Terminal caret ──────────────────────────────────────────────────────────
+
+@keyframes omega-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.omega-caret::after {
+  content: '';
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-inline-start: 2px;
+  vertical-align: text-bottom;
+  background: currentcolor;
+  animation: omega-caret-blink 1.1s steps(1) infinite;
+}
+
+// ─── Reduced motion: kill every ambient/looping effect ──────────────────────
+
+@media (prefers-reduced-motion: reduce) {
+  .omega-float,
+  .omega-marquee__track,
+  .omega-caret::after {
+    animation: none;
+  }
+
+  .omega-hover-lift,
+  .omega-hover-raise,
+  .omega-pressable,
+  .omega-hover-nudge .omega-nudge,
+  html[data-omega-motion] [data-omega-rotate] > * {
+    transition: none;
+  }
+
+  .omega-hover-lift:hover,
+  .omega-hover-raise:hover,
+  .omega-pressable:active,
+  .omega-hover-nudge:hover .omega-nudge {
+    transform: none;
+    box-shadow: none;
+  }
+}

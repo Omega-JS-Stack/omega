@@ -1,0 +1,88 @@
+/**
+ * motion tests — the shared animation engine's pure logic (classy v2): the
+ * count-up parser/formatter round-trip and the factory's environment safety
+ * (no document → inert, like icon-renderer). The DOM behaviors (reveals,
+ * rotators, marquees) are exercised end-to-end by @omega.js/web's build
+ * and the browser proof. Pure CJS — required straight from dist.
+ */
+const assert = require('assert');
+const path = require('path');
+
+const DIST_PATH = path.join(__dirname, '..', '..', 'dist', 'modules', 'motion.js');
+
+describe('motion', () => {
+  let motion;
+
+  before(() => {
+    motion = require(DIST_PATH);
+  });
+
+  describe('parseCountTarget', () => {
+    it('parses plain integers with grouping and suffixes', () => {
+      assert.deepStrictEqual(motion.parseCountTarget('12,400+'), {
+        prefix: '',
+        value: 12400,
+        decimals: 0,
+        suffix: '+',
+      });
+    });
+
+    it('parses currency prefixes and decimals', () => {
+      assert.deepStrictEqual(motion.parseCountTarget('$1,234.56'), {
+        prefix: '$',
+        value: 1234.56,
+        decimals: 2,
+        suffix: '',
+      });
+    });
+
+    it('parses percentages and ratings', () => {
+      assert.deepStrictEqual(motion.parseCountTarget('99.98%'), {
+        prefix: '',
+        value: 99.98,
+        decimals: 2,
+        suffix: '%',
+      });
+      assert.deepStrictEqual(motion.parseCountTarget('4.9/5'), {
+        prefix: '',
+        value: 4.9,
+        decimals: 1,
+        suffix: '/5',
+      });
+    });
+
+    it('returns null for text without a number', () => {
+      assert.strictEqual(motion.parseCountTarget('Unlimited'), null);
+      assert.strictEqual(motion.parseCountTarget(''), null);
+    });
+  });
+
+  describe('formatCount', () => {
+    it('round-trips the parsed target at full value', () => {
+      for (const text of ['12,400+', '$1,234.56', '99.98%', '4.9/5', '200+']) {
+        const target = motion.parseCountTarget(text);
+        assert.strictEqual(motion.formatCount(target, target.value), text);
+      }
+    });
+
+    it('formats intermediate frames with the target decimals and grouping', () => {
+      const target = motion.parseCountTarget('50,000+');
+      assert.strictEqual(motion.formatCount(target, 12345.678), '12,346+');
+    });
+  });
+
+  describe('createMotion', () => {
+    it('returns the engine surface and stays inert without a document', () => {
+      const engine = motion.createMotion();
+
+      assert.strictEqual(typeof engine.start, 'function');
+      assert.strictEqual(typeof engine.stop, 'function');
+      assert.strictEqual(typeof engine.scan, 'function');
+
+      // No document in the unit env — start()/scan()/stop() must not throw.
+      engine.start();
+      engine.scan(null);
+      engine.stop();
+    });
+  });
+});

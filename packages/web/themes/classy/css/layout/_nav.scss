@@ -1,0 +1,115 @@
+// Classy v2 marketing nav — invisible over the hero, glassy after scroll.
+// The shared motion engine stamps data-omega-scrolled via
+// [data-omega-scroll-watch]; no theme JS involved.
+
+.classy-nav {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 1030;
+  border-bottom: 1px solid transparent;
+  transition:
+    background-color var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease);
+
+  &[data-omega-scrolled='true'] {
+    background: color-mix(in srgb, var(--omega-ground) 82%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-bottom-color: var(--omega-line);
+  }
+
+  .navbar {
+    min-height: 4rem;
+    padding-block: 0.625rem;
+  }
+
+  // ── Brand lockup ───────────────────────────────────────────────────────────
+  .classy-nav__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.984375rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--omega-ink);
+    text-decoration: none;
+
+    img {
+      height: 1.625rem;
+      width: auto;
+      border-radius: var(--omega-radius-xs);
+    }
+  }
+
+  // ── Links ──────────────────────────────────────────────────────────────────
+  .classy-nav__link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 550;
+    color: var(--omega-ink-muted);
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    border-radius: var(--omega-radius-s);
+    transition:
+      color var(--omega-speed) var(--omega-ease),
+      background-color var(--omega-speed) var(--omega-ease);
+
+    &:hover,
+    &:focus-visible {
+      color: var(--omega-ink);
+      background: var(--omega-surface-2);
+    }
+
+    &.active {
+      color: var(--omega-ink);
+    }
+  }
+
+  // Kill the shared overrides' active-underline for this namespace
+  .classy-nav__link.active {
+    text-decoration: none !important;
+  }
+
+  .navbar-toggler {
+    padding: 0.375rem 0.625rem;
+    color: var(--omega-ink);
+    background: var(--omega-surface);
+    border: 1px solid var(--omega-line-strong);
+    border-radius: var(--omega-radius-s);
+
+    &:focus {
+      box-shadow: 0 0 0 0.1875rem var(--omega-accent-ring);
+    }
+  }
+
+  // ── Mobile collapse panel ──────────────────────────────────────────────────
+  @media (max-width: 991.98px) {
+    background: color-mix(in srgb, var(--omega-ground) 92%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border-bottom-color: var(--omega-line);
+
+    .navbar-collapse {
+      margin-top: 0.625rem;
+      margin-bottom: 0.75rem;
+      padding: 0.625rem;
+      background: var(--omega-surface);
+      border: 1px solid var(--omega-line);
+      border-radius: var(--omega-radius-l);
+      box-shadow: var(--omega-shadow-2);
+    }
+
+    .classy-nav__link {
+      width: 100%;
+    }
+  }
+}
+
+// Anything with an in-page anchor scrolls clear of the fixed nav
+[id] {
+  scroll-margin-top: 5rem;
+}
