@@ -13,7 +13,7 @@ export async function triggerCelebration() {
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
-      // Brand confetti: ocean accent + the daybreak-arc stops (legacy
+      // Brand confetti: ocean accent + a festive hand-mixed set (legacy
       // purple-era palette retired, Ian 2026-07-16)
       colors: ['#2563eb', '#18b7cf', '#21c07c', '#efa312', '#e4572e'],
     });

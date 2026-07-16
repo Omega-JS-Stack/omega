@@ -217,42 +217,48 @@
 // iridescent OUTLINE for the few surfaces that earn it (recommended plan
 // card, trial CTA, nav signup). Two-layer paint: the inner layer fills
 // padding-box with the surface/button bg, the gradient paints only the
-// border-box ring. Leads with the brand accent so it re-brands itself.
-// The daybreak arc (ocean → lagoon → emerald → gold) is original to v2 —
-// legacy classy gradients (aurora/sunset/rainbow) are retired; never
-// reintroduce them. Stops are hand-mixed, deliberately NOT Tailwind hexes
-// (those all collide with legacy semantic tokens).
+// border-box ring. Per Ian's refs (2026-07-16): a PASTEL spectrum that
+// wraps the perimeter (conic), not a diagonal sweep — modern rainbow,
+// deliberately brand-agnostic. Stops are hand-mixed and unique to v2:
+// legacy classy gradients (aurora/sunset/rainbow) are retired, and every
+// obvious Tailwind hex collides with legacy semantic tokens — never
+// reintroduce either. First stop repeats last so the wrap is seamless.
 // ============================================
+@property --classy-ring-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
 :root {
-  --classy-gradient: linear-gradient(135deg, var(--omega-accent) 0%, #18b7cf 35%, #21c07c 68%, #efa312 100%);
+  // butter → coral → pink → lavender → periwinkle → aqua → soft green
+  --classy-gradient-stops: #f2d478, #f2a288, #f094c2, #bd97f2, #88b4f2, #7fd9cf, #a5e08c, #f2d478;
+  --classy-gradient: conic-gradient(from 250deg, var(--classy-gradient-stops));
 }
 
 .classy-btn-ring {
+  --classy-ring-angle: 0deg;
   border: 2px solid transparent !important;
   background:
     linear-gradient(var(--bs-btn-bg, var(--omega-surface)), var(--bs-btn-bg, var(--omega-surface))) padding-box,
-    var(--classy-gradient) border-box !important;
-  background-size: 100% 100%, 250% 250% !important;
-  background-position: 0 0, 0% 50% !important;
+    conic-gradient(from calc(250deg + var(--classy-ring-angle)), var(--classy-gradient-stops)) border-box !important;
   transition:
-    background-position var(--omega-speed-slow) var(--omega-ease),
+    --classy-ring-angle var(--omega-speed-slow) var(--omega-ease),
     transform var(--omega-speed) var(--omega-ease),
     box-shadow var(--omega-speed) var(--omega-ease);
 
   &:hover,
   &:focus-visible {
+    --classy-ring-angle: 160deg; // the spectrum swirls around the pill
     background:
       linear-gradient(var(--bs-btn-hover-bg, var(--bs-btn-bg, var(--omega-surface))), var(--bs-btn-hover-bg, var(--bs-btn-bg, var(--omega-surface)))) padding-box,
-      var(--classy-gradient) border-box !important;
-    background-size: 100% 100%, 250% 250% !important;
-    background-position: 0 0, 100% 50% !important; // the ring shimmers across
+      conic-gradient(from calc(250deg + var(--classy-ring-angle)), var(--classy-gradient-stops)) border-box !important;
   }
 
   &:active {
     background:
       linear-gradient(var(--bs-btn-active-bg, var(--bs-btn-bg, var(--omega-surface))), var(--bs-btn-active-bg, var(--bs-btn-bg, var(--omega-surface)))) padding-box,
-      var(--classy-gradient) border-box !important;
-    background-size: 100% 100%, 250% 250% !important;
+      conic-gradient(from calc(250deg + var(--classy-ring-angle)), var(--classy-gradient-stops)) border-box !important;
   }
 }
 
