@@ -49,17 +49,25 @@ hero:
         text: "Start free trial"
         class: "btn-adaptive"
 
-# Trusted By Section — masked logo marquee
+# Trusted By Section — logo marquee. `icon` = FA brands slug (inlined mark);
+# `src` = custom image; name-only falls back to the typographic word.
 trusted_by:
   headline: "Trusted by teams at"
   logos:
-    - name: "amazon"
-    - name: "google"
-    - name: "hubspot"
-    - name: "paypal"
-    - name: "slack"
-    - name: "shopify"
-    - name: "stripe"
+    - name: "Amazon"
+      icon: "amazon"
+    - name: "Google"
+      icon: "google"
+    - name: "HubSpot"
+      icon: "hubspot"
+    - name: "PayPal"
+      icon: "paypal"
+    - name: "Slack"
+      icon: "slack"
+    - name: "Shopify"
+      icon: "shopify"
+    - name: "Stripe"
+      icon: "stripe-s"
 
 # Bento Section — the hairline feature grid
 bento:
@@ -349,6 +357,11 @@ cta:
             <div class="omega-marquee__item">
               {% if logo.src %}
                 <img src="{{ logo.src | uj_cachebreak }}" alt="{{ logo.name }}" loading="lazy"/>
+              {% elsif logo.icon %}
+                <span class="classy-logos__lockup">
+                  {% uj_icon logo.icon %}
+                  <span>{{ logo.name }}</span>
+                </span>
               {% else %}
                 <span class="classy-logos__word">{{ logo.name }}</span>
               {% endif %}

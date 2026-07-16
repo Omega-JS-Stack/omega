@@ -4,7 +4,7 @@ post:
   title: "Dark mode, done properly"
   description: "Inverting the colors is the easy part. The last 10% — images, shadows, and charcoal instead of blue — is where dark modes are won."
   id: 9000006
-  image: false
+  image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1600&q=80"
   categories: ["Design"]
   tags: ["design", "engineering"]
 ---

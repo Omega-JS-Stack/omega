@@ -4,7 +4,7 @@ post:
   title: "Notes from a shipping week"
   description: "Five days, one feature, no heroics — what a calm release cycle actually looks like from the inside."
   id: 9000003
-  image: false
+  image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80"
   categories: ["Engineering"]
   tags: ["engineering", "process"]
 ---

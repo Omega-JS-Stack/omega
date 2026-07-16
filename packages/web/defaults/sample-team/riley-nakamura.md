@@ -6,6 +6,7 @@ meta:
   index: false
 
 member:
+  id: riley-nakamura
   name: Riley Nakamura
   position: Support Lead
   excerpt: "Riley answers faster than the status page and remembers every customer by name."

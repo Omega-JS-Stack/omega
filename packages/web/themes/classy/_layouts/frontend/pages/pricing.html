@@ -203,7 +203,7 @@ faqs:
                 <!-- Price -->
                 {% if plan.free %}
                   <div class="classy-price-card__price">
-                    <span class="classy-price-card__amount">Free</span>
+                    <span class="classy-price-card__amount classy-price-card__amount--word">Free</span>
                   </div>
                 {% else %}
                   {% if _default_annual and plan.prices.annually > 0 %}
@@ -340,7 +340,7 @@ faqs:
                 <p class="classy-price-card__tagline">{{ resolved.pricing.enterprise.tagline | default: "Larger teams & organizations" }}</p>
 
                 <div class="classy-price-card__price">
-                  <span class="classy-price-card__amount classy-price-card__amount--custom">{{ resolved.pricing.enterprise.price_label | default: "Custom" }}</span>
+                  <span class="classy-price-card__amount classy-price-card__amount--word">{{ resolved.pricing.enterprise.price_label | default: "Custom" }}</span>
                 </div>
 
                 <p class="classy-price-card__billing">
@@ -388,7 +388,7 @@ faqs:
         </div>
 
         <p class="small text-center classy-quiet mb-0">
-          {% uj_icon "shield-halved", "me-1" %}
+          <span class="classy-guarantee-icon me-1">{% uj_icon "shield-halved" %}</span>
           {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
         </p>
 
@@ -518,13 +518,13 @@ faqs:
                 {% assign _cell = feature.values[plan.id] %}
                 <td>
                   {% if _cell == true %}
-                    <span class="classy-price-card__check">{% uj_icon "check-circle", "fa-md" %}</span>
+                    <span class="classy-compare__yes">{% uj_icon "circle-check", "fa-md" %}</span>
                   {% elsif _cell == 'Unlimited' %}
                     Unlimited
                   {% elsif _cell %}
                     {{ _cell | uj_commaify }}
                   {% else %}
-                    <span class="text-muted opacity-25">{% uj_icon "minus", "fa-sm" %}</span>
+                    <span class="classy-compare__no">{% uj_icon "circle-xmark", "fa-md" %}</span>
                   {% endif %}
                 </td>
               {% endfor %}

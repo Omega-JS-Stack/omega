@@ -6,6 +6,7 @@ meta:
   index: false
 
 member:
+  id: avery-quinn
   name: Avery Quinn
   position: Founding Engineer
   excerpt: "Avery built the first prototype in a weekend and has been un-building it properly ever since."

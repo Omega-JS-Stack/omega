@@ -6,6 +6,7 @@ meta:
   index: false
 
 member:
+  id: sam-okafor
   name: Sam Okafor
   position: Design Lead
   excerpt: "Sam owns the type scale, the spacing scale, and every opinion about both."

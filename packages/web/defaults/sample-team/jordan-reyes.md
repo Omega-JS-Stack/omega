@@ -6,6 +6,7 @@ meta:
   index: false
 
 member:
+  id: jordan-reyes
   name: Jordan Reyes
   position: CEO
   excerpt: "Jordan sets the direction and still reviews every release note before it ships."
