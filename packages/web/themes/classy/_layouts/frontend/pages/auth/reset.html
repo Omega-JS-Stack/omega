@@ -2,75 +2,49 @@
 layout: frontend/core/cover
 ---
 
-<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
-  <div class="card border-0 shadow-lg">
-    <div class="card-body p-3 p-md-5">
+<section class="col-12">
+  <div class="classy-auth" data-omega-reveal>
+    <div class="classy-auth__card">
       <!-- Logo -->
-      <div class="text-center mb-3">
-        <div class="avatar avatar-xl">
-          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
-        </div>
+      <div class="classy-auth__brand">
+        <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
-      <div class="text-center mb-4">
-        <h1 class="h3 mb-2">Reset password</h1>
-        <p class="text-muted">Enter your email address and we'll send you a link to reset your password.</p>
-      </div>
+      <h1 class="classy-auth__title">Reset your password</h1>
+      <p class="classy-auth__sub">Enter your email and we'll send you a reset link.</p>
 
       <!-- Spinner -->
       {% capture initializing_spinner %}<span class="spinner-border spinner-border-sm me-2 form-initializing-spinner"></span>{% endcapture %}
 
       <!-- Reset Form -->
       <form id="auth-form" autocomplete="on" novalidate data-form-state="initializing" onsubmit="return false">
-        <div class="mb-4 text-start">
-          <label for="email" class="form-label fw-semibold">
+        <div class="mb-3 text-start">
+          <label for="email" class="form-label">
             Email <span class="text-danger">*</span>
           </label>
-          <input type="email" class="form-control form-control-md" id="email" name="email" placeholder="Enter your email" autocomplete="email" autofocus required>
+          <input type="email" class="form-control" id="email" name="email" placeholder="you@example.com" autocomplete="email" autofocus required>
         </div>
 
-        <button type="submit" class="btn btn-success _btn-lg w-100 mb-4" data-provider="email">
+        <button type="submit" class="btn btn-adaptive w-100 mb-2" data-provider="email">
           {{ initializing_spinner }}
-          {% uj_icon "paper-plane", "me-2" %}
           <span class="button-text">Send reset link</span>
+          <span class="ms-2">{% uj_icon "paper-plane", "fa-sm" %}</span>
         </button>
       </form>
 
       <!-- Back to Sign in -->
-      <div class="text-center">
-        <p class="text-muted mb-0">
-          Remember your password?
-          <a href="/signin" class="text-decoration-none fw-semibold">
-            Sign in
-          </a>
-        </p>
+      <div class="classy-auth__foot">
+        Remember your password?
+        <a href="/signin">Sign in</a>
       </div>
 
-      <!-- Help Section -->
-      <div class="mt-4 pt-4 border-top text-center">
-        <p class="text-muted small mb-2">Need help?</p>
-        <a href="/contact" class="btn btn-outline-adaptive btn-sm">
-          {% uj_icon "headset", "me-1" %}
-          Contact support
-        </a>
+      <!-- Help -->
+      <div class="mt-4 pt-3 hairline-top text-center">
+        <span class="small classy-quiet">
+          Need help? <a href="/contact" class="text-decoration-none">Contact support</a>
+        </span>
       </div>
-
-      <!-- Additional Info -->
-      {% comment %}
-        <div class="text-center mt-4">
-          <div class="bg-body rounded-3 p-4">
-            <div class="d-flex align-items-center justify-content-center mb-3">
-              {% uj_icon "shield-check", "text-success fs-3 me-2" %}
-              <h3 class="h6 fw-bold mb-0">Secure & Private</h3>
-            </div>
-            <p class="text-muted small mb-0">
-              We'll only send a password reset link to your registered email address.
-              The link expires in 1 hour for your security.
-            </p>
-          </div>
-        </div>
-      {% endcomment %}
     </div>
   </div>
 </section>

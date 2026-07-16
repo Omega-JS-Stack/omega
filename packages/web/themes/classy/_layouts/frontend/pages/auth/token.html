@@ -2,42 +2,38 @@
 layout: frontend/core/cover
 ---
 
-<section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
-  <div class="card border-0 shadow-lg">
-    <div class="card-body p-3 p-md-5">
+<section class="col-12">
+  <div class="classy-auth" data-omega-reveal>
+    <div class="classy-auth__card text-center">
       <!-- Logo -->
-      <div class="text-center mb-3">
-        <div class="avatar avatar-xl">
-          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
-        </div>
+      <div class="classy-auth__brand">
+        <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="filter-adaptive" alt="{{ site.brand.name }} Logo"/>
       </div>
 
       <!-- Header -->
-      <div class="text-center mb-4">
-        <h1 class="h3 mb-2">Authenticating...</h1>
-        <p class="text-muted">Please wait while we complete your sign in</p>
-      </div>
+      <h1 class="classy-auth__title">Signing you in</h1>
+      <p class="classy-auth__sub">Hold tight — completing your secure sign-in.</p>
 
       <!-- Spinner -->
-      <div id="token-spinner" class="text-center mb-4">
-        <div class="spinner-border text-primary" role="status">
+      <div id="token-spinner" class="text-center mb-3">
+        <div class="spinner-border spinner-border-sm" role="status">
           <span class="visually-hidden">Loading...</span>
         </div>
       </div>
 
       <!-- Status message -->
       <div id="token-status" class="text-center">
-        <p class="text-muted small">Generating secure token...</p>
+        <p class="small classy-quiet mb-0">Generating secure token...</p>
       </div>
 
       <!-- Error message (hidden by default) -->
-      <div id="token-error" class="alert alert-danger d-none" role="alert">
+      <div id="token-error" class="alert alert-danger d-none mt-3 text-start" role="alert">
         <strong>Error:</strong> <span id="token-error-message"></span>
       </div>
 
       <!-- Actions (hidden until the flow resolves with an error) -->
-      <div id="token-actions" class="text-center d-none">
-        <button type="button" id="token-retry" class="btn btn-primary w-100">Try again</button>
+      <div id="token-actions" class="text-center d-none mt-3">
+        <button type="button" id="token-retry" class="btn btn-adaptive w-100">Try again</button>
         <a href="/" class="btn btn-link btn-sm text-muted d-block mt-2">Go home</a>
       </div>
     </div>
