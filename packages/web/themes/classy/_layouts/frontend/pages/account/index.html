@@ -862,6 +862,7 @@ badges:
         <!-- Generate Signin Link (advanced) -->
         <div id="generate-signin-link-trigger" class="text-center">
           <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="modal" data-bs-target="#generate-signin-link-modal">
+            {% uj_icon "link", "fa-xs me-1" %}
             Generate signin link
           </button>
         </div>
@@ -1088,6 +1089,7 @@ badges:
         <!-- Cancel Subscription (only visible for paid users) -->
         <div id="cancel-subscription-trigger" class="text-center" data-wm-bind="@show billing.buttons.cancel" hidden>
           <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion" aria-expanded="false" aria-controls="cancel-subscription-accordion">
+            {% uj_icon "xmark", "fa-xs me-1" %}
             Cancel subscription
           </button>
         </div>

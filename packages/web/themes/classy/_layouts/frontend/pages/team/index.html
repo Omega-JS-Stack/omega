@@ -23,7 +23,7 @@ join_cta:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="classy-dotgrid pb-4">
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     <span class="classy-micro d-block mb-3" data-omega-reveal>Team</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
@@ -144,8 +144,9 @@ join_cta:
           <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
         {% iftruthy resolved.join_cta.secondary_button.text %}
-          <a href="{{ resolved.join_cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+          <a href="{{ resolved.join_cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
             {{ resolved.join_cta.secondary_button.text }}
+            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
           </a>
         {% endiftruthy %}
       </div>

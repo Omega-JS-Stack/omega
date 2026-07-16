@@ -132,6 +132,17 @@ test('match, enum, and type violations are reported', () => {
   assert.ok(errors.some((e) => e.includes('config.payment.products has wrong type')));
 });
 
+test("parent accepts 'self', a URL string, or the deliberate false opt-out — union types (backend rule)", () => {
+  const opts = { target: 'backend' };
+  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'self' }, opts).errors, []);
+  assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'https://api.example.com' }, opts).errors, []);
+  // false = "shared webhook account owned elsewhere" (the playground's shape)
+  assert.deepStrictEqual(validateConfig({ ...VALID, parent: false }, opts).errors, []);
+
+  const { errors } = validateConfig({ ...VALID, parent: 42 }, opts);
+  assert.ok(errors.some((e) => e.includes('config.parent has wrong type') && e.includes('string|boolean')));
+});
+
 test('match/enum only run on present values — null/empty ids are silent', () => {
   const { errors } = validateConfig({
     ...VALID,

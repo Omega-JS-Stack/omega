@@ -84,6 +84,7 @@ web_manager:
         <p data-wm-bind="@text checkout.error.message"></p>
         <hr>
         <button class="btn btn-outline-danger" onclick="window.location.reload()">
+          {% uj_icon "rotate-right", "fa-sm me-2" %}
           Try again
         </button>
       </div>
@@ -396,7 +397,7 @@ web_manager:
                         <div class="input-group" data-wm-bind="@show checkout" hidden>
                           <label for="discount-code" class="visually-hidden">Discount code</label>
                           <input type="text" class="form-control rounded-start-3 border py-2 px-3 text-start" id="discount-code" name="discount" placeholder="Discount code" autocomplete="off">
-                          <button class="btn btn-adaptive rounded-end-3 border px-4" type="button" id="apply-discount" data-action="apply-discount">Apply</button>
+                          <button class="btn btn-adaptive rounded-end-3 border px-4" type="button" id="apply-discount" data-action="apply-discount">{% uj_icon "tag", "fa-xs me-1" %}Apply</button>
                         </div>
 
                         <!-- Discount Messages -->

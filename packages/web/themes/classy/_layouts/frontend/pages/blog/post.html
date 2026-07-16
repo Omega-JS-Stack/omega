@@ -232,7 +232,7 @@ newsletter:
               <input type="email" name="email" id="newsletter-email" class="form-control form-control-lg" placeholder="{% iftruthy resolved.newsletter.form.placeholder %}{{ resolved.newsletter.form.placeholder }}{% endiftruthy %}" autocomplete="email" required>
             </div>
             <div class="col-md-auto">
-              <button type="submit" class="btn btn-adaptive btn-lg px-4">{% iftruthy resolved.newsletter.button.text %}{{ resolved.newsletter.button.text }}{% endiftruthy %}</button>
+              <button type="submit" class="btn btn-adaptive btn-lg px-4">{% uj_icon "paper-plane", "fa-sm me-2" %}{% iftruthy resolved.newsletter.button.text %}{{ resolved.newsletter.button.text }}{% endiftruthy %}</button>
             </div>
           </form>
         </div>

@@ -338,9 +338,9 @@ const TARGET_SCHEMAS = {
   backend: [
     {
       path:        'parent',
-      type:        'string',
+      type:        'string|boolean',
       required:    false,
-      description: 'Parent backend/brand identifier — empty when the brand stands alone.',
+      description: "Webhook parent topology: 'self' when this brand IS the parent, a parent URL otherwise, or false to deliberately opt out (shared webhook account owned elsewhere).",
     },
     {
       path:        'github',

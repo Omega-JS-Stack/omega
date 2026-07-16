@@ -160,7 +160,7 @@ cta:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="classy-dotgrid pb-4">
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     <span class="classy-micro d-block mb-3" data-omega-reveal>Download</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
@@ -534,8 +534,9 @@ cta:
           <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
         {% iftruthy resolved.cta.secondary_button.text %}
-          <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+          <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
             {{ resolved.cta.secondary_button.text }}
+            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
           </a>
         {% endiftruthy %}
       </div>
@@ -930,7 +931,7 @@ cta:
         </div>
       </div>
       <div class="modal-footer border-0 pt-0">
-        <button type="button" class="btn btn-adaptive" data-bs-dismiss="modal">Got it!</button>
+        <button type="button" class="btn btn-adaptive" data-bs-dismiss="modal">{% uj_icon "check", "fa-sm me-2" %}Got it!</button>
       </div>
     </div>
   </div>

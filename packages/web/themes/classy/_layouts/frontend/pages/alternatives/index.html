@@ -73,7 +73,7 @@ cta:
 ---
 
 <!-- ═══ Masthead ═══ -->
-<section class="classy-dotgrid pb-4">
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     {% iftruthy resolved.hero.tagline %}
       <span class="classy-micro d-block mb-3" data-omega-reveal>{{ resolved.hero.tagline }}</span>
@@ -92,8 +92,9 @@ cta:
         </a>
       {% endiftruthy %}
       {% iftruthy resolved.hero.secondary_button.text %}
-        <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+        <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ resolved.hero.secondary_button.text }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endiftruthy %}
     </div>

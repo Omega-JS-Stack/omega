@@ -70,10 +70,10 @@ function runSchema(config, schema) {
       continue;
     }
 
-    // ─── Type check ─────────────────────────────────────────────────────────
+    // ─── Type check ('|' unions allowed: 'string|boolean') ──────────────────
     if (rule.type) {
-      const ok = (() => {
-        switch (rule.type) {
+      const matches = (type) => {
+        switch (type) {
           case 'string':  return typeof value === 'string';
           case 'boolean': return typeof value === 'boolean';
           case 'number':  return typeof value === 'number' && Number.isFinite(value);
@@ -81,8 +81,8 @@ function runSchema(config, schema) {
           case 'object':  return isPlainObject(value);
           default:        return true;
         }
-      })();
-      if (!ok) {
+      };
+      if (!rule.type.split('|').some(matches)) {
         errors.push(`config.${rule.path} has wrong type — got ${Array.isArray(value) ? 'array' : typeof value}, expected ${rule.type}`);
         continue;          // skip secondary checks if the type is wrong
       }

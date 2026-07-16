@@ -136,7 +136,7 @@ alternative:
 {% endcapture %}
 
 <!-- ═══ Masthead ═══ -->
-<section class="classy-dotgrid pb-4" data-competitor-name="{{ alt.competitor.name }}">
+<section class="classy-dotgrid pb-4" data-omega-dotfield data-competitor-name="{{ alt.competitor.name }}">
   <div class="container" data-omega-reveal-stagger="90">
     <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
       <a href="/alternatives">Alternatives</a>
@@ -157,8 +157,9 @@ alternative:
         </a>
       {% endiftruthy %}
       {% iftruthy alt.hero.secondary_button.text %}
-        <a href="{{ alt.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+        <a href="{{ alt.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ alt.hero.secondary_button.text }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endiftruthy %}
     </div>

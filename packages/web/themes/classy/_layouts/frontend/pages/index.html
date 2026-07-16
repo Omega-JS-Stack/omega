@@ -256,8 +256,9 @@ cta:
         </a>
       {% endiftruthy %}
       {% if resolved.hero.secondary_button.enabled != false and resolved.hero.secondary_button.text %}
-        <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+        <a href="{{ resolved.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
           {{ resolved.hero.secondary_button.text }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
       {% endif %}
     </div>

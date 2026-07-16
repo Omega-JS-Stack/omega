@@ -23,7 +23,7 @@ newsletter_cta:
 ---
 
 <!-- ═══ Masthead — mono eyebrow, huge serif, one dek line, search right ═══ -->
-<section class="classy-dotgrid pb-0">
+<section class="classy-dotgrid pb-0" data-omega-dotfield>
   <div class="container">
     <div class="classy-masthead" data-omega-reveal-stagger="90">
       <div>
@@ -46,7 +46,7 @@ newsletter_cta:
             placeholder="Search posts..."
             aria-label="Search posts"
           >
-          <button class="btn btn-adaptive btn-sm" type="submit">Search</button>
+          <button class="btn btn-adaptive btn-sm" type="submit">{% uj_icon "magnifying-glass", "fa-xs me-1" %}Search</button>
         </form>
       </div>
     </div>
@@ -265,6 +265,7 @@ newsletter_cta:
           </div>
           <div class="col-md-auto">
             <button type="submit" class="btn btn-adaptive btn-lg px-4">
+              {% uj_icon "paper-plane", "fa-sm me-2" %}
               <span class="button-text">{{ resolved.newsletter_cta.button.text }}</span>
             </button>
           </div>

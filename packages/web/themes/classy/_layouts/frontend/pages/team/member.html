@@ -3,7 +3,7 @@ layout: frontend/core/base
 ---
 
 <!-- ═══ Member — portrait split ═══ -->
-<section class="classy-dotgrid">
+<section class="classy-dotgrid" data-omega-dotfield>
   <div class="container">
     {%- capture member_name -%}{%- uj_member resolved.member.id, "name" -%}{%- endcapture -%}
     {%- assign first_name = member_name | split: ' ' | first -%}

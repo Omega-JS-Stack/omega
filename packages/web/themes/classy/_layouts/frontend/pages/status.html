@@ -65,7 +65,7 @@ build_info:
 <!-- Hero Section with Status Banner -->
 <section class="status-hero py-5">
   <div class="container">
-    <div class="mb-5 classy-dotgrid" data-omega-reveal-stagger="90">
+    <div class="mb-5 classy-dotgrid" data-omega-dotfield data-omega-reveal-stagger="90">
       <span class="classy-micro d-block mb-3" data-omega-reveal>Status</span>
       <h1 class="classy-display classy-display--page" data-omega-reveal>
         {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
@@ -257,6 +257,7 @@ build_info:
                     required
                   >
                   <button type="submit" class="btn btn-adaptive text-nowrap flex-shrink-0">
+                    {% uj_icon "paper-plane", "fa-sm me-2" %}
                     <span class="button-text">{{ resolved.updates.button.text }}</span>
                   </button>
                 </form>

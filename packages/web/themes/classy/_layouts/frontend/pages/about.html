@@ -25,7 +25,7 @@ story:
     icon: "clock-rotate-left"
     text: "History"
   headline: "Follow our <em>journey</em>"
-  subheadline: "From a stubborn idea to the product it is today — the moments that shaped how we work."
+  subheadline: "The moments that shaped how we work."
   items:
   - year: "2017"
     title: "The beginning"
@@ -91,7 +91,7 @@ team_cta:
     icon: "handshake"
     text: "People"
   headline: "Meet the people behind {{ site.brand.name }}"
-  subheadline: "Get to know the passionate individuals who work every day to make your experience exceptional"
+  subheadline: "The people who build and run it, every day."
   button:
     text: "Meet the team"
     icon: "arrow-right"
@@ -99,7 +99,7 @@ team_cta:
 ---
 
 <!-- ═══ Hero — the statement + facts rail ═══ -->
-<section class="classy-dotgrid">
+<section class="classy-dotgrid" data-omega-dotfield>
   <div class="container">
     <div class="classy-hero-split">
       <div data-omega-reveal-stagger="90">
@@ -137,6 +137,29 @@ team_cta:
     <div class="classy-duo">
       <div class="classy-duo__aside" data-omega-reveal>
         <span class="classy-micro">Why we exist</span>
+
+        <!-- A living ops feed, not a paragraph -->
+        <div class="classy-object position-relative pe-4 mt-4 d-none d-lg-block">
+          <div class="classy-fragment pb-5">
+            <span class="classy-micro classy-fragment__label">This week at {{ site.brand.name }}</span>
+            <div class="classy-fragment__msg">
+              <span class="classy-fragment__msg-mark">{% uj_icon "rocket", "fa-xs" %}</span>
+              <span><strong>v2.4</strong> shipped to production</span>
+            </div>
+            <div class="classy-fragment__msg">
+              <span class="classy-fragment__msg-mark">{% uj_icon "user-plus", "fa-xs" %}</span>
+              <span>Two new faces on support</span>
+            </div>
+            <div class="classy-fragment__msg">
+              <span class="classy-fragment__msg-mark">{% uj_icon "quote-left", "fa-xs" %}</span>
+              <span>"Best tool we've adopted this year"</span>
+            </div>
+          </div>
+          <div class="classy-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
+            <span class="classy-dot classy-status--ok"></span>
+            All systems go
+          </div>
+        </div>
       </div>
       <div data-omega-reveal-stagger="120">
         <div data-omega-reveal>
