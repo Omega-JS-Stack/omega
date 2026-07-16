@@ -3,6 +3,7 @@
 
 ## 🎯 Now
 - **SKIN PASS — REFERENCE-BAR REMAKE COMPLETE through cp153, milestone root suite GREEN (1226/0)** — Ian reviews at localhost:4000; playground redeploy on his word (suggested name `classy-v2-reference-bar`); then showcase/FOUC QA → C4 → arc close
+- **Brandmark star re-round (Ian 2026-07-16)** — tips rebuilt as round button caps matching the pre-v2 original (ctl 0.10 / tipR 0.36, clearance 103px/side) in-tree on top of 5084cec; rides the next checkpoint commit
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **SKIN PASS remainder (after DRAFT 1)** — default pages + blueprints → auth/account/payment + dashboard/admin remake → showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close; D5 vendored-webfont picks are Ian's call mid-arc

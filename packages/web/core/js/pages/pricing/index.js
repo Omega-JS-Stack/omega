@@ -1,6 +1,7 @@
 // Libraries
 import { getSaleName } from '__main_assets__/js/libs/sale-name.js';
 import omega from '@omega.js/client';
+import { parseCountTarget, formatCount } from '@omega.js/client/modules/motion.js';
 
 // Module
 export default () => {
@@ -96,19 +97,50 @@ function updateToggleButtons(activeRadio) {
   });
 }
 
+// Tween a numeric text swap (prices glide between billing periods); falls
+// back to an instant swap for non-numeric text or reduced motion.
+const PRICE_TWEEN_MS = 450;
+
+function animateNumericText($el, newText) {
+  const from = parseCountTarget($el.textContent);
+  const to = parseCountTarget(newText);
+
+  if (!from || !to || from.value === to.value
+    || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    $el.textContent = newText;
+    return;
+  }
+
+  // Rapid toggling cancels the in-flight tween
+  if ($el._priceTween) {
+    cancelAnimationFrame($el._priceTween);
+  }
+
+  const start = performance.now();
+  const tick = (now) => {
+    const progress = Math.min((now - start) / PRICE_TWEEN_MS, 1);
+    const eased = 1 - ((1 - progress) ** 3);
+
+    if (progress < 1) {
+      $el.textContent = formatCount(to, from.value + ((to.value - from.value) * eased));
+      $el._priceTween = requestAnimationFrame(tick);
+    } else {
+      $el.textContent = newText;
+      $el._priceTween = null;
+    }
+  };
+  $el._priceTween = requestAnimationFrame(tick);
+}
+
 // Update pricing display based on billing type
 function updatePricing(billingType, amountElements, billingInfoElements, pricePerUnitElements) {
-  // Update prices
+  // Update prices (tweened — the numbers glide between billing periods)
   amountElements.forEach(amount => {
     const newPrice = billingType === 'monthly'
       ? amount.dataset.monthly
       : amount.dataset.annually;
 
-    console.log(`Updating price from ${amount.textContent} to ${newPrice} (${billingType})`);
-    console.log('Monthly value:', amount.dataset.monthly, 'Annual value:', amount.dataset.annually);
-
-    // Update the text content with the new price
-    amount.textContent = newPrice;
+    animateNumericText(amount, newPrice);
   });
 
   // Update billing info
@@ -120,13 +152,13 @@ function updatePricing(billingType, amountElements, billingInfoElements, pricePe
     info.textContent = newText;
   });
 
-  // Update price per unit
+  // Update price per unit (tweened, same as the headline amounts)
   pricePerUnitElements.forEach(pricePerUnit => {
     const newPricePerUnit = billingType === 'monthly'
       ? pricePerUnit.dataset.monthly
       : pricePerUnit.dataset.annually;
 
-    pricePerUnit.textContent = newPricePerUnit;
+    animateNumericText(pricePerUnit, newPricePerUnit);
   });
 }
 
@@ -363,8 +395,9 @@ function adjustNavbarOffset() {
   // Remove hidden attribute
   $promoBanner.removeAttribute('hidden');
 
-  const bannerHeight = $promoBanner.offsetHeight;
-  const bannerOffset = bannerHeight - 10;
+  // Full banner height — the banner sits entirely ABOVE the nav, never
+  // bleeding into it (the nav/section transitions make the push-down glide)
+  const bannerOffset = $promoBanner.offsetHeight;
 
   // Push navbar down to make room for banner
   $nav.style.marginTop = `${bannerOffset}px`;

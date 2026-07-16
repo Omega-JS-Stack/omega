@@ -39,10 +39,10 @@ newsletter:
         <header data-omega-reveal-stagger="80">
           <!-- Mono breadcrumb -->
           <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
-            <a href="{{ site.url }}/blog">Blog</a>
+            <a href="/blog">Blog</a>
             {% if resolved.post.categories[0] %}
               <span>/</span>
-              <a href="{{ site.url }}/blog/categories/{{ resolved.post.categories[0] | slugify }}">{{ resolved.post.categories[0] | uj_title_case }}</a>
+              <a href="/blog/categories/{{ resolved.post.categories[0] | slugify }}">{{ resolved.post.categories[0] | uj_title_case }}</a>
             {% endif %}
           </div>
 
@@ -125,7 +125,7 @@ newsletter:
         <div class="col-xl-7 col-lg-8 col-md-12 col-12">
           <div class="classy-chip-cloud justify-content-start">
             {% for tag in tags %}
-              <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="classy-chip">{{ tag }}</a>
+              <a href="/blog/tags/{{ tag | slugify }}" class="classy-chip">{{ tag }}</a>
             {% endfor %}
           </div>
         </div>
@@ -226,7 +226,7 @@ newsletter:
             <p class="classy-cta__sub">{{ resolved.newsletter.subheadline }}</p>
           {% endiftruthy %}
 
-          <form class="row g-3 justify-content-center needs-validation mt-2" action="{{ site.url }}/email-subscription">
+          <form class="row g-3 justify-content-center needs-validation mt-2" action="/email-subscription">
             <div class="col-md-7">
               <label for="newsletter-email" class="visually-hidden">Email address</label>
               <input type="email" name="email" id="newsletter-email" class="form-control form-control-lg" placeholder="{% iftruthy resolved.newsletter.form.placeholder %}{{ resolved.newsletter.form.placeholder }}{% endiftruthy %}" autocomplete="email" required>

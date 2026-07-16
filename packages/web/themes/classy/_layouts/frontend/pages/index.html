@@ -207,7 +207,7 @@ cta:
 {% endcapture %}
 
 <!-- ═══ Hero ═══ -->
-<section class="classy-hero classy-dotgrid">
+<section class="classy-hero classy-dotgrid" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     {% iftruthy resolved.hero.badge.text %}
       {% if resolved.hero.badge.href %}
@@ -441,7 +441,7 @@ cta:
 
       <!-- Tab Buttons -->
       <div class="d-flex flex-wrap justify-content-center mb-4" data-omega-reveal>
-        <div class="classy-billing-toggle" role="tablist">
+        <div class="classy-billing-toggle" role="tablist" data-omega-segmented>
           {% for tab in resolved.product_demo.tabs %}
             <button
               class="btn {% if forloop.first %}active{% endif %}"

@@ -18,10 +18,11 @@ main {
     }
 
     &:first-child {
-      padding-top: 8.5rem; // 4rem nav clearance + section
+      padding-top: 10rem; // 4rem nav clearance + hero breathing room
+      transition: padding-top var(--omega-speed-slow) var(--omega-ease); // promo-banner push-down glides
 
       @media (min-width: 992px) {
-        padding-top: 10rem;
+        padding-top: 12rem;
       }
     }
   }

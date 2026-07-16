@@ -112,9 +112,32 @@
   }
 }
 
+// Switches glide: the knob slides and the track tints (Bootstrap only
+// transitions background-position by default), with a light press squish.
+.form-switch .form-check-input {
+  transition:
+    background-position var(--omega-speed) var(--omega-ease),
+    background-color var(--omega-speed) var(--omega-ease),
+    border-color var(--omega-speed) var(--omega-ease);
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
 .form-switch .form-check-input:checked {
   background-color: var(--omega-accent);
   border-color: var(--omega-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .form-switch .form-check-input {
+    transition: none;
+
+    &:active {
+      transform: none;
+    }
+  }
 }
 
 // ============================================

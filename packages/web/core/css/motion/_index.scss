@@ -125,7 +125,8 @@
   animation: omega-float 7s var(--omega-ease) infinite alternate;
 }
 
-// ─── Marquee (seamless loop; engine duplicates the track once) ───────────────
+// ─── Marquee (seamless loop; engine clones the set until half the track
+// covers the container, then doubles it for the -50% loop) ───────────────────
 
 .omega-marquee {
   overflow: hidden;
@@ -206,6 +207,46 @@ html[data-omega-motion] [data-omega-rotate] > [data-omega-active] {
   animation: omega-caret-blink 1.1s steps(1) infinite;
 }
 
+// ─── Segmented controls (engine injects + positions the gliding thumb) ──────
+
+// isolation + negative z-index: the thumb paints above the container's own
+// background but below every segment — no touching the segments themselves
+// (forcing position on them would break Bootstrap's .btn-check clip hiding).
+[data-omega-segmented] {
+  position: relative;
+  isolation: isolate;
+}
+
+.omega-segmented__thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--omega-segment-w, 0);
+  height: var(--omega-segment-h, 0);
+  transform: translate(var(--omega-segment-x, 0px), var(--omega-segment-y, 0px));
+  transition:
+    transform var(--omega-speed) var(--omega-ease),
+    width var(--omega-speed) var(--omega-ease),
+    height var(--omega-speed) var(--omega-ease),
+    opacity var(--omega-speed) var(--omega-ease);
+  pointer-events: none;
+  z-index: -1;
+}
+
+// ─── Dot field (canvas dot grid: traveling wave + pointer glow) ──────────────
+
+[data-omega-dotfield] {
+  position: relative;
+}
+
+.omega-dotfield__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 // ─── Reduced motion: kill every ambient/looping effect ──────────────────────
 
 @media (prefers-reduced-motion: reduce) {
@@ -219,6 +260,7 @@ html[data-omega-motion] [data-omega-rotate] > [data-omega-active] {
   .omega-hover-raise,
   .omega-pressable,
   .omega-hover-nudge .omega-nudge,
+  .omega-segmented__thumb,
   html[data-omega-motion] [data-omega-rotate] > * {
     transition: none;
   }

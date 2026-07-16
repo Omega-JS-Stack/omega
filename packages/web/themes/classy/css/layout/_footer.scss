@@ -208,6 +208,18 @@
         outline-offset: 1px;
       }
     }
+
+    // The gliding thumb carries the active surface once the engine is live
+    &[data-omega-segmented-ready] button.active {
+      background: transparent;
+    }
+
+    .omega-segmented__thumb {
+      background: var(--omega-surface-2);
+      border: 0;
+      border-radius: calc(var(--omega-radius-s) - 2px);
+      box-shadow: none;
+    }
   }
 
   @media (max-width: 575.98px) {

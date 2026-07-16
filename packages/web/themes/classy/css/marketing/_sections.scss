@@ -256,6 +256,13 @@
     border-color: var(--omega-line);
     box-shadow: var(--omega-shadow-1);
   }
+
+  // The gliding thumb carries the active surface once the engine is live
+  &[data-omega-segmented-ready] .btn-check:checked + .btn {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
 }
 
 // Platform rail — the download page's segmented selector (Bootstrap tab
@@ -292,6 +299,13 @@
       border-color: var(--omega-line);
       box-shadow: var(--omega-shadow-1);
     }
+  }
+
+  // The gliding thumb carries the active surface once the engine is live
+  &[data-omega-segmented-ready] .btn.active {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
   }
 }
 
@@ -511,10 +525,27 @@
   font-size: 0.84375rem;
   color: var(--omega-ink-muted);
 
+  // Slides in when the JS un-hides it — the nav/section transitions glide down
+  &:not([hidden]) {
+    animation: classy-promo-in var(--omega-speed-slow) var(--omega-ease);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:not([hidden]) {
+      animation: none;
+    }
+  }
+
   .classy-promo__countdown,
   .classy-promo__code {
     font-family: var(--omega-font-mono);
     font-weight: 600;
     color: var(--omega-ink);
+  }
+}
+
+@keyframes classy-promo-in {
+  from {
+    transform: translateY(-100%);
   }
 }

@@ -57,10 +57,32 @@
   background-size: 22px 22px;
   mask-image: radial-gradient(ellipse 72% 62% at 50% 32%, #000 30%, transparent 72%);
   pointer-events: none;
+  transition: opacity var(--omega-speed-slow) var(--omega-ease);
 }
 
-.classy-dotgrid > * {
+// The live canvas (data-omega-dotfield) takes over from the static dots —
+// same breathing mask, static grid fades out underneath it.
+.classy-dotgrid[data-omega-dotfield-ready]::before {
+  opacity: 0;
+}
+
+.classy-dotgrid > .omega-dotfield__canvas {
+  mask-image: radial-gradient(ellipse 72% 62% at 50% 32%, #000 30%, transparent 72%);
+}
+
+.classy-dotgrid > :not(.omega-dotfield__canvas) {
   position: relative;
+}
+
+// ============================================
+// Segmented-control thumb (engine-injected via data-omega-segmented) —
+// the pill that glides between segments; containers may re-skin it.
+// ============================================
+.omega-segmented__thumb {
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-s);
+  box-shadow: var(--omega-shadow-1);
 }
 
 // ============================================

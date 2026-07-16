@@ -37,7 +37,7 @@ newsletter_cta:
       </div>
 
       <div class="classy-masthead__actions" data-omega-reveal>
-        <form action="{{ site.url }}/search/cse" target="_blank" class="classy-blog-search">
+        <form action="/search/cse" target="_blank" class="classy-blog-search">
           <span class="classy-blog-search__icon">{% uj_icon "search", "fa-sm" %}</span>
           <input
             type="search"
@@ -65,11 +65,11 @@ newsletter_cta:
 
     {% if categories.size > 0 %}
       <nav class="classy-tabs mt-5" aria-label="Post categories" data-omega-reveal>
-        <a href="{{ site.url }}/blog" class="active">All</a>
+        <a href="/blog" class="active">All</a>
         {% for category in categories %}
-          <a href="{{ site.url }}/blog/categories/{{ category | slugify }}">{{ category }}</a>
+          <a href="/blog/categories/{{ category | slugify }}">{{ category }}</a>
         {% endfor %}
-        <a href="{{ site.url }}/blog/categories">All categories</a>
+        <a href="/blog/categories">All categories</a>
       </nav>
     {% endif %}
   </div>
@@ -100,7 +100,7 @@ newsletter_cta:
 
     {% if _featured %}
       <article class="classy-featured-post mb-5 pb-3" data-omega-reveal>
-        <a href="{{ site.url }}{{ _featured.url }}" class="classy-featured-post__media{% if _featured.post.image == false %} classy-dotgrid{% endif %}">
+        <a href="{{ _featured.url }}" class="classy-featured-post__media{% if _featured.post.image == false %} classy-dotgrid{% endif %}">
           {%- if _featured.post.image == false -%}
             {%- assign _mono_source = _featured.post.categories[0] | default: _featured.post.title -%}
             <span class="classy-featured-post__monogram" aria-hidden="true">{{ _mono_source | slice: 0 | upcase }}</span>
@@ -113,7 +113,7 @@ newsletter_cta:
         <div class="classy-featured-post__body">
           <div class="classy-post-card__eyebrow">
             {% if _featured.post.categories[0] %}
-              <a href="{{ site.url }}/blog/categories/{{ _featured.post.categories[0] | slugify }}">{{ _featured.post.categories[0] | uj_title_case }}</a>
+              <a href="/blog/categories/{{ _featured.post.categories[0] | slugify }}">{{ _featured.post.categories[0] | uj_title_case }}</a>
               <span>·</span>
             {% endif %}
             <time datetime="{{ _featured.date | date_to_xmlschema }}">{{ _featured.date | date: "%b %d, %Y" }}</time>
@@ -121,13 +121,13 @@ newsletter_cta:
             <span>{% uj_readtime _featured.content %} min read</span>
           </div>
           <h2 class="classy-featured-post__title">
-            <a href="{{ site.url }}{{ _featured.url }}">{{ _featured.post.title }}</a>
+            <a href="{{ _featured.url }}">{{ _featured.post.title }}</a>
           </h2>
           {% iftruthy _featured.post.description %}
             <p class="classy-featured-post__desc">{{ _featured.post.description }}</p>
           {% endiftruthy %}
           <div class="mt-2">
-            <a href="{{ site.url }}{{ _featured.url }}" class="btn btn-outline-adaptive btn-sm omega-hover-nudge">
+            <a href="{{ _featured.url }}" class="btn btn-outline-adaptive btn-sm omega-hover-nudge">
               Read the story
               <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-xs" %}</span>
             </a>
@@ -172,7 +172,7 @@ newsletter_cta:
 
           {% if start_page > 1 %}
             <li class="page-item">
-              <a class="page-link" href="{{ site.url }}/blog">1</a>
+              <a class="page-link" href="/blog">1</a>
             </li>
             {% if start_page > 2 %}
               <li class="page-item disabled">
@@ -184,9 +184,9 @@ newsletter_cta:
           {% for page in (start_page..end_page) %}
             <li class="page-item {% if page == paginator.page %}active{% endif %}">
               {% if page == 1 %}
-                <a class="page-link" href="{{ site.url }}/blog">{{ page }}</a>
+                <a class="page-link" href="/blog">{{ page }}</a>
               {% else %}
-                <a class="page-link" href="{{ site.url }}/blog/page/{{ page }}">{{ page }}</a>
+                <a class="page-link" href="/blog/page/{{ page }}">{{ page }}</a>
               {% endif %}
             </li>
           {% endfor %}
@@ -199,7 +199,7 @@ newsletter_cta:
               </li>
             {% endif %}
             <li class="page-item">
-              <a class="page-link" href="{{ site.url }}/blog/page/{{ paginator.total_pages }}">
+              <a class="page-link" href="/blog/page/{{ paginator.total_pages }}">
                 {{ paginator.total_pages }}
               </a>
             </li>

@@ -10,7 +10,7 @@
 {% endcomment %}
 {% assign _p = include.post %}
 <article class="classy-post-card">
-  <a href="{{ site.url }}{{ _p.url }}" class="classy-post-card__media{% if _p.post.image == false %} classy-post-card__media--pattern classy-dotgrid{% endif %}">
+  <a href="{{ _p.url }}" class="classy-post-card__media{% if _p.post.image == false %} classy-post-card__media--pattern classy-dotgrid{% endif %}">
     {%- if _p.post.image == false -%}
       {%- assign _mono_source = _p.post.categories[0] | default: _p.post.title -%}
       <span class="classy-post-card__monogram" aria-hidden="true">{{ _mono_source | slice: 0 | upcase }}</span>
@@ -24,14 +24,14 @@
   <div class="classy-post-card__body">
     <div class="classy-post-card__eyebrow">
       {% if _p.post.categories[0] %}
-        <a href="{{ site.url }}/blog/categories/{{ _p.post.categories[0] | slugify }}">{{ _p.post.categories[0] | uj_title_case }}</a>
+        <a href="/blog/categories/{{ _p.post.categories[0] | slugify }}">{{ _p.post.categories[0] | uj_title_case }}</a>
         <span>·</span>
       {% endif %}
       <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
     </div>
 
     <h3 class="classy-post-card__title">
-      <a href="{{ site.url }}{{ _p.url }}">{{ _p.post.title }}</a>
+      <a href="{{ _p.url }}">{{ _p.post.title }}</a>
     </h3>
 
     {%- capture _excerpt -%}{{ _p.post.description }}{%- endcapture -%}

@@ -81,6 +81,23 @@ describe('motion', () => {
     });
   });
 
+  describe('marqueeCopies', () => {
+    it('clones the set until half the track covers the container', () => {
+      // 500px set in a 1400px container → 3 copies per half (1500 ≥ 1400)
+      assert.strictEqual(motion.marqueeCopies(500, 1400), 3);
+      // exact fit needs no extra copy
+      assert.strictEqual(motion.marqueeCopies(700, 1400), 2);
+      // a set already wider than the container needs one copy
+      assert.strictEqual(motion.marqueeCopies(1600, 1400), 1);
+    });
+
+    it('falls back to one copy when geometry is unmeasurable', () => {
+      assert.strictEqual(motion.marqueeCopies(0, 1400), 1);
+      assert.strictEqual(motion.marqueeCopies(500, 0), 1);
+      assert.strictEqual(motion.marqueeCopies(NaN, 1400), 1);
+    });
+  });
+
   describe('createMotion', () => {
     it('returns the engine surface and stays inert without a document', () => {
       const engine = motion.createMotion();

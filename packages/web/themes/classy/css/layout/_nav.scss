@@ -10,12 +10,13 @@
   border-bottom: 1px solid transparent;
   transition:
     background-color var(--omega-speed) var(--omega-ease),
-    border-color var(--omega-speed) var(--omega-ease);
+    border-color var(--omega-speed) var(--omega-ease),
+    margin-top var(--omega-speed-slow) var(--omega-ease); // promo-banner push-down
 
   &[data-omega-scrolled='true'] {
-    background: color-mix(in srgb, var(--omega-ground) 82%, transparent);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    background: color-mix(in srgb, var(--omega-ground) 70%, transparent);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
     border-bottom-color: var(--omega-line);
   }
 
@@ -95,9 +96,9 @@
 
   // ── Mobile collapse panel ──────────────────────────────────────────────────
   @media (max-width: 991.98px) {
-    background: color-mix(in srgb, var(--omega-ground) 92%, transparent);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    background: color-mix(in srgb, var(--omega-ground) 86%, transparent);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
     border-bottom-color: var(--omega-line);
 
     .navbar-collapse {

@@ -56,13 +56,13 @@ join_cta:
       {% for member in site.team %}
         <div class="col-lg-3 col-md-4 col-6" data-omega-reveal>
           <div class="classy-person">
-            <a href="{{ site.url }}{{ member.url }}" class="classy-person__portrait">
+            <a href="{{ member.url }}" class="classy-person__portrait">
               {%- uj_member member.id, "image-tag", class="" -%}
             </a>
 
             <div class="classy-person__body">
               <h3 class="classy-person__name">
-                <a href="{{ site.url }}{{ member.url }}">
+                <a href="{{ member.url }}">
                   {%- uj_member member.id, "name" -%}
                 </a>
               </h3>

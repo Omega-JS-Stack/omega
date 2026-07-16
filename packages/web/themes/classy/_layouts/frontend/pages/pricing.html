@@ -102,7 +102,7 @@ faqs:
 {% endunless %}
 
 <!-- Hero Section -->
-<section class="classy-dotgrid pb-4">
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container">
     <div class="row justify-content-center text-center">
       <div class="col-lg-10" data-omega-reveal-stagger="90">
@@ -153,7 +153,7 @@ faqs:
             {% assign _savings = 20 %}
           {% endif %}
           <div class="d-flex align-items-center justify-content-center mb-4" data-omega-reveal>
-            <div class="classy-billing-toggle" role="group" aria-label="Billing toggle">
+            <div class="classy-billing-toggle" role="group" aria-label="Billing toggle" data-omega-segmented>
               <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly" {% unless _default_annual %}checked{% endunless %}>
               <label class="btn" for="monthly">Monthly</label>
 
