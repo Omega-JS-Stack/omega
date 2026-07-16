@@ -1,0 +1,1932 @@
+<title>classy v2 — Draft 1</title>
+<style>
+/* ============================================================================
+   CLASSY v2 — DRAFT 1 (interactive direction mockup, not production code)
+   One token sheet skins two surfaces: marketing Site + dashboard App.
+   Draft controls (bottom dock): view · theme · brand accent · type · density.
+   ========================================================================== */
+
+/* ─── Tokens ─────────────────────────────────────────────────────────────── */
+
+:root {
+  /* geometry */
+  --r-xs: 6px;
+  --r-s: 8px;
+  --r-m: 10px;
+  --r-l: 14px;
+  --r-xl: 20px;
+
+  /* type */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: var(--font-ui);
+  --track-display: -0.035em;
+  --fs-ui: 13.5px;
+
+  /* density-scaled geometry */
+  --control-h: 34px;
+  --pad-card: 20px;
+  --nav-item-h: 34px;
+  --cell-pad: 12px 16px;
+  --shell-side: 264px;
+  --shell-rail: 68px;
+  --shell-top: 60px;
+
+  /* motion */
+  --speed: 160ms;
+  --ease: cubic-bezier(0.25, 0.5, 0.35, 1);
+
+  /* brand accent — light/dark variants; theme blocks resolve them.
+     A brand preset only redefines these six. */
+  --acc-l: #5b47fb;
+  --acc-d: #8577ff;
+  --acc2-l: #00d4ff;
+  --acc2-d: #22d9ff;
+  --chart2-l: #0f8fa9;
+  --chart2-d: #1f9fb4;
+}
+
+:root[data-density="compact"] {
+  --fs-ui: 12.5px;
+  --control-h: 29px;
+  --pad-card: 14px;
+  --nav-item-h: 29px;
+  --cell-pad: 8px 14px;
+  --shell-top: 52px;
+}
+
+:root[data-type="editorial"] {
+  --font-display: "New York", ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --track-display: -0.015em;
+}
+
+:root[data-type="terminal"] {
+  --font-display: var(--font-mono);
+  --track-display: -0.03em;
+}
+
+/* brand presets */
+:root[data-brand="ember"]   { --acc-l:#e8590c; --acc-d:#ff8b3d; --acc2-l:#f43f5e; --acc2-d:#fb7185; }
+:root[data-brand="emerald"] { --acc-l:#0e9f6e; --acc-d:#34d39b; --acc2-l:#00d4ff; --acc2-d:#22d9ff; }
+:root[data-brand="ocean"]   { --acc-l:#2563eb; --acc-d:#6395ff; --acc2-l:#00d4ff; --acc2-d:#22d9ff; }
+:root[data-brand="rose"]    { --acc-l:#e11d63; --acc-d:#fb5c94; --acc2-l:#8b5cf6; --acc2-d:#a78bfa; }
+
+/* light theme (default) */
+:root {
+  color-scheme: light;
+  --ground: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --ink: #16181d;
+  --muted: #616873;
+  --faint: #98a0ab;
+  --line: #e6e8ec;
+  --line-strong: #d9dce2;
+  --accent: var(--acc-l);
+  --accent-2: var(--acc2-l);
+  --chart-2: var(--chart2-l);
+  --accent-ink: #ffffff;
+  --ok: #12925c;
+  --warn: #c47206;
+  --danger: #d92d20;
+  --shadow-s: 0 1px 2px rgb(16 18 23 / 5%);
+  --shadow-m: 0 8px 24px -12px rgb(16 18 23 / 18%);
+  --shadow-l: 0 24px 60px -24px rgb(16 18 23 / 25%);
+  --glass: rgb(255 255 255 / 68%);
+  --hero-ink-bg: #101116;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #0f1013;
+    --surface: #16171b;
+    --surface-2: #1d1f24;
+    --ink: #e8e9ee;
+    --muted: #9aa1ac;
+    --faint: #666d78;
+    --line: #26282f;
+    --line-strong: #33363e;
+    --accent: var(--acc-d);
+    --accent-2: var(--acc2-d);
+    --chart-2: var(--chart2-d);
+    --accent-ink: #101116;
+    --ok: #3ecf8e;
+    --warn: #f5a524;
+    --danger: #f0574d;
+    --shadow-s: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-m: 0 8px 24px -12px rgb(0 0 0 / 55%);
+    --shadow-l: 0 24px 60px -24px rgb(0 0 0 / 65%);
+    --glass: rgb(22 23 27 / 66%);
+    --hero-ink-bg: #0b0c0f;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0f1013;
+  --surface: #16171b;
+  --surface-2: #1d1f24;
+  --ink: #e8e9ee;
+  --muted: #9aa1ac;
+  --faint: #666d78;
+  --line: #26282f;
+  --line-strong: #33363e;
+  --accent: var(--acc-d);
+  --accent-2: var(--acc2-d);
+  --chart-2: var(--chart2-d);
+  --accent-ink: #101116;
+  --ok: #3ecf8e;
+  --warn: #f5a524;
+  --danger: #f0574d;
+  --shadow-s: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-m: 0 8px 24px -12px rgb(0 0 0 / 55%);
+  --shadow-l: 0 24px 60px -24px rgb(0 0 0 / 65%);
+  --glass: rgb(22 23 27 / 66%);
+  --hero-ink-bg: #0b0c0f;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ground: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --ink: #16181d;
+  --muted: #616873;
+  --faint: #98a0ab;
+  --line: #e6e8ec;
+  --line-strong: #d9dce2;
+  --accent: var(--acc-l);
+  --accent-2: var(--acc2-l);
+  --chart-2: var(--chart2-l);
+  --accent-ink: #ffffff;
+  --ok: #12925c;
+  --warn: #c47206;
+  --danger: #d92d20;
+  --shadow-s: 0 1px 2px rgb(16 18 23 / 5%);
+  --shadow-m: 0 8px 24px -12px rgb(16 18 23 / 18%);
+  --shadow-l: 0 24px 60px -24px rgb(16 18 23 / 25%);
+  --glass: rgb(255 255 255 / 68%);
+  --hero-ink-bg: #101116;
+}
+
+/* derived */
+:root {
+  --beam: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --accent-subtle: color-mix(in srgb, var(--accent) 11%, transparent);
+  --accent-hover: color-mix(in srgb, var(--accent) 88%, var(--ink) 12%);
+  --ring: color-mix(in srgb, var(--accent) 40%, transparent);
+  --ok-subtle: color-mix(in srgb, var(--ok) 13%, transparent);
+  --warn-subtle: color-mix(in srgb, var(--warn) 14%, transparent);
+  --danger-subtle: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+
+html { scroll-behavior: smooth; }
+html[data-view="app"] { overflow: hidden; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+svg { display: block; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:is(button, a, [tabindex]):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--r-xs); }
+::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+
+h1, h2, h3 { margin: 0; font-family: var(--font-display); letter-spacing: var(--track-display); text-wrap: balance; }
+p { margin: 0; }
+
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); }
+
+/* view switching */
+.view--site { display: block; }
+.view--app { display: none; }
+html[data-view="app"] .view--site { display: none; }
+html[data-view="app"] .view--app { display: block; }
+
+/* ─── Shared atoms ───────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: var(--control-h);
+  padding: 0 14px;
+  border-radius: var(--r-s);
+  font-weight: 560;
+  font-size: var(--fs-ui);
+  border: 1px solid transparent;
+  transition: background var(--speed) var(--ease), border-color var(--speed) var(--ease),
+              color var(--speed) var(--ease), transform var(--speed) var(--ease);
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn--primary { background: var(--accent); color: var(--accent-ink); }
+.btn--primary:hover { background: var(--accent-hover); }
+.btn--ink { background: var(--ink); color: var(--surface); }
+.btn--ink:hover { opacity: 0.88; }
+.btn--ghost { border-color: var(--line-strong); color: var(--ink); background: var(--surface); }
+.btn--ghost:hover { background: var(--surface-2); }
+.btn--quiet:hover { background: var(--surface-2); }
+.btn--lg { height: calc(var(--control-h) + 10px); padding: 0 20px; font-size: calc(var(--fs-ui) + 1.5px); border-radius: var(--r-m); }
+
+/* gradient border shell — Ian's gradient-border buttons/cards */
+.gborder {
+  position: relative;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--beam) border-box;
+}
+.btn.gborder:hover { box-shadow: 0 0 0 3px var(--accent-subtle); }
+
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  border-radius: var(--r-s);
+  color: var(--muted);
+  position: relative;
+}
+.iconbtn:hover { background: var(--surface-2); color: var(--ink); }
+.iconbtn .dot {
+  position: absolute; top: 7px; right: 7px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--danger); border: 2px solid var(--surface);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 560;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.chip--accent { background: var(--accent-subtle); border-color: transparent; color: var(--accent); }
+
+.pill-status { display: inline-flex; align-items: center; gap: 7px; font-weight: 560; font-size: 12px; }
+.pill-status i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.pill-status--ok { color: var(--ok); } .pill-status--ok i { background: var(--ok); }
+.pill-status--warn { color: var(--warn); } .pill-status--warn i { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+.pill-status--danger { color: var(--danger); } .pill-status--danger i { background: var(--danger); }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+}
+.seg button {
+  height: calc(var(--control-h) - 8px);
+  padding: 0 12px;
+  border-radius: calc(var(--r-s) - 3px);
+  color: var(--muted);
+  font-weight: 560;
+  font-size: 12.5px;
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-s); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-s);
+}
+
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--beam); color: #fff;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+  flex: none;
+}
+
+/* Ω brandmark */
+.mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--beam); color: #fff;
+  font-size: 17px; font-weight: 700; line-height: 1;
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+  flex: none;
+  font-family: var(--font-ui);
+}
+.lockup { display: inline-flex; align-items: center; gap: 10px; font-weight: 680; font-size: 15.5px; letter-spacing: -0.02em; }
+
+/* ============================================================================
+   SITE — marketing view
+   ========================================================================== */
+
+.site { position: relative; }
+
+/* glassy nav — invisible until scroll */
+.nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  transition: background var(--speed) var(--ease), border-color var(--speed) var(--ease),
+              backdrop-filter var(--speed) var(--ease);
+  border-bottom: 1px solid transparent;
+}
+.nav.scrolled {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  border-bottom-color: var(--line);
+}
+.nav__in {
+  max-width: 1180px; margin: 0 auto;
+  display: flex; align-items: center; gap: 26px;
+  padding: 12px 28px;
+}
+.nav__links { display: flex; gap: 4px; margin-inline-start: 10px; }
+.nav__links a {
+  color: var(--muted); text-decoration: none; font-weight: 540; font-size: 13.5px;
+  padding: 7px 11px; border-radius: var(--r-s);
+}
+.nav__links a:hover { color: var(--ink); background: var(--surface-2); }
+.nav__cta { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+
+/* hero */
+.hero {
+  position: relative;
+  padding: 158px 28px 96px;
+  overflow: clip;
+  background: var(--ground);
+}
+.hero__bg { position: absolute; inset: 0; pointer-events: none; }
+.hero__dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 16%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 62% at 50% 30%, #000 30%, transparent 72%);
+  mask-image: radial-gradient(ellipse 75% 62% at 50% 30%, #000 30%, transparent 72%);
+  opacity: 0.5;
+}
+.aurora { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.42; will-change: transform; }
+.aurora--1 { width: 560px; height: 420px; left: 6%; top: -6%; background: var(--accent); animation: drift1 26s ease-in-out infinite alternate; }
+.aurora--2 { width: 480px; height: 380px; right: 4%; top: 4%; background: var(--accent-2); opacity: 0.3; animation: drift2 31s ease-in-out infinite alternate; }
+.aurora--3 { width: 420px; height: 360px; left: 38%; top: 30%; background: color-mix(in srgb, var(--accent) 60%, var(--accent-2)); opacity: 0.2; animation: drift1 37s ease-in-out infinite alternate-reverse; }
+@keyframes drift1 { to { transform: translate(70px, 46px) scale(1.12); } }
+@keyframes drift2 { to { transform: translate(-64px, 38px) scale(0.92); } }
+
+.hero__in { position: relative; max-width: 1180px; margin: 0 auto; text-align: center; }
+
+.hero__badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 560; color: var(--muted);
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--beam) border-box;
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-s);
+}
+.hero__badge b { color: var(--accent); font-weight: 650; }
+
+.hero h1 {
+  margin: 26px auto 0;
+  max-width: 15ch;
+  font-size: clamp(44px, 7.2vw, 86px);
+  line-height: 1.02;
+  font-weight: 740;
+}
+.hero h1 .beam-text {
+  background: var(--beam);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero__sub {
+  margin: 22px auto 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: clamp(15px, 1.6vw, 18px);
+  line-height: 1.65;
+}
+.hero__sub code { font-family: var(--font-mono); font-size: 0.88em; background: var(--surface-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; }
+.hero__cta { margin-top: 32px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.hero__cmd { gap: 10px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--muted); }
+.hero__cmd:hover { color: var(--ink); }
+
+/* entrance stagger */
+.rise { opacity: 0; transform: translateY(16px); animation: rise 0.7s var(--ease) forwards; }
+.rise-2 { animation-delay: 0.08s; }
+.rise-3 { animation-delay: 0.16s; }
+.rise-4 { animation-delay: 0.26s; }
+.rise-5 { animation-delay: 0.4s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+/* floating app frame */
+.frame-wrap { position: relative; margin: 64px auto 0; max-width: 980px; perspective: 1600px; }
+.frame-halo {
+  position: absolute; inset: -8% -6%;
+  background: conic-gradient(from 210deg, transparent 12%, color-mix(in srgb, var(--accent) 32%, transparent), color-mix(in srgb, var(--accent-2) 30%, transparent), transparent 78%);
+  filter: blur(56px);
+  border-radius: 50%;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.frame {
+  position: relative;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-l);
+  overflow: hidden;
+  transform: rotateX(7deg);
+  transform-origin: 50% 0;
+  transition: transform 0.7s var(--ease);
+}
+.frame-wrap:hover .frame { transform: rotateX(2.5deg); }
+.frame__bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.frame__bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
+.frame__url {
+  margin: 0 auto;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line);
+  padding: 4px 14px; border-radius: 999px;
+  font-family: var(--font-mono);
+}
+.frame__body { display: grid; grid-template-columns: 208px 1fr; min-height: 380px; background: var(--ground); }
+.frame__side { background: var(--ground); border-inline-end: 1px solid var(--line); padding: 14px 10px; display: flex; flex-direction: column; gap: 3px; }
+.frame__side .lockup { padding: 4px 8px 10px; font-size: 13px; }
+.frame__side .mark { width: 22px; height: 22px; border-radius: 7px; font-size: 12px; }
+.fnav {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 9px; border-radius: 8px;
+  color: var(--muted); font-size: 12px; font-weight: 540;
+}
+.fnav svg { opacity: 0.75; }
+.fnav.on { background: var(--accent-subtle); color: var(--accent); font-weight: 620; }
+.fnav.on svg { opacity: 1; }
+.frame__main { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.frame__tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ftile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; text-align: left; }
+.ftile b { display: block; font-size: 17px; letter-spacing: -0.02em; }
+.ftile span { font-size: 11px; color: var(--muted); }
+.ftile .up { color: var(--ok); font-size: 10.5px; font-weight: 650; }
+.fchart { flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; text-align: left; }
+.fchart span { font-size: 11px; color: var(--muted); }
+
+/* logo marquee */
+.logos { padding: 34px 0 10px; border-block: 1px solid var(--line); background: var(--surface); }
+.logos p { text-align: center; font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.marquee { overflow: hidden; margin-top: 18px; padding-bottom: 26px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.marquee__track { display: flex; width: max-content; animation: slide 30s linear infinite; }
+.marquee__track .wlogo { margin-inline-end: 64px; }
+.marquee:hover .marquee__track { animation-play-state: paused; }
+@keyframes slide { to { transform: translateX(-50%); } }
+.wlogo { font-weight: 740; font-size: 17px; letter-spacing: 0.02em; color: var(--faint); white-space: nowrap; font-family: var(--font-display); }
+
+/* sections */
+.section { padding: 96px 28px; }
+.section__in { max-width: 1180px; margin: 0 auto; }
+.section__eyebrow { color: var(--accent); font-weight: 650; font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; }
+.section h2 { font-size: clamp(30px, 4vw, 46px); font-weight: 720; line-height: 1.08; margin-top: 12px; max-width: 22ch; }
+.section__sub { color: var(--muted); max-width: 58ch; margin-top: 14px; font-size: 15.5px; line-height: 1.65; }
+
+/* bento */
+.bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 44px; }
+.bento .card { padding: var(--pad-card); display: flex; flex-direction: column; gap: 10px; transition: transform var(--speed) var(--ease), box-shadow var(--speed) var(--ease); position: relative; overflow: clip; }
+.bento .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-m); }
+.bento .card h3 { font-size: 16.5px; font-weight: 650; letter-spacing: -0.015em; }
+.bento .card p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.b-2x2 { grid-column: span 2; grid-row: span 2; }
+.b-2x1 { grid-column: span 2; }
+.icotile {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-subtle); color: var(--accent);
+  flex: none;
+}
+.codebox {
+  margin-top: auto;
+  background: var(--hero-ink-bg);
+  color: #dfe2ea;
+  border-radius: var(--r-m);
+  border: 1px solid color-mix(in srgb, var(--line-strong) 50%, transparent);
+  padding: 16px 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.75;
+  overflow-x: auto;
+}
+.codebox .k { color: #8ea0b8; }
+.codebox .s { color: var(--accent-2); }
+.codebox .c { color: #5b6474; }
+.targets { display: flex; flex-wrap: wrap; gap: 8px; }
+.brand-dots { display: flex; gap: 10px; margin-top: auto; padding-top: 6px; }
+.bdot {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform var(--speed) var(--ease), box-shadow var(--speed) var(--ease);
+}
+.bdot:hover { transform: scale(1.15); }
+.bdot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.08); }
+.split { display: flex; border-radius: var(--r-m); overflow: hidden; border: 1px solid var(--line); margin-top: auto; min-height: 74px; }
+.split > div { flex: 1; padding: 10px 12px; font-size: 11px; font-weight: 600; }
+.split .lite { background: #f4f5f7; color: #616873; }
+.split .dark { background: #101116; color: #9aa1ac; }
+.split i { display: block; width: 34px; height: 8px; border-radius: 999px; background: var(--beam); margin-top: 8px; }
+.term {
+  margin-top: auto;
+  background: var(--hero-ink-bg); border-radius: var(--r-m); padding: 14px 18px;
+  font-family: var(--font-mono); font-size: 12.5px; color: #dfe2ea;
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 50%, transparent);
+  overflow-x: auto; white-space: nowrap;
+}
+.term .p { color: var(--accent-2); }
+.term .okx { color: #3ecf8e; }
+.term::after { content: ""; width: 7px; height: 15px; background: #dfe2ea; animation: caret 1.1s steps(1) infinite; flex: none; }
+@keyframes caret { 50% { opacity: 0; } }
+.mini-rows { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.mini-rows div { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--muted); font-weight: 540; }
+.mini-rows svg { color: var(--ok); flex: none; }
+
+/* stats band */
+.band {
+  position: relative;
+  background: var(--hero-ink-bg);
+  color: #eceef4;
+  overflow: clip;
+}
+.band .aurora--1 { opacity: 0.3; }
+.band .aurora--2 { opacity: 0.22; }
+.band__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; position: relative; }
+.band__cell { text-align: center; padding: 10px 6px; }
+.band__cell b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.6vw, 58px);
+  font-weight: 740;
+  letter-spacing: var(--track-display);
+  background: var(--beam);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.band__cell span { color: #9aa1ac; font-size: 13px; font-weight: 540; }
+
+/* pricing */
+.pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 44px; align-items: stretch; }
+.price { padding: calc(var(--pad-card) + 6px); display: flex; flex-direction: column; gap: 14px; }
+.price--pop { box-shadow: var(--shadow-m); }
+.price__head { display: flex; align-items: center; justify-content: space-between; }
+.price__name { font-weight: 680; font-size: 15.5px; }
+.price__amt { font-family: var(--font-display); font-size: 40px; font-weight: 730; letter-spacing: -0.03em; }
+.price__amt span { font-size: 14px; color: var(--muted); font-weight: 520; letter-spacing: 0; font-family: var(--font-ui); }
+.price ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.price li { display: flex; gap: 9px; align-items: center; color: var(--muted); font-size: 13px; }
+.price li svg { color: var(--ok); flex: none; }
+.price .btn { margin-top: auto; }
+
+/* quote */
+.quote { text-align: center; max-width: 760px; margin: 0 auto; }
+.quote blockquote {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 620;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.quote blockquote .beam-text { background: var(--beam); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.quote figcaption { margin-top: 18px; color: var(--muted); font-size: 13.5px; display: flex; align-items: center; gap: 10px; justify-content: center; }
+
+/* cta band */
+.cta-band {
+  position: relative;
+  border-radius: var(--r-xl);
+  overflow: clip;
+  background: var(--hero-ink-bg);
+  color: #eceef4;
+  padding: 72px 40px;
+  text-align: center;
+}
+.cta-band .aurora--1 { left: 18%; top: 20%; opacity: 0.36; }
+.cta-band .aurora--2 { right: 12%; top: -10%; opacity: 0.3; }
+.cta-band h2 { font-size: clamp(28px, 3.6vw, 44px); font-weight: 730; position: relative; }
+.cta-band p { color: #9aa1ac; margin-top: 12px; position: relative; }
+.cta-band .hero__cta { position: relative; }
+
+/* footer */
+.footer { border-top: 1px solid var(--line); background: var(--surface); padding: 56px 28px 34px; }
+.footer__in { max-width: 1180px; margin: 0 auto; }
+.footer__grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px; }
+.footer h4 { margin: 0 0 12px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.footer a { display: block; color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 0; }
+.footer a:hover { color: var(--ink); }
+.footer__brand p { color: var(--muted); font-size: 13px; max-width: 30ch; margin-top: 12px; line-height: 1.6; }
+.footer__base {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 40px; padding-top: 22px;
+  border-top: 1px solid var(--line);
+  color: var(--faint); font-size: 12.5px;
+}
+
+/* scroll reveal */
+.rv { opacity: 0; transform: translateY(16px); }
+.rv.in { opacity: 1; transform: none; transition: opacity 0.65s var(--ease), transform 0.65s var(--ease); }
+
+/* ============================================================================
+   APP — dashboard view
+   ========================================================================== */
+
+.shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  background: var(--ground);
+}
+
+/* sidebar lives ON the ground (GitBook pattern) — content gets the big card */
+.side {
+  grid-row: 1 / -1;
+  width: var(--shell-side);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 12px 12px;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width var(--speed) var(--ease), transform var(--speed) var(--ease);
+}
+.side__head { display: flex; align-items: center; gap: 10px; padding: 2px 8px 12px; }
+.side__head .word { font-weight: 680; font-size: 15px; letter-spacing: -0.02em; white-space: nowrap; }
+.side__head .ver { margin-inline-start: auto; }
+
+.selector {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px;
+  border-radius: var(--r-m);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-s);
+  margin-bottom: 10px;
+  width: 100%;
+  text-align: left;
+}
+.selector:hover { border-color: var(--line-strong); }
+.selector .pdot { width: 20px; height: 20px; border-radius: 7px; background: var(--beam); flex: none; }
+.selector b { font-size: 12.5px; font-weight: 620; display: block; line-height: 1.2; white-space: nowrap; }
+.selector span { font-size: 11px; color: var(--faint); display: block; line-height: 1.2; }
+.selector svg { margin-inline-start: auto; color: var(--faint); flex: none; }
+
+.side__search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  height: calc(var(--control-h) - 2px);
+  border-radius: var(--r-s);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 12.5px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+.side__search:hover { border-color: var(--line-strong); color: var(--muted); }
+.side__search kbd {
+  margin-inline-start: auto;
+  font-family: var(--font-mono); font-size: 10px;
+  border: 1px solid var(--line); border-radius: 5px;
+  padding: 1px 5px; color: var(--faint); background: var(--surface-2);
+}
+
+.side__label {
+  padding: 14px 10px 5px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  height: var(--nav-item-h);
+  padding: 0 10px;
+  border-radius: var(--r-s);
+  color: var(--muted);
+  font-weight: 540;
+  font-size: 13px;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+.nav-item svg { flex: none; opacity: 0.85; }
+.nav-item:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); color: var(--ink); }
+.nav-item[aria-current="page"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 620;
+  box-shadow: var(--shadow-s);
+  border: 1px solid var(--line);
+}
+.nav-item[aria-current="page"] svg { color: var(--accent); opacity: 1; }
+.nav-item .tail { margin-inline-start: auto; }
+
+.side__foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 14px; }
+
+/* the optional ad module */
+.ad {
+  position: relative;
+  border-radius: var(--r-m);
+  padding: 12px 12px 11px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--beam) border-box;
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-s);
+}
+.ad__tag { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); font-weight: 650; }
+.ad b { display: block; font-size: 12.5px; font-weight: 620; margin-top: 3px; letter-spacing: -0.01em; }
+.ad p { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
+.ad a { color: var(--accent); font-size: 11.5px; font-weight: 620; text-decoration: none; display: inline-block; margin-top: 6px; }
+.ad__x { position: absolute; top: 6px; right: 6px; color: var(--faint); width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+.ad__x:hover { color: var(--ink); background: var(--surface-2); }
+
+.user-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: var(--r-s); width: 100%; text-align: left; }
+.user-row:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.user-row b { display: block; font-size: 12.5px; font-weight: 600; line-height: 1.25; white-space: nowrap; }
+.user-row span { display: block; font-size: 11px; color: var(--faint); line-height: 1.25; white-space: nowrap; }
+.user-row svg { margin-inline-start: auto; color: var(--faint); flex: none; }
+
+/* collapsed rail */
+.shell[data-collapsed="true"] .side { width: var(--shell-rail); padding-inline: 10px; }
+.shell[data-collapsed="true"] :is(.side__head .word, .side__head .ver, .side .meta, .selector > svg,
+  .side__search kbd, .side__search span, .side__label, .nav-item .lbl, .nav-item .tail,
+  .ad, .user-row > svg) { display: none; }
+.shell[data-collapsed="true"] .side__head { justify-content: center; padding-inline: 0; }
+.shell[data-collapsed="true"] .selector { justify-content: center; padding: 8px 0; }
+.shell[data-collapsed="true"] .side__search { justify-content: center; padding: 0; }
+.shell[data-collapsed="true"] .nav-item { justify-content: center; padding: 0; gap: 0; }
+.shell[data-collapsed="true"] .user-row { justify-content: center; }
+
+/* topbar */
+.top {
+  grid-column: 2;
+  display: flex; align-items: center; gap: 10px;
+  min-height: var(--shell-top);
+  padding: 0 18px 0 6px;
+}
+.top__toggle { color: var(--muted); }
+.crumb { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 620; }
+.crumb .sep { color: var(--faint); font-weight: 400; }
+.top__end { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; }
+.top__divider { width: 1px; height: 22px; background: var(--line-strong); margin: 0 6px; }
+
+.account { position: relative; }
+.account > button {
+  display: flex; align-items: center; gap: 9px;
+  height: var(--control-h);
+  padding: 0 10px 0 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.account > button:hover { background: var(--surface); border-color: var(--line); box-shadow: var(--shadow-s); }
+.account b { font-size: 12.5px; font-weight: 600; }
+.account svg { color: var(--faint); }
+.menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  min-width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-m);
+  padding: 6px;
+  display: none;
+  z-index: 40;
+}
+.account.open .menu { display: block; }
+.menu__head { padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.menu__head b { font-size: 13px; display: block; }
+.menu__head span { font-size: 11.5px; color: var(--faint); }
+.menu button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border-radius: var(--r-s); font-size: 13px; color: var(--muted); }
+.menu button:hover { background: var(--surface-2); color: var(--ink); }
+.menu button.danger { color: var(--danger); }
+
+/* main — the one big rounded card */
+.main {
+  grid-column: 2;
+  overflow-y: auto;
+  margin: 0 14px 14px 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-s);
+}
+.main__in { max-width: 1160px; margin: 0 auto; padding: calc(var(--pad-card) + 12px) calc(var(--pad-card) + 12px) 48px; }
+
+.page-head { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.page-head h1 { font-size: 25px; font-weight: 700; }
+.page-head .sub { color: var(--muted); font-size: 13.5px; margin-top: 5px; }
+.page-head__end { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+
+/* stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 26px; }
+.tile { padding: calc(var(--pad-card) - 4px) var(--pad-card); display: flex; flex-direction: column; gap: 4px; }
+.tile__label { font-size: 12px; color: var(--muted); font-weight: 560; display: flex; align-items: center; gap: 8px; }
+.tile__row { display: flex; align-items: baseline; gap: 10px; }
+.tile__num { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+.delta { font-size: 11.5px; font-weight: 650; padding: 2px 7px; border-radius: 999px; }
+.delta--up { color: var(--ok); background: var(--ok-subtle); }
+.delta--down { color: var(--danger); background: var(--danger-subtle); }
+.delta--flat { color: var(--muted); background: var(--surface-2); }
+.tile svg.spark { margin-top: 8px; width: 100%; height: 34px; }
+
+/* grid: chart + side column */
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; margin-top: 14px; }
+.panel { padding: var(--pad-card); }
+.panel__head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.panel__head h3 { font-size: 14.5px; font-weight: 650; letter-spacing: -0.01em; }
+.panel__head .end { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--accent); vertical-align: middle; margin-inline-end: 6px; }
+.legend .prev i { background: var(--chart-2); height: 0; border-top: 2.5px dashed var(--chart-2); }
+
+.chart-wrap { position: relative; }
+.panel--chart { display: flex; flex-direction: column; }
+.toppages { margin-top: auto; border-top: 1px solid var(--line); padding-top: 12px; }
+.tp-head { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); font-weight: 640; margin-bottom: 4px; }
+.tp-row { display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 7px 0; font-size: 12.5px; color: var(--muted); }
+.tp-row i { display: block; position: relative; height: 6px; border-radius: 999px; background: var(--accent-subtle); overflow: hidden; }
+.tp-row i::after { content: ""; position: absolute; inset: 0; width: var(--w); background: var(--accent); border-radius: 999px; opacity: 0.85; }
+.tp-row b { color: var(--ink); font-weight: 620; }
+.chart-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-s);
+  box-shadow: var(--shadow-m);
+  padding: 8px 11px;
+  font-size: 11.5px;
+  display: none;
+  min-width: 122px;
+  z-index: 5;
+}
+.chart-tip b { display: block; font-size: 11px; color: var(--faint); font-weight: 600; margin-bottom: 4px; }
+.chart-tip .row { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.chart-tip .row i { width: 8px; height: 8px; border-radius: 3px; }
+.chart-tip .row .v { margin-inline-start: auto; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.side-col { display: flex; flex-direction: column; gap: 14px; }
+.meter { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.meter__row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); font-weight: 540; }
+.meter__row b { color: var(--ink); font-weight: 620; }
+.meter__bar { height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.meter__bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.meter__bar i.warnfill { background: var(--warn); }
+
+.check-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.check {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: var(--r-s);
+  font-size: 13px; color: var(--muted); font-weight: 540;
+}
+.check:hover { background: var(--surface-2); }
+.check .box { width: 17px; height: 17px; border-radius: 6px; border: 1.5px solid var(--line-strong); flex: none; display: flex; align-items: center; justify-content: center; }
+.check.done { color: var(--faint); text-decoration: line-through; }
+.check.done .box { background: var(--ok); border-color: var(--ok); color: #fff; }
+.check .go { margin-inline-start: auto; color: var(--accent); font-size: 11.5px; font-weight: 640; text-decoration: none; }
+
+.feed { display: flex; flex-direction: column; margin-top: 6px; }
+.feed__item { display: flex; gap: 11px; padding: 9px 2px; align-items: flex-start; border-bottom: 1px solid var(--line); }
+.feed__item:last-child { border-bottom: 0; }
+.feed__dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+.feed__item p { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.feed__item p b { color: var(--ink); font-weight: 600; }
+.feed__item time { display: block; font-size: 11px; color: var(--faint); margin-top: 1px; }
+
+/* promo banner — the gradient-border big-card moment */
+.promo {
+  margin-top: 14px;
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px var(--pad-card);
+  border-radius: var(--r-l);
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--beam) border-box;
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-s);
+  flex-wrap: wrap;
+}
+.promo b { font-size: 13.5px; font-weight: 650; display: block; letter-spacing: -0.01em; }
+.promo p { font-size: 12.5px; color: var(--muted); }
+.promo .brand-dots { margin: 0 0 0 auto; padding: 0; }
+
+/* table */
+.tablecard { margin-top: 14px; overflow: hidden; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--faint); font-weight: 640; padding: var(--cell-pad);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+td { padding: var(--cell-pad); border-bottom: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+tbody tr:hover td { background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
+tbody tr:last-child td { border-bottom: 0; }
+td .proj { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 600; }
+td .pdot { width: 18px; height: 18px; border-radius: 6px; background: var(--beam); flex: none; opacity: 0.9; }
+.tfoot { display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: var(--faint); font-size: 12px; }
+.tfoot .pages { margin-inline-start: auto; display: flex; gap: 4px; }
+
+/* mobile drawer */
+.scrim { display: none; position: fixed; inset: 0; z-index: 45; background: rgb(0 0 0 / 45%); border: 0; }
+.top__drawer { display: none; }
+
+@media (max-width: 1200px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .top, .main { grid-column: 1; }
+  .side {
+    position: fixed; inset-block: 0; inset-inline-start: 0; z-index: 50;
+    transform: translateX(-105%);
+    background: var(--ground);
+    box-shadow: var(--shadow-l);
+    width: var(--shell-side) !important;
+  }
+  .shell[data-open="true"] .side { transform: none; }
+  .shell[data-open="true"] .scrim { display: block; }
+  .top__drawer { display: inline-flex; }
+  .top__collapse { display: none; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .bento { grid-template-columns: repeat(2, 1fr); }
+  .b-2x2, .b-2x1 { grid-column: span 2; }
+  .band__grid { grid-template-columns: repeat(2, 1fr); }
+  .pricing { grid-template-columns: 1fr; }
+  .footer__grid { grid-template-columns: 1fr 1fr; }
+  .nav__links { display: none; }
+  .frame__body { grid-template-columns: 1fr; }
+  .frame__side { display: none; }
+}
+@media (max-width: 640px) {
+  .tiles { grid-template-columns: 1fr; }
+  .bento { grid-template-columns: 1fr; }
+  .b-2x2, .b-2x1 { grid-column: span 1; }
+}
+
+/* ─── Draft dock (meta chrome — always dark glass) ───────────────────────── */
+
+.dock {
+  position: fixed;
+  bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgb(15 16 20 / 88%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgb(255 255 255 / 12%);
+  box-shadow: 0 18px 50px -12px rgb(0 0 0 / 55%);
+  color: #cfd3db;
+  font-size: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 24px);
+}
+.dock__tag { font-size: 9.5px; letter-spacing: 0.12em; font-weight: 700; color: #7d8593; padding: 0 6px 0 4px; text-transform: uppercase; }
+.dock__sep { width: 1px; height: 18px; background: rgb(255 255 255 / 14%); margin: 0 3px; }
+.dock button { border-radius: 999px; }
+.dock .dseg { display: flex; background: rgb(255 255 255 / 7%); border-radius: 999px; padding: 2px; }
+.dock .dseg button { padding: 4px 12px; font-weight: 620; font-size: 12px; color: #9aa1ac; }
+.dock .dseg button[aria-pressed="true"] { background: #eceef4; color: #101116; }
+.dock .dicon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: #9aa1ac; }
+.dock .dicon:hover { color: #eceef4; background: rgb(255 255 255 / 8%); }
+.dock .dicon[aria-pressed="true"] { color: #eceef4; background: rgb(255 255 255 / 14%); }
+.dock .bdot { border-color: transparent; box-shadow: 0 0 0 1px rgb(255 255 255 / 25%); width: 20px; height: 20px; }
+.dock .bdot[aria-pressed="true"] { box-shadow: 0 0 0 2px #eceef4; }
+.dock .tbtn { padding: 3px 9px; font-weight: 650; color: #9aa1ac; }
+.dock .tbtn[aria-pressed="true"] { background: rgb(255 255 255 / 14%); color: #eceef4; }
+.dock .tbtn.t-e { font-family: "New York", ui-serif, Georgia, serif; }
+.dock .tbtn.t-t { font-family: var(--font-mono); }
+
+/* ─── Motion safety ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .aurora, .marquee__track, .term::after, .pill-status--warn i { animation: none !important; }
+  .rise { animation-duration: 0.01ms; }
+  .rv { opacity: 1; transform: none; }
+  .frame { transform: none; transition: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+</style>
+
+<!-- ═══════════════════════ SVG symbol defs ═══════════════════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 16 16"><path d="M2.5 6.5 8 2l5.5 4.5V13a1 1 0 0 1-1 1h-3v-4h-3v4h-3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 16 16"><path d="M1.5 8h3l2-4.5L10 12l2-4h2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M1.5 4a1 1 0 0 1 1-1H6l1.5 2h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 16 16"><path d="M8.8 1.5 3.5 9h3.4l-.7 5.5L11.5 7H8.1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-users" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 13.5c.5-2.3 2.3-3.5 4.5-3.5s4 1.2 4.5 3.5M11 3.3a2.5 2.5 0 0 1 0 4.4M12 10.3c1.3.5 2.2 1.5 2.5 3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-key" viewBox="0 0 16 16"><circle cx="5" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7.2 8.8 13.5 2.5M11 5l2 2M9 7l1.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 16 16"><path d="M2 2v11a1 1 0 0 0 1 1h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 10.5V8M8 10.5V5.5M11 10.5V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 16 16"><path d="M2.5 12.5a6 6 0 1 1 11 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 9.5 10.8 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-card" viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 6.5h13" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 16 16"><path d="M8 2a4 4 0 0 1 4 4c0 3 .8 4 1.5 4.7H2.5C3.2 10 4 9 4 6a4 4 0 0 1 4-4zM6.5 13a1.6 1.6 0 0 0 3 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-book" viewBox="0 0 16 16"><path d="M2.5 3.5A1.5 1.5 0 0 1 4 2h9.5v10.5H4A1.5 1.5 0 0 0 2.5 14z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M2.5 12.5A1.5 1.5 0 0 1 4 11h9.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-chev-d" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-ud" viewBox="0 0 16 16"><path d="m5 6.2 3-3 3 3M5 9.8l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.2 2.5v11" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="m3 8.5 3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="12.5" cy="8" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M2.5 8h10M9 4.5 13 8l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 1.5 9.6 6 14 8l-4.4 2L8 14.5 6.4 10 2 8l4.4-2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M12.6 3.4l-1.3 1.3M4.7 11.3l-1.3 1.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13.5 9.5A6 6 0 0 1 6.5 2.5 6 6 0 1 0 13.5 9.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-density" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h12M8 2c-3.5 3.8-3.5 8.2 0 12 3.5-3.8 3.5-8.2 0-12z" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+    <symbol id="i-desktop" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 14h5M8 11.5V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-puzzle" viewBox="0 0 16 16"><path d="M6 2.5h4v3a1.5 1.5 0 1 0 3 0v0h.5v8h-11v-8H3v0a1.5 1.5 0 1 0 3 0z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-server" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="4.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="12" height="4.5" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="4.6" cy="4.75" r="0.9" fill="currentColor"/><circle cx="4.6" cy="11.25" r="0.9" fill="currentColor"/></symbol>
+  </defs>
+</svg>
+
+<!-- ═══════════════════════════════ SITE ═══════════════════════════════ -->
+<div class="view view--site site" id="view-site">
+
+  <header class="nav" id="site-nav">
+    <div class="nav__in">
+      <span class="lockup"><span class="mark">Ω</span><span class="word">Playground</span></span>
+      <nav class="nav__links" aria-label="Site">
+        <a href="#bento">Product</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#">Docs</a>
+        <a href="#">Changelog</a>
+      </nav>
+      <div class="nav__cta">
+        <button class="btn btn--quiet">Sign in</button>
+        <button class="btn btn--primary">Get started</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero__bg">
+      <div class="hero__dots"></div>
+      <div class="aurora aurora--1"></div>
+      <div class="aurora aurora--2"></div>
+      <div class="aurora aurora--3"></div>
+    </div>
+    <div class="hero__in">
+      <span class="hero__badge rise"><svg width="13" height="13"><use href="#i-spark"/></svg> <b>OMEGA 1.0</b> is here — one framework, every surface</span>
+      <h1 class="rise rise-2">The whole stack, from <span class="beam-text">one config.</span></h1>
+      <p class="hero__sub rise rise-3">OMEGA turns a single <code>omega.json5</code> into your marketing site, dashboard, backend, desktop app, and browser extension. One brand. One deploy verb. Every target.</p>
+      <div class="hero__cta rise rise-4">
+        <button class="btn btn--primary btn--lg">Start building free</button>
+        <button class="btn btn--ghost btn--lg hero__cmd mono">npx omega setup <svg width="14" height="14"><use href="#i-arrow"/></svg></button>
+      </div>
+
+      <div class="frame-wrap rise rise-5">
+        <div class="frame-halo"></div>
+        <div class="frame">
+          <div class="frame__bar">
+            <i></i><i></i><i></i>
+            <span class="frame__url"><svg width="11" height="11"><use href="#i-globe"/></svg> app.playground.omegajs.dev</span>
+          </div>
+          <div class="frame__body">
+            <div class="frame__side">
+              <span class="lockup"><span class="mark">Ω</span> Playground</span>
+              <span class="fnav on"><svg width="13" height="13"><use href="#i-home"/></svg> Overview</span>
+              <span class="fnav"><svg width="13" height="13"><use href="#i-folder"/></svg> Projects</span>
+              <span class="fnav"><svg width="13" height="13"><use href="#i-chart"/></svg> Analytics</span>
+              <span class="fnav"><svg width="13" height="13"><use href="#i-users"/></svg> Members</span>
+              <span class="fnav"><svg width="13" height="13"><use href="#i-gear"/></svg> Settings</span>
+            </div>
+            <div class="frame__main">
+              <div class="frame__tiles">
+                <div class="ftile"><span>Revenue</span><b class="num">$12,480</b><span class="up">↑ 8.2%</span></div>
+                <div class="ftile"><span>Active users</span><b class="num">3,204</b><span class="up">↑ 4.1%</span></div>
+                <div class="ftile"><span>Uptime</span><b class="num">99.98%</b><span class="up">30 days</span></div>
+              </div>
+              <div class="fchart">
+                <span>Traffic</span>
+                <svg id="frame-chart" viewBox="0 0 560 150" width="100%" height="150" role="img" aria-label="Decorative traffic chart"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="logos">
+    <p>Powering every ITW Creative Works brand</p>
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee__track" id="marquee-track">
+        <span class="wlogo">SOMIIBO</span><span class="wlogo">StudyMonkey</span><span class="wlogo">SLAPFORM</span><span class="wlogo">chatsy.</span><span class="wlogo">Replyify</span><span class="wlogo">PROXIFLY</span><span class="wlogo">ITW Creative Works</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="bento">
+    <div class="section__in">
+      <span class="section__eyebrow rv">Why OMEGA</span>
+      <h2 class="rv">Every target. Zero drift.</h2>
+      <p class="section__sub rv">Every surface reads the same config, wears the same brand tokens, and ships with the same deploy verb — so your product feels like one product, everywhere.</p>
+
+      <div class="bento">
+        <div class="card b-2x2 rv">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-globe"/></svg></span>
+          <h3>One config, every target</h3>
+          <p>Declare your brand once. Web, backend, desktop, and extension builds all derive from it — colors, icons, auth, analytics, payments.</p>
+          <div class="targets">
+            <span class="chip"><svg width="11" height="11"><use href="#i-globe"/></svg> web</span>
+            <span class="chip"><svg width="11" height="11"><use href="#i-server"/></svg> backend</span>
+            <span class="chip"><svg width="11" height="11"><use href="#i-desktop"/></svg> desktop</span>
+            <span class="chip"><svg width="11" height="11"><use href="#i-puzzle"/></svg> extension</span>
+          </div>
+          <div class="codebox"><span class="c">// omega.json5</span><br>{<br>&nbsp;&nbsp;<span class="k">brand</span>: { <span class="k">name</span>: <span class="s">'Playground'</span>, <span class="k">color</span>: <span class="s">'#5B47FB'</span> },<br>&nbsp;&nbsp;<span class="k">targets</span>: {<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">web</span>: { <span class="k">theme</span>: <span class="s">'classy'</span> },<br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">backend</span>: {}, <span class="k">desktop</span>: {}, <span class="k">extension</span>: {}<br>&nbsp;&nbsp;}<br>}</div>
+        </div>
+
+        <div class="card rv">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-spark"/></svg></span>
+          <h3>Your brand is a token</h3>
+          <p>One hex in config becomes a full accent ramp. Try it —</p>
+          <div class="brand-dots" data-brand-dots></div>
+        </div>
+
+        <div class="card rv">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-moon"/></svg></span>
+          <h3>Dark mode, day one</h3>
+          <p>Both themes are defined at the token level. No retrofits.</p>
+          <div class="split"><div class="lite">Light<i></i></div><div class="dark">Dark<i></i></div></div>
+        </div>
+
+        <div class="card b-2x1 rv">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-bolt"/></svg></span>
+          <h3>Deploys that mean it</h3>
+          <p>Nothing publishes on commit. When you're ready, one verb ships every surface.</p>
+          <div class="term"><span class="p">$</span> omega deploy&nbsp;&nbsp;<span class="okx">✓ web · backend · desktop · extension</span></div>
+        </div>
+
+        <div class="card rv">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-key"/></svg></span>
+          <h3>Auth → payments, wired</h3>
+          <p>The unglamorous stuff is the default.</p>
+          <div class="mini-rows">
+            <div><svg width="13" height="13"><use href="#i-check"/></svg> Sign-in, OAuth &amp; accounts</div>
+            <div><svg width="13" height="13"><use href="#i-check"/></svg> Checkout &amp; billing portal</div>
+            <div><svg width="13" height="13"><use href="#i-check"/></svg> Usage limits &amp; plans</div>
+          </div>
+        </div>
+
+        <div class="card rv">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-gauge"/></svg></span>
+          <h3>Fast by default</h3>
+          <p>Minified HTML, hashed assets, image matrix, CSS hot-swap in under a second.</p>
+          <div class="mini-rows">
+            <div><svg width="13" height="13"><use href="#i-check"/></svg> <span class="mono num">&lt;1s</span>&nbsp;style reloads in dev</div>
+            <div><svg width="13" height="13"><use href="#i-check"/></svg> Purged, hashed production CSS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band section">
+    <div class="aurora aurora--1"></div>
+    <div class="aurora aurora--2"></div>
+    <div class="section__in">
+      <div class="band__grid">
+        <div class="band__cell rv"><b class="num" data-count="45">0</b><span>layouts skinned</span></div>
+        <div class="band__cell rv"><b class="num" data-count="4">0</b><span>surface families</span></div>
+        <div class="band__cell rv"><b class="num" data-count="1">0</b><span>token sheet</span></div>
+        <div class="band__cell rv"><b class="num">&lt;1s</b><span>css hot-swap</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="pricing">
+    <div class="section__in">
+      <span class="section__eyebrow rv">Pricing</span>
+      <h2 class="rv">Start free. Scale when it's real.</h2>
+      <div class="pricing">
+        <div class="card price rv">
+          <div class="price__head"><span class="price__name">Hobby</span></div>
+          <div class="price__amt num">$0<span> /mo</span></div>
+          <ul>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> 1 project, all targets</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Community themes</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Deploy to your own infra</li>
+          </ul>
+          <button class="btn btn--ghost">Start free</button>
+        </div>
+        <div class="card price price--pop gborder rv">
+          <div class="price__head"><span class="price__name">Pro</span><span class="chip chip--accent">Most popular</span></div>
+          <div class="price__amt num">$19<span> /mo</span></div>
+          <ul>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Unlimited projects</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> classy v2 + premium themes</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Payments &amp; usage plans</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Remove the sidebar ad slot</li>
+          </ul>
+          <button class="btn btn--primary">Go Pro</button>
+        </div>
+        <div class="card price rv">
+          <div class="price__head"><span class="price__name">Scale</span></div>
+          <div class="price__amt num">$99<span> /mo</span></div>
+          <ul>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Everything in Pro</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Multi-brand workspaces</li>
+            <li><svg width="13" height="13"><use href="#i-check"/></svg> Priority support</li>
+          </ul>
+          <button class="btn btn--ghost">Talk to us</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <figure class="quote rv">
+      <blockquote>“We rebuilt five products on OMEGA <span class="beam-text">without touching a stylesheet.</span>”</blockquote>
+      <figcaption><span class="avatar">IW</span> Ian Wiedenman — ITW Creative Works</figcaption>
+    </figure>
+  </section>
+
+  <section class="section" style="padding-top: 0;">
+    <div class="section__in">
+      <div class="cta-band rv">
+        <div class="aurora aurora--1"></div>
+        <div class="aurora aurora--2"></div>
+        <h2>Ready to ship every surface?</h2>
+        <p>From <span class="mono">omega setup</span> to a live product — site, app, backend, desktop, extension.</p>
+        <div class="hero__cta">
+          <button class="btn btn--primary btn--lg">Start building free</button>
+          <button class="btn btn--lg" style="color:#cfd3db;">Read the docs <svg width="14" height="14"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer__in">
+      <div class="footer__grid">
+        <div class="footer__brand">
+          <span class="lockup"><span class="mark">Ω</span><span class="word">Playground</span></span>
+          <p>The OMEGA demonstration brand. One config, every surface — built with classy v2.</p>
+        </div>
+        <div><h4>Product</h4><a href="#">Features</a><a href="#">Pricing</a><a href="#">Themes</a><a href="#">Changelog</a></div>
+        <div><h4>Resources</h4><a href="#">Docs</a><a href="#">Guides</a><a href="#">API</a><a href="#">Status</a></div>
+        <div><h4>Company</h4><a href="#">About</a><a href="#">Blog</a><a href="#">Contact</a><a href="#">Legal</a></div>
+      </div>
+      <div class="footer__base">
+        <span class="mark" style="width:22px;height:22px;font-size:12px;border-radius:7px;">Ω</span>
+        <span>© 2026 OMEGA Playground. A test brand, deliberately on fire.</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- ═══════════════════════════════ APP ═══════════════════════════════ -->
+<div class="view view--app" id="view-app">
+  <div class="shell" id="shell">
+
+    <aside class="side" id="side">
+      <div class="side__head">
+        <span class="mark">Ω</span>
+        <span class="word">Playground</span>
+        <span class="chip ver mono">v2</span>
+      </div>
+
+      <button class="selector" title="Switch project">
+        <span class="pdot"></span>
+        <span class="meta"><b>somiibo</b><span>Production</span></span>
+        <svg width="13" height="13"><use href="#i-chev-ud"/></svg>
+      </button>
+
+      <button class="side__search">
+        <svg width="13" height="13"><use href="#i-search"/></svg>
+        <span>Search…</span>
+        <kbd>⌘K</kbd>
+      </button>
+
+      <button class="nav-item" aria-current="page"><svg width="15" height="15"><use href="#i-home"/></svg><span class="lbl">Overview</span></button>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-pulse"/></svg><span class="lbl">Activity</span></button>
+
+      <div class="side__label">Workspace</div>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-folder"/></svg><span class="lbl">Projects</span><span class="tail chip num">6</span></button>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-bolt"/></svg><span class="lbl">Automations</span><span class="tail chip chip--accent">New</span></button>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-users"/></svg><span class="lbl">Members</span><span class="tail chip num">12</span></button>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-key"/></svg><span class="lbl">API keys</span></button>
+
+      <div class="side__label">Insights</div>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-chart"/></svg><span class="lbl">Analytics</span></button>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-gauge"/></svg><span class="lbl">Usage</span></button>
+
+      <div class="side__label">Settings</div>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-gear"/></svg><span class="lbl">General</span></button>
+      <button class="nav-item"><svg width="15" height="15"><use href="#i-card"/></svg><span class="lbl">Billing</span></button>
+
+      <div class="side__foot">
+        <div class="ad" id="ad-slot">
+          <button class="ad__x" id="ad-dismiss" aria-label="Dismiss ad"><svg width="11" height="11"><use href="#i-x"/></svg></button>
+          <span class="ad__tag">Sponsored</span>
+          <b>Ship faster with DevKit Pro</b>
+          <p>The toolkit your deploys deserve.</p>
+          <a href="#">Learn more → <span style="color:var(--faint);font-weight:400;">· Pro removes ads</span></a>
+        </div>
+        <button class="user-row">
+          <span class="avatar">IW</span>
+          <span class="meta"><b>Ian W.</b><span>ian@itwcreativeworks.com</span></span>
+          <svg width="14" height="14"><use href="#i-dots"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <header class="top">
+      <button class="iconbtn top__drawer" id="drawer-btn" aria-label="Open navigation" aria-expanded="false"><svg width="16" height="16"><use href="#i-panel"/></svg></button>
+      <button class="iconbtn top__collapse" id="collapse-btn" aria-label="Collapse sidebar" aria-expanded="true"><svg width="16" height="16"><use href="#i-panel"/></svg></button>
+      <div class="crumb"><span style="color:var(--faint);font-weight:520;">somiibo</span><span class="sep">/</span><span>Overview</span></div>
+      <span class="pill-status pill-status--ok" style="margin-inline-start:6px;"><i></i>Production</span>
+      <div class="top__end">
+        <button class="iconbtn" aria-label="Search"><svg width="15" height="15"><use href="#i-search"/></svg></button>
+        <button class="iconbtn" aria-label="Documentation"><svg width="15" height="15"><use href="#i-book"/></svg></button>
+        <button class="iconbtn" aria-label="Notifications"><svg width="15" height="15"><use href="#i-bell"/></svg><span class="dot"></span></button>
+        <div class="top__divider"></div>
+        <div class="account" id="account">
+          <button aria-haspopup="menu" aria-expanded="false" id="account-btn">
+            <span class="avatar">IW</span>
+            <b>Ian W.</b>
+            <svg width="12" height="12"><use href="#i-chev-d"/></svg>
+          </button>
+          <div class="menu" role="menu">
+            <div class="menu__head"><b>Ian Wiedenman</b><span>ian@itwcreativeworks.com</span></div>
+            <button role="menuitem"><svg width="14" height="14"><use href="#i-users"/></svg> Profile</button>
+            <button role="menuitem"><svg width="14" height="14"><use href="#i-gear"/></svg> Preferences</button>
+            <button role="menuitem"><svg width="14" height="14"><use href="#i-chev-ud"/></svg> Switch account</button>
+            <button role="menuitem" class="danger"><svg width="14" height="14"><use href="#i-x"/></svg> Sign out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="main__in">
+        <div class="page-head">
+          <div>
+            <h1>Good evening, Ian</h1>
+            <p class="sub">Here's what's happening across your workspace.</p>
+          </div>
+          <div class="page-head__end">
+            <div class="seg" role="group" aria-label="Period">
+              <button aria-pressed="false">24h</button>
+              <button aria-pressed="true">7d</button>
+              <button aria-pressed="false">30d</button>
+            </div>
+            <button class="btn btn--primary"><svg width="13" height="13"><use href="#i-plus"/></svg> New project</button>
+          </div>
+        </div>
+
+        <div class="tiles">
+          <div class="card tile">
+            <span class="tile__label">Monthly revenue</span>
+            <div class="tile__row"><span class="tile__num num">$12,480</span><span class="delta delta--up num">↑ 8.2%</span></div>
+            <svg class="spark" data-spark="4,6,5,8,9,8,11,12,11,13,14,13,15,17" aria-hidden="true"></svg>
+          </div>
+          <div class="card tile">
+            <span class="tile__label">Active users</span>
+            <div class="tile__row"><span class="tile__num num">3,204</span><span class="delta delta--up num">↑ 4.1%</span></div>
+            <svg class="spark" data-spark="6,7,7,8,9,10,9,11,10,12,12,13,13,14" aria-hidden="true"></svg>
+          </div>
+          <div class="card tile">
+            <span class="tile__label">API requests</span>
+            <div class="tile__row"><span class="tile__num num">1.2M</span><span class="delta delta--down num">↓ 2.3%</span></div>
+            <svg class="spark" data-spark="12,13,11,12,10,11,9,10,9,8,9,8,8,7" aria-hidden="true"></svg>
+          </div>
+          <div class="card tile">
+            <span class="tile__label">Uptime <span class="pill-status pill-status--ok"><i></i></span></span>
+            <div class="tile__row"><span class="tile__num num">99.98%</span><span class="delta delta--flat num">30 days</span></div>
+            <svg class="spark" data-spark="12,12,12,12,11.6,12,12,12,12,11.8,12,12,12,12" aria-hidden="true"></svg>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card panel panel--chart">
+            <div class="panel__head">
+              <h3>Traffic</h3>
+              <div class="end">
+                <div class="legend"><span><i></i>This period</span><span class="prev"><i></i>Previous</span></div>
+                <div class="seg" role="group" aria-label="Traffic metric">
+                  <button aria-pressed="true">Visitors</button>
+                  <button aria-pressed="false">Page views</button>
+                </div>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <svg id="big-chart" viewBox="0 0 720 260" width="100%" role="img" aria-label="Visitors for the last 14 days, this period versus previous"></svg>
+              <div class="chart-tip" id="chart-tip"></div>
+            </div>
+            <div class="toppages">
+              <div class="tp-head"><span>Top pages</span><span>Visitors</span></div>
+              <div class="tp-row"><span class="mono">/</span><i style="--w:100%"></i><b class="num">4,812</b></div>
+              <div class="tp-row"><span class="mono">/pricing</span><i style="--w:42%"></i><b class="num">1,904</b></div>
+              <div class="tp-row"><span class="mono">/signin</span><i style="--w:24%"></i><b class="num">1,102</b></div>
+            </div>
+          </div>
+
+          <div class="side-col">
+            <div class="card panel">
+              <div class="panel__head"><h3>Usage</h3><div class="end"><a href="#" style="color:var(--accent);font-size:12px;font-weight:640;text-decoration:none;">Upgrade</a></div></div>
+              <div class="meter">
+                <div class="meter__row"><span>Builds</span><b class="num">82 / 100</b></div>
+                <div class="meter__bar"><i class="warnfill" style="width:82%"></i></div>
+              </div>
+              <div class="meter">
+                <div class="meter__row"><span>Bandwidth</span><b class="num">64%</b></div>
+                <div class="meter__bar"><i style="width:64%"></i></div>
+              </div>
+              <div class="meter">
+                <div class="meter__row"><span>Seats</span><b class="num">9 / 12</b></div>
+                <div class="meter__bar"><i style="width:75%"></i></div>
+              </div>
+            </div>
+
+            <div class="card panel">
+              <div class="panel__head"><h3>Get started</h3><span class="chip num">2/4</span></div>
+              <div class="check-list">
+                <div class="check done"><span class="box"><svg width="10" height="10"><use href="#i-check"/></svg></span> Create your first project</div>
+                <div class="check done"><span class="box"><svg width="10" height="10"><use href="#i-check"/></svg></span> Connect a domain</div>
+                <div class="check"><span class="box"></span> Invite your team <a class="go" href="#">Invite →</a></div>
+                <div class="check"><span class="box"></span> Enable payments <a class="go" href="#">Set up →</a></div>
+              </div>
+            </div>
+
+            <div class="card panel">
+              <div class="panel__head"><h3>Activity</h3></div>
+              <div class="feed">
+                <div class="feed__item"><i class="feed__dot" style="background:var(--ok)"></i><p><b>Deploy succeeded</b> — somiibo · web<time>2 minutes ago</time></p></div>
+                <div class="feed__item"><i class="feed__dot" style="background:var(--accent)"></i><p><b>Nathan</b> invited <b>rachel@itw.co</b><time>1 hour ago</time></p></div>
+                <div class="feed__item"><i class="feed__dot" style="background:var(--warn)"></i><p><b>Usage alert</b> — builds at 82%<time>3 hours ago</time></p></div>
+                <div class="feed__item"><i class="feed__dot" style="background:var(--ok)"></i><p><b>Payment received</b> — $49.00 · Pro<time>Yesterday</time></p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="promo">
+          <span class="icotile"><svg width="16" height="16"><use href="#i-spark"/></svg></span>
+          <div>
+            <b>classy v2 is live for your workspace</b>
+            <p>Swap the accent, keep the theme — your whole stack recolors from one token.</p>
+          </div>
+          <div class="brand-dots" data-brand-dots></div>
+          <button class="btn btn--ghost">Try it</button>
+        </div>
+
+        <div class="card tablecard">
+          <div class="panel__head" style="padding:16px var(--pad-card) 0;">
+            <h3>Recent deployments</h3>
+            <div class="end"><button class="btn btn--ghost" style="height:28px;font-size:12px;">View all</button></div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead>
+                <tr><th scope="col">Project</th><th scope="col">Target</th><th scope="col">Status</th><th scope="col">Duration</th><th scope="col">When</th><th scope="col"></th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="proj"><span class="pdot"></span>somiibo <span class="chip mono">prod</span></span></td>
+                  <td><span class="chip"><svg width="11" height="11"><use href="#i-globe"/></svg> web</span></td>
+                  <td><span class="pill-status pill-status--ok"><i></i>Live</span></td>
+                  <td class="mono num">42s</td>
+                  <td>2 min ago</td>
+                  <td><button class="iconbtn" aria-label="Row actions" style="width:26px;height:26px;"><svg width="14" height="14"><use href="#i-dots"/></svg></button></td>
+                </tr>
+                <tr>
+                  <td><span class="proj"><span class="pdot"></span>somiibo <span class="chip mono">prod</span></span></td>
+                  <td><span class="chip"><svg width="11" height="11"><use href="#i-server"/></svg> backend</span></td>
+                  <td><span class="pill-status pill-status--ok"><i></i>Live</span></td>
+                  <td class="mono num">1m 18s</td>
+                  <td>2 min ago</td>
+                  <td><button class="iconbtn" aria-label="Row actions" style="width:26px;height:26px;"><svg width="14" height="14"><use href="#i-dots"/></svg></button></td>
+                </tr>
+                <tr>
+                  <td><span class="proj"><span class="pdot" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"></span>studymonkey <span class="chip mono">staging</span></span></td>
+                  <td><span class="chip"><svg width="11" height="11"><use href="#i-desktop"/></svg> desktop</span></td>
+                  <td><span class="pill-status pill-status--warn"><i></i>Building</span></td>
+                  <td class="mono num">—</td>
+                  <td>6 min ago</td>
+                  <td><button class="iconbtn" aria-label="Row actions" style="width:26px;height:26px;"><svg width="14" height="14"><use href="#i-dots"/></svg></button></td>
+                </tr>
+                <tr>
+                  <td><span class="proj"><span class="pdot" style="background:linear-gradient(135deg,#10b981,#06b6d4)"></span>slapform <span class="chip mono">prod</span></span></td>
+                  <td><span class="chip"><svg width="11" height="11"><use href="#i-puzzle"/></svg> extension</span></td>
+                  <td><span class="pill-status pill-status--ok"><i></i>Live</span></td>
+                  <td class="mono num">55s</td>
+                  <td>1 hour ago</td>
+                  <td><button class="iconbtn" aria-label="Row actions" style="width:26px;height:26px;"><svg width="14" height="14"><use href="#i-dots"/></svg></button></td>
+                </tr>
+                <tr>
+                  <td><span class="proj"><span class="pdot" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)"></span>chatsy <span class="chip mono">prod</span></span></td>
+                  <td><span class="chip"><svg width="11" height="11"><use href="#i-globe"/></svg> web</span></td>
+                  <td><span class="pill-status pill-status--danger"><i></i>Failed</span></td>
+                  <td class="mono num">12s</td>
+                  <td>3 hours ago</td>
+                  <td><button class="btn btn--ghost" style="height:26px;font-size:12px;padding:0 10px;">Retry</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="tfoot">
+            <span class="num">Showing 5 of 128 deployments</span>
+            <div class="pages">
+              <button class="iconbtn" style="width:26px;height:26px;transform:rotate(90deg)" aria-label="Previous page"><svg width="13" height="13"><use href="#i-chev-d"/></svg></button>
+              <button class="iconbtn" style="width:26px;height:26px;transform:rotate(-90deg)" aria-label="Next page"><svg width="13" height="13"><use href="#i-chev-d"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <button class="scrim" id="scrim" aria-label="Close navigation" tabindex="-1"></button>
+  </div>
+</div>
+
+<!-- ═══════════════════════ DRAFT CONTROL DOCK ═══════════════════════ -->
+<div class="dock" role="toolbar" aria-label="Draft controls">
+  <span class="dock__tag">Draft 1</span>
+  <div class="dseg" role="group" aria-label="View">
+    <button id="dock-site" aria-pressed="true">Site</button>
+    <button id="dock-app" aria-pressed="false">App</button>
+  </div>
+  <span class="dock__sep"></span>
+  <button class="dicon" id="dock-light" aria-pressed="true" title="Light theme" aria-label="Light theme"><svg width="15" height="15"><use href="#i-sun"/></svg></button>
+  <button class="dicon" id="dock-dark" aria-pressed="false" title="Dark theme" aria-label="Dark theme"><svg width="15" height="15"><use href="#i-moon"/></svg></button>
+  <span class="dock__sep"></span>
+  <span data-brand-dots data-dock></span>
+  <span class="dock__sep"></span>
+  <button class="tbtn" data-type-btn="grotesk" aria-pressed="true" title="Grotesk display">Aa</button>
+  <button class="tbtn t-e" data-type-btn="editorial" aria-pressed="false" title="Editorial display">Aa</button>
+  <button class="tbtn t-t" data-type-btn="terminal" aria-pressed="false" title="Terminal display">Aa</button>
+  <span class="dock__sep"></span>
+  <button class="dicon" id="dock-density" aria-pressed="false" title="Compact density" aria-label="Toggle compact density"><svg width="15" height="15"><use href="#i-density"/></svg></button>
+</div>
+
+<script>
+/* classy v2 draft — mockup logic (throwaway comp; the real theme ships its own modules) */
+(() => {
+  const root = document.documentElement;
+
+  /* ── draft dock: view / theme / brand / type / density ────────────────── */
+
+  const BRANDS = [
+    { id: 'omega',   dot: 'linear-gradient(135deg,#5b47fb,#00d4ff)' },
+    { id: 'ember',   dot: 'linear-gradient(135deg,#e8590c,#f43f5e)' },
+    { id: 'emerald', dot: 'linear-gradient(135deg,#0e9f6e,#00d4ff)' },
+    { id: 'ocean',   dot: 'linear-gradient(135deg,#2563eb,#00d4ff)' },
+    { id: 'rose',    dot: 'linear-gradient(135deg,#e11d63,#8b5cf6)' },
+  ];
+
+  function setBrand(id) {
+    if (id === 'omega') {
+      delete root.dataset.brand;
+    } else {
+      root.dataset.brand = id;
+    }
+    document.querySelectorAll('.bdot').forEach((dot) => {
+      dot.setAttribute('aria-pressed', String(dot.dataset.brand === id));
+    });
+    drawAllCharts();
+  }
+
+  document.querySelectorAll('[data-brand-dots]').forEach((host) => {
+    BRANDS.forEach((brand) => {
+      const btn = document.createElement('button');
+      btn.className = 'bdot';
+      btn.dataset.brand = brand.id;
+      btn.style.background = brand.dot;
+      btn.title = `Brand: ${brand.id}`;
+      btn.setAttribute('aria-label', `Brand accent: ${brand.id}`);
+      btn.setAttribute('aria-pressed', String(brand.id === 'omega'));
+      btn.addEventListener('click', () => setBrand(brand.id));
+      host.appendChild(btn);
+    });
+  });
+
+  const dockSite = document.getElementById('dock-site');
+  const dockApp = document.getElementById('dock-app');
+
+  function setView(view) {
+    root.dataset.view = view;
+    dockSite.setAttribute('aria-pressed', String(view === 'site'));
+    dockApp.setAttribute('aria-pressed', String(view === 'app'));
+    drawAllCharts();
+  }
+  dockSite.addEventListener('click', () => setView('site'));
+  dockApp.addEventListener('click', () => setView('app'));
+
+  const dockLight = document.getElementById('dock-light');
+  const dockDark = document.getElementById('dock-dark');
+
+  function setTheme(theme) {
+    root.dataset.theme = theme;
+    dockLight.setAttribute('aria-pressed', String(theme === 'light'));
+    dockDark.setAttribute('aria-pressed', String(theme === 'dark'));
+    drawAllCharts();
+  }
+  dockLight.addEventListener('click', () => setTheme('light'));
+  dockDark.addEventListener('click', () => setTheme('dark'));
+
+  document.querySelectorAll('[data-type-btn]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.typeBtn;
+      if (type === 'grotesk') {
+        delete root.dataset.type;
+      } else {
+        root.dataset.type = type;
+      }
+      document.querySelectorAll('[data-type-btn]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+    });
+  });
+
+  const dockDensity = document.getElementById('dock-density');
+  dockDensity.addEventListener('click', () => {
+    const compact = root.dataset.density !== 'compact';
+    if (compact) {
+      root.dataset.density = 'compact';
+    } else {
+      delete root.dataset.density;
+    }
+    dockDensity.setAttribute('aria-pressed', String(compact));
+  });
+
+  /* sync initial theme buttons with the viewer/OS theme */
+  const prefersDark = matchMedia('(prefers-color-scheme: dark)');
+  const startDark = root.dataset.theme
+    ? root.dataset.theme === 'dark'
+    : prefersDark.matches;
+  dockLight.setAttribute('aria-pressed', String(!startDark));
+  dockDark.setAttribute('aria-pressed', String(startDark));
+
+  /* ── site: glassy nav + scroll reveals + counters + marquee ───────────── */
+
+  const nav = document.getElementById('site-nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  const track = document.getElementById('marquee-track');
+  track.innerHTML += track.innerHTML; // duplicate for the seamless loop
+
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const countUp = (el) => {
+    const target = Number(el.dataset.count);
+    if (reduceMotion) { el.textContent = target; return; }
+    const t0 = performance.now();
+    const tick = (t) => {
+      const k = Math.min(1, (t - t0) / 900);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
+  const seen = new WeakSet();
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('in');
+      entry.target.querySelectorAll('[data-count]').forEach((el) => {
+        if (seen.has(el)) return;
+        seen.add(el);
+        countUp(el);
+      });
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.rv').forEach((el) => observer.observe(el));
+
+  /* ── charts (drawn from data so they re-paint on theme/brand swap) ────── */
+
+  const css = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+
+  const CURR = [420, 460, 445, 510, 548, 530, 585, 620, 604, 668, 701, 662, 731, 768];
+  const PREV = [380, 398, 412, 405, 440, 452, 438, 472, 489, 470, 502, 516, 508, 522];
+  const DAYS = ['Jul 1', 'Jul 2', 'Jul 3', 'Jul 4', 'Jul 5', 'Jul 6', 'Jul 7',
+                'Jul 8', 'Jul 9', 'Jul 10', 'Jul 11', 'Jul 12', 'Jul 13', 'Jul 14'];
+
+  const pts = (data, x0, x1, y0, y1, max) =>
+    data.map((v, i) => [x0 + (i * (x1 - x0)) / (data.length - 1), y1 - (v / max) * (y1 - y0)]);
+
+  const lineD = (p) => 'M' + p.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L');
+
+  function drawBigChart() {
+    const svg = document.getElementById('big-chart');
+    const accent = css('--accent');
+    const second = css('--chart-2');
+    const line = css('--line');
+    const faint = css('--faint');
+    const MAX = 800;
+    const [x0, x1, y0, y1] = [34, 706, 14, 224];
+    const cp = pts(CURR, x0, x1, y0, y1, MAX);
+    const pp = pts(PREV, x0, x1, y0, y1, MAX);
+
+    let grid = '';
+    [0, 200, 400, 600, 800].forEach((v) => {
+      const y = y1 - (v / MAX) * (y1 - y0);
+      grid += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${line}" stroke-width="1"/>` +
+              `<text x="${x0 - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="${faint}">${v}</text>`;
+    });
+    let xlabels = '';
+    [0, 3, 6, 9, 13].forEach((i) => {
+      xlabels += `<text x="${cp[i][0]}" y="248" text-anchor="middle" font-size="10" fill="${faint}">${DAYS[i]}</text>`;
+    });
+
+    const areaD = `${lineD(cp)} L${x1},${y1} L${x0},${y1} Z`;
+    const endC = cp[cp.length - 1];
+    const endP = pp[pp.length - 1];
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="area-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${accent}" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${grid}${xlabels}
+      <path d="${areaD}" fill="url(#area-fill)"/>
+      <path d="${lineD(pp)}" fill="none" stroke="${second}" stroke-width="2" stroke-dasharray="5 5" stroke-linecap="round"/>
+      <path d="${lineD(cp)}" fill="none" stroke="${accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${endC[0]}" cy="${endC[1]}" r="4" fill="${accent}"/>
+      <circle cx="${endC[0]}" cy="${endC[1]}" r="8" fill="${accent}" opacity="0.18"/>
+      <text x="${endC[0] - 10}" y="${endC[1] - 12}" text-anchor="end" font-size="11" font-weight="650" fill="${accent}">768</text>
+      <text x="${endP[0] - 10}" y="${endP[1] + 18}" text-anchor="end" font-size="11" font-weight="600" fill="${second}">522</text>
+      <g id="chart-hover" style="display:none">
+        <line id="hover-line" y1="${y0}" y2="${y1}" stroke="${faint}" stroke-width="1" stroke-dasharray="3 3"/>
+        <circle id="hover-dot-c" r="4" fill="${accent}" stroke="${css('--surface')}" stroke-width="2"/>
+        <circle id="hover-dot-p" r="4" fill="${second}" stroke="${css('--surface')}" stroke-width="2"/>
+      </g>`;
+
+    /* hover layer */
+    const tip = document.getElementById('chart-tip');
+    const hover = svg.querySelector('#chart-hover');
+    const hline = svg.querySelector('#hover-line');
+    const hdc = svg.querySelector('#hover-dot-c');
+    const hdp = svg.querySelector('#hover-dot-p');
+
+    svg.onpointermove = (event) => {
+      const rect = svg.getBoundingClientRect();
+      const sx = ((event.clientX - rect.left) / rect.width) * 720;
+      const i = Math.max(0, Math.min(CURR.length - 1,
+        Math.round(((sx - x0) / (x1 - x0)) * (CURR.length - 1))));
+      const [cx, cy] = cp[i];
+      hover.style.display = '';
+      hline.setAttribute('x1', cx); hline.setAttribute('x2', cx);
+      hdc.setAttribute('cx', cx); hdc.setAttribute('cy', cy);
+      hdp.setAttribute('cx', pp[i][0]); hdp.setAttribute('cy', pp[i][1]);
+      tip.style.display = 'block';
+      tip.innerHTML = `<b>${DAYS[i]}</b>
+        <div class="row"><i style="background:${accent}"></i>This period <span class="v num">${CURR[i]}</span></div>
+        <div class="row"><i style="background:${second}"></i>Previous <span class="v num">${PREV[i]}</span></div>`;
+      const px = (cx / 720) * rect.width;
+      tip.style.left = `${Math.min(rect.width - 140, Math.max(4, px + 14))}px`;
+      tip.style.top = `${(cy / 260) * rect.height - 8}px`;
+    };
+    svg.onpointerleave = () => {
+      hover.style.display = 'none';
+      tip.style.display = 'none';
+    };
+  }
+
+  function drawSparks() {
+    document.querySelectorAll('svg.spark').forEach((svg) => {
+      const data = svg.dataset.spark.split(',').map(Number);
+      const max = Math.max(...data) * 1.15;
+      const p = pts(data, 2, 118, 4, 32, max);
+      const accent = css('--accent');
+      const end = p[p.length - 1];
+      svg.setAttribute('viewBox', '0 0 120 36');
+      svg.innerHTML = `
+        <path d="${lineD(p)} L118,34 L2,34 Z" fill="${accent}" opacity="0.1"/>
+        <path d="${lineD(p)}" fill="none" stroke="${accent}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${end[0]}" cy="${end[1]}" r="2.6" fill="${accent}"/>`;
+    });
+  }
+
+  function drawFrameChart() {
+    const svg = document.getElementById('frame-chart');
+    const accent = css('--accent');
+    const second = css('--chart-2');
+    const p1 = pts(CURR, 6, 554, 8, 140, 800);
+    const p2 = pts(PREV, 6, 554, 8, 140, 800);
+    svg.innerHTML = `
+      <path d="${lineD(p1)} L554,146 L6,146 Z" fill="${accent}" opacity="0.12"/>
+      <path d="${lineD(p2)}" fill="none" stroke="${second}" stroke-width="1.6" stroke-dasharray="4 4"/>
+      <path d="${lineD(p1)}" fill="none" stroke="${accent}" stroke-width="2" stroke-linecap="round"/>`;
+  }
+
+  function drawAllCharts() {
+    requestAnimationFrame(() => {
+      drawBigChart();
+      drawSparks();
+      drawFrameChart();
+    });
+  }
+  drawAllCharts();
+  prefersDark.addEventListener('change', drawAllCharts);
+
+  /* ── app shell: collapse, drawer, menus, ad dismiss ───────────────────── */
+
+  const shell = document.getElementById('shell');
+  const collapseBtn = document.getElementById('collapse-btn');
+  collapseBtn.addEventListener('click', () => {
+    const collapsed = shell.dataset.collapsed !== 'true';
+    shell.dataset.collapsed = String(collapsed);
+    collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+  });
+
+  const drawerBtn = document.getElementById('drawer-btn');
+  const scrim = document.getElementById('scrim');
+  const setDrawer = (open) => {
+    shell.dataset.open = String(open);
+    drawerBtn.setAttribute('aria-expanded', String(open));
+  };
+  drawerBtn.addEventListener('click', () => setDrawer(shell.dataset.open !== 'true'));
+  scrim.addEventListener('click', () => setDrawer(false));
+
+  const account = document.getElementById('account');
+  const accountBtn = document.getElementById('account-btn');
+  accountBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = !account.classList.contains('open');
+    account.classList.toggle('open', open);
+    accountBtn.setAttribute('aria-expanded', String(open));
+  });
+  addEventListener('click', () => {
+    account.classList.remove('open');
+    accountBtn.setAttribute('aria-expanded', 'false');
+  });
+
+  document.getElementById('ad-dismiss').addEventListener('click', () => {
+    document.getElementById('ad-slot').remove();
+  });
+
+  /* segmented controls + sidebar nav: purely visual state for the draft */
+  document.querySelectorAll('.seg').forEach((seg) => {
+    seg.addEventListener('click', (event) => {
+      const btn = event.target.closest('button');
+      if (!btn) return;
+      seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+    });
+  });
+  document.querySelectorAll('.side .nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.side .nav-item').forEach((n) => n.removeAttribute('aria-current'));
+      item.setAttribute('aria-current', 'page');
+    });
+  });
+})();
+</script>

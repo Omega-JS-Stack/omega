@@ -2,11 +2,10 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **Systems TODOs FIRST (Ian 2026-07-14): skin remake + dashboard/admin remake + brand rebuilds come ONLY AFTER the queue below is done — do not suggest them earlier**
-- Skin pass still also waits on Ian's theme notes (meridian direction drafted; systems prerequisites shipped)
+- **SKIN PASS IN FLIGHT (Ian GO 2026-07-16)** — direction LOCKED from Draft 2 comps: [plans/classy-v2/DIRECTION.md](plans/classy-v2/DIRECTION.md) (cp143); next: DRAFT 1 in-repo — classy gut renovation, home/pricing/signin + chrome + app shell on playground, light+dark, screenshots, suites, ONE named deploy for Ian's reaction
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
-1. **SKIN PASS — after the above + Ian's theme notes** — DRAFT on playground (home/pricing/signin) → default pages + blueprints, auth/account/payment + dashboard/admin remake, showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close
+1. **SKIN PASS remainder (after DRAFT 1)** — default pages + blueprints → auth/account/payment + dashboard/admin remake → showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close; D5 vendored-webfont picks are Ian's call mid-arc
 2. Brand rebuilds on the new stack (post-dogfood): somiibo → sweet-saucy — **HARD GATE (Ian 2026-07-11): explicitly ask and wait for his go before starting either**; Ian's password formula → his company hook file at migration (Ian involved)
 
 ## ⏸ Blocked / Waiting (Ian-owned)
@@ -58,4 +57,4 @@
 - [x] 129 config-truth pass — MrLogo brandmark ladder (assets.brandmark options GONE; SA→API-key→token, BEM wire verified), reverse-DNS bundle ids (wizard-derived; playground → com.itwcreativeworks), `gcp` key, targets-last SSOT; Apple terms accepted → leg ran LIVE (bundle id CREATED + 2 profiles minted); mgr 655 / config 109 / corpus 1225 (1952448) → CHANGELOG
 - [x] Phases 0–2 + cp33–128 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning (116 site LIVE · 119 first full pipeline PASS · 121–123 seeds/brandmark/src-dist pillar/live-site gaps · 124–126 findings sweep + 2b mints + core graduations · 128 board-clear + sound root `npm test`) → CHANGELOG + git log
 
-*Last updated: 2026-07-15 (cp142: full-deploy rehearsal COMPLETE — all four targets shipped/built for real, desktop signed+notarized; next: skin pass awaits Ian's theme notes + direct ask)*
+*Last updated: 2026-07-16 (cp143: classy v2 direction LOCKED — spec + comps at plans/classy-v2/; skin arc open, DRAFT 1 in-repo is next)*
