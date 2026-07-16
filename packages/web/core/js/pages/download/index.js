@@ -36,49 +36,51 @@ export default () => {
 // Configuration
 const config = {
   selectors: {
-    platformButtons: '.platform-btn',
-    platformDownloads: '[data-platform]',
-    downloadButtons: '.tab-pane[data-platform] [data-download]',
+    platformDownloads: '[data-download-card][data-platform]',
+    downloadButtons: '[data-download-card][data-platform] [data-download]',
   },
 };
 
-// Setup platform detection and auto-select
+// Platform detection → the hero button becomes YOUR download (manus-style):
+// label, href, and platform mark come from the detected platform's card. No
+// card or no configured URL → the "See every download" fallback stays.
 function setupPlatformDetection() {
   const detectedPlatform = omega.utilities().getPlatform();
   console.log('Detected platform:', detectedPlatform);
 
-  // Listen for tab changes to scroll to download card
-  document.querySelectorAll(config.selectors.platformButtons).forEach($tab => {
-    $tab.addEventListener('shown.bs.tab', (event) => {
-      const platformId = event.target.id.replace('-tab', '');
-      scrollToDownloadCard(platformId);
-    });
+  const $hero = document.getElementById('download-hero');
+  const $fallback = document.getElementById('download-hero-fallback');
+  if (!$hero || !$fallback) {
+    return;
+  }
+
+  // Cards/store rows carry data-download-card — the bare [data-platform]
+  // attribute also lives on <html> (detection stamp), forms, and the modal's
+  // instruction panes, none of which are download surfaces.
+  const $card = document.querySelector(`[data-download-card][data-platform="${detectedPlatform}"]`);
+  const $link = $card ? $card.querySelector('a[data-download]') : null;
+  if (!$link) {
+    return;
+  }
+
+  const platformName = $card.querySelector('.classy-dl-card__name, strong')?.textContent.trim() || detectedPlatform;
+  const $chipIcon = $card.querySelector('.classy-icon-chip, .fa');
+
+  $hero.href = $link.getAttribute('href');
+  $hero.querySelector('[data-hero-label]').textContent = `Download for ${platformName}`;
+  if ($chipIcon) {
+    $hero.querySelector('[data-hero-icon]').innerHTML = $chipIcon.querySelector('svg')?.outerHTML || '';
+  }
+
+  // The hero IS a download button — same tracking + onboarding as the cards
+  $hero.addEventListener('click', () => {
+    trackDownloadClick(detectedPlatform, $hero.textContent.trim(), $hero.href);
+    showOnboardingModal(detectedPlatform);
   });
 
-  // Activate the detected platform tab using Bootstrap's tab API
-  const $detectedTab = document.querySelector(`#${detectedPlatform}-tab`);
-  if (!$detectedTab) {
-    return;
-  }
-
-  const tab = new bootstrap.Tab($detectedTab);
-  tab.show();
+  $fallback.setAttribute('hidden', '');
+  $hero.removeAttribute('hidden');
 }
-
-// Scroll to the download card for a given platform
-function scrollToDownloadCard(platformId) {
-  const $downloadCard = document.querySelector(`#${platformId}-pane .card`);
-  if (!$downloadCard) {
-    return;
-  }
-
-  setTimeout(() => {
-    $downloadCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 100);
-}
-
-// Bootstrap's tab component handles all tab switching automatically via data-bs-toggle="tab"
-// No manual switcher needed!
 
 // Setup download button tracking
 function setupDownloadTracking() {
@@ -86,7 +88,7 @@ function setupDownloadTracking() {
 
   $downloadButtons.forEach($button => {
     $button.addEventListener('click', function() {
-      const $platformPane = this.closest('[data-platform]');
+      const $platformPane = this.closest('[data-download-card][data-platform]');
       const platformId = $platformPane ? $platformPane.dataset.platform : 'unknown';
       const downloadName = this.textContent.trim();
       const downloadUrl = this.getAttribute('href');
@@ -108,6 +110,12 @@ function showOnboardingModal(platform) {
   const $modal = document.getElementById('onboardingModal');
   if (!$modal) {
     console.error('Onboarding modal not found in DOM');
+    return;
+  }
+
+  // Store platforms (ios/android) have no install walkthrough — the store
+  // handles onboarding; never show an empty modal.
+  if (!$modal.querySelector(`.platform-instructions[data-platform="${platform}"]`)) {
     return;
   }
 
@@ -301,15 +309,15 @@ function setupAutoDownload() {
     return;
   }
 
-  // Find the first download link in the active platform's tab pane
+  // Find the first download link in the detected platform's card
   const detectedPlatform = omega.utilities().getPlatform();
-  const $pane = document.querySelector(`#${detectedPlatform}-pane`);
+  const $pane = document.querySelector(`[data-download-card][data-platform="${detectedPlatform}"]`);
 
   if (!$pane) {
     return;
   }
 
-  const $downloadLink = $pane.querySelector('a.btn-primary');
+  const $downloadLink = $pane.querySelector('a[data-download]');
 
   if (!$downloadLink) {
     return;

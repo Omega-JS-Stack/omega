@@ -60,6 +60,19 @@
     private: false,
   },
 
+  // Download endpoints (site.download[platform][type]) — drive the /download
+  // cards + the detection hero. Playground points at the repo's releases hub
+  // until real release assets exist (releases stay GATED); ios/android are
+  // deliberately absent so the store band demos the notify-me flow.
+  download: {
+    mac: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
+    windows: { universal: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest" },
+    linux: {
+      debian: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+      snap: "https://github.com/Omega-JS-Stack/omega-playground/releases/latest",
+    },
+  },
+
   // Registrar of the PARENT omegajs.dev (subdomain project — the domain
   // service manages the parent's nameservers at Namecheap → Cloudflare).
   domain: {

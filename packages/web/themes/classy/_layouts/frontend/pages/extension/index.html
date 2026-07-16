@@ -1,67 +1,103 @@
 ---
 layout: frontend/core/base
 
+# ═══ /extension — reimagined 2026-07-16 (family DNA with /download): the
+# detected browser's button leads, every browser card sits in the open with
+# its REAL brandmark, and "coming soon" is a designed state, not a warning
+# banner. Data contract preserved: resolved.downloads.browsers + the
+# detection JS; site.extension[browser.id] supplies the store URLs.
+
 # Hero Section
 hero:
-  headline: "{{ site.brand.name }}, in your <em>browser</em>"
+  headline: "One tab away, in <em>every</em> browser"
   headline_accent: ""
-  description: "One click from any tab. Chrome, Firefox, Edge, and friends."
+  description: "The full product, folded into your toolbar — one click from wherever you already are."
 
 # Downloads Section
 downloads:
+  superheadline:
+    icon: "puzzle-piece"
+    text: "Extension"
+  headline: "Your browser is"
+  headline_accent: "covered"
+  subheadline: "Real support for the browsers people actually use."
   loading:
     headline: "Detecting browser"
     description: "Determining your browser..."
     button_text: "Please wait"
   not_available:
-    headline: "Not available yet"
-    description: "The {{ site.brand.name }} extension is not currently available for this browser."
+    headline: "Coming soon"
+    description: "The {{ site.brand.name }} extension isn't listed for this browser yet."
   browsers:
     - id: "chrome"
       name: "Chrome"
       logo: "chrome"
       description: "Chrome 88+"
+      action: "Add to Chrome"
     - id: "firefox"
       name: "Firefox"
       logo: "firefox"
       description: "Firefox 78+"
+      action: "Add to Firefox"
     - id: "edge"
       name: "Edge"
       logo: "edge"
       description: "Edge 88+"
+      action: "Add to Edge"
     - id: "opera"
       name: "Opera"
       logo: "opera"
       description: "Opera 74+"
+      action: "Add to Opera"
     - id: "safari"
       name: "Safari"
       logo: "safari"
       description: "Safari 14+"
+      action: "Get for Safari"
     - id: "brave"
       name: "Brave"
       logo: "brave"
       description: "Brave 1.25+"
+      action: "Add to Brave"
+
+# After install — the pin ritual
+setup:
+  superheadline:
+    icon: "thumbtack"
+    text: "Setup"
+  headline: "Thirty seconds to"
+  headline_accent: "pinned"
+  steps:
+    - title: "Install from your store"
+      description: "One click on the button above — the store handles the rest."
+      icon: "puzzle-piece"
+    - title: "Pin it to the toolbar"
+      description: "Click the puzzle piece in your toolbar, then the pin next to {{ site.brand.name }}."
+      icon: "thumbtack"
+    - title: "Sign in once"
+      description: "Your account carries over — everything you have here is in the popup."
+      icon: "user-check"
 
 # Features Section
 features:
   superheadline:
     icon: "star"
-    text: "Benefits"
-  headline: "Why you should"
-  headline_accent: "install"
-  subheadline: "Everything you need, right in your browser"
+    text: "Included"
+  headline: "Small icon, whole"
+  headline_accent: "product"
+  subheadline: ""
   items:
-    - title: "Quick access"
-      description: "Access {{ site.brand.name }} features with just one click"
+    - title: "One-click access"
+      description: "The popup is the product — no new tab, no context switch."
       icon: "bolt"
-    - title: "Seamless integration"
-      description: "Works naturally with your browsing workflow"
+    - title: "Works where you work"
+      description: "Actions available on the page you're already reading."
       icon: "link"
-    - title: "Real-Time Updates"
-      description: "Get instant notifications and alerts"
+    - title: "Real-time alerts"
+      description: "Badge counts and notifications the moment something needs you."
       icon: "bell"
-    - title: "Secure & Private"
-      description: "Your data stays safe with enterprise-grade encryption"
+    - title: "Least-privilege by design"
+      description: "It asks only for the permissions it demonstrably needs."
       icon: "shield-halved"
 
 # FAQ Section
@@ -69,206 +105,142 @@ faqs:
   superheadline:
     icon: "circle-question"
     text: "FAQs"
-  headline: "Frequently asked"
-  headline_accent: "questions"
-  subheadline: "Everything you need to know about the {{ site.brand.name }} browser extension."
+  headline: "Before you"
+  headline_accent: "add it"
+  subheadline: "Quick answers about the browser extension."
   items:
     - question: "Is the extension free?"
-      answer: "Yes! The {{ site.brand.name }} browser extension is completely free to download and use."
+      answer: "Yes — free to install and free to use. Your plan applies to your account, not to where you access it."
     - question: "Which browsers are supported?"
-      answer: "The extension is available for Chrome, Firefox, Edge, Opera, and Safari."
+      answer: "It's built for Chrome, Firefox, Edge, Opera, Safari, and Brave. Store buttons above go live per browser as listings roll out."
     - question: "How do I pin the extension?"
-      answer: "After installing, click the puzzle piece icon in your browser toolbar, then click the pin icon next to {{ site.brand.name }}."
-    - question: "Is my data secure?"
-      answer: "Absolutely. We use enterprise-grade encryption to protect your data. The extension only accesses what it needs to function."
+      answer: "Click the puzzle-piece icon in your toolbar, then the pin next to {{ site.brand.name }}. Pinned is a different product — one click instead of three."
+    - question: "What can it see?"
+      answer: "Only what it needs to function, and the permission prompt tells you exactly what that is. No browsing-history collection, ever."
 
 # CTA Section
 cta:
   superheadline:
     icon: "comments"
     text: "Support"
-  headline: "Need help with"
-  headline_accent: "installation?"
-  subheadline: "Our support team is here 24/7 to help you get set up"
+  headline: "Extension acting"
+  headline_accent: "up?"
+  subheadline: "Tell us the browser and what you clicked — we'll take it from there."
   primary_button:
     text: "Contact support"
     icon: "headset"
     href: "/contact"
+  secondary_button:
+    text: "Release notes"
+    icon: "book"
+    href: "/updates"
 ---
 
-<!-- ═══ Masthead ═══ -->
-<section class="classy-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
+<!-- ═══ Hero: the page already picked your browser ═══ -->
+<section class="classy-dotgrid pb-0" data-omega-dotfield>
+  <div class="container text-center" data-omega-reveal-stagger="90">
     <span class="classy-micro d-block mb-3" data-omega-reveal>Extension</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
       {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
     </h1>
     {% iftruthy resolved.hero.description %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+      <p class="classy-hero__sub mx-auto" data-omega-reveal>{{ resolved.hero.description }}</p>
     {% endiftruthy %}
+
+    <div class="classy-dl-hero" data-omega-reveal>
+      <!-- Filled by the detection JS: your browser's store button -->
+      <a id="extension-hero" class="btn btn-adaptive btn-lg classy-dl-hero__btn" href="#browsers" hidden>
+        <span class="classy-dl-hero__icon" data-hero-icon></span>
+        <span data-hero-label>Install</span>
+      </a>
+      <!-- Shown until detection resolves (and forever without JS / no listing) -->
+      <a id="extension-hero-fallback" class="btn btn-adaptive btn-lg classy-dl-hero__btn" href="#browsers">
+        {% uj_icon "puzzle-piece", "fa-sm me-2" %}
+        See supported browsers
+      </a>
+      <a class="btn btn-outline-adaptive btn-lg omega-hover-nudge" href="#browsers">
+        All browsers
+        <span class="omega-nudge ms-2">{% uj_icon "arrow-down", "fa-sm" %}</span>
+      </a>
+    </div>
+
+    <p class="classy-dl-hero__platforms classy-quiet small" data-omega-reveal>
+      {% for browser in resolved.downloads.browsers %}{{ browser.name }}{% unless forloop.last %} · {% endunless %}{% endfor %}
+    </p>
   </div>
 </section>
 
-<!-- Downloads Section -->
-<section class="pt-0">
+<!-- ═══ Browser grid: real marks, buttons in hand ═══ -->
+<section id="browsers" class="pt-5">
   <div class="container">
-    <!-- Browser Selector (segmented rail; tab machinery + detection JS untouched) -->
-    <div class="row justify-content-center mb-5">
-      <div class="col-12 text-center">
-        <div class="d-inline-flex" data-omega-reveal>
-          <ul class="nav classy-platform-rail border-0" id="browser-selector" role="tablist" data-omega-segmented>
-            <!-- Loading tab (shown by default until browser is detected) -->
-            <li class="nav-item d-none" role="presentation" data-browser="loading">
-              <button
-                class="btn active d-flex align-items-center justify-content-center"
-                id="loading-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#loading-pane"
-                type="button"
-                role="tab"
-                aria-controls="loading-pane"
-                aria-selected="true"
-              >
-                <div class="spinner-border spinner-border-sm me-2" role="status">
-                  <span class="visually-hidden">Loading...</span>
-                </div>
-                Detecting...
-              </button>
-            </li>
-
-            {% for browser in resolved.downloads.browsers %}
-              {% assign has_download = false %}
-              {% assign config_url = site.extension[browser.id] %}
-              {% iftruthy config_url %}
-                {% assign has_download = true %}
-              {% endiftruthy %}
-
-              <li class="nav-item" role="presentation">
-                <button
-                  class="btn browser-btn d-flex align-items-center justify-content-center"
-                  id="{{ browser.id }}-tab"
-                  data-bs-toggle="tab"
-                  data-bs-target="#{{ browser.id }}-pane"
-                  data-browser="{{ browser.id }}"
-                  data-has-download="{% if has_download %}true{% else %}false{% endif %}"
-                  type="button"
-                  role="tab"
-                  aria-controls="{{ browser.id }}-pane"
-                  aria-selected="false"
-                >
-                  <span class="avatar avatar-xs me-2">{% uj_icon browser.logo %}</span>
-                  {{ browser.name }}
-                </button>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      </div>
+    <div class="classy-section-head text-center mx-auto mb-5" data-omega-reveal>
+      <span class="classy-micro">{{ resolved.downloads.superheadline.text }}</span>
+      <h2 class="classy-display classy-display--section">
+        {{ resolved.downloads.headline }}
+        {% iftruthy resolved.downloads.headline_accent %}<em>{{ resolved.downloads.headline_accent }}</em>{% endiftruthy %}
+      </h2>
+      <p>{{ resolved.downloads.subheadline }}</p>
     </div>
 
-    <!-- Download Cards -->
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div class="tab-content">
-          <!-- Loading Browser Card -->
-          <div
-            class="tab-pane fade show active"
-            id="loading-pane"
-            role="tabpanel"
-            aria-labelledby="loading-tab"
-            tabindex="0"
-          >
-            <div class="card">
-              <div class="card-body p-4 p-md-5 text-center">
-                <div class="mb-4">
-                  <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg">
-                    <div class="spinner-border spinner-border-sm" role="status">
-                      <span class="visually-hidden">Loading...</span>
-                    </div>
-                  </span>
-                </div>
-                <h2 class="classy-display classy-display--section mb-1">{{ resolved.downloads.loading.headline }}</h2>
-                <p class="text-muted mb-4">{{ resolved.downloads.loading.description }}</p>
+    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
+      {% for browser in resolved.downloads.browsers %}
+        {% assign config_url = site.extension[browser.id] %}
 
-                <div class="d-flex flex-column gap-3">
-                  <button type="button" class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center" disabled>
-                    {% uj_icon "puzzle-piece", "fa-sm me-2" %}
-                    {{ resolved.downloads.loading.button_text }}
-                  </button>
-                </div>
-              </div>
+        <div class="col-sm-6 col-lg-4 d-flex" data-omega-reveal>
+          <div class="classy-dl-card omega-hover-lift" data-download-card data-browser="{{ browser.id }}">
+            <span class="classy-dl-card__mark">{% uj_logo browser.logo, "brandmarks" %}</span>
+            <h3 class="classy-dl-card__name">{{ browser.name }}</h3>
+            <p class="classy-dl-card__req classy-quiet small">{{ browser.description }}</p>
+
+            <div class="classy-dl-card__actions">
+              {% iftruthy config_url %}
+                <a href="{{ config_url }}" class="btn btn-adaptive w-100" data-install="true" target="_blank" rel="noopener">
+                  {% uj_icon "puzzle-piece", "fa-sm me-2" %}
+                  {{ browser.action | default: "Install" }}
+                </a>
+              {% endiftruthy %}
+              {% iffalsy config_url %}
+                <span class="classy-status w-100 justify-content-center">
+                  <span class="classy-dot"></span>
+                  {{ resolved.downloads.not_available.headline }}
+                </span>
+              {% endiffalsy %}
             </div>
           </div>
-
-          {% for browser in resolved.downloads.browsers %}
-            {% assign has_download = false %}
-            {% assign config_url = site.extension[browser.id] %}
-            {% iftruthy config_url %}
-              {% assign has_download = true %}
-            {% endiftruthy %}
-
-            <div
-              class="tab-pane fade"
-              id="{{ browser.id }}-pane"
-              role="tabpanel"
-              aria-labelledby="{{ browser.id }}-tab"
-              tabindex="0"
-              data-browser="{{ browser.id }}"
-              data-has-download="{% if has_download %}true{% else %}false{% endif %}"
-            >
-              <div class="card">
-                <div class="card-body p-4 p-md-5 text-center">
-                  <div class="mb-4">
-                    <span class="avatar avatar-xl">{% uj_icon browser.logo %}</span>
-                  </div>
-                  <h2 class="classy-display classy-display--section mb-1">{{ browser.name }}</h2>
-                  <p class="text-muted mb-4">{{ browser.description }}</p>
-
-                  {% unless has_download %}
-                    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
-                      {% uj_icon "triangle-exclamation", "fs-4 me-3" %}
-                      <div class="text-start">
-                        <h6 class="mb-0">{{ resolved.downloads.not_available.headline }}</h6>
-                        <small>{{ resolved.downloads.not_available.description }}</small>
-                      </div>
-                    </div>
-                  {% endunless %}
-
-                  {% if has_download %}
-                    <div class="d-flex flex-column gap-3">
-                      <a
-                        href="{{ config_url }}"
-                        class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {% uj_icon "puzzle-piece", "fa-sm me-2" %}
-                        Add to {{ browser.name }}
-                      </a>
-                    </div>
-                  {% else %}
-                    <div class="d-flex flex-column gap-3">
-                      <button
-                        type="button"
-                        class="btn btn-outline-adaptive btn-lg d-flex align-items-center justify-content-center"
-                        disabled
-                      >
-                        {% uj_icon "puzzle-piece", "fa-sm me-2" %}
-                        Coming soon
-                      </button>
-                    </div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-          {% endfor %}
         </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══ The pin ritual — three steps ═══ -->
+<section>
+  <div class="container">
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        <span class="classy-micro">{{ resolved.setup.superheadline.text }}</span>
+        <h2 class="classy-display classy-display--section">
+          {{ resolved.setup.headline }}
+          {% iftruthy resolved.setup.headline_accent %}<em>{{ resolved.setup.headline_accent }}</em>{% endiftruthy %}
+        </h2>
+      </div>
+
+      <div class="classy-rowlist" data-omega-reveal-stagger="60">
+        {% for step in resolved.setup.steps %}
+          <div class="classy-rowlist__item" data-omega-reveal>
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon step.icon, "fa-sm" %}</span>
+              <strong>{{ forloop.index }}. {{ step.title }}</strong>
+            </span>
+            <span class="classy-rowlist__meta">{{ step.description }}</span>
+          </div>
+        {% endfor %}
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ What you get — hairline rows ═══ -->
+<!-- ═══ What the little icon carries ═══ -->
 <section>
   <div class="container">
     <div class="classy-duo">
@@ -359,6 +331,12 @@ cta:
           {{ resolved.cta.primary_button.text }}
           <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
+        {% iftruthy resolved.cta.secondary_button.text %}
+          <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
+            {{ resolved.cta.secondary_button.text }}
+            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          </a>
+        {% endiftruthy %}
       </div>
     </div>
   </div>

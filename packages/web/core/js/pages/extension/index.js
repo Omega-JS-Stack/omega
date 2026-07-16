@@ -31,46 +31,45 @@ export default () => {
 // Configuration
 const config = {
   selectors: {
-    browserButtons: '.browser-btn',
-    browserPanes: '[data-browser]',
-    installButtons: '.tab-pane[data-browser] .btn-primary',
+    browserCards: '[data-download-card][data-browser]',
+    installButtons: '[data-download-card][data-browser] a[data-install]',
   },
 };
 
-// Setup browser detection and auto-select
+// Browser detection → the hero button becomes YOUR store button: label,
+// href, and browser mark come from the detected browser's card. No card or
+// no store listing → the "See supported browsers" fallback stays.
 function setupBrowserDetection() {
   const detectedBrowser = omega.utilities().getBrowser();
   console.log('Detected browser:', detectedBrowser);
 
-  // Listen for tab changes to scroll to download card
-  document.querySelectorAll(config.selectors.browserButtons).forEach($tab => {
-    $tab.addEventListener('shown.bs.tab', (event) => {
-      const browserId = event.target.id.replace('-tab', '');
-      scrollToDownloadCard(browserId);
-    });
+  const $hero = document.getElementById('extension-hero');
+  const $fallback = document.getElementById('extension-hero-fallback');
+  if (!$hero || !$fallback) {
+    return;
+  }
+
+  const $card = document.querySelector(`[data-download-card][data-browser="${detectedBrowser}"]`);
+  const $link = $card ? $card.querySelector('a[data-install]') : null;
+  if (!$link) {
+    return;
+  }
+
+  $hero.href = $link.getAttribute('href');
+  $hero.target = '_blank';
+  $hero.rel = 'noopener';
+  $hero.querySelector('[data-hero-label]').textContent = $link.textContent.trim();
+  const $mark = $card.querySelector('.classy-dl-card__mark svg');
+  if ($mark) {
+    $hero.querySelector('[data-hero-icon]').innerHTML = $mark.outerHTML;
+  }
+
+  $hero.addEventListener('click', () => {
+    trackInstallClick(detectedBrowser, $hero.href);
   });
 
-  // Show loading state initially, then switch to detected browser
-  // Activate the detected browser tab using Bootstrap's tab API
-  const $detectedTab = document.querySelector(`#${detectedBrowser}-tab`);
-  if (!$detectedTab) {
-    return;
-  }
-
-  const tab = new bootstrap.Tab($detectedTab);
-  tab.show();
-}
-
-// Scroll to the download card for a given browser
-function scrollToDownloadCard(browserId) {
-  const $downloadCard = document.querySelector(`#${browserId}-pane .card`);
-  if (!$downloadCard) {
-    return;
-  }
-
-  setTimeout(() => {
-    $downloadCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 100);
+  $fallback.setAttribute('hidden', '');
+  $hero.removeAttribute('hidden');
 }
 
 // Setup install button tracking
@@ -113,7 +112,7 @@ function trackInstallClick(browser, installUrl) {
 // Trigger install for testing (simulates clicking the install button)
 function triggerInstall(browser) {
   const browserId = browser || omega.utilities().getBrowser();
-  const $button = document.querySelector(`.tab-pane[data-browser="${browserId}"] .btn-primary`);
+  const $button = document.querySelector(`[data-download-card][data-browser="${browserId}"] a[data-install]`);
 
   if (!$button) {
     console.error(`No install button found for browser: ${browserId}`);

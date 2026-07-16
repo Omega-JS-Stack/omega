@@ -1,20 +1,25 @@
 ---
 layout: frontend/core/base
 
+# ═══ /download — reimagined 2026-07-16 (manus-grade: the page knows your
+# platform and leads with YOUR button; everything else is one scroll away).
+# Data contract preserved: resolved.downloads.platforms drives cards + the
+# detection JS; site.download[platform][type] supplies the URLs.
+
 # Hero Section
 hero:
-  headline: "{{ site.brand.name }}, on <em>your</em> machine"
+  headline: "Take {{ site.brand.name }} with you"
   headline_accent: ""
-  description: "One download away. Every platform, always in sync."
+  description: "Native on desktop, in your pocket on mobile — one account, always in sync."
 
 # Downloads Section
 downloads:
   superheadline:
     icon: "download"
     text: "Download"
-  headline: "Available on every"
-  headline_accent: "platform"
-  subheadline: "Choose your platform below to get started"
+  headline: "Every platform,"
+  headline_accent: "first-class"
+  subheadline: "Pick your machine. We already picked the button."
   supported_platforms:
     - "Windows"
     - "macOS"
@@ -27,75 +32,77 @@ downloads:
     button_text: "Please wait"
   coming_soon_mobile:
     headline: "Coming soon to mobile"
-    description: "Enter your email below and we'll send you the desktop version download link."
+    description: "Leave your email and the download link arrives the moment it ships."
   not_available:
     headline: "Not available yet"
-    description: "{{ site.brand.name }} is not currently available for {{ platform.name }}. Please choose another platform."
+    description: "{{ site.brand.name }} is not currently available for this platform yet."
   platforms:
-    - id: "windows"
-      name: "Windows"
-      icon: "windows"
-      description: "Windows 10+"
-      types:
-        - type: "universal"
-          name: "Windows installer"
-          icon: "download"
     - id: "mac"
       name: "macOS"
       icon: "apple"
       description: "macOS 10.15+ (Apple Silicon & Intel)"
       types:
         - type: "universal"
-          name: "macOS installer"
-          icon: "download"
+          name: "Download for macOS"
+          icon: "apple"
+    - id: "windows"
+      name: "Windows"
+      icon: "windows"
+      description: "Windows 10 and later"
+      types:
+        - type: "universal"
+          name: "Download for Windows"
+          icon: "windows"
     - id: "linux"
       name: "Linux"
       icon: "linux"
-      description: "Ubuntu 18.04+"
+      description: "Ubuntu 18.04+ and friends"
       types:
         - type: "debian"
           name: "Debian package"
-          icon: "download"
+          icon: "linux"
         - type: "snap"
           name: "Snap package"
-          icon: "download"
-    - id: "android"
-      name: "Android"
-      icon: "android"
-      description: "Android 8.0+"
-      types:
-        - type: "universal"
-          name: "APK download"
-          icon: "download"
+          icon: "linux"
     - id: "ios"
       name: "iOS"
       icon: "apple"
-      description: "iOS 13+"
+      description: "iOS 13 and later"
+      store_badge: "apple-app-store"
       types:
         - type: "universal"
-          name: "Download from App Store"
+          name: "App Store"
           icon: "apple"
+    - id: "android"
+      name: "Android"
+      icon: "android"
+      description: "Android 8.0 and later"
+      store_badge: "google-play-store"
+      types:
+        - type: "universal"
+          name: "Google Play"
+          icon: "android"
 
-# Features Section
+# What travels with you — hairline rows
 features:
   superheadline:
     icon: "star"
-    text: "Benefits"
-  headline: "Why you should"
-  headline_accent: "download"
-  subheadline: "Everything you need to succeed, built right in"
+    text: "Included"
+  headline: "The install is the"
+  headline_accent: "easy part"
+  subheadline: ""
   items:
-    - title: "Lightning fast"
-      description: "Install in seconds and start using immediately"
-      icon: "bolt"
-    - title: "Cross-platform"
-      description: "Seamlessly sync across all your devices"
-      icon: "sync"
-    - title: "Auto-update"
-      description: "Always get the latest features automatically"
+    - title: "Everything syncs"
+      description: "Sign in anywhere and your work is already there — desktop, mobile, browser."
+      icon: "rotate"
+    - title: "Updates itself"
+      description: "New versions arrive quietly in the background. You never install twice."
       icon: "cloud-arrow-down"
-    - title: "Secure"
-      description: "Enterprise-grade security built-in"
+    - title: "Fast to first use"
+      description: "Small download, no bundled extras, running in under a minute."
+      icon: "bolt"
+    - title: "Secure by default"
+      description: "Signed builds and encrypted sync, on every platform."
       icon: "shield-halved"
 
 # System Requirements Section
@@ -103,9 +110,9 @@ system_requirements:
   superheadline:
     icon: "server"
     text: "Requirements"
-  headline: "System"
-  headline_accent: "requirements"
-  subheadline: "Make sure your device meets these minimum requirements"
+  headline: "Will it run?"
+  headline_accent: ""
+  subheadline: "Almost certainly. Here's the fine print."
   desktop:
     label: "Desktop"
     icon: "desktop"
@@ -128,272 +135,196 @@ faqs:
   superheadline:
     icon: "circle-question"
     text: "FAQs"
-  headline: "Frequently asked"
-  headline_accent: "questions"
-  subheadline: "Everything you need to know about downloading and installing {{ site.brand.name }}."
+  headline: "Before you"
+  headline_accent: "install"
+  subheadline: "The questions everyone asks, answered straight."
   items:
     - question: "Is {{ site.brand.name }} free to download?"
-      answer: "Yes! {{ site.brand.name }} is completely free to download and use. We offer premium features for power users, but the core functionality is always free."
-    - question: "How do I update {{ site.brand.name }}?"
-      answer: "{{ site.brand.name }} automatically checks for updates and will notify you when a new version is available. You can also manually check for updates in the app settings."
-    - question: "Can I use {{ site.brand.name }} on multiple devices?"
-      answer: "Absolutely! Your {{ site.brand.name }} account works across all platforms. Download the app on all your devices and your data will sync automatically."
+      answer: "Yes. The download is free and the core product works without a card. Paid plans add capacity and team features — see pricing when you're ready."
+    - question: "How do updates work?"
+      answer: "The app keeps itself current in the background and tells you when something notable lands. Release notes live on the updates page."
+    - question: "Can I use one account on all my devices?"
+      answer: "That's the point. Install everywhere, sign in once per device, and your data follows you."
     - question: "Is my data secure?"
-      answer: "Yes. We use enterprise-grade encryption to protect your data both in transit and at rest. Your privacy and security are our top priorities."
+      answer: "Builds are signed, transport is encrypted, and data is encrypted at rest. Security isn't a plan tier."
 
 # CTA Section
 cta:
   superheadline:
     icon: "comments"
     text: "Support"
-  headline: "Need help getting"
-  headline_accent: "started?"
-  subheadline: "Our support team is here 24/7 to help you with installation and setup"
+  headline: "Stuck on the"
+  headline_accent: "install?"
+  subheadline: "Real humans answer. Bring your error message."
   primary_button:
     text: "Contact support"
     icon: "headset"
     href: "/contact"
   secondary_button:
-    text: "View docs"
+    text: "Release notes"
     icon: "book"
-    href: "#docs"
+    href: "/updates"
 ---
 
-<!-- ═══ Masthead ═══ -->
-<section class="classy-dotgrid pb-4" data-omega-dotfield>
-  <div class="container" data-omega-reveal-stagger="90">
+<!-- ═══ Hero: the page already picked your button ═══ -->
+<section class="classy-dotgrid pb-0" data-omega-dotfield>
+  <div class="container text-center" data-omega-reveal-stagger="90">
     <span class="classy-micro d-block mb-3" data-omega-reveal>Download</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
       {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
     </h1>
     {% iftruthy resolved.hero.description %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+      <p class="classy-hero__sub mx-auto" data-omega-reveal>{{ resolved.hero.description }}</p>
     {% endiftruthy %}
+
+    <div class="classy-dl-hero" data-omega-reveal>
+      <!-- Filled by the detection JS: your platform's primary download -->
+      <a id="download-hero" class="btn btn-adaptive btn-lg classy-dl-hero__btn" href="#platforms" hidden>
+        <span class="classy-dl-hero__icon" data-hero-icon></span>
+        <span data-hero-label>Download</span>
+      </a>
+      <!-- Shown until detection resolves (and forever without JS) -->
+      <a id="download-hero-fallback" class="btn btn-adaptive btn-lg classy-dl-hero__btn" href="#platforms">
+        {% uj_icon "download", "fa-sm me-2" %}
+        See every download
+      </a>
+      <a class="btn btn-outline-adaptive btn-lg omega-hover-nudge" href="#platforms">
+        All platforms
+        <span class="omega-nudge ms-2">{% uj_icon "arrow-down", "fa-sm" %}</span>
+      </a>
+    </div>
+
+    <p class="classy-dl-hero__platforms classy-quiet small" data-omega-reveal>
+      {% for name in resolved.downloads.supported_platforms %}{{ name }}{% unless forloop.last %} · {% endunless %}{% endfor %}
+    </p>
   </div>
 </section>
 
-<!-- Downloads Section -->
-<section class="pt-0">
+<!-- ═══ Desktop: three cards, buttons in hand ═══ -->
+<section id="platforms" class="pt-5">
   <div class="container">
-
-    <!-- Platform Selector (segmented rail; tab machinery + detection JS untouched) -->
-    <div class="row justify-content-center mb-5">
-      <div class="col-12 text-center">
-        <div class="d-inline-flex" data-omega-reveal>
-          <ul class="nav classy-platform-rail border-0" id="platform-selector" role="tablist" data-omega-segmented>
-          <!-- Loading tab (shown by default until platform is detected) -->
-          <li class="nav-item d-none" role="presentation" data-platform="loading">
-            <button
-              class="btn active d-flex align-items-center justify-content-center"
-              id="loading-tab"
-              data-bs-toggle="tab"
-              data-bs-target="#loading-pane"
-              type="button"
-              role="tab"
-              aria-controls="loading-pane"
-              aria-selected="true"
-            >
-              <div class="spinner-border spinner-border-sm me-2" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-              Detecting...
-            </button>
-          </li>
-
-          {% for platform in resolved.downloads.platforms %}
-            {% assign has_download = false %}
-            {% for type in platform.types %}
-              {% assign config_url = site.download[platform.id][type.type] %}
-              {% iftruthy config_url %}
-                {% assign has_download = true %}
-                {% break %}
-              {% endiftruthy %}
-            {% endfor %}
-
-            <li class="nav-item" role="presentation">
-              <button
-                class="btn platform-btn d-flex align-items-center justify-content-center"
-                id="{{ platform.id }}-tab"
-                data-bs-toggle="tab"
-                data-bs-target="#{{ platform.id }}-pane"
-                data-platform="{{ platform.id }}"
-                data-has-download="{% if has_download %}true{% else %}false{% endif %}"
-                type="button"
-                role="tab"
-                aria-controls="{{ platform.id }}-pane"
-                aria-selected="false"
-              >
-                {% uj_icon platform.icon, "fa-sm me-2" %}
-                {{ platform.name }}
-              </button>
-            </li>
-          {% endfor %}
-          </ul>
-        </div>
-      </div>
+    <div class="classy-section-head text-center mx-auto mb-5" data-omega-reveal>
+      <span class="classy-micro">{{ resolved.downloads.superheadline.text }}</span>
+      <h2 class="classy-display classy-display--section">
+        {{ resolved.downloads.headline }}
+        {% iftruthy resolved.downloads.headline_accent %}<em>{{ resolved.downloads.headline_accent }}</em>{% endiftruthy %}
+      </h2>
+      <p>{{ resolved.downloads.subheadline }}</p>
     </div>
 
-    <!-- Download Buttons -->
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div class="tab-content">
-          <!-- Loading Platform Card -->
-          <div
-            class="tab-pane fade show active"
-            id="loading-pane"
-            role="tabpanel"
-            aria-labelledby="loading-tab"
-            tabindex="0"
-          >
-            <div class="card">
-              <div class="card-body p-4 p-md-5 text-center">
-                <div class="mb-4">
-                  <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg">
-                    <div class="spinner-border spinner-border-sm" role="status">
-                      <span class="visually-hidden">Loading...</span>
-                    </div>
-                  </span>
-                </div>
-                <h2 class="classy-display classy-display--section mb-1">{{ resolved.downloads.loading.headline }}</h2>
-                <p class="text-muted mb-4">{{ resolved.downloads.loading.description }}</p>
+    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="90">
+      {% for platform in resolved.downloads.platforms %}
+        {% if platform.id == 'ios' or platform.id == 'android' %}{% continue %}{% endif %}
 
-                <div class="d-flex flex-column gap-3">
-                  <button type="button" class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center">
-                    {% uj_icon "download", "fa-sm me-2" %}
-                    {{ resolved.downloads.loading.button_text }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {% for platform in resolved.downloads.platforms %}
         {% assign has_download = false %}
         {% for type in platform.types %}
           {% assign config_url = site.download[platform.id][type.type] %}
-          {% iftruthy config_url %}
-            {% assign has_download = true %}
-            {% break %}
-          {% endiftruthy %}
+          {% iftruthy config_url %}{% assign has_download = true %}{% break %}{% endiftruthy %}
         {% endfor %}
 
-          <div
-            class="tab-pane fade"
-            id="{{ platform.id }}-pane"
-            role="tabpanel"
-            aria-labelledby="{{ platform.id }}-tab"
-            tabindex="0"
-            data-platform="{{ platform.id }}"
-            data-has-download="{% if has_download %}true{% else %}false{% endif %}"
-          >
-            <div class="card">
-            <div class="card-body p-4 p-md-5 text-center">
-              <div class="mb-4">
-                <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg">
-                  {% uj_icon platform.icon, "fa-lg" %}
-                </span>
-              </div>
-              <h2 class="classy-display classy-display--section mb-1">{{ platform.name }}</h2>
-              <p class="text-muted mb-4">{{ platform.description }}</p>
+        <div class="col-md-6 col-lg-4 d-flex" data-omega-reveal>
+          <div class="classy-dl-card omega-hover-lift" data-download-card data-platform="{{ platform.id }}">
+            <span class="classy-icon-chip classy-icon-chip--neutral classy-dl-card__chip">
+              {% uj_icon platform.icon, "fa-md" %}
+            </span>
+            <h3 class="classy-dl-card__name">{{ platform.name }}</h3>
+            <p class="classy-dl-card__req classy-quiet small">{{ platform.description }}</p>
 
-              {% unless has_download %}
-                {% if platform.id == "android" or platform.id == "ios" %}
-                  <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
-                    {% uj_icon "mobile", "fs-4 me-3" %}
-                    <div class="text-start">
-                      <h6 class="mb-0">{{ resolved.downloads.coming_soon_mobile.headline }}</h6>
-                      <small>{{ resolved.downloads.coming_soon_mobile.description }}</small>
-                    </div>
-                  </div>
-                {% else %}
-                  <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
-                    {% uj_icon "triangle-exclamation", "fs-4 me-3" %}
-                    <div class="text-start">
-                      <h6 class="mb-0">{{ resolved.downloads.not_available.headline }}</h6>
-                      <small>{{ site.brand.name }} is not currently available for {{ platform.name }}. Please choose another platform.</small>
-                    </div>
-                  </div>
-                {% endif %}
-              {% endunless %}
-
+            <div class="classy-dl-card__actions">
               {% if has_download %}
-                <div class="d-flex flex-column gap-3">
-                  {% for type in platform.types %}
-                    {% assign config_url = site.download[platform.id][type.type] %}
-                    {% iftruthy config_url %}
-                      <a
-                        href="{{ config_url }}"
-                        class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center"
-                        data-download="true"
-                      >
-                        {% uj_icon type.icon, "fa-sm me-2" %}
-                        {{ type.name }}
-                      </a>
-                    {% endiftruthy %}
-                    {% iffalsy config_url %}
-                      <button
-                        type="button"
-                        class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center"
-                        data-download="true"
-                      >
-                        {% uj_icon type.icon, "fa-sm me-2" %}
-                        {{ type.name }}
-                      </button>
-                    {% endiffalsy %}
-                  {% endfor %}
-                </div>
-              {% else %}
-                {% if platform.id == "android" or platform.id == "ios" %}
-                  <div class="mb-4 text-start">
-                    <form id="mobile-email-form-{{ platform.id }}" class="mobile-email-form" data-platform="{{ platform.id }}" data-form-state="initializing" onsubmit="return false">
-                      <label for="email-{{ platform.id }}" class="form-label">Email address</label>
-                      <div class="row g-3">
-                        <div class="col-12 col-md-8">
-                          <input
-                            type="email"
-                            class="form-control form-control-md"
-                            id="email-{{ platform.id }}"
-                            name="email"
-                            placeholder="jonsnow@gmail.com"
-                            autocomplete="email"
-                            required
-                          >
-                        </div>
-                        <div class="col-12 col-md-4">
-                          <button type="submit" class="btn btn-adaptive btn-md w-100">
-                            {% uj_icon "paper-plane", "me-2" %}
-                            Send link
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-                {% endif %}
-
-                <div class="d-flex flex-column gap-3">
-                  {% for type in platform.types %}
-                    <button
-                      type="button"
-                      class="btn btn-outline-adaptive btn-lg d-flex align-items-center justify-content-center"
-                      disabled
-                    >
-                      {% uj_icon type.icon, "fa-sm me-2" %}
+                {% for type in platform.types %}
+                  {% assign config_url = site.download[platform.id][type.type] %}
+                  {% iftruthy config_url %}
+                    <a href="{{ config_url }}" class="btn {% if forloop.first %}btn-adaptive{% else %}btn-outline-adaptive{% endif %} w-100" data-download="true" data-download-name="{{ type.name }}">
+                      {% uj_icon "download", "fa-sm me-2" %}
                       {{ type.name }}
-                    </button>
-                  {% endfor %}
-                </div>
+                    </a>
+                  {% endiftruthy %}
+                {% endfor %}
+              {% else %}
+                <span class="classy-status w-100 justify-content-center">
+                  <span class="classy-dot"></span>
+                  {{ resolved.downloads.not_available.headline }}
+                </span>
               {% endif %}
             </div>
           </div>
-          </div>
-          {% endfor %}
         </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Mobile: store badges or the tell-me-when form ═══ -->
+<section>
+  <div class="container">
+    <div class="classy-dl-mobile" data-omega-reveal="scale">
+      <div class="classy-dl-mobile__copy">
+        <span class="classy-micro d-block mb-3">On the go</span>
+        <h2 class="classy-display classy-display--section mb-2">In your <em>pocket</em> too</h2>
+        <p class="classy-quiet mb-0">The same account, the small screen. Everything you do here shows up there before you've stood up.</p>
+      </div>
+
+      <div class="classy-dl-mobile__stores" data-omega-reveal-stagger="80">
+        {% for platform in resolved.downloads.platforms %}
+          {% unless platform.id == 'ios' or platform.id == 'android' %}{% continue %}{% endunless %}
+
+          {% assign has_download = false %}
+          {% for type in platform.types %}
+            {% assign config_url = site.download[platform.id][type.type] %}
+            {% iftruthy config_url %}{% assign has_download = true %}{% break %}{% endiftruthy %}
+          {% endfor %}
+
+          <div class="classy-dl-store" data-download-card data-platform="{{ platform.id }}" data-omega-reveal>
+            {% if has_download %}
+              {% for type in platform.types %}
+                {% assign config_url = site.download[platform.id][type.type] %}
+                {% iftruthy config_url %}
+                  <a href="{{ config_url }}" class="classy-dl-store__badge" data-download="true" aria-label="{{ platform.name }} — {{ type.name }}">
+                    {% uj_logo platform.store_badge, "brandmarks" %}
+                    <span class="classy-dl-store__badge-text">
+                      <span class="classy-dl-store__hint">Download on</span>
+                      <strong>{{ type.name }}</strong>
+                    </span>
+                  </a>
+                {% endiftruthy %}
+              {% endfor %}
+            {% else %}
+              <div class="classy-dl-store__soon">
+                <span class="d-inline-flex align-items-center gap-2 mb-1">
+                  {% uj_icon platform.icon, "fa-sm" %}
+                  <strong>{{ platform.name }}</strong>
+                  <span class="classy-chip classy-chip--accent">Soon</span>
+                </span>
+                <form id="mobile-email-form-{{ platform.id }}" class="mobile-email-form" data-platform="{{ platform.id }}" data-form-state="initializing" onsubmit="return false">
+                  <label for="email-{{ platform.id }}" class="visually-hidden">Email address</label>
+                  <div class="classy-dl-store__form">
+                    <input
+                      type="email"
+                      class="form-control"
+                      id="email-{{ platform.id }}"
+                      name="email"
+                      placeholder="you@work.com"
+                      autocomplete="email"
+                      required
+                    >
+                    <button class="btn btn-adaptive" type="submit">
+                      {% uj_icon "paper-plane", "fa-sm me-1" %}
+                      Notify me
+                    </button>
+                  </div>
+                  <div class="form-message small mt-2" aria-live="polite"></div>
+                </form>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ What you get — hairline rows ═══ -->
+<!-- ═══ What travels with you — hairline rows ═══ -->
 <section>
   <div class="container">
     <div class="classy-duo">
@@ -424,7 +355,7 @@ cta:
   </div>
 </section>
 
-<!-- ═══ System requirements — quiet duo ═══ -->
+<!-- ═══ Requirements — quiet duo ═══ -->
 <section>
   <div class="container">
     <div class="classy-duo">
@@ -438,6 +369,9 @@ cta:
             <em>{{ resolved.system_requirements.headline_accent }}</em>
           {% endiftruthy %}
         </h2>
+        {% iftruthy resolved.system_requirements.subheadline %}
+          <p>{{ resolved.system_requirements.subheadline }}</p>
+        {% endiftruthy %}
       </div>
 
       <div class="row g-5" data-omega-reveal>

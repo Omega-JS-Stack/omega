@@ -1,0 +1,174 @@
+// classy download surfaces — /download + /extension (reimagined Ian
+// 2026-07-16, manus-grade): the detected platform/browser's button leads the
+// hero, cards sit in the open (no tab reveal dance), mobile gets a store
+// band. Shared marketing partial because both pages speak this vocabulary;
+// the modal/slideshow machinery stays in core's download page css.
+
+// ── Hero: your button, already picked ────────────────────────────────────────
+
+.classy-dl-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2.25rem;
+}
+
+.classy-dl-hero__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .classy-dl-hero__icon {
+    display: inline-flex;
+
+    svg {
+      width: 1.05em;
+      height: 1.05em;
+    }
+  }
+}
+
+.classy-dl-hero__platforms {
+  margin-top: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+// ── Desktop platform cards ───────────────────────────────────────────────────
+
+.classy-dl-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 1.75rem;
+  text-align: center;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+
+  .classy-dl-card__chip {
+    margin-inline: auto;
+    margin-bottom: 1rem;
+  }
+
+  // Real brandmark variant (browser cards) — the mark IS the identity
+  .classy-dl-card__mark {
+    display: inline-flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+
+    svg {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+  }
+
+  .classy-dl-card__name {
+    font-family: var(--omega-font-marketing);
+    font-size: 1.375rem;
+    font-weight: 550;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.25rem;
+  }
+
+  .classy-dl-card__req {
+    margin-bottom: 1.5rem;
+  }
+
+  .classy-dl-card__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    margin-top: auto;
+  }
+}
+
+// ── Mobile band: split panel with store rows ─────────────────────────────────
+
+.classy-dl-mobile {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 3rem;
+  align-items: center;
+  padding: 3rem;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+
+  @media (max-width: 991.98px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    padding: 2rem;
+  }
+}
+
+.classy-dl-mobile__stores {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.classy-dl-store__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1.375rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
+  border-radius: var(--omega-radius-m);
+  color: var(--omega-ink);
+  text-decoration: none;
+  transition: transform var(--omega-speed) var(--omega-ease), box-shadow var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    color: var(--omega-ink);
+    transform: translateY(-2px);
+    box-shadow: var(--omega-shadow-2);
+  }
+
+  svg {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+.classy-dl-store__badge-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: start;
+
+  .classy-dl-store__hint {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--omega-ink-muted);
+  }
+
+  strong {
+    font-size: 1.0625rem;
+  }
+}
+
+.classy-dl-store__soon {
+  padding: 1.25rem 1.375rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+}
+
+.classy-dl-store__form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+
+  .form-control {
+    max-width: 18rem;
+  }
+
+  .btn {
+    white-space: nowrap;
+  }
+}
