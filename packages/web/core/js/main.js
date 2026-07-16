@@ -46,6 +46,12 @@ export default async function ({ manager, options } = {}) {
     import('__main_assets__/js/core/dev-palette.js')
       .then(({ default: devPalette }) => devPalette())
       .catch((error) => console.error('Failed to load dev-palette.js:', error));
+
+    // Missing-icon loudness (Ian 2026-07-16): every fallback triangle the
+    // build stamped becomes a console.error in dev
+    import('__main_assets__/js/core/dev-icon-audit.js')
+      .then(({ default: devIconAudit }) => devIconAudit())
+      .catch((error) => console.error('Failed to load dev-icon-audit.js:', error));
   }
 
   // Conditionally loaded modules based on config. Static import paths (no

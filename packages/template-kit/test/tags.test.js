@@ -179,7 +179,11 @@ test('uj_icon loads from injected dirs with brands fallback, flag mapping, and d
   assert.ok(enFlag.includes('width="1em"') && enFlag.includes('height="1em"'), '1em sizing injected');
 
   // unknown -> default warning triangle
-  assert.ok(TAGS.uj_icon.render(ctx, 'definitely-not-real').includes('M320 64'));
+  const missing = TAGS.uj_icon.render(ctx, 'definitely-not-real');
+  assert.ok(missing.includes('M320 64'));
+  // The fallback carries the failed slug so the dev-only browser audit can
+  // console.error it ([data-omega-icon-missing] scan)
+  assert.ok(missing.includes('data-omega-icon-missing="definitely-not-real"'));
 
   // no dirs configured -> default icon, no crash
   const bare = makeCtx({});

@@ -130,7 +130,17 @@ function defaultIconWithWarning(iconName, dirs) {
     warnedIcons.add(iconName);
     console.warn(`[template-kit] uj_icon: no SVG found for "${iconName}" — rendering the default icon`);
   }
-  return DEFAULT_ICON;
+  return tagMissing(DEFAULT_ICON, iconName);
+}
+
+/**
+ * Stamp the failed slug onto the fallback SVG so the browser can see it:
+ * the dev-only icon audit (web core/js/core/dev-icon-audit.js) scans
+ * [data-omega-icon-missing] and console.errors every miss.
+ */
+function tagMissing(svg, name) {
+  const safe = String(name || 'unknown').replace(/["<>&]/g, '');
+  return svg.replace('<svg ', `<svg data-omega-icon-missing="${safe}" `);
 }
 
 function tryLoadFlag(icons, iconName) {
@@ -182,8 +192,14 @@ function loadLogo(ctx, logoName, type, color) {
 
   if (logoCache.has(cacheKey)) return logoCache.get(cacheKey);
 
-  const svg = (logos.dir && readFileIfExists(path.join(logos.dir, type, color, `${logoName}.svg`)))
-    || DEFAULT_ICON;
+  let svg = logos.dir && readFileIfExists(path.join(logos.dir, type, color, `${logoName}.svg`));
+  if (!svg) {
+    if (!warnedIcons.has(`logo:${logoName}`)) {
+      warnedIcons.add(`logo:${logoName}`);
+      console.warn(`[template-kit] uj_logo: no SVG found for "${type}/${color}/${logoName}" — rendering the default icon`);
+    }
+    svg = tagMissing(DEFAULT_ICON, `logo:${logoName}`);
+  }
 
   logoCache.set(cacheKey, svg);
   return svg;

@@ -87,9 +87,15 @@
 // ============================================
 // Ghost — the hairline neutral (draft-2 secondary voice)
 // ============================================
-// Outranks the shared overrides layer (which loads after the theme) via the
-// extra .btn in the selector.
-.btn.btn-outline-adaptive {
+// The shared adaptive layer loads AFTER the theme, and its
+// [data-bs-theme="dark"] block re-litigates these vars at (0,2,0) — it
+// wants the ghost to INVERT to paper on hover, which read as light-text-
+// on-paper in dark mode (Ian's "can't read hover text" bug). Double-
+// scoping wins both modes; the omega tokens already flip with the theme.
+// No unconditional color/background here — they out-order .btn:hover and
+// freeze states (the earlier "Google button has no hover" bug).
+.btn.btn-outline-adaptive,
+[data-bs-theme='dark'] .btn.btn-outline-adaptive {
   --bs-btn-color: var(--omega-ink);
   --bs-btn-bg: var(--omega-surface);
   --bs-btn-border-color: var(--omega-line-strong);
@@ -100,15 +106,9 @@
   --bs-btn-active-bg: var(--omega-surface-2);
   --bs-btn-active-border-color: var(--omega-line-strong);
 
-  color: var(--omega-ink);
+  // Raw border-color: the shared dark block sets one at (0,2,0), which
+  // out-orders Bootstrap's var-driven border — re-assert at (0,3,0)
   border-color: var(--omega-line-strong);
-
-  // Resting fill only — an UNCONDITIONAL background here out-ordered
-  // Bootstrap's .btn:hover rule and froze the ghost's hover state (the
-  // "Google button has no hover" bug)
-  &:not(:hover, :active, .active) {
-    background: var(--omega-surface) !important;
-  }
 }
 
 // ============================================
