@@ -6,76 +6,137 @@ app:
   protocol: "{{ site.brand.id | default: site.brand.name | slugify }}://"
 ---
 
+<!-- Self-contained, token-driven (mirrors the redirect interstitial) -->
+<style>
+  .omega-launch {
+    text-align: center;
+    padding: 2.75rem 2rem 2.25rem;
+    background: var(--omega-surface);
+    border: 1px solid var(--omega-line);
+    border-radius: var(--omega-radius-xl);
+  }
+
+  .omega-launch__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 1.25rem;
+    background: var(--omega-surface-2);
+    border: 1px solid var(--omega-line);
+    border-radius: var(--omega-radius-m);
+    overflow: hidden;
+  }
+
+  .omega-launch__mark img {
+    width: 1.75rem;
+    height: 1.75rem;
+    object-fit: contain;
+  }
+
+  .omega-launch__title {
+    font-family: var(--omega-font-marketing);
+    font-weight: 550;
+    letter-spacing: -0.02em;
+    font-size: 1.75rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .omega-launch__title em {
+    font-style: italic;
+  }
+
+  .omega-launch__sub {
+    color: var(--omega-ink-muted);
+    font-size: 0.9375rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .omega-launch__dots {
+    display: inline-flex;
+    gap: 0.4375rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .omega-launch__dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--omega-ink-faint);
+    animation: omega-launch-pulse 1.1s var(--omega-ease) infinite;
+  }
+
+  .omega-launch__dots span:nth-child(2) { animation-delay: 0.18s; }
+  .omega-launch__dots span:nth-child(3) { animation-delay: 0.36s; }
+
+  @keyframes omega-launch-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    40% { opacity: 1; transform: scale(1); background: var(--omega-accent); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .omega-launch__dots span { animation: none; }
+  }
+
+  .omega-launch__footer {
+    margin-top: 1.75rem;
+    padding-top: 1.375rem;
+    border-top: 1px solid var(--omega-line);
+    font-size: 0.8125rem;
+    color: var(--omega-ink-faint);
+  }
+</style>
+
 <!-- App Launch Section -->
 <section class="col-12 col-md-8 col-lg-6 col-xl-5 mw-sm">
-  <div class="card">
-    <div class="card-body p-3 p-md-5">
-      <!-- Logo -->
-      <div class="text-center mb-3">
-        <div class="avatar avatar-xl">
-          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+  <div class="omega-launch">
+    <!-- Brand mark -->
+    <span class="omega-launch__mark">
+      <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }} Logo"/>
+    </span>
+
+    <!-- Header -->
+    <h1 class="omega-launch__title">Opening <em>{{ site.brand.name }}</em></h1>
+    <p class="omega-launch__sub">Handing you off to the desktop app.</p>
+
+    <!-- Progress -->
+    <div class="omega-launch__dots" role="status" aria-label="Launching">
+      <span></span><span></span><span></span>
+      <span class="visually-hidden">Launching…</span>
+    </div>
+
+    <!-- Error Alert (Hidden by default) -->
+    <div id="error-alert" class="alert alert-warning mb-4 text-start" role="alert" hidden>
+      <div class="d-flex align-items-center">
+        {% uj_icon "triangle-exclamation", "me-2" %}
+        <div>
+          <strong>App not installed?</strong><br>
+          <small>Download {{ site.brand.name }} for your platform below.</small>
         </div>
       </div>
+    </div>
 
-      <!-- Header -->
-      <div class="text-center mb-4">
-        <h1 class="h3 mb-2">Opening {{ site.brand.name }}...</h1>
-        <p class="text-muted">Launching your desktop application</p>
-      </div>
+    <!-- Action Buttons -->
+    <div class="d-grid gap-2 d-sm-block">
+      <a id="launch-button" href="{{ resolved.app.protocol }}" class="btn btn-adaptive mb-2 mb-sm-0 me-sm-2">
+        {% uj_icon "rocket", "fa-sm me-2" %}
+        <span>Launch app</span>
+      </a>
+      <a id="download-button" href="/download" class="btn btn-outline-adaptive mb-2 mb-sm-0">
+        {% uj_icon "download", "fa-sm me-2" %}
+        <span>Download app</span>
+      </a>
+    </div>
 
-      <!-- Loading Spinner -->
-      <div class="text-center mb-4">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-      </div>
-
-      <!-- Error Alert (Hidden by default) -->
-      <div id="error-alert" class="alert alert-warning mb-4" role="alert" hidden>
-        <div class="d-flex align-items-center">
-          {% uj_icon "triangle-exclamation", "me-2" %}
-          <div>
-            <strong>App not installed?</strong><br>
-            <small>Download {{ site.brand.name }} for your platform below.</small>
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="d-grid gap-2 mb-4">
-        <a id="launch-button" href="{{ resolved.app.protocol }}" class="btn btn-adaptive">
-          {% uj_icon "rocket", "me-2" %}
-          <span>Launch app</span>
-        </a>
-      </div>
-
-      <!-- Download Section -->
-      <div class="text-center">
-        <p class="text-muted small mb-3">Don't have the app?</p>
-
-        <a id="download-button" href="/download" class="btn btn-adaptive">
-          {% uj_icon "download", "me-2" %}
-          <span>Download app</span>
-        </a>
-      </div>
-
-      <!-- Alternative Actions -->
-      <div class="mt-4 pt-4 border-top text-center">
-        <p class="text-muted small mb-2">Having trouble?</p>
-        <div class="btn-group" role="group">
-          <a href="/" class="btn btn-sm btn-outline-adaptive">
-            {% uj_icon "house", "me-1" %}
-            <span>Go to website</span>
-          </a>
-          <a href="/contact" class="btn btn-sm btn-outline-adaptive">
-            {% uj_icon "headset", "me-1" %}
-            <span>Get help</span>
-          </a>
-        </div>
-      </div>
+    <!-- Alternative Actions -->
+    <div class="omega-launch__footer">
+      Having trouble?
+      <a href="/" class="text-decoration-none">Go to website</a>
+      ·
+      <a href="/contact" class="text-decoration-none">Get help</a>
     </div>
   </div>
 </section>
 
 {{ content | uj_content_format }}
-

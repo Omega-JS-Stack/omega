@@ -135,19 +135,21 @@ alternative:
   {% endiftruthy %}
 {% endcapture %}
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid" data-competitor-name="{{ alt.competitor.name }}">
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-4" data-competitor-name="{{ alt.competitor.name }}">
   <div class="container" data-omega-reveal-stagger="90">
-    {% iftruthy alt.hero.tagline %}
-      <span class="classy-micro" data-omega-reveal>{{ alt.hero.tagline | uj_liquify }}</span>
-    {% endiftruthy %}
+    <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="{{ site.url }}/alternatives">Alternatives</a>
+      <span>/</span>
+      <span>{{ alt.competitor.name }}</span>
+    </div>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
       {{ alt.hero.headline | uj_liquify }} <em>{{ alt.hero.headline_accent | uj_liquify }}</em>
     </h1>
     {% iftruthy alt.hero.description %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ alt.hero.description | uj_liquify }}</p>
+      <p class="classy-hero-split__sub" data-omega-reveal>{{ alt.hero.description | uj_liquify }}</p>
     {% endiftruthy %}
-    <div class="classy-page-hero__actions" data-omega-reveal>
+    <div class="d-flex flex-wrap gap-3 mt-4" data-omega-reveal>
       {% iftruthy alt.hero.primary_button.text %}
         <a href="{{ alt.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
           {{ alt.hero.primary_button.text }}

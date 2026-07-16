@@ -3,9 +3,9 @@ layout: frontend/core/base
 
 # Hero Section
 hero:
-  headline: "Download {{ site.brand.name }}"
-  headline_accent: "today"
-  description: "Get {{ site.brand.name }} for your platform and start building amazing things"
+  headline: "{{ site.brand.name }}, on <em>your</em> machine"
+  headline_accent: ""
+  description: "One download away. Every platform, always in sync."
 
 # Downloads Section
 downloads:
@@ -159,14 +159,15 @@ cta:
     href: "#docs"
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-4">
   <div class="container" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-3" data-omega-reveal>Download</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+      {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
     </h1>
     {% iftruthy resolved.hero.description %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
     {% endiftruthy %}
   </div>
 </section>
@@ -175,15 +176,15 @@ cta:
 <section class="pt-0">
   <div class="container">
 
-    <!-- Platform Selector -->
+    <!-- Platform Selector (segmented rail; tab machinery + detection JS untouched) -->
     <div class="row justify-content-center mb-5">
-      <div class="col-12">
-        <div class="d-flex flex-wrap justify-content-center gap-3" data-omega-reveal>
-          <ul class="nav nav-pills gap-3 border-0 justify-content-center w-100" id="platform-selector" role="tablist">
+      <div class="col-12 text-center">
+        <div class="d-inline-flex" data-omega-reveal>
+          <ul class="nav classy-platform-rail border-0" id="platform-selector" role="tablist">
           <!-- Loading tab (shown by default until platform is detected) -->
           <li class="nav-item d-none" role="presentation" data-platform="loading">
             <button
-              class="btn btn-outline-adaptive btn-lg active d-flex align-items-center justify-content-center"
+              class="btn active d-flex align-items-center justify-content-center"
               id="loading-tab"
               data-bs-toggle="tab"
               data-bs-target="#loading-pane"
@@ -209,9 +210,9 @@ cta:
               {% endiftruthy %}
             {% endfor %}
 
-            <li class="nav-item flex-fill flex-sm-grow-0" role="presentation">
+            <li class="nav-item" role="presentation">
               <button
-                class="btn btn-outline-adaptive btn-lg platform-btn d-flex align-items-center justify-content-center w-100"
+                class="btn platform-btn d-flex align-items-center justify-content-center"
                 id="{{ platform.id }}-tab"
                 data-bs-toggle="tab"
                 data-bs-target="#{{ platform.id }}-pane"
@@ -222,7 +223,7 @@ cta:
                 aria-controls="{{ platform.id }}-pane"
                 aria-selected="false"
               >
-                {% uj_icon platform.icon, "fa-lg me-2" %}
+                {% uj_icon platform.icon, "fa-sm me-2" %}
                 {{ platform.name }}
               </button>
             </li>
@@ -392,97 +393,79 @@ cta:
   </div>
 </section>
 
-<!-- ═══ Features ═══ -->
+<!-- ═══ What you get — hairline rows ═══ -->
 <section>
   <div class="container">
-    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-      {% iftruthy resolved.features.superheadline.text %}
-        <span class="classy-micro">{{ resolved.features.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-display classy-display--section">
-        {{ resolved.features.headline }}
-        {% iftruthy resolved.features.headline_accent %}
-          <em>{{ resolved.features.headline_accent }}</em>
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        {% iftruthy resolved.features.superheadline.text %}
+          <span class="classy-micro">{{ resolved.features.superheadline.text }}</span>
         {% endiftruthy %}
-      </h2>
-      {% iftruthy resolved.features.subheadline %}
-        <p>{{ resolved.features.subheadline }}</p>
-      {% endiftruthy %}
-    </div>
+        <h2 class="classy-display classy-display--section">
+          {{ resolved.features.headline }}
+          {% iftruthy resolved.features.headline_accent %}
+            <em>{{ resolved.features.headline_accent }}</em>
+          {% endiftruthy %}
+        </h2>
+      </div>
 
-    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
-      {% for feature in resolved.features.items %}
-        <div class="col-lg-3 col-md-6" data-omega-reveal>
-          <div class="classy-tile h-100">
-            <div class="classy-tile__head">
-              <span class="classy-icon-chip">{% uj_icon feature.icon, "fa-sm" %}</span>
-              <span class="classy-tile__title">{{ feature.title }}</span>
-            </div>
-            <p class="classy-tile__desc mb-0">{{ feature.description }}</p>
+      <div class="classy-rowlist" data-omega-reveal-stagger="60">
+        {% for feature in resolved.features.items %}
+          <div class="classy-rowlist__item" data-omega-reveal>
+            <span class="d-inline-flex align-items-center gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon feature.icon, "fa-sm" %}</span>
+              <strong>{{ feature.title }}</strong>
+            </span>
+            <span class="classy-rowlist__meta">{{ feature.description }}</span>
           </div>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ System requirements ═══ -->
+<!-- ═══ System requirements — quiet duo ═══ -->
 <section>
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10" data-omega-reveal>
-        <div class="card">
-          <div class="card-body p-4 p-md-5">
-            <div class="classy-section-head classy-section-head--center mb-4">
-              {% iftruthy resolved.system_requirements.superheadline.text %}
-                <span class="classy-micro">{{ resolved.system_requirements.superheadline.text }}</span>
-              {% endiftruthy %}
-              <h2 class="classy-display classy-display--section">
-                {{ resolved.system_requirements.headline }}
-                {% iftruthy resolved.system_requirements.headline_accent %}
-                  <em>{{ resolved.system_requirements.headline_accent }}</em>
-                {% endiftruthy %}
-              </h2>
-              {% iftruthy resolved.system_requirements.subheadline %}
-                <p>{{ resolved.system_requirements.subheadline }}</p>
-              {% endiftruthy %}
-            </div>
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        {% iftruthy resolved.system_requirements.superheadline.text %}
+          <span class="classy-micro">{{ resolved.system_requirements.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">
+          {{ resolved.system_requirements.headline }}
+          {% iftruthy resolved.system_requirements.headline_accent %}
+            <em>{{ resolved.system_requirements.headline_accent }}</em>
+          {% endiftruthy %}
+        </h2>
+      </div>
 
-            <div class="row g-4">
-              <div class="col-md-6">
-                <h5 class="d-flex align-items-center gap-2 mb-3 classy-panel-head justify-content-start">
-                  <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon resolved.system_requirements.desktop.icon, "fa-sm" %}</span>
-                  {{ resolved.system_requirements.desktop.label }}
-                </h5>
-                <ul class="list-unstyled text-muted">
-                  {% for platform in resolved.downloads.platforms %}
-                    {% if platform.id == 'windows' or platform.id == 'mac' or platform.id == 'linux' %}
-                      <li class="mb-2">{% uj_icon "check", "text-success fa-sm me-2" %} {{ platform.description }}</li>
-                    {% endif %}
-                  {% endfor %}
-                  {% for req in resolved.system_requirements.desktop.items %}
-                    <li class="mb-2">{% uj_icon req.icon, "text-success fa-sm me-2" %} {{ req.text }}</li>
-                  {% endfor %}
-                </ul>
-              </div>
+      <div class="row g-5" data-omega-reveal>
+        <div class="col-md-6">
+          <span class="classy-micro d-block mb-3">{{ resolved.system_requirements.desktop.label }}</span>
+          <div class="classy-rowlist">
+            {% for platform in resolved.downloads.platforms %}
+              {% if platform.id == 'windows' or platform.id == 'mac' or platform.id == 'linux' %}
+                <div class="classy-rowlist__item"><span>{{ platform.description }}</span></div>
+              {% endif %}
+            {% endfor %}
+            {% for req in resolved.system_requirements.desktop.items %}
+              <div class="classy-rowlist__item"><span>{{ req.text }}</span></div>
+            {% endfor %}
+          </div>
+        </div>
 
-              <div class="col-md-6">
-                <h5 class="d-flex align-items-center gap-2 mb-3 classy-panel-head justify-content-start">
-                  <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon resolved.system_requirements.mobile.icon, "fa-sm" %}</span>
-                  {{ resolved.system_requirements.mobile.label }}
-                </h5>
-                <ul class="list-unstyled text-muted">
-                  {% for platform in resolved.downloads.platforms %}
-                    {% if platform.id == 'ios' or platform.id == 'android' %}
-                      <li class="mb-2">{% uj_icon "check", "text-success fa-sm me-2" %} {{ platform.description }}</li>
-                    {% endif %}
-                  {% endfor %}
-                  {% for req in resolved.system_requirements.mobile.items %}
-                    <li class="mb-2">{% uj_icon req.icon, "text-success fa-sm me-2" %} {{ req.text }}</li>
-                  {% endfor %}
-                </ul>
-              </div>
-            </div>
+        <div class="col-md-6">
+          <span class="classy-micro d-block mb-3">{{ resolved.system_requirements.mobile.label }}</span>
+          <div class="classy-rowlist">
+            {% for platform in resolved.downloads.platforms %}
+              {% if platform.id == 'ios' or platform.id == 'android' %}
+                <div class="classy-rowlist__item"><span>{{ platform.description }}</span></div>
+              {% endif %}
+            {% endfor %}
+            {% for req in resolved.system_requirements.mobile.items %}
+              <div class="classy-rowlist__item"><span>{{ req.text }}</span></div>
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -493,39 +476,37 @@ cta:
 <!-- ═══ FAQ ═══ -->
 <section>
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
-        <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-          {% iftruthy resolved.faqs.superheadline.text %}
-            <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        {% iftruthy resolved.faqs.superheadline.text %}
+          <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">
+          {{ resolved.faqs.headline }}
+          {% iftruthy resolved.faqs.headline_accent %}
+            <em>{{ resolved.faqs.headline_accent }}</em>
           {% endiftruthy %}
-          <h2 class="classy-display classy-display--section">
-            {{ resolved.faqs.headline }}
-            {% iftruthy resolved.faqs.headline_accent %}
-              <em>{{ resolved.faqs.headline_accent }}</em>
-            {% endiftruthy %}
-          </h2>
-          {% iftruthy resolved.faqs.subheadline %}
-            <p>{{ resolved.faqs.subheadline }}</p>
-          {% endiftruthy %}
-        </div>
+        </h2>
+        {% iftruthy resolved.faqs.subheadline %}
+          <p>{{ resolved.faqs.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
 
-        <div class="classy-faq accordion" id="downloadFaqAccordion" data-omega-reveal>
-          {% for faq in resolved.faqs.items %}
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
-                  {{ faq.question }}
-                </button>
-              </h2>
-              <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#downloadFaqAccordion">
-                <div class="accordion-body">
-                  {{ faq.answer }}
-                </div>
+      <div class="classy-faq accordion" id="downloadFaqAccordion" data-omega-reveal>
+        {% for faq in resolved.faqs.items %}
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                {{ faq.question }}
+              </button>
+            </h2>
+            <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#downloadFaqAccordion">
+              <div class="accordion-body">
+                {{ faq.answer }}
               </div>
             </div>
-          {% endfor %}
-        </div>
+          </div>
+        {% endfor %}
       </div>
     </div>
   </div>

@@ -258,6 +258,43 @@
   }
 }
 
+// Platform rail — the download page's segmented selector (Bootstrap tab
+// machinery underneath: .active is stamped by tab JS / platform detection)
+.classy-platform-rail {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0.25rem;
+  gap: 0.25rem;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+
+  .btn {
+    --bs-btn-color: var(--omega-ink-muted);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--omega-ink);
+    --bs-btn-hover-bg: transparent;
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--omega-ink);
+    --bs-btn-active-bg: var(--omega-surface);
+    --bs-btn-active-border-color: var(--omega-line);
+
+    border-radius: var(--omega-radius-s) !important;
+    font-size: 0.875rem;
+    font-weight: 550;
+    padding: 0.4375rem 1rem;
+
+    &.active {
+      color: var(--omega-ink);
+      background: var(--omega-surface);
+      border-color: var(--omega-line);
+      box-shadow: var(--omega-shadow-1);
+    }
+  }
+}
+
 // ── Serif quote ──────────────────────────────────────────────────────────────
 
 .classy-quote {
