@@ -135,13 +135,28 @@
     margin-bottom: 1.5rem;
   }
 
-  // Social provider button: neutral ghost with the provider logo
+  // Social provider button: neutral ghost with the provider's brand icon
+  // (inlined via uj_icon — the ITW CDN logo <img> is retired)
   .classy-auth__social {
-    img {
+    svg {
       width: 1.125rem;
       height: 1.125rem;
-      object-fit: contain;
     }
+  }
+
+  // Signup consent group: transparent border reserves the layout space; the
+  // validation JS (libs/auth/forms.js) toggles .is-invalid — same border
+  // color the email/password fields show when invalid
+  .classy-auth__consent {
+    border: 1px solid transparent;
+
+    &.is-invalid {
+      border-color: var(--bs-form-invalid-border-color, var(--bs-danger, #dc3545));
+    }
+  }
+
+  .classy-auth__consent-error {
+    color: var(--bs-form-invalid-color, var(--bs-danger, #dc3545));
   }
 
   // OR divider

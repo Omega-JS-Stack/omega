@@ -48,13 +48,21 @@ export default function () {
       // Log
       console.log('[Auth] state changed:', state);
 
-      // Short-circuit if a reverse-signup is in progress (libs/auth.js#reverseAccidentalSignup
+      // Short-circuit if a reverse-signup is in progress (libs/auth/oauth.js#reverseAccidentalSignup
       // sets this synchronously before .delete() + signOut()). Without this, the brief
       // window where Firebase shows user=<about-to-be-deleted-account> would trigger the
       // policy-based redirect to /account (or authReturnUrl) BEFORE the user sees the
       // inline error on /signin. Flag is cleared at the end of reverseAccidentalSignup.
       if (window.__UJM_REVERSING_SIGNUP) {
         console.warn('[Auth] Skipping state-change processing — reverse-signup in progress');
+        return;
+      }
+
+      // Same courtesy for custom-token sign-ins (libs/auth/session-params.js):
+      // that handler owns the post-signin navigation (authReturnUrl), and this
+      // listener's authenticated-default redirect must not race it.
+      if (window.__UJM_CUSTOM_TOKEN_SIGNIN) {
+        console.warn('[Auth] Skipping state-change processing — custom-token sign-in owns navigation');
         return;
       }
 

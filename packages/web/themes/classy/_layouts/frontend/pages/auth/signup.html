@@ -15,7 +15,7 @@ benefits:
 social_signup:
   - id: "google.com"
     name: "Google"
-    logo: "https://cdn.itwcreativeworks.com/assets/general/images/brands/color/google.svg"
+    icon: "google"
 ---
 
 <section class="col-12">
@@ -45,7 +45,7 @@ social_signup:
             {% for provider in resolved.social_signup %}
               <button type="submit" class="btn btn-outline-adaptive classy-auth__social w-100 mb-2 d-flex align-items-center justify-content-center" data-provider="{{ provider.id }}">
                 {{ initializing_spinner }}
-                <img src="{{ provider.logo | uj_cachebreak }}" class="me-2" alt="{{ provider.name }} Logo"/>
+                {% uj_icon provider.icon, "me-2" %}
                 <span class="button-text">Sign up with {{ provider.name }}</span>
               </button>
             {% endfor %}
@@ -76,7 +76,7 @@ social_signup:
         </div>
 
         {% comment %} TODO: in regions that allow pre-checked consent (e.g. US), default both to checked. {% endcomment %}
-        <div id="consent-group" class="mb-3 text-start p-2 rounded" style="border: 1px solid transparent;">
+        <div id="consent-group" class="classy-auth__consent mb-3 text-start p-2 rounded">
           <div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" id="consent-legal" name="consentLegal">
             <label class="form-check-label small" for="consent-legal">
@@ -92,7 +92,7 @@ social_signup:
               Send me product updates and occasional news. Unsubscribe anytime.
             </label>
           </div>
-          <div id="consent-error" class="small mt-2 d-none" style="color: var(--bs-form-invalid-color, var(--bs-danger, #dc3545));"></div>
+          <div id="consent-error" class="classy-auth__consent-error small mt-2 d-none"></div>
         </div>
 
         <button type="submit" class="btn btn-adaptive w-100 mb-2 omega-hover-nudge" data-provider="email">
