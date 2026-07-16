@@ -1,0 +1,39 @@
+// Classy v2 feedback page — the rating selector. Hairline buttons; the
+// selected state is told by the ink border (never color-alone). This is a
+// theme PAGE entry (css/pages/feedback/index.scss): it loads AFTER the core
+// feedback page css, so the !important flags below win core's.
+
+.feedback-rating-btn {
+  padding: 1rem 0.75rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  color: var(--omega-ink-muted);
+  transition:
+    border-color var(--omega-speed) var(--omega-ease),
+    transform var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    border-color: var(--omega-line-strong);
+    transform: translateY(-2px);
+    box-shadow: none;
+  }
+
+  &.active {
+    border-color: var(--omega-ink) !important;
+    border-width: 1px !important;
+    color: var(--omega-ink);
+    transform: none;
+    box-shadow: inset 0 0 0 1px var(--omega-ink);
+  }
+
+  .feedback-rating-img {
+    filter: grayscale(0.35);
+    transition: filter var(--omega-speed) var(--omega-ease);
+  }
+
+  &:hover .feedback-rating-img,
+  &.active .feedback-rating-img {
+    filter: grayscale(0);
+  }
+}

@@ -1,0 +1,84 @@
+// Classy v2 status page — the page JS toggles bg-success/warning/danger/info
+// on the banner, service dots, and uptime bars (that class contract is the
+// API; don't rename it). In classy the banner and dots stay hairline
+// surfaces: the LEVEL paints the glyph, never a colored slab. Uptime bars
+// keep their bg-* paint — there the color IS the data (chart semantics).
+// This is a theme PAGE entry (css/pages/status/index.scss): it loads AFTER
+// the core status page css, so equal-specificity overrides here win.
+
+.status-banner {
+  // Beat the .bg-* utility the JS applies AND the core status css's
+  // .status-banner.bg-* washes (0,2,0 specificity — match it per level)
+  &,
+  &.bg-success,
+  &.bg-warning,
+  &.bg-danger,
+  &.bg-info {
+    background: var(--omega-surface) !important;
+    border: 1px solid var(--omega-line) !important;
+  }
+
+  color: var(--omega-ink);
+
+  .status-icon {
+    transition: color var(--omega-speed) var(--omega-ease);
+  }
+
+  // Level → glyph + pulse color
+  &.bg-success .status-icon,
+  &.bg-success .status-pulse {
+    color: var(--omega-ok) !important;
+  }
+
+  &.bg-warning .status-icon,
+  &.bg-warning .status-pulse {
+    color: var(--omega-warn) !important;
+  }
+
+  &.bg-danger .status-icon,
+  &.bg-danger .status-pulse {
+    color: var(--omega-danger) !important;
+  }
+
+  &.bg-info .status-icon,
+  &.bg-info .status-pulse {
+    color: var(--omega-accent) !important;
+  }
+
+  // The pulse dot rides currentColor
+  .status-pulse {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+    background: currentcolor !important;
+  }
+}
+
+// Service rows — the dot span gets the bg-* class; recolor the glyph instead
+.service-status-dot {
+  background: transparent !important;
+
+  svg {
+    transition: color var(--omega-speed) var(--omega-ease);
+  }
+
+  &.bg-success svg {
+    color: var(--omega-ok) !important;
+  }
+
+  &.bg-warning svg {
+    color: var(--omega-warn) !important;
+  }
+
+  &.bg-danger svg {
+    color: var(--omega-danger) !important;
+  }
+
+  &.bg-info svg {
+    color: var(--omega-accent) !important;
+  }
+}
+
+.service-item {
+  border-color: var(--omega-line) !important;
+}

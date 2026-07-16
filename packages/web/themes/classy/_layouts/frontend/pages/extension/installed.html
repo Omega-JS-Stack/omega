@@ -19,20 +19,21 @@ steps:
 
 <!-- Main content -->
 <section class="col-12 col-md-10 col-lg-8 col-xl-7">
-  <div class="card border-0 shadow-lg">
+  <div class="card">
     <div class="card-body p-4 p-md-5">
       <!-- Success Icon -->
-      <div class="text-center mb-4" data-lazy="@class animation-slide-up">
-        <div class="extension-success-icon bg-success avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center">
-          {% uj_icon "check", "fs-2 text-light" %}
-        </div>
+      <div class="text-center mb-4" data-omega-reveal>
+        <span class="classy-status classy-status--ok">
+          <span class="classy-dot classy-dot--ok"></span>
+          Installed
+        </span>
       </div>
 
       <!-- Headline -->
-      <div class="text-center mb-5" data-lazy="@class animation-slide-up">
-        <h1 class="h2 fw-bold mb-3">
+      <div class="text-center mb-5" data-omega-reveal>
+        <h1 class="classy-display classy-display--section mb-3">
           {{ resolved.hero.headline }}
-          <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+          <em>{{ resolved.hero.headline_accent }}</em>
         </h1>
       </div>
 
@@ -174,17 +175,17 @@ steps:
             {% uj_icon "chevron-left", "me-1" %} Back
           </button>
           <div class="steps-dots"></div>
-          <button type="button" class="btn btn-primary btn-sm step-next">
+          <button type="button" class="btn btn-adaptive btn-sm step-next">
             <span class="button-text">Next</span> {% uj_icon "chevron-right", "ms-1" %}
           </button>
         </div>
       </div>
 
       <!-- CTA Button -->
-      <div class="text-center mt-4" data-lazy="@class animation-slide-up">
-        <a href="/" class="btn btn-primary btn-lg px-5">
-          {% uj_icon "arrow-right", "me-2" %}
+      <div class="text-center mt-4" data-omega-reveal>
+        <a href="/" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
           Start using {{ site.brand.name }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
         </a>
       </div>
     </div>

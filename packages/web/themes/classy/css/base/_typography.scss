@@ -41,6 +41,11 @@ h6, .h6 {
   line-height: 1.08;
 }
 
+.classy-display--page {
+  font-size: clamp(2.25rem, 4.6vw, 3.375rem);
+  line-height: 1.06;
+}
+
 .classy-display em,
 .classy-display i {
   font-style: italic;

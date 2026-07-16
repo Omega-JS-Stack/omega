@@ -10,31 +10,27 @@ theme:
     enabled: true
 ---
 
-<section>
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-8 col-md-12 col-12">
-        <div class="text-center">
-          <h1 class="h1 mb-3">
-            {{ resolved.meta.breadcrumb }}
-          </h1>
-          <p class="lead px-8">
-            {{ resolved.meta.description }}
-          </p>
-        </div>
-      </div>
-    </div>
+<!-- ═══ Page hero (document pages: legal, plain-markdown content) ═══ -->
+<section class="classy-page-hero classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.meta.breadcrumb }}
+    </h1>
+    {% iftruthy resolved.meta.description %}
+      <p class="classy-page-hero__sub" data-omega-reveal>
+        {{ resolved.meta.description }}
+      </p>
+    {% endiftruthy %}
   </div>
 </section>
 
-<section>
+<!-- ═══ Document body ═══ -->
+<section class="pt-0">
   <div class="container">
     <div class="row justify-content-center">
-      <div class="col-12">
+      <div class="col-lg-8 classy-prose">
         {{ content | uj_content_format }}
       </div>
     </div>
   </div>
 </section>
-
-

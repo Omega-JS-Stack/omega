@@ -66,6 +66,25 @@ the tokens).
 Tier 2 stays: fork `themes/_template` for a full theme; classy remains the
 fall-through layer for anything the theme doesn't cover.
 
+## Content-page vocabulary (default pages + blueprints)
+
+Every classy frontend default page composes from one shared set
+(`themes/classy/css/marketing/_content.scss` + the existing section/bento
+vocab): `classy-page-hero` (+ `classy-display--page`) opener, `classy-prose`
+long-form (blog posts, legal md, bios), `classy-timeline`, `classy-post-card`
+(the ONE blog card — `_includes/frontend/components/post-card.html`, shared
+by index/related/category/tag grids), `classy-person`, `classy-facts`
+(hairline-divided columns), `classy-chip-cloud`, `classy-blog-search`, and
+token-driven `.pagination`. Consumer frontmatter keys are unchanged — pages
+re-rendered, data contracts kept.
+
+**Per-page theme css override slot**: `themes/<theme>/css/pages/<page>/index.scss`
+compiles into the manifest's `themePages` bucket and loads LAST on its page —
+after main css AND core page css. That's where a theme outranks core page
+rules; classy's `status` and `feedback` entries repaint the JS-toggled `bg-*`
+state classes (a class contract — never rename them) into the hairline
+language there.
+
 ## Motion library
 
 CSS: `core/css/motion/_index.scss`. Engine: `@omega.js/client/modules/motion.js`

@@ -20,7 +20,7 @@ navigation:
 <section class="update-hero py-5">
   <div class="container">
     <div class="row justify-content-center">
-      <div class="col-lg-10" data-lazy="@class animation-slide-up">
+      <div class="col-lg-10" data-omega-reveal>
         <!-- Back Link -->
         <div class="mb-4">
           <a href="{{ resolved.navigation.back_url }}" class="text-decoration-none text-muted">
@@ -30,31 +30,31 @@ navigation:
         </div>
 
         <!-- Update Header -->
-        <div class="card border-0 bg-body-tertiary update-header-card">
+        <div class="card update-header-card">
           <div class="card-body p-4">
             <div class="d-flex align-items-start gap-3 flex-wrap">
-              <div class="avatar avatar-lg bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
+              <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg flex-shrink-0">
                 {% if resolved.update.type == "security" %}
-                  {% uj_icon "shield-check", "text-danger fs-4" %}
+                  {% uj_icon "shield-check", "fa-lg" %}
                 {% elsif resolved.update.type == "hotfix" %}
-                  {% uj_icon "bug", "text-warning fs-4" %}
+                  {% uj_icon "bug", "fa-lg" %}
                 {% elsif resolved.update.type == "maintenance" %}
-                  {% uj_icon "wrench", "text-info fs-4" %}
+                  {% uj_icon "wrench", "fa-lg" %}
                 {% else %}
-                  {% uj_icon "rocket", "text-primary fs-4" %}
+                  {% uj_icon "rocket", "fa-lg" %}
                 {% endif %}
-              </div>
+              </span>
               <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                  <h1 class="h2 fw-bold mb-0">Version {{ resolved.update.version }}</h1>
+                  <h1 class="classy-display classy-display--section mb-0">Version {{ resolved.update.version }}</h1>
                   {% if resolved.update.type == "security" %}
-                    <span class="badge bg-danger-subtle text-danger">Security</span>
+                    <span class="classy-status classy-status--danger"><span class="classy-dot classy-dot--danger"></span>Security</span>
                   {% elsif resolved.update.type == "hotfix" %}
-                    <span class="badge bg-warning-subtle text-warning">Hotfix</span>
+                    <span class="classy-status classy-status--warn"><span class="classy-dot classy-dot--warn"></span>Hotfix</span>
                   {% elsif resolved.update.type == "maintenance" %}
-                    <span class="badge bg-info-subtle text-info">Maintenance</span>
+                    <span class="classy-status"><span class="classy-dot"></span>Maintenance</span>
                   {% else %}
-                    <span class="badge bg-primary-subtle text-primary">Release</span>
+                    <span class="classy-chip classy-chip--accent">Release</span>
                   {% endif %}
                 </div>
                 {% iftruthy resolved.update.title %}
@@ -68,11 +68,10 @@ navigation:
             </div>
 
             {% iftruthy resolved.update.highlights %}
-              <div class="mt-4 pt-3 border-top">
+              <div class="mt-4 pt-3 hairline-top">
                 <div class="d-flex flex-wrap gap-2">
                   {% for highlight in resolved.update.highlights %}
-                    <span class="badge bg-body-secondary text-body-secondary">
-                      {% uj_icon highlight.icon, "me-1" %}
+                    <span class="classy-chip">
                       {{ highlight.text }}
                     </span>
                   {% endfor %}
@@ -91,7 +90,7 @@ navigation:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <div class="update-content" data-lazy="@class animation-slide-up">
+        <div class="update-content classy-prose" data-omega-reveal>
           {{ content | uj_content_format }}
         </div>
       </div>
@@ -104,7 +103,7 @@ navigation:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3" data-lazy="@class animation-slide-up">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3" data-omega-reveal>
           <a href="{{ resolved.navigation.back_url }}" class="text-decoration-none">
             {% uj_icon "arrow-left", "me-1" %}
             {{ resolved.navigation.back_text }}

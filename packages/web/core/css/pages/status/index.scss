@@ -14,25 +14,26 @@
   height: 8px;
 }
 
-// Status Banner - gradient backgrounds based on Bootstrap color classes
+// Status Banner - flat semantic washes based on Bootstrap color classes
+// (themes may override; classy repaints this as a hairline surface card)
 .status-banner {
   &.bg-success {
-    background: linear-gradient(135deg, rgba(var(--bs-success-rgb), 0.1) 0%, rgba(var(--bs-success-rgb), 0.05) 100%) !important;
+    background: rgba(var(--bs-success-rgb), 0.08) !important;
     border-left: 4px solid var(--bs-success) !important;
   }
 
   &.bg-warning {
-    background: linear-gradient(135deg, rgba(var(--bs-warning-rgb), 0.1) 0%, rgba(var(--bs-warning-rgb), 0.05) 100%) !important;
+    background: rgba(var(--bs-warning-rgb), 0.08) !important;
     border-left: 4px solid var(--bs-warning) !important;
   }
 
   &.bg-danger {
-    background: linear-gradient(135deg, rgba(var(--bs-danger-rgb), 0.1) 0%, rgba(var(--bs-danger-rgb), 0.05) 100%) !important;
+    background: rgba(var(--bs-danger-rgb), 0.08) !important;
     border-left: 4px solid var(--bs-danger) !important;
   }
 
   &.bg-info {
-    background: linear-gradient(135deg, rgba(var(--bs-info-rgb), 0.1) 0%, rgba(var(--bs-info-rgb), 0.05) 100%) !important;
+    background: rgba(var(--bs-info-rgb), 0.08) !important;
     border-left: 4px solid var(--bs-info) !important;
   }
 }

@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **SKIN PASS IN FLIGHT** — Draft-1 feedback round 1 landed (cp145: signin un-broken, flat legacy URLs restored, service worker ported dev+prod w/ cross-project takeover, Inter+Newsreader vendored, icon-size fix → CHANGELOG); Ian re-reviewing at localhost:4000; next: default pages + blueprints skinned (about/contact/blog/team/status/download/…), cookie/vert/exit-popup core chrome polish
+- **SKIN PASS IN FLIGHT** — default pages + blueprints SKINNED (cp146: all ~20 frontend layouts in the v2 language, shared content vocabulary + post-card include, themePages override slot, /blog alive for post-less brands, exit-popup remade → CHANGELOG); Ian reviewing at localhost:4000; next: auth/account/payment surfaces (incl. /signup remake) + dashboard/admin content remake
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **SKIN PASS remainder (after DRAFT 1)** — default pages + blueprints → auth/account/payment + dashboard/admin remake → showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close; D5 vendored-webfont picks are Ian's call mid-arc
@@ -58,4 +58,4 @@
 - [x] 129 config-truth pass — MrLogo brandmark ladder (assets.brandmark options GONE; SA→API-key→token, BEM wire verified), reverse-DNS bundle ids (wizard-derived; playground → com.itwcreativeworks), `gcp` key, targets-last SSOT; Apple terms accepted → leg ran LIVE (bundle id CREATED + 2 profiles minted); mgr 655 / config 109 / corpus 1225 (1952448) → CHANGELOG
 - [x] Phases 0–2 + cp33–128 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning (116 site LIVE · 119 first full pipeline PASS · 121–123 seeds/brandmark/src-dist pillar/live-site gaps · 124–126 findings sweep + 2b mints + core graduations · 128 board-clear + sound root `npm test`) → CHANGELOG + git log
 
-*Last updated: 2026-07-16 (cp144: classy v2 DRAFT 1 in-repo + deployed — awaiting Ian's reaction; default-pages skin is next)*
+*Last updated: 2026-07-16 (cp146: default pages + blueprints skinned — auth/account/payment + dashboard/admin remake is next)*

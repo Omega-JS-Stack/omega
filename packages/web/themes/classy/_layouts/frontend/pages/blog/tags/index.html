@@ -8,26 +8,20 @@ hero:
   subheadline: "Browse posts by tag"
 ---
 
-<!-- Hero Section -->
-<section>
-  <div class="container">
-    <div class="row justify-content-center text-center">
-      <div class="col-lg-10" data-lazy="@class animation-slide-up">
-        <h1 class="h1 mb-3">
-          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
-        </h1>
-        {% iftruthy resolved.hero.subheadline %}
-          <p class="fs-5 text-muted">
-            {{ resolved.hero.subheadline }}
-          </p>
-        {% endiftruthy %}
-      </div>
-    </div>
+<!-- ═══ Page hero ═══ -->
+<section class="classy-page-hero classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+    {% endiftruthy %}
   </div>
 </section>
 
-<!-- Tags Cloud -->
-<section class="pt-4">
+<!-- ═══ Tag cloud ═══ -->
+<section class="pt-0">
   <div class="container">
     {% comment %} Build unique tags list with post counts {% endcomment %}
     {% assign tags = '' | split: ',' %}
@@ -53,14 +47,13 @@ hero:
       {% endfor %}
     {% endfor %}
 
-    <div class="row justify-content-center mb-5">
-      <div class="col-lg-10">
-        <div class="d-flex flex-wrap gap-2 justify-content-center" data-lazy="@class animation-slide-up">
+    <div class="row justify-content-center">
+      <div class="col-lg-10" data-omega-reveal>
+        <div class="classy-chip-cloud">
           {% for tag in tags %}
-            <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-adaptive px-3 py-2 d-inline-flex align-items-center gap-2">
-              {% uj_icon "tag", "fa-lg" %}
+            <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="classy-chip">
               {{ tag }}
-              <span class="badge bg-primary rounded-pill">{{ tag_counts[forloop.index0] }}</span>
+              <span class="text-muted">{{ tag_counts[forloop.index0] }}</span>
             </a>
           {% endfor %}
         </div>
@@ -69,13 +62,12 @@ hero:
 
     {% if tags.size == 0 %}
       <div class="row justify-content-center">
-        <div class="col-lg-6 text-center" data-lazy="@class animation-slide-up">
+        <div class="col-lg-6 text-center" data-omega-reveal>
           <div class="py-5">
-            {% uj_icon "tags", "fa-4xl text-muted mb-3" %}
-            <h2 class="h4 text-muted">No tags yet</h2>
+            <h2 class="h5">No tags yet</h2>
             <p class="text-muted">Check back soon for tagged content.</p>
-            <a href="{{ site.url }}/blog" class="btn btn-primary">
-              {% uj_icon "arrow-left", "me-2" %}
+            <a href="{{ site.url }}/blog" class="btn btn-adaptive">
+              {% uj_icon "arrow-left", "fa-sm me-2" %}
               Back to blog
             </a>
           </div>

@@ -15,16 +15,15 @@ author_section:
   author_position: "Marketing Manager"
 
 related_posts:
-  headline: "Related"
-  headline_accent: "posts"
+  superheadline: "Keep reading"
+  headline: "Related <em>posts</em>"
   limit: 3
 
 newsletter:
   superheadline:
     icon: "envelope"
     text: "Newsletter"
-  headline: "Stay in the"
-  headline_accent: "loop"
+  headline: "Stay in the loop"
   subheadline: "Join our newsletter and get resources, curated content, and inspiration delivered straight to your inbox."
   button:
     text: "Submit"
@@ -32,98 +31,95 @@ newsletter:
     placeholder: "jonsnow@gmail.com"
 ---
 
-<!-- Article Header & Content -->
-<article class="pt-10">
+<!-- ═══ Article ═══ -->
+<article class="classy-dotgrid">
   <div class="container">
     <div class="row justify-content-center mb-3">
       <div class="col-xl-8 col-lg-8 col-md-12 col-12">
-        <header class="text-center mb-5" data-lazy="@class animation-slide-up">
-          <h1 class="h1 fw-bold mb-0">{{ resolved.post.title }}</h1>
+        <header class="text-center mb-4" data-omega-reveal-stagger="80">
+          {% if resolved.post.categories[0] %}
+            <div class="mb-3" data-omega-reveal>
+              <a href="{{ site.url }}/blog/categories/{{ resolved.post.categories[0] | slugify }}" class="classy-chip classy-chip--accent text-decoration-none">
+                {{ resolved.post.categories[0] | uj_title_case }}
+              </a>
+            </div>
+          {% endif %}
+          <h1 class="classy-display classy-display--section mb-0" data-omega-reveal>{{ resolved.post.title }}</h1>
         </header>
 
         <!-- Author & Meta -->
-        <div class="d-flex justify-content-between align-items-center mb-5" data-lazy="@class animation-slide-up">
+        <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap mb-4" data-omega-reveal>
           <div class="d-flex align-items-center">
-            <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none me-2">
-              <div class="avatar avatar-md">
-                {%- uj_member resolved.post.author, "image-tag", class="rounded-circle" -%}
-              </div>
+            <a href="{%- uj_member resolved.post.author, "url" -%}" class="classy-post-card__avatar me-2">
+              {%- uj_member resolved.post.author, "image-tag", class="" -%}
             </a>
-            <div>
-              <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold d-block">
-                {%- uj_member resolved.post.author, "name" -%}
-              </a>
-              {% iftruthy resolved.author_section.author_position %}
-                <span class="text-muted small">{{ resolved.author_section.author_position }}</span>
-              {% endiftruthy %}
-            </div>
+            <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold small">
+              {%- uj_member resolved.post.author, "name" -%}
+            </a>
           </div>
-          <div class="d-flex flex-column align-items-end text-end gap-1">
-            <time datetime="{{ page.date | date_to_xmlschema }}" class="text-muted small d-block">
-              {{ page.date | date: "%b %d, %Y" }}
-            </time>
-            <div class="badge bg-primary">{% uj_readtime content %} min read</div>
-          </div>
+          <span class="text-muted small">·</span>
+          <time datetime="{{ page.date | date_to_xmlschema }}" class="text-muted small">
+            {{ page.date | date: "%b %d, %Y" }}
+          </time>
+          <span class="text-muted small">·</span>
+          <span class="text-muted small">{% uj_readtime content %} min read</span>
         </div>
       </div>
     </div>
 
     <div class="row justify-content-center">
-      <div class="col-xl-10 col-lg-10 col-md-12 col-12 mb-5" data-lazy="@class animation-slide-up">
-        {%- uj_post resolved.post.id, "image-tag", class="img-fluid rounded-3 w-100 blog-post-image" -%}
+      <div class="col-xl-10 col-lg-10 col-md-12 col-12 mb-5" data-omega-reveal>
+        {%- uj_post resolved.post.id, "image-tag", class="img-fluid w-100 blog-post-image hairline rounded-4" -%}
       </div>
     </div>
 
     <div class="row justify-content-center mb-3">
-      <div class="blog-post-content col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
+      <div class="blog-post-content classy-prose col-xl-8 col-lg-8 col-md-12 col-12">
         {{ content | uj_content_format }}
       </div>
     </div>
 
     <!-- Ad -->
     <div class="row justify-content-center mb-3">
-      <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
+      <div class="col-xl-8 col-lg-8 col-md-12 col-12">
         {% include modules/adunits/adsense.html type="in-article" %}
       </div>
     </div>
   </div>
 </article>
 
-<!-- Author & Comments -->
-<section>
+<!-- ═══ Tags, author & comments ═══ -->
+<section class="pt-0">
   <div class="container">
-    <hr class="my-5">
-
     <!-- Tags -->
-    <div class="row justify-content-center mb-4">
-      <div class="col-xl-8 col-lg-8 col-md-12 col-12 text-center" data-lazy="@class animation-slide-up">
-        {% assign tags = '' | split: ',' %}
-          {% for tag in resolved.post.tags %}
-            {% assign tag_fixed = tag | uj_title_case %}
-
-            {% unless tags contains tag_fixed %}
-              {% assign tags = tags | push: tag_fixed %}
-            {% endunless %}
-          {% endfor %}
-        {% for tag in tags %}
-          <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="btn btn-adaptive btn-sm px-2 py-1 mb-2" style="font-size: 0.75rem;">{% uj_icon "tag", "me-1" %}{{ tag }}</a>
-        {% endfor %}
+    {% assign tags = '' | split: ',' %}
+    {% for tag in resolved.post.tags %}
+      {% assign tag_fixed = tag | uj_title_case %}
+      {% unless tags contains tag_fixed %}
+        {% assign tags = tags | push: tag_fixed %}
+      {% endunless %}
+    {% endfor %}
+    {% if tags.size > 0 %}
+      <div class="row justify-content-center mb-5">
+        <div class="col-xl-8 col-lg-8 col-md-12 col-12">
+          <div class="classy-chip-cloud justify-content-start">
+            {% for tag in tags %}
+              <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="classy-chip">{{ tag }}</a>
+            {% endfor %}
+          </div>
+        </div>
       </div>
-    </div>
+    {% endif %}
 
-    <!-- Author -->
+    <!-- Author & share -->
     <div class="row justify-content-center mb-5">
-      <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center">
-          <div class="d-flex mb-3 mb-sm-0">
-            <div class="flex-shrink-0">
-              <a href="{% uj_member resolved.post.author, "url" %}">
-                <div class="avatar avatar-lg">
-                  {% uj_member resolved.post.author, "image-tag", class="rounded-circle" %}
-                </div>
-              </a>
-            </div>
-            <div class="ms-3">
+      <div class="col-xl-8 col-lg-8 col-md-12 col-12">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 py-4 hairline-top hairline-bottom">
+          <div class="d-flex align-items-center">
+            <a href="{% uj_member resolved.post.author, "url" %}" class="classy-person__avatar d-block me-3" style="width: 3rem; height: 3rem; margin-bottom: 0;">
+              {% uj_member resolved.post.author, "image-tag", class="w-100 h-100 object-fit-cover" %}
+            </a>
+            <div>
               <a href="{% uj_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
                 <div class="fw-semibold">
                   {%- uj_member resolved.post.author, "name" -%}
@@ -149,160 +145,70 @@ newsletter:
     </div>
 
     <!-- Comments -->
-    <div class="row justify-content-center mb-5">
-      <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
+    <div class="row justify-content-center">
+      <div class="col-xl-8 col-lg-8 col-md-12 col-12">
         {%- include modules/engagement/giscus.html -%}
       </div>
     </div>
   </div>
 </section>
 
-<!-- Related Posts -->
+<!-- ═══ Related posts ═══ -->
 <section class="pt-0">
   <div class="container">
-    <div class="row justify-content-center mb-3">
-      <div class="col-12">
-        <div class="mb-3 mb-sm-5 text-center" data-lazy="@class animation-slide-up">
-          {% iftruthy resolved.related_posts.superheadline %}
-            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-              {{ resolved.related_posts.superheadline }}
-            </span>
-          {% endiftruthy %}
-          {% iftruthy resolved.related_posts.headline %}
-            <h3 class="h2 mb-0">
-              {{ resolved.related_posts.headline }}{% iftruthy resolved.related_posts.headline_accent %} <span class="text-accent">{{ resolved.related_posts.headline_accent }}</span>{% endiftruthy %}
-            </h3>
-          {% endiftruthy %}
-        </div>
-        <div class="row g-4">
-          <!-- Loop through posts based on configured limit -->
-          {% assign count = 0 %}
-          {% assign limit = resolved.related_posts.limit | default: 3 %}
-          {% for post in site.posts %}
-            {% if count < limit %}
-              {% if post.id != resolved.post.id %}
-                {% assign count = count | plus: 1 %}
-                <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">
-                  <article class="card h-100 shadow-sm border-0 bg-body-tertiary">
-                    <!-- Image -->
-                    <div class="p-3 pb-0">
-                      <a href="{{ site.url }}{{ post.url }}" class="text-decoration-none">
-                        {%- uj_post post.post.id, "image-tag", class="img-fluid object-fit-cover blog-post-card-image rounded-3" -%}
-                      </a>
-                    </div>
-
-                    <!-- Card Body -->
-                    <div class="card-body d-flex flex-column">
-                      <!-- Category Badge -->
-                      {% if post.post.categories[0] %}
-                        <div class="mb-2">
-                          <a href="{{ site.url }}/blog/categories/{{ post.post.categories[0] | slugify }}" class="badge bg-primary-soft text-primary text-decoration-none">
-                            {{ post.post.categories[0] | uj_title_case }}
-                          </a>
-                        </div>
-                      {% endif %}
-
-                      <!-- Title -->
-                      <h3 class="h5 card-title mb-0">
-                        <a href="{{ site.url }}{{ post.url }}" class="text-decoration-none text-body">
-                          {{ post.post.title }}
-                        </a>
-                      </h3>
-                    </div>
-
-                    <!-- Card Footer -->
-                    <div class="card-footer bg-transparent border-0 pt-0 pb-3">
-                      <div class="d-flex align-items-center justify-content-between small">
-                        <!-- Left side: Author and Date -->
-                        <div class="d-flex align-items-center">
-                          <!-- Author Avatar -->
-                          <a href="{%- uj_member post.post.author, "url" -%}" class="text-decoration-none me-2 position-relative z-1">
-                            <div class="avatar avatar-md">
-                              {%- uj_member post.post.author, "image-tag", class="rounded-circle" -%}
-                            </div>
-                          </a>
-
-                          <!-- Author Name and Date stacked -->
-                          <div>
-                            <a href="{%- uj_member post.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold position-relative z-1 d-block">
-                              {%- uj_member post.post.author, "name" -%}
-                            </a>
-                            <time datetime="{{ post.date | date_to_xmlschema }}" class="text-muted">
-                              {{ post.date | date: "%b %d, %Y" }}
-                            </time>
-                          </div>
-                        </div>
-
-                        <!-- Right side: Read time -->
-                        <div class="text-muted">
-                          {% uj_readtime post.content %} min read
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                </div>
-              {% endif %}
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
+    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+      {% iftruthy resolved.related_posts.superheadline %}
+        <span class="classy-micro">{{ resolved.related_posts.superheadline }}</span>
+      {% endiftruthy %}
+      {% iftruthy resolved.related_posts.headline %}
+        <h2 class="classy-display classy-display--section">{{ resolved.related_posts.headline }}</h2>
+      {% endiftruthy %}
     </div>
 
+    <div class="row g-4" data-omega-reveal-stagger="60">
+      {% assign count = 0 %}
+      {% assign limit = resolved.related_posts.limit | default: 3 %}
+      {% for post in site.posts %}
+        {% if count < limit %}
+          {% if post.id != resolved.post.id %}
+            {% assign count = count | plus: 1 %}
+            <div class="col-xl-4 col-lg-6 col-md-12" data-omega-reveal>
+              {% include frontend/components/post-card.html post=post %}
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </div>
   </div>
 </section>
 
-<!-- Newsletter -->
-<section>
+<!-- ═══ Newsletter band ═══ -->
+<section class="pt-0">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-xl-8 col-lg-8 col-md-12 col-12">
-        <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
-          <!-- Decorative icon - top right -->
-          <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
-            {% uj_icon "comments", "text-white" %}
-          </div>
+        <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
+          {% iftruthy resolved.newsletter.superheadline.text %}
+            <span class="classy-micro d-block mb-3">{{ resolved.newsletter.superheadline.text }}</span>
+          {% endiftruthy %}
+          {% iftruthy resolved.newsletter.headline %}
+            <h2 class="classy-cta__headline">{{ resolved.newsletter.headline }}</h2>
+          {% endiftruthy %}
+          {% iftruthy resolved.newsletter.subheadline %}
+            <p class="classy-cta__sub">{{ resolved.newsletter.subheadline }}</p>
+          {% endiftruthy %}
 
-          <!-- Decorative icon - bottom left -->
-          <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
-            {% uj_icon "rss", "text-white" %}
-          </div>
-
-          <div class="position-relative">
-            {% iftruthy resolved.newsletter.superheadline.text %}
-              <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
-                {% iftruthy resolved.newsletter.superheadline.icon %}
-                  {% uj_icon resolved.newsletter.superheadline.icon, "me-1" %}
-                {% endiftruthy %}
-                {{ resolved.newsletter.superheadline.text }}
-              </span>
-            {% endiftruthy %}
-
-            {% iftruthy resolved.newsletter.headline %}
-              <h2 class="h3 fw-bold mb-3">
-                {{ resolved.newsletter.headline }}
-                {% iftruthy resolved.newsletter.headline_accent %}
-                  {{ resolved.newsletter.headline_accent }}
-                {% endiftruthy %}
-              </h2>
-            {% endiftruthy %}
-
-            {% iftruthy resolved.newsletter.subheadline %}
-              <p class="lead mb-4">{{ resolved.newsletter.subheadline }}</p>
-            {% endiftruthy %}
-
-            <form class="row g-3 justify-content-center needs-validation" action="{{ site.url }}/email-subscription">
-              <div class="col-md-7">
-                <label for="newsletter-email" class="visually-hidden">Email address</label>
-                <input type="email" name="email" id="newsletter-email" class="form-control form-control-lg" placeholder="{% iftruthy resolved.newsletter.form.placeholder %}{{ resolved.newsletter.form.placeholder }}{% endiftruthy %}" autocomplete="email" required>
-              </div>
-              <div class="col-md-auto">
-                <button type="submit" class="btn btn-light btn-lg px-4">{% iftruthy resolved.newsletter.button.text %}{{ resolved.newsletter.button.text }}{% endiftruthy %}</button>
-              </div>
-            </form>
-          </div>
+          <form class="row g-3 justify-content-center needs-validation mt-2" action="{{ site.url }}/email-subscription">
+            <div class="col-md-7">
+              <label for="newsletter-email" class="visually-hidden">Email address</label>
+              <input type="email" name="email" id="newsletter-email" class="form-control form-control-lg" placeholder="{% iftruthy resolved.newsletter.form.placeholder %}{{ resolved.newsletter.form.placeholder }}{% endiftruthy %}" autocomplete="email" required>
+            </div>
+            <div class="col-md-auto">
+              <button type="submit" class="btn btn-adaptive btn-lg px-4">{% iftruthy resolved.newsletter.button.text %}{{ resolved.newsletter.button.text }}{% endiftruthy %}</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
   </div>
 </section>
-

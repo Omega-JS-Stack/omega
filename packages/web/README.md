@@ -82,7 +82,14 @@ see the harness README for the honest before/after numbers.
   admin layouts, includes, css, js, vendored webfonts): warm-paper/charcoal
   token-driven skin, zero gradients, ink primaries, serif marketing display
   (Newsreader) over an Inter UI, `.omega-shell` app chrome — see
-  [docs/theming.md](../../docs/theming.md);
+  [docs/theming.md](../../docs/theming.md). Every default frontend page ships
+  in the v2 language (page-hero/prose/timeline/post-card/person/facts
+  vocabulary in `css/marketing/_content.scss`; the shared blog card is ONE
+  include, `_includes/frontend/components/post-card.html`). Per-page THEME
+  css lives at `css/pages/<page>/index.scss` — it loads LAST on its page
+  (after core page css), which makes it the override slot for core page rules
+  (status/feedback use this to repaint JS-toggled `bg-*` state classes in the
+  hairline language);
   `themes/neobrutalism/` and `themes/newsflash/` — partial themes that fall
   back to classy per file; `themes/bootstrap/` — the vendored Bootstrap 5
   scss/js the themes build on (sibling imports); `themes/_template/` — the
@@ -97,7 +104,9 @@ see the harness README for the honest before/after numbers.
   modules incl. the motion boot, libs, per-page modules), `icons/`.
 - `defaults/pages/**` — ~60 default pages at their real URLs (about, pricing,
   contact, auth, legal, payment, portal, team, updates, alternatives, admin,
-  test pages) + the blog set: paginated index (`/blog/page/N.html`, size 6),
+  test pages) + the blog set: paginated index (`/blog/page/N.html`, size 6;
+  `generatePageOnEmptyData` keeps `/blog` alive with an empty state for
+  post-less brands),
   category/tag index pages, and per-category/per-tag generator pages
   (pagination over the aggregated taxonomy — replaces dynamic-pages.rb) + the
   site meta-files (sitemap.xml, `/feeds/posts.{xml,json}` RSS + JSON feeds,

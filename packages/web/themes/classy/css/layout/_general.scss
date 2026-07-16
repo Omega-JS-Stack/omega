@@ -3,10 +3,12 @@
 // ============================================
 // Section rhythm
 // ============================================
-// Every frontend page is a stack of <section>s; the first one absorbs the
-// fixed-nav height so backgrounds run flush behind the transparent nav.
+// Every frontend page is a stack of <section>s (blog posts open with an
+// <article>); the first one absorbs the fixed-nav height so backgrounds run
+// flush behind the transparent nav.
 main {
-  > section {
+  > section,
+  > article {
     padding-top: 4rem;
     padding-bottom: 4rem;
 
@@ -15,7 +17,7 @@ main {
       padding-bottom: 5.5rem;
     }
 
-    &:first-of-type {
+    &:first-child {
       padding-top: 8.5rem; // 4rem nav clearance + section
 
       @media (min-width: 992px) {

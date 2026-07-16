@@ -96,20 +96,15 @@ cta:
     href: "/contact"
 ---
 
-<!-- Hero Section -->
-<section>
-  <div class="container">
-    <div class="row justify-content-center text-center">
-      <div class="col-lg-10" data-lazy="@class animation-slide-up">
-        <h1 class="h1 mb-3">
-          {{ resolved.hero.headline }}
-          <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
-        </h1>
-        <p class="fs-5 text-muted mb-0">
-          {{ resolved.hero.description }}
-        </p>
-      </div>
-    </div>
+<!-- ═══ Page hero ═══ -->
+<section class="classy-page-hero classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+    </h1>
+    {% iftruthy resolved.hero.description %}
+      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+    {% endiftruthy %}
   </div>
 </section>
 
@@ -119,7 +114,7 @@ cta:
     <!-- Browser Selector -->
     <div class="row justify-content-center mb-5">
       <div class="col-12">
-        <div class="d-flex flex-wrap justify-content-center gap-3" data-lazy="@class animation-slide-up">
+        <div class="d-flex flex-wrap justify-content-center gap-3" data-omega-reveal>
           <ul class="nav nav-pills gap-3 border-0 justify-content-center w-100" id="browser-selector" role="tablist">
             <!-- Loading tab (shown by default until browser is detected) -->
             <li class="nav-item d-none" role="presentation" data-browser="loading">
@@ -182,21 +177,21 @@ cta:
             aria-labelledby="loading-tab"
             tabindex="0"
           >
-            <div class="card border-0 shadow-lg">
-              <div class="card-body p-5 text-center">
+            <div class="card">
+              <div class="card-body p-4 p-md-5 text-center">
                 <div class="mb-4">
-                  <div class="avatar avatar-2xl rounded-circle bg-primary d-inline-flex align-items-center justify-content-center">
-                    <div class="spinner-border text-light" role="status">
+                  <span class="classy-icon-chip classy-icon-chip--neutral classy-icon-chip--lg">
+                    <div class="spinner-border spinner-border-sm" role="status">
                       <span class="visually-hidden">Loading...</span>
                     </div>
-                  </div>
+                  </span>
                 </div>
-                <h2 class="h2 mb-1">{{ resolved.downloads.loading.headline }}</h2>
-                <p class="text-muted fs-5 mb-4">{{ resolved.downloads.loading.description }}</p>
+                <h2 class="classy-display classy-display--section mb-1">{{ resolved.downloads.loading.headline }}</h2>
+                <p class="text-muted mb-4">{{ resolved.downloads.loading.description }}</p>
 
                 <div class="d-flex flex-column gap-3">
-                  <button type="button" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center" disabled>
-                    {% uj_icon "puzzle-piece", "fa-3xl me-2" %}
+                  <button type="button" class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center" disabled>
+                    {% uj_icon "puzzle-piece", "fa-sm me-2" %}
                     {{ resolved.downloads.loading.button_text }}
                   </button>
                 </div>
@@ -220,13 +215,13 @@ cta:
               data-browser="{{ browser.id }}"
               data-has-download="{% if has_download %}true{% else %}false{% endif %}"
             >
-              <div class="card border-0 shadow-lg">
-                <div class="card-body p-5 text-center">
+              <div class="card">
+                <div class="card-body p-4 p-md-5 text-center">
                   <div class="mb-4">
-                    <span class="avatar avatar-2xl">{% uj_logo browser.logo %}</span>
+                    <span class="avatar avatar-xl">{% uj_logo browser.logo %}</span>
                   </div>
-                  <h2 class="h2 mb-1">{{ browser.name }}</h2>
-                  <p class="text-muted fs-5 mb-4">{{ browser.description }}</p>
+                  <h2 class="classy-display classy-display--section mb-1">{{ browser.name }}</h2>
+                  <p class="text-muted mb-4">{{ browser.description }}</p>
 
                   {% unless has_download %}
                     <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
@@ -242,11 +237,11 @@ cta:
                     <div class="d-flex flex-column gap-3">
                       <a
                         href="{{ config_url }}"
-                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                        class="btn btn-adaptive btn-lg d-flex align-items-center justify-content-center"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {% uj_icon "puzzle-piece", "fa-3xl me-2" %}
+                        {% uj_icon "puzzle-piece", "fa-sm me-2" %}
                         Add to {{ browser.name }}
                       </a>
                     </div>
@@ -254,10 +249,10 @@ cta:
                     <div class="d-flex flex-column gap-3">
                       <button
                         type="button"
-                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center"
+                        class="btn btn-outline-adaptive btn-lg d-flex align-items-center justify-content-center"
                         disabled
                       >
-                        {% uj_icon "puzzle-piece", "fa-3xl me-2" %}
+                        {% uj_icon "puzzle-piece", "fa-sm me-2" %}
                         Coming soon
                       </button>
                     </div>
@@ -272,40 +267,33 @@ cta:
   </div>
 </section>
 
-<!-- Features Section -->
+<!-- ═══ Features ═══ -->
 <section>
   <div class="container">
-    <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
       {% iftruthy resolved.features.superheadline.text %}
-        <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-          {% iftruthy resolved.features.superheadline.icon %}
-            {% uj_icon resolved.features.superheadline.icon, "me-1" %}
-          {% endiftruthy %}
-          {{ resolved.features.superheadline.text }}
-        </span>
+        <span class="classy-micro">{{ resolved.features.superheadline.text }}</span>
       {% endiftruthy %}
-      <h2 class="h2 mb-2">
+      <h2 class="classy-display classy-display--section">
         {{ resolved.features.headline }}
         {% iftruthy resolved.features.headline_accent %}
-          <span class="text-accent">{{ resolved.features.headline_accent }}</span>
+          <em>{{ resolved.features.headline_accent }}</em>
         {% endiftruthy %}
       </h2>
       {% iftruthy resolved.features.subheadline %}
-        <p class="fs-5 text-muted">{{ resolved.features.subheadline }}</p>
+        <p>{{ resolved.features.subheadline }}</p>
       {% endiftruthy %}
     </div>
 
-    <div class="row g-4 justify-content-center">
+    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
       {% for feature in resolved.features.items %}
-        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
-          <div class="card h-100 border-0 shadow-sm text-center">
-            <div class="card-body p-4">
-              <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
-                {% uj_icon feature.icon, "text-light fs-2" %}
-              </div>
-              <h4 class="mb-3">{{ feature.title }}</h4>
-              <p class="text-muted mb-0">{{ feature.description }}</p>
+        <div class="col-lg-3 col-md-6" data-omega-reveal>
+          <div class="classy-tile h-100">
+            <div class="classy-tile__head">
+              <span class="classy-icon-chip">{% uj_icon feature.icon, "fa-sm" %}</span>
+              <span class="classy-tile__title">{{ feature.title }}</span>
             </div>
+            <p class="classy-tile__desc mb-0">{{ feature.description }}</p>
           </div>
         </div>
       {% endfor %}
@@ -318,36 +306,31 @@ cta:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+        <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
           {% iftruthy resolved.faqs.superheadline.text %}
-            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-              {% iftruthy resolved.faqs.superheadline.icon %}
-                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
-              {% endiftruthy %}
-              {{ resolved.faqs.superheadline.text }}
-            </span>
+            <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
           {% endiftruthy %}
-          <h2 class="h2 mb-2">
+          <h2 class="classy-display classy-display--section">
             {{ resolved.faqs.headline }}
             {% iftruthy resolved.faqs.headline_accent %}
-              <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
+              <em>{{ resolved.faqs.headline_accent }}</em>
             {% endiftruthy %}
           </h2>
           {% iftruthy resolved.faqs.subheadline %}
-            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+            <p>{{ resolved.faqs.subheadline }}</p>
           {% endiftruthy %}
         </div>
 
-        <div class="accordion" id="extensionFaqAccordion" data-lazy="@class animation-slide-up">
+        <div class="classy-faq accordion" id="extensionFaqAccordion" data-omega-reveal>
           {% for faq in resolved.faqs.items %}
-            <div class="accordion-item border-0 mb-3">
+            <div class="accordion-item">
               <h2 class="accordion-header">
-                <button class="accordion-button collapsed py-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
-                  <span class="fw-semibold">{{ faq.question }}</span>
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                  {{ faq.question }}
                 </button>
               </h2>
               <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#extensionFaqAccordion">
-                <div class="accordion-body text-muted shadow-sm">
+                <div class="accordion-body">
                   {{ faq.answer }}
                 </div>
               </div>
@@ -359,47 +342,27 @@ cta:
   </div>
 </section>
 
-<!-- CTA Section -->
+<!-- ═══ CTA band ═══ -->
 <section>
   <div class="container">
-    <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
-      <!-- Decorative icon - top right -->
-      <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
-        {% uj_icon "puzzle-piece", "text-white" %}
-      </div>
-
-      <!-- Decorative icon - bottom left -->
-      <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
-        {% uj_icon "shield-check", "text-white" %}
-      </div>
-
-      <div class="position-relative">
-        {% iftruthy resolved.cta.superheadline.text %}
-          <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
-            {% iftruthy resolved.cta.superheadline.icon %}
-              {% uj_icon resolved.cta.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
-            {{ resolved.cta.superheadline.text }}
-          </span>
+    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
+      {% iftruthy resolved.cta.superheadline.text %}
+        <span class="classy-micro d-block mb-3">{{ resolved.cta.superheadline.text }}</span>
+      {% endiftruthy %}
+      <h2 class="classy-cta__headline">
+        {{ resolved.cta.headline }}
+        {% iftruthy resolved.cta.headline_accent %}
+          <em>{{ resolved.cta.headline_accent }}</em>
         {% endiftruthy %}
-
-        <h2 class="h3 fw-bold mb-3">
-          {{ resolved.cta.headline }}
-          {% iftruthy resolved.cta.headline_accent %}
-            <span class="text-accent">{{ resolved.cta.headline_accent }}</span>
-          {% endiftruthy %}
-        </h2>
-
-        {% iftruthy resolved.cta.subheadline %}
-          <p class="lead mb-4">{{ resolved.cta.subheadline }}</p>
-        {% endiftruthy %}
-
-        <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-          <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-light btn-lg px-4">
-            {% uj_icon resolved.cta.primary_button.icon, "me-2" %}
-            {{ resolved.cta.primary_button.text }}
-          </a>
-        </div>
+      </h2>
+      {% iftruthy resolved.cta.subheadline %}
+        <p class="classy-cta__sub">{{ resolved.cta.subheadline }}</p>
+      {% endiftruthy %}
+      <div class="classy-cta__ctas">
+        <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+          {{ resolved.cta.primary_button.text }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
       </div>
     </div>
   </div>

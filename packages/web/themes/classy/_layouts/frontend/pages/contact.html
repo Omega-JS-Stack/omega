@@ -25,8 +25,7 @@ contact_form:
   superheadline:
     icon: "envelope"
     text: "Email"
-  headline: "Send us a"
-  headline_accent: "message"
+  headline: "Send us a <em>message</em>"
   subheadline: "Fill out the form below and we'll get back to you within 24 hours."
 
 # Stats Section
@@ -34,53 +33,23 @@ stats:
   items:
     - number: "<15m"
       label: "Response time"
-      icon: "clock"
-      color: "primary"
+      sublabel: "Median first reply"
     - number: "24/7"
       label: "Live chat support"
-      icon: "users"
-      color: "success"
+      sublabel: "Every day of the year"
     - number: "4.9"
       label: "Support rating"
-      icon: "star"
-      color: "warning"
+      sublabel: "Across review platforms"
     - number: "50+"
       label: "Languages"
-      icon: "globe"
-      color: "info"
-
-# Testimonials Section
-testimonials:
-  superheadline:
-    icon: "megaphone"
-    text: "Testimonials"
-  headline: "What our customers"
-  headline_accent: "say"
-  subheadline: "Hear from people who've experienced our support firsthand"
-  items:
-  - quote: "The support team responded within minutes and solved my issue perfectly!"
-    author: "Jessica Martinez"
-    role: "Marketing Manager"
-    company: "TechCorp"
-    initial: "J"
-  - quote: "Outstanding customer service. They went above and beyond to help me."
-    author: "David Thompson"
-    role: "Product Designer"
-    company: "StartupCo"
-    initial: "D"
-  - quote: "Quick, professional, and friendly. Exactly what you want in support."
-    author: "Lisa Chen"
-    role: "Developer"
-    company: "InnovateLab"
-    initial: "L"
+      sublabel: "Around the world"
 
 # FAQs Section
 faqs:
   superheadline:
     icon: "messages-question"
     text: "FAQs"
-  headline: "Frequently asked"
-  headline_accent: "questions"
+  headline: "Frequently asked <em>questions</em>"
   subheadline: "Everything you need to know about our support experience."
   items:
   - question: "How quickly do you respond to support requests?"
@@ -91,31 +60,23 @@ faqs:
     answer: "Absolutely! Our technical support team can help with API integration, troubleshooting, and custom implementations."
 ---
 
-<!-- Hero Section -->
-<section>
-  <div class="container">
-    <div class="row justify-content-center text-center">
-      <div class="col-lg-10" data-lazy="@class animation-slide-up">
-        <h1 class="h1 mb-3">
-          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
-        </h1>
-        {% iftruthy resolved.hero.subheadline %}
-          <p class="fs-5 text-muted">
-            {{ resolved.hero.subheadline }}
-          </p>
-        {% endiftruthy %}
-      </div>
-    </div>
+<!-- ═══ Page hero ═══ -->
+<section class="classy-page-hero classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+    {% endiftruthy %}
   </div>
 </section>
 
-<!-- Contact Methods Section -->
+<!-- ═══ Contact methods ═══ -->
 <section class="pt-0">
   <div class="container">
-    <div class="row g-4 justify-content-center">
+    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
       {% assign method_count = resolved.contact_methods | size %}
-
-      <!-- Determine column classes based on number of contact methods -->
       {% if method_count == 1 %}
         {% assign col_classes = "col-12 col-md-8 col-lg-6 col-xl-5" %}
       {% elsif method_count == 2 %}
@@ -124,23 +85,20 @@ faqs:
         {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
       {% elsif method_count == 4 %}
         {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-3" %}
-      {% elsif method_count == 5 %}
-        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
       {% else %}
-        <!-- Fallback for 6+ methods -->
-        {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3" %}
+        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
       {% endif %}
 
       {% for method in resolved.contact_methods %}
-        <div class="{{ col_classes }}">
-          <div class="card h-100 border-0 shadow-sm text-center" data-lazy="@class animation-slide-up">
-            <div class="card-body p-4">
-              <div class="bg-primary avatar avatar-xl rounded-circle d-inline-flex align-items-center justify-content-center mb-3">
-                {% uj_icon method.icon, "text-light fs-2" %}
-              </div>
-              <h4 class="mb-1">{{ method.title }}</h4>
-              <p class="text-muted mb-3">{{ method.description }}</p>
-              <a href="{{ method.link }}" class="btn btn-outline-primary">{{ method.value }}</a>
+        <div class="{{ col_classes }}" data-omega-reveal>
+          <div class="classy-tile h-100">
+            <div class="classy-tile__head">
+              <span class="classy-icon-chip">{% uj_icon method.icon, "fa-sm" %}</span>
+              <span class="classy-tile__title">{{ method.title }}</span>
+            </div>
+            <p class="classy-tile__desc">{{ method.description }}</p>
+            <div class="mt-auto">
+              <a href="{{ method.link }}" class="btn btn-outline-adaptive btn-sm">{{ method.value }}</a>
             </div>
           </div>
         </div>
@@ -149,30 +107,20 @@ faqs:
   </div>
 </section>
 
-<!-- Contact Form Section -->
-<section id="form">
+<!-- ═══ Contact form ═══ -->
+<section id="form" class="pt-0">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <div class="card border-0 shadow-lg" data-lazy="@class animation-slide-up">
-          <div class="card-body p-5">
-            <div class="text-center mb-4">
+        <div class="card" data-omega-reveal>
+          <div class="card-body p-4 p-md-5">
+            <div class="classy-section-head classy-section-head--center mb-4">
               {% iftruthy resolved.contact_form.superheadline.text %}
-                <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-                  {% iftruthy resolved.contact_form.superheadline.icon %}
-                    {% uj_icon resolved.contact_form.superheadline.icon, "me-1" %}
-                  {% endiftruthy %}
-                  {{ resolved.contact_form.superheadline.text }}
-                </span>
+                <span class="classy-micro">{{ resolved.contact_form.superheadline.text }}</span>
               {% endiftruthy %}
-              <h2 class="h3 mb-2">
-                {{ resolved.contact_form.headline }}
-                {% iftruthy resolved.contact_form.headline_accent %}
-                  <span class="text-accent">{{ resolved.contact_form.headline_accent }}</span>
-                {% endiftruthy %}
-              </h2>
+              <h2 class="classy-display classy-display--section">{{ resolved.contact_form.headline }}</h2>
               {% iftruthy resolved.contact_form.subheadline %}
-                <p class="text-muted">{{ resolved.contact_form.subheadline }}</p>
+                <p>{{ resolved.contact_form.subheadline }}</p>
               {% endiftruthy %}
             </div>
 
@@ -250,12 +198,11 @@ faqs:
               </div>
 
               <div class="d-grid gap-2 d-md-flex justify-content-md-between align-items-center">
-                <button type="submit" class="btn btn-primary btn-lg px-5">
-                  {% uj_icon "paper-plane", "me-2" %}
+                <button type="submit" class="btn btn-adaptive btn-lg px-5">
                   Send message
                 </button>
                 <a href="{{ site.url }}" class="btn btn-link">
-                  {% uj_icon "arrow-left", "me-1" %}
+                  {% uj_icon "arrow-left", "fa-sm me-1" %}
                   Back to home
                 </a>
               </div>
@@ -267,60 +214,49 @@ faqs:
   </div>
 </section>
 
-<!-- Stats Section -->
+<!-- ═══ Stats band ═══ -->
 <section>
   <div class="container">
-    <div class="row text-center g-4">
+    <div class="classy-stats" data-omega-reveal-stagger="80">
       {% for stat in resolved.stats.items %}
-        <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
-          <div class="mb-3">
-            {% capture uj_migrate_arg_1 %}text-{{ stat.color }} display-4{% endcapture %}
-            {% uj_icon stat.icon, uj_migrate_arg_1 %}
-          </div>
-          <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
-          <p class="text-muted mb-0">{{ stat.label }}</p>
+        <div class="classy-stat" data-omega-reveal>
+          <div class="classy-stat__num">{{ stat.number }}</div>
+          <div class="classy-stat__label">{{ stat.label }}</div>
+          {% iftruthy stat.sublabel %}
+            <div class="classy-stat__sub">{{ stat.sublabel }}</div>
+          {% endiftruthy %}
         </div>
       {% endfor %}
     </div>
   </div>
 </section>
 
-<!-- FAQ Section -->
+<!-- ═══ FAQ ═══ -->
 <section>
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+        <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
           {% iftruthy resolved.faqs.superheadline.text %}
-            <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-              {% iftruthy resolved.faqs.superheadline.icon %}
-                {% uj_icon resolved.faqs.superheadline.icon, "me-1" %}
-              {% endiftruthy %}
-              {{ resolved.faqs.superheadline.text }}
-            </span>
+            <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
           {% endiftruthy %}
-          <h2 class="display-5 fw-bold mb-2">
-            {{ resolved.faqs.headline }}
-            {% iftruthy resolved.faqs.headline_accent %}
-              <span class="text-accent">{{ resolved.faqs.headline_accent }}</span>
-            {% endiftruthy %}
-          </h2>
+          <h2 class="classy-display classy-display--section">{{ resolved.faqs.headline }}</h2>
           {% iftruthy resolved.faqs.subheadline %}
-            <p class="fs-5 text-muted">{{ resolved.faqs.subheadline }}</p>
+            <p>{{ resolved.faqs.subheadline }}</p>
           {% endiftruthy %}
         </div>
 
         {% if resolved.faqs.items %}
-          <div class="accordion" id="contactFaqAccordion">
+          <div class="classy-faq accordion" id="contactFaqAccordion" data-omega-reveal>
             {% for faq in resolved.faqs.items %}
-              <div class="accordion-item border-0 mb-3" data-lazy="@class animation-slide-up">
+              <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-4 shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#contactFaq{{ forloop.index }}" aria-expanded="false" aria-controls="contactFaq{{ forloop.index }}">
-                    <span class="fw-semibold">{{ faq.question }}</span>
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#contactFaq{{ forloop.index }}" aria-expanded="false" aria-controls="contactFaq{{ forloop.index }}">
+                    {{ faq.question }}
                   </button>
                 </h2>
                 <div id="contactFaq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#contactFaqAccordion">
-                  <div class="accordion-body text-muted shadow-sm">
+                  <div class="accordion-body">
                     {{ faq.answer }}
                   </div>
                 </div>

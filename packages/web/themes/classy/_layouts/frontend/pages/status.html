@@ -66,13 +66,12 @@ build_info:
 <section class="status-hero py-5">
   <div class="container">
     <div class="row justify-content-center text-center mb-4">
-      <div class="col-lg-10" data-lazy="@class animation-slide-up">
-        <h1 class="h1 mb-3">
-          {{ resolved.hero.headline }}
-          <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
+      <div class="col-lg-10 classy-page-hero" data-omega-reveal-stagger="90">
+        <h1 class="classy-display classy-display--page" data-omega-reveal>
+          {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
         </h1>
         {% iftruthy resolved.hero.subheadline %}
-          <p class="fs-5 text-muted mb-0">
+          <p class="classy-page-hero__sub" data-omega-reveal>
             {{ resolved.hero.subheadline }}
           </p>
         {% endiftruthy %}
@@ -82,13 +81,13 @@ build_info:
     <!-- Overall Status Banner -->
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <div id="status-banner" class="card border-0 shadow-lg status-banner bg-success" data-lazy="@class animation-slide-up">
+        <div id="status-banner" class="card status-banner bg-success" data-omega-reveal>
           <div class="card-body p-4">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
               <div class="d-flex align-items-center gap-3">
-                <div class="avatar avatar-md bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center status-indicator">
+                <span class="status-indicator d-inline-flex">
                   {% uj_icon "circle-check", "status-icon text-success fs-4" %}
-                </div>
+                </span>
                 <h2 id="status-text" class="h3 mb-0">{{ resolved.status.overall.operational }}</h2>
               </div>
               <div class="d-flex align-items-center gap-2 text-muted small">
@@ -110,7 +109,7 @@ build_info:
       <div class="col-lg-10">
         <div id="services-list">
           {% for service in resolved.status.services %}
-            <div class="service-item py-3 border-bottom {% if forloop.last %}border-bottom-0{% endif %}" data-service-id="{{ service.id }}" data-lazy="@class animation-slide-up">
+            <div class="service-item py-3 border-bottom {% if forloop.last %}border-bottom-0{% endif %}" data-service-id="{{ service.id }}" data-omega-reveal>
               <div class="d-flex align-items-center justify-content-between mb-2">
                 <div class="d-flex align-items-center gap-2">
                   <span class="service-status-dot" data-service-status="{{ service.id }}">
@@ -140,7 +139,7 @@ build_info:
         </div>
 
         <!-- Uptime Legend -->
-        <div class="mt-4 d-flex align-items-center justify-content-between flex-wrap gap-2 text-muted small" data-lazy="@class animation-slide-up">
+        <div class="mt-4 d-flex align-items-center justify-content-between flex-wrap gap-2 text-muted small" data-omega-reveal>
           <div class="d-flex align-items-center flex-wrap gap-2 gap-md-4">
             <div class="d-flex align-items-center gap-1">
               <div class="uptime-bar-legend rounded-1 bg-success"></div>
@@ -177,12 +176,12 @@ build_info:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <h2 class="h4 mb-4" data-lazy="@class animation-slide-up">{{ resolved.incidents.headline }}</h2>
+        <h2 class="classy-panel-head justify-content-start h5 mb-4" data-omega-reveal>{{ resolved.incidents.headline }}</h2>
 
-        <div id="incidents-list" data-lazy="@class animation-slide-up">
+        <div id="incidents-list" data-omega-reveal>
           <!-- Incident items will be populated by JavaScript -->
           <!-- If no incidents, show empty state -->
-          <div id="incidents-empty" class="card border-0 bg-body-tertiary">
+          <div id="incidents-empty" class="card">
             <div class="card-body p-4 text-center text-muted">
               {% uj_icon "circle-check", "fs-1 mb-3 text-success opacity-75" %}
               <p class="mb-0">{{ resolved.incidents.empty_message }}</p>
@@ -191,7 +190,7 @@ build_info:
         </div>
 
         {% iftruthy resolved.incidents.history_url %}
-          <div class="mt-4" data-lazy="@class animation-slide-up">
+          <div class="mt-4" data-omega-reveal>
             <a href="{{ resolved.incidents.history_url }}" class="text-decoration-none">
               {{ resolved.incidents.show_history_link }}
               {% uj_icon "arrow-right", "ms-1" %}
@@ -208,12 +207,12 @@ build_info:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <h2 class="h4 mb-4" data-lazy="@class animation-slide-up">{{ resolved.maintenance.headline }}</h2>
+        <h2 class="classy-panel-head justify-content-start h5 mb-4" data-omega-reveal>{{ resolved.maintenance.headline }}</h2>
 
-        <div id="maintenance-list" data-lazy="@class animation-slide-up">
+        <div id="maintenance-list" data-omega-reveal>
           <!-- Maintenance items will be populated by JavaScript -->
           <!-- If no maintenance scheduled, show empty state -->
-          <div id="maintenance-empty" class="card border-0 bg-body-tertiary">
+          <div id="maintenance-empty" class="card">
             <div class="card-body p-4 text-center text-muted">
               {% uj_icon "calendar-check", "fs-1 mb-3 opacity-50" %}
               <p class="mb-0">{{ resolved.maintenance.empty_message }}</p>
@@ -230,22 +229,17 @@ build_info:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <div class="card border-0 bg-body-tertiary" data-lazy="@class animation-slide-up">
+        <div class="card" data-omega-reveal>
           <div class="card-body p-4">
             <div class="row align-items-center">
               <div class="col-lg-7 mb-3 mb-lg-0">
                 {% iftruthy resolved.updates.superheadline.text %}
-                  <span class="badge bg-primary bg-opacity-10 text-primary p-2 mb-2 fw-semibold small">
-                    {% iftruthy resolved.updates.superheadline.icon %}
-                      {% uj_icon resolved.updates.superheadline.icon, "me-1" %}
-                    {% endiftruthy %}
-                    {{ resolved.updates.superheadline.text }}
-                  </span>
+                  <span class="classy-micro d-block mb-2">{{ resolved.updates.superheadline.text }}</span>
                 {% endiftruthy %}
-                <h3 class="h4 mb-1">
+                <h3 class="h5 mb-1">
                   {{ resolved.updates.headline }}
                   {% iftruthy resolved.updates.headline_accent %}
-                    <span class="text-accent">{{ resolved.updates.headline_accent }}</span>
+                    <em class="text-marketing">{{ resolved.updates.headline_accent }}</em>
                   {% endiftruthy %}
                 </h3>
                 {% iftruthy resolved.updates.subheadline %}
@@ -263,8 +257,7 @@ build_info:
                     autocomplete="email"
                     required
                   >
-                  <button type="submit" class="btn btn-primary text-nowrap flex-shrink-0">
-                    {% uj_icon resolved.updates.button.icon, "me-2" %}
+                  <button type="submit" class="btn btn-adaptive text-nowrap flex-shrink-0">
                     <span class="button-text">{{ resolved.updates.button.text }}</span>
                   </button>
                 </form>
@@ -282,9 +275,9 @@ build_info:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <h2 class="h4 mb-4" data-lazy="@class animation-slide-up">{{ resolved.build_info.headline }}</h2>
+        <h2 class="classy-panel-head justify-content-start h5 mb-4" data-omega-reveal>{{ resolved.build_info.headline }}</h2>
 
-        <div id="build-info" class="card border-0 bg-body-tertiary" data-lazy="@class animation-slide-up">
+        <div id="build-info" class="card" data-omega-reveal>
           <div class="card-body p-4">
             <!-- Loading state -->
             <div id="build-info-loading" class="text-center text-muted py-3">
@@ -300,9 +293,9 @@ build_info:
                 <!-- Build Time -->
                 <div class="col-md-6">
                   <div class="d-flex align-items-start gap-3">
-                    <div class="avatar avatar-sm bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
-                      {% uj_icon "clock", "text-primary" %}
-                    </div>
+                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                      {% uj_icon "clock", "fa-sm" %}
+                    </span>
                     <div>
                       <div class="text-muted small mb-1">Last build</div>
                       <div class="fw-semibold"><span id="build-time">—</span> <span id="build-time-ago" class="text-muted small ms-1"></span></div>
@@ -313,9 +306,9 @@ build_info:
                 <!-- Environment -->
                 <div class="col-md-6">
                   <div class="d-flex align-items-start gap-3">
-                    <div class="avatar avatar-sm bg-info bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
-                      {% uj_icon "server", "text-info" %}
-                    </div>
+                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                      {% uj_icon "server", "fa-sm" %}
+                    </span>
                     <div>
                       <div class="text-muted small mb-1">Environment</div>
                       <div id="build-environment" class="fw-semibold">—</div>
@@ -326,9 +319,9 @@ build_info:
                 <!-- Packages -->
                 <div class="col-12">
                   <div class="d-flex align-items-start gap-3">
-                    <div class="avatar avatar-sm bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
-                      {% uj_icon "box", "text-success" %}
-                    </div>
+                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                      {% uj_icon "box", "fa-sm" %}
+                    </span>
                     <div class="flex-grow-1">
                       <div class="text-muted small mb-2">Package versions</div>
                       <div id="build-packages" class="d-flex flex-wrap gap-2">
@@ -341,9 +334,9 @@ build_info:
                 <!-- Repository -->
                 <div class="col-12">
                   <div class="d-flex align-items-start gap-3">
-                    <div class="avatar avatar-sm bg-secondary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
-                      {% uj_icon "code-branch", "text-secondary" %}
-                    </div>
+                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                      {% uj_icon "code-branch", "fa-sm" %}
+                    </span>
                     <div>
                       <div class="text-muted small mb-1">Repository</div>
                       <div id="build-repo" class="fw-semibold">—</div>
@@ -370,7 +363,7 @@ build_info:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-        <div class="d-flex justify-content-center align-items-center gap-3 text-muted small flex-wrap" data-lazy="@class animation-slide-up">
+        <div class="d-flex justify-content-center align-items-center gap-3 text-muted small flex-wrap" data-omega-reveal>
           <a href="/updates" class="text-decoration-none">
             {% uj_icon "rocket", "me-1" %}
             View updates

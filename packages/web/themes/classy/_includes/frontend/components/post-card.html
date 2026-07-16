@@ -1,0 +1,41 @@
+{% comment %}
+  Classy v2 post card — the shared blog grid unit (index, related posts,
+  category and tag pages all render the SAME card). Usage:
+    {% include frontend/components/post-card.html post=post %}
+  where post is a posts-collection item (post.url, post.date, post.content,
+  post.post.{id,title,author,categories}).
+{% endcomment %}
+{% assign _p = include.post %}
+<article class="classy-post-card">
+  <a href="{{ site.url }}{{ _p.url }}" class="classy-post-card__media">
+    {%- uj_post _p.post.id, "image-tag", class="" -%}
+  </a>
+
+  <div class="classy-post-card__body">
+    {% if _p.post.categories[0] %}
+      <div>
+        <a href="{{ site.url }}/blog/categories/{{ _p.post.categories[0] | slugify }}" class="classy-chip classy-chip--accent text-decoration-none">
+          {{ _p.post.categories[0] | uj_title_case }}
+        </a>
+      </div>
+    {% endif %}
+
+    <h3 class="classy-post-card__title">
+      <a href="{{ site.url }}{{ _p.url }}">{{ _p.post.title }}</a>
+    </h3>
+
+    <div class="classy-post-card__meta">
+      <a href="{%- uj_member _p.post.author, "url" -%}" class="classy-post-card__avatar">
+        {%- uj_member _p.post.author, "image-tag", class="" -%}
+      </a>
+      <a href="{%- uj_member _p.post.author, "url" -%}">
+        {%- uj_member _p.post.author, "name" -%}
+      </a>
+      <span class="ms-auto d-inline-flex align-items-center gap-2">
+        <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
+        <span>·</span>
+        <span>{% uj_readtime _p.content %} min</span>
+      </span>
+    </div>
+  </div>
+</article>

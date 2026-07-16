@@ -12,8 +12,7 @@ feedback_form:
   superheadline:
     icon: "face-smile"
     text: "Your experience"
-  headline: "How would you rate"
-  headline_accent: "{{ site.brand.name }}?"
+  headline: "How would you rate <em>{{ site.brand.name }}</em>?"
   subheadline: "Select a rating and let us know what you think."
   ratings:
     - id: "dislike"
@@ -37,48 +36,32 @@ prerender_icons:
   - name: "check"
 ---
 
-<!-- Hero Section -->
-<section>
-  <div class="container">
-    <div class="row justify-content-center text-center">
-      <div class="col-lg-8" data-lazy="@class animation-slide-up">
-        <h1 class="h1 mb-3">
-          {{ resolved.hero.headline }} <span class="text-gradient-rainbow">{{ resolved.hero.headline_accent }}</span>
-        </h1>
-        {% iftruthy resolved.hero.subheadline %}
-          <p class="fs-5 text-muted">
-            {{ resolved.hero.subheadline }}
-          </p>
-        {% endiftruthy %}
-      </div>
-    </div>
+<!-- ═══ Page hero ═══ -->
+<section class="classy-page-hero classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+    {% endiftruthy %}
   </div>
 </section>
 
-<!-- Feedback Form Section -->
+<!-- ═══ Feedback form ═══ -->
 <section class="pt-0">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        <div class="card border-0 shadow-lg" data-lazy="@class animation-slide-up">
-          <div class="card-body p-5">
-            <div class="text-center mb-4">
+        <div class="card" data-omega-reveal>
+          <div class="card-body p-4 p-md-5">
+            <div class="classy-section-head classy-section-head--center mb-4">
               {% iftruthy resolved.feedback_form.superheadline.text %}
-                <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-                  {% iftruthy resolved.feedback_form.superheadline.icon %}
-                    {% uj_icon resolved.feedback_form.superheadline.icon, "me-1" %}
-                  {% endiftruthy %}
-                  {{ resolved.feedback_form.superheadline.text }}
-                </span>
+                <span class="classy-micro">{{ resolved.feedback_form.superheadline.text }}</span>
               {% endiftruthy %}
-              <h2 class="h3 mb-2">
-                {{ resolved.feedback_form.headline }}
-                {% iftruthy resolved.feedback_form.headline_accent %}
-                  <span class="text-accent">{{ resolved.feedback_form.headline_accent }}</span>
-                {% endiftruthy %}
-              </h2>
+              <h2 class="classy-display classy-display--section">{{ resolved.feedback_form.headline }}</h2>
               {% iftruthy resolved.feedback_form.subheadline %}
-                <p class="text-muted">{{ resolved.feedback_form.subheadline }}</p>
+                <p>{{ resolved.feedback_form.subheadline }}</p>
               {% endiftruthy %}
             </div>
 
@@ -89,9 +72,9 @@ prerender_icons:
                 <div class="row g-3 justify-content-center">
                   {% for rating in resolved.feedback_form.ratings %}
                     <div class="col-6 col-sm-3">
-                      <button type="button" class="feedback-rating-btn w-100 border rounded-3 bg-body text-center" data-rating="{{ rating.id }}">
+                      <button type="button" class="feedback-rating-btn w-100 text-center" data-rating="{{ rating.id }}">
                         <img src="{{ rating.image | uj_cachebreak }}" alt="{{ rating.label }}" class="feedback-rating-img mb-2" width="64" height="64" loading="eager">
-                        <span class="d-block small fw-semibold text-muted">{{ rating.label }}</span>
+                        <span class="d-block small fw-semibold">{{ rating.label }}</span>
                       </button>
                     </div>
                   {% endfor %}
@@ -111,7 +94,6 @@ prerender_icons:
               <!-- Positive feedback? -->
               <div class="mb-4">
                 <label for="feedback-positive" class="form-label fw-semibold">
-                  {% uj_icon "thumbs-up", "me-1 text-success" %}
                   What do you like about {{ site.brand.name }}?
                 </label>
                 <textarea class="form-control form-control-lg" id="feedback-positive" name="positive" rows="2"
@@ -122,7 +104,6 @@ prerender_icons:
               <!-- Negative feedback? -->
               <div class="mb-4">
                 <label for="feedback-negative" class="form-label fw-semibold">
-                  {% uj_icon "thumbs-down", "me-1 text-danger" %}
                   What could we improve?
                 </label>
                 <textarea class="form-control form-control-lg" id="feedback-negative" name="negative" rows="2"
@@ -133,7 +114,6 @@ prerender_icons:
               <!-- Additional Comments -->
               <div class="mb-4">
                 <label for="feedback-comments" class="form-label fw-semibold">
-                  {% uj_icon "message-lines", "me-1 text-info" %}
                   Additional comments
                 </label>
                 <textarea class="form-control form-control-lg" id="feedback-comments" name="comments" rows="3"
@@ -143,8 +123,7 @@ prerender_icons:
 
               <!-- Submit -->
               <div class="d-grid">
-                <button type="submit" class="btn btn-primary btn-lg">
-                  {% uj_icon "paper-plane", "me-2" %}
+                <button type="submit" class="btn btn-adaptive btn-lg">
                   Submit feedback
                 </button>
               </div>
@@ -159,12 +138,12 @@ prerender_icons:
 <!-- Review Prompt Modal -->
 <div class="modal fade" id="review-modal" tabindex="-1" aria-labelledby="review-modal-label" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg">
-      <div class="modal-body text-center p-5">
+    <div class="modal-content">
+      <div class="modal-body text-center p-4 p-md-5">
         <div class="mb-4">
-          <img src="{{ 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/love.png' | uj_cachebreak }}" alt="Thank you" width="80" height="80">
+          <img src="{{ 'https://cdn.itwcreativeworks.com/assets/general/images/feedback/love.png' | uj_cachebreak }}" alt="Thank you" width="72" height="72">
         </div>
-        <h3 class="mb-3" id="review-modal-label">You're awesome!</h3>
+        <h3 class="classy-display classy-display--section mb-3" id="review-modal-label">You're <em>awesome</em>!</h3>
         <p class="text-muted mb-3">
           We're so glad you love {{ site.brand.name }}! Share your experience on a review site to be entered to win a $100 gift card.
         </p>
@@ -176,21 +155,20 @@ prerender_icons:
         <!-- Copy-paste feedback -->
         <div class="text-start mb-4">
           <label class="form-label fw-semibold small text-muted">
-            {% uj_icon "copy", "me-1" %}
             Your feedback (copy and paste into your review)
           </label>
           <div class="position-relative">
-            <textarea id="review-modal-feedback" class="form-control bg-body-tertiary" rows="4" readonly></textarea>
-            <button type="button" id="review-modal-copy" class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2">
-              {% uj_icon "copy", "me-1" %}
+            <textarea id="review-modal-feedback" class="form-control" rows="4" readonly></textarea>
+            <button type="button" id="review-modal-copy" class="btn btn-sm btn-adaptive position-absolute top-0 end-0 m-2">
+              {% uj_icon "copy", "fa-sm me-1" %}
               Copy
             </button>
           </div>
         </div>
 
-        <a id="review-modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg mb-3">
-          {% uj_icon "arrow-up-right-from-square", "me-2" %}
+        <a id="review-modal-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-adaptive btn-lg mb-3">
           Post your review
+          {% uj_icon "arrow-up-right-from-square", "fa-sm ms-2" %}
         </a>
         <div>
           <button type="button" class="btn btn-link text-muted" data-bs-dismiss="modal">Maybe later</button>

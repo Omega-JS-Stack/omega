@@ -35,8 +35,10 @@
 @import 'css/marketing/hero';
 @import 'css/marketing/bento';
 @import 'css/marketing/sections';
+@import 'css/marketing/content';
 
-// Pages
+// Pages (main-bundle partials; per-page THEME css lives at css/pages/<page>/index.scss
+// and loads LAST on its page — that's the slot that outranks core page css)
 @import 'css/pages/auth';
 
 // Universal Bootstrap overrides (shared across all UJ themes)

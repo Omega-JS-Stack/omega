@@ -1,11 +1,6 @@
 ---
 layout: frontend/core/base
 
-#### THEME CONFIG ####
-theme:
-  main:
-    class: "pt-0"
-
 # Alternative page defaults - shared content lives here so competitor pages only need competitor-specific data
 alternative:
   competitor:
@@ -18,14 +13,10 @@ alternative:
     description: "Looking for a {{ resolved.alternative.competitor.name }} alternative? See why thousands of users choose {{ site.brand.name }} for a faster, more powerful experience."
     primary_button:
       text: "Try free for 14 days"
-      icon: "rocket"
       href: "/pricing"
-      class: "btn-light"
     secondary_button:
       text: "See all features"
-      icon: "list-check"
       href: "/pricing"
-      class: "btn-outline-light"
   comparison:
     superheadline:
       icon: "scale-balanced"
@@ -63,21 +54,21 @@ alternative:
     superheadline:
       icon: "megaphone"
       text: "Testimonials"
-    headline: "People {% uj_icon \"heart\", \"text-danger\" %} "
+    headline: "People love"
     headline_accent: "{{ site.brand.name }}"
     subheadline: "Hear from real users who made the switch"
     items:
-      - quote: "We made the switch and the difference is night and day. Everything just works faster."
+      - quote: "We made the switch and the difference is <em>night and day</em>. Everything just works faster."
         author: "Sarah Johnson"
         role: "Product Manager"
         company: "TechStart Inc"
         initial: "S"
-      - quote: "The AI features alone justified the switch. We're saving 10+ hours per week on repetitive tasks."
+      - quote: "The AI features alone justified the switch. We're saving <em>10+ hours per week</em> on repetitive tasks."
         author: "Michael Chen"
         role: "CTO"
         company: "DataFlow"
         initial: "M"
-      - quote: "The support team responds within minutes. It's refreshing to work with a company that actually cares."
+      - quote: "The support team responds within minutes. It's refreshing to work with a company that <em>actually cares</em>."
         author: "Emily Davis"
         role: "Operations Director"
         company: "Creative Studio"
@@ -86,23 +77,15 @@ alternative:
     - number: "50,000+"
       label: "Active users"
       sublabel: "From 120+ countries"
-      icon: "users"
-      color: "primary"
     - number: "4.9"
       label: "Average rating"
-      icon: "star"
-      color: "warning"
-      show_stars: true
+      sublabel: "Across review platforms"
     - number: "99.99%"
       label: "Uptime"
       sublabel: "Enterprise-grade"
-      icon: "shield-check"
-      color: "success"
     - number: "24/7"
       label: "Support"
       sublabel: "Real humans"
-      icon: "headset"
-      color: "info"
   faqs:
     superheadline:
       icon: "messages-question"
@@ -123,7 +106,6 @@ alternative:
         answer: "Yes, you can cancel your subscription at any time with no questions asked. We also offer a 30-day money-back guarantee."
   section_cta:
     text: "Get started free"
-    icon: "rocket"
     href: "/pricing"
   cta:
     superheadline:
@@ -134,120 +116,105 @@ alternative:
     description: "Join thousands who chose {{ site.brand.name }}. Start your free trial today — no credit card required."
     primary_button:
       text: "Start free trial"
-      icon: "rocket"
       href: "/pricing"
     secondary_button:
       text: "Talk to sales"
-      icon: "comments"
       href: "/contact"
 ---
 
 {% assign alt = resolved.alternative %}
 
-<!-- Hero Section -->
-<section class="bg-gradient-rainbow gradient-animated gradient-grain text-light overflow-hidden position-relative min-vh-80 d-flex align-items-center rounded-bottom-4 shadow-lg" data-competitor-name="{{ alt.competitor.name }}">
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-lg-10 text-center py-5">
-        <div data-lazy="@class animation-slide-up">
-          {% iftruthy alt.hero.tagline %}
-            <p class="text-uppercase fw-semibold mb-3 opacity-80">{{ alt.hero.tagline | uj_liquify }}</p>
-          {% endiftruthy %}
+{% capture section_cta_block %}
+  {% iftruthy alt.section_cta.text %}
+    <div class="text-center mt-5" data-omega-reveal>
+      <a href="{{ alt.section_cta.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+        {{ alt.section_cta.text }}
+        <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+      </a>
+    </div>
+  {% endiftruthy %}
+{% endcapture %}
 
-          <h1 class="display-3 fw-900 mb-4">
-            {{ alt.hero.headline | uj_liquify }} <span class="text-accent">{{ alt.hero.headline_accent | uj_liquify }}</span>
-          </h1>
-
-          {% iftruthy alt.hero.description %}
-            <p class="fs-4 mb-4 opacity-80">{{ alt.hero.description | uj_liquify }}</p>
-          {% endiftruthy %}
-
-          {% assign primary_btn_class = alt.hero.primary_button.class | default: "btn-light" %}
-          {% assign secondary_btn_class = alt.hero.secondary_button.class | default: "btn-outline-light" %}
-          <div class="d-flex flex-row flex-wrap gap-3 justify-content-center">
-            {% iftruthy alt.hero.primary_button.text %}
-              <a href="{{ alt.hero.primary_button.href }}" class="btn {{ primary_btn_class }} btn-lg py-3 px-5">
-                {% iftruthy alt.hero.primary_button.icon %}
-                  {% uj_icon alt.hero.primary_button.icon, "me-2" %}
-                {% endiftruthy %}
-                {{ alt.hero.primary_button.text }}
-              </a>
-            {% endiftruthy %}
-            {% iftruthy alt.hero.secondary_button.text %}
-              <a href="{{ alt.hero.secondary_button.href }}" class="btn {{ secondary_btn_class }} btn-lg py-3 px-5">
-                {% iftruthy alt.hero.secondary_button.icon %}
-                  {% uj_icon alt.hero.secondary_button.icon, "me-2" %}
-                {% endiftruthy %}
-                {{ alt.hero.secondary_button.text }}
-              </a>
-            {% endiftruthy %}
-          </div>
-        </div>
-      </div>
+<!-- ═══ Page hero ═══ -->
+<section class="classy-page-hero classy-dotgrid" data-competitor-name="{{ alt.competitor.name }}">
+  <div class="container" data-omega-reveal-stagger="90">
+    {% iftruthy alt.hero.tagline %}
+      <span class="classy-micro" data-omega-reveal>{{ alt.hero.tagline | uj_liquify }}</span>
+    {% endiftruthy %}
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ alt.hero.headline | uj_liquify }} <em>{{ alt.hero.headline_accent | uj_liquify }}</em>
+    </h1>
+    {% iftruthy alt.hero.description %}
+      <p class="classy-page-hero__sub" data-omega-reveal>{{ alt.hero.description | uj_liquify }}</p>
+    {% endiftruthy %}
+    <div class="classy-page-hero__actions" data-omega-reveal>
+      {% iftruthy alt.hero.primary_button.text %}
+        <a href="{{ alt.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+          {{ alt.hero.primary_button.text }}
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      {% endiftruthy %}
+      {% iftruthy alt.hero.secondary_button.text %}
+        <a href="{{ alt.hero.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+          {{ alt.hero.secondary_button.text }}
+        </a>
+      {% endiftruthy %}
     </div>
   </div>
 </section>
 
-<!-- Comparison Table Section -->
+<!-- ═══ Comparison table ═══ -->
 {% assign comparison_features = alt.comparison.features %}
 {% assign comparison_size = comparison_features | size %}
 {% if comparison_size > 0 %}
-  <section>
+  <section class="pt-0">
     <div class="container">
-      <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
         {% iftruthy alt.comparison.superheadline.text %}
-          <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-            {% iftruthy alt.comparison.superheadline.icon %}
-              {% uj_icon alt.comparison.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
-            {{ alt.comparison.superheadline.text }}
-          </span>
+          <span class="classy-micro">{{ alt.comparison.superheadline.text }}</span>
         {% endiftruthy %}
-        <h2 class="h2 mb-2">
+        <h2 class="classy-display classy-display--section">
           {{ alt.comparison.headline | uj_liquify }}
           {% iftruthy alt.comparison.headline_accent %}
-            <span class="text-accent">{{ alt.comparison.headline_accent | uj_liquify }}</span>
+            <em>{{ alt.comparison.headline_accent | uj_liquify }}</em>
           {% endiftruthy %}
         </h2>
         {% iftruthy alt.comparison.subheadline %}
-          <p class="fs-5 text-muted">{{ alt.comparison.subheadline | uj_liquify }}</p>
+          <p>{{ alt.comparison.subheadline | uj_liquify }}</p>
         {% endiftruthy %}
       </div>
 
       <div class="row justify-content-center">
         <div class="col-lg-10">
-          <div class="table-responsive" data-lazy="@class animation-slide-up">
+          <div class="classy-compare table-responsive" data-omega-reveal>
             <table class="table table-hover align-middle">
               <thead>
                 <tr>
-                  <th scope="col" class="border-0 w-40">Feature</th>
-                  <th scope="col" class="border-0 text-center fw-bold">{{ site.brand.name }}</th>
-                  <th scope="col" class="border-0 text-center text-muted">{{ alt.competitor.name }}</th>
+                  <th scope="col" class="w-40">Feature</th>
+                  <th scope="col" class="text-center">{{ site.brand.name }}</th>
+                  <th scope="col" class="text-center">{{ alt.competitor.name }}</th>
                 </tr>
               </thead>
               <tbody>
                 {% for feature in comparison_features %}
                   <tr>
-                    <td class="fw-semibold">
-                      {% iftruthy feature.icon %}
-                        {% uj_icon feature.icon, "fa-md me-2 text-muted" %}
-                      {% endiftruthy %}
+                    <th scope="row">
                       {{ feature.name }}
-                    </td>
+                    </th>
                     <td class="text-center">
                       {% if feature.ours.value == true %}
-                        {% uj_icon "circle-check", "text-success fs-4" %}
+                        {% uj_icon "circle-check", "text-success" %}
                       {% elsif feature.ours.value == false %}
-                        {% uj_icon "circle-xmark", "text-muted fs-4 opacity-25" %}
+                        {% uj_icon "circle-xmark", "text-muted opacity-25" %}
                       {% else %}
-                        <span class="fw-semibold">{{ feature.ours.value }}</span>
+                        <span class="fw-semibold text-adaptive">{{ feature.ours.value }}</span>
                       {% endif %}
                     </td>
                     <td class="text-center">
                       {% if feature.theirs.value == true %}
-                        {% uj_icon "circle-check", "text-success fs-4" %}
+                        {% uj_icon "circle-check", "text-success" %}
                       {% elsif feature.theirs.value == false %}
-                        {% uj_icon "circle-xmark", "text-muted fs-4 opacity-25" %}
+                        {% uj_icon "circle-xmark", "text-muted opacity-25" %}
                       {% else %}
                         <span class="text-muted">{{ feature.theirs.value }}</span>
                       {% endif %}
@@ -260,43 +227,29 @@ alternative:
         </div>
       </div>
 
-      {% iftruthy alt.section_cta.text %}
-        <div class="text-center mt-5" data-lazy="@class animation-slide-up">
-          <a href="{{ alt.section_cta.href }}" class="btn btn-primary btn-lg px-5">
-            {% iftruthy alt.section_cta.icon %}
-              {% uj_icon alt.section_cta.icon, "me-2" %}
-            {% endiftruthy %}
-            {{ alt.section_cta.text }}
-          </a>
-        </div>
-      {% endiftruthy %}
+      {{ section_cta_block }}
     </div>
   </section>
 {% endif %}
 
-<!-- Why switch Section -->
+<!-- ═══ Why switch ═══ -->
 {% assign why_switch_items = alt.why_switch.items %}
 {% assign why_switch_size = why_switch_items | size %}
 {% if why_switch_size > 0 %}
-  <section class="bg-body-secondary rounded-4">
+  <section>
     <div class="container">
-      <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
         {% iftruthy alt.why_switch.superheadline.text %}
-          <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-            {% iftruthy alt.why_switch.superheadline.icon %}
-              {% uj_icon alt.why_switch.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
-            {{ alt.why_switch.superheadline.text }}
-          </span>
+          <span class="classy-micro">{{ alt.why_switch.superheadline.text }}</span>
         {% endiftruthy %}
-        <h2 class="h2 mb-2">
+        <h2 class="classy-display classy-display--section">
           {{ alt.why_switch.headline | uj_liquify }}
           {% iftruthy alt.why_switch.headline_accent %}
-            <span class="text-accent">{{ alt.why_switch.headline_accent | uj_liquify }}</span>
+            <em>{{ alt.why_switch.headline_accent | uj_liquify }}</em>
           {% endiftruthy %}
         </h2>
         {% iftruthy alt.why_switch.subheadline %}
-          <p class="fs-5 text-muted">{{ alt.why_switch.subheadline | uj_liquify }}</p>
+          <p>{{ alt.why_switch.subheadline | uj_liquify }}</p>
         {% endiftruthy %}
       </div>
 
@@ -313,65 +266,46 @@ alternative:
 
         <div class="row align-items-center g-3 g-lg-5 {% unless forloop.last %} mb-5 pb-5 {% endunless %}">
           {% iftruthy item.image %}
-            <div class="{{ image_col_class }}" data-lazy="@class animation-slide-up">
-              <div class="card border-0 shadow-sm ratio ratio-4x3">
-                {% uj_image item.image, class="w-100 h-100 object-fit-cover rounded", alt=item.title %}
+            <div class="{{ image_col_class }}" data-omega-reveal>
+              <div class="card overflow-hidden ratio ratio-4x3">
+                {% uj_image item.image, class="w-100 h-100 object-fit-cover", alt=item.title %}
               </div>
             </div>
           {% endiftruthy %}
-          <div class="{% iftruthy item.image %}{{ text_col_class }}{% endiftruthy %}{% iffalsy item.image %}col-lg-8 mx-auto text-center{% endiffalsy %}" data-lazy="@class animation-slide-up">
-            {% iftruthy item.icon %}
-              <div class="mb-3">
-                {% uj_icon item.icon, "display-5 text-primary" %}
-              </div>
-            {% endiftruthy %}
-            <h3 class="h2 mb-4">{{ item.title | uj_liquify }}</h3>
-            <p class="fs-5 text-muted mb-0">{{ item.description | uj_liquify }}</p>
+          <div class="{% iftruthy item.image %}{{ text_col_class }}{% endiftruthy %}{% iffalsy item.image %}col-lg-8 mx-auto text-center{% endiffalsy %}" data-omega-reveal>
+            <h3 class="classy-display classy-display--section mb-3">{{ item.title | uj_liquify }}</h3>
+            <p class="text-muted fs-6 mb-0">{{ item.description | uj_liquify }}</p>
           </div>
         </div>
       {% endfor %}
 
-      {% iftruthy alt.section_cta.text %}
-        <div class="text-center mt-5" data-lazy="@class animation-slide-up">
-          <a href="{{ alt.section_cta.href }}" class="btn btn-primary btn-lg px-5">
-            {% iftruthy alt.section_cta.icon %}
-              {% uj_icon alt.section_cta.icon, "me-2" %}
-            {% endiftruthy %}
-            {{ alt.section_cta.text }}
-          </a>
-        </div>
-      {% endiftruthy %}
+      {{ section_cta_block }}
     </div>
   </section>
 {% endif %}
 
-<!-- Video Section -->
+<!-- ═══ Video ═══ -->
 {% iftruthy alt.video.youtube_id %}
   <section>
     <div class="container">
-      <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
         {% iftruthy alt.video.superheadline.text %}
-          <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-            {% iftruthy alt.video.superheadline.icon %}
-              {% uj_icon alt.video.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
-            {{ alt.video.superheadline.text }}
-          </span>
+          <span class="classy-micro">{{ alt.video.superheadline.text }}</span>
         {% endiftruthy %}
-        <h2 class="h2 mb-2">
+        <h2 class="classy-display classy-display--section">
           {{ alt.video.headline | uj_liquify }}
           {% iftruthy alt.video.headline_accent %}
-            <span class="text-accent">{{ alt.video.headline_accent | uj_liquify }}</span>
+            <em>{{ alt.video.headline_accent | uj_liquify }}</em>
           {% endiftruthy %}
         </h2>
         {% iftruthy alt.video.subheadline %}
-          <p class="fs-5 text-muted">{{ alt.video.subheadline | uj_liquify }}</p>
+          <p>{{ alt.video.subheadline | uj_liquify }}</p>
         {% endiftruthy %}
       </div>
 
       <div class="row justify-content-center">
-        <div class="col-lg-10" data-lazy="@class animation-slide-up">
-          <div class="card border-gradient-rainbow shadow-lg rounded-4 overflow-hidden">
+        <div class="col-lg-10" data-omega-reveal>
+          <div class="card overflow-hidden">
             <div class="ratio ratio-16x9">
               <iframe
                 data-lazy="@src https://www.youtube.com/embed/{{ alt.video.youtube_id }}?rel=0"
@@ -385,106 +319,71 @@ alternative:
         </div>
       </div>
 
-      {% iftruthy alt.section_cta.text %}
-        <div class="text-center mt-5" data-lazy="@class animation-slide-up">
-          <a href="{{ alt.section_cta.href }}" class="btn btn-primary btn-lg px-5">
-            {% iftruthy alt.section_cta.icon %}
-              {% uj_icon alt.section_cta.icon, "me-2" %}
-            {% endiftruthy %}
-            {{ alt.section_cta.text }}
-          </a>
-        </div>
-      {% endiftruthy %}
+      {{ section_cta_block }}
     </div>
   </section>
 {% endiftruthy %}
 
-<!-- Testimonials Section -->
+<!-- ═══ Testimonials ═══ -->
 {% assign testimonials_size = alt.testimonials.items | size %}
 {% if testimonials_size > 0 %}
   {% include frontend/components/testimonial-scroll.html testimonials=alt.testimonials %}
 {% endif %}
 
-<!-- Stats Section -->
+<!-- ═══ Stats band ═══ -->
 {% assign stats_size = alt.stats | size %}
 {% if stats_size > 0 %}
   <section>
     <div class="container">
-      <div class="row text-center g-4">
+      <div class="classy-stats" data-omega-reveal-stagger="80">
         {% for stat in alt.stats %}
-          <div class="col-lg-3 col-md-6" data-lazy="@class animation-slide-up">
-            <div class="mb-3">
-              {% capture uj_migrate_arg_1 %}text-{{ stat.color }} display-4{% endcapture %}
-              {% uj_icon stat.icon, uj_migrate_arg_1 %}
-            </div>
-            <h3 class="display-5 fw-bold mb-2">{{ stat.number }}</h3>
-            {% iftruthy stat.show_stars %}
-              <div class="mb-0">
-                {% for i in (1..5) %}
-                  {% capture uj_migrate_arg_2 %}text-{{ stat.color }}{% endcapture %}
-                  {% uj_icon "star", uj_migrate_arg_2 %}
-                {% endfor %}
-              </div>
-            {% endiftruthy %}
-            <p class="text-muted mb-0">{{ stat.label }}</p>
+          <div class="classy-stat" data-omega-reveal>
+            <div class="classy-stat__num" data-omega-countup>{{ stat.number }}</div>
+            <div class="classy-stat__label">{{ stat.label }}</div>
             {% iftruthy stat.sublabel %}
-              <p class="small text-muted">{{ stat.sublabel }}</p>
+              <div class="classy-stat__sub">{{ stat.sublabel }}</div>
             {% endiftruthy %}
           </div>
         {% endfor %}
       </div>
 
-      {% iftruthy alt.section_cta.text %}
-        <div class="text-center mt-5" data-lazy="@class animation-slide-up">
-          <a href="{{ alt.section_cta.href }}" class="btn btn-primary btn-lg px-5">
-            {% iftruthy alt.section_cta.icon %}
-              {% uj_icon alt.section_cta.icon, "me-2" %}
-            {% endiftruthy %}
-            {{ alt.section_cta.text }}
-          </a>
-        </div>
-      {% endiftruthy %}
+      {{ section_cta_block }}
     </div>
   </section>
 {% endif %}
 
-<!-- FAQ Section -->
+<!-- ═══ FAQ ═══ -->
 {% assign faqs_size = alt.faqs.items | size %}
 {% if faqs_size > 0 %}
   <section>
     <div class="container">
       <div class="row justify-content-center">
         <div class="col-lg-8">
-          <div class="text-center mb-5" data-lazy="@class animation-slide-up">
+          <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
             {% iftruthy alt.faqs.superheadline.text %}
-              <span class="badge bg-body-tertiary border-gradient-rainbow border-1 text-body p-2 mb-1 fw-semibold small">
-                {% iftruthy alt.faqs.superheadline.icon %}
-                  {% uj_icon alt.faqs.superheadline.icon, "me-1" %}
-                {% endiftruthy %}
-                {{ alt.faqs.superheadline.text }}
-              </span>
+              <span class="classy-micro">{{ alt.faqs.superheadline.text }}</span>
             {% endiftruthy %}
-            <h2 class="h2 mb-2">
+            <h2 class="classy-display classy-display--section">
               {{ alt.faqs.headline | uj_liquify }}
               {% iftruthy alt.faqs.headline_accent %}
-                <span class="text-accent">{{ alt.faqs.headline_accent | uj_liquify }}</span>
+                <em>{{ alt.faqs.headline_accent | uj_liquify }}</em>
               {% endiftruthy %}
             </h2>
             {% iftruthy alt.faqs.subheadline %}
-              <p class="fs-5 text-muted">{{ alt.faqs.subheadline | uj_liquify }}</p>
+              <p>{{ alt.faqs.subheadline | uj_liquify }}</p>
             {% endiftruthy %}
           </div>
 
-          <div class="accordion" id="faqAccordion" data-lazy="@class animation-slide-up">
+          <div class="classy-faq accordion" id="faqAccordion" data-omega-reveal>
             {% for faq in alt.faqs.items %}
-              <div class="accordion-item border-0 mb-3">
+              <div class="accordion-item">
                 <h2 class="accordion-header">
-                  <button class="accordion-button collapsed py-4" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
-                    <span class="fw-semibold">{{ faq.question | uj_liquify }}</span>
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
+                    {{ faq.question | uj_liquify }}
                   </button>
                 </h2>
                 <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body text-muted">
+                  <div class="accordion-body">
                     {{ faq.answer | uj_liquify }}
                   </div>
                 </div>
@@ -498,60 +397,35 @@ alternative:
   </section>
 {% endif %}
 
-<!-- CTA Section -->
+<!-- ═══ CTA band ═══ -->
 {% iftruthy alt.cta.headline %}
   <section>
     <div class="container">
-      <div class="card border-0 bg-gradient bg-primary text-white rounded-4 p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
-        <!-- Decorative icon - top right -->
-        <div class="position-absolute top-0 end-0 opacity-25" style="font-size:10rem;transform:rotate(15deg)translate(30%,-30%)">
-          {% uj_icon "rocket", "text-white" %}
-        </div>
-
-        <!-- Decorative icon - bottom left -->
-        <div class="position-absolute bottom-0 start-0 opacity-25" style="font-size:8rem;transform:rotate(-20deg)translate(-30%,30%)">
-          {% uj_icon "sparkles", "text-white" %}
-        </div>
-
-        <div class="position-relative">
-          {% iftruthy alt.cta.superheadline.text %}
-            <span class="badge bg-white bg-opacity-25 text-light p-2 mb-3 fw-semibold small">
-              {% iftruthy alt.cta.superheadline.icon %}
-                {% uj_icon alt.cta.superheadline.icon, "me-1" %}
-              {% endiftruthy %}
-              {{ alt.cta.superheadline.text }}
-            </span>
+      <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
+        {% iftruthy alt.cta.superheadline.text %}
+          <span class="classy-micro d-block mb-3">{{ alt.cta.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-cta__headline">
+          {{ alt.cta.headline | uj_liquify }}
+          {% iftruthy alt.cta.headline_accent %}
+            <em>{{ alt.cta.headline_accent | uj_liquify }}</em>
           {% endiftruthy %}
-
-          <h2 class="h3 fw-bold mb-3">
-            {{ alt.cta.headline | uj_liquify }}
-            {% iftruthy alt.cta.headline_accent %}
-              <span class="text-accent">{{ alt.cta.headline_accent | uj_liquify }}</span>
-            {% endiftruthy %}
-          </h2>
-
-          {% iftruthy alt.cta.description %}
-            <p class="lead mb-4">{{ alt.cta.description | uj_liquify }}</p>
+        </h2>
+        {% iftruthy alt.cta.description %}
+          <p class="classy-cta__sub">{{ alt.cta.description | uj_liquify }}</p>
+        {% endiftruthy %}
+        <div class="classy-cta__ctas">
+          {% iftruthy alt.cta.primary_button.text %}
+            <a href="{{ alt.cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+              {{ alt.cta.primary_button.text }}
+              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+            </a>
           {% endiftruthy %}
-
-          <div class="d-flex flex-column flex-sm-row gap-3 justify-content-center">
-            {% iftruthy alt.cta.primary_button.text %}
-              <a href="{{ alt.cta.primary_button.href }}" class="btn btn-light btn-lg px-4">
-                {% iftruthy alt.cta.primary_button.icon %}
-                  {% uj_icon alt.cta.primary_button.icon, "me-2" %}
-                {% endiftruthy %}
-                {{ alt.cta.primary_button.text }}
-              </a>
-            {% endiftruthy %}
-            {% iftruthy alt.cta.secondary_button.text %}
-              <a href="{{ alt.cta.secondary_button.href }}" class="btn btn-outline-light btn-lg px-4">
-                {% iftruthy alt.cta.secondary_button.icon %}
-                  {% uj_icon alt.cta.secondary_button.icon, "me-2" %}
-                {% endiftruthy %}
-                {{ alt.cta.secondary_button.text }}
-              </a>
-            {% endiftruthy %}
-          </div>
+          {% iftruthy alt.cta.secondary_button.text %}
+            <a href="{{ alt.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+              {{ alt.cta.secondary_button.text }}
+            </a>
+          {% endiftruthy %}
         </div>
       </div>
     </div>
