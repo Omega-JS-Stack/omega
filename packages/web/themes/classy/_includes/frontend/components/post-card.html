@@ -4,11 +4,24 @@
     {% include frontend/components/post-card.html post=post %}
   where post is a posts-collection item (post.url, post.date, post.content,
   post.post.{id,title,author,categories}).
+
+  Media contract: post.image === false → designed no-media panel (serif
+  monogram on dotgrid); post.image = "/path.jpg" → that image; absent →
+  the legacy /assets/images/blog/post-<id>/ convention via uj_post.
+  Author contract: an author that resolves to no team member falls back to
+  the brand name with a neutral mark (no broken avatar row).
 {% endcomment %}
 {% assign _p = include.post %}
 <article class="classy-post-card">
-  <a href="{{ site.url }}{{ _p.url }}" class="classy-post-card__media">
-    {%- uj_post _p.post.id, "image-tag", class="" -%}
+  <a href="{{ site.url }}{{ _p.url }}" class="classy-post-card__media{% if _p.post.image == false %} classy-post-card__media--pattern classy-dotgrid{% endif %}">
+    {%- if _p.post.image == false -%}
+      {%- assign _mono_source = _p.post.categories[0] | default: _p.post.title -%}
+      <span class="classy-post-card__monogram" aria-hidden="true">{{ _mono_source | slice: 0 | upcase }}</span>
+    {%- elsif _p.post.image -%}
+      <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ _p.post.image }}" alt="{{ _p.post.title }}">
+    {%- else -%}
+      {%- uj_post _p.post.id, "image-tag", class="" -%}
+    {%- endif -%}
   </a>
 
   <div class="classy-post-card__body">
@@ -25,12 +38,18 @@
     </h3>
 
     <div class="classy-post-card__meta">
-      <a href="{%- uj_member _p.post.author, "url" -%}" class="classy-post-card__avatar">
-        {%- uj_member _p.post.author, "image-tag", class="" -%}
-      </a>
-      <a href="{%- uj_member _p.post.author, "url" -%}">
-        {%- uj_member _p.post.author, "name" -%}
-      </a>
+      {%- capture _author_name -%}{%- uj_member _p.post.author, "name" -%}{%- endcapture -%}
+      {% if _author_name != '' %}
+        <a href="{%- uj_member _p.post.author, "url" -%}" class="classy-post-card__avatar">
+          {%- uj_member _p.post.author, "image-tag", class="" -%}
+        </a>
+        <a href="{%- uj_member _p.post.author, "url" -%}">{{ _author_name }}</a>
+      {% else %}
+        <span class="classy-post-card__avatar classy-post-card__avatar--fallback" aria-hidden="true">
+          {% uj_icon "pen-nib", "fa-xs" %}
+        </span>
+        <span>{{ site.brand.name }}</span>
+      {% endif %}
       <span class="ms-auto d-inline-flex align-items-center gap-2">
         <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
         <span>·</span>

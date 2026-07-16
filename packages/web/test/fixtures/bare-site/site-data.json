@@ -1,0 +1,6 @@
+{
+  "url": "https://bare.example.com",
+  "brand": { "id": "bare", "name": "BareCo", "description": "Post-less test brand" },
+  "meta": { "title": "BareCo", "description": "Bare meta description" },
+  "theme": { "id": "classy" }
+}

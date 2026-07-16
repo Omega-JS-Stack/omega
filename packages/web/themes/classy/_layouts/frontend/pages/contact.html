@@ -3,11 +3,11 @@ layout: frontend/core/base
 
 # Hero Section
 hero:
-  headline: "Get in"
-  headline_accent: "touch"
-  subheadline: "Have questions about {{ site.brand.name }}? Our support team is here to help you"
+  headline: "Talk to a <em>human</em>"
+  headline_accent: ""
+  subheadline: "Questions, ideas, or something broken — a real person from {{ site.brand.name }} reads every message."
 
-# Contact Methods Section
+# Contact Methods Section (the channels rail)
 contact_methods:
   - title: "Email support"
     description: "Get help within 24 hours"
@@ -28,7 +28,7 @@ contact_form:
   headline: "Send us a <em>message</em>"
   subheadline: "Fill out the form below and we'll get back to you within 24 hours."
 
-# Stats Section
+# Response facts — the rail footer
 stats:
   items:
     - number: "<15m"
@@ -60,213 +60,191 @@ faqs:
     answer: "Absolutely! Our technical support team can help with API integration, troubleshooting, and custom implementations."
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-0">
   <div class="container" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-3" data-omega-reveal>Contact</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+      {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
     </h1>
     {% iftruthy resolved.hero.subheadline %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
     {% endiftruthy %}
   </div>
 </section>
 
-<!-- ═══ Contact methods ═══ -->
-<section class="pt-0">
+<!-- ═══ Channels rail + form ═══ -->
+<section id="form">
   <div class="container">
-    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
-      {% assign method_count = resolved.contact_methods | size %}
-      {% if method_count == 1 %}
-        {% assign col_classes = "col-12 col-md-8 col-lg-6 col-xl-5" %}
-      {% elsif method_count == 2 %}
-        {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-5" %}
-      {% elsif method_count == 3 %}
-        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
-      {% elsif method_count == 4 %}
-        {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-3" %}
-      {% else %}
-        {% assign col_classes = "col-12 col-md-6 col-lg-4" %}
-      {% endif %}
+    <div class="classy-duo" style="--classy-duo-cols: 5fr 7fr;">
+      <!-- Rail: ways to reach us + response facts -->
+      <div class="classy-duo__aside" data-omega-reveal-stagger="80">
+        <span class="classy-micro d-block mb-2" data-omega-reveal>Ways to reach us</span>
 
-      {% for method in resolved.contact_methods %}
-        <div class="{{ col_classes }}" data-omega-reveal>
-          <div class="classy-tile h-100">
-            <div class="classy-tile__head">
+        <div class="mb-4">
+          {% for method in resolved.contact_methods %}
+            <a href="{{ method.link }}" class="classy-channel" data-omega-reveal>
               <span class="classy-icon-chip">{% uj_icon method.icon, "fa-sm" %}</span>
-              <span class="classy-tile__title">{{ method.title }}</span>
-            </div>
-            <p class="classy-tile__desc">{{ method.description }}</p>
-            <div class="mt-auto">
-              <a href="{{ method.link }}" class="btn btn-outline-adaptive btn-sm">{{ method.value }}</a>
-            </div>
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- ═══ Contact form ═══ -->
-<section id="form" class="pt-0">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
-        <div class="card" data-omega-reveal>
-          <div class="card-body p-4 p-md-5">
-            <div class="classy-section-head classy-section-head--center mb-4">
-              {% iftruthy resolved.contact_form.superheadline.text %}
-                <span class="classy-micro">{{ resolved.contact_form.superheadline.text }}</span>
-              {% endiftruthy %}
-              <h2 class="classy-display classy-display--section">{{ resolved.contact_form.headline }}</h2>
-              {% iftruthy resolved.contact_form.subheadline %}
-                <p>{{ resolved.contact_form.subheadline }}</p>
-              {% endiftruthy %}
-            </div>
-
-            <form id="contact-form" autocomplete="on" data-form-state="initializing" onsubmit="return false">
-              <div class="row g-3 mb-4">
-                <div class="col-md-6">
-                  <label for="first_name" class="form-label fw-semibold">First name <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control form-control-lg" id="first_name" name="first_name"
-                    placeholder="Enter your first name"
-                    autocomplete="given-name"
-                    minlength="2"
-                    maxlength="50"
-                    required>
-                  <div class="invalid-feedback"></div>
-                </div>
-                <div class="col-md-6">
-                  <label for="last_name" class="form-label fw-semibold">Last name <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control form-control-lg" id="last_name" name="last_name"
-                    placeholder="Enter your last name"
-                    autocomplete="family-name"
-                    minlength="2"
-                    maxlength="50"
-                    required>
-                  <div class="invalid-feedback"></div>
-                </div>
-              </div>
-
-              <!-- Honeypot field (bot detection) -->
-              <div class="form-group mb-3" style="display: none;" aria-hidden="true">
-                <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
-              </div>
-
-              <!-- Hidden auth field (auto-populated via bindings) -->
-              <input type="hidden" aria-hidden="true" name="uid" data-wm-bind="@value auth.user.uid">
-
-              <div class="mb-4">
-                <label for="email" class="form-label fw-semibold">Email address <span class="text-danger">*</span></label>
-                <input type="email" class="form-control form-control-lg" id="email" name="email"
-                  placeholder="Enter your email address"
-                  autocomplete="email"
-                  data-wm-bind="@value auth.user.email"
-                  required>
-                <div class="invalid-feedback"></div>
-              </div>
-
-              <div class="mb-4">
-                <label for="company" class="form-label fw-semibold">Company</label>
-                <input type="text" class="form-control form-control-lg" id="company" name="company"
-                  placeholder="Enter your company name (optional)"
-                  autocomplete="organization"
-                  maxlength="100">
-              </div>
-
-              <div class="mb-4">
-                <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
-                <select class="form-select form-select-lg" id="subject" name="subject" required>
-                  <option value="">Choose a topic...</option>
-                  <option value="general">General inquiry</option>
-                  <option value="support">Technical support</option>
-                  <option value="billing">Billing question</option>
-                  <option value="partnership">Partnership</option>
-                  <option value="other">Other</option>
-                </select>
-                <div class="invalid-feedback"></div>
-              </div>
-
-              <div class="mb-4">
-                <label for="message" class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
-                <textarea class="form-control form-control-lg" id="message" name="message" rows="3"
-                  placeholder="Tell us how we can help you..."
-                  minlength="10"
-                  maxlength="5000"
-                  required></textarea>
-                <div class="invalid-feedback"></div>
-              </div>
-
-              <div class="d-grid gap-2 d-md-flex justify-content-md-between align-items-center">
-                <button type="submit" class="btn btn-adaptive btn-lg px-5">
-                  Send message
-                </button>
-                <a href="{{ site.url }}" class="btn btn-link">
-                  {% uj_icon "arrow-left", "fa-sm me-1" %}
-                  Back to home
-                </a>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ Stats band ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-stats" data-omega-reveal-stagger="80">
-      {% for stat in resolved.stats.items %}
-        <div class="classy-stat" data-omega-reveal>
-          <div class="classy-stat__num">{{ stat.number }}</div>
-          <div class="classy-stat__label">{{ stat.label }}</div>
-          {% iftruthy stat.sublabel %}
-            <div class="classy-stat__sub">{{ stat.sublabel }}</div>
-          {% endiftruthy %}
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- ═══ FAQ ═══ -->
-<section>
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
-        <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-          {% iftruthy resolved.faqs.superheadline.text %}
-            <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
-          {% endiftruthy %}
-          <h2 class="classy-display classy-display--section">{{ resolved.faqs.headline }}</h2>
-          {% iftruthy resolved.faqs.subheadline %}
-            <p>{{ resolved.faqs.subheadline }}</p>
-          {% endiftruthy %}
+              <span class="classy-channel__body">
+                <span class="classy-channel__title d-block">{{ method.title }}</span>
+                <span class="classy-channel__desc d-block">{{ method.description }}</span>
+              </span>
+              <span class="classy-channel__arrow">{% uj_icon "arrow-right", "fa-sm" %}</span>
+            </a>
+          {% endfor %}
         </div>
 
-        {% if resolved.faqs.items %}
-          <div class="classy-faq accordion" id="contactFaqAccordion" data-omega-reveal>
-            {% for faq in resolved.faqs.items %}
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#contactFaq{{ forloop.index }}" aria-expanded="false" aria-controls="contactFaq{{ forloop.index }}">
-                    {{ faq.question }}
-                  </button>
-                </h2>
-                <div id="contactFaq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#contactFaqAccordion">
-                  <div class="accordion-body">
-                    {{ faq.answer }}
-                  </div>
-                </div>
+        {% if resolved.stats.items %}
+          <div class="classy-facts" style="--classy-facts-cols: 2;" data-omega-reveal>
+            {% for stat in resolved.stats.items %}
+              <div class="classy-facts__item">
+                <span class="classy-micro classy-facts__label">{{ stat.label }}</span>
+                <span class="classy-facts__value classy-facts__value--num">{{ stat.number }}</span>
+                {% iftruthy stat.sublabel %}
+                  <span class="classy-facts__sub">{{ stat.sublabel }}</span>
+                {% endiftruthy %}
               </div>
             {% endfor %}
           </div>
         {% endif %}
       </div>
+
+      <!-- The form -->
+      <div class="classy-form-panel" data-omega-reveal>
+        <div class="mb-4">
+          {% iftruthy resolved.contact_form.superheadline.text %}
+            <span class="classy-micro d-block mb-2">{{ resolved.contact_form.superheadline.text }}</span>
+          {% endiftruthy %}
+          <h2 class="classy-display classy-display--section mb-2">{{ resolved.contact_form.headline }}</h2>
+          {% iftruthy resolved.contact_form.subheadline %}
+            <p class="text-muted mb-0">{{ resolved.contact_form.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        <form id="contact-form" autocomplete="on" data-form-state="initializing" onsubmit="return false">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label for="first_name" class="form-label fw-semibold">First name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="first_name" name="first_name"
+                placeholder="Enter your first name"
+                autocomplete="given-name"
+                minlength="2"
+                maxlength="50"
+                required>
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6">
+              <label for="last_name" class="form-label fw-semibold">Last name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="last_name" name="last_name"
+                placeholder="Enter your last name"
+                autocomplete="family-name"
+                minlength="2"
+                maxlength="50"
+                required>
+              <div class="invalid-feedback"></div>
+            </div>
+          </div>
+
+          <!-- Honeypot field (bot detection) -->
+          <div class="form-group mb-3" style="display: none;" aria-hidden="true">
+            <input type="text" class="form-control" name="honey" tabindex="-1" autocomplete="off">
+          </div>
+
+          <!-- Hidden auth field (auto-populated via bindings) -->
+          <input type="hidden" aria-hidden="true" name="uid" data-wm-bind="@value auth.user.uid">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label for="email" class="form-label fw-semibold">Email address <span class="text-danger">*</span></label>
+              <input type="email" class="form-control" id="email" name="email"
+                placeholder="Enter your email address"
+                autocomplete="email"
+                data-wm-bind="@value auth.user.email"
+                required>
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6">
+              <label for="company" class="form-label fw-semibold">Company</label>
+              <input type="text" class="form-control" id="company" name="company"
+                placeholder="Optional"
+                autocomplete="organization"
+                maxlength="100">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="subject" class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+            <select class="form-select" id="subject" name="subject" required>
+              <option value="">Choose a topic...</option>
+              <option value="general">General inquiry</option>
+              <option value="support">Technical support</option>
+              <option value="billing">Billing question</option>
+              <option value="partnership">Partnership</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="invalid-feedback"></div>
+          </div>
+
+          <div class="mb-4">
+            <label for="message" class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="message" name="message" rows="5"
+              placeholder="Tell us how we can help you..."
+              minlength="10"
+              maxlength="5000"
+              required></textarea>
+            <div class="invalid-feedback"></div>
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <button type="submit" class="btn btn-adaptive btn-lg px-5 omega-hover-nudge">
+              Send message
+              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+            </button>
+            <span class="small classy-quiet">
+              {% uj_icon "lock", "fa-xs me-1" %}
+              We only use this to reply — nothing else.
+            </span>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </section>
+
+<!-- ═══ FAQ — asymmetric ═══ -->
+{% if resolved.faqs.items %}
+<section>
+  <div class="container">
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        {% iftruthy resolved.faqs.superheadline.text %}
+          <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ resolved.faqs.headline }}</h2>
+        {% iftruthy resolved.faqs.subheadline %}
+          <p>{{ resolved.faqs.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+
+      <div class="classy-faq accordion" id="contactFaqAccordion" data-omega-reveal>
+        {% for faq in resolved.faqs.items %}
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#contactFaq{{ forloop.index }}" aria-expanded="false" aria-controls="contactFaq{{ forloop.index }}">
+                {{ faq.question }}
+              </button>
+            </h2>
+            <div id="contactFaq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#contactFaqAccordion">
+              <div class="accordion-body">
+                {{ faq.answer }}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {{ content | uj_content_format }}

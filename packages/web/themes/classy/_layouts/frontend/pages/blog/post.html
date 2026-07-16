@@ -48,14 +48,20 @@ newsletter:
         </header>
 
         <!-- Author & Meta -->
+        {%- capture _author_name -%}{%- uj_member resolved.post.author, "name" -%}{%- endcapture -%}
         <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap mb-4" data-omega-reveal>
           <div class="d-flex align-items-center">
-            <a href="{%- uj_member resolved.post.author, "url" -%}" class="classy-post-card__avatar me-2">
-              {%- uj_member resolved.post.author, "image-tag", class="" -%}
-            </a>
-            <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold small">
-              {%- uj_member resolved.post.author, "name" -%}
-            </a>
+            {% if _author_name != '' %}
+              <a href="{%- uj_member resolved.post.author, "url" -%}" class="classy-post-card__avatar me-2">
+                {%- uj_member resolved.post.author, "image-tag", class="" -%}
+              </a>
+              <a href="{%- uj_member resolved.post.author, "url" -%}" class="text-decoration-none text-body fw-semibold small">{{ _author_name }}</a>
+            {% else %}
+              <span class="classy-post-card__avatar classy-post-card__avatar--fallback me-2" aria-hidden="true">
+                {% uj_icon "pen-nib", "fa-xs" %}
+              </span>
+              <span class="text-body fw-semibold small">{{ site.brand.name }}</span>
+            {% endif %}
           </div>
           <span class="text-muted small">·</span>
           <time datetime="{{ page.date | date_to_xmlschema }}" class="text-muted small">
@@ -67,11 +73,19 @@ newsletter:
       </div>
     </div>
 
-    <div class="row justify-content-center">
-      <div class="col-xl-10 col-lg-10 col-md-12 col-12 mb-5" data-omega-reveal>
-        {%- uj_post resolved.post.id, "image-tag", class="img-fluid w-100 blog-post-image hairline rounded-4" -%}
+    {% comment %} Hero media honors the post.image contract: false → no hero
+    (the title IS the hero); a string → that image; absent → legacy id-path {% endcomment %}
+    {% unless resolved.post.image == false %}
+      <div class="row justify-content-center">
+        <div class="col-xl-10 col-lg-10 col-md-12 col-12 mb-5" data-omega-reveal>
+          {%- if resolved.post.image -%}
+            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ resolved.post.image }}" alt="{{ resolved.post.title }}" class="img-fluid w-100 blog-post-image hairline rounded-4">
+          {%- else -%}
+            {%- uj_post resolved.post.id, "image-tag", class="img-fluid w-100 blog-post-image hairline rounded-4" -%}
+          {%- endif -%}
+        </div>
       </div>
-    </div>
+    {% endunless %}
 
     <div class="row justify-content-center mb-3">
       <div class="blog-post-content classy-prose col-xl-8 col-lg-8 col-md-12 col-12">
@@ -111,27 +125,34 @@ newsletter:
       </div>
     {% endif %}
 
-    <!-- Author & share -->
+    <!-- Author & share (author block only when the member resolves) -->
     <div class="row justify-content-center mb-5">
       <div class="col-xl-8 col-lg-8 col-md-12 col-12">
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 py-4 hairline-top hairline-bottom">
-          <div class="d-flex align-items-center">
-            <a href="{% uj_member resolved.post.author, "url" %}" class="classy-person__avatar d-block me-3" style="width: 3rem; height: 3rem; margin-bottom: 0;">
-              {% uj_member resolved.post.author, "image-tag", class="w-100 h-100 object-fit-cover" %}
-            </a>
-            <div>
-              <a href="{% uj_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
-                <div class="fw-semibold">
-                  {%- uj_member resolved.post.author, "name" -%}
-                </div>
+          {% if _author_name != '' %}
+            <div class="d-flex align-items-center">
+              <a href="{% uj_member resolved.post.author, "url" %}" class="classy-person__avatar d-block me-3" style="width: 3rem; height: 3rem; margin-bottom: 0;">
+                {% uj_member resolved.post.author, "image-tag", class="w-100 h-100 object-fit-cover" %}
               </a>
-              {% iftruthy resolved.author_section.author_position %}
-                <div class="text-muted small">
-                  {{ resolved.author_section.author_position }}
-                </div>
-              {% endiftruthy %}
+              <div>
+                <a href="{% uj_member resolved.post.author, "url" %}" class="text-body text-decoration-none">
+                  <div class="fw-semibold">{{ _author_name }}</div>
+                </a>
+                {% iftruthy resolved.author_section.author_position %}
+                  <div class="text-muted small">
+                    {{ resolved.author_section.author_position }}
+                  </div>
+                {% endiftruthy %}
+              </div>
             </div>
-          </div>
+          {% else %}
+            <div class="d-flex align-items-center">
+              <span class="classy-post-card__avatar classy-post-card__avatar--fallback me-2" aria-hidden="true">
+                {% uj_icon "pen-nib", "fa-xs" %}
+              </span>
+              <div class="fw-semibold">{{ site.brand.name }}</div>
+            </div>
+          {% endif %}
           <div data-social-share
                 data-platforms=""
                 data-title=""

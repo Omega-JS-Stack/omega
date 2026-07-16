@@ -81,6 +81,11 @@ h6, .h6 {
   color: var(--omega-ink-muted) !important;
 }
 
+// The faintest voice — footnotes, reassurance lines, fine print
+.classy-quiet {
+  color: var(--omega-ink-faint);
+}
+
 // ============================================
 // Links — accent-driven (brand.color aware)
 // ============================================

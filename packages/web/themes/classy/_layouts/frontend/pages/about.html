@@ -1,21 +1,22 @@
 ---
 layout: frontend/core/base
 
-# Hero Section
+# Hero — the statement (headline carries the whole sentence; a legacy
+# headline_accent still lands as the italic tail)
 hero:
-  headline: "About"
-  headline_accent: "us"
-  description: "Learn about the people, mission, and values driving {{ site.brand.name }} forward"
+  headline: "We make complex things <em>feel simple</em>"
+  headline_accent: ""
+  description: "The people, principles, and stubborn opinions behind {{ site.brand.name }} — and where we're taking it next."
 
-# Mission & Vision
+# Mission & Vision — rendered as the editorial letter
 mission:
   title: "Our mission"
-  description: "To empower individuals and businesses with innovative technology solutions that simplify complex challenges and unlock new possibilities for growth and success."
+  description: "To empower individuals and businesses with technology that <em>simplifies</em> complex challenges and unlocks new possibilities for growth."
   icon: "bullseye"
 
 vision:
   title: "Our vision"
-  description: "To become the world's most trusted platform for business transformation, where innovation meets simplicity and everyone can achieve their full potential."
+  description: "A world where powerful tools feel effortless — where anyone can build, launch, and grow without wrestling the machinery. That's the product we <em>refuse to stop</em> working toward."
   icon: "lightbulb"
 
 # Story Timeline Section
@@ -24,7 +25,7 @@ story:
     icon: "clock-rotate-left"
     text: "History"
   headline: "Follow our <em>journey</em>"
-  subheadline: "From humble beginnings to industry leaders"
+  subheadline: "From a stubborn idea to the product it is today — the moments that shaped how we work."
   items:
   - year: "2017"
     title: "The beginning"
@@ -42,7 +43,7 @@ story:
     title: "The future"
     description: "Continuing to push boundaries and build the future of business technology"
 
-# Company Stats
+# Company facts — the hero rail (numbers count up on reveal)
 stats:
   superheadline:
     icon: "chart-line"
@@ -63,13 +64,13 @@ stats:
     label: "Countries"
     icon: "globe"
 
-# Company Values Section
+# Company Values Section — rendered as the numbered principles list
 values:
   superheadline:
     icon: "compass"
     text: "Principles"
-  headline: "Our core <em>values</em>"
-  subheadline: "The principles that guide everything we do"
+  headline: "What we <em>refuse</em> to compromise on"
+  subheadline: "Four principles, in order. When two of them collide, the one with the smaller number wins."
   items:
   - title: "Innovation first"
     description: "We push boundaries and challenge the status quo to create breakthrough solutions that transform how businesses operate"
@@ -97,98 +98,92 @@ team_cta:
     href: "/team"
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
-  <div class="container" data-omega-reveal-stagger="90">
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-    </h1>
-    {% iftruthy resolved.hero.description %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
-    {% endiftruthy %}
-  </div>
-</section>
-
-<!-- ═══ Story timeline ═══ -->
-<section class="pt-0">
+<!-- ═══ Hero — the statement + facts rail ═══ -->
+<section class="classy-dotgrid">
   <div class="container">
-    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-      {% iftruthy resolved.story.superheadline.text %}
-        <span class="classy-micro">{{ resolved.story.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-display classy-display--section">{{ resolved.story.headline }}</h2>
-      {% iftruthy resolved.story.subheadline %}
-        <p>{{ resolved.story.subheadline }}</p>
-      {% endiftruthy %}
-    </div>
-
-    <div class="classy-timeline" data-omega-reveal-stagger="80">
-      {% for item in resolved.story.items %}
-        <div class="classy-timeline__item" data-omega-reveal>
-          <div class="classy-timeline__year">{{ item.year }}</div>
-          <div class="classy-timeline__title">{{ item.title }}</div>
-          <p class="classy-timeline__desc">{{ item.description }}</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- ═══ Mission & Vision ═══ -->
-<section>
-  <div class="container">
-    <div class="row g-4">
-      <div class="col-lg-6" data-omega-reveal>
-        <div class="classy-tile h-100">
-          <div class="classy-tile__head">
-            <span class="classy-icon-chip">{% uj_icon resolved.mission.icon, "fa-sm" %}</span>
-            <span class="classy-tile__title">{{ resolved.mission.title }}</span>
-          </div>
-          <p class="classy-tile__desc mb-0">{{ resolved.mission.description }}</p>
-        </div>
+    <div class="classy-hero-split">
+      <div data-omega-reveal-stagger="90">
+        {% iftruthy resolved.hero.superheadline.text %}
+          <span class="classy-micro d-block mb-3" data-omega-reveal>{{ resolved.hero.superheadline.text }}</span>
+        {% endiftruthy %}
+        {% iffalsy resolved.hero.superheadline.text %}
+          <span class="classy-micro d-block mb-3" data-omega-reveal>About {{ site.brand.name }}</span>
+        {% endiffalsy %}
+        <h1 class="classy-display classy-display--page" data-omega-reveal>
+          {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
+        </h1>
+        {% iftruthy resolved.hero.description %}
+          <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+        {% endiftruthy %}
       </div>
 
-      <div class="col-lg-6" data-omega-reveal>
-        <div class="classy-tile h-100">
-          <div class="classy-tile__head">
-            <span class="classy-icon-chip">{% uj_icon resolved.vision.icon, "fa-sm" %}</span>
-            <span class="classy-tile__title">{{ resolved.vision.title }}</span>
-          </div>
-          <p class="classy-tile__desc mb-0">{{ resolved.vision.description }}</p>
+      {% if resolved.stats.items %}
+        <div class="classy-facts" style="--classy-facts-cols: 2;" data-omega-reveal="left">
+          {% for stat in resolved.stats.items %}
+            <div class="classy-facts__item">
+              <span class="classy-micro classy-facts__label">{{ stat.label }}</span>
+              <span class="classy-facts__value classy-facts__value--num" data-omega-countup>{{ stat.number }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══ The letter — mission & vision as editorial statements ═══ -->
+<section>
+  <div class="container">
+    <div class="classy-duo">
+      <div class="classy-duo__aside" data-omega-reveal>
+        <span class="classy-micro">Why we exist</span>
+      </div>
+      <div data-omega-reveal-stagger="120">
+        <div data-omega-reveal>
+          <span class="classy-micro d-block mb-3">{{ resolved.mission.title }}</span>
+          <p class="classy-statement">{{ resolved.mission.description }}</p>
+        </div>
+        <hr class="my-4">
+        <div data-omega-reveal>
+          <span class="classy-micro d-block mb-3">{{ resolved.vision.title }}</span>
+          <p class="classy-statement">{{ resolved.vision.description }}</p>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ Stats band ═══ -->
+<!-- ═══ The journey — sticky head + timeline ═══ -->
 <section>
   <div class="container">
-    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-      {% iftruthy resolved.stats.superheadline.text %}
-        <span class="classy-micro">{{ resolved.stats.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-display classy-display--section">{{ resolved.stats.headline }}</h2>
-      {% iftruthy resolved.stats.subheadline %}
-        <p>{{ resolved.stats.subheadline }}</p>
-      {% endiftruthy %}
-    </div>
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        {% iftruthy resolved.story.superheadline.text %}
+          <span class="classy-micro">{{ resolved.story.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ resolved.story.headline }}</h2>
+        {% iftruthy resolved.story.subheadline %}
+          <p>{{ resolved.story.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
 
-    <div class="classy-stats" data-omega-reveal-stagger="80">
-      {% for stat in resolved.stats.items %}
-        <div class="classy-stat" data-omega-reveal>
-          <div class="classy-stat__num" data-omega-countup>{{ stat.number }}</div>
-          <div class="classy-stat__label">{{ stat.label }}</div>
-        </div>
-      {% endfor %}
+      <div class="classy-timeline" data-omega-reveal-stagger="80">
+        {% for item in resolved.story.items %}
+          <div class="classy-timeline__item" data-omega-reveal>
+            <div class="classy-timeline__year">{{ item.year }}</div>
+            <div class="classy-timeline__title">{{ item.title }}</div>
+            <p class="classy-timeline__desc">{{ item.description }}</p>
+          </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ═══ Values ═══ -->
+<!-- ═══ Principles — the numbered list ═══ -->
 <section>
   <div class="container">
-    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+    <div class="classy-section-head mb-5" data-omega-reveal>
       {% iftruthy resolved.values.superheadline.text %}
         <span class="classy-micro">{{ resolved.values.superheadline.text }}</span>
       {% endiftruthy %}
@@ -198,16 +193,12 @@ team_cta:
       {% endiftruthy %}
     </div>
 
-    <div class="row g-4" data-omega-reveal-stagger="70">
+    <div class="classy-numbered" data-omega-reveal-stagger="70">
       {% for value in resolved.values.items %}
-        <div class="col-lg-3 col-md-6" data-omega-reveal>
-          <div class="classy-tile h-100">
-            <div class="classy-tile__head">
-              <span class="classy-icon-chip">{% uj_icon value.icon, "fa-sm" %}</span>
-              <span class="classy-tile__title">{{ value.title }}</span>
-            </div>
-            <p class="classy-tile__desc mb-0">{{ value.description }}</p>
-          </div>
+        <div class="classy-numbered__item" data-omega-reveal>
+          <span class="classy-numbered__index">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</span>
+          <div class="classy-numbered__title">{{ value.title }}</div>
+          <p class="classy-numbered__desc">{{ value.description }}</p>
         </div>
       {% endfor %}
     </div>

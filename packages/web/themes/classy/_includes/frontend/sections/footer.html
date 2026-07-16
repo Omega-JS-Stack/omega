@@ -1,11 +1,16 @@
-{% comment %} Section data: json-in-_includes (a consumer src/_includes/frontend/sections/footer.json overrides the packaged one) — same binding pattern as admin/sections/sidebar {% endcomment %}
+{% comment %}
+  Classy v2 footer — draft-2 pattern: brand block + link columns on one grid,
+  then ONE hairline base row where every control (legal links, language,
+  appearance) shares the same quiet 1.75rem scale. Section data:
+  json-in-_includes (a consumer src/_includes/frontend/sections/footer.json
+  overrides the packaged one) — same binding pattern as admin/sections/sidebar.
+{% endcomment %}
 {% assign data = site.data._includes.frontend.sections.footer %}
 <footer class="classy-footer mt-auto" role="contentinfo" aria-label="Site footer">
   <div class="container">
-    <!-- Logo Row -->
-    <div class="row mb-4">
-      <!-- Brand/Logo Section -->
-      <div class="col-12 col-lg-3 mb-4 mb-lg-0">
+    <div class="classy-footer__grid">
+      <!-- Brand block: lockup, one-liner, socials -->
+      <div class="classy-footer__brand">
         {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
         {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
         {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
@@ -15,133 +20,29 @@
         {% if logo_description == '' or logo_description == 'null' %}{% assign logo_description = site.brand.description %}{% endif %}
         {% capture logo_class %}{{ data.logo.class }}{% endcapture %}
 
-        <a class="classy-nav__brand mb-3" href="{{ logo_href }}">
+        <a class="classy-nav__brand" href="{{ logo_href }}">
           {% if logo_src and logo_src != '' and logo_src != 'null' %}
-            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.625rem; width: auto;"/>
+            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ logo_src }}" alt="{{ logo_text }} Logo" class="{{ logo_class }}" style="height: 1.5rem; width: auto;"/>
           {% endif %}
           {% if logo_text and logo_text != '' and logo_text != 'null' %}
             <span>{{ logo_text }}</span>
           {% endif %}
         </a>
         {% if logo_description and logo_description != '' and logo_description != 'null' %}
-          <p class="classy-footer__desc mb-0">{{ logo_description }}</p>
+          <p class="classy-footer__desc">{{ logo_description }}</p>
         {% endif %}
-      </div>
 
-      <!-- Links Column (only on lg screens) -->
-      <div class="col-12 col-lg-9">
-        <div class="row">
-          <!-- Dynamic Links Sections -->
-          {% if data.links and data.links.size > 0 %}
-            {% assign links_count = data.links.size %}
-            {% assign col_class = 'col-6 col-md' %}
-            {% if links_count == 2 %}
-              {% assign col_class = 'col-6 col-md-6' %}
-            {% elsif links_count == 3 %}
-              {% assign col_class = 'col-6 col-md-4' %}
-            {% elsif links_count == 4 %}
-              {% assign col_class = 'col-6 col-md-3' %}
-            {% elsif links_count == 6 %}
-              {% assign col_class = 'col-6 col-md-2' %}
-            {% endif %}
-
-            {% for link_group in data.links %}
-              {% capture group_label %}{{ link_group.label | default: 'Links' }}{% endcapture %}
-              <div class="{{ col_class }}">
-                <div class="classy-micro classy-footer__group">{{ group_label }}</div>
-                <ul class="list-unstyled">
-                  {% for link in link_group.links %}
-                    {% capture link_classes %}classy-footer__link{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
-                    {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
-                    {% capture link_icon %}{% if link.icon %}{{ site.icons[link.icon] }}{% endif %}{% endcapture %}
-                    {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
-                    <li class="mb-2">
-                      <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
-                        {{ link_icon }}
-                        {{ link.label }}
-                      </a>
-                    </li>
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endfor %}
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- Bottom Section -->
-    <div class="row classy-footer__bottom align-items-center">
-      <div class="col-md-6 d-flex align-items-center">
-        <!-- Language Dropdown -->
-        <div class="d-flex align-items-center me-2">
-          <div class="dropup uj-language-dropdown">
-            <button class="btn btn-sm btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-              {% uj_icon "language", "fa-sm me-1" %}
-              <span>Language</span>
-            </button>
-            <ul class="dropdown-menu">
-              {% assign default_language = site.translation.default | default: "en" %}
-              {% assign page_excluded_from_translation = false %}
-              {% for exclude in site.translation.exclude %}
-                {% assign exclude_folder = "/" | append: exclude | append: "/" %}
-                {% assign exclude_page = "/" | append: exclude %}
-                {% if page.url == exclude_page or page.url contains exclude_folder %}
-                  {% assign page_excluded_from_translation = true %}
-                {% endif %}
-              {% endfor %}
-              {% if site.translation.enabled and site.translation.languages.size > 0 and page_excluded_from_translation != true %}
-                {% assign all_languages = site.translation.languages | push: default_language %}
-              {% else %}
-                {% assign all_languages = "" | split: "" | push: default_language %}
-              {% endif %}
-              {% for language in all_languages %}
-                <li>
-                  {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
-                  <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
-                    {% uj_icon language, "fa-sm me-2" %}
-                    {{ lang_name | capitalize }}
-                  </a>
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-
-        <!-- Appearance Dropdown (logic handled framework-side via data-appearance-* attributes — see docs/appearance.md) -->
-        <div class="d-flex align-items-center me-3">
-          <div class="dropup uj-appearance-dropdown">
-            <button class="btn btn-sm btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Appearance">
-              <span data-appearance-icon="light" hidden>{% uj_icon "sun", "fa-sm" %}</span>
-              <span data-appearance-icon="dark" hidden>{% uj_icon "moon-stars", "fa-sm" %}</span>
-              <span data-appearance-icon="system" hidden>{% uj_icon "circle-half-stroke", "fa-sm" %}</span>
-            </button>
-            <ul class="dropdown-menu">
-              <li><button class="dropdown-item" type="button" data-appearance-set="light">{% uj_icon "sun", "fa-sm me-2" %}Light</button></li>
-              <li><button class="dropdown-item" type="button" data-appearance-set="dark">{% uj_icon "moon-stars", "fa-sm me-2" %}Dark</button></li>
-              <li><button class="dropdown-item" type="button" data-appearance-set="system">{% uj_icon "circle-half-stroke", "fa-sm me-2" %}System</button></li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Social Links -->
         {% if data.socials.enabled %}
-          <div class="d-flex align-items-center">
+          <div class="classy-footer__social" aria-label="Social links">
             {% if data.socials.list and data.socials.list.size > 0 %}
               {% assign social_list = data.socials.list %}
             {% else %}
               {% assign social_list = 'twitter,facebook,instagram,linkedin,github' | split: ',' %}
             {% endif %}
-
             {% for social in social_list %}
               {% iftruthy social %}
-                {% if forloop.last %}
-                  {% assign spacing_class = '' %}
-                {% else %}
-                  {% assign spacing_class = 'me-2' %}
-                {% endif %}
-                <a href="{% uj_social social %}" class="classy-footer__link {{ spacing_class }}" aria-label="{{ social | capitalize }}">
-                  {% uj_icon social, "fa-lg" %}
+                <a href="{% uj_social social %}" class="classy-footer__social-link" aria-label="{{ social | capitalize }}">
+                  {% uj_icon social, "fa-sm" %}
                 </a>
               {% endiftruthy %}
             {% endfor %}
@@ -149,34 +50,94 @@
         {% endif %}
       </div>
 
-      <!-- Legal Links -->
-      {% if data.legal.enabled %}
-        <div class="col-md-6 text-md-end classy-footer__legal mt-3 mt-md-0">
-          <a href="/terms">Terms</a>
-          <span class="mx-2">/</span>
-          <a href="/privacy">Privacy</a>
-          <span class="mx-2">/</span>
-          <a href="/cookies">Cookies</a>
+      <!-- Link columns -->
+      {% if data.links and data.links.size > 0 %}
+        <div class="classy-footer__cols">
+          {% for link_group in data.links %}
+            {% capture group_label %}{{ link_group.label | default: 'Links' }}{% endcapture %}
+            <nav class="classy-footer__col" aria-label="{{ group_label }}">
+              <div class="classy-footer__head">{{ group_label }}</div>
+              <ul class="list-unstyled mb-0">
+                {% for link in link_group.links %}
+                  {% capture link_classes %}classy-footer__link{% if link.classes %} {{ link.classes | join: ' ' }}{% endif %}{% endcapture %}
+                  {% capture link_attributes %}{% if link.attributes %}{% for attr in link.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
+                  {% capture link_icon %}{% if link.icon %}{{ site.icons[link.icon] }}{% endif %}{% endcapture %}
+                  {% capture link_href %}{% if link.href and link.href != '' and link.href != 'null' %}{{ link.href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+                  <li>
+                    <a class="{{ link_classes }}" href="{{ link_href }}"{{ link_attributes }}>
+                      {{ link_icon }}
+                      {{ link.label }}
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </nav>
+          {% endfor %}
         </div>
       {% endif %}
     </div>
 
-    <!-- Copyright Row -->
-    {% if data.copyright.enabled %}
-      <div class="row mt-3">
-        <div class="col-12 text-center">
+    <!-- Base row: copyright left, matched-scale utilities right -->
+    <div class="classy-footer__base">
+      {% if data.copyright.enabled %}
+        <span class="classy-footer__copyright">
           {% if data.copyright.text %}
-            {% capture copyright_text %}{{ data.copyright.text }}{% endcapture %}
+            {{ data.copyright.text | uj_liquify }}
           {% else %}
-            {% capture copyright_text %}
-              {{ site.characters.copyright }} {{ site.uj.date.year }} <strong>{{ site.brand.name }}</strong> by <a href="https://itwcreativeworks.com">ITW Creative Works</a>. All rights reserved.
-              <br>
-              By using this site and our services, you agree to our <a href="/terms">Terms</a> & <a href="/privacy">Privacy Policy</a>.
-            {% endcapture %}
+            © {{ site.uj.date.year }} {{ site.brand.name }}. All rights reserved.
           {% endif %}
-          <span class="classy-footer__copyright">{{ copyright_text | uj_liquify }}</span>
+        </span>
+      {% endif %}
+
+      <div class="classy-footer__tools">
+        {% if data.legal.enabled %}
+          <nav class="classy-footer__legal" aria-label="Legal">
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/cookies">Cookies</a>
+          </nav>
+        {% endif %}
+
+        <!-- Language (dropup) -->
+        <div class="dropup uj-language-dropdown">
+          <button class="classy-footer__pill dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            {% uj_icon "language", "fa-sm" %}
+            <span>Language</span>
+          </button>
+          <ul class="dropdown-menu">
+            {% assign default_language = site.translation.default | default: "en" %}
+            {% assign page_excluded_from_translation = false %}
+            {% for exclude in site.translation.exclude %}
+              {% assign exclude_folder = "/" | append: exclude | append: "/" %}
+              {% assign exclude_page = "/" | append: exclude %}
+              {% if page.url == exclude_page or page.url contains exclude_folder %}
+                {% assign page_excluded_from_translation = true %}
+              {% endif %}
+            {% endfor %}
+            {% if site.translation.enabled and site.translation.languages.size > 0 and page_excluded_from_translation != true %}
+              {% assign all_languages = site.translation.languages | push: default_language %}
+            {% else %}
+              {% assign all_languages = "" | split: "" | push: default_language %}
+            {% endif %}
+            {% for language in all_languages %}
+              <li>
+                {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
+                <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
+                  {% uj_icon language, "fa-sm me-2" %}
+                  {{ lang_name | capitalize }}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <!-- Appearance (segmented; core appearance.js stamps .active/aria-pressed on data-appearance-set) -->
+        <div class="classy-footer__seg" role="group" aria-label="Appearance">
+          <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false">{% uj_icon "sun", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% uj_icon "moon-stars", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false">{% uj_icon "circle-half-stroke", "fa-sm" %}</button>
         </div>
       </div>
-    {% endif %}
+    </div>
   </div>
 </footer>

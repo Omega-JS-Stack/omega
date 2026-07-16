@@ -39,8 +39,10 @@ function prefersReducedMotion() {
 
 /**
  * Parse a rendered number ("12,400+", "$1.2M", "99.98%") into its parts.
+ * Grouping is inherited from the markup: "2017" stays ungrouped (years!),
+ * "12,400" keeps its commas.
  * @param {string} text - the element's final text
- * @returns {{ prefix: string, value: number, decimals: number, suffix: string }|null}
+ * @returns {{ prefix: string, value: number, decimals: number, suffix: string, grouped: boolean }|null}
  */
 function parseCountTarget(text) {
   const match = String(text).trim().match(/^([^0-9-]*)(-?[\d,]*\.?\d+)(.*)$/s);
@@ -55,19 +57,19 @@ function parseCountTarget(text) {
   }
 
   const decimals = raw.includes('.') ? raw.split('.')[1].length : 0;
-  return { prefix: match[1], value, decimals, suffix: match[3] };
+  return { prefix: match[1], value, decimals, suffix: match[3], grouped: match[2].includes(',') };
 }
 
 /**
  * Format a count-up frame with the target's grouping and decimals.
- * @param {{ prefix: string, decimals: number, suffix: string }} target
+ * @param {{ prefix: string, decimals: number, suffix: string, grouped: boolean }} target
  * @param {number} value - current frame value
  * @returns {string}
  */
 function formatCount(target, value) {
   const fixed = value.toFixed(target.decimals);
   const [whole, fraction] = fixed.split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const grouped = target.grouped ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : whole;
   return `${target.prefix}${grouped}${fraction ? `.${fraction}` : ''}${target.suffix}`;
 }
 

@@ -201,7 +201,7 @@
         </div>
 
         <!-- Non-account actions for mobile (inside collapsible) -->
-        <div class="d-lg-none">
+        <div class="d-lg-none classy-nav__mobile-actions">
           {% for action in data.actions %}
             {% if action.type != 'account' %}
               {% capture action_class %}btn w-100 mt-2 {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}

@@ -84,8 +84,13 @@ see the harness README for the honest before/after numbers.
   (Newsreader) over an Inter UI, `.omega-shell` app chrome — see
   [docs/theming.md](../../docs/theming.md). Every default frontend page ships
   in the v2 language (page-hero/prose/timeline/post-card/person/facts
-  vocabulary in `css/marketing/_content.scss`; the shared blog card is ONE
-  include, `_includes/frontend/components/post-card.html`). Per-page THEME
+  vocabulary in `css/marketing/_content.scss` + the cp147 compositional set:
+  hero-split, duo, statement, numbered, channel, band, form-panel — pages are
+  COMPOSED asymmetrically, not centered; the shared blog card is ONE
+  include, `_includes/frontend/components/post-card.html`). The footer is the
+  draft-2 pattern (brand block + auto-fit link columns + ONE matched-scale
+  base row with legal links, language pill, segmented appearance control).
+  Per-page THEME
   css lives at `css/pages/<page>/index.scss` — it loads LAST on its page
   (after core page css), which makes it the override slot for core page rules
   (status/feedback use this to repaint JS-toggled `bg-*` state classes in the
@@ -116,6 +121,16 @@ see the harness README for the honest before/after numbers.
   construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
   renders the configured `advertising.providers.google-adsense.client` or an
   honest comment.
+- `defaults/sample-posts/**` — six starter posts injected as virtual
+  `_posts/` templates in **development builds only**, and only while the
+  brand has zero posts of its own (nested `_posts/<year>/` dirs count) — a
+  post-less brand still gets a living blog locally (index, taxonomy, prose,
+  read times). The first consumer post — or any production build — removes
+  them entirely. They carry `post.image: false` + no author, exercising the
+  designed no-media panel (serif category monogram) and the brand-byline
+  author fallback; both contracts apply to real posts too (`post.image:
+  false` → no-media panel, a path → that image, absent → the legacy
+  id-path convention).
 - `sw/` — the service worker: `manager.js` (the master-service-worker
   successor — FCM background messaging, notification clicks, the
   `update-cache` command, brand+build-named caches with foreign-cache

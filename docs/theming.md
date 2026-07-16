@@ -74,9 +74,36 @@ vocab): `classy-page-hero` (+ `classy-display--page`) opener, `classy-prose`
 long-form (blog posts, legal md, bios), `classy-timeline`, `classy-post-card`
 (the ONE blog card — `_includes/frontend/components/post-card.html`, shared
 by index/related/category/tag grids), `classy-person`, `classy-facts`
-(hairline-divided columns), `classy-chip-cloud`, `classy-blog-search`, and
-token-driven `.pagination`. Consumer frontmatter keys are unchanged — pages
-re-rendered, data contracts kept.
+(hairline-divided columns; `__value--num` serif numerals, `__sub` footnote),
+`classy-chip-cloud`, `classy-blog-search`, and token-driven `.pagination`.
+Consumer frontmatter keys are unchanged — pages re-rendered, data contracts
+kept.
+
+**Compositional set (cp147 — pages are COMPOSED, not centered)**:
+`classy-hero-split` (asymmetric opener: statement + side rail),
+`classy-duo` (label/head column + body column, sticky aside; column split
+overridable via `--classy-duo-cols`), `classy-statement` (editorial letter
+text — big serif with italic `<em>`), `classy-numbered` (principles list
+with serif italic indices), `classy-channel` (contact/support rows),
+`classy-band` (one wide hairline row — enterprise, platform strips),
+`classy-form-panel` (the hairline container every long form sits in), and
+the `.classy-quiet` fine-print voice.
+
+**Post media + author contracts** (post-card AND the post page honor them):
+`post.image: false` → designed no-media panel (serif italic category
+monogram on dotgrid), never a 404 `<img>`; `post.image: "<path>"` → that
+image lazy-loaded; absent → the legacy `/assets/images/blog/post-<id>/`
+convention. An author that resolves to no team member renders a neutral
+pen-nib mark + the brand name (no broken avatar rows).
+
+**Footer pattern** (`frontend/sections/footer.html` + `css/layout/_footer.scss`,
+draft-2): brand block (lockup + one-liner + social icon row) beside auto-fit
+link columns; ONE hairline base row where copyright, legal links, the
+language dropup pill, and the segmented appearance control all share the
+same 1.75rem scale. The appearance segments are plain `data-appearance-set`
+buttons — core appearance.js stamps `.active`/`aria-pressed`. The brand
+lockup class (`.classy-nav__brand`) is root-scoped and shared by nav +
+footer.
 
 **Per-page theme css override slot**: `themes/<theme>/css/pages/<page>/index.scss`
 compiles into the manifest's `themePages` bucket and loads LAST on its page —

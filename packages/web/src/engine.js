@@ -386,6 +386,18 @@ function configureOmega(eleventyConfig, options) {
     eleventyConfig.addTemplate(`omega-defaults/${rel}`, raw);
   }
 
+  // ---- Sample posts (development only): a post-less brand still gets a
+  // living blog locally. Injected as virtual templates under an _posts/
+  // segment so they ride the exact same lane as real posts (posts tag,
+  // /blog/<slug> permalink, taxonomy). The FIRST consumer post — or a
+  // production build — removes them entirely.
+  if (options.environment !== 'production' && !hasOwnPosts(options.consumerDir)) {
+    const samplePosts = collectLayered([path.join(defaultsDir, 'sample-posts')]);
+    for (const [rel, abs] of samplePosts) {
+      eleventyConfig.addTemplate(`omega-defaults/_posts/${rel}`, fs.readFileSync(abs, 'utf8'));
+    }
+  }
+
   // ---- Globals. site.uj carries UJM-runtime site values the core includes
   // read (cache_breaker in the @omega.js/client Configuration, date.year in
   // the copyright meta, date.iso as the sitemap/feed build stamp — legacy
@@ -420,6 +432,27 @@ function configureOmega(eleventyConfig, options) {
   }
 
   return { site, layers, layoutMap, frontmatter, suppressed, collectionsHolder };
+}
+
+/**
+ * Does the consumer have any post of their own? Recursive — Jekyll-style
+ * year subfolders (_posts/2024/…) count. Dotfiles don't.
+ * @param {string} consumerDir
+ * @returns {boolean}
+ */
+function hasOwnPosts(consumerDir) {
+  const root = path.join(consumerDir, '_posts');
+  if (!fs.existsSync(root)) return false;
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      if (entry.isDirectory()) stack.push(path.join(dir, entry.name));
+      else if (entry.isFile()) return true;
+    }
+  }
+  return false;
 }
 
 module.exports = { configureOmega };
