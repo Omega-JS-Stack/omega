@@ -1,0 +1,51 @@
+// Classy v2 alerts — Bootstrap's tinted slabs become quiet hairline notes:
+// surface background, a 3px level edge, ink text, the LEVEL speaks through
+// the edge + icon color (status colors stay reserved for status).
+
+.alert {
+  --bs-alert-bg: var(--omega-surface);
+  --bs-alert-color: var(--omega-ink);
+  --bs-alert-border-color: var(--omega-line);
+
+  border-inline-start-width: 3px;
+  border-radius: var(--omega-radius-m);
+
+  a,
+  .alert-link {
+    color: var(--omega-ink);
+    font-weight: 600;
+  }
+}
+
+.alert-success {
+  --bs-alert-border-color: var(--omega-line);
+  border-inline-start-color: var(--omega-ok);
+
+  svg {
+    color: var(--omega-ok);
+  }
+}
+
+.alert-warning {
+  border-inline-start-color: var(--omega-warn);
+
+  svg {
+    color: var(--omega-warn);
+  }
+}
+
+.alert-danger {
+  border-inline-start-color: var(--omega-danger);
+
+  svg {
+    color: var(--omega-danger);
+  }
+}
+
+.alert-info {
+  border-inline-start-color: var(--omega-accent);
+
+  svg {
+    color: var(--omega-accent);
+  }
+}
