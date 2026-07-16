@@ -263,7 +263,7 @@ function setupForm() {
       get bindings() { return buildBindingsState(); },
       resolveProcessor: (method) => resolveProcessor(method || 'card'),
     };
-    console.log('%c[Checkout Dev] window._checkout available', 'color: #8B5CF6');
+    console.log('%c[Checkout Dev] window._checkout available', 'color: #2563EB');
 
     initDevPanel();
   }

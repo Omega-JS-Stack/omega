@@ -218,9 +218,13 @@
 // card, trial CTA, nav signup). Two-layer paint: the inner layer fills
 // padding-box with the surface/button bg, the gradient paints only the
 // border-box ring. Leads with the brand accent so it re-brands itself.
+// The daybreak arc (ocean → lagoon → emerald → gold) is original to v2 —
+// legacy classy gradients (aurora/sunset/rainbow) are retired; never
+// reintroduce them. Stops are hand-mixed, deliberately NOT Tailwind hexes
+// (those all collide with legacy semantic tokens).
 // ============================================
 :root {
-  --classy-gradient: linear-gradient(135deg, var(--omega-accent) 0%, #22d3ee 48%, #fb7185 100%);
+  --classy-gradient: linear-gradient(135deg, var(--omega-accent) 0%, #18b7cf 35%, #21c07c 68%, #efa312 100%);
 }
 
 .classy-btn-ring {

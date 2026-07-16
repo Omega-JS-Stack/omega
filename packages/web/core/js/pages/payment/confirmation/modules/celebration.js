@@ -13,7 +13,9 @@ export async function triggerCelebration() {
       particleCount: 100,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#5b6fff', '#8b5cf6', '#22d3ee', '#34d399', '#fb923c'],
+      // Brand confetti: ocean accent + the daybreak-arc stops (legacy
+      // purple-era palette retired, Ian 2026-07-16)
+      colors: ['#2563eb', '#18b7cf', '#21c07c', '#efa312', '#e4572e'],
     });
 
     // Left side burst
@@ -23,7 +25,7 @@ export async function triggerCelebration() {
         angle: 60,
         spread: 55,
         origin: { x: 0 },
-        colors: ['#5b6fff', '#8b5cf6', '#22d3ee'],
+        colors: ['#2563eb', '#18b7cf', '#21c07c'],
       });
     }, 250);
 
@@ -34,7 +36,7 @@ export async function triggerCelebration() {
         angle: 120,
         spread: 55,
         origin: { x: 1 },
-        colors: ['#34d399', '#fb923c', '#5b6fff'],
+        colors: ['#21c07c', '#efa312', '#e4572e'],
       });
     }, 400);
   } catch (error) {
