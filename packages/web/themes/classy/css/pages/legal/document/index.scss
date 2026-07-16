@@ -1,0 +1,184 @@
+// classy legal documents (/terms /privacy /cookies) — the editorial document
+// treatment: quiet header + hub chips, sticky "On this page" rail, readable
+// measure, print-clean.
+
+.classy-legal__sub {
+  max-width: 46rem;
+}
+
+.classy-legal__hub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+
+  a.classy-chip {
+    text-decoration: none;
+    transition: border-color var(--omega-speed) var(--omega-ease), color var(--omega-speed) var(--omega-ease);
+
+    &:hover {
+      color: var(--omega-ink);
+      border-color: var(--omega-line-strong);
+    }
+  }
+}
+
+// ── Rail + document grid ─────────────────────────────────────────────────────
+
+.classy-legal {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 4rem;
+  align-items: start;
+
+  @media (max-width: 991.98px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+.classy-legal__rail {
+  @media (max-width: 991.98px) {
+    display: none; // the hub chips + in-doc headings carry small screens
+  }
+}
+
+.classy-legal__rail-inner {
+  position: sticky;
+  top: 5.5rem;
+}
+
+.classy-legal__toc {
+  max-height: calc(100vh - 16rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.classy-legal__toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  a {
+    display: block;
+    padding: 0.3125rem 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--omega-ink-muted);
+    text-decoration: none;
+    border-inline-start: 1px solid var(--omega-line);
+    transition: color var(--omega-speed) var(--omega-ease), border-color var(--omega-speed) var(--omega-ease);
+
+    &:hover {
+      color: var(--omega-ink);
+    }
+
+    &.active {
+      color: var(--omega-ink);
+      border-inline-start-color: var(--omega-ink);
+      font-weight: 550;
+    }
+  }
+
+  .classy-legal__toc-sub a {
+    padding-inline-start: 1.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+.classy-legal__rail-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--omega-line);
+}
+
+.classy-legal__rail-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 0.8125rem;
+  color: var(--omega-ink-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    color: var(--omega-ink);
+  }
+}
+
+// ── The document itself ──────────────────────────────────────────────────────
+
+.classy-legal__doc {
+  max-width: 46rem;
+
+  .classy-legal__meta {
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--omega-ink-muted);
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--omega-line);
+    margin-bottom: 2rem;
+
+    strong {
+      color: var(--omega-ink);
+    }
+  }
+
+  // Section headings: serif voice, generous clearance, anchor-friendly
+  h2,
+  h3 {
+    font-family: var(--omega-font-marketing);
+    font-weight: 550;
+    letter-spacing: -0.01em;
+    margin-top: 2.75rem;
+    scroll-margin-top: 5.5rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    padding-bottom: 0.625rem;
+    border-bottom: 1px solid var(--omega-line);
+  }
+
+  h3 {
+    font-size: 1.1875rem;
+  }
+
+  hr {
+    border-color: var(--omega-line);
+    opacity: 1;
+    margin-block: 2rem;
+  }
+}
+
+.classy-legal__doc-foot {
+  margin-top: 3.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--omega-line);
+}
+
+// ── Print: the document, nothing else ────────────────────────────────────────
+
+@media print {
+  .classy-legal {
+    display: block;
+  }
+
+  .classy-legal__rail,
+  .classy-legal__hub {
+    display: none;
+  }
+
+  .classy-legal__doc {
+    max-width: none;
+  }
+}

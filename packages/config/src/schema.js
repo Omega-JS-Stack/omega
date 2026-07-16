@@ -69,6 +69,12 @@ const SHARED_SCHEMA = [
     description: 'Short marketing tagline.',
   },
   {
+    path:        'brand.company',
+    type:        'string',
+    required:    false,
+    description: 'Parent/legal entity name ("Acme Inc"). Legal documents, receipts; falls back to brand.name.',
+  },
+  {
     path:        'brand.contact.email',
     type:        'string',
     required:    false,

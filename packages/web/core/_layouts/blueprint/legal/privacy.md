@@ -1,5 +1,5 @@
 ---
-layout: frontend/core/minimal
+layout: frontend/pages/legal/document
 
 meta:
   title: "Privacy Policy - {{ site.brand.name }}"
@@ -14,10 +14,9 @@ web_manager:
 {% capture brand %}**{{ site.brand.name | uj_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | uj_liquify }}{% endcapture %}
 
-### Effective date: <span class="text-primary">8th of April, 2017</span>
-<hr>
+<p class="classy-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
-Welcome to [{{ site.url }}]({{ site.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"), a brand that is a part of our parent company, **ITW Creative Works**. By visiting our website ("the website","our website", "the site", or "our site"), using the {{ brand }} application ("the software", "our software", "the application", "our application", "the app", or "our app"), and/or accessing the information, resources, services, and tools we provide, you acknowledge, understand, and agree to accept and adhere to the following {{ breadcrumb }} as stated in this policy. Our Policy applies to all visitors, users, and others who access the Service ("Users").
+Welcome to [{{ site.url }}]({{ site.url }}). This website is owned and operated by {{ brand }} ("{{ brand }}", "we", "us", or "our"){% if site.brand.company and site.brand.company != site.brand.name %}, a brand that is a part of our parent company, **{{ site.brand.company }}**.{% else %}.{% endif %} By visiting our website ("the website","our website", "the site", or "our site"), using the {{ brand }} application ("the software", "our software", "the application", "our application", "the app", or "our app"), and/or accessing the information, resources, services, and tools we provide, you acknowledge, understand, and agree to accept and adhere to the following {{ breadcrumb }} as stated in this policy. Our Policy applies to all visitors, users, and others who access the Service ("Users").
 
 All third-party trademarks are the property of their respective owners.
 

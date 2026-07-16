@@ -17,6 +17,7 @@
   brand: {
     id: "omega-playground",
     name: "OMEGA Playground",
+    company: "ITW Creative Works",
     description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
     tagline: "One config. Every target.",
     color: "#2563eb", // draft-1 "ocean" ideation blue (Ian 2026-07-16: purple retired) — drives the --omega-accent-* ramps

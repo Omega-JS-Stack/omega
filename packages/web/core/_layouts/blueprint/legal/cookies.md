@@ -1,5 +1,5 @@
 ---
-layout: frontend/core/minimal
+layout: frontend/pages/legal/document
 
 meta:
   title: "Cookie Policy - {{ site.brand.name }}"
@@ -14,8 +14,7 @@ web_manager:
 {% capture brand %}**{{ site.brand.name | uj_liquify }}**{% endcapture %}
 {% capture breadcrumb %}{{ resolved.meta.breadcrumb | uj_liquify }}{% endcapture %}
 
-### Effective date: <span class="text-primary">8th of April, 2017</span>
-<hr>
+<p class="classy-legal__meta">Effective date: <strong>April 8, 2017</strong></p>
 
 <p>
   This is the Cookie Policy for {{ brand }}, accessible from {{ site.url }}
