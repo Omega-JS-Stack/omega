@@ -113,7 +113,7 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
 
   const classyCss = fs.readFileSync(path.join(OUT, classy.css.main.slice(1)), 'utf8');
   const newsflashCss = fs.readFileSync(path.join(OUT, newsflash.css.main.slice(1)), 'utf8');
-  assert.ok(classyCss.includes('#5B47FB') || classyCss.includes('#5b47fb'), 'classy primary in classy build');
+  assert.ok(classyCss.includes('#2563EB') || classyCss.includes('#2563eb'), 'classy primary in classy build');
   assert.ok(newsflashCss.includes('#F03612') || newsflashCss.includes('#f03612'), 'newsflash primary in newsflash build');
   assert.ok(classyCss.includes('.btn'), 'bootstrap compiled in via the theme config');
   assert.notStrictEqual(classy.css.main, newsflash.css.main, 'content hash differs per theme');

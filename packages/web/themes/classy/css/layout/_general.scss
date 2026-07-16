@@ -9,12 +9,14 @@
 main {
   > section,
   > article {
-    padding-top: 4rem;
-    padding-bottom: 4rem;
+    // Bronn-calibrated air (Ian 2026-07-16: "MORE EXPANDED") — sections
+    // breathe; density is the dashboard's job, not marketing's
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
 
     @media (min-width: 992px) {
-      padding-top: 5.5rem;
-      padding-bottom: 5.5rem;
+      padding-top: 7rem;
+      padding-bottom: 7rem;
     }
 
     &:first-child {

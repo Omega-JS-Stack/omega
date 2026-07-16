@@ -22,6 +22,10 @@ export default function () {
     // Check for authSignout parameter first
     await handleAuthSignout();
 
+    // Pure-UI wiring FIRST: the eye toggle must work even when a later step
+    // early-returns (custom token, OAuth redirect, subdomain bounce)
+    setupPasswordToggle();
+
     // Check for authCustomToken parameter (admin impersonation / custom token sign-in)
     const customTokenHandled = await handleCustomTokenSignin();
     if (customTokenHandled) {
@@ -63,9 +67,6 @@ export default function () {
 
     // Update auth return URL in all auth-related links
     updateAuthReturnUrl();
-
-    // Setup password visibility toggle
-    setupPasswordToggle();
   });
 
   // Initialize the form based on current page

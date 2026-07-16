@@ -43,6 +43,22 @@ story:
     title: "The future"
     description: "Continuing to push boundaries and build the future of business technology"
 
+# Photo band — life in pictures (gallery: false kills it). Placeholder
+# imagery ships by default; point src at your own photos. wide: true spans
+# the grid; the wide tile loads via @bg, stills via responsive @srcset.
+gallery:
+  items:
+  - src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80"
+    alt: "The team working around one table"
+    caption: "Shipping week, every week"
+    wide: true
+  - src: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80"
+    alt: "Two teammates pairing on a laptop"
+    caption: "Pairing beats meetings"
+  - src: "https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&q=80"
+    alt: "A notebook and coffee on a desk"
+    caption: "Plans in pencil"
+
 # Company facts — the hero rail (numbers count up on reveal)
 stats:
   superheadline:
@@ -202,6 +218,34 @@ team_cta:
     </div>
   </div>
 </section>
+
+<!-- ═══ Life in pictures — photo band (gallery: false kills it) ═══ -->
+{% unless resolved.gallery == false %}
+  {% if resolved.gallery.items and resolved.gallery.items.size > 0 %}
+    <section class="pt-0">
+      <div class="container">
+        <div class="classy-photo-band" data-omega-reveal-stagger="90">
+          {% for photo in resolved.gallery.items %}
+            {% if photo.wide %}
+              <div class="classy-photo-band__tile classy-photo-band__tile--wide lazy-loading" data-lazy="@bg {{ photo.src }}&w=1600" role="img" aria-label="{{ photo.alt }}" data-omega-reveal>
+                {% iftruthy photo.caption %}<span class="classy-photo-band__caption">{{ photo.caption }}</span>{% endiftruthy %}
+              </div>
+            {% else %}
+              <figure class="classy-photo-band__tile" data-omega-reveal>
+                <img
+                  src="{{ site.uj.placeholder.src }}"
+                  data-lazy="@srcset {{ photo.src }}&w=640 640w, {{ photo.src }}&w=1080 1080w"
+                  sizes="(min-width: 992px) 40vw, 100vw"
+                  alt="{{ photo.alt }}"/>
+                {% iftruthy photo.caption %}<figcaption class="classy-photo-band__caption">{{ photo.caption }}</figcaption>{% endiftruthy %}
+              </figure>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  {% endif %}
+{% endunless %}
 
 <!-- ═══ Principles — the numbered list ═══ -->
 <section>

@@ -81,6 +81,11 @@ const ujMember = {
 };
 
 function memberImagePath(member) {
+  // Explicit member.image wins (external URL or any asset path — sample
+  // members and CDN-hosted portraits); the team-assets convention stands
+  const memberData = (member.data && member.data.member) || {};
+  if (memberData.image) return memberData.image;
+
   const cleanId = String(member.id).replace('/team/', '');
   return `/assets/images/team/${cleanId}/profile.jpg`;
 }

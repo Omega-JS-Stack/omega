@@ -74,6 +74,26 @@ function composePlan(product) {
 }
 
 /**
+ * Backfill feature definitions by id: a definition authored on ANY product's
+ * copy of a feature applies to every other copy — author the tooltip once in
+ * omega.json5 and every instance (plan cards, extras, comparison) carries it.
+ * @param {Array<Array<object>>} featureLists - composed feature arrays to unify
+ */
+function backfillDefinitions(featureLists) {
+  const byId = new Map();
+  for (const features of featureLists) {
+    for (const feature of features) {
+      if (feature.definition && !byId.has(feature.id)) byId.set(feature.id, feature.definition);
+    }
+  }
+  for (const features of featureLists) {
+    for (const feature of features) {
+      if (!feature.definition) feature.definition = byId.get(feature.id) || null;
+    }
+  }
+}
+
+/**
  * Split each plan's features into the set common to ALL plans (rendered with
  * per-plan values) and the plan's extras (rendered under "Everything in
  * <previous>, and more").
@@ -144,7 +164,6 @@ function composePricing(payment) {
   const plans = products
     .filter((product) => (product.type || 'subscription') === 'subscription')
     .map(composePlan);
-  splitCommonFeatures(plans);
 
   const oneTime = products
     .filter((product) => product.type === 'one-time')
@@ -155,6 +174,13 @@ function composePricing(payment) {
       price: (product.prices && typeof product.prices.once === 'number') ? product.prices.once : 0,
       features: composeFeatures(product),
     }));
+
+  // Definitions unify BEFORE the comparison copies feature objects
+  backfillDefinitions([
+    ...plans.map((plan) => plan.features),
+    ...oneTime.map((product) => product.features),
+  ]);
+  splitCommonFeatures(plans);
 
   // Billing toggle only exists when both cadences are actually purchasable
   const billing = {

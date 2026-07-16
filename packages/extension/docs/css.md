@@ -34,7 +34,7 @@ So this just works in a consumer's `src/assets/css/main.scss`:
 ```scss
 // 1. Resolves to @omega.js/extension's main entry — sets up Bootstrap, utilities, etc.
 @use 'omega-extension' as * with (
-  $primary: #5B47FB,
+  $primary: #2563EB,
 );
 
 // 2. Resolves to the active theme's _theme.scss

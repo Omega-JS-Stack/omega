@@ -79,6 +79,20 @@ test('composePricing: subscription/one-time split, free detection, limits fallba
   assert.strictEqual(kit.tagline, 'everything to ship day one');
 });
 
+test('composePricing: definitions backfill by id — author once, tooltip everywhere', () => {
+  const pricing = composePricing(CATALOG);
+  const [, premium] = pricing.plans;
+
+  // premium's `requests` copy declares NO definition — it inherits basic's,
+  // so every plan card (not just the first) renders the dotted tooltip
+  assert.strictEqual(premium.features[0].definition, 'API requests per month.');
+  assert.strictEqual(
+    premium.commonFeatures.find((f) => f.id === 'requests').definition,
+    'API requests per month.',
+    'the split keeps the backfilled objects',
+  );
+});
+
 test('composePricing: common/extra split + comparison inheritance', () => {
   const pricing = composePricing(CATALOG);
   const [basic, premium] = pricing.plans;

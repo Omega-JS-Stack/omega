@@ -69,8 +69,8 @@ test('token sheet compiles clean — modern sass, ZERO deprecations, full plumbi
 
   assert.deepEqual(warnings, [], 'new core css never warns — the #16 bar');
   assert.match(result.css, /--omega-ground/);
-  assert.match(result.css, /--omega-accent: #5b47fb/, 'classy v2 placeholder accent (light)');
-  assert.match(result.css, /--omega-accent: #8577ff/, 'classy v2 placeholder accent (dark variant)');
+  assert.match(result.css, /--omega-accent: #2563eb/, 'classy v2 placeholder accent (light)');
+  assert.match(result.css, /--omega-accent: #5484ef/, 'classy v2 placeholder accent (dark variant)');
   assert.match(result.css, /--omega-font-marketing/, 'type pairing slots present (D5 seam)');
   assert.match(result.css, /prefers-color-scheme: dark/, 'OS preference carries (D2)');
   assert.match(result.css, /data-bs-theme=['"]?dark/, 'appearance.js stamp beats OS — dark');

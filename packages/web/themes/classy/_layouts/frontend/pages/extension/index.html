@@ -62,12 +62,12 @@ features:
       icon: "bell"
     - title: "Secure & Private"
       description: "Your data stays safe with enterprise-grade encryption"
-      icon: "shield-check"
+      icon: "shield-halved"
 
 # FAQ Section
 faqs:
   superheadline:
-    icon: "messages-question"
+    icon: "circle-question"
     text: "FAQs"
   headline: "Frequently asked"
   headline_accent: "questions"
@@ -156,7 +156,7 @@ cta:
                   aria-controls="{{ browser.id }}-pane"
                   aria-selected="false"
                 >
-                  <span class="avatar avatar-xs me-2">{% uj_logo browser.logo %}</span>
+                  <span class="avatar avatar-xs me-2">{% uj_icon browser.logo %}</span>
                   {{ browser.name }}
                 </button>
               </li>
@@ -219,7 +219,7 @@ cta:
               <div class="card">
                 <div class="card-body p-4 p-md-5 text-center">
                   <div class="mb-4">
-                    <span class="avatar avatar-xl">{% uj_logo browser.logo %}</span>
+                    <span class="avatar avatar-xl">{% uj_icon browser.logo %}</span>
                   </div>
                   <h2 class="classy-display classy-display--section mb-1">{{ browser.name }}</h2>
                   <p class="text-muted mb-4">{{ browser.description }}</p>

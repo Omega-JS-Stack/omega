@@ -21,9 +21,12 @@
  *                                       and keeps it under the checked/.active
  *                                       segment (CSS transitions do the glide)
  *   [data-omega-dotfield="22"]        — canvas dot grid (value = px spacing):
- *                                       dots breathe on a slow traveling wave,
- *                                       tint toward the accent along it, and
- *                                       brighten/grow near the pointer
+ *                                       dots breathe on a slow traveling wave
+ *                                       and tint along ONE rainbow gradient
+ *                                       that drifts across the field; the
+ *                                       pointer brightens/grows nearby dots
+ *                                       (tracked window-level so fixed
+ *                                       overlays like the nav can't blind it)
  *
  * Resilience contract (mirrors the stylesheet):
  *   - The page stamps html[data-omega-motion] via an inline head script; the
@@ -116,6 +119,48 @@ function parseColor(ctx, value) {
   }
   const parts = match[1].split(',').map((part) => parseFloat(part));
   return [parts[0], parts[1], parts[2]];
+}
+
+// Dotfield rainbow ramp: fixed saturation/lightness so the spectrum reads as
+// ONE continuous gradient (not per-dot confetti); hue comes from grid
+// position + time. Q/P are the hue-to-rgb intermediates for that fixed S/L.
+const RAINBOW_S = 0.68;
+const RAINBOW_L = 0.58;
+const RAINBOW_Q = RAINBOW_L < 0.5 ? RAINBOW_L * (1 + RAINBOW_S) : RAINBOW_L + RAINBOW_S - (RAINBOW_L * RAINBOW_S);
+const RAINBOW_P = (2 * RAINBOW_L) - RAINBOW_Q;
+
+/**
+ * One channel of the fixed-S/L hue→rgb conversion.
+ * @param {number} t - hue offset (turns)
+ * @returns {number} channel 0-1
+ */
+function hueChannel(t) {
+  let tn = t;
+  if (tn < 0) tn += 1;
+  if (tn > 1) tn -= 1;
+  if (tn < 1 / 6) return RAINBOW_P + ((RAINBOW_Q - RAINBOW_P) * 6 * tn);
+  if (tn < 1 / 2) return RAINBOW_Q;
+  if (tn < 2 / 3) return RAINBOW_P + ((RAINBOW_Q - RAINBOW_P) * ((2 / 3) - tn) * 6);
+  return RAINBOW_P;
+}
+
+/**
+ * Rainbow color for a dotfield dot: hue advances along the grid diagonal
+ * (one full spectrum ≈ 1.25 container widths) and drifts with time (a full
+ * cycle every ~20s), so every dot samples one moving gradient.
+ * @param {number} x - dot x within the field (px)
+ * @param {number} y - dot y within the field (px)
+ * @param {number} width - field width (px)
+ * @param {number} t - elapsed seconds
+ * @param {number[]} [out] - reusable output array (hot-loop friendly)
+ * @returns {number[]} [r, g, b] channels 0-255
+ */
+function rainbowColor(x, y, width, t, out = []) {
+  const hue = (((((x + (y * 0.35)) / (Math.max(width, 1) * 1.25)) + (t * 0.05)) % 1) + 1) % 1;
+  out[0] = Math.round(hueChannel(hue + (1 / 3)) * 255);
+  out[1] = Math.round(hueChannel(hue) * 255);
+  out[2] = Math.round(hueChannel(hue - (1 / 3)) * 255);
+  return out;
 }
 
 /**
@@ -381,7 +426,7 @@ function createMotion() {
     el.prepend(canvas);
 
     const spacing = Number(el.getAttribute('data-omega-dotfield')) || 22;
-    const colors = { base: [128, 128, 128], accent: [128, 128, 128] };
+    const colors = { base: [128, 128, 128] };
     const pointer = { x: -1e4, y: -1e4, targetX: -1e4, targetY: -1e4 };
     let width = 0;
     let height = 0;
@@ -393,7 +438,6 @@ function createMotion() {
     const readColors = () => {
       const styles = window.getComputedStyle(el);
       colors.base = parseColor(ctx, styles.getPropertyValue('--omega-line-strong')) || colors.base;
-      colors.accent = parseColor(ctx, styles.getPropertyValue('--omega-accent')) || colors.accent;
     };
 
     const resize = () => {
@@ -427,8 +471,8 @@ function createMotion() {
       ctx.clearRect(0, 0, width, height);
 
       const [br, bg, bb] = colors.base;
-      const [ar, ag, ab] = colors.accent;
       const t = now / 1000;
+      const rgb = [0, 0, 0]; // reused per dot — no per-frame allocation churn
 
       for (let y = spacing / 2; y < height; y += spacing) {
         for (let x = spacing / 2; x < width; x += spacing) {
@@ -438,11 +482,12 @@ function createMotion() {
           const dy = y - pointer.y;
           const boost = Math.exp(-(dx * dx + dy * dy) / POINTER_RADIUS);
 
+          rainbowColor(x, y, width, t, rgb);
           const mix = Math.min(1, wave * 0.45 + boost * 0.55);
           const alpha = Math.min(1, 0.28 + wave * 0.38 + boost * 0.5);
           const radius = 1 + wave * 0.35 + boost * 0.9;
 
-          ctx.fillStyle = `rgba(${Math.round(br + (ar - br) * mix)},${Math.round(bg + (ag - bg) * mix)},${Math.round(bb + (ab - bb) * mix)},${alpha})`;
+          ctx.fillStyle = `rgba(${Math.round(br + (rgb[0] - br) * mix)},${Math.round(bg + (rgb[1] - bg) * mix)},${Math.round(bb + (rgb[2] - bb) * mix)},${alpha})`;
           ctx.beginPath();
           ctx.arc(x, y, radius, 0, Math.PI * 2);
           ctx.fill();
@@ -465,12 +510,28 @@ function createMotion() {
     readColors();
     resize();
 
-    el.addEventListener('pointermove', (event) => {
+    // Window-level tracking: an el-level pointermove stops firing while the
+    // cursor rides a covering element (the fixed nav over a hero), so the
+    // boost froze there and JUMPED on re-entry. The window always fires;
+    // out-of-range coordinates park the boost off-field smoothly.
+    const POINTER_MARGIN = 140;
+    window.addEventListener('pointermove', (event) => {
+      if (!running) {
+        return; // offscreen fields skip the rect read
+      }
       const rect = el.getBoundingClientRect();
-      pointer.targetX = event.clientX - rect.left;
-      pointer.targetY = event.clientY - rect.top;
-    });
-    el.addEventListener('pointerleave', () => {
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      if (x < -POINTER_MARGIN || y < -POINTER_MARGIN
+        || x > rect.width + POINTER_MARGIN || y > rect.height + POINTER_MARGIN) {
+        pointer.targetX = -1e4;
+        pointer.targetY = -1e4;
+        return;
+      }
+      pointer.targetX = x;
+      pointer.targetY = y;
+    }, { passive: true });
+    doc.documentElement.addEventListener('mouseleave', () => {
       pointer.targetX = -1e4;
       pointer.targetY = -1e4;
     });
@@ -632,4 +693,4 @@ function createMotion() {
   return { start, stop, scan };
 }
 
-module.exports = { createMotion, parseCountTarget, formatCount, marqueeCopies, parseColor };
+module.exports = { createMotion, parseCountTarget, formatCount, marqueeCopies, parseColor, rainbowColor };

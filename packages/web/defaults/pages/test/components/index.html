@@ -1,0 +1,586 @@
+---
+layout: frontend/core/base
+permalink: /test/components
+
+sitemap:
+  include: false
+meta:
+  title: "Components"
+  description: "Every token, type style, button, form control, and motion attribute in one place — the theme's living styleguide."
+  breadcrumb: "Components"
+  index: false
+---
+
+{% comment %}
+  The living styleguide (successor to UJM's /test/libraries/bootstrap page):
+  every design token, type style, component, and data-omega-* motion
+  attribute on one dev-only page, so a theme change can be eyeballed in one
+  scroll. Ships as a default page (noindex + /test sitemap exclusion); a
+  consumer page at the same URL suppresses it like any default.
+{% endcomment %}
+
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-3" data-omega-reveal>Styleguide</span>
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      Every piece, <em>one page</em>
+    </h1>
+    <p class="classy-hero__sub" data-omega-reveal>
+      Tokens, typography, buttons, forms, and motion — the whole vocabulary this theme ships, rendered live.
+    </p>
+    <div class="d-flex flex-wrap gap-2 mt-4" data-omega-reveal>
+      <a href="#colors" class="classy-chip text-decoration-none">Colors</a>
+      <a href="#typography" class="classy-chip text-decoration-none">Typography</a>
+      <a href="#buttons" class="classy-chip text-decoration-none">Buttons</a>
+      <a href="#chips" class="classy-chip text-decoration-none">Chips</a>
+      <a href="#forms" class="classy-chip text-decoration-none">Forms</a>
+      <a href="#cards" class="classy-chip text-decoration-none">Cards</a>
+      <a href="#feedback" class="classy-chip text-decoration-none">Feedback</a>
+      <a href="#data" class="classy-chip text-decoration-none">Data</a>
+      <a href="#motion" class="classy-chip text-decoration-none">Motion</a>
+      <a href="#icons" class="classy-chip text-decoration-none">Icons</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Colors & tokens ═══ -->
+<section id="colors" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Tokens</span>
+      <h2 class="classy-display classy-display--section">Colors</h2>
+      <p>The <code>--omega-*</code> token sheet — light and dark ship together; the accent family follows <code>brand.color</code>.</p>
+    </div>
+
+    <div class="row g-3" data-omega-reveal-stagger="40">
+      {% assign _swatches = "ground|surface|surface-2|ink|ink-muted|ink-faint|line|line-strong|accent|accent-hover|accent-subtle|accent-ring|ok|warn|danger" | split: "|" %}
+      {% for swatch in _swatches %}
+        <div class="col-6 col-md-4 col-lg-3 col-xl-2" data-omega-reveal>
+          <div class="card p-2 h-100">
+            <div class="rounded-2 border mb-2" style="height: 3.25rem; background: var(--omega-{{ swatch }});"></div>
+            <code class="small">--omega-{{ swatch }}</code>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Typography ═══ -->
+<section id="typography" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Type</span>
+      <h2 class="classy-display classy-display--section">Typography</h2>
+      <p>Serif marketing display over sans UI — the Manus-split pairing.</p>
+    </div>
+
+    <div class="card p-4 p-lg-5" data-omega-reveal>
+      <span class="classy-micro d-block mb-3">classy-micro — the uppercase eyebrow</span>
+      <p class="classy-display classy-display--page mb-2">Display page, <em>with italics</em></p>
+      <p class="classy-display classy-display--section mb-4">Display section headline</p>
+      <hr/>
+      <h1>Heading one</h1>
+      <h2>Heading two</h2>
+      <h3>Heading three</h3>
+      <h4>Heading four</h4>
+      <h5>Heading five</h5>
+      <h6>Heading six</h6>
+      <hr/>
+      <p class="lead">Lead paragraph — the standfirst voice for section intros and summaries.</p>
+      <p>Body text with a <a href="#typography">standard link</a>, <strong>strong emphasis</strong>, <em>italics</em>, and <code>inline code</code>. Numbers set tabular where they align: 1,024 / 2,048 / 4,096.</p>
+      <p class="text-muted mb-0">Muted body — supporting notes and captions ride the ink-muted token.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Buttons ═══ -->
+<section id="buttons" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Actions</span>
+      <h2 class="classy-display classy-display--section">Buttons</h2>
+      <p>Every button lifts on hover and presses on click — the unified niceties. Icons nudge on <code>omega-hover-nudge</code>.</p>
+    </div>
+
+    <div class="card p-4 mb-4" data-omega-reveal>
+      <span class="classy-micro d-block mb-3">Variants</span>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <button type="button" class="btn btn-adaptive">Adaptive (ink)</button>
+        <button type="button" class="btn btn-outline-adaptive">Outline adaptive</button>
+        <button type="button" class="btn btn-primary">Primary (accent)</button>
+        <button type="button" class="btn btn-outline-primary">Outline primary</button>
+        <button type="button" class="btn btn-adaptive classy-btn-ring">Gradient ring</button>
+        <button type="button" class="btn btn-cmd"><span class="classy-cmd-prompt">$</span>npx omega setup</button>
+        <button type="button" class="btn btn-icon" aria-label="Icon button">{% uj_icon "gear" %}</button>
+      </div>
+
+      <span class="classy-micro d-block mb-3">Sizes & states</span>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <button type="button" class="btn btn-adaptive btn-lg">Large</button>
+        <button type="button" class="btn btn-adaptive">Default</button>
+        <button type="button" class="btn btn-adaptive btn-sm">Small</button>
+        <button type="button" class="btn btn-adaptive" disabled>Disabled</button>
+        <button type="button" class="btn btn-outline-adaptive">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          Loading
+        </button>
+      </div>
+
+      <span class="classy-micro d-block mb-3">With icons</span>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <a href="#buttons" class="btn btn-adaptive omega-hover-nudge">
+          Continue
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+        <a href="#buttons" class="btn btn-outline-adaptive">
+          {% uj_icon "paper-plane", "fa-sm me-2" %}
+          Send message
+        </a>
+        <a href="#buttons" class="btn btn-primary omega-hover-nudge">
+          Get free trial
+          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Chips & status ═══ -->
+<section id="chips" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Signals</span>
+      <h2 class="classy-display classy-display--section">Chips & status</h2>
+      <p>Quiet neutrals; status is told by dot + label, never color alone.</p>
+    </div>
+
+    <div class="card p-4" data-omega-reveal>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <span class="classy-chip">Default chip</span>
+        <span class="classy-chip classy-chip--accent">Accent chip</span>
+        <span class="classy-chip classy-chip--ink">Ink chip</span>
+        <span class="classy-chip omega-float">Floating chip</span>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="classy-status classy-status--ok"><span class="classy-dot bg-success rounded-circle"></span> Operational</span>
+        <span class="classy-status classy-status--warn"><span class="classy-dot bg-warning rounded-circle"></span> Degraded</span>
+        <span class="classy-status classy-status--danger"><span class="classy-dot bg-danger rounded-circle"></span> Outage</span>
+        <span class="badge text-bg-secondary">Badge</span>
+        <span class="badge text-bg-primary">Primary badge</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Forms ═══ -->
+<section id="forms" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Input</span>
+      <h2 class="classy-display classy-display--section">Forms</h2>
+      <p>Controls, groups, switches (they glide), and the segmented control's gliding thumb.</p>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-6" data-omega-reveal>
+        <div class="card p-4 h-100">
+          <div class="mb-3 text-start">
+            <label for="sg-email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="sg-email" placeholder="you@example.com"/>
+            <div class="form-text">Help text rides under the control.</div>
+          </div>
+          <div class="mb-3 text-start">
+            <label for="sg-password" class="form-label">Password (input group)</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="sg-password" placeholder="Enter your password"/>
+              <button class="btn uj-password-toggle px-3" type="button" aria-label="Toggle password visibility">
+                <span class="uj-password-show">{% uj_icon "eye", "fa-fw" %}</span>
+                <span class="uj-password-hide d-none">{% uj_icon "eye-slash", "fa-fw" %}</span>
+              </button>
+            </div>
+          </div>
+          <div class="mb-3 text-start">
+            <label for="sg-select" class="form-label">Select</label>
+            <select class="form-select" id="sg-select">
+              <option selected>Choose an option</option>
+              <option>Option two</option>
+              <option>Option three</option>
+            </select>
+          </div>
+          <div class="text-start">
+            <label for="sg-range" class="form-label">Range</label>
+            <input type="range" class="form-range" id="sg-range"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6" data-omega-reveal>
+        <div class="card p-4 h-100">
+          <span class="classy-micro d-block mb-3">Checks & switches</span>
+          <div class="form-check text-start">
+            <input class="form-check-input" type="checkbox" id="sg-check" checked/>
+            <label class="form-check-label" for="sg-check">Checkbox, checked</label>
+          </div>
+          <div class="form-check text-start">
+            <input class="form-check-input" type="radio" name="sg-radio" id="sg-radio1" checked/>
+            <label class="form-check-label" for="sg-radio1">Radio, selected</label>
+          </div>
+          <div class="form-check text-start mb-3">
+            <input class="form-check-input" type="radio" name="sg-radio" id="sg-radio2"/>
+            <label class="form-check-label" for="sg-radio2">Radio, idle</label>
+          </div>
+          <div class="form-check form-switch text-start mb-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="sg-switch" checked/>
+            <label class="form-check-label" for="sg-switch">Switch — it glides</label>
+          </div>
+
+          <span class="classy-micro d-block mb-3">Segmented control</span>
+          <div class="classy-billing-toggle" role="group" aria-label="Segmented demo" data-omega-segmented>
+            <input type="radio" class="btn-check" name="sg-segment" id="sg-seg-a" autocomplete="off" checked/>
+            <label class="btn" for="sg-seg-a">Overview</label>
+            <input type="radio" class="btn-check" name="sg-segment" id="sg-seg-b" autocomplete="off"/>
+            <label class="btn" for="sg-seg-b">Usage</label>
+            <input type="radio" class="btn-check" name="sg-segment" id="sg-seg-c" autocomplete="off"/>
+            <label class="btn" for="sg-seg-c">Billing</label>
+          </div>
+
+          <span class="classy-micro d-block mt-4 mb-3">Validation</span>
+          <div class="text-start">
+            <input type="text" class="form-control is-valid mb-2" value="Looks good"/>
+            <input type="text" class="form-control is-invalid" value="Not quite"/>
+            <div class="invalid-feedback d-block">This field needs attention.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Cards ═══ -->
+<section id="cards" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Surfaces</span>
+      <h2 class="classy-display classy-display--section">Cards</h2>
+      <p>Hairline surfaces on the paper ground; the gradient ring marks the recommended thing.</p>
+    </div>
+
+    <div class="row g-4" data-omega-reveal-stagger="70">
+      <div class="col-md-4" data-omega-reveal>
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 card-title">Plain card</h3>
+            <p class="card-text text-muted mb-0">The default surface: hairline border, soft radius, no shadow until it earns one.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4" data-omega-reveal>
+        <div class="card h-100">
+          <div class="card-header">Header</div>
+          <div class="card-body">
+            <p class="card-text text-muted mb-0">Header + footer variant for grouped content.</p>
+          </div>
+          <div class="card-footer text-muted">Footer</div>
+        </div>
+      </div>
+      <div class="col-md-4" data-omega-reveal>
+        <div class="card classy-price-card classy-price-card--popular h-100">
+          <span class="classy-chip classy-chip--ink classy-price-card__popular">Most popular</span>
+          <h3 class="card-title classy-price-card__name mb-0">Ringed card</h3>
+          <p class="classy-price-card__tagline">The gradient ring treatment</p>
+          <p class="text-muted mb-0">Reserved for the one thing on the page you'd recommend.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Feedback ═══ -->
+<section id="feedback" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Feedback</span>
+      <h2 class="classy-display classy-display--section">Alerts, progress & overlays</h2>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-6" data-omega-reveal>
+        <div class="card p-4 h-100">
+          <div class="alert alert-primary" role="alert">Primary alert — something informational.</div>
+          <div class="alert alert-success" role="alert">Success alert — that worked.</div>
+          <div class="alert alert-warning" role="alert">Warning alert — check this first.</div>
+          <div class="alert alert-danger mb-4" role="alert">Danger alert — that failed.</div>
+
+          <div class="progress mb-2" role="progressbar" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width: 65%"></div>
+          </div>
+          <div class="d-flex align-items-center gap-3 mt-3">
+            <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading…</span></div>
+            <div class="spinner-grow spinner-grow-sm" role="status"><span class="visually-hidden">Loading…</span></div>
+            <span class="text-muted small">Spinners</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6" data-omega-reveal>
+        <div class="card p-4 h-100">
+          <span class="classy-micro d-block mb-3">Overlays</span>
+          <div class="d-flex flex-wrap gap-2 mb-4">
+            <button type="button" class="btn btn-outline-adaptive" data-bs-toggle="tooltip" data-bs-title="Tooltips ride Bootstrap's engine">Tooltip</button>
+            <button type="button" class="btn btn-outline-adaptive" data-bs-toggle="popover" data-bs-title="Popover" data-bs-content="Richer hover content with a title and body.">Popover</button>
+            <button type="button" class="btn btn-outline-adaptive" id="sg-toast-btn">Show toast</button>
+            <button type="button" class="btn btn-outline-adaptive" data-bs-toggle="modal" data-bs-target="#sg-modal">Open modal</button>
+          </div>
+
+          <span class="classy-micro d-block mb-3">Dotted definitions</span>
+          <p class="mb-4">
+            Features use a
+            <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="Exactly like the pricing page's config-defined feature definitions.">dotted underline</span>
+            for hover definitions.
+          </p>
+
+          <span class="classy-micro d-block mb-3">Dropdown</span>
+          <div class="dropdown">
+            <button class="btn btn-outline-adaptive dropdown-toggle" type="button" data-bs-toggle="dropdown">Menu</button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#feedback">Action</a></li>
+              <li><a class="dropdown-item" href="#feedback">Another action</a></li>
+              <li><hr class="dropdown-divider"/></li>
+              <li><a class="dropdown-item" href="#feedback">Separated action</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Data ═══ -->
+<section id="data" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Data</span>
+      <h2 class="classy-display classy-display--section">Tables, lists & navigation</h2>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-7" data-omega-reveal>
+        <div class="card p-4 h-100">
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Target</th>
+                  <th>Status</th>
+                  <th class="text-end">Build</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>marketing-site</td>
+                  <td><span class="classy-chip">web</span></td>
+                  <td><span class="classy-status classy-status--ok"><span class="classy-dot bg-success rounded-circle"></span> Live</span></td>
+                  <td class="text-end"><code>42s</code></td>
+                </tr>
+                <tr>
+                  <td>companion-app</td>
+                  <td><span class="classy-chip">desktop</span></td>
+                  <td><span class="classy-status classy-status--warn"><span class="classy-dot bg-warning rounded-circle"></span> Building</span></td>
+                  <td class="text-end"><code>2m 10s</code></td>
+                </tr>
+                <tr>
+                  <td>clip-extension</td>
+                  <td><span class="classy-chip">extension</span></td>
+                  <td><span class="classy-status classy-status--danger"><span class="classy-dot bg-danger rounded-circle"></span> Failed</span></td>
+                  <td class="text-end"><code>—</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <nav aria-label="Pagination demo" class="mt-3">
+            <ul class="pagination mb-0">
+              <li class="page-item disabled"><span class="page-link">Previous</span></li>
+              <li class="page-item active"><span class="page-link">1</span></li>
+              <li class="page-item"><a class="page-link" href="#data">2</a></li>
+              <li class="page-item"><a class="page-link" href="#data">3</a></li>
+              <li class="page-item"><a class="page-link" href="#data">Next</a></li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+
+      <div class="col-lg-5" data-omega-reveal>
+        <div class="card p-4 h-100">
+          <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb mb-0">
+              <li class="breadcrumb-item"><a href="#data">Home</a></li>
+              <li class="breadcrumb-item"><a href="#data">Library</a></li>
+              <li class="breadcrumb-item active" aria-current="page">Data</li>
+            </ol>
+          </nav>
+
+          <ul class="nav nav-pills mb-3">
+            <li class="nav-item"><a class="nav-link active" href="#data">Active</a></li>
+            <li class="nav-item"><a class="nav-link" href="#data">Link</a></li>
+            <li class="nav-item"><a class="nav-link disabled">Disabled</a></li>
+          </ul>
+
+          <div class="list-group mb-3">
+            <a href="#data" class="list-group-item list-group-item-action active">Active list item</a>
+            <a href="#data" class="list-group-item list-group-item-action">Second item</a>
+            <a href="#data" class="list-group-item list-group-item-action">Third item</a>
+          </div>
+
+          <div class="accordion" id="sg-accordion">
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#sg-acc-1">Accordion item</button>
+              </h3>
+              <div id="sg-acc-1" class="accordion-collapse collapse show" data-bs-parent="#sg-accordion">
+                <div class="accordion-body">FAQ-style disclosure, styled by the theme.</div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sg-acc-2">Second item</button>
+              </h3>
+              <div id="sg-acc-2" class="accordion-collapse collapse" data-bs-parent="#sg-accordion">
+                <div class="accordion-body">Collapsed by default.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Motion ═══ -->
+<section id="motion" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Motion</span>
+      <h2 class="classy-display classy-display--section">The data-omega-* attributes</h2>
+      <p>One engine drives every animation; <code>prefers-reduced-motion</code> kills all of it.</p>
+    </div>
+
+    <div class="row g-4" data-omega-reveal-stagger="80">
+      <div class="col-md-4" data-omega-reveal="up">
+        <div class="card p-4 h-100"><code>data-omega-reveal="up"</code></div>
+      </div>
+      <div class="col-md-4" data-omega-reveal="fade">
+        <div class="card p-4 h-100"><code>data-omega-reveal="fade"</code></div>
+      </div>
+      <div class="col-md-4" data-omega-reveal="scale">
+        <div class="card p-4 h-100"><code>data-omega-reveal="scale"</code></div>
+      </div>
+
+      <div class="col-md-4" data-omega-reveal>
+        <div class="card p-4 h-100 text-center">
+          <div class="display-6 fw-semibold" data-omega-countup>12,400+</div>
+          <span class="classy-micro mt-2">data-omega-countup</span>
+        </div>
+      </div>
+      <div class="col-md-4" data-omega-reveal>
+        <div class="card p-4 h-100 text-center">
+          <div data-omega-rotate="2200">
+            <span class="d-block fw-semibold">builders</span>
+            <span class="d-block fw-semibold">designers</span>
+            <span class="d-block fw-semibold">founders</span>
+          </div>
+          <span class="classy-micro mt-2">data-omega-rotate</span>
+        </div>
+      </div>
+      <div class="col-md-4" data-omega-reveal>
+        <div class="card p-4 h-100 text-center">
+          <span class="classy-typing mx-auto"><span></span><span></span><span></span></span>
+          <span class="classy-micro mt-3">classy-typing</span>
+        </div>
+      </div>
+
+      <div class="col-12" data-omega-reveal>
+        <div class="card p-4 classy-dotgrid position-relative" data-omega-dotfield style="min-height: 11rem;">
+          <span class="classy-micro position-relative">data-omega-dotfield — wave, rainbow drift, pointer glow</span>
+        </div>
+      </div>
+
+      <div class="col-12" data-omega-reveal>
+        <div class="card p-4">
+          <span class="classy-micro d-block mb-3">data-omega-marquee</span>
+          <div class="classy-marquee" data-omega-marquee>
+            <div class="classy-marquee__track">
+              {% assign _words = "OMEGA|Playground|Classy|Tokens|Motion|Bindings|Lazy|Deploys" | split: "|" %}
+              {% for word in _words %}
+                <span class="classy-chip mx-2">{{ word }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Icons ═══ -->
+<section id="icons" class="pt-0">
+  <div class="container">
+    <div class="classy-section-head mb-4" data-omega-reveal>
+      <span class="classy-micro">Icons</span>
+      <h2 class="classy-display classy-display--section">uj_icon</h2>
+      <p>Build-time inlined SVGs — solid by default, brands resolve automatically.</p>
+    </div>
+
+    <div class="card p-4" data-omega-reveal>
+      <span class="classy-micro d-block mb-3">Solid</span>
+      <div class="d-flex flex-wrap gap-3 fs-4 mb-4">
+        {% assign _solid = "house|user|gear|bell|check|xmark|magnifying-glass|paper-plane|rocket|heart|bolt|cloud|lock|wand-magic-sparkles|layer-group|headset|palette|shield-halved|circle-question|arrow-right" | split: "|" %}
+        {% for name in _solid %}
+          <span title="{{ name }}">{% uj_icon name %}</span>
+        {% endfor %}
+      </div>
+      <span class="classy-micro d-block mb-3">Brands</span>
+      <div class="d-flex flex-wrap gap-3 fs-4">
+        {% assign _brands = "chrome|firefox|edge|safari|opera|brave|apple|windows|linux|android|github|google|x-twitter|discord|slack|youtube" | split: "|" %}
+        {% for name in _brands %}
+          <span title="{{ name }}">{% uj_icon name %}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Toast + modal fixtures -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="sg-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <strong class="me-auto">Toast</strong>
+      <small>just now</small>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body">Saved. This is what confirmation feels like.</div>
+  </div>
+</div>
+
+<div class="modal fade" id="sg-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5">Modal title</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Modal body — the theme's surface, radius, and shadow tokens apply here too.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-adaptive" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-adaptive" data-bs-dismiss="modal">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ content | uj_content_format }}

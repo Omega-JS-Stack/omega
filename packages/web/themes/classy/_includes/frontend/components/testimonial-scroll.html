@@ -23,7 +23,12 @@
           <div class="w-100" style="white-space: normal;">
             <p class="classy-quote__text">&ldquo;{{ item.quote }}&rdquo;</p>
             <div class="classy-quote__attr">
-              <span class="classy-quote__avatar">{{ item.initial | default: item.author | slice: 0 }}</span>
+              {% iftruthy item.avatar %}
+                <span class="classy-quote__avatar"><img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ item.avatar }}" alt="{{ item.author }}"/></span>
+              {% endiftruthy %}
+              {% iffalsy item.avatar %}
+                <span class="classy-quote__avatar">{{ item.initial | default: item.author | slice: 0 }}</span>
+              {% endiffalsy %}
               <span class="classy-quote__name">{{ item.author }}</span>
               <span class="classy-quote__role">
                 {{ item.role }}{% if item.company %}{% if item.role %}, {% endif %}{{ item.company }}{% endif %}

@@ -31,16 +31,19 @@ testimonials:
       role: "CEO"
       company: "TechStart Inc"
       initial: "S"
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80"
     - quote: "Best investment I've made. Achieved more here than with <em>any</em> consultant."
       author: "Michael Chen"
       role: "Founder"
       company: "DataFlow"
       initial: "M"
+      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80"
     - quote: "The community support made all the difference in our <em>growth journey</em>."
       author: "Emily Davis"
       role: "Director"
       company: "Creative Studio"
       initial: "E"
+      avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80"
 
 # FAQs Section
 faqs:
@@ -152,13 +155,13 @@ faqs:
           {% else %}
             {% assign _savings = 20 %}
           {% endif %}
-          <div class="d-flex align-items-center justify-content-center mb-4" data-omega-reveal>
+          <div class="d-flex align-items-center justify-content-center mb-5" data-omega-reveal>
             <div class="classy-billing-toggle" role="group" aria-label="Billing toggle" data-omega-segmented>
               <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly" {% unless _default_annual %}checked{% endunless %}>
               <label class="btn" for="monthly">Monthly</label>
 
               <input type="radio" class="btn-check" name="billing" id="annually" autocomplete="off" {% if _default_annual %}checked{% endif %} data-billing="annually">
-              <label class="btn" for="annually">Annually <span class="classy-quiet">· Save {{ _savings }}%</span></label>
+              <label class="btn" for="annually">Annually <span class="classy-chip classy-chip--accent classy-billing-toggle__save ms-1">Save {{ _savings }}%</span></label>
             </div>
           </div>
         {% endif %}
@@ -185,7 +188,7 @@ faqs:
           {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2" %}
         {% endif %}
 
-        <div class="row g-4 mb-2 justify-content-center" data-omega-reveal-stagger="80">
+        <div class="row g-4 g-xl-5 mb-2 justify-content-center" data-omega-reveal-stagger="80">
           {% for plan in _plans %}
             <div class="{{ col_classes }}" data-omega-reveal>
               <div class="card classy-price-card {% if plan.popular %}classy-price-card--popular{% endif %} h-100">
@@ -300,7 +303,7 @@ faqs:
                 <!-- CTA — pinned to the card floor; buttons align across the row -->
                 <div class="d-grid classy-price-card__cta">
                   {% if plan.popular %}
-                    {% assign _plan_btn = "btn-adaptive" %}
+                    {% assign _plan_btn = "btn-adaptive classy-btn-ring" %}
                   {% else %}
                     {% assign _plan_btn = "btn-outline-adaptive" %}
                   {% endif %}
@@ -385,7 +388,7 @@ faqs:
         </div>
 
         <p class="small text-center classy-quiet mb-0">
-          {% uj_icon "shield-check", "me-1" %}
+          {% uj_icon "shield-halved", "me-1" %}
           {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
         </p>
 
@@ -437,7 +440,12 @@ faqs:
                       {% elsif feature.value and feature.value != true %}
                         {{ feature.value | uj_commaify }}
                       {% endif %}
-                      {{ feature.name }}
+                      {% iftruthy feature.definition %}
+                        <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
+                      {% endiftruthy %}
+                      {% iffalsy feature.definition %}
+                        {{ feature.name }}
+                      {% endiffalsy %}
                     </span>
                   </li>
                 {% endfor %}

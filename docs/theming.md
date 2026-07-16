@@ -138,7 +138,7 @@ desktop/extension at C4 exactly like icon-renderer.
 | `data-omega-marquee` + `.omega-marquee__track/__item` | seamless loop — the set is cloned until half the track covers the container (never runs dry), constant px/s (attr value overrides) |
 | `data-omega-scroll-watch="24"` | stamps `data-omega-scrolled` (glassy nav) |
 | `data-omega-segmented` | gliding-thumb segmented control: engine injects `.omega-segmented__thumb` and tracks the checked/`.active` segment (billing toggle, platform rails, footer appearance) |
-| `data-omega-dotfield="22"` | canvas dot grid (value = px spacing): slow traveling wave, accent tint along it, pointer glow; static CSS dots remain for no-JS/reduced-motion |
+| `data-omega-dotfield="22"` | canvas dot grid (value = px spacing): slow traveling wave, dots tint along ONE drifting rainbow gradient, pointer glow (tracked window-level so the fixed nav can't blind it); static CSS dots remain for no-JS/reduced-motion |
 | `.omega-hover-lift/-raise/-dim`, `.omega-pressable`, `.omega-hover-nudge .omega-nudge` | pure-CSS hover/press effects |
 | `.omega-float`, `.omega-caret` | ambient float, terminal caret |
 

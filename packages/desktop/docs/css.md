@@ -8,7 +8,7 @@
 
 ```scss
 @use 'omega-desktop' as * with (
-  $primary: #5B47FB,
+  $primary: #2563EB,
   $dark: #1a1a2e,
   $classy-bg-dark: #0f0f1a,
   $classy-bg-dark-secondary: #161628,

@@ -33,7 +33,7 @@ Dark (neutral charcoal, de-blued):
 `ground #0d0d0e · surface #151516 · surface-2 #1d1d1f · ink #ebebea · muted #9f9fa0 · faint #6c6c6e · line #262628 · line-strong #333336`
 
 Accent (single hue, from `brand.color`; light/dark variants; derived hover/subtle/ring via color-mix in the comps — production derives via composeBrandTokens):
-default (playground) `#5b47fb` light / `#8577ff` dark · `accent-ink` = white on light, near-black on dark.
+default (playground) `#2563eb` light / `#5484ef` dark (draft-1 "ocean" — Ian retired the draft-2 purple 2026-07-16) · `accent-ink` = white on light, near-black on dark.
 
 Status (semantic, reserved): `ok #12925c/#3ecf8e · warn #c47206/#f5a524 · danger #d92d20/#f0574d` (light/dark).
 

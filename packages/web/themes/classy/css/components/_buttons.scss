@@ -18,15 +18,29 @@
     transform var(--omega-speed) var(--omega-ease),
     box-shadow var(--omega-speed) var(--omega-ease);
 
+  // The unified niceties (Ian 2026-07-16): EVERY button lifts on hover and
+  // presses on click — no per-variant opt-in
+  &:hover {
+    transform: translateY(-1px);
+  }
+
   &:active {
     transform: scale(0.985);
   }
+}
+
+// Attached/segmented contexts: a lift would detach the button from its
+// group geometry (password eye in the input group, gliding-thumb segments)
+.input-group .btn:hover,
+[data-omega-segmented] .btn:hover {
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .btn {
     transition: none;
 
+    &:hover,
     &:active {
       transform: none;
     }
@@ -87,9 +101,11 @@
   --bs-btn-active-border-color: var(--omega-line-strong);
 
   color: var(--omega-ink);
-  background: var(--omega-surface);
   border-color: var(--omega-line-strong);
 
+  // Resting fill only — an UNCONDITIONAL background here out-ordered
+  // Bootstrap's .btn:hover rule and froze the ghost's hover state (the
+  // "Google button has no hover" bug)
   &:not(:hover, :active, .active) {
     background: var(--omega-surface) !important;
   }

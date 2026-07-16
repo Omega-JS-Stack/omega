@@ -43,7 +43,7 @@
     {
       label: 'Sign up',
       href: '/signup',
-      class: 'btn-adaptive',
+      class: 'btn-adaptive classy-btn-ring',
       icon: 'user-plus',
       attributes: [
         ['data-wm-bind', '@show !auth.user']

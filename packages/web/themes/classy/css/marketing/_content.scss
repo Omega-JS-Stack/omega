@@ -1127,3 +1127,64 @@
   border-radius: var(--omega-radius-l);
   overflow: hidden;
 }
+
+// ============================================
+// Photo band — the about page's life-in-pictures collage: one wide tile
+// (lazy @bg) + supporting stills (lazy responsive @srcset), captions as
+// glassy micro pills.
+// ============================================
+.classy-photo-band {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+
+  @media (min-width: 992px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .classy-photo-band__tile {
+    position: relative;
+    margin: 0;
+    height: 16rem;
+    overflow: hidden;
+    background-color: var(--omega-surface-2);
+    background-size: cover; // the @bg tile paints here on lazy-load
+    background-position: center;
+    border: 1px solid var(--omega-line);
+    border-radius: var(--omega-radius-l);
+
+    @media (min-width: 992px) {
+      height: 19rem;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &.classy-photo-band__tile--wide {
+      @media (min-width: 992px) {
+        grid-column: span 2;
+        height: 22rem;
+      }
+    }
+  }
+
+  .classy-photo-band__caption {
+    position: absolute;
+    left: 0.875rem;
+    bottom: 0.875rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #f5f5f4;
+    background: rgba(17, 18, 19, 0.55);
+    backdrop-filter: blur(6px);
+    border-radius: var(--omega-radius-pill, 50rem);
+  }
+}

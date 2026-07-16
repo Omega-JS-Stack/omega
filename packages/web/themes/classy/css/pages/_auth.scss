@@ -4,12 +4,20 @@
 
 .classy-auth {
   width: 100%;
-  max-width: 26rem;
   margin-inline: auto;
+
+  // Breakpoint contract (Ian 2026-07-16): full width on small screens,
+  // "not quite full" through md, the fixed card from lg up
+  @media (min-width: 768px) {
+    max-width: 82%;
+  }
+
+  @media (min-width: 992px) {
+    max-width: 26rem;
+  }
 
   // Split variant: form card + ink pitch panel (signup)
   &.classy-auth--split {
-    max-width: 58rem;
     display: grid;
     gap: 0;
     background: var(--omega-surface);
@@ -19,6 +27,7 @@
     overflow: hidden;
 
     @media (min-width: 992px) {
+      max-width: 58rem;
       grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     }
 

@@ -12,6 +12,7 @@ const path = require('node:path');
 const JSON5 = require('json5');
 const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
+const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
 const { toSiteGlobal } = require('@omega.js/config/site-global');
 const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
@@ -169,7 +170,10 @@ function configureOmega(eleventyConfig, options) {
   collectionsHolder.set = (name, docs) => {
     if (SITE_COLLECTIONS.includes(name)) {
       site[name].length = 0;
-      site[name].push(...docs.map((doc) => ({ url: doc.url, date: doc.date, ...doc.data })));
+      // id rides along (Jekyll doc parity — layouts pass member.id/post.id
+      // to the uj_member/uj_post tags); explicit frontmatter id still wins
+      // via the data spread.
+      site[name].push(...docs.map((doc) => ({ id: doc.id, url: doc.url, date: doc.date, ...doc.data })));
     }
     return holderSet(name, docs);
   };
@@ -386,15 +390,21 @@ function configureOmega(eleventyConfig, options) {
     eleventyConfig.addTemplate(`omega-defaults/${rel}`, raw);
   }
 
-  // ---- Sample posts (development only): a post-less brand still gets a
-  // living blog locally. Injected as virtual templates under an _posts/
-  // segment so they ride the exact same lane as real posts (posts tag,
-  // /blog/<slug> permalink, taxonomy). The FIRST consumer post — or a
-  // production build — removes them entirely.
-  if (options.environment !== 'production' && !hasOwnPosts(options.consumerDir)) {
-    const samplePosts = collectLayered([path.join(defaultsDir, 'sample-posts')]);
-    for (const [rel, abs] of samplePosts) {
-      eleventyConfig.addTemplate(`omega-defaults/_posts/${rel}`, fs.readFileSync(abs, 'utf8'));
+  // ---- Sample content (development only): a content-less brand still gets
+  // living pages locally. Injected as virtual templates under the matching
+  // collection segment so they ride the exact same lane as real content
+  // (tags, permalinks, taxonomy). The FIRST consumer file in a collection —
+  // or a production build — removes that collection's samples entirely.
+  if (options.environment !== 'production') {
+    const sampleSets = [
+      ['_posts', 'sample-posts'], // the blog
+      ['_team', 'sample-team'], // the /team portrait grid + member pages
+    ];
+    for (const [collectionDir, samplesDir] of sampleSets) {
+      if (hasOwnContent(options.consumerDir, collectionDir)) continue;
+      for (const [rel, abs] of collectLayered([path.join(defaultsDir, samplesDir)])) {
+        eleventyConfig.addTemplate(`omega-defaults/${collectionDir}/${rel}`, fs.readFileSync(abs, 'utf8'));
+      }
     }
   }
 
@@ -403,7 +413,10 @@ function configureOmega(eleventyConfig, options) {
   // the copyright meta, date.iso as the sitemap/feed build stamp — legacy
   // site.time, placeholder.src in lazy-loaded imgs).
   site.uj = {
-    cache_breaker: 0,
+    // The build stamp the runtime lazy-loader appends (cb=) — same value as
+    // uj_cachebreak and the omega-cachebreak-img transform. Was 0 (inert)
+    // until the central cache-breaker landed.
+    cache_breaker: CACHE_TIMESTAMP,
     date: { year: new Date().getFullYear(), iso: new Date().toISOString() },
     placeholder: { src: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' },
     ...(site.uj || {}),
@@ -417,6 +430,18 @@ function configureOmega(eleventyConfig, options) {
     dev: options.dev || null,
   });
   eleventyConfig.addGlobalData('assetManifest', options.assetManifest || { js: { pages: {} }, css: { pages: {}, themePages: {} } });
+
+  // ---- Image cache-breaker (dev AND prod): every local <img>/<source> URL
+  // in a .html output carries ?cb=<build stamp> so image edits show up on
+  // rebuilds. Registered before the minifier (transforms run in order) and
+  // shares the uj_cachebreak filter's stamp — one value per build process.
+  const { cachebreakHtml } = require('./cachebreak-html.js');
+  eleventyConfig.addTransform('omega-cachebreak-img', function (content) {
+    if (this.page.outputPath && this.page.outputPath.endsWith('.html')) {
+      return cachebreakHtml(content, CACHE_TIMESTAMP);
+    }
+    return content;
+  });
 
   // ---- Production HTML minification (the UJM minifyHtml successor). Only
   // .html outputs — the meta-files (sitemap.xml, feeds, robots.txt, …) ship
@@ -435,13 +460,15 @@ function configureOmega(eleventyConfig, options) {
 }
 
 /**
- * Does the consumer have any post of their own? Recursive — Jekyll-style
- * year subfolders (_posts/2024/…) count. Dotfiles don't.
+ * Does the consumer have any file of their own in a collection dir?
+ * Recursive — Jekyll-style year subfolders (_posts/2024/…) count. Dotfiles
+ * don't.
  * @param {string} consumerDir
+ * @param {string} collectionDir - collection folder name ('_posts', '_team')
  * @returns {boolean}
  */
-function hasOwnPosts(consumerDir) {
-  const root = path.join(consumerDir, '_posts');
+function hasOwnContent(consumerDir, collectionDir) {
+  const root = path.join(consumerDir, collectionDir);
   if (!fs.existsSync(root)) return false;
   const stack = [root];
   while (stack.length) {

@@ -98,6 +98,41 @@ describe('motion', () => {
     });
   });
 
+  describe('rainbowColor', () => {
+    it('returns valid rgb channels and is deterministic', () => {
+      const a = motion.rainbowColor(100, 50, 1400, 2);
+      const b = motion.rainbowColor(100, 50, 1400, 2);
+
+      assert.deepStrictEqual(a, b);
+      a.forEach((channel) => {
+        assert.ok(Number.isInteger(channel) && channel >= 0 && channel <= 255, `channel in range: ${channel}`);
+      });
+    });
+
+    it('hue advances across the field — one gradient, not confetti', () => {
+      // Same moment, positions a quarter-field apart → clearly different hues
+      const left = motion.rainbowColor(0, 0, 1400, 0);
+      const mid = motion.rainbowColor(700, 0, 1400, 0);
+      assert.notDeepStrictEqual(left, mid);
+    });
+
+    it('drifts with time and wraps cleanly past a full cycle', () => {
+      const now = motion.rainbowColor(300, 100, 1400, 0);
+      const later = motion.rainbowColor(300, 100, 1400, 5);
+      assert.notDeepStrictEqual(now, later, 'gradient moves over time');
+
+      // t*0.05 → a full hue cycle every 20s: same dot, same color again
+      const cycled = motion.rainbowColor(300, 100, 1400, 20);
+      assert.deepStrictEqual(now, cycled);
+    });
+
+    it('fills a caller-supplied array without allocating (hot loop contract)', () => {
+      const out = [0, 0, 0];
+      const result = motion.rainbowColor(64, 64, 800, 1, out);
+      assert.strictEqual(result, out);
+    });
+  });
+
   describe('createMotion', () => {
     it('returns the engine surface and stays inert without a document', () => {
       const engine = motion.createMotion();

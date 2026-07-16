@@ -122,8 +122,10 @@
             {% for language in all_languages %}
               <li>
                 {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
+                {% comment %} No per-language icon: language codes aren't
+                country codes (en → no flag), so the miss rendered the
+                placeholder triangle — the native name is the label. {% endcomment %}
                 <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
-                  {% uj_icon language, "fa-sm me-2" %}
                   {{ lang_name | capitalize }}
                 </a>
               </li>
@@ -134,7 +136,7 @@
         <!-- Appearance (segmented; core appearance.js stamps .active/aria-pressed on data-appearance-set) -->
         <div class="classy-footer__seg" role="group" aria-label="Appearance" data-omega-segmented>
           <button type="button" data-appearance-set="light" aria-label="Light theme" aria-pressed="false">{% uj_icon "sun", "fa-sm" %}</button>
-          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% uj_icon "moon-stars", "fa-sm" %}</button>
+          <button type="button" data-appearance-set="dark" aria-label="Dark theme" aria-pressed="false">{% uj_icon "moon", "fa-sm" %}</button>
           <button type="button" data-appearance-set="system" aria-label="System theme" aria-pressed="false">{% uj_icon "circle-half-stroke", "fa-sm" %}</button>
         </div>
       </div>

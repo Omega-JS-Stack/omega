@@ -277,6 +277,11 @@ test('uj_video builds video element with flag attributes and mime types', () => 
 test('uj_member resolves team docs: name/url/path/image/image-tag/dynamic', () => {
   const team = [
     { id: '/team/ian-wieds', url: '/team/ian-wieds', data: { member: { name: 'Ian Wieds', role: 'Founder' } } },
+    {
+      id: '/team/sam-okafor',
+      url: '/team/sam-okafor',
+      data: { member: { name: 'Sam Okafor', image: 'https://images.example.com/sam.jpg' } },
+    },
   ];
   const ctx = makeCtx(
     { page: { post: { member: 'ian-wieds' } }, who: 'ian-wieds' },
@@ -287,6 +292,11 @@ test('uj_member resolves team docs: name/url/path/image/image-tag/dynamic', () =
   assert.strictEqual(TAGS.uj_member.render(ctx, '"ian-wieds", "url"'), 'https://somiibo.com/team/ian-wieds');
   assert.strictEqual(TAGS.uj_member.render(ctx, '"ian-wieds", "path"'), '/team/ian-wieds');
   assert.strictEqual(TAGS.uj_member.render(ctx, '"ian-wieds", "image"'), '/assets/images/team/ian-wieds/profile.jpg');
+  assert.strictEqual(
+    TAGS.uj_member.render(ctx, '"sam-okafor", "image"'),
+    'https://images.example.com/sam.jpg',
+    'explicit member.image beats the team-assets convention',
+  );
   assert.strictEqual(TAGS.uj_member.render(ctx, '"ian-wieds", "role"'), 'Founder');
   assert.strictEqual(TAGS.uj_member.render(ctx, 'who'), 'Ian Wieds'); // variable id
   assert.strictEqual(TAGS.uj_member.render(ctx, ''), 'Ian Wieds'); // page.post.member default

@@ -21,7 +21,15 @@ const byDateThenSlug = (a, b) => (b.date - a.date) || a.page.fileSlug.localeComp
  * @param {Map<string, object[]>} collectionsHolder - template-kit's collection view
  */
 function registerCollections(eleventyConfig, collectionsHolder) {
-  const toDoc = (item) => ({ id: item.inputPath, url: item.url, date: item.date, data: item.data });
+  // Jekyll-style doc id ('/team/ian', '/blog/slug') — the shape the uj_member
+  // and uj_post tags match on and derive asset paths from. inputPath only as
+  // a fallback for url-less docs.
+  const toDoc = (item) => ({
+    id: String(item.url || '').replace(/\/+$/, '') || item.inputPath,
+    url: item.url,
+    date: item.date,
+    data: item.data,
+  });
 
   eleventyConfig.addCollection('posts', (api) => {
     const posts = api.getFilteredByTag('posts').sort(byDateThenSlug);

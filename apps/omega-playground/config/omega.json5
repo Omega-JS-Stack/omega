@@ -19,7 +19,7 @@
     name: "OMEGA Playground",
     description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
     tagline: "One config. Every target.",
-    color: "#5b47fb", // classy v2 default accent (draft-2, Ian-approved) — drives the --omega-accent-* ramps
+    color: "#2563eb", // draft-1 "ocean" ideation blue (Ian 2026-07-16: purple retired) — drives the --omega-accent-* ramps
     // PLAYGROUND scope (Ian 2026-07-11): this rehearsal brand lives on a
     // SUBDOMAIN of the real domain, so every derived surface (authDomain,
     // api.playground.omegajs.dev, canonicals) stays clear of the REAL
@@ -125,8 +125,10 @@
         tagline: "best for trying OMEGA",
         limits: { requests: 100 },
         features: [
-          { id: "requests", name: "Requests", icon: "sparkles", definition: "API requests per month." },
-          { id: "targets", name: "All four targets", icon: "layer-group", value: true },
+          // definition = the dotted-underline tooltip; author it ONCE per
+          // feature id — the pricing composer backfills every other copy
+          { id: "requests", name: "Requests", icon: "wand-magic-sparkles", definition: "API requests per month." },
+          { id: "targets", name: "All four targets", icon: "layer-group", value: true, definition: "Web, backend, desktop, and browser extension from one brand config." },
         ],
       },
       {
@@ -139,9 +141,9 @@
         trial: { days: 14 },
         prices: { monthly: 9.99, annually: 99.99 },
         features: [
-          { id: "requests", name: "Requests", icon: "sparkles" },
+          { id: "requests", name: "Requests", icon: "wand-magic-sparkles" },
           { id: "targets", name: "All four targets", icon: "layer-group", value: true },
-          { id: "support", name: "Priority support", icon: "headset", value: true },
+          { id: "support", name: "Priority support", icon: "headset", value: true, definition: "Your tickets jump the queue and reach a real engineer first." },
         ],
         stripe: { productId: "prod_UscSf6XFplJRS1" },
         paypal: { productId: null },
@@ -154,7 +156,7 @@
         tagline: "everything to launch day one",
         prices: { once: 49.99 },
         features: [
-          { id: "templates", name: "Brand templates", icon: "palette", value: 12 },
+          { id: "templates", name: "Brand templates", icon: "palette", value: 12, definition: "Ready-made brand starter kits included with your license." },
         ],
         stripe: { productId: "prod_UscSbPkRMWy3Yr" },
         chargebee: { itemId: null },

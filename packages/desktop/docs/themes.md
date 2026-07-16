@@ -20,7 +20,7 @@ Your `src/assets/scss/main.scss` becomes:
 
 ```scss
 @use 'omega-desktop' as * with (
-  $primary: #5B47FB,
+  $primary: #2563EB,
   // $secondary: #6C757D,
   // $border-radius: 0.5rem,
 );

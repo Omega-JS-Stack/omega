@@ -52,7 +52,7 @@ In a consumer's `src/assets/css/main.scss`:
 ```scss
 // Override before @use to take effect
 @use 'omega-extension' as * with (
-  $primary: #5B47FB,
+  $primary: #2563EB,
   $secondary: #FFA500,
 );
 @use 'theme' as *;

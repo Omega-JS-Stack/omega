@@ -655,7 +655,7 @@ Ported the full classy + bootstrap theme stack from UJM into EM. Consumer's `src
 
 ```scss
 @use 'electron-manager' as * with (
-  $primary: #5B47FB,
+  $primary: #2563EB,
 );
 ```
 
@@ -680,7 +680,7 @@ Ported the full classy + bootstrap theme stack from UJM into EM. Consumer's `src
 
 **Smoke-test in deployment-playground:**
 - `npm run build` succeeds
-- `dist/assets/css/main.bundle.css` = 292KB (full Bootstrap 5.3 + classy theme + `--bs-primary: #5B47FB` from override)
+- `dist/assets/css/main.bundle.css` = 292KB (full Bootstrap 5.3 + classy theme + `--bs-primary: #2563EB` from override)
 - `dist/assets/css/components/{main,settings,about}.bundle.css` emit correctly (0 bytes since empty by default)
 - Existing 292 EM tests still pass
 
