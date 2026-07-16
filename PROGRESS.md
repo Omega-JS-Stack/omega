@@ -2,8 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **SKIN PASS — REFERENCE BAR (bronn/manus)** — shipped through cp151 (content 5667e22 · product 22ce4ec · utility 326c9cb · auth/signup ce4efa0); remaining: account/payment/portal (cp152) → dashboard/admin content (cp153) → full-suite milestone run + playground redeploy on Ian's word
-- **Playground brandmark v2 (Ian 2026-07-16)** — parametric rebuild in-tree (band 236→310, star 166→205 centered 68.7px/side, gap 34°→48°, chisel tips; params in the SVG comment); rides the next checkpoint commit
+- **SKIN PASS — REFERENCE-BAR REMAKE COMPLETE through cp153, milestone root suite GREEN (1226/0)** — Ian reviews at localhost:4000; playground redeploy on his word (suggested name `classy-v2-reference-bar`); then showcase/FOUC QA → C4 → arc close
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **SKIN PASS remainder (after DRAFT 1)** — default pages + blueprints → auth/account/payment + dashboard/admin remake → showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close; D5 vendored-webfont picks are Ian's call mid-arc
@@ -44,6 +43,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 148–153 reference-bar remake — pricing/blog/contact/team (5667e22), download/extension/app/alternatives (22ce4ec), status/updates/legal/404 (326c9cb), auth + /signup split (ce4efa0), account/payment/portal (e9227b3), dashboard/admin App DNA + brandmark v2 (cff3df2) → CHANGELOG
 - [x] 147 remake mandate opens — chrome (footer/nav/redirect) + dev sample posts + about/contact/pricing recomposed + countup year fix (`8920e52`) → CHANGELOG
 - [x] 146 default pages + blueprints skinned — shared content vocabulary, themePages override slot, /blog alive post-less (`4a478f9`) → CHANGELOG
 - [x] 143+144 classy v2 DIRECTION + DRAFT 1 — spec/comps vendored (143), then the gut renovation LIVE (144: draft-2 tokens + dual brand ramps + reusable motion library + omega-shell move + home/pricing/signin/chrome remade, light+dark browser-proven; web 143 / client 103 / root suite green; playground deploy `classy-v2-draft-1`) → CHANGELOG
@@ -61,4 +61,4 @@
 - [x] 129 config-truth pass — MrLogo brandmark ladder (assets.brandmark options GONE; SA→API-key→token, BEM wire verified), reverse-DNS bundle ids (wizard-derived; playground → com.itwcreativeworks), `gcp` key, targets-last SSOT; Apple terms accepted → leg ran LIVE (bundle id CREATED + 2 profiles minted); mgr 655 / config 109 / corpus 1225 (1952448) → CHANGELOG
 - [x] Phases 0–2 + cp33–128 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning (116 site LIVE · 119 first full pipeline PASS · 121–123 seeds/brandmark/src-dist pillar/live-site gaps · 124–126 findings sweep + 2b mints + core graduations · 128 board-clear + sound root `npm test`) → CHANGELOG + git log
 
-*Last updated: 2026-07-16 (cp147: remake mandate opens — chrome + sample posts + marketing core; full-theme remake queue running)*
+*Last updated: 2026-07-16 (cp153b: reference-bar remake milestone — root suite green; brandmark tips rounded)*
