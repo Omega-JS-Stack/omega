@@ -37,6 +37,8 @@
 - Local-first (Ian 2026-07-09): zero npm publishes until Ian finalizes versions; migrators/verifiers pinned.
 
 ## ⚠ Parked findings (detail: the named task's CHANGELOG entry)
+- **Theme CSS fall-through asymmetry (audit 2026-07-16, Ian's call on direction)**: layouts/includes/section-JSON fall through consumer→theme→classy→core per-file, but the main `_theme.scss` does NOT — a partial/new theme renders the shared `classy-*` vocabulary UNSTYLED (shipped neobrutalism/newsflash affected; no auth-css floor outside classy; themes.test asserts render, not styled). Candidate fixes: document-only (done — `_template` README rewritten), bless the `@forward 'omega:theme'` inheritance hatch (mechanism exists via importer self-skip, untested), or grow a core vocabulary floor (155)
+- permalinkOf regex can't match spaced/Liquid permalinks (`consumer-scan.js`) — the paginated blog default can never be URL-suppressed and same-URL consumer pages fail to suppress silently (155)
 - blogify/optimize NOT ported (cp140 verdict): blogify = fake-post test generator (the corpus generator covers it), optimize = GPT content-rewrite authoring tool — revisit post-launch if Ian wants them (140)
 - First-paint blank flash — mechanism CORRECTED cp123: no JS gate hides content (the page-loading gate only guards buttons); the flash is render-blocking CSS/fonts on a cold cache = exactly the critical-CSS/font pass Ian re-tabled to SKIN-PASS QA (116/123)
 - devkit e2e-harness rare flake (~1-in-15, mechanism uncaptured): isolated two-pass runner + one retry that SAVES the failing output to .temp/ — the next firing names the mechanism; a real regression still fails twice (124)

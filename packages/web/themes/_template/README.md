@@ -1,32 +1,44 @@
 # Theme Template
 
-A minimal, copy-paste starting point for a **brand-new UJM theme** — whether
-you're adding one inside UJM (`src/assets/themes/<id>/`) or creating one in your
-own consumer project (`<project>/src/assets/themes/<id>/`).
+A minimal, copy-paste starting point for a **brand-new @omega.js/web theme** —
+whether you're adding one inside this package (`themes/<id>/`) or creating one
+in your own consumer project (`<project>/themes/<id>/` — the consumer-local
+copy beats the packaged one with the same id).
 
-> Full guide: [`docs/themes.md`](../../../../docs/themes.md).
+> The design-system contract (tokens, motion, brand ramps, the classy
+> vocabulary): [`docs/theming.md`](../../../../docs/theming.md).
 
 ## Create a theme from this template
 
 1. **Copy this folder** to your theme id (the `_` prefix excludes this template
    from selection, so rename it):
-   - Inside UJM: `src/assets/themes/my-theme/`
-   - In a consumer: `<project>/src/assets/themes/my-theme/`
-2. **Select it** in your consumer's `src/_config.yml`:
-   ```yaml
-   theme:
-     id: "my-theme"
+   - Inside the package: `themes/my-theme/`
+   - In a consumer: `<project>/themes/my-theme/`
+2. **Select it** in `omega.json5`:
+   ```json5
+   theme: {
+     id: "my-theme",
+   }
    ```
 3. **Customize** `_config.scss` (tokens), `css/` (styles), and `_theme.js`
    (behaviors). Restyle Bootstrap's own classes (`.btn`, `.card`, `.navbar`,
    `.form-control`) so the shared layouts pick up your look with no HTML edits.
-4. **Layouts/includes are inherited automatically.** You do NOT need to copy the
-   ~40 page layouts — UJM's build copies any missing layout/include from the
-   `classy` theme and rewrites the paths to your theme id. Override a layout only
-   when its *markup* (not just CSS) must differ — create
-   `src/defaults/dist/_layouts/themes/my-theme/<path>` (in UJM) or
-   `src/_layouts/themes/my-theme/<path>` (in a consumer) for just that file.
-   A common one: override `frontend/core/base.html` to load your theme's fonts.
+4. **Layouts, includes, and section JSON are inherited automatically — zero
+   copies.** The engine resolves every file through a layered union
+   (consumer → your theme → classy → core), so all ~40 page layouts render
+   without you owning a single one. Override a layout only when its *markup*
+   (not just CSS) must differ — create the same path inside your theme
+   (`themes/my-theme/_layouts/frontend/pages/<page>.html`) and yours wins.
+
+## The CSS boundary (read this before shipping a partial theme)
+
+Unlike layouts/includes, the MAIN stylesheet does **not** fall through:
+exactly one `_theme.scss` loads — yours. The shared layouts you inherit emit
+classy's `classy-*` content vocabulary (nav, footer, marketing sections,
+auth/form panels — see `docs/theming.md`), so a theme that doesn't restyle
+that vocabulary renders those pages structurally intact but unstyled beyond
+Bootstrap + core tokens/shell/motion. Budget for it: restyle the vocabulary
+namespaces you keep, or override the layouts whose markup you replace.
 
 ## What's here
 
@@ -41,10 +53,13 @@ _template/
     └── components/_components.scss  ← restyle Bootstrap classes here
 ```
 
-## Principles (see docs/themes.md for the full list)
+## Principles (the contract lives in docs/theming.md)
 
 - **Tokens are `!default`** so consumers can override without forking your theme.
-- **Bridge to CSS variables** in `_root.scss` for free dark-mode switching.
-- **Don't duplicate the shared layers** — `core/` CSS (animations, alerts, lazy
-  loading) and `bootstrap/overrides` are injected for every theme already.
-- **Namespace your own components** (`.mytheme-*`) to avoid collisions.
+- **Bridge to CSS variables** in `_root.scss` — the `--omega-*` token names are
+  the stable API; light + dark ship together.
+- **Don't duplicate the shared layers** — core tokens/shell/motion CSS and
+  `bootstrap/overrides` are in every build already.
+- **Namespace your own components** (`.mytheme-*`) to avoid collisions;
+  runtime-stamped classes must live in the `omega-` namespace (PurgeCSS
+  safelist).
