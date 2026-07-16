@@ -14,21 +14,18 @@ updates:
   latest_badge: "Latest"
 ---
 
-<!-- Hero Section -->
-<section class="updates-hero py-5">
-  <div class="container">
-    <div class="row justify-content-center text-center mb-4">
-      <div class="col-lg-10 classy-page-hero" data-omega-reveal-stagger="90">
-        <h1 class="classy-display classy-display--page" data-omega-reveal>
-          {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-        </h1>
-        {% iftruthy resolved.hero.subheadline %}
-          <p class="classy-page-hero__sub" data-omega-reveal>
-            {{ resolved.hero.subheadline }}
-          </p>
-        {% endiftruthy %}
-      </div>
-    </div>
+<!-- Masthead -->
+<section class="updates-hero py-5 classy-dotgrid">
+  <div class="container" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-3" data-omega-reveal>Changelog</span>
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="classy-hero-split__sub" data-omega-reveal>
+        {{ resolved.hero.subheadline }}
+      </p>
+    {% endiftruthy %}
   </div>
 </section>
 

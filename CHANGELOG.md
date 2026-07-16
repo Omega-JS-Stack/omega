@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **cp150 — utility set to the reference bar: status, updates, legal, 404.** Status gets the left masthead + eyebrow (banner/services/uptime JS machinery untouched — verified live); updates index becomes the "Changelog" masthead and the update detail gets a mono `All updates / vX` breadcrumb; the legal/document layout goes left-aligned (masthead + left prose measure); 404 copy cut to one line each ("This page doesn't exist — or it moved somewhere smarter."). Web 147/0.
 - **cp149 — product set to the reference bar: download, extension, app launcher, alternatives.** Same DNA, four more surfaces:
   - **Download**: left masthead (serif "on <em>your</em> machine", one dek line), the platform selector recut as a SEGMENTED RAIL (`classy-platform-rail` — Bootstrap tab machinery, `platform-btn`/`data-platform`/`data-has-download` ids and the detection JS untouched; verified live: macOS auto-detected + active), features and system requirements recomposed as hairline rowlist duos, FAQ duo. The onboarding modal + per-platform steps slideshows ride along unchanged.
   - **Extension**: identical treatment (browser rail w/ `avatar-xs` logos — Chrome auto-detected + active verified), features/FAQ duos; the installed page already spoke v2 (status chip + slideshow) and stands.

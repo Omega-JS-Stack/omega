@@ -21,12 +21,11 @@ navigation:
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-lg-10" data-omega-reveal>
-        <!-- Back Link -->
-        <div class="mb-4">
-          <a href="{{ resolved.navigation.back_url }}" class="text-decoration-none text-muted">
-            {% uj_icon "arrow-left", "me-1" %}
-            {{ resolved.navigation.back_text }}
-          </a>
+        <!-- Mono breadcrumb -->
+        <div class="classy-post-card__eyebrow mb-4">
+          <a href="{{ resolved.navigation.back_url }}">{{ resolved.navigation.back_text }}</a>
+          <span>/</span>
+          <span>v{{ resolved.update.version }}</span>
         </div>
 
         <!-- Update Header -->

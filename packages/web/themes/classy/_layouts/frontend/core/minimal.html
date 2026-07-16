@@ -10,14 +10,14 @@ theme:
     enabled: true
 ---
 
-<!-- ═══ Page hero (document pages: legal, plain-markdown content) ═══ -->
-<section class="classy-page-hero classy-dotgrid">
+<!-- ═══ Masthead (document pages: legal, plain-markdown content) ═══ -->
+<section class="classy-dotgrid pb-4">
   <div class="container" data-omega-reveal-stagger="90">
     <h1 class="classy-display classy-display--page" data-omega-reveal>
       {{ resolved.meta.breadcrumb }}
     </h1>
     {% iftruthy resolved.meta.description %}
-      <p class="classy-page-hero__sub" data-omega-reveal>
+      <p class="classy-hero-split__sub" data-omega-reveal>
         {{ resolved.meta.description }}
       </p>
     {% endiftruthy %}
@@ -25,9 +25,9 @@ theme:
 </section>
 
 <!-- ═══ Document body ═══ -->
-<section class="pt-0">
+<section>
   <div class="container">
-    <div class="row justify-content-center">
+    <div class="row">
       <div class="col-lg-8 classy-prose">
         {{ content | uj_content_format }}
       </div>
