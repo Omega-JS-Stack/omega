@@ -592,12 +592,62 @@ const JOURNEY_ACCOUNTS = {
 };
 
 /**
+ * Google picker personas (Ian 2026-07-16) — the Auth emulator's "Sign in
+ * with Google" picker only lists accounts whose auth record carries a
+ * google.com provider, so a fresh emulator showed "No Google accounts".
+ * These are IMPORT-ONLY (importUsers with providerData — the one server-side
+ * surface that writes it; the emulator refuses imports over an existing uid,
+ * so they never go through createAccount). Deliberately NO user doc at seed
+ * time: their FIRST popup sign-in fires auth:on-create and materializes the
+ * doc exactly like a production Google user. Not part of TEST_ACCOUNTS —
+ * they exist for the picker, not for API-credentialed test flows.
+ */
+const GOOGLE_ACCOUNTS = {
+  'google-one': {
+    id: 'google-one',
+    uid: '_test-google-one',
+    email: '_test.google.one@{domain}',
+    name: 'Google One',
+  },
+  'google-two': {
+    id: 'google-two',
+    uid: '_test-google-two',
+    email: '_test.google.two@{domain}',
+    name: 'Google Two',
+  },
+};
+
+/**
  * All test accounts combined
  */
 const TEST_ACCOUNTS = {
   ...STATIC_ACCOUNTS,
   ...JOURNEY_ACCOUNTS,
 };
+
+/**
+ * Canonical seeded-consent record (mirrors buildConsentRecord's granted
+ * shape, source 'seed'): legal granted — the consent guard's requirement —
+ * and marketing revoked (personas never join real marketing lists; the
+ * _test.* block at the providers is the second fence).
+ * @returns {object} consent user-doc section
+ */
+function seededConsent() {
+  const now = new Date();
+  const stamp = {
+    timestamp: now.toISOString(),
+    timestampUNIX: Math.floor(now.getTime() / 1000),
+    source: 'seed',
+    ip: null,
+    text: null,
+  };
+  const emptyMeta = { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null };
+
+  return {
+    legal: { status: 'granted', grantedAt: { ...stamp } },
+    marketing: { status: 'revoked', grantedAt: { ...emptyMeta }, revokedAt: { ...stamp } },
+  };
+}
 
 /**
  * Get all test account definitions with resolved emails and dynamic product IDs
@@ -621,6 +671,17 @@ function getAccountDefinitions(domain, config, extraAccounts) {
     if (properties.subscription?.product?.id === 'premium') {
       properties.subscription.product.id = paidProduct.id;
       properties.subscription.product.name = paidProduct.name;
+    }
+
+    // STATIC personas are ESTABLISHED users: born signup-processed with
+    // granted legal consent (source 'seed'), so the frontend consent guard —
+    // which signs out processed-but-unconsented docs as signup orphans —
+    // accepts every auth flow (password, custom token, Google picker).
+    // JOURNEY accounts stay untouched: their tests exercise the signup
+    // pipeline and seed their own flag/consent states explicitly.
+    if (STATIC_ACCOUNTS[key]) {
+      properties.flags = { signupProcessed: true, ...(properties.flags || {}) };
+      properties.consent = properties.consent || seededConsent();
     }
 
     accounts[key] = {
@@ -773,6 +834,32 @@ async function createAccount(admin, account) {
   // Exhausted retries — return anyway so the runner reports the downstream failure with a
   // meaningful test assertion rather than a setup throw.
   return { uid: account.uid, email: account.email };
+}
+
+/**
+ * Import a FRESH auth record carrying a google.com provider so the Auth
+ * emulator's Google sign-in picker lists it (the emulator refuses imports
+ * over an existing uid — these accounts exist only via this import).
+ * @param {object} admin - Firebase admin instance
+ * @param {object} account - Definition with uid, resolved email, name
+ */
+async function importGoogleAccount(admin, account) {
+  const result = await admin.auth().importUsers([{
+    uid: account.uid,
+    email: account.email,
+    emailVerified: true,
+    displayName: account.name || account.email,
+    providerData: [{
+      uid: `google-${account.uid}`,
+      providerId: 'google.com',
+      email: account.email,
+      displayName: account.name || account.email,
+    }],
+  }]);
+
+  if (result.failureCount > 0) {
+    throw new Error(`importUsers (google provider): ${result.errors[0]?.error?.message || 'failed'}`);
+  }
 }
 
 /**
@@ -974,6 +1061,19 @@ async function createTestAccounts(admin, domain, config, extraAccounts) {
     })
   );
 
+  // Google picker personas — import-only (fresh uids; see GOOGLE_ACCOUNTS)
+  await Promise.all(
+    Object.values(GOOGLE_ACCOUNTS).map(async (account) => {
+      const email = account.email.replace('{domain}', domain);
+      try {
+        await importGoogleAccount(admin, { ...account, email });
+        results.created.push({ id: account.id, uid: account.uid, email });
+      } catch (error) {
+        results.failed.push({ id: account.id, uid: account.uid, email, error: error.message });
+      }
+    })
+  );
+
   return {
     success: results.failed.length === 0,
     created: results.created.length,
@@ -995,6 +1095,7 @@ const TEST_DATA = {
 module.exports = {
   STATIC_ACCOUNTS,
   JOURNEY_ACCOUNTS,
+  GOOGLE_ACCOUNTS,
   TEST_ACCOUNTS,
   TEST_DATA,
   TEST_ACCOUNT_PASSWORD,

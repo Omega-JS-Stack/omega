@@ -15,6 +15,22 @@ Watching 4 packages (src→dist): backend, client, desktop, extension
 - **Single-instance**: the orchestrator takes `.omega/dev-watch.lock` (pid inside). A second `npm start` — or an `omega dev --local` session — sees the live lock and exits cleanly instead of double-watching. Stale locks (dead pid) are swept automatically.
 - **Shutdown**: SIGINT/SIGTERM kills every watch child and releases the lock. A watch child dying on its own is announced loudly; the others stay up.
 
+## Brand-root one command: `omega dev` (web + backend together)
+
+At a **brand root** (the dir with `config/omega.json5`), every framework's `omega` bin dispatches to `@omega.js/manager` — whose `dev` command boots the whole local stack at once (`npm run dev` is the packaged form):
+
+```
+omega dev                      # website dev server + backend FULL emulator suite
+omega dev --only web           # one leg
+omega dev --except backend     # default set minus
+omega dev --all                # every target with a dev leg (desktop/extension opt-in)
+```
+
+- **Default set = `web` + `backend`** — the local web loop. GUI/watcher targets (desktop opens an Electron window; extension runs a build watcher) never boot unless named via `--only`/`--all`. The default also adapts: a web-only brand boots just web, no warning.
+- **Legs**: web → the app's `npm start` (`omega dev`, :4000); backend → `npm run emulator` (auth/firestore/functions/database/hosting + seeded personas). Backend boots first so its port map is published before web reads it (N7 makes the order optional — web falls back to the classic ports).
+- **Per-app Node**: each leg spawns under its app's own `.nvmrc` major (web and backend pin different ones).
+- Output is line-prefixed per target (`[backend] …`, `[web] …`); one Ctrl-C stops everything; a leg dying alone is announced and its siblings stay up.
+
 ## One-command consumer sessions: `omega dev --local`
 
 In a brand's website app, `omega dev --local` runs the full local-mode prelude before the normal dev server:

@@ -10,8 +10,12 @@ class AuthCommand extends BaseCommand {
     const subcommand = args[0]; // e.g., 'auth:get' or 'auth:set-claims'
     const action = subcommand.split(':').slice(1).join(':'); // handles 'auth:set-claims'
 
-    // Initialize Firebase
-    const isEmulator = argv.emulator || false;
+    // Initialize Firebase. auth:token is a dev/QA surface — it defaults to
+    // the EMULATOR (pass --production deliberately); the other subcommands
+    // keep their explicit --emulator opt-in.
+    const isEmulator = subcommand === 'auth:token'
+      ? !argv.production
+      : (argv.emulator || false);
     let firebase;
 
     try {
@@ -38,9 +42,42 @@ class AuthCommand extends BaseCommand {
         return await this.del(admin, args, argv, isEmulator);
       case 'set-claims':
         return await this.setClaims(admin, args, argv);
+      case 'token':
+        return await this.token(admin, args, argv, isEmulator);
       default:
         this.logError(`Unknown auth subcommand: ${action}`);
-        this.log(chalk.gray('  Available: auth:get, auth:list, auth:delete, auth:set-claims'));
+        this.log(chalk.gray('  Available: auth:get, auth:list, auth:delete, auth:set-claims, auth:token'));
+    }
+  }
+
+  /**
+   * Mint a custom token for a user and print the one-click sign-in URL —
+   * the QA "log in as anyone" surface. The auth pages already consume
+   * ?authCustomToken= (+ optional authReturnUrl), so the printed URL signs
+   * the browser in directly. Emulator by default; --production is explicit.
+   * Usage: npx omega auth:token _test.admin@playground.omegajs.dev
+   *        npx omega auth:token <uid> --url http://localhost:4000 --return /account
+   */
+  async token(admin, args, argv, isEmulator) {
+    const identifier = args[1];
+
+    if (!identifier) {
+      this.logError('Usage: npx omega auth:token <uid-or-email> [--url http://localhost:4000] [--return /dashboard]');
+      return;
+    }
+
+    try {
+      const user = await this.resolveUser(admin, identifier);
+      const token = await admin.auth().createCustomToken(user.uid);
+      const base = String(argv.url || 'http://localhost:4000').replace(/\/+$/, '');
+      const returnUrl = String(argv.return || '/dashboard');
+      const signinUrl = `${base}/signin?authCustomToken=${encodeURIComponent(token)}&authReturnUrl=${encodeURIComponent(returnUrl)}`;
+
+      this.log(chalk.bold(`\n  Custom token for ${user.email || user.uid}${isEmulator ? chalk.gray(' (emulator)') : chalk.red(' (PRODUCTION)')}`));
+      this.log(`  ${chalk.gray('Sign-in URL:')}`);
+      this.log(`  ${chalk.cyan(signinUrl)}\n`);
+    } catch (error) {
+      this.logError(`Token mint failed: ${error.message}`);
     }
   }
 

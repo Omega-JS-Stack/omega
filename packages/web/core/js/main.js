@@ -39,6 +39,15 @@ export default async function ({ manager, options } = {}) {
   appShellModule({ manager, options });
   motionModule({ manager, options });
 
+  // Dev palette (development only): the yellow DEV pull-tab — persona
+  // switcher + quick links. Dynamic import so production pages never load
+  // the chunk; the branch itself is a two-line no-op there.
+  if (omega.isDevelopment()) {
+    import('__main_assets__/js/core/dev-palette.js')
+      .then(({ default: devPalette }) => devPalette())
+      .catch((error) => console.error('Failed to load dev-palette.js:', error));
+  }
+
   // Conditionally loaded modules based on config. Static import paths (no
   // template literals) — esbuild resolves and inlines each dynamic import;
   // webpack-style expression contexts don't exist here.

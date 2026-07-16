@@ -11,7 +11,7 @@ async function run() {
   // --version/--help are disabled so `-v`/`--version` route to our version
   // command through the alias table.
   const argv = require('yargs')(process.argv.slice(2))
-    .boolean(['continue-on-error', 'dry-run', 'parallel', 'manage'])
+    .boolean(['continue-on-error', 'dry-run', 'parallel', 'manage', 'all'])
     .version(false)
     .help(false)
     .parseSync();

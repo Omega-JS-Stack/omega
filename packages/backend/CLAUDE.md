@@ -78,6 +78,7 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `mcp` | Start the stdio MCP server (for Claude Code / Claude Desktop). Supports `--token <key>` for user-level connections |
 | `firestore:get/set/query/delete` | Direct Firestore reads/writes from the terminal |
 | `auth:get/list/delete/set-claims` | Manage Auth users from the terminal |
+| `auth:token` | Mint a custom token + one-click sign-in URL (QA "log in as anyone"; emulator by default, `--production` explicit) |
 | `logs:read` / `logs:tail` | Cloud Function logs from Google Cloud Logging |
 | `stripe` | Standalone Stripe CLI webhook forwarding |
 | `indexes` | Sync required Firestore indexes into `firestore.indexes.json` |

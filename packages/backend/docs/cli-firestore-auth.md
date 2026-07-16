@@ -26,7 +26,21 @@ npx omega auth:get <uid-or-email>                       # Get user by UID or ema
 npx omega auth:list [--limit N] [--page-token T]        # List users (default 100)
 npx omega auth:delete <uid-or-email>                    # Delete user (prompts for confirmation)
 npx omega auth:set-claims <uid-or-email> '<json>'       # Set custom claims
+npx omega auth:token <uid-or-email>                     # Mint a custom token + one-click sign-in URL (QA)
 ```
+
+### `auth:token` — log in as anyone (QA)
+
+Mints a custom token for the user and prints a URL the auth pages consume
+directly (`/signin?authCustomToken=…&authReturnUrl=…`) — open it and the
+browser IS that user. Unlike its siblings it targets the **emulator by
+default** (it's a dev/QA surface); pass `--production` deliberately.
+
+| Flag | Description |
+|------|-------------|
+| `--url <base>` | Website base URL for the printed link (default `http://localhost:4000`) |
+| `--return <path>` | `authReturnUrl` after sign-in (default `/dashboard`) |
+| `--production` | Mint against production instead of the emulator |
 
 ## Shared Flags
 
@@ -53,6 +67,9 @@ npx omega auth:get user@example.com
 
 # Set admin claims
 npx omega auth:set-claims user@example.com '{"admin":true}'
+
+# One-click sign-in URL for a seeded persona (emulator)
+npx omega auth:token _test.admin@playground.omegajs.dev --return /account
 
 # Delete from emulator (no confirmation needed)
 npx omega firestore:delete users/test123 --emulator

@@ -158,7 +158,8 @@ Main.prototype.process = async function (args) {
 
   // Auth utility commands
   if (self.options['auth:get'] || self.options['auth:list']
-    || self.options['auth:delete'] || self.options['auth:set-claims']) {
+    || self.options['auth:delete'] || self.options['auth:set-claims']
+    || self.options['auth:token']) {
     const cmd = new AuthCommand(self);
     return await cmd.execute();
   }

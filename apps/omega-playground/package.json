@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "start": "omega-manager",
+    "dev": "omega-manager dev",
     "pipeline": "omega-manager pipeline --require=analytics,disperse,update,bookmark"
   }
 }
