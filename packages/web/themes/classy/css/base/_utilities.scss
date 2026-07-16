@@ -257,3 +257,12 @@
     transition: none;
   }
 }
+
+// Language flag chip (footer language dropdown): flags size like inline
+// icons, with a hairline ring + tiny radius so the square set reads clean
+.classy-flag svg {
+  width: 1.125em;
+  height: 1.125em;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--omega-line);
+}

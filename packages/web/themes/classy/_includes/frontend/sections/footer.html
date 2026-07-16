@@ -122,10 +122,10 @@
             {% for language in all_languages %}
               <li>
                 {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
-                {% comment %} No per-language icon: language codes aren't
-                country codes (en → no flag), so the miss rendered the
-                placeholder triangle — the native name is the label. {% endcomment %}
+                {% comment %} Language flags resolve via the core flag set +
+                the language→country map (en → us.svg) {% endcomment %}
                 <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
+                  <span class="classy-flag me-2">{% uj_icon language %}</span>
                   {{ lang_name | capitalize }}
                 </a>
               </li>

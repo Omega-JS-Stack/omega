@@ -171,7 +171,12 @@ test('uj_icon loads from injected dirs with brands fallback, flag mapping, and d
 
   // flag via direct country code and via language mapping (en -> us)
   assert.ok(TAGS.uj_icon.render(ctx, 'us').includes('M3 3'));
-  assert.ok(TAGS.uj_icon.render(ctx, 'en').includes('M3 3'));
+  const enFlag = TAGS.uj_icon.render(ctx, 'en');
+  assert.ok(enFlag.includes('M3 3'));
+  // the flag set's hardcoded width/height="512" is stripped so the standard
+  // 1em inline-icon sizing applies (a 512px flag blew up the dropdown)
+  assert.ok(!enFlag.includes('"512"'), 'hardcoded flag dimensions stripped');
+  assert.ok(enFlag.includes('width="1em"') && enFlag.includes('height="1em"'), '1em sizing injected');
 
   // unknown -> default warning triangle
   assert.ok(TAGS.uj_icon.render(ctx, 'definitely-not-real').includes('M320 64'));

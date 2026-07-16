@@ -137,11 +137,23 @@ function tryLoadFlag(icons, iconName) {
   if (!icons.flagsDir || !iconName) return null;
 
   const direct = readFileIfExists(path.join(icons.flagsDir, `${iconName}.svg`));
-  if (direct) return direct;
+  if (direct) return normalizeFlagSvg(direct);
 
   const countryCode = LANGUAGE_TO_COUNTRY[iconName.toLowerCase()];
   if (!countryCode) return null;
-  return readFileIfExists(path.join(icons.flagsDir, `${countryCode}.svg`));
+  const mapped = readFileIfExists(path.join(icons.flagsDir, `${countryCode}.svg`));
+  return mapped ? normalizeFlagSvg(mapped) : null;
+}
+
+/**
+ * The flag set carries hardcoded width/height="512" on the root — strip
+ * them so injectSvgAttributes' standard 1em inline-icon sizing applies
+ * (FA sources never carry dimensions; flags are the exception).
+ * @param {string} svg
+ * @returns {string}
+ */
+function normalizeFlagSvg(svg) {
+  return svg.replace(/<svg([^>]*)>/, (match, attrs) => `<svg${attrs.replace(/\s(?:width|height)="[^"]*"/g, '')}>`);
 }
 
 // {% uj_logo name %} / {% uj_logo name, type, color %} — inline SVG with

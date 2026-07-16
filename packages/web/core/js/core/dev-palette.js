@@ -22,6 +22,10 @@ const PERSONAS = [
 // Deterministic seeded password (emulator-only accounts — public by design)
 const TEST_PASSWORD = 'omega-test-password';
 
+// Font Awesome Free "flask" (fontawesome.com/license/free — CC BY 4.0),
+// inlined because this module injects at runtime (no uj_icon at this layer)
+const FLASK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M288 0L128 0C110.3 0 96 14.3 96 32s14.3 32 32 32L128 215.5 7.5 426.3C2.6 435 0 444.7 0 454.7 0 486.4 25.6 512 57.3 512l333.4 0c31.6 0 57.3-25.6 57.3-57.3 0-10-2.6-19.8-7.5-28.4L320 215.5 320 64c17.7 0 32-14.3 32-32S337.7 0 320 0L288 0zM192 215.5l0-151.5 64 0 0 151.5c0 11.1 2.9 22.1 8.4 31.8l41.6 72.7-164 0 41.6-72.7c5.5-9.7 8.4-20.6 8.4-31.8z"/></svg>';
+
 const STYLES = `
 .omega-devbar-tab {
   position: fixed;
@@ -29,19 +33,22 @@ const STYLES = `
   right: 0;
   z-index: 2000;
   transform: translateY(-50%);
-  padding: 0.625rem 0.375rem;
-  font: 700 0.625rem/1 var(--omega-font-ui, system-ui);
-  letter-spacing: 0.14em;
-  writing-mode: vertical-rl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 3.25rem;
+  padding: 0;
   color: #1a1a19;
   background: #facc15;
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-right: 0;
-  border-radius: 6px 0 0 6px;
+  border-radius: 12px 0 0 12px;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  transition: width 140ms ease, background 140ms ease;
 }
-.omega-devbar-tab:hover { background: #fde047; }
+.omega-devbar-tab:hover { background: #fde047; width: 3.125rem; }
 .omega-devbar {
   position: fixed;
   top: 0;
@@ -152,12 +159,13 @@ export default function devPalette() {
   style.textContent = STYLES;
   doc.head.appendChild(style);
 
-  // The pull tab
+  // The pull tab — the flask, not a text label
   const tab = doc.createElement('button');
   tab.type = 'button';
   tab.className = 'omega-devbar-tab';
-  tab.textContent = 'DEV';
+  tab.innerHTML = FLASK_SVG;
   tab.setAttribute('aria-label', 'Open the dev palette');
+  tab.title = 'Dev palette';
 
   // The panel
   const panel = doc.createElement('aside');
