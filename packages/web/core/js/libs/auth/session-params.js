@@ -62,7 +62,7 @@ export async function handleCustomTokenSignin() {
     const authReturnUrl = url.searchParams.get('authReturnUrl');
     const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
       ? authReturnUrl
-      : '/dashboard';
+      : '/account';
 
     window.location.href = redirectTo;
     return true;

@@ -190,6 +190,22 @@ module.exports = [
       properties: {},
     },
   },
+  {
+    name: 'list_users',
+    description: 'List users (newest first) with the Firebase Auth join the client cannot read: providers, disabled flag, email verification, last sign-in. Supports email/uid prefix search and cursor pagination.',
+    role: 'admin',
+    method: 'GET',
+    path: 'admin/users/list',
+    annotations: { title: 'List users with auth records', readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Page size (default 20, max 100)' },
+        search: { type: 'string', description: 'Email or UID prefix filter' },
+        startAfter: { type: 'string', description: 'UID cursor from the previous page\'s nextCursor' },
+      },
+    },
+  },
 
   // --- Marketing Campaigns ---
   {

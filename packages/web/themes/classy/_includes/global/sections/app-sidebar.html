@@ -18,7 +18,7 @@
 
 <aside class="omega-shell__sidebar" id="app-sidebar">
   <!-- Brand lockup -->
-  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
   {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
   {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
 
