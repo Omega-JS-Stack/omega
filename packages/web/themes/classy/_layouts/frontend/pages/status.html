@@ -1,11 +1,19 @@
 ---
-layout: frontend/core/cover
+layout: frontend/core/base
+
+# ═══ /status — reimagined 2026-07-16: the status IS the hero (typographic
+# state line + live strip, no shouting green banner-card), services live in
+# ONE ops card, incidents/maintenance sit as a quiet duo, build info reads
+# like a build manifest. Every JS hook preserved (core/js/pages/status):
+# #status-banner/#status-text/#status-refresh-timer, data-service-*,
+# .uptime-bars/.uptime-bar, incidents/maintenance lists, subscribe form,
+# build-info ids.
 
 # Hero Section
 hero:
-  headline: "{{ site.brand.name }}"
-  headline_accent: "status"
-  subheadline: "Current status and uptime for all {{ site.brand.name }} services"
+  headline: "Every system,"
+  headline_accent: "accounted for"
+  subheadline: "Live status and 90-day uptime for everything {{ site.brand.name }} runs."
 
 # Status Section
 status:
@@ -38,9 +46,9 @@ updates:
   superheadline:
     icon: "bell"
     text: "Notifications"
-  headline: "Get"
-  headline_accent: "updates"
-  subheadline: "Subscribe to receive status updates via email"
+  headline: "Hear it from us"
+  headline_accent: "first"
+  subheadline: "Status changes land in your inbox the moment they happen."
   button:
     text: "Subscribe"
     icon: "envelope"
@@ -48,174 +56,148 @@ updates:
 # Maintenance Section
 maintenance:
   headline: "Scheduled maintenance"
-  empty_message: "No scheduled maintenance"
+  empty_message: "Nothing scheduled — no planned interruptions."
 
 # Incidents Section
 incidents:
   headline: "Recent incidents"
-  empty_message: "No incidents reported"
+  empty_message: "No incidents reported."
   show_history_link: "Show incident history"
   history_url: null  # Optional: Link to full incident history
 
 # Build Info Section
 build_info:
-  headline: "Build information"
+  headline: "Build manifest"
 ---
 
-<!-- Hero Section with Status Banner -->
-<section class="status-hero py-5">
-  <div class="container">
-    <div class="mb-5 classy-dotgrid" data-omega-dotfield data-omega-reveal-stagger="90">
-      <span class="classy-micro d-block mb-3" data-omega-reveal>Status</span>
-      <h1 class="classy-display classy-display--page" data-omega-reveal>
-        {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-      </h1>
-      {% iftruthy resolved.hero.subheadline %}
-        <p class="classy-hero-split__sub" data-omega-reveal>
-          {{ resolved.hero.subheadline }}
-        </p>
-      {% endiftruthy %}
-    </div>
+<!-- ═══ Hero: the state is the headline ═══ -->
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
+  <div class="container" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-3" data-omega-reveal>Status</span>
+    <h1 class="classy-display classy-display--page" data-omega-reveal>
+      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+    </h1>
+    {% iftruthy resolved.hero.subheadline %}
+      <p class="classy-hero-split__sub" data-omega-reveal>
+        {{ resolved.hero.subheadline }}
+      </p>
+    {% endiftruthy %}
+  </div>
+</section>
 
-    <!-- Overall Status Banner -->
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div id="status-banner" class="card status-banner bg-success" data-omega-reveal>
-          <div class="card-body p-4">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-              <div class="d-flex align-items-center gap-3">
-                <span class="status-indicator d-inline-flex">
-                  {% uj_icon "circle-check", "status-icon text-success fs-4" %}
+<!-- ═══ Live status strip ═══ -->
+<section class="pt-0 pb-4">
+  <div class="container">
+    <div id="status-banner" class="status-banner classy-status-strip bg-success" data-omega-reveal>
+      <div class="d-flex align-items-center gap-3">
+        <span class="status-indicator d-inline-flex">
+          {% uj_icon "circle-check", "status-icon fs-4" %}
+        </span>
+        <h2 id="status-text" class="classy-status-strip__text mb-0">{{ resolved.status.overall.operational }}</h2>
+      </div>
+      <div class="d-flex align-items-center gap-2 classy-quiet small">
+        <span class="status-pulse rounded-circle animation-pulse"></span>
+        <span>Refreshed <span id="status-refresh-timer">0</span>s ago</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Services — one ops card ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <div class="classy-status-card" data-omega-reveal>
+      <div id="services-list">
+        {% for service in resolved.status.services %}
+          <div class="service-item classy-status-card__row {% unless forloop.last %}classy-status-card__row--divided{% endunless %}" data-service-id="{{ service.id }}">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="service-status-dot" data-service-status="{{ service.id }}">
+                  {% uj_icon "circle-check", "text-success" %}
                 </span>
-                <h2 id="status-text" class="h3 mb-0">{{ resolved.status.overall.operational }}</h2>
+                {% iftruthy service.url %}
+                  <a href="{{ service.url }}" class="fw-semibold text-body text-decoration-none">{{ service.name }}</a>
+                {% endiftruthy %}
+                {% iffalsy service.url %}
+                  <span class="fw-semibold">{{ service.name }}</span>
+                {% endiffalsy %}
+                {% iftruthy service.description %}
+                  <span class="classy-quiet small d-none d-md-inline">— {{ service.description }}</span>
+                {% endiftruthy %}
               </div>
-              <div class="d-flex align-items-center gap-2 text-muted small">
-                <span class="status-pulse bg-success rounded-circle animation-pulse"></span>
-                <span>Refreshed <span id="status-refresh-timer">0</span>s ago</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="service-uptime fw-semibold font-monospace" data-service-uptime="{{ service.id }}">100%</span>
               </div>
             </div>
+            <div class="uptime-bars d-flex gap-1 cursor-pointer" data-service-bars="{{ service.id }}" title="Uptime history for the last {{ resolved.status.days }} days">
+              {% for i in (1..90) %}
+                <div class="uptime-bar rounded-1 bg-success" data-day="{{ i }}"></div>
+              {% endfor %}
+            </div>
           </div>
+        {% endfor %}
+      </div>
+
+      <!-- Uptime Legend -->
+      <div class="classy-status-card__legend d-flex align-items-center justify-content-between flex-wrap gap-2 classy-quiet small">
+        <div class="d-flex align-items-center flex-wrap gap-2 gap-md-4">
+          <div class="d-flex align-items-center gap-1">
+            <div class="uptime-bar-legend rounded-1 bg-success"></div>
+            <span>Operational</span>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <div class="uptime-bar-legend rounded-1 bg-warning"></div>
+            <span>Degraded</span>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <div class="uptime-bar-legend rounded-1 bg-danger"></div>
+            <span>Outage</span>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <div class="uptime-bar-legend rounded-1 bg-info"></div>
+            <span>Maintenance</span>
+          </div>
+        </div>
+        <div>
+          <span class="d-none d-lg-inline">{{ resolved.status.days }} days ago</span>
+          <span class="d-none d-md-inline d-lg-none">60 days ago</span>
+          <span class="d-md-none">30 days ago</span>
+          <span class="mx-2">—</span>
+          <span>Today</span>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Services Status Section -->
-<section class="py-5">
+<!-- ═══ Incidents + maintenance duo ═══ -->
+<section>
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div id="services-list">
-          {% for service in resolved.status.services %}
-            <div class="service-item py-3 border-bottom {% if forloop.last %}border-bottom-0{% endif %}" data-service-id="{{ service.id }}" data-omega-reveal>
-              <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="d-flex align-items-center gap-2">
-                  <span class="service-status-dot" data-service-status="{{ service.id }}">
-                    {% uj_icon "circle-check", "text-success" %}
-                  </span>
-                  {% iftruthy service.url %}
-                    <a href="{{ service.url }}" class="fw-semibold text-body text-decoration-none">{{ service.name }}</a>
-                  {% endiftruthy %}
-                  {% iffalsy service.url %}
-                    <span class="fw-semibold">{{ service.name }}</span>
-                  {% endiffalsy %}
-                  {% iftruthy service.description %}
-                    <span class="text-muted small d-none d-md-inline">— {{ service.description }}</span>
-                  {% endiftruthy %}
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                  <span class="service-uptime fw-semibold" data-service-uptime="{{ service.id }}">100%</span>
-                </div>
-              </div>
-              <div class="uptime-bars d-flex gap-1 cursor-pointer" data-service-bars="{{ service.id }}" title="Uptime history for the last {{ resolved.status.days }} days">
-                {% for i in (1..90) %}
-                  <div class="uptime-bar rounded-1 bg-success" data-day="{{ i }}"></div>
-                {% endfor %}
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-
-        <!-- Uptime Legend -->
-        <div class="mt-4 d-flex align-items-center justify-content-between flex-wrap gap-2 text-muted small" data-omega-reveal>
-          <div class="d-flex align-items-center flex-wrap gap-2 gap-md-4">
-            <div class="d-flex align-items-center gap-1">
-              <div class="uptime-bar-legend rounded-1 bg-success"></div>
-              <span>Operational</span>
-            </div>
-            <div class="d-flex align-items-center gap-1">
-              <div class="uptime-bar-legend rounded-1 bg-warning"></div>
-              <span>Degraded</span>
-            </div>
-            <div class="d-flex align-items-center gap-1">
-              <div class="uptime-bar-legend rounded-1 bg-danger"></div>
-              <span>Outage</span>
-            </div>
-            <div class="d-flex align-items-center gap-1">
-              <div class="uptime-bar-legend rounded-1 bg-info"></div>
-              <span>Maintenance</span>
-            </div>
-          </div>
-          <div>
-            <span class="d-none d-lg-inline">{{ resolved.status.days }} days ago</span>
-            <span class="d-none d-md-inline d-lg-none">60 days ago</span>
-            <span class="d-md-none">30 days ago</span>
-            <span class="mx-2">—</span>
-            <span>Today</span>
+    <div class="row g-4">
+      <div class="col-lg-6" data-omega-reveal>
+        <h2 class="classy-panel-head justify-content-start h5 mb-3">{{ resolved.incidents.headline }}</h2>
+        <div id="incidents-list">
+          <div id="incidents-empty" class="classy-status-empty">
+            <span class="classy-dot classy-dot--ok"></span>
+            <span>{{ resolved.incidents.empty_message }}</span>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Recent Incidents Section -->
-<section class="py-5">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <h2 class="classy-panel-head justify-content-start h5 mb-4" data-omega-reveal>{{ resolved.incidents.headline }}</h2>
-
-        <div id="incidents-list" data-omega-reveal>
-          <!-- Incident items will be populated by JavaScript -->
-          <!-- If no incidents, show empty state -->
-          <div id="incidents-empty" class="card">
-            <div class="card-body p-4 text-center text-muted">
-              {% uj_icon "circle-check", "fs-1 mb-3 text-success opacity-75" %}
-              <p class="mb-0">{{ resolved.incidents.empty_message }}</p>
-            </div>
-          </div>
-        </div>
-
         {% iftruthy resolved.incidents.history_url %}
-          <div class="mt-4" data-omega-reveal>
-            <a href="{{ resolved.incidents.history_url }}" class="text-decoration-none">
+          <div class="mt-3">
+            <a href="{{ resolved.incidents.history_url }}" class="text-decoration-none small">
               {{ resolved.incidents.show_history_link }}
-              {% uj_icon "arrow-right", "ms-1" %}
+              {% uj_icon "arrow-right", "fa-xs ms-1" %}
             </a>
           </div>
         {% endiftruthy %}
       </div>
-    </div>
-  </div>
-</section>
 
-<!-- Scheduled Maintenance Section -->
-<section class="py-5">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <h2 class="classy-panel-head justify-content-start h5 mb-4" data-omega-reveal>{{ resolved.maintenance.headline }}</h2>
-
-        <div id="maintenance-list" data-omega-reveal>
-          <!-- Maintenance items will be populated by JavaScript -->
-          <!-- If no maintenance scheduled, show empty state -->
-          <div id="maintenance-empty" class="card">
-            <div class="card-body p-4 text-center text-muted">
-              {% uj_icon "calendar-check", "fs-1 mb-3 opacity-50" %}
-              <p class="mb-0">{{ resolved.maintenance.empty_message }}</p>
-            </div>
+      <div class="col-lg-6" data-omega-reveal>
+        <h2 class="classy-panel-head justify-content-start h5 mb-3">{{ resolved.maintenance.headline }}</h2>
+        <div id="maintenance-list">
+          <div id="maintenance-empty" class="classy-status-empty">
+            <span class="classy-dot"></span>
+            <span>{{ resolved.maintenance.empty_message }}</span>
           </div>
         </div>
       </div>
@@ -223,155 +205,135 @@ build_info:
   </div>
 </section>
 
-<!-- Subscribe to Updates Section -->
-<section class="py-5 pb-0">
+<!-- ═══ Subscribe band ═══ -->
+<section>
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div class="card" data-omega-reveal>
-          <div class="card-body p-4">
-            <div class="row align-items-center">
-              <div class="col-lg-7 mb-3 mb-lg-0">
-                {% iftruthy resolved.updates.superheadline.text %}
-                  <span class="classy-micro d-block mb-2">{{ resolved.updates.superheadline.text }}</span>
-                {% endiftruthy %}
-                <h3 class="h5 mb-1">
-                  {{ resolved.updates.headline }}
-                  {% iftruthy resolved.updates.headline_accent %}
-                    <em class="text-marketing">{{ resolved.updates.headline_accent }}</em>
-                  {% endiftruthy %}
-                </h3>
-                {% iftruthy resolved.updates.subheadline %}
-                  <p class="text-muted mb-0">{{ resolved.updates.subheadline }}</p>
-                {% endiftruthy %}
+    <div class="classy-status-subscribe" data-omega-reveal="scale">
+      <div>
+        {% iftruthy resolved.updates.superheadline.text %}
+          <span class="classy-micro d-block mb-2">{{ resolved.updates.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h3 class="h5 mb-1">
+          {{ resolved.updates.headline }}
+          {% iftruthy resolved.updates.headline_accent %}
+            <em class="text-marketing">{{ resolved.updates.headline_accent }}</em>
+          {% endiftruthy %}
+        </h3>
+        {% iftruthy resolved.updates.subheadline %}
+          <p class="classy-quiet mb-0">{{ resolved.updates.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+      <form id="status-subscribe-form" class="d-flex flex-column flex-sm-row gap-2" novalidate data-form-state="initializing" onsubmit="return false">
+        <input
+          type="email"
+          class="form-control flex-grow-1"
+          id="status-email"
+          name="email"
+          placeholder="you@work.com"
+          autocomplete="email"
+          required
+        >
+        <button type="submit" class="btn btn-adaptive text-nowrap flex-shrink-0">
+          {% uj_icon "paper-plane", "fa-sm me-2" %}
+          <span class="button-text">{{ resolved.updates.button.text }}</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ Build manifest ═══ -->
+<section class="pb-4">
+  <div class="container">
+    <h2 class="classy-panel-head justify-content-start h5 mb-3" data-omega-reveal>{{ resolved.build_info.headline }}</h2>
+
+    <div id="build-info" class="classy-status-card classy-status-card--manifest" data-omega-reveal>
+      <!-- Loading state -->
+      <div id="build-info-loading" class="text-center classy-quiet py-3">
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        Loading build information...
+      </div>
+
+      <!-- Content (hidden until loaded) -->
+      <div id="build-info-content" class="d-none">
+        <div class="row g-4">
+          <!-- Build Time -->
+          <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                {% uj_icon "clock", "fa-sm" %}
+              </span>
+              <div>
+                <div class="classy-micro mb-1">Last build</div>
+                <div class="fw-semibold"><span id="build-time">—</span> <span id="build-time-ago" class="classy-quiet small ms-1"></span></div>
               </div>
-              <div class="col-lg-5">
-                <form id="status-subscribe-form" class="d-flex flex-column flex-sm-row gap-2" novalidate data-form-state="initializing" onsubmit="return false">
-                  <input
-                    type="email"
-                    class="form-control flex-grow-1"
-                    id="status-email"
-                    name="email"
-                    placeholder="your@email.com"
-                    autocomplete="email"
-                    required
-                  >
-                  <button type="submit" class="btn btn-adaptive text-nowrap flex-shrink-0">
-                    {% uj_icon "paper-plane", "fa-sm me-2" %}
-                    <span class="button-text">{{ resolved.updates.button.text }}</span>
-                  </button>
-                </form>
+            </div>
+          </div>
+
+          <!-- Environment -->
+          <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                {% uj_icon "server", "fa-sm" %}
+              </span>
+              <div>
+                <div class="classy-micro mb-1">Environment</div>
+                <div id="build-environment" class="fw-semibold">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Packages -->
+          <div class="col-12">
+            <div class="d-flex align-items-start gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                {% uj_icon "box", "fa-sm" %}
+              </span>
+              <div class="flex-grow-1">
+                <div class="classy-micro mb-2">Package versions</div>
+                <div id="build-packages" class="d-flex flex-wrap gap-2">
+                  <!-- Package badges will be inserted here -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Repository -->
+          <div class="col-12">
+            <div class="d-flex align-items-start gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                {% uj_icon "code-branch", "fa-sm" %}
+              </span>
+              <div>
+                <div class="classy-micro mb-1">Repository</div>
+                <div id="build-repo" class="fw-semibold">—</div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-</section>
 
-<!-- Build Info Section -->
-<section class="py-5">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <h2 class="classy-panel-head justify-content-start h5 mb-4" data-omega-reveal>{{ resolved.build_info.headline }}</h2>
-
-        <div id="build-info" class="card" data-omega-reveal>
-          <div class="card-body p-4">
-            <!-- Loading state -->
-            <div id="build-info-loading" class="text-center text-muted py-3">
-              <div class="spinner-border spinner-border-sm me-2" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-              Loading build information...
-            </div>
-
-            <!-- Content (hidden until loaded) -->
-            <div id="build-info-content" class="d-none">
-              <div class="row g-4">
-                <!-- Build Time -->
-                <div class="col-md-6">
-                  <div class="d-flex align-items-start gap-3">
-                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                      {% uj_icon "clock", "fa-sm" %}
-                    </span>
-                    <div>
-                      <div class="text-muted small mb-1">Last build</div>
-                      <div class="fw-semibold"><span id="build-time">—</span> <span id="build-time-ago" class="text-muted small ms-1"></span></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Environment -->
-                <div class="col-md-6">
-                  <div class="d-flex align-items-start gap-3">
-                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                      {% uj_icon "server", "fa-sm" %}
-                    </span>
-                    <div>
-                      <div class="text-muted small mb-1">Environment</div>
-                      <div id="build-environment" class="fw-semibold">—</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Packages -->
-                <div class="col-12">
-                  <div class="d-flex align-items-start gap-3">
-                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                      {% uj_icon "box", "fa-sm" %}
-                    </span>
-                    <div class="flex-grow-1">
-                      <div class="text-muted small mb-2">Package versions</div>
-                      <div id="build-packages" class="d-flex flex-wrap gap-2">
-                        <!-- Package badges will be inserted here -->
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Repository -->
-                <div class="col-12">
-                  <div class="d-flex align-items-start gap-3">
-                    <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
-                      {% uj_icon "code-branch", "fa-sm" %}
-                    </span>
-                    <div>
-                      <div class="text-muted small mb-1">Repository</div>
-                      <div id="build-repo" class="fw-semibold">—</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Error state -->
-            <div id="build-info-error" class="d-none text-center text-muted py-3">
-              {% uj_icon "circle-exclamation", "fs-3 mb-2 text-warning opacity-75" %}
-              <p class="mb-0">Unable to load build information</p>
-            </div>
-          </div>
-        </div>
+      <!-- Error state -->
+      <div id="build-info-error" class="d-none text-center classy-quiet py-3">
+        {% uj_icon "circle-exclamation", "fs-3 mb-2 text-warning opacity-75" %}
+        <p class="mb-0">Unable to load build information</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Footer Links -->
-<section class="py-5 pt-1">
+<!-- ═══ Footer links ═══ -->
+<section class="pt-0">
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div class="d-flex justify-content-center align-items-center gap-3 text-muted small flex-wrap" data-omega-reveal>
-          <a href="/updates" class="text-decoration-none">
-            {% uj_icon "rocket", "me-1" %}
-            View updates
-          </a>
-          <span>•</span>
-          <span>Powered by <a href="/" class="text-decoration-none fw-semibold">{{ site.brand.name }}</a></span>
-        </div>
-      </div>
+    <div class="d-flex justify-content-center align-items-center gap-3 classy-quiet small flex-wrap" data-omega-reveal>
+      <a href="/updates" class="text-decoration-none">
+        {% uj_icon "rocket", "fa-xs me-1" %}
+        View updates
+      </a>
+      <span>•</span>
+      <span>Powered by <a href="/" class="text-decoration-none fw-semibold">{{ site.brand.name }}</a></span>
     </div>
   </div>
 </section>

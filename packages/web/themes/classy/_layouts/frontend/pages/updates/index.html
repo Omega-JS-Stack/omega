@@ -1,21 +1,25 @@
 ---
-layout: frontend/core/cover
+layout: frontend/core/base
+
+# ═══ /updates — reimagined 2026-07-16: a version TIMELINE (hairline spine,
+# version nodes, latest release featured) instead of a stack of identical
+# cards. Data: site.updates (update.version/title/date/summary/highlights).
 
 # Hero Section
 hero:
-  headline: "{{ site.brand.name }}"
-  headline_accent: "updates"
-  subheadline: "Release notes and version history for {{ site.brand.name }}"
+  headline: "What changed, and"
+  headline_accent: "when"
+  subheadline: "Every release, its reasons, and the fine print — newest first."
 
 # Updates Section
 updates:
-  empty_message: "No updates available yet"
-  view_details: "View details"
+  empty_message: "No releases yet — the first one will land right here."
+  view_details: "Read the release notes"
   latest_badge: "Latest"
 ---
 
-<!-- Masthead -->
-<section class="updates-hero py-5 classy-dotgrid" data-omega-dotfield>
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
     <span class="classy-micro d-block mb-3" data-omega-reveal>Changelog</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
@@ -29,11 +33,11 @@ updates:
   </div>
 </section>
 
-<!-- Updates List Section -->
-<section class="py-5">
+<!-- ═══ The timeline ═══ -->
+<section class="pt-2">
   <div class="container">
     <div class="row justify-content-center">
-      <div class="col-lg-10">
+      <div class="col-lg-9 col-xl-8">
         {% if site.updates %}
           {% assign updates = site.updates | sort: 'update.date' | reverse %}
         {% else %}
@@ -41,59 +45,57 @@ updates:
         {% endif %}
 
         {% if updates and updates.size > 0 %}
-          <div id="updates-list">
+          <div class="classy-timeline" id="updates-list">
             {% for item in updates %}
               {% if item.draft and jekyll.environment == 'production' %}
                 {% continue %}
               {% endif %}
-              <div class="card mb-3 update-card" data-omega-reveal>
-                <div class="card-body p-4">
-                  <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-3">
-                      <span class="classy-icon-chip classy-icon-chip--neutral">
-                        {% uj_icon "rocket", "fa-sm" %}
-                      </span>
-                      <div>
-                        <h3 class="h5 fw-semibold mb-0 text-marketing">
-                          <a href="{{ item.url }}" class="text-body text-decoration-none stretched-link">
-                            Version {{ item.update.version }}
-                          </a>
-                        </h3>
-                        {% iftruthy item.update.title %}
-                          <p class="text-muted mb-0 small">{{ item.update.title }}</p>
-                        {% endiftruthy %}
-                      </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                      {% if forloop.first %}
-                        <span class="classy-status classy-status--ok"><span class="classy-dot classy-dot--ok"></span>{{ resolved.updates.latest_badge }}</span>
-                      {% endif %}
-                      <span class="text-muted small">{{ item.update.date | date: "%b %d, %Y" }}</span>
-                    </div>
-                  </div>
+
+              <article class="classy-timeline__entry {% if forloop.first %}classy-timeline__entry--latest{% endif %}" data-omega-reveal>
+                <div class="classy-timeline__node" aria-hidden="true">
+                  <span class="classy-timeline__dot"></span>
+                </div>
+
+                <div class="classy-timeline__meta">
+                  <span class="classy-timeline__version font-monospace">v{{ item.update.version }}</span>
+                  {% if forloop.first %}
+                    <span class="classy-status classy-status--ok"><span class="classy-dot classy-dot--ok"></span>{{ resolved.updates.latest_badge }}</span>
+                  {% endif %}
+                  <time class="classy-quiet small" datetime="{{ item.update.date | date: '%Y-%m-%d' }}">{{ item.update.date | date: "%b %d, %Y" }}</time>
+                </div>
+
+                <div class="classy-timeline__body">
+                  <h2 class="classy-timeline__title">
+                    <a href="{{ item.url }}" class="stretched-link">
+                      {% iftruthy item.update.title %}{{ item.update.title }}{% endiftruthy %}
+                      {% iffalsy item.update.title %}Version {{ item.update.version }}{% endiffalsy %}
+                    </a>
+                  </h2>
 
                   {% iftruthy item.update.summary %}
-                    <p class="text-muted mb-3">{{ item.update.summary }}</p>
+                    <p class="classy-timeline__summary classy-quiet">{{ item.update.summary }}</p>
                   {% endiftruthy %}
 
                   {% iftruthy item.update.highlights %}
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap gap-2 mt-2">
                       {% for highlight in item.update.highlights %}
-                        <span class="classy-chip">
-                          {{ highlight.text }}
-                        </span>
+                        <span class="classy-chip">{{ highlight.text }}</span>
                       {% endfor %}
                     </div>
                   {% endiftruthy %}
+
+                  <span class="classy-timeline__more small">
+                    {{ resolved.updates.view_details }}
+                    {% uj_icon "arrow-right", "fa-xs ms-1" %}
+                  </span>
                 </div>
-              </div>
+              </article>
             {% endfor %}
           </div>
         {% else %}
-          <div class="card" data-omega-reveal>
-            <div class="card-body p-4 text-center text-muted">
-              <p class="mb-0">{{ resolved.updates.empty_message }}</p>
-            </div>
+          <div class="classy-status-empty" data-omega-reveal>
+            <span class="classy-dot"></span>
+            <span>{{ resolved.updates.empty_message }}</span>
           </div>
         {% endif %}
       </div>
@@ -101,18 +103,19 @@ updates:
   </div>
 </section>
 
-<!-- Back to Status Link -->
-<section class="py-5 pt-0">
+<!-- ═══ Cross-links ═══ -->
+<section class="pt-0">
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-10">
-        <div class="text-center" data-omega-reveal>
-          <a href="/status" class="text-decoration-none">
-            {% uj_icon "arrow-left", "me-1" %}
-            Back to system status
-          </a>
-        </div>
-      </div>
+    <div class="d-flex justify-content-center align-items-center gap-3 classy-quiet small flex-wrap" data-omega-reveal>
+      <a href="/status" class="text-decoration-none">
+        {% uj_icon "signal", "fa-xs me-1" %}
+        System status
+      </a>
+      <span>•</span>
+      <a href="/blog" class="text-decoration-none">
+        {% uj_icon "newspaper", "fa-xs me-1" %}
+        The blog
+      </a>
     </div>
   </div>
 </section>

@@ -1,45 +1,52 @@
 ---
-layout: frontend/core/cover
+layout: frontend/core/base
+
+# ═══ 404 — reimagined 2026-07-16: no more card-in-the-void. A full-bleed
+# typographic moment on the dotfield (the pointer glow makes the page feel
+# alive while you're lost), real URL stamped by the page JS (#page-url),
+# full chrome kept so every exit is one click away.
+
+theme:
+  nav:
+    enabled: true
+  footer:
+    enabled: true
 ---
 
-<section class="col-12 col-md-10 col-lg-8 col-xl-6 mw-md">
-  <div class="card">
-    <div class="card-body p-4 p-md-5 text-center">
-      <!-- Header -->
-      <div class="mb-4">
-        <div class="classy-display classy-display--hero mb-3" aria-hidden="true">4<em>0</em>4</div>
-        <h1 class="visually-hidden">Page not found</h1>
-        <p class="text-muted mb-0">
-          This page doesn't exist — or it moved somewhere smarter.
-        </p>
-      </div>
+<section class="classy-404 classy-dotgrid" data-omega-dotfield>
+  <div class="container text-center" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-2" data-omega-reveal>Error 404</span>
 
-      <!-- URL Display -->
-      <div class="d-inline-flex align-items-center gap-2 px-3 py-2 mb-4 hairline rounded-3 small text-muted mw-100">
-        <span class="classy-micro flex-shrink-0">URL</span>
-        <span id="page-url" class="text-break font-monospace">{{ site.url }}{{ page.url }}</span>
-      </div>
+    <div class="classy-404__code" aria-hidden="true" data-omega-reveal>4<em>0</em>4</div>
+    <h1 class="visually-hidden">Page not found</h1>
 
-      <!-- Primary Actions -->
-      <div class="d-grid gap-2 d-sm-block text-center mb-4">
-        <a href="/" class="btn btn-adaptive btn-lg mb-2 mb-sm-0 me-sm-2">
-          {% uj_icon "house", "fa-sm me-2" %}
-          Back to home
-        </a>
-        <button class="btn btn-outline-adaptive btn-lg mb-2 mb-sm-0" onclick="window.history.back()">
-          {% uj_icon "arrow-left", "fa-sm me-2" %}
-          Go back
-        </button>
-      </div>
+    <p class="classy-404__line" data-omega-reveal>
+      Lost, <em>elegantly</em>. This page doesn't exist — or it moved somewhere smarter.
+    </p>
 
-      <!-- Help Section -->
-      <div class="text-center pt-4 hairline-top">
-        <p class="text-muted mb-0">
-          Still lost?
-          <a href="/contact" class="text-decoration-none fw-semibold">Contact support</a> — a human will point you right.
-        </p>
-      </div>
+    <div class="classy-404__url d-inline-flex align-items-center gap-2 px-3 py-2 small text-muted mw-100" data-omega-reveal>
+      <span class="classy-micro flex-shrink-0">URL</span>
+      <span id="page-url" class="text-break font-monospace">{{ site.url }}{{ page.url }}</span>
     </div>
+
+    <div class="classy-404__actions" data-omega-reveal>
+      <a href="/" class="btn btn-adaptive btn-lg omega-hover-nudge">
+        {% uj_icon "house", "fa-sm me-2" %}
+        Back to home
+      </a>
+      <button class="btn btn-outline-adaptive btn-lg" onclick="window.history.back()">
+        {% uj_icon "arrow-left", "fa-sm me-2" %}
+        Go back
+      </button>
+    </div>
+
+    <p class="classy-404__trail classy-quiet small" data-omega-reveal>
+      Or try:
+      <a href="/blog">Blog</a> ·
+      <a href="/pricing">Pricing</a> ·
+      <a href="/updates">Updates</a> ·
+      <a href="/contact">Support</a>
+    </p>
   </div>
 </section>
 

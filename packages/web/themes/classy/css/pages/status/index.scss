@@ -82,3 +82,83 @@
 .service-item {
   border-color: var(--omega-line) !important;
 }
+
+// ── Reimagined composition (2026-07-16) ──────────────────────────────────────
+
+// The live strip: status as a sentence, not a colored slab
+.classy-status-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.125rem 1.5rem;
+  border-radius: var(--omega-radius-l);
+}
+
+.classy-status-strip__text {
+  font-family: var(--omega-font-marketing);
+  font-size: 1.375rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+// The ops card: every service in ONE surface
+.classy-status-card {
+  padding: 1.75rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+}
+
+.classy-status-card__row {
+  padding-block: 1.125rem;
+
+  &:first-child {
+    padding-top: 0;
+  }
+
+  &--divided {
+    border-bottom: 1px solid var(--omega-line);
+  }
+}
+
+.classy-status-card__legend {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--omega-line);
+}
+
+.classy-status-card--manifest {
+  padding: 1.5rem 1.75rem;
+}
+
+// Quiet empty states: a dot and a sentence, not a card-in-card
+.classy-status-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1.125rem 1.375rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+  color: var(--omega-ink-muted);
+}
+
+// Subscribe band: split panel on surface-2
+.classy-status-subscribe {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 2rem;
+  align-items: center;
+  padding: 2rem 2.25rem;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+
+  @media (max-width: 767.98px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 1.5rem;
+  }
+}
