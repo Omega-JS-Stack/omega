@@ -150,4 +150,23 @@ function loadBrand(brandRoot, { companyConfig = null } = {}) {
   };
 }
 
-module.exports = { resolveBrandRoot, loadBrand, discoverApps, targetFromDirName };
+/**
+ * Resolve a brand image (brand.images.<key>) to an ABSOLUTE URL for external
+ * services (Stripe product images, Chatsy avatars, …). Config stores
+ * site-relative paths (served by the web build's static channel — the site
+ * itself absolutizes per environment); external surfaces can't resolve a
+ * relative path, so join against brand.url. Full URLs pass through.
+ * @param {object} brandConfig - merged brand config
+ * @param {string} key - images key ('brandmark' | 'social' | ...)
+ * @returns {string|null} absolute URL, or null when unresolvable
+ */
+function absoluteBrandImage(brandConfig, key) {
+  const value = brandConfig?.brand?.images?.[key] || null;
+  if (!value) return null;
+  if (/^https?:\/\//.test(value)) return value;
+
+  const base = String(brandConfig?.brand?.url || '').replace(/\/$/, '');
+  return base ? `${base}${value.startsWith('/') ? '' : '/'}${value}` : null;
+}
+
+module.exports = { resolveBrandRoot, loadBrand, discoverApps, targetFromDirName, absoluteBrandImage };

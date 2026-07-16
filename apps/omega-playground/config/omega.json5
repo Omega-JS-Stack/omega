@@ -42,9 +42,11 @@
     },
     images: {
       // Served by the web build's static channel: the minted set under
-      // .omega/assets is bridged to /assets/images/{favicon,brand} at build
-      brandmark: "https://playground.omegajs.dev/assets/images/brand/brandmark.png",
-      social: "https://playground.omegajs.dev/assets/images/brand/social.png",
+      // .omega/assets is bridged to /assets/images/{favicon,brand} at build.
+      // SITE-RELATIVE on purpose — each surface absolutizes per environment
+      // (dev = localhost, prod = brand.url; emails/external always brand.url)
+      brandmark: "/assets/images/brand/brandmark.png",
+      social: "/assets/images/brand/social.png",
     },
   },
 

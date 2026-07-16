@@ -3,6 +3,7 @@ const _ = require('lodash');
 const moment = require('moment');
 const powertools = require('node-powertools');
 const crypto = require('crypto');
+const { sanitizeImagesForEmail } = require('../../../../../libraries/email/constants.js');
 
 // SendGrid limit for scheduled emails (72 hours, but use 71 for buffer)
 const SEND_AT_LIMIT = 71;
@@ -193,7 +194,7 @@ Module.prototype.defaultize = function () {
       name: brand.name,
       url: brand.url,
       email: brand.contact?.email,
-      images: brand.images || {},
+      images: sanitizeImagesForEmail(brand.images || {}, brand.url),
     };
 
     if (!brandData.email) {

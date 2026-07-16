@@ -18,6 +18,7 @@ const { join } = require('node:path');
 const fs = require('node:fs');
 const chalk = require('chalk').default;
 const { getBaselineKnowledge } = require('../lib/baseline-knowledge.js');
+const { absoluteBrandImage } = require('../../../lib/brand.js');
 
 module.exports = async function ensureChat(context) {
   const { brandConfig, brandRoot, db, agentId, options } = context;
@@ -35,7 +36,7 @@ module.exports = async function ensureChat(context) {
   const baseline = getBaselineKnowledge(brandConfig);
   const knowledge = brandKnowledge ? `${baseline}\n\n${brandKnowledge}` : baseline;
 
-  const image = brandConfig.brand.images?.brandmark || null;
+  const image = absoluteBrandImage(brandConfig, 'brandmark');
 
   const desired = {
     name: `${brandName} Support`,

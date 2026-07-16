@@ -139,3 +139,14 @@ test('devCleanUrls middleware: /signin, /signin/ and dotted slugs resolve to fla
   assert.equal(rewritten('/real.txt'), '/real.txt', 'real files pass through');
   assert.equal(rewritten('/missing'), '/missing', 'no .html candidate — untouched');
 });
+
+test('applyDevSiteUrl: dev builds link to the local origin, never the live site', () => {
+  const { applyDevSiteUrl } = require('../src/commands/dev.js');
+  const siteData = { url: 'https://playground.omegajs.dev', brand: { url: 'https://playground.omegajs.dev' } };
+
+  applyDevSiteUrl(siteData, 4000);
+  assert.equal(siteData.url, 'http://localhost:4000', 'site.url is the dev origin');
+
+  applyDevSiteUrl(siteData, 4001);
+  assert.equal(siteData.url, 'http://localhost:4001', 'bumped port carries through');
+});

@@ -36,7 +36,7 @@ function resolveBrand(Manager) {
   }
 
   const brand = _.cloneDeep(raw);
-  brand.images = sanitizeImagesForEmail(brand.images || {});
+  brand.images = sanitizeImagesForEmail(brand.images || {}, brand.url);
 
   if (!brand.contact?.email) {
     throw errorWithCode('Missing brand.contact.email in config/omega.json5', 400);

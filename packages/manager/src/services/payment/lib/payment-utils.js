@@ -5,6 +5,7 @@
  * the stripe/paypal/chargebee handlers (and hardcoded the company CDN for
  * product images — the image is brand.images.brandmark config now).
  */
+const { absoluteBrandImage } = require('../../../lib/brand.js');
 
 /**
  * Products the processors manage: priced and not archived. Free tiers have
@@ -37,7 +38,7 @@ function productDisplayName(brandConfig, product) {
  * @returns {string|null} Image URL or null
  */
 function productImage(brandConfig) {
-  return brandConfig.brand.images?.brandmark || null;
+  return absoluteBrandImage(brandConfig, 'brandmark');
 }
 
 /**

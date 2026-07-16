@@ -1052,3 +1052,24 @@ test('processor-setup: non-interactive returns false without touching anything',
   assert.equal(landed, false);
   assert.equal(readConfigSource(brandRoot), PROCESSOR_FLOW_CONFIG);
 });
+
+test('absoluteBrandImage: relative brand.images join brand.url; full URLs pass through; unresolvable → null', () => {
+  const { absoluteBrandImage } = require('../src/lib/brand.js');
+
+  const relative = { brand: { url: 'https://playground.omegajs.dev/', images: { brandmark: '/assets/images/brand/brandmark.png' } } };
+  assert.equal(
+    absoluteBrandImage(relative, 'brandmark'),
+    'https://playground.omegajs.dev/assets/images/brand/brandmark.png',
+    'relative path joins brand.url (trailing slash collapsed)'
+  );
+
+  const absolute = { brand: { url: 'https://x.dev', images: { brandmark: 'https://cdn.example.com/mark.png' } } };
+  assert.equal(absoluteBrandImage(absolute, 'brandmark'), 'https://cdn.example.com/mark.png', 'full URL passes through');
+
+  assert.equal(absoluteBrandImage({ brand: { url: 'https://x.dev', images: {} } }, 'brandmark'), null, 'missing image → null');
+  assert.equal(
+    absoluteBrandImage({ brand: { images: { brandmark: '/mark.png' } } }, 'brandmark'),
+    null,
+    'relative path without brand.url is unresolvable → null'
+  );
+});

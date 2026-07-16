@@ -116,7 +116,11 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
           title: settings.title,
           body: `"${settings.title}" was just published on our blog. It's a great read and we think you'll enjoy the content!`,
           click_action: `${Manager.project.websiteUrl}/blog`,
-          icon: Manager.config.brand.images.brandmark,
+          // brand.images stores site-relative paths — the push icon must be a
+          // fetchable URL, resolved against THIS environment's website origin
+          icon: Manager.config.brand.images.brandmark
+            ? new URL(Manager.config.brand.images.brandmark, Manager.project.websiteUrl).href
+            : undefined,
         }
       },
     }).catch(e => {

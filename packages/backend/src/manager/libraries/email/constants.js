@@ -225,18 +225,27 @@ function getNextFutureOccurrence(currentSendAt, recurrence, now) {
 }
 
 /**
- * Convert SVG image URLs to PNG equivalents — email clients don't render SVGs.
- * CDN naming convention: `-x.svg` -> `-1024.png`
+ * Make brand images email-safe: SVG URLs become PNG equivalents (email
+ * clients don't render SVGs; CDN naming convention `-x.svg` -> `-1024.png`)
+ * and site-relative paths (the config's stored shape — the website
+ * absolutizes per environment) become absolute against brand.url, since an
+ * email client can only fetch a public URL.
  */
-function sanitizeImagesForEmail(images) {
+function sanitizeImagesForEmail(images, brandUrl) {
+  const base = String(brandUrl || '').replace(/\/$/, '');
   const result = {};
 
   for (const [key, value] of Object.entries(images)) {
-    if (typeof value === 'string' && value.endsWith('.svg')) {
-      result[key] = value.replace(/-x\.svg$/, '-1024.png');
-    } else {
-      result[key] = value;
+    let sanitized = value;
+
+    if (typeof sanitized === 'string' && sanitized.endsWith('.svg')) {
+      sanitized = sanitized.replace(/-x\.svg$/, '-1024.png');
     }
+    if (typeof sanitized === 'string' && sanitized.startsWith('/') && base) {
+      sanitized = `${base}${sanitized}`;
+    }
+
+    result[key] = sanitized;
   }
 
   return result;

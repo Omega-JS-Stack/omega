@@ -54,6 +54,8 @@ module.exports = async function (options) {
   const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
   const devPorts = { ...readSiblingPorts(paths.root), website: port };
 
+  applyDevSiteUrl(siteData, port);
+
   const activeTheme = (siteData.theme && siteData.theme.id) || 'classy';
   const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: paths.root, themesDir: PATHS.themes });
   const layers = [
@@ -253,6 +255,18 @@ function devCleanUrls(outDir) {
 }
 
 /**
+ * Dev builds link to THIS server, never the live site (legacy _config_dev.yml
+ * url-override parity): site.url is the one root every absolute-URL surface
+ * derives from — canonicals/og tags, uj_external, absolute_url, redirect
+ * pages, nav — so pointing it at the local origin keeps every click in dev.
+ * @param {object} siteData - the loaded site global (mutated)
+ * @param {number} port - the resolved dev-server port
+ */
+function applyDevSiteUrl(siteData, port) {
+  siteData.url = `http://localhost:${port}`;
+}
+
+/**
  * Resolve the website port through the allocator (N7). An explicit `--port`
  * flag or a config `ports.website` entry PINS the port (busy = hard error);
  * otherwise start from OMEGA_WEBSITE_PORT (a parent that already allocated)
@@ -333,6 +347,7 @@ function readSiblingPorts(root) {
 module.exports.resolveWebsitePort = resolveWebsitePort;
 module.exports.readSiblingPorts = readSiblingPorts;
 module.exports.devServerOptions = devServerOptions;
+module.exports.applyDevSiteUrl = applyDevSiteUrl;
 
 async function linkBrandToMonorepo() {
   const local = require('@omega.js/devkit/local');

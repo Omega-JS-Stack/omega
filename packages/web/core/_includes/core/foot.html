@@ -235,7 +235,7 @@
     "url": "{{ site.url }}",
     "name": "{{ site.brand.name }}",
     "description": "{{ site.brand.description }}",
-    "logo": "{%- if site.brand.images.brandmark contains '://' %}{%- else %}{{ site.url }}/assets/images/og{%- endif -%}{{ site.brand.images.brandmark }}",
+    "logo": "{% uj_external site.brand.images.brandmark %}",
     "sameAs": [
       {%- for social in site.socials -%}
         {% assign platform = social[0] %}
@@ -437,7 +437,7 @@
       "publisher": {
         "@id": "{{ site.url }}#{{ site.brand.type }}"
       },
-      "image": "{%- if site.brand.images.brandmark contains '://' %}{%- else %}{{ site.url }}/assets/images/og{%- endif -%}{{ site.brand.images.brandmark }}",
+      "image": "{% uj_external site.brand.images.brandmark %}",
       {% iftruthy sa.features %}
       "featureList": {{ sa.features | jsonify }},
       {% endiftruthy %}
