@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **SKIN PASS — REMAKE MANDATE + REFERENCE BAR (Ian 2026-07-16: bronn/manus refs — serif scale, less text, unique elements, aligned pricing + config tooltips, unboxed blog; applies to ALL pages)** — cp148 done pending commit; next: product set (download/extension/app/alternatives) → utility set (status/updates/legal/404) → auth set (/signup incl.) → account/payment/portal → dashboard → admin — each to the reference bar, then a text-trim/unique-element sweep over home-adjacent leftovers
+- **SKIN PASS — REFERENCE BAR (bronn/manus)** — shipped through cp151 (content 5667e22 · product 22ce4ec · utility 326c9cb · auth/signup ce4efa0); remaining: account/payment/portal (cp152) → dashboard/admin content (cp153) → full-suite milestone run + playground redeploy on Ian's word
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **SKIN PASS remainder (after DRAFT 1)** — default pages + blueprints → auth/account/payment + dashboard/admin remake → showcase → C4 sharing → arc close (template repo cut OUTSIDE the monorepo; **DON'T FORGET (Ian 2026-07-12): playground source lands on the EXISTING Omega-JS-Stack/omega-playground repo's main + CI workflows — `omega deploy` CI dispatch then REPLACES the direct gh-pages push, nothing manual survives**); FOUC critical-CSS/font pass rides skin QA; omegajs.dev wiring + api.playground zone-worker parent scope land at arc close; D5 vendored-webfont picks are Ian's call mid-arc

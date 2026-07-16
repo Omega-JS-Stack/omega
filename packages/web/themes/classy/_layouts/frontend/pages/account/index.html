@@ -160,7 +160,7 @@ badges:
 <!-- Mobile Navigation Dropdown -->
 <div class="d-lg-none pt-5">
   <div class="container-fluid px-0">
-    <div class="card border-0 shadow-sm">
+    <div class="card">
       <div class="card-body p-3">
         <div class="d-flex gap-2">
           <select class="form-select flex-grow-1" id="mobile-nav-select" aria-label="Select account section">
@@ -189,7 +189,7 @@ badges:
   <div class="row">
     <!-- Desktop Sidebar -->
     <nav class="col-lg-3 d-none d-lg-block px-3 pb-3 pt-0" aria-label="Account navigation">
-      <div class="card border-0 shadow-sm position-sticky" style="top: 90px;">
+      <div class="card position-sticky" style="top: 90px;">
         <div class="card-body p-3">
           <ul class="nav nav-pills flex-column" id="account-nav" role="tablist" aria-label="Account sections">
             {% for section in resolved.sections %}
@@ -232,7 +232,7 @@ badges:
 
       <!-- Profile Section -->
       <section id="profile-section" class="account-section d-none">
-        <h2 class="h3 mb-4" >My profile</h2>
+        <h2 class="classy-display classy-display--section mb-4">My profile</h2>
 
         <form id="profile-form" novalidate data-form-state="initializing" onsubmit="return false">
           <!-- Avatar and Edit Button -->
@@ -756,7 +756,7 @@ badges:
 
               <!-- Save Button -->
               <div class="mt-3 d-grid d-sm-block">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-adaptive">
                   {% uj_icon "floppy-disk", "me-2" %}
                   <span class="button-text">Save changes</span>
                 </button>
@@ -768,7 +768,7 @@ badges:
 
       <!-- Security Section -->
       <section id="security-section" class="account-section d-none">
-        <h2 class="h3 mb-4" >Security and data</h2>
+        <h2 class="classy-display classy-display--section mb-4">Security and data</h2>
 
         <!-- Sign-in Methods Section -->
         <div class="card mb-3">
@@ -797,13 +797,13 @@ badges:
                     <form id="signin-method-{{ method.id }}-form" class="d-grid d-sm-inline-block" novalidate data-form-state="initializing" onsubmit="return false">
                       <input type="hidden" name="method" value="{{ method.id }}">
                       {% if method.id == "password" %}
-                        <button type="submit" class="btn btn-primary btn-sm" data-action="change">
+                        <button type="submit" class="btn btn-adaptive btn-sm" data-action="change">
                           {% uj_icon "key", "me-1" %}
                           <span class="button-text">Change</span>
                         </button>
                       {% else %}
                         <!-- Connect button -->
-                        <button type="submit" class="btn btn-primary btn-sm" data-action="connect">
+                        <button type="submit" class="btn btn-adaptive btn-sm" data-action="connect">
                           {% uj_icon "link", "me-1" %}
                           <span class="button-text">Connect</span>
                         </button>
@@ -828,7 +828,7 @@ badges:
               <span id="2fa-status"></span>
             </div>
             <p class="card-text">Add an extra layer of security to your account.</p>
-            <button id="2fa-btn" class="btn btn-primary">Enable 2FA</button>
+            <button id="2fa-btn" class="btn btn-adaptive">Enable 2FA</button>
           </div>
         </div> -->
 
@@ -908,7 +908,7 @@ badges:
                   <label for="signin-link-output" class="form-label small text-muted mb-1">Your signin link:</label>
                   <div class="input-group">
                     <input type="text" class="form-control font-monospace small" id="signin-link-output" readonly>
-                    <button type="button" class="btn btn-outline-primary" id="signin-link-copy-btn">
+                    <button type="button" class="btn btn-outline-adaptive" id="signin-link-copy-btn">
                       {% uj_icon "copy", "me-1" %}
                       <span class="button-text">Copy</span>
                     </button>
@@ -928,7 +928,7 @@ badges:
 
       <!-- Connections Section -->
       <section id="connections-section" class="account-section d-none">
-        <h2 class="h3 mb-4" >Connected accounts</h2>
+        <h2 class="classy-display classy-display--section mb-4">Connected accounts</h2>
 
         <div class="card">
           <div class="card-body">
@@ -965,7 +965,7 @@ badges:
                         <form id="connection-form-{{ connection.id }}" class="d-grid d-sm-inline-block" novalidate data-form-state="initializing" onsubmit="return false">
                           <input type="hidden" name="provider" value="{{ connection.id }}">
                           <!-- Connect button -->
-                          <button type="submit" class="btn btn-sm btn-primary" data-action="connect">
+                          <button type="submit" class="btn btn-sm btn-adaptive" data-action="connect">
                             {% uj_icon "link", "fa-sm" %}
                             <span class="button-text">Connect</span>
                           </button>
@@ -988,7 +988,7 @@ badges:
 
       <!-- Billing Section -->
       <section id="billing-section" class="account-section d-none">
-        <h2 class="h3 mb-4">Billing and usage</h2>
+        <h2 class="classy-display classy-display--section mb-4">Billing and usage</h2>
 
         <!-- Plan Overview Card -->
         <div class="card mb-3">
@@ -1059,7 +1059,7 @@ badges:
 
             <!-- Action Buttons -->
             <div class="d-grid d-sm-flex gap-2">
-              <button id="upgrade-plan-btn" class="btn btn-success plan-action-btn" data-wm-bind="@show billing.buttons.upgrade" hidden>
+              <button id="upgrade-plan-btn" class="btn btn-adaptive plan-action-btn" data-wm-bind="@show billing.buttons.upgrade" hidden>
                 {% uj_icon "crown", "me-2" %}
                 <span class="button-text">Upgrade plan</span>
               </button>
@@ -1067,7 +1067,7 @@ badges:
                 {% uj_icon "arrow-right-arrow-left", "me-2" %}
                 <span class="button-text">Change plan</span>
               </button>
-              <button id="manage-billing-btn" class="btn btn-primary plan-action-btn" data-wm-bind="@show billing.buttons.manage" hidden>
+              <button id="manage-billing-btn" class="btn btn-adaptive plan-action-btn" data-wm-bind="@show billing.buttons.manage" hidden>
                 {% uj_icon "credit-card", "me-2" %}
                 <span class="button-text">Manage billing</span>
               </button>
@@ -1139,7 +1139,7 @@ badges:
                     </button>
                   </div>
                   <div class="col-12 col-md-6 order-md-1">
-                    <button type="button" class="btn btn-primary w-100" id="keep-plan-btn" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion">
+                    <button type="button" class="btn btn-adaptive w-100" id="keep-plan-btn" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion">
                       {% uj_icon "circle-check", "fa-sm me-2" %}
                       <span>Keep my plan</span>
                     </button>
@@ -1153,7 +1153,7 @@ badges:
 
       <!-- Referrals Section -->
       <section id="referrals-section" class="account-section d-none">
-        <h2 class="h3 mb-4" >Referrals</h2>
+        <h2 class="classy-display classy-display--section mb-4">Referrals</h2>
 
         <!-- Referral Code Card -->
         <div class="card mb-3">
@@ -1219,13 +1219,13 @@ badges:
 
       <!-- Team Section -->
       <section id="team-section" class="account-section d-none">
-        <h2 class="h3 mb-4" >Team</h2>
+        <h2 class="classy-display classy-display--section mb-4">Team</h2>
 
         <div class="card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <h5 class="card-title mb-0">Team members</h5>
-              <button class="btn btn-primary btn-sm" id="invite-team-member-btn">
+              <button class="btn btn-adaptive btn-sm" id="invite-team-member-btn">
                 {% uj_icon "user-plus", "me-2" %}
                 <span class="button-text">
                   Invite<span class="d-none d-md-inline"> team member</span>
@@ -1250,7 +1250,7 @@ badges:
 
       <!-- Notifications Section -->
       <section id="notifications-section" class="account-section d-none">
-        <h2 class="h3 mb-4" >Notifications</h2>
+        <h2 class="classy-display classy-display--section mb-4">Notifications</h2>
 
         <div class="card">
           <div class="card-body">
@@ -1265,7 +1265,7 @@ badges:
                   <small id="marketing-emails-grant-date" class="d-block text-muted d-none"></small>
                 </label>
               </div>
-              <button type="submit" class="btn btn-primary">
+              <button type="submit" class="btn btn-adaptive">
                 {% uj_icon "floppy-disk", "me-2" %}
                 <span class="button-text">Save preferences</span>
               </button>
@@ -1306,7 +1306,7 @@ badges:
 
       <!-- API Keys Section -->
       <section id="api-keys-section" class="account-section d-none">
-        <h2 class="h3 mb-4">API & MCP</h2>
+        <h2 class="classy-display classy-display--section mb-4">API & MCP</h2>
 
         <!-- API Key Card -->
         <div class="card mb-4">
@@ -1557,7 +1557,7 @@ badges:
 
       <!-- Data Request Section (Hidden by default) -->
       <section id="data-request-section" class="account-section d-none">
-        <h2 class="h3 mb-4">Request your data</h2>
+        <h2 class="classy-display classy-display--section mb-4">Request your data</h2>
 
         <!-- Info card (always shown) -->
         <div class="card mb-4">
@@ -1615,7 +1615,7 @@ badges:
               <p id="data-request-status-message" class="card-text text-muted"></p>
               <div id="data-request-download" class="d-none">
                 <form id="data-request-download-form" data-form-state="initializing" onsubmit="return false">
-                  <button type="submit" class="btn btn-primary btn-sm" id="data-request-download-btn">
+                  <button type="submit" class="btn btn-adaptive btn-sm" id="data-request-download-btn">
                     {% uj_icon "download", "fa-sm me-2" %}
                     <span class="button-text">Download your data</span>
                   </button>
@@ -1623,7 +1623,7 @@ badges:
               </div>
               <div id="data-request-cancel" class="d-none">
                 <form id="data-request-cancel-form" data-form-state="initializing" onsubmit="return false">
-                  <button type="submit" class="btn btn-primary btn-sm" id="data-request-cancel-btn">
+                  <button type="submit" class="btn btn-adaptive btn-sm" id="data-request-cancel-btn">
                     {% uj_icon "rotate-left", "fa-sm me-2" %}
                     <span class="button-text">Request withdrawal</span>
                   </button>
@@ -1677,7 +1677,7 @@ badges:
                       </button>
                     </div>
                     <div class="col-12 col-md-6 order-md-1">
-                      <a href="/account" class="btn btn-primary w-100">
+                      <a href="/account" class="btn btn-adaptive w-100">
                         {% uj_icon "arrow-left", "fa-sm me-2" %}
                         <span>Return to profile</span>
                       </a>
@@ -1692,7 +1692,7 @@ badges:
 
       <!-- Delete Account Section (Hidden by default) -->
       <section id="delete-section" class="account-section d-none">
-        <h2 class="h3 mb-4">Delete account</h2>
+        <h2 class="classy-display classy-display--section mb-4">Delete account</h2>
 
         <div class="card mb-4">
           <div class="card-body">
@@ -1794,7 +1794,7 @@ badges:
 
       <!-- Refund Section (Hidden by default) -->
       <section id="refund-section" class="account-section d-none">
-        <h2 class="h3 mb-4">Request a refund</h2>
+        <h2 class="classy-display classy-display--section mb-4">Request a refund</h2>
 
         <!-- Refund policy info card -->
         <div class="card mb-4">
@@ -1910,7 +1910,7 @@ badges:
                   </button>
                 </div>
                 <div class="col-12 col-md-6 order-md-1">
-                  <a href="#billing" class="btn btn-primary w-100">
+                  <a href="#billing" class="btn btn-adaptive w-100">
                     {% uj_icon "arrow-left", "fa-sm me-2" %}
                     <span>Return to billing</span>
                   </a>
