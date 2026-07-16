@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { buildAssets, purgeCss } = require('./assets.js');
+const { buildServiceWorker, writeBuildMeta } = require('./service-worker.js');
 const { copyStaticAssets } = require('./static-assets.js');
 const { processImages } = require('./imagemin.js');
 const { configureOmega } = require('./engine.js');
@@ -22,6 +23,7 @@ const { PATHS } = require('./paths.js');
  * @param {object} options.siteData - raw site data (resolved omega config shape)
  * @param {string} options.outDir - output dir (cleared first)
  * @param {string} options.clientEntry - @omega.js/client entry for the `@omega.js/client` esbuild alias
+ * @param {string} [options.version] - the consumer package version (build meta / service worker)
  * @param {string} [options.siteAssetsDir] - the consumer's own asset layer (js/pages page modules)
  * @param {string} [options.themesDir] - default: packaged themes
  * @param {string} [options.coreDir] - default: packaged core
@@ -74,6 +76,22 @@ async function buildSite(options) {
     fs.mkdirSync(path.dirname(options.manifestPath), { recursive: true });
     fs.writeFileSync(options.manifestPath, JSON.stringify(manifest, null, 2));
   }
+
+  // ---- service worker + build meta: /service-worker.js, /build.js, /build.json
+  await phase('service-worker', async () => {
+    writeBuildMeta({
+      siteData: options.siteData,
+      outDir: options.outDir,
+      environment: options.environment,
+      version: options.version,
+      manifest,
+    });
+    return buildServiceWorker({
+      consumerDir: options.consumerDir,
+      outDir: options.outDir,
+      clientEntry: options.clientEntry,
+    });
+  });
 
   // ---- runtime icon set (assets/fa/) — feeds the browser-side auto-render
   await phase('icons', () => emitIcons({

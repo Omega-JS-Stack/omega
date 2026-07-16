@@ -79,11 +79,11 @@ test('tier 1: consumer main.scss pulls, configures, and overrides the chain via 
 test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall through to classy', async () => {
   const pages = await buildWith(miniData, { activeTheme: 'toy' });
 
-  const pricing = pages.get('/pricing/');
+  const pricing = pages.get('/pricing');
   assert.ok(pricing.includes('TOY THEME PRICING via consumer-local theme'), 'toy layout rendered /pricing');
   assert.ok(!pricing.includes('id="pricing-promo-banner"'), 'classy pricing chrome fully replaced');
 
-  const about = pages.get('/about/');
+  const about = pages.get('/about');
   assert.ok(about && about.length > 0, 'pages the toy theme does not cover still render');
   assert.ok(about.includes('<html'), 'fallback pages render through the classy base chain');
 });

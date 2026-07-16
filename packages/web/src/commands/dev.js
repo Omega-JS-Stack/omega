@@ -29,6 +29,7 @@ const {
   findBrandRoot, hasOmegaConfig, loadConfig,
 } = require('@omega.js/config');
 const { buildAssets } = require('../assets.js');
+const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
 const { resolveStaticDirs, copyStaticAssets } = require('../static-assets.js');
 const { devImageFallback } = require('../imagemin.js');
 const { configureOmega } = require('../engine.js');
@@ -79,6 +80,27 @@ module.exports = async function (options) {
   jetpack.write(paths.manifest, JSON.stringify(manifest, null, 2));
   logger.log('Assets built (dev mode: stable names, no minify)');
 
+  // ---- Service worker + build meta (/service-worker.js, /build.js,
+  // /build.json) — dev serves the REAL service worker so push/caching are
+  // testable; registration takeover + cache eviction keep one localhost
+  // port safe across different projects.
+  const buildSw = async () => {
+    writeBuildMeta({
+      siteData,
+      outDir: paths.out,
+      environment: 'development',
+      version: jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version,
+      manifest,
+    });
+    await buildServiceWorker({
+      consumerDir: paths.src,
+      outDir: paths.out,
+      clientEntry,
+      dev: true,
+    });
+  };
+  await buildSw();
+
   // Static images (minted brand identity + src/assets/images) — copied once
   // at boot; they change rarely, so no watcher (restart to pick up new ones)
   copyStaticAssets({
@@ -119,6 +141,22 @@ module.exports = async function (options) {
         build(only)
           .then(() => logger.log(`Assets rebuilt (${only || 'all'}) — browser live-reloads${only === 'css' ? ' via css hot-swap' : ''}`))
           .catch((error) => logger.error('Asset rebuild failed:', error));
+      }, WATCH_DEBOUNCE_MS);
+    });
+  }
+
+  // The consumer's service-worker entry lives OUTSIDE the asset trees
+  // (src/service-worker.js) — its own watcher; the browser picks the new
+  // worker up on the next reload's registration update check.
+  const consumerSwEntry = path.join(paths.src, 'service-worker.js');
+  if (fs.existsSync(consumerSwEntry)) {
+    let swTimer = null;
+    fs.watch(consumerSwEntry, () => {
+      clearTimeout(swTimer);
+      swTimer = setTimeout(() => {
+        buildSw()
+          .then(() => logger.log('Service worker rebuilt — reload to activate the new worker'))
+          .catch((error) => logger.error('Service worker rebuild failed:', error));
       }, WATCH_DEBOUNCE_MS);
     });
   }
@@ -170,11 +208,47 @@ module.exports = async function (options) {
  */
 function devServerOptions(outDir) {
   return {
-    middleware: [devImageFallback(outDir)],
+    middleware: [devCleanUrls(outDir), devImageFallback(outDir)],
     watch: [
       path.join(outDir, 'assets', 'css'),
       path.join(outDir, 'assets', 'js'),
     ],
+  };
+}
+
+/**
+ * Clean-URL resolution, the legacy serve.js contract: pages are flat `.html`
+ * files with slash-free URLs, so `/signin` (and a stray `/signin/`) serves
+ * `signin.html`. Mirrors production GitHub Pages, which resolves extensionless
+ * paths against `.html` files natively.
+ * @param {string} outDir
+ * @returns {function} connect-style middleware
+ */
+function devCleanUrls(outDir) {
+  const root = path.resolve(outDir);
+
+  return (req, res, next) => {
+    const [pathname, query] = (req.url || '').split('?');
+    const clean = decodeURIComponent(pathname).replace(/\/+$/, '');
+
+    if (!clean) {
+      return next();
+    }
+
+    // Legacy serve.js contract: rewrite only when the request doesn't hit a
+    // real file but `<path>.html` exists. No extension sniffing — dotted
+    // slugs (/updates/v1.0.0) are page URLs too.
+    const original = path.resolve(root, `.${decodeURIComponent(pathname)}`);
+    const resolved = path.resolve(root, `.${clean}.html`);
+    if (
+      resolved.startsWith(root + path.sep)
+      && jetpack.exists(original) !== 'file'
+      && jetpack.exists(resolved) === 'file'
+    ) {
+      req.url = `${clean}.html${query ? `?${query}` : ''}`;
+    }
+
+    return next();
   };
 }
 

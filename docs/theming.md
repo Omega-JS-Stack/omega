@@ -50,7 +50,18 @@ the tokens).
 - **Type presets**: stamp `data-omega-type="sans|serif|mono"` on `<html>`
   (via `theme.html.attributes`) or re-point `--omega-font-marketing`
   / `--omega-font-display` directly. Default is the mix pairing — serif
-  marketing display over sans UI. D5 (vendored webfonts) swaps values only.
+  marketing display over sans UI.
+- **Fonts (D5, shipped)**: classy vendors **Inter** (UI grotesk) and
+  **Newsreader** (marketing serif) — variable woff2, latin + latin-ext, OFL —
+  in `themes/classy/fonts/`; the asset pipeline copies every layer's `fonts/`
+  dir to `/assets/fonts` (first layer wins), `css/base/_fonts.scss` carries
+  the `@font-face` blocks (`font-display: swap`), and `css/base/_root.scss`
+  re-points `--omega-font-ui` / `--omega-font-serif` at them. The core token
+  sheet keeps system stacks as the framework default AND the fallback tail —
+  swapping faces stays a values-only change (two custom properties + the
+  files). Ordering note: core main.scss MUST load the token sheet before the
+  theme `@forward` (Sass emits a module's CSS at its first load), or theme
+  token overrides lose the cascade.
 
 Tier 2 stays: fork `themes/_template` for a full theme; classy remains the
 fall-through layer for anything the theme doesn't cover.

@@ -79,6 +79,32 @@ class ServiceWorker {
     }
   }
 
+  // Unregister every service worker claiming this origin. Dev-loop hygiene:
+  // a previous project's service worker on the same localhost port would
+  // otherwise keep controlling pages and serving its stale caches.
+  async unregisterAll() {
+    if (!this.isSupported()) {
+      return 0;
+    }
+
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+
+      if (registrations.length > 0) {
+        console.log(`[ServiceWorker] Unregistered ${registrations.length} service worker(s) claiming this origin`);
+      }
+
+      this._registration = null;
+
+      return registrations.length;
+    } catch (error) {
+      console.warn('[ServiceWorker] Failed to unregister service workers:', error);
+      return 0;
+    }
+  }
+
   // Get current registration
   getRegistration() {
     return this._registration;

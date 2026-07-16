@@ -1,7 +1,7 @@
 {
   "name": "@omega.js/web",
   "version": "0.4.0",
-  "description": "The OMEGA web framework (UJM successor) — Eleventy 3 + LiquidJS + @omega.js/template-kit engine core with the `omega` CLI: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, the esbuild/sass/PurgeCSS asset pipeline, and the ESM boot runtime. Private until first publish.",
+  "description": "The OMEGA web framework (UJM successor) \u2014 Eleventy 3 + LiquidJS + @omega.js/template-kit engine core with the `omega` CLI: layered themes with zero copying, page.resolved data cascade, frontmatter Liquid, Jekyll conventions, default pages as virtual templates, the esbuild/sass/PurgeCSS asset pipeline, and the ESM boot runtime. Private until first publish.",
   "private": true,
   "main": "./src/index.js",
   "bin": {
@@ -21,6 +21,7 @@
     "./paths": "./src/paths.js",
     "./consumer": "./src/consumer.js",
     "./scaffold": "./src/scaffold.js",
+    "./service-worker": "./sw/manager.js",
     "./migrate": "./src/migrate/index.js",
     "./cli": "./src/cli-run.js"
   },

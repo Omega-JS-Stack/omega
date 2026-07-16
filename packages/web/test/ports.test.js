@@ -52,7 +52,7 @@ before(async () => {
 });
 
 test('real classy contact: layout-frontmatter Liquid, fixed icon args, full sections', () => {
-  const html = pages.get('/contact/');
+  const html = pages.get('/contact');
   assert.ok(html, '/contact/ rendered');
 
   // Layout frontmatter carries {{ site.brand.name }} — must render per-site
@@ -74,7 +74,7 @@ test('real classy contact: layout-frontmatter Liquid, fixed icon args, full sect
 });
 
 test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, adsense include params', () => {
-  const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies/');
+  const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
   assert.ok(html, 'recipe page rendered');
 
   // Layout-frontmatter meta carries {{ page.recipe.title }} — page-scoped rendering
@@ -87,7 +87,7 @@ test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, ads
 
   // uj_member against the REAL UJM default team doc
   assert.ok(html.includes('Alex Raeburn'), 'uj_member name resolved from team collection');
-  assert.ok(html.includes('href="https://ports.example.com/team/alex-raeburn/"'), 'uj_member url resolved');
+  assert.ok(html.includes('href="https://ports.example.com/team/alex-raeburn"'), 'uj_member url resolved');
 
   // The real adsense include, 3 placements via include params
   assert.ok(html.includes('"data-ad-client": "ca-pub-PORTSTEST"'), 'adsense client from resolved data');
@@ -101,7 +101,7 @@ test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, ads
 });
 
 test('real sweet-saucy recipe: JSON-LD Recipe schema is valid and complete', () => {
-  const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies/');
+  const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
   const match = html.match(/<script id="uj-schema-recipe" type="application\/ld\+json">([\s\S]*?)<\/script>/);
   assert.ok(match, 'schema script present');
 
@@ -137,5 +137,5 @@ test('real somiibo index: verbatim content page with consumer include', () => {
 });
 
 test('team doc renders at its permalink (Jekyll outputs team pages)', () => {
-  assert.ok(pages.get('/team/alex-raeburn/'), 'team page output exists');
+  assert.ok(pages.get('/team/alex-raeburn'), 'team page output exists');
 });

@@ -62,7 +62,7 @@ test('theme-base bracket layout aliases into the real chain (root → classy bas
 });
 
 test('frontmatter-only override page: consumer data over layout defaults (deep merge)', () => {
-  const html = pages.get('/about/');
+  const html = pages.get('/about');
   assert.ok(html.includes('The consumer about page'), 'consumer hero.headline wins');
   assert.ok(html.includes('success'), 'layout-only hero.headline_accent survives the deep merge');
   assert.ok(html.includes('<title>About - MiniCo</title>'), 'frontmatter Liquid in meta.title');
@@ -75,7 +75,7 @@ test('site-wide defaults layer: root directory data beats layout frontmatter, lo
   // ABOVE layout frontmatter and BELOW each page's own frontmatter — the same
   // layer jekyll-uj-powertools 1.8.1 gave Jekyll sites via _config.yml
   // `defaults:` (the N4 parked verify this test closes).
-  const html = pages.get('/about/');
+  const html = pages.get('/about');
   assert.ok(html.includes('Site-wide directory-data override'), 'directory data replaces layout hero.description site-wide');
   assert.ok(!html.includes('AI automation for modern businesses'), 'layout sample content loses');
   assert.ok(html.includes('<title>About - MiniCo</title>'), 'page frontmatter still beats directory data (meta.title)');
@@ -83,7 +83,7 @@ test('site-wide defaults layer: root directory data beats layout frontmatter, lo
 });
 
 test('consumer about.md SUPPRESSES the framework default about page', () => {
-  const html = pages.get('/about/');
+  const html = pages.get('/about');
   // The default about page dispatches blueprint/about → classy about layout
   // (hero "About us"); the consumer page uses blueprint/index — if the
   // default leaked, both would target /about and the classy-about hero
@@ -92,11 +92,11 @@ test('consumer about.md SUPPRESSES the framework default about page', () => {
 });
 
 test('default pages render when the consumer has no same-URL file', () => {
-  const signin = pages.get('/signin/');
+  const signin = pages.get('/signin');
   assert.ok(signin.includes('id="auth-form"'), 'real classy signin form present');
   assert.ok(signin.includes('/assets/js/pages/signin/index-TEST.js'), 'pageAssets script from the manifest');
-  assert.ok(pages.get('/signup/').includes('id="auth-form"'), 'signup default');
-  assert.ok(pages.get('/404.html').includes('id="page-url"'), '404 default at literal /404.html');
+  assert.ok(pages.get('/signup').includes('id="auth-form"'), 'signup default');
+  assert.ok(pages.get('/404').includes('id="page-url"'), '404 default (flat url, 404.html file)');
 });
 
 test('resolved site seed: site sections surface as resolved.* (Configuration block)', () => {
@@ -107,13 +107,13 @@ test('resolved site seed: site sections surface as resolved.* (Configuration blo
 });
 
 test('pricing: template-default hero copy renders (layout frontmatter knobs are gone)', () => {
-  const html = pages.get('/pricing/');
+  const html = pages.get('/pricing');
   assert.ok(html.includes('The right plans,'), 'classy pricing hero default');
   assert.ok(html.includes('for the right price'), 'hero accent');
 });
 
 test('posts: Jekyll filename convention, readtime, taxonomy links', () => {
-  const html = pages.get('/blog/first-post/');
+  const html = pages.get('/blog/first-post');
   assert.ok(html, 'date stripped from URL (fileSlug)');
   assert.ok(html.includes('First post'), 'post.title');
   assert.ok(/[1-9]\d* min read/.test(html), 'uj_readtime');
@@ -121,20 +121,20 @@ test('posts: Jekyll filename convention, readtime, taxonomy links', () => {
 });
 
 test('blog index: paginator compat over Eleventy pagination', () => {
-  const html = pages.get('/blog/');
+  const html = pages.get('/blog');
   assert.ok(html.includes('First post') && html.includes('Second post'), 'both posts listed via paginator.posts');
 });
 
 test('taxonomy pages generated from post.categories / post.tags', () => {
-  const growth = pages.get('/blog/categories/growth/');
+  const growth = pages.get('/blog/categories/growth');
   assert.ok(growth.includes('First post') && growth.includes('Second post'), 'category aggregates');
-  const marketing = pages.get('/blog/categories/marketing/');
+  const marketing = pages.get('/blog/categories/marketing');
   assert.ok(marketing.includes('Second post') && !marketing.includes('First post'), 'category filters');
-  assert.ok(pages.get('/blog/tags/automation/').includes('Second post'), 'tag page');
+  assert.ok(pages.get('/blog/tags/automation').includes('Second post'), 'tag page');
 });
 
 test('alternatives collection: permalink convention + comparison content', () => {
-  const html = pages.get('/alternatives/acme-growth/');
+  const html = pages.get('/alternatives/acme-growth');
   assert.ok(html.includes('MiniCo vs'), 'site brand in the layout-default hero headline');
   assert.ok(html.includes('Acme Growth'), 'competitor name via resolved-templated layout defaults');
   assert.ok(html.includes('Automation depth'), 'comparison rows');
@@ -148,14 +148,14 @@ test('template-kit tags render inside Eleventy (uj_icon, urlmatches nav)', () =>
 test('neobrutalism theme: layered overrides win, classy fills the gaps', async () => {
   const neo = await buildMini({ activeTheme: 'neobrutalism' });
   assert.ok(neo.get('/').includes('data-theme-id="neobrutalism"'), 'site.theme.id reflects active theme');
-  assert.ok(neo.get('/pricing/').includes('pricing-title'), 'neobrutalism pricing layout override wins (neo-only markup)');
-  assert.ok(neo.get('/signin/').includes('id="auth-form"'), 'classy signin fills the gap');
+  assert.ok(neo.get('/pricing').includes('pricing-title'), 'neobrutalism pricing layout override wins (neo-only markup)');
+  assert.ok(neo.get('/signin').includes('id="auth-form"'), 'classy signin fills the gap');
 });
 
 test('farm mode (symlinks, dev): identical output to virtual mode', async () => {
   const farm = await buildMini({ layoutMode: 'farm' });
   assert.strictEqual(farm.get('/404.html'), pages.get('/404.html'), '404 byte-identical');
-  assert.strictEqual(farm.get('/pricing/'), pages.get('/pricing/'), 'pricing byte-identical');
+  assert.strictEqual(farm.get('/pricing'), pages.get('/pricing'), 'pricing byte-identical');
   const link = path.join(PKG, '.omega', 'layout-farm', 'frontend', 'core', 'base.html');
   assert.ok(fs.lstatSync(link).isSymbolicLink(), 'farm is symlinks, not copies');
 });

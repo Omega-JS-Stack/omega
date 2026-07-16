@@ -19,9 +19,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - **`modules/motion.js` — the shared animation engine (classy v2, C3).** Icon-renderer-pattern factory (`createMotion()` → `start/stop/scan`) driving the `data-omega-*` motion attributes: scroll reveals (+ parent stagger), count-ups (final value lives in markup; parser handles `$`, `%`, commas, decimals, suffixes), word rotators, seamless marquee track duplication, and scroll-position watchers. Resilient by contract: no-JS pages render visible, `prefers-reduced-motion` gets static final states, missing observers degrade to instant reveal. Booted by @omega.js/web's `core/js/core/motion.js`; desktop/extension pick it up at C4.
+- **`ServiceWorker.unregisterAll()`** — unregisters every worker claiming the origin; called automatically when `serviceWorker.enabled` is false so a previous project's worker can't keep serving stale caches on a shared localhost port.
 
 ### Changed
 - **Cookie-consent default palette rides the `--omega-*` tokens** (surface/ink with hard fallbacks) instead of the legacy electric-blue `#237afc` — the banner now matches whatever theme the page runs. Consumer `cookieConsent.config.palette` overrides behave exactly as before.
+- **Service worker registration is dev-inclusive and takeover-safe**: registration happens in every environment (push and cache behavior are testable locally); same-scope registration + the worker's own cache eviction make one localhost port safe across different projects.
+
+### Fixed
+- **icon-core treats `fa-2xs` (real Font Awesome size) and the legacy UJM house sizes `fa-md`/`fa-3xl` as modifiers** — previously they parsed as icon NAMES, which 404'd (`solid/md.svg`) and, worse, wiped build-time-inlined icons off the page when the renderer re-scanned them.
 
 ## [5.0.0] - 2026-07-10
 

@@ -63,7 +63,13 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 ## ServiceWorker (`service-worker.js`)
 
 - **Class**: `ServiceWorker`
-- **Key Methods**: `isSupported()`, `register()`, `ready()`, `postMessage()`, `onMessage()`, `getState()`
+- **Key Methods**: `isSupported()`, `register()`, `ready()`, `postMessage()`, `onMessage()`, `getState()`, `unregisterAll()`
+- **Registration policy**: `serviceWorker.enabled` (default true) registers at
+  scope `/` with `updateViaCache: 'none'` on every init — dev included (the
+  worker is how push/caching get tested locally, and same-scope registration
+  is what replaces a DIFFERENT project's worker left on the same localhost
+  port). `enabled: false` calls `unregisterAll()` instead — the origin is
+  swept clean, never left to a stale foreign worker.
 
 ## Sentry (`sentry.js`)
 

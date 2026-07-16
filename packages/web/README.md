@@ -63,8 +63,9 @@ see the harness README for the honest before/after numbers.
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
-| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, PurgeCSS post-pass |
-| [build.js](src/build.js) | `buildSite()` — assets → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
+| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass |
+| [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`) |
+| [build.js](src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [imagemin.js](src/imagemin.js) | Responsive image matrix (the UJM imagemin successor): 320/640/1024 + original × source-format + webp @ q80 over `dist/assets/images` (favicon dir exempt), content-addressed cache at the brand `.omega`, `devImageFallback()` dev-server middleware |
 | [minify-html.js](src/minify-html.js) | Production HTML minification (UJM minifyHtml successor) — Rust minifier with the legacy extraction dance (JSON-LD minified as JSON, inline scripts esbuild-minified, IE conditionals preserved); engine mounts it as a transform for `environment: 'production'`, .html outputs only |
 | [purge.js](src/purge.js) | Cloudflare cache purge (UJM cloudflare-purge successor, de-ITW'd — direct API, brand's own `CLOUDFLARE_TOKEN`): zone from config `cloudflare.zone` or brand-url apex lookup; `omega purge` command, auto after `omega deploy --direct`, CI workflow step when the secret exists |
@@ -78,9 +79,10 @@ see the harness README for the honest before/after numbers.
 ## Packaged content (the real UJM port, B2)
 
 - `themes/classy/` — the full flagship theme, classy v2 (frontend + backend +
-  admin layouts, includes, css, js): warm-paper/charcoal token-driven skin,
-  zero gradients, ink primaries, serif marketing display, `.omega-shell` app
-  chrome — see [docs/theming.md](../../docs/theming.md);
+  admin layouts, includes, css, js, vendored webfonts): warm-paper/charcoal
+  token-driven skin, zero gradients, ink primaries, serif marketing display
+  (Newsreader) over an Inter UI, `.omega-shell` app chrome — see
+  [docs/theming.md](../../docs/theming.md);
   `themes/neobrutalism/` and `themes/newsflash/` — partial themes that fall
   back to classy per file; `themes/bootstrap/` — the vendored Bootstrap 5
   scss/js the themes build on (sibling imports); `themes/_template/` — the
@@ -105,6 +107,39 @@ see the harness README for the honest before/after numbers.
   construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
   renders the configured `advertising.providers.google-adsense.client` or an
   honest comment.
+- `sw/` — the service worker: `manager.js` (the master-service-worker
+  successor — FCM background messaging, notification clicks, the
+  `update-cache` command, brand+build-named caches with foreign-cache
+  eviction) + `entry.js` (the consumer-less default entry; the scaffold seeds
+  `src/service-worker.js` with the same import for custom worker code).
+
+## URL shape — flat `.html`, no trailing slashes (legacy parity)
+
+Pages write **flat files** (`/signin` → `signin.html`, never
+`signin/index.html`) and `page.url` is **extensionless with no trailing
+slash** (`/signin`) — exactly legacy UJM/Jekyll. Mechanics: the computed
+`permalink` appends `.html` to extensionless permalinks (a REAL-extension
+whitelist, not `path.extname` — dotted slugs like `/updates/v1.0.0` are page
+URLs), an Eleventy `addUrlTransform` strips `.html` back off `page.url`, and
+Liquid-carrying permalinks (blog pagination, taxonomy generators) spell their
+full shape explicitly. Serving: the dev server's `devCleanUrls` middleware
+resolves `/signin` (and a stray `/signin/`) to `signin.html` — the legacy
+serve.js contract — and GitHub Pages resolves extensionless paths against
+`.html` files natively, so production behaves identically.
+
+## Service worker (dev AND production)
+
+Every build emits `/service-worker.js` + `/build.js` + `/build.json`;
+@omega.js/client registers the worker at scope `/` on every page load
+(`updateViaCache: 'none'`). Push (FCM background messages) rides it —
+`notifications.getToken({ serviceWorkerRegistration })` uses THIS
+registration. **Cross-project safety on one localhost port**: registering
+replaces whatever worker last claimed the origin (one registration per
+scope), the fresh `/build.js` bytes force the update, `skipWaiting` +
+`clients.claim` take over immediately, and the worker's boot evicts every
+cache not named `<brand>-<cacheBreaker>`. A project that explicitly disables
+the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
+(`unregisterAll()`).
 
 ## Architecture
 

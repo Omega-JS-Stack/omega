@@ -118,7 +118,7 @@ test('app-shell module is wired into main.js and speaks the declarative contract
 
 test('a theme expresses the shell through the engine — toy backend base renders the contract', async () => {
   const pages = await buildWith(miniData, { activeTheme: 'toy' });
-  const app = pages.get('/app/');
+  const app = pages.get('/app');
 
   assert.ok(app.includes('data-omega-shell'), 'shell root present');
   for (const region of ['omega-shell__sidebar', 'omega-shell__topbar', 'omega-shell__main', 'omega-shell__scrim']) {
@@ -132,7 +132,7 @@ test('a theme expresses the shell through the engine — toy backend base render
 
 test('the same page falls through to classy — v2 rides the shell contract too', async () => {
   const pages = await buildWith(miniData);
-  const app = pages.get('/app/');
+  const app = pages.get('/app');
 
   assert.ok(app && app.includes('id="app-page-content"'), 'classy backend base still renders the page');
   assert.ok(app.includes('data-omega-shell'), 'classy v2 expresses the omega-shell contract');

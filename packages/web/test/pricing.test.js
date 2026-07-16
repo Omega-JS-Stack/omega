@@ -130,7 +130,7 @@ test('composePricing: untyped products default to subscription', () => {
 for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
   test(`${theme}: /pricing renders from the catalog alone (plans, one-time, checkout wiring)`, async () => {
     const pages = await buildWith({ ...miniData, payment: CATALOG }, { activeTheme: theme });
-    const html = pages.get('/pricing/');
+    const html = pages.get('/pricing');
 
     // Plans from config
     assert.ok(html.includes('Basic'), `${theme}: catalog plan name`);
@@ -160,7 +160,7 @@ for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
 
   test(`${theme}: bare catalog → honest empty state (friction #6)`, async () => {
     const pages = await buildWith({ ...miniData, payment: undefined }, { activeTheme: theme });
-    const html = pages.get('/pricing/');
+    const html = pages.get('/pricing');
 
     assert.ok(!html.includes('data-plan-id='), `${theme}: no plan buttons`);
     assert.ok(!html.includes('>Basic<') && !html.includes('>Plus<'), `${theme}: no plans at all`);
@@ -174,14 +174,14 @@ test('classy: monthly-only catalog hides the billing toggle', async () => {
     ...miniData,
     payment: { products: [{ id: 'solo', name: 'Solo', prices: { monthly: 5 } }] },
   });
-  const html = pages.get('/pricing/');
+  const html = pages.get('/pricing');
   assert.ok(!html.includes('name="billing"'), 'no toggle without both cadences');
   assert.ok(html.includes('data-plan-id="solo"'), 'plan still renders');
 });
 
 test('classy: marketing chrome defaults ship ON (Ian 2026-07-11 — social proof, testimonials, FAQs, enterprise)', async () => {
   const pages = await buildWith({ ...miniData, payment: CATALOG });
-  const html = pages.get('/pricing/');
+  const html = pages.get('/pricing');
   assert.ok(html.includes('5M'), 'default social proof');
   assert.ok(html.includes('Sarah Johnson'), 'default testimonials');
   assert.ok(html.includes('Can I cancel at any time?'), 'default FAQs');
@@ -193,7 +193,7 @@ test('classy: consumer frontmatter still overrides presentation (consumer surfac
   // The mini fixture has no consumer pricing page — resolved.pricing comes
   // from the site seed; hero copy proves the template-default path.
   const pages = await buildWith({ ...miniData, payment: CATALOG });
-  const html = pages.get('/pricing/');
+  const html = pages.get('/pricing');
   assert.ok(html.includes('The right plans,'), 'template hero default');
   assert.ok(html.includes('for the right price'), 'template hero accent default');
 });

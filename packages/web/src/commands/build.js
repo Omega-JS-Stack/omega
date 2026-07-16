@@ -9,6 +9,7 @@
  * cold pages instead (with a warning list) for LLM-free builds.
  */
 const path = require('node:path');
+const jetpack = require('fs-jetpack');
 const Logger = require('@omega.js/devkit/logger');
 const { findBrandRoot } = require('@omega.js/config');
 const { buildSite } = require('../build.js');
@@ -38,6 +39,7 @@ module.exports = async function (options) {
     outDir: paths.out,
     clientEntry: resolveClientEntry(),
     environment: 'production',
+    version: jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version,
     manifestPath: paths.manifest,
     staticDirs: resolveStaticDirs({
       brandRoot,

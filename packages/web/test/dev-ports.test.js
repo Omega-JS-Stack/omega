@@ -103,16 +103,39 @@ test('merges live sibling maps, skips own app dir and dead pids, empty without b
   assert.deepEqual(readSiblingPorts(standalone), {});
 });
 
-test('devServerOptions: image fallback middleware + live-reload watch on the built asset trees', () => {
+test('devServerOptions: clean-url + image fallback middleware + live-reload watch on the built asset trees', () => {
   const { devServerOptions } = require('../src/commands/dev.js');
   const options = devServerOptions('/tmp/site-out');
 
-  assert.equal(options.middleware.length, 1);
-  assert.equal(typeof options.middleware[0], 'function');
+  assert.equal(options.middleware.length, 2);
+  assert.ok(options.middleware.every((fn) => typeof fn === 'function'));
   // The dev server chokidars the OUT-dir asset trees our watcher rebuilds
   // into — css changes hot-swap, js changes reload; no hand refresh
   assert.deepEqual(options.watch, [
     path.join('/tmp/site-out', 'assets', 'css'),
     path.join('/tmp/site-out', 'assets', 'js'),
   ]);
+});
+
+test('devCleanUrls middleware: /signin, /signin/ and dotted slugs resolve to flat .html files', () => {
+  const { devServerOptions } = require('../src/commands/dev.js');
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-clean-urls-'));
+  fs.writeFileSync(path.join(out, 'signin.html'), 'x');
+  fs.mkdirSync(path.join(out, 'updates'));
+  fs.writeFileSync(path.join(out, 'updates', 'v1.0.0.html'), 'x');
+  fs.writeFileSync(path.join(out, 'real.txt'), 'x');
+
+  const middleware = devServerOptions(out).middleware[0];
+  const rewritten = (url) => {
+    const req = { url };
+    middleware(req, {}, () => {});
+    return req.url;
+  };
+
+  assert.equal(rewritten('/signin'), '/signin.html', 'extensionless page resolves');
+  assert.equal(rewritten('/signin/'), '/signin.html', 'stray trailing slash strips (legacy serve.js contract)');
+  assert.equal(rewritten('/signin?next=/account'), '/signin.html?next=/account', 'query survives');
+  assert.equal(rewritten('/updates/v1.0.0'), '/updates/v1.0.0.html', 'dotted slug is a page URL too');
+  assert.equal(rewritten('/real.txt'), '/real.txt', 'real files pass through');
+  assert.equal(rewritten('/missing'), '/missing', 'no .html candidate — untouched');
 });

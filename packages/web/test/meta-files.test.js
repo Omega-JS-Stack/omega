@@ -29,8 +29,8 @@ test('sitemap.xml: real pages in, machine/redirect/test pages out', () => {
 
   // Real pages with absolute locs; the root page collapses to the bare url
   assert.ok(xml.includes('<loc>https://mini.example.com</loc>'), 'root page, no trailing slash');
-  assert.ok(xml.includes('<loc>https://mini.example.com/about/</loc>'), 'consumer page listed');
-  assert.ok(xml.includes('<loc>https://mini.example.com/pricing/</loc>'), 'default-page channel listed');
+  assert.ok(xml.includes('<loc>https://mini.example.com/about</loc>'), 'consumer page listed');
+  assert.ok(xml.includes('<loc>https://mini.example.com/pricing</loc>'), 'default-page channel listed');
   assert.ok(/<priority>1.0<\/priority>/.test(xml), 'root priority 1.0');
   assert.ok(/<changefreq>weekly<\/changefreq>/.test(xml), 'default changefreq');
   assert.ok(/<lastmod>\d{4}-\d{2}-\d{2}T/.test(xml), 'build-stamp lastmod');
@@ -82,7 +82,7 @@ test('pages.json: VALID search index — real pages with titles, machine files o
   assert.ok(Array.isArray(index) && index.length > 0);
 
   const urls = index.map((entry) => entry.url);
-  assert.ok(urls.includes('https://mini.example.com/about/'), 'consumer page indexed');
+  assert.ok(urls.includes('https://mini.example.com/about'), 'consumer page indexed');
   assert.ok(!urls.some((url) => url.includes('robots.txt') || url.includes('sitemap.xml')), 'machine files not search hits');
   assert.ok(!urls.some((url) => url.includes('/test/') || url.includes('/admin/')), 'test/admin out of the index');
 

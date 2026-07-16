@@ -8,6 +8,9 @@
 @forward 'config';
 @use 'config' as *;
 
+// Vendored webfonts (Inter + Newsreader — D5)
+@import 'css/base/fonts';
+
 // Token bridge + root defaults
 @import 'css/base/root';
 

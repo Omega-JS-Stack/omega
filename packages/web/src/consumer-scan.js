@@ -10,14 +10,15 @@ const path = require('node:path');
 /**
  * Extract and normalize the `permalink:` value from raw frontmatter.
  * @param {string} raw
- * @returns {string|null} normalized URL (`/about` → `/about/`) or null
+ * @returns {string|null} normalized URL (`/about/` → `/about`, the canonical
+ *   slash-free legacy UJM shape) or null
  */
 function permalinkOf(raw) {
   const match = raw.match(/^permalink:\s*(\S+)\s*$/m);
   if (!match) return null;
 
   let url = match[1].replace(/^["']|["']$/g, '');
-  if (!path.extname(url) && !url.endsWith('/')) url += '/';
+  if (url.length > 1) url = url.replace(/\/+$/, '');
   return url;
 }
 

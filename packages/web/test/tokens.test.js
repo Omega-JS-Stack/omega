@@ -93,7 +93,7 @@ test('brand.color → inline --omega-accent ramp in <head>, after the css bundle
     ...miniData,
     brand: { ...miniData.brand, color: '#d6336c' },
   });
-  const html = pages.get('/pricing/');
+  const html = pages.get('/pricing');
 
   assert.ok(html.includes('--omega-accent:#d6336c'), 'ramp emitted from brand.color');
   assert.ok(html.includes('--omega-accent-ink:#ffffff'), 'derived ink emitted');
@@ -129,6 +129,6 @@ test('composeBrandTokens: dark variant lifts dark accents, passes light ones thr
 
 test('no brand.color → no inline ramp (the sheet placeholder stands)', async () => {
   const pages = await buildWith({ ...miniData });
-  const html = pages.get('/pricing/');
+  const html = pages.get('/pricing');
   assert.ok(!html.includes('--omega-accent:'), 'nothing emitted without a usable color');
 });

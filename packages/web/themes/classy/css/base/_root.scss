@@ -4,6 +4,15 @@
 // ZERO recompilation. The `:root[data-bs-theme]` arm outranks Bootstrap's own
 // compiled [data-bs-theme='dark'] block, so the bridge wins in both modes.
 
+// Classy's vendored faces take over the font tokens (scheme-agnostic — one
+// :root stamp). The system stacks stay as fallbacks, and everything below
+// (Bootstrap bridge, type presets, .classy-display) reads THESE tokens, so a
+// consumer re-points fonts by redefining two custom properties.
+:root {
+  --omega-font-ui: 'Inter', -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, 'Helvetica Neue', arial, sans-serif;
+  --omega-font-serif: 'Newsreader', ui-serif, georgia, 'Times New Roman', times, serif;
+}
+
 :root,
 :root[data-bs-theme] {
   // Surfaces + text

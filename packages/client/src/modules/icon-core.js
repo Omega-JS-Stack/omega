@@ -126,7 +126,7 @@ const BASE_STYLE_CLASSES = {
 const FAMILY_CLASSES = { 'fa-sharp': 'sharp', 'fa-duotone': 'duotone', fad: 'duotone', 'fa-sharp-duotone': 'sharp-duotone' };
 
 // fa-* classes that are modifiers (style/size/animation/layout), not icon names.
-const MODIFIER_REGEX = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp-duotone|sharp|fw|xs|sm|lg|xl|2xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
+const MODIFIER_REGEX = /^fa-(?:solid|brands|regular|light|thin|duotone|sharp-duotone|sharp|fw|2xs|xs|sm|md|lg|xl|2xl|3xl|[0-9]+x|spin|spin-pulse|spin-reverse|pulse|beat|fade|beat-fade|bounce|shake|flip(?:-horizontal|-vertical|-both)?|rotate-(?:90|180|270|by)|inverse|border|pull-left|pull-right|stack(?:-1x|-2x)?|li|ul|sr-only)$/;
 
 /**
  * Parse an element's class list the way Font Awesome does:

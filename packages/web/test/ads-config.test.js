@@ -55,7 +55,7 @@ const ADVERTISING = {
 
 test('configured advertising renders the ad unit from config values', async () => {
   const pages = await buildWith({ ...miniData, advertising: ADVERTISING });
-  const html = pages.get('/ad/');
+  const html = pages.get('/ad');
 
   assert.ok(html.includes('ca-pub-TEST123'), 'client id flows from config');
   assert.ok(html.includes('"data-ad-slot": "9990001"'), 'in-article slot flows from config');
@@ -64,7 +64,7 @@ test('configured advertising renders the ad unit from config values', async () =
 
 test('no advertising config → no ad unit markup at all', async () => {
   const pages = await buildWith(miniData);
-  const html = pages.get('/ad/');
+  const html = pages.get('/ad');
 
   assert.ok(html.includes('id="ad-page"'), 'page itself renders');
   assert.ok(!html.includes('data-ad-client'), 'no ad unit without a configured client');

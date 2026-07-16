@@ -106,7 +106,7 @@ test('static channel ships the minted set and the consumer layer wins collisions
 });
 
 test('nav + footer render their section data (JSON5 json-in-_includes)', () => {
-  const html = fs.readFileSync(path.join(OUT, 'about', 'index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
 
   // nav.json: links + actions
   assert.ok(html.includes('href="/pricing"'), 'nav links render');
@@ -117,7 +117,7 @@ test('nav + footer render their section data (JSON5 json-in-_includes)', () => {
 });
 
 test('admin sidebar renders its section data too (was silently empty under JSON.parse)', () => {
-  const html = fs.readFileSync(path.join(OUT, 'admin', 'dashboard', 'index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(OUT, 'admin', 'dashboard.html'), 'utf8');
   assert.ok(html.includes('Dashboard'), 'admin sidebar labels render');
 });
 
@@ -137,7 +137,7 @@ test('<title> falls back to the brand name — no page ever renders an empty tit
 });
 
 test('head wires the minted set: webmanifest link + og:image brand fallback', () => {
-  const html = fs.readFileSync(path.join(OUT, 'about', 'index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(OUT, 'about.html'), 'utf8');
   assert.ok(html.includes('/assets/images/favicon/site.webmanifest'), 'manifest link points at the minted webmanifest');
   assert.ok(!html.includes('/manifest.json'), 'the old never-emitted /manifest.json link is gone');
   assert.ok(!html.includes('browserconfig.xml') && !html.includes('safari-pinned-tab'), 'legacy favicon tags dropped (mint never produces them)');

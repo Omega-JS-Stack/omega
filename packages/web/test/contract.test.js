@@ -53,31 +53,31 @@ test('every theme builds the full default page set for a bare consumer', () => {
 
 test('key default pages land at their real URLs', () => {
   for (const rel of [
-    '404.html', 'about/index.html', 'pricing/index.html', 'signin/index.html',
-    'contact/index.html', 'blog/index.html', 'terms/index.html', 'team/index.html',
-    'careers/index.html', 'payment/checkout/index.html', 'admin/dashboard/index.html',
+    '404.html', 'about.html', 'pricing.html', 'signin.html',
+    'contact.html', 'blog.html', 'terms.html', 'team.html',
+    'careers.html', 'payment/checkout.html', 'admin/dashboard.html',
   ]) {
     assert.ok(fs.existsSync(path.join(PKG, '.omega', 'contract-classy', rel)), `classy builds ${rel}`);
   }
 });
 
 test('collection docs + generators: team, updates, alternatives, taxonomy', () => {
-  assert.ok(page('classy', 'team/ian-wiedenman/index.html').includes('Ian Wiedenman'), 'team member page');
-  assert.ok(page('classy', 'updates/v1.0.0/index.html').includes('1.0.0'), 'update page');
-  assert.ok(page('classy', 'alternatives/example-competitor/index.html').includes('Example Competitor'), 'alternative page');
-  assert.ok(page('classy', 'blog/categories/news/index.html').includes('Hello OMEGA'), 'category generator page lists its post');
-  assert.ok(page('classy', 'blog/tags/omega/index.html').includes('OMEGA'), 'tag generator page');
+  assert.ok(page('classy', 'team/ian-wiedenman.html').includes('Ian Wiedenman'), 'team member page');
+  assert.ok(page('classy', 'updates/v1.0.0.html').includes('1.0.0'), 'update page');
+  assert.ok(page('classy', 'alternatives/example-competitor.html').includes('Example Competitor'), 'alternative page');
+  assert.ok(page('classy', 'blog/categories/news.html').includes('Hello OMEGA'), 'category generator page lists its post');
+  assert.ok(page('classy', 'blog/tags/omega.html').includes('OMEGA'), 'tag generator page');
 });
 
 test('markdown legal layout renders its default text as HTML (append pattern)', () => {
-  const terms = page('classy', 'terms/index.html');
+  const terms = page('classy', 'terms.html');
   assert.ok(terms.includes('<h2') || terms.includes('<h1'), 'legal markdown became HTML headings');
   assert.ok(terms.includes('Contract'), 'brand name templated into legal text');
 });
 
 test('manifest-injected assets on every theme (hashed main css/js, valid Configuration)', () => {
   for (const theme of THEMES) {
-    const html = page(theme, 'pricing/index.html');
+    const html = page(theme, 'pricing.html');
     assert.match(html, /href="\/assets\/css\/main-[a-f0-9]{8}\.css"/, `${theme}: hashed main css linked`);
     assert.match(html, /<script type="module" src="\/assets\/js\/main-[A-Z0-9]{8}\.js"><\/script>/, `${theme}: hashed main js linked as an ESM module`);
     assert.ok(html.includes('brand: {"id":"contract","name":"Contract"}'), `${theme}: Configuration brand`);
@@ -121,21 +121,21 @@ test('no unresolved Liquid syntax leaks into any built page', () => {
 });
 
 test('redirect module: careers renders the redirect chrome', () => {
-  const careers = page('classy', 'careers/index.html');
+  const careers = page('classy', 'careers.html');
   assert.ok(careers.includes('docs.google.com/forms'), 'redirect target URL present');
 });
 
 test('redirect shortlinks: auth + billing defaults emit their targets', () => {
   const cases = [
-    ['login/index.html', '/signin'],
-    ['register/index.html', '/signup'],
-    ['join/index.html', '/signup'],
-    ['forgot/index.html', '/reset?authSignout=true'],
-    ['recover/index.html', '/reset?authSignout=true'],
-    ['reset-password/index.html', '/reset?authSignout=true'],
-    ['change-password/index.html', '/reset?authSignout=true'],
-    ['cancel/index.html', '/account#billing'],
-    ['refund/index.html', '/terms'],
+    ['login.html', '/signin'],
+    ['register.html', '/signup'],
+    ['join.html', '/signup'],
+    ['forgot.html', '/reset?authSignout=true'],
+    ['recover.html', '/reset?authSignout=true'],
+    ['reset-password.html', '/reset?authSignout=true'],
+    ['change-password.html', '/reset?authSignout=true'],
+    ['cancel.html', '/account#billing'],
+    ['refund.html', '/terms'],
   ];
   for (const [file, target] of cases) {
     assert.ok(page('classy', file).includes(target), `${file} → ${target}`);

@@ -137,11 +137,18 @@ class Manager {
         console.log('[Analytics] Skipped: missing analytics.providers.google id or secret');
       }
 
-      // Initialize service worker if enabled
+      // Initialize service worker if enabled — dev included (push/caching are
+      // testable locally). Registering at scope '/' REPLACES whatever worker
+      // last claimed the origin (a different project on the same localhost
+      // port), and the worker itself evicts foreign caches on boot. When a
+      // project explicitly disables the SW, sweep the origin clean instead so
+      // a previous project's worker can't keep serving its stale caches.
       if (this.config.serviceWorker?.enabled) {
         this._serviceWorker.register({
           path: this.config.serviceWorker?.config?.path
         });
+      } else {
+        this._serviceWorker.unregisterAll();
       }
 
       // Start version checking if enabled

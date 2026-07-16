@@ -31,6 +31,11 @@ export default function () {
     // Initialize the appropriate form based on the page (with autoReady: false)
     initializePageForm();
 
+    // No form matched (warned above) — bail instead of crashing on null
+    if (!formManager) {
+      return;
+    }
+
     // Disable form fields while checking for OAuth redirect result.
     // State stays 'initializing' so spinners remain visible during the check.
     // formManager.ready() transitions to 'ready' and re-enables if no redirect is found.
@@ -65,19 +70,24 @@ export default function () {
 
   // Initialize the form based on current page
   function initializePageForm() {
-    const pagePath = document.documentElement.getAttribute('data-page-path');
+    // page.url carries a trailing slash ('/signin/') and may carry a locale
+    // prefix ('/es/signin/') — match on the final segment. Safe because this
+    // module is only ever imported by the auth pages themselves.
+    const pagePath = (document.documentElement.getAttribute('data-page-path') || '').replace(/\/+$/, '');
 
     if (!pagePath) {
       console.warn('[Auth] No data-page-path attribute found on HTML element');
       return;
     }
 
-    if (pagePath === '/signin') {
+    if (pagePath.endsWith('/signin')) {
       initializeSigninForm();
-    } else if (pagePath === '/signup') {
+    } else if (pagePath.endsWith('/signup')) {
       initializeSignupForm();
-    } else if (pagePath === '/reset') {
+    } else if (pagePath.endsWith('/reset')) {
       initializeResetForm();
+    } else {
+      console.warn(`[Auth] Unrecognized auth page path: ${pagePath}`);
     }
   }
 

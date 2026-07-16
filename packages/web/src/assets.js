@@ -211,6 +211,16 @@ async function buildAssets(options) {
     }
   }
 
+  // ---- Fonts: every layer's fonts/ dir lands at /assets/fonts verbatim
+  // (first layer wins — a consumer's file beats the theme's vendored face).
+  // Stable names by design: @font-face src URLs are written in theme css.
+  const fontDirs = options.layers.map((layer) => path.join(layer, 'fonts')).filter((dir) => fs.existsSync(dir));
+  for (const [rel, abs] of collectLayered(fontDirs)) {
+    const dest = path.join(options.outDir, 'assets', 'fonts', rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(abs, dest);
+  }
+
   return manifest;
 }
 

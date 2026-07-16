@@ -267,22 +267,33 @@ function configureOmega(eleventyConfig, options) {
   eleventyConfig.addGlobalData('eleventyComputed', {
     permalink: (data) => {
       const inputPath = data.page.inputPath;
+      let permalink = data.permalink;
       // Collection URLs mirror UJM's Jekyll defaults (permalink: "/<coll>/
       // :title", with Eleventy's fileSlug stripping the dated-filename part) —
       // but an EXPLICIT permalink in the doc's frontmatter wins, like Jekyll.
       // '' counts as absent: Eleventy's computed dependency pass probes with
       // an empty-string proxy, and that probe value persists into the data.
-      if (data.permalink === undefined || data.permalink === '') {
-        if (inputPath.includes('/_posts/')) return `/blog/${data.page.fileSlug}/`;
-        if (inputPath.includes('/_alternatives/')) return `/alternatives/${data.page.fileSlug}/`;
-        if (inputPath.includes('/_team/')) return `/team/${data.page.fileSlug}/`;
-        if (inputPath.includes('/_updates/')) return `/updates/${data.page.fileSlug}/`;
+      if (permalink === undefined || permalink === '') {
+        if (inputPath.includes('/_posts/')) permalink = `/blog/${data.page.fileSlug}`;
+        else if (inputPath.includes('/_alternatives/')) permalink = `/alternatives/${data.page.fileSlug}`;
+        else if (inputPath.includes('/_team/')) permalink = `/team/${data.page.fileSlug}`;
+        else if (inputPath.includes('/_updates/')) permalink = `/updates/${data.page.fileSlug}`;
       }
-      // Jekyll pretty URLs: `/about` means `/about/index.html`
-      if (typeof data.permalink === 'string' && !path.extname(data.permalink) && !data.permalink.endsWith('/')) {
-        return `${data.permalink}/`;
+      // Jekyll flat URLs (legacy UJM parity): `/about` writes `about.html`,
+      // NOT `about/index.html` — site URLs carry no trailing slash. page.url
+      // stays extensionless ('/about') via the .html-stripping urlTransform
+      // below, exactly like Jekyll's page.url for extensionless permalinks.
+      // A whitelist of real output extensions, NOT path.extname — dotted slugs
+      // (`/updates/v1.0.0`) must still get their .html. Liquid-carrying
+      // permalinks (pagination/taxonomy) can't be shape-tested as raw strings —
+      // they spell their full shape explicitly (blog.md ends in `.html`) and
+      // pass through untouched.
+      const KNOWN_EXT = /\.(html|xml|txt|json|js|css|webmanifest|svg|ics|pdf)$/i;
+      if (typeof permalink === 'string' && !/[{}]/.test(permalink)
+          && !KNOWN_EXT.test(permalink) && !permalink.endsWith('/')) {
+        return `${permalink}.html`;
       }
-      return data.permalink;
+      return permalink;
     },
     // Jekyll paginator compat: layouts iterate `paginator.posts` with Jekyll
     // post shapes (post.url, post.post.title), so items are flattened
@@ -345,6 +356,17 @@ function configureOmega(eleventyConfig, options) {
         page: { ...out, resolved: out, url: data.page.url, slug: data.page.fileSlug, fileSlug: data.page.fileSlug },
       });
     },
+  });
+
+  // page.url parity with Jekyll (legacy UJM): the flat `about.html` output
+  // still reads as '/about' everywhere templates look (canonical, hreflang,
+  // data-page-path, nav active-detection, collection doc.url). index.html
+  // outputs are collapsed to directory URLs by Eleventy before transforms run.
+  eleventyConfig.addUrlTransform(({ url }) => {
+    if (typeof url === 'string' && url.endsWith('.html')) {
+      return url.slice(0, -'.html'.length);
+    }
+    return undefined;
   });
 
   // ---- Collections: posts, alternatives, team, blog taxonomy
