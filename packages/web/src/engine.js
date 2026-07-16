@@ -397,8 +397,9 @@ function configureOmega(eleventyConfig, options) {
   // or a production build — removes that collection's samples entirely.
   if (options.environment !== 'production') {
     const sampleSets = [
-      ['_posts', 'sample-posts'], // the blog
+      ['_posts', 'sample-posts'], // the blog (11 posts — enough to exercise pagination at size 6)
       ['_team', 'sample-team'], // the /team portrait grid + member pages
+      ['_updates', 'sample-updates'], // the /updates release feed
     ];
     for (const [collectionDir, samplesDir] of sampleSets) {
       if (hasOwnContent(options.consumerDir, collectionDir)) continue;

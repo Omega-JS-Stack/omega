@@ -55,12 +55,11 @@ test('dev build without consumer posts injects the sample posts', async () => {
   assert.ok(welcome, 'sample post gets its /blog/<slug> URL');
   assert.ok(welcome.includes('Welcome to the blog'), 'post title renders');
 
-  // Blog index lists them (no empty state)
+  // Blog index lists them newest-first (no empty state)
   const blogUrl = [...pages.keys()].find((u) => u === '/blog/' || u === '/blog');
   assert.ok(blogUrl, 'blog index exists');
   const blog = pages.get(blogUrl);
-  assert.ok(blog.includes('Welcome to the blog'), 'blog index lists sample posts');
-  assert.ok(blog.includes('classy-post-card__media--pattern'), 'image-less samples use the designed no-media panel');
+  assert.ok(blog.includes('Ship the docs with the diff'), 'blog index lists the newest sample posts');
 
   // Author-less samples fall back to the brand byline, never a broken row
   assert.ok(blog.includes('BareCo'), 'author fallback renders the brand name');
@@ -68,6 +67,20 @@ test('dev build without consumer posts injects the sample posts', async () => {
   // Taxonomy rides along
   const category = [...pages.keys()].find((u) => u.startsWith('/blog/categories/'));
   assert.ok(category, 'sample categories aggregate into taxonomy pages');
+
+  // 11 samples at pagination size 6 → a real page 2 (Ian 2026-07-16:
+  // pagination must be VISIBLE with sample content). The two image-less
+  // samples are the oldest, so the designed no-media panel proves there.
+  const page2 = [...pages.keys()].find((u) => u === '/blog/page/2' || u === '/blog/page/2/');
+  assert.ok(page2, 'sample volume exercises pagination (page 2 exists)');
+  assert.ok(pages.get(page2).includes('Welcome to the blog'), 'oldest samples paginate to page 2');
+  assert.ok(pages.get(page2).includes('classy-post-card__media--pattern'), 'image-less samples use the designed no-media panel');
+
+  // Sample updates ride the same lane (/updates release feed)
+  const update = pages.get('/updates/v1.3.0');
+  assert.ok(update, 'sample update gets its /updates/<version> URL');
+  const updatesUrl = [...pages.keys()].find((u) => u === '/updates/' || u === '/updates');
+  assert.ok(pages.get(updatesUrl).includes('1.3.0'), 'updates index lists sample releases');
 });
 
 test('production build never ships sample posts', async () => {
@@ -78,6 +91,8 @@ test('production build never ships sample posts', async () => {
   const blogUrl = [...pages.keys()].find((u) => u === '/blog/' || u === '/blog');
   assert.ok(blogUrl, '/blog stays alive (generatePageOnEmptyData)');
   assert.ok(!pages.get(blogUrl).includes('Welcome to the blog'), 'blog index carries no sample content');
+
+  assert.strictEqual(pages.get('/updates/v1.3.0'), undefined, 'no sample update URLs in production');
 });
 
 test('a consumer with their own posts never sees samples (dev included)', async () => {
