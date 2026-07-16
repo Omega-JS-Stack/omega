@@ -3,9 +3,9 @@ layout: frontend/core/base
 
 # Hero Section
 hero:
-  headline: "The {{ site.brand.name }}"
-  headline_accent: "blog"
-  subheadline: "Discover insights, tutorials, and news from our team"
+  headline: "Thoughts, news and"
+  headline_accent: "stories"
+  subheadline: "The latest from {{ site.brand.name }} — product news, guides, and perspectives."
 
 # Newsletter CTA Section
 newsletter_cta:
@@ -22,35 +22,61 @@ newsletter_cta:
     error_message: "Something went wrong. Please try again."
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
-  <div class="container" data-omega-reveal-stagger="90">
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-    </h1>
-    {% iftruthy resolved.hero.subheadline %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
-    {% endiftruthy %}
+<!-- ═══ Masthead — mono eyebrow, huge serif, one dek line, search right ═══ -->
+<section class="classy-dotgrid pb-0">
+  <div class="container">
+    <div class="classy-masthead" data-omega-reveal-stagger="90">
+      <div>
+        <span class="classy-micro d-block mb-3" data-omega-reveal>Blog</span>
+        <h1 class="classy-display classy-display--page mb-0" data-omega-reveal>
+          {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="classy-hero-split__sub mt-3 mb-0" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
 
-    <!-- Search -->
-    <div class="classy-page-hero__actions" data-omega-reveal>
-      <form action="{{ site.url }}/search/cse" target="_blank" class="classy-blog-search">
-        <span class="classy-blog-search__icon">{% uj_icon "search", "fa-sm" %}</span>
-        <input
-          type="search"
-          class="classy-blog-search__input"
-          name="q"
-          placeholder="Search posts..."
-          aria-label="Search posts"
-        >
-        <button class="btn btn-adaptive btn-sm" type="submit">Search</button>
-      </form>
+      <div class="classy-masthead__actions" data-omega-reveal>
+        <form action="{{ site.url }}/search/cse" target="_blank" class="classy-blog-search">
+          <span class="classy-blog-search__icon">{% uj_icon "search", "fa-sm" %}</span>
+          <input
+            type="search"
+            class="classy-blog-search__input"
+            name="q"
+            placeholder="Search posts..."
+            aria-label="Search posts"
+          >
+          <button class="btn btn-adaptive btn-sm" type="submit">Search</button>
+        </form>
+      </div>
     </div>
+
+    {% comment %} Category tab rail — All + the top categories {% endcomment %}
+    {% assign categories = '' | split: ',' %}
+    {% for post in site.posts %}
+      {% if categories.size >= 6 %}{% break %}{% endif %}
+      {% for category in post.post.categories %}
+        {% assign category_fixed = category | uj_title_case %}
+        {% unless categories contains category_fixed %}
+          {% assign categories = categories | push: category_fixed %}
+        {% endunless %}
+      {% endfor %}
+    {% endfor %}
+
+    {% if categories.size > 0 %}
+      <nav class="classy-tabs mt-5" aria-label="Post categories" data-omega-reveal>
+        <a href="{{ site.url }}/blog" class="active">All</a>
+        {% for category in categories %}
+          <a href="{{ site.url }}/blog/categories/{{ category | slugify }}">{{ category }}</a>
+        {% endfor %}
+        <a href="{{ site.url }}/blog/categories">All categories</a>
+      </nav>
+    {% endif %}
   </div>
 </section>
 
-<!-- ═══ Posts grid ═══ -->
-<section class="pt-0">
+<!-- ═══ Posts — featured lead (page 1) + unboxed grid ═══ -->
+<section>
   <div class="container">
     {% assign post_count = paginator.posts | size %}
     {% if post_count == 0 %}
@@ -66,8 +92,53 @@ newsletter_cta:
       </div>
     {% endif %}
 
-    <div class="row g-4 mb-5" data-omega-reveal-stagger="60">
+    {% comment %} Page 1 leads with the newest post as the magazine feature {% endcomment %}
+    {% assign _featured = nil %}
+    {% if paginator.page == 1 and post_count > 0 %}
+      {% assign _featured = paginator.posts | first %}
+    {% endif %}
+
+    {% if _featured %}
+      <article class="classy-featured-post mb-5 pb-3" data-omega-reveal>
+        <a href="{{ site.url }}{{ _featured.url }}" class="classy-featured-post__media{% if _featured.post.image == false %} classy-dotgrid{% endif %}">
+          {%- if _featured.post.image == false -%}
+            {%- assign _mono_source = _featured.post.categories[0] | default: _featured.post.title -%}
+            <span class="classy-featured-post__monogram" aria-hidden="true">{{ _mono_source | slice: 0 | upcase }}</span>
+          {%- elsif _featured.post.image -%}
+            <img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ _featured.post.image }}" alt="{{ _featured.post.title }}">
+          {%- else -%}
+            {%- uj_post _featured.post.id, "image-tag", class="" -%}
+          {%- endif -%}
+        </a>
+        <div class="classy-featured-post__body">
+          <div class="classy-post-card__eyebrow">
+            {% if _featured.post.categories[0] %}
+              <a href="{{ site.url }}/blog/categories/{{ _featured.post.categories[0] | slugify }}">{{ _featured.post.categories[0] | uj_title_case }}</a>
+              <span>·</span>
+            {% endif %}
+            <time datetime="{{ _featured.date | date_to_xmlschema }}">{{ _featured.date | date: "%b %d, %Y" }}</time>
+            <span>·</span>
+            <span>{% uj_readtime _featured.content %} min read</span>
+          </div>
+          <h2 class="classy-featured-post__title">
+            <a href="{{ site.url }}{{ _featured.url }}">{{ _featured.post.title }}</a>
+          </h2>
+          {% iftruthy _featured.post.description %}
+            <p class="classy-featured-post__desc">{{ _featured.post.description }}</p>
+          {% endiftruthy %}
+          <div class="mt-2">
+            <a href="{{ site.url }}{{ _featured.url }}" class="btn btn-outline-adaptive btn-sm omega-hover-nudge">
+              Read the story
+              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-xs" %}</span>
+            </a>
+          </div>
+        </div>
+      </article>
+    {% endif %}
+
+    <div class="row g-4 gy-5 mb-5" data-omega-reveal-stagger="60">
       {% for post in paginator.posts %}
+        {% if _featured and post.url == _featured.url %}{% continue %}{% endif %}
         <div class="col-xl-4 col-lg-6 col-md-12" data-omega-reveal>
           {% include frontend/components/post-card.html post=post %}
         </div>
@@ -155,81 +226,16 @@ newsletter_cta:
     {% endif %}
 
     <!-- In-Feed Ad -->
-    <div class="row justify-content-center mb-5">
+    <div class="row justify-content-center">
       <div class="col-12 col-lg-8">
         {% include modules/adunits/adsense.html type="in-feed" %}
       </div>
     </div>
-
-    <!-- Categories & Tags -->
-    {% comment %} Build unique categories list (max 10) {% endcomment %}
-    {% assign categories = '' | split: ',' %}
-    {% for post in site.posts %}
-      {% if categories.size >= 10 %}
-        {% break %}
-      {% endif %}
-      {% for category in post.post.categories %}
-        {% assign category_fixed = category | uj_title_case %}
-        {% unless categories contains category_fixed %}
-          {% assign categories = categories | push: category_fixed %}
-        {% endunless %}
-      {% endfor %}
-    {% endfor %}
-
-    {% comment %} Build unique tags list (max 10) {% endcomment %}
-    {% assign tags = '' | split: ',' %}
-    {% for post in site.posts %}
-      {% if tags.size >= 10 %}
-        {% break %}
-      {% endif %}
-      {% for tag in post.post.tags %}
-        {% assign tag_fixed = tag | uj_title_case %}
-        {% unless tags contains tag_fixed %}
-          {% assign tags = tags | push: tag_fixed %}
-        {% endunless %}
-      {% endfor %}
-    {% endfor %}
-
-    {% if categories.size > 0 or tags.size > 0 %}
-      <div class="row justify-content-center g-4" data-omega-reveal>
-        {% if categories.size > 0 %}
-          <div class="col-lg-10 text-center">
-            <span class="classy-micro d-block mb-3">Categories</span>
-            <div class="classy-chip-cloud">
-              {% for category in categories %}
-                <a href="{{ site.url }}/blog/categories/{{ category | slugify }}" class="classy-chip">
-                  {{ category }}
-                </a>
-              {% endfor %}
-              <a href="{{ site.url }}/blog/categories" class="classy-chip">
-                View all {% uj_icon "arrow-right", "fa-xs" %}
-              </a>
-            </div>
-          </div>
-        {% endif %}
-
-        {% if tags.size > 0 %}
-          <div class="col-lg-10 text-center">
-            <span class="classy-micro d-block mb-3">Tags</span>
-            <div class="classy-chip-cloud">
-              {% for tag in tags %}
-                <a href="{{ site.url }}/blog/tags/{{ tag | slugify }}" class="classy-chip">
-                  {{ tag }}
-                </a>
-              {% endfor %}
-              <a href="{{ site.url }}/blog/tags" class="classy-chip">
-                View all {% uj_icon "arrow-right", "fa-xs" %}
-              </a>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-    {% endif %}
   </div>
 </section>
 
 <!-- ═══ Newsletter CTA band ═══ -->
-<section>
+<section class="pt-0">
   <div class="container">
     <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
       {% iftruthy resolved.newsletter_cta.superheadline.text %}

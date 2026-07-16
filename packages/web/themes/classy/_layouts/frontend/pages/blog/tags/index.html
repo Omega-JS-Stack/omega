@@ -8,14 +8,19 @@ hero:
   subheadline: "Browse posts by tag"
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-4">
   <div class="container" data-omega-reveal-stagger="90">
+    <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="{{ site.url }}/blog">Blog</a>
+      <span>/</span>
+      <span>Tags</span>
+    </div>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
       {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
     </h1>
     {% iftruthy resolved.hero.subheadline %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
     {% endiftruthy %}
   </div>
 </section>

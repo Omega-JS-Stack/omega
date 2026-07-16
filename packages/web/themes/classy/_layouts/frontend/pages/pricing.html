@@ -147,45 +147,45 @@ faqs:
     <div class="row justify-content-center">
       <div class="col-12">
         {% if _show_toggle %}
-          <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap mb-3" data-omega-reveal>
+          {% if resolved.pricing.savingsPercent > 0 %}
+            {% assign _savings = resolved.pricing.savingsPercent %}
+          {% else %}
+            {% assign _savings = 20 %}
+          {% endif %}
+          <div class="d-flex align-items-center justify-content-center mb-4" data-omega-reveal>
             <div class="classy-billing-toggle" role="group" aria-label="Billing toggle">
               <input type="radio" class="btn-check" name="billing" id="monthly" autocomplete="off" data-billing="monthly" {% unless _default_annual %}checked{% endunless %}>
               <label class="btn" for="monthly">Monthly</label>
 
               <input type="radio" class="btn-check" name="billing" id="annually" autocomplete="off" {% if _default_annual %}checked{% endif %} data-billing="annually">
-              <label class="btn" for="annually">Annually</label>
+              <label class="btn" for="annually">Annually <span class="classy-quiet">· Save {{ _savings }}%</span></label>
             </div>
-
-            {% if resolved.pricing.savingsPercent > 0 %}
-              {% assign _savings = resolved.pricing.savingsPercent %}
-            {% else %}
-              {% assign _savings = 20 %}
-            {% endif %}
-            <span class="classy-chip classy-chip--accent">Save up to {{ _savings }}%</span>
           </div>
         {% endif %}
 
-        <p class="small text-muted text-center mb-4">
-          {% uj_icon "shield-check", "me-1" %}
-          {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
-        </p>
+        {% comment %} Enterprise rides the SAME row as a peer card (bronn) —
+        pricing.enterprise: false kills it {% endcomment %}
+        {% assign _has_enterprise = true %}
+        {% if resolved.pricing.enterprise == false %}{% assign _has_enterprise = false %}{% endif %}
+        {% assign _card_count = _plan_count %}
+        {% if _has_enterprise %}{% assign _card_count = _plan_count | plus: 1 %}{% endif %}
 
-        <!-- Determine column classes based on number of plans -->
-        {% if _plan_count == 1 %}
+        <!-- Determine column classes based on number of cards -->
+        {% if _card_count == 1 %}
           {% assign col_classes = "col-12 col-md-8 col-lg-6 col-xl-5" %}
-        {% elsif _plan_count == 2 %}
+        {% elsif _card_count == 2 %}
           {% assign col_classes = "col-12 col-md-6 col-lg-5 col-xl-5" %}
-        {% elsif _plan_count == 3 %}
+        {% elsif _card_count == 3 %}
           {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-4" %}
-        {% elsif _plan_count == 4 %}
+        {% elsif _card_count == 4 %}
           {% assign col_classes = "col-12 col-md-6 col-lg-6 col-xl-3" %}
-        {% elsif _plan_count == 5 %}
+        {% elsif _card_count == 5 %}
           {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-4 col-xxl-2" %}
         {% else %}
           {% assign col_classes = "col-12 col-md-6 col-lg-4 col-xl-3 col-xxl-2" %}
         {% endif %}
 
-        <div class="row g-4 mb-4 justify-content-center" data-omega-reveal-stagger="80">
+        <div class="row g-4 mb-2 justify-content-center" data-omega-reveal-stagger="80">
           {% for plan in _plans %}
             <div class="{{ col_classes }}" data-omega-reveal>
               <div class="card classy-price-card {% if plan.popular %}classy-price-card--popular{% endif %} h-100">
@@ -193,192 +193,198 @@ faqs:
                   <span class="classy-chip classy-chip--ink classy-price-card__popular">Most popular</span>
                 {% endif %}
 
-                <div class="d-flex flex-column justify-content-between h-100">
-                  <div>
-                    <!-- Header -->
-                    <h3 class="card-title classy-price-card__name mb-0">{{ plan.name }}</h3>
-                    <p class="classy-price-card__tagline">{{ plan.tagline }}</p>
+                <!-- Header (fixed rhythm — every card's features start on the same row) -->
+                <h3 class="card-title classy-price-card__name mb-0">{{ plan.name }}</h3>
+                <p class="classy-price-card__tagline">{{ plan.tagline }}</p>
 
-                    <!-- Price -->
-                    {% if plan.free %}
-                      <div class="classy-price-card__price">
-                        <span class="classy-price-card__amount">Free</span>
-                      </div>
+                <!-- Price -->
+                {% if plan.free %}
+                  <div class="classy-price-card__price">
+                    <span class="classy-price-card__amount">Free</span>
+                  </div>
+                {% else %}
+                  {% if _default_annual and plan.prices.annually > 0 %}
+                    {% assign _initial_amount = plan.prices.annuallyPerMonth %}
+                  {% else %}
+                    {% assign _initial_amount = plan.prices.monthly %}
+                  {% endif %}
+                  <div class="classy-price-card__price">
+                    <span class="classy-price-card__currency">$</span>
+                    <span class="classy-price-card__amount amount" data-monthly="{{ plan.prices.monthly }}" data-annually="{{ plan.prices.annuallyPerMonth }}">{{ _initial_amount }}</span>
+                    <span class="classy-price-card__per">/month</span>
+                  </div>
+                {% endif %}
+
+                <!-- Billing info line (swaps with the toggle — JS contract) -->
+                <p class="classy-price-card__billing">
+                  {% if plan.free %}
+                    <span>No credit card required</span>
+                  {% else %}
+                    {% if _default_annual and plan.prices.annually > 0 %}
+                      {% capture _initial_billing %}Billed ${{ plan.prices.annually | uj_commaify }} annually{% endcapture %}
                     {% else %}
-                      {% if _default_annual and plan.prices.annually > 0 %}
-                        {% assign _initial_amount = plan.prices.annuallyPerMonth %}
-                      {% else %}
-                        {% assign _initial_amount = plan.prices.monthly %}
-                      {% endif %}
-                      <div class="classy-price-card__price">
-                        <span class="classy-price-card__currency">$</span>
-                        <span class="classy-price-card__amount amount" data-monthly="{{ plan.prices.monthly }}" data-annually="{{ plan.prices.annuallyPerMonth }}">{{ _initial_amount }}</span>
-                        <span class="classy-price-card__per">/month</span>
-                      </div>
+                      {% capture _initial_billing %}Billed ${{ plan.prices.monthly | uj_commaify }} monthly{% endcapture %}
                     {% endif %}
-
-                    <!-- Price per unit (consumer knob: pricing.price_per_unit) -->
+                    <span class="billing-info" data-monthly="Billed ${{ plan.prices.monthly | uj_commaify }} monthly" data-annually="Billed ${{ plan.prices.annually | uj_commaify }} annually">
+                      {{ _initial_billing }}
+                    </span>
                     {% if resolved.pricing.price_per_unit.enabled %}
                       {% include core/pricing/price-per-unit.html plan=plan %}
-                      <p class="classy-price-card__billing mb-0">
-                        {% if monthly_price_per_unit %}
-                          <span class="price-per-unit" data-monthly="${{ monthly_price_per_unit }}" data-annually="${{ annual_price_per_unit }}">${{ annual_price_per_unit }}</span> per {{ resolved.pricing.price_per_unit.label }}
-                        {% elsif plan.free %}
-                          Perfect for trying out
-                        {% endif %}
-                      </p>
+                      {% if monthly_price_per_unit %}
+                        · <span class="price-per-unit" data-monthly="${{ monthly_price_per_unit }}" data-annually="${{ annual_price_per_unit }}">${{ annual_price_per_unit }}</span> per {{ resolved.pricing.price_per_unit.label }}
+                      {% endif %}
                     {% endif %}
+                  {% endif %}
+                </p>
 
-                    <!-- Billing info -->
-                    <p class="classy-price-card__billing">
-                      {% if plan.free %}
-                        <span>No credit card required</span>
-                      {% else %}
-                        {% if _default_annual and plan.prices.annually > 0 %}
-                          {% capture _initial_billing %}Billed ${{ plan.prices.annually | uj_commaify }} annually{% endcapture %}
-                        {% else %}
-                          {% capture _initial_billing %}Billed ${{ plan.prices.monthly | uj_commaify }} monthly{% endcapture %}
-                        {% endif %}
-                        <span class="billing-info" data-monthly="Billed ${{ plan.prices.monthly | uj_commaify }} monthly" data-annually="Billed ${{ plan.prices.annually | uj_commaify }} annually">
-                          {{ _initial_billing }}
+                {% if plan.features.size > 0 %}
+                  <!-- Features (definitions from config → dotted underline + tooltip) -->
+                  <ul class="classy-price-card__features">
+                    {% for feature in plan.commonFeatures %}
+                      <li>
+                        <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                        <span>
+                          {% if feature.value == 'Unlimited' %}
+                            Unlimited
+                          {% elsif feature.value and feature.value != true %}
+                            {{ feature.value | uj_commaify }}
+                          {% endif %}
+                          {% iftruthy feature.definition %}
+                            <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
+                          {% endiftruthy %}
+                          {% iffalsy feature.definition %}
+                            {{ feature.name }}
+                          {% endiffalsy %}
                         </span>
-                      {% endif %}
-                    </p>
+                      </li>
+                    {% endfor %}
+                  </ul>
 
-                    <!-- Button -->
-                    <div class="d-grid classy-price-card__cta">
-                      {% if plan.popular %}
-                        {% assign _plan_btn = "btn-adaptive" %}
-                      {% else %}
-                        {% assign _plan_btn = "btn-outline-adaptive" %}
-                      {% endif %}
-                      {% iftruthy plan.url %}
-                        <a href="{{ plan.url }}" class="btn {{ _plan_btn }} fw-semibold">
-                          {% if plan.trialDays > 0 %}
-                            Get free trial
-                          {% else %}
-                            Get started
-                          {% endif %}
-                        </a>
-                      {% endiftruthy %}
-                      {% iffalsy plan.url %}
-                        <button class="btn {{ _plan_btn }} fw-semibold" data-plan-id="{{ plan.id }}" data-plan-type="subscription">
-                          {% if plan.trialDays > 0 %}
-                            Get free trial
-                          {% else %}
-                            Get started
-                          {% endif %}
-                        </button>
-                      {% endiffalsy %}
-                    </div>
-
-                    {% if plan.free %}
-                      <p class="classy-price-card__note">
-                        {% uj_icon "rocket", "me-1" %}
-                        Upgrade any time
-                      </p>
-                    {% else %}
-                      <p class="classy-price-card__note">
-                        {% uj_icon "shield-check", "me-1" %}
-                        {{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
-                      </p>
-                    {% endif %}
-
-                    {% if plan.features.size > 0 %}
-                      <hr>
-
-                      <!-- Features -->
-                      <div>
-                        <!-- Features common to every plan, with this plan's values -->
-                        <ul class="classy-price-card__features mb-3">
-                          {% for feature in plan.commonFeatures %}
-                            <li>
-                              <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
-                              <span>
-                                {% if feature.value == 'Unlimited' %}
-                                  Unlimited
-                                {% elsif feature.value and feature.value != true %}
-                                  {{ feature.value | uj_commaify }}
-                                {% endif %}
-                                {% iftruthy feature.definition %}
-                                  <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
-                                {% endiftruthy %}
-                                {% iffalsy feature.definition %}
-                                  {{ feature.name }}
-                                {% endiffalsy %}
-                              </span>
-                            </li>
-                          {% endfor %}
-                        </ul>
-
-                        {% if plan.extraFeatures.size > 0 %}
-                          {% if forloop.first %}
-                            <div class="classy-price-card__tier-note">
-                              What you get:
-                            </div>
-                          {% else %}
-                            {% assign _prev_index = forloop.index0 | minus: 1 %}
-                            {% assign _prev_plan = _plans[_prev_index] %}
-                            <div class="classy-price-card__tier-note">
-                              Everything in <strong>{{ _prev_plan.name }}</strong>, and more:
-                            </div>
-                          {% endif %}
-                          <ul class="classy-price-card__features mb-0">
-                            {% for feature in plan.extraFeatures %}
-                              <li{% if forloop.last %} class="mb-0"{% endif %}>
-                                <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
-                                <span>
-                                  {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
-                                    {{ feature.value }}
-                                  {% elsif feature.value and feature.value != true %}
-                                    {{ feature.value | uj_commaify }}
-                                  {% endif %}
-                                  {% iftruthy feature.definition %}
-                                    <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
-                                  {% endiftruthy %}
-                                  {% iffalsy feature.definition %}
-                                    {{ feature.name }}
-                                  {% endiffalsy %}
-                                </span>
-                              </li>
-                            {% endfor %}
-                          </ul>
-                        {% elsif forloop.first == false %}
-                          {% assign _prev_index = forloop.index0 | minus: 1 %}
-                          {% assign _prev_plan = _plans[_prev_index] %}
-                          <div class="classy-price-card__tier-note mb-0">
-                            Everything in <strong>{{ _prev_plan.name }}</strong>
-                          </div>
-                        {% endif %}
+                  {% if plan.extraFeatures.size > 0 %}
+                    {% unless forloop.first %}
+                      {% assign _prev_index = forloop.index0 | minus: 1 %}
+                      {% assign _prev_plan = _plans[_prev_index] %}
+                      <div class="classy-price-card__tier-note">
+                        Everything in <strong>{{ _prev_plan.name }}</strong>, and more:
                       </div>
-                    {% endif %}
-                  </div>
+                    {% endunless %}
+                    <ul class="classy-price-card__features">
+                      {% for feature in plan.extraFeatures %}
+                        <li>
+                          <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                          <span>
+                            {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
+                              {{ feature.value }}
+                            {% elsif feature.value and feature.value != true %}
+                              {{ feature.value | uj_commaify }}
+                            {% endif %}
+                            {% iftruthy feature.definition %}
+                              <span class="text-decoration-underline text-decoration-dotted cursor-help" data-bs-toggle="tooltip" data-bs-title="{{ feature.definition }}">{{ feature.name }}</span>
+                            {% endiftruthy %}
+                            {% iffalsy feature.definition %}
+                              {{ feature.name }}
+                            {% endiffalsy %}
+                          </span>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  {% elsif forloop.first == false %}
+                    {% assign _prev_index = forloop.index0 | minus: 1 %}
+                    {% assign _prev_plan = _plans[_prev_index] %}
+                    <div class="classy-price-card__tier-note">
+                      Everything in <strong>{{ _prev_plan.name }}</strong>
+                    </div>
+                  {% endif %}
+                {% endif %}
+
+                <!-- CTA — pinned to the card floor; buttons align across the row -->
+                <div class="d-grid classy-price-card__cta">
+                  {% if plan.popular %}
+                    {% assign _plan_btn = "btn-adaptive" %}
+                  {% else %}
+                    {% assign _plan_btn = "btn-outline-adaptive" %}
+                  {% endif %}
+                  {% iftruthy plan.url %}
+                    <a href="{{ plan.url }}" class="btn {{ _plan_btn }} fw-semibold">
+                      {% if plan.trialDays > 0 %}
+                        Get free trial
+                      {% else %}
+                        Get started
+                      {% endif %}
+                    </a>
+                  {% endiftruthy %}
+                  {% iffalsy plan.url %}
+                    <button class="btn {{ _plan_btn }} fw-semibold" data-plan-id="{{ plan.id }}" data-plan-type="subscription">
+                      {% if plan.trialDays > 0 %}
+                        Get free trial
+                      {% else %}
+                        Get started
+                      {% endif %}
+                    </button>
+                  {% endiffalsy %}
                 </div>
               </div>
             </div>
           {% endfor %}
+
+          {% comment %} Enterprise — a PEER card with the serif Custom amount {% endcomment %}
+          {% if _has_enterprise %}
+            <div class="{{ col_classes }}" data-omega-reveal>
+              <div class="card classy-price-card h-100">
+                <h3 class="card-title classy-price-card__name mb-0">{{ resolved.pricing.enterprise.name | default: "Enterprise" }}</h3>
+                <p class="classy-price-card__tagline">{{ resolved.pricing.enterprise.tagline | default: "Larger teams & organizations" }}</p>
+
+                <div class="classy-price-card__price">
+                  <span class="classy-price-card__amount classy-price-card__amount--custom">{{ resolved.pricing.enterprise.price_label | default: "Custom" }}</span>
+                </div>
+
+                <p class="classy-price-card__billing">
+                  <span>{{ resolved.pricing.enterprise.billing_label | default: "Tailored to your needs" }}</span>
+                </p>
+
+                <ul class="classy-price-card__features">
+                  {% if resolved.pricing.enterprise.features %}
+                    {% for feature in resolved.pricing.enterprise.features %}
+                      <li>
+                        <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                        <span>{{ feature }}</span>
+                      </li>
+                    {% endfor %}
+                  {% else %}
+                    {% assign _last_plan = _plans | last %}
+                    <li>
+                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span>Everything in {{ _last_plan.name }}</span>
+                    </li>
+                    <li>
+                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span>Custom volume &amp; terms</span>
+                    </li>
+                    <li>
+                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span>Security review &amp; SLA</span>
+                    </li>
+                    <li>
+                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span>Dedicated support</span>
+                    </li>
+                  {% endif %}
+                </ul>
+
+                <div class="d-grid classy-price-card__cta">
+                  <button class="btn btn-outline-adaptive fw-semibold" data-plan-id="enterprise">
+                    <span class="button-text">{{ resolved.pricing.enterprise.button_text | default: "Contact us" }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          {% endif %}
         </div>
 
-        <!-- Enterprise band — ON by default; pricing.enterprise overrides copy, pricing.enterprise: false kills it -->
-        {% unless resolved.pricing.enterprise == false %}
-          <div class="classy-band mt-4" data-omega-reveal>
-            <div class="classy-band__body">
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="classy-band__title mb-0">{{ resolved.pricing.enterprise.name | default: "Enterprise" }}</span>
-                <span class="classy-chip">{{ resolved.pricing.enterprise.price_label | default: "Custom pricing" }}</span>
-              </div>
-              <p class="classy-band__desc">{{ resolved.pricing.enterprise.description | default: "Custom solutions for large organizations. Advanced security and flexible pricing based on your needs." }}</p>
-            </div>
-            <div class="classy-band__actions">
-              <button class="btn btn-outline-adaptive px-4" data-plan-id="enterprise">
-                {% uj_icon "envelope", "me-2" %}
-                <span class="button-text">
-                  {{ resolved.pricing.enterprise.button_text | default: "Contact us" }}
-                </span>
-              </button>
-            </div>
-          </div>
-        {% endunless %}
+        <p class="small text-center classy-quiet mb-0">
+          {% uj_icon "shield-check", "me-1" %}
+          {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
+        </p>
 
       </div>
     </div>
@@ -404,47 +410,41 @@ faqs:
       {% for product in _onetime %}
         <div class="col-12 col-md-6 col-lg-5 col-xl-4" data-omega-reveal>
           <div class="card classy-price-card h-100">
-            <div class="d-flex flex-column justify-content-between h-100">
-              <div>
-                <h3 class="card-title classy-price-card__name mb-0">{{ product.name }}</h3>
-                <p class="classy-price-card__tagline">{{ product.tagline }}</p>
+            <h3 class="card-title classy-price-card__name mb-0">{{ product.name }}</h3>
+            <p class="classy-price-card__tagline">{{ product.tagline }}</p>
 
-                <div class="classy-price-card__price">
-                  <span class="classy-price-card__currency">$</span>
-                  <span class="classy-price-card__amount">{{ product.price | uj_commaify }}</span>
-                  <span class="classy-price-card__per">one-time</span>
-                </div>
+            <div class="classy-price-card__price">
+              <span class="classy-price-card__currency">$</span>
+              <span class="classy-price-card__amount">{{ product.price | uj_commaify }}</span>
+              <span class="classy-price-card__per">one-time</span>
+            </div>
 
-                <div class="d-grid classy-price-card__cta">
-                  <button class="btn btn-adaptive fw-semibold" data-plan-id="{{ product.id }}" data-plan-type="one-time">
-                    Buy now
-                  </button>
-                </div>
+            <p class="classy-price-card__billing">
+              <span>Yours forever — pay once</span>
+            </p>
 
-                <p class="classy-price-card__note">
-                  {% uj_icon "circle-check", "me-1" %}
-                  Yours forever — pay once
-                </p>
+            {% if product.features.size > 0 %}
+              <ul class="classy-price-card__features">
+                {% for feature in product.features %}
+                  <li>
+                    <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                    <span>
+                      {% if feature.value == 'Unlimited' %}
+                        Unlimited
+                      {% elsif feature.value and feature.value != true %}
+                        {{ feature.value | uj_commaify }}
+                      {% endif %}
+                      {{ feature.name }}
+                    </span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
 
-                {% if product.features.size > 0 %}
-                  <hr>
-                  <ul class="classy-price-card__features mb-0">
-                    {% for feature in product.features %}
-                      <li{% if forloop.last %} class="mb-0"{% endif %}>
-                        <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
-                        <span>
-                          {% if feature.value == 'Unlimited' %}
-                            Unlimited
-                          {% elsif feature.value and feature.value != true %}
-                            {{ feature.value | uj_commaify }}
-                          {% endif %}
-                          {{ feature.name }}
-                        </span>
-                      </li>
-                    {% endfor %}
-                  </ul>
-                {% endif %}
-              </div>
+            <div class="d-grid classy-price-card__cta">
+              <button class="btn btn-adaptive fw-semibold" data-plan-id="{{ product.id }}" data-plan-type="one-time">
+                Buy now
+              </button>
             </div>
           </div>
         </div>

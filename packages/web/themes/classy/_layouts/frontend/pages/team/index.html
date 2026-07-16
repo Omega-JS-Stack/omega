@@ -3,30 +3,12 @@ layout: frontend/core/base
 
 # Hero Section
 hero:
-  headline: "Meet our"
-  headline_accent: "team"
-  description: "We're a diverse group of passionate individuals working together to build the future of {{ site.brand.name }}."
+  headline: "The people behind the"
+  headline_accent: "product"
+  description: "A small team with strong opinions, shipping every week."
 
 # Mission quote (rendered as the serif quote; attributed to the CEO/owner)
 mission_quote: "To empower individuals and businesses with <em>innovative technology</em> that simplifies complex challenges and unlocks new possibilities."
-
-company_values:
-  superheadline: "Principles"
-  headline: "Our core <em>values</em>"
-  subheadline: "The principles that guide everything we do"
-  items:
-    - title: "Innovation first"
-      description: "We push boundaries and challenge the status quo to create breakthrough solutions"
-      icon: "lightbulb"
-    - title: "Customer obsessed"
-      description: "Everything we do is focused on delivering exceptional value to our customers"
-      icon: "heart"
-    - title: "Team excellence"
-      description: "We hire the best talent and create an environment where everyone can thrive"
-      icon: "users"
-    - title: "Transparent culture"
-      description: "We believe in open communication, honest feedback, and shared decision-making"
-      icon: "magnifying-glass"
 
 # Join CTA
 join_cta:
@@ -40,48 +22,64 @@ join_cta:
     href: "/contact"
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
+<!-- ═══ Masthead ═══ -->
+<section class="classy-dotgrid pb-4">
   <div class="container" data-omega-reveal-stagger="90">
+    <span class="classy-micro d-block mb-3" data-omega-reveal>Team</span>
     <h1 class="classy-display classy-display--page" data-omega-reveal>
       {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
     </h1>
     {% iftruthy resolved.hero.description %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
+      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
     {% endiftruthy %}
   </div>
 </section>
 
-<!-- ═══ Member grid ═══ -->
+<!-- ═══ Portrait grid ═══ -->
 <section class="pt-0">
   <div class="container">
-    <div class="row g-4 justify-content-center" data-omega-reveal-stagger="70">
+    {% assign _team_count = site.team | size %}
+    {% if _team_count == 0 %}
+      <div class="row justify-content-center">
+        <div class="col-lg-6">
+          <div class="card" data-omega-reveal>
+            <div class="card-body p-5 text-center text-muted">
+              <h2 class="h5">No profiles yet</h2>
+              <p class="mb-0">The team page fills in as member profiles are added.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="row g-4" data-omega-reveal-stagger="70">
       {% for member in site.team %}
-        <div class="col-lg-4 col-md-6" data-omega-reveal>
+        <div class="col-lg-3 col-md-4 col-6" data-omega-reveal>
           <div class="classy-person">
-            <a href="{{ site.url }}{{ member.url }}" class="classy-person__avatar d-block">
+            <a href="{{ site.url }}{{ member.url }}" class="classy-person__portrait">
               {%- uj_member member.id, "image-tag", class="" -%}
             </a>
 
-            <h3 class="classy-person__name">
-              <a href="{{ site.url }}{{ member.url }}">
-                {%- uj_member member.id, "name" -%}
-              </a>
-            </h3>
-            <span class="classy-micro classy-person__role">{{ member.member.position }}</span>
-            <p class="classy-person__desc">{{ member.member.description }}</p>
+            <div class="classy-person__body">
+              <h3 class="classy-person__name">
+                <a href="{{ site.url }}{{ member.url }}">
+                  {%- uj_member member.id, "name" -%}
+                </a>
+              </h3>
+              <span class="classy-micro classy-person__role">{{ member.member.position }}</span>
 
-            {% iftruthy member.member.links %}
-              <div class="classy-person__links">
-                {% for link in member.member.links %}
-                  {% assign link_icon = link.id %}
-                  {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
-                  <a href="{{ link.url }}" class="classy-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-                    {% uj_icon link_icon, "fa-sm" %}
-                  </a>
-                {% endfor %}
-              </div>
-            {% endiftruthy %}
+              {% iftruthy member.member.links %}
+                <div class="classy-person__links">
+                  {% for link in member.member.links %}
+                    {% assign link_icon = link.id %}
+                    {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
+                    <a href="{{ link.url }}" class="classy-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
+                      {% uj_icon link_icon, "fa-sm" %}
+                    </a>
+                  {% endfor %}
+                </div>
+              {% endiftruthy %}
+            </div>
           </div>
         </div>
       {% endfor %}
@@ -90,6 +88,7 @@ join_cta:
 </section>
 
 <!-- ═══ Mission quote ═══ -->
+{% if _team_count > 0 %}
 <section>
   <div class="container">
     {% assign mission_member = nil %}
@@ -129,38 +128,10 @@ join_cta:
     </figure>
   </div>
 </section>
-
-<!-- ═══ Values ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-      {% iftruthy resolved.company_values.superheadline %}
-        <span class="classy-micro">{{ resolved.company_values.superheadline }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-display classy-display--section">{{ resolved.company_values.headline }}</h2>
-      {% iftruthy resolved.company_values.subheadline %}
-        <p>{{ resolved.company_values.subheadline }}</p>
-      {% endiftruthy %}
-    </div>
-
-    <div class="row g-4" data-omega-reveal-stagger="70">
-      {% for value in resolved.company_values.items %}
-        <div class="col-lg-3 col-md-6" data-omega-reveal>
-          <div class="classy-tile h-100">
-            <div class="classy-tile__head">
-              <span class="classy-icon-chip">{% uj_icon value.icon, "fa-sm" %}</span>
-              <span class="classy-tile__title">{{ value.title }}</span>
-            </div>
-            <p class="classy-tile__desc mb-0">{{ value.description }}</p>
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
+{% endif %}
 
 <!-- ═══ Join CTA band ═══ -->
-<section>
+<section{% if _team_count == 0 %} class="pt-0"{% endif %}>
   <div class="container">
     <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
       <h2 class="classy-cta__headline">{{ resolved.join_cta.headline }}</h2>

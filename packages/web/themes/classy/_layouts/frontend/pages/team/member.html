@@ -2,102 +2,84 @@
 layout: frontend/core/base
 ---
 
-<!-- ═══ Member hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
-  <div class="container" data-omega-reveal-stagger="90">
-    <div class="classy-person__avatar d-inline-block mx-auto mb-4" style="width: 7rem; height: 7rem;" data-omega-reveal>
-      {%- uj_member resolved.member.id, "image-tag", class="w-100 h-100 object-fit-cover" -%}
+<!-- ═══ Member — portrait split ═══ -->
+<section class="classy-dotgrid">
+  <div class="container">
+    {%- capture member_name -%}{%- uj_member resolved.member.id, "name" -%}{%- endcapture -%}
+    {%- assign first_name = member_name | split: ' ' | first -%}
+
+    <!-- Mono breadcrumb -->
+    <div class="classy-post-card__eyebrow mb-4" data-omega-reveal>
+      <a href="{{ site.url }}/team">Team</a>
+      <span>/</span>
+      <span>{{ member_name }}</span>
     </div>
 
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {%- uj_member resolved.member.id, "name" -%}
-    </h1>
+    <div class="classy-duo" style="--classy-duo-cols: 4fr 8fr;">
+      <!-- Portrait panel + facts -->
+      <div class="classy-duo__aside" data-omega-reveal>
+        <div class="classy-person mb-4">
+          <span class="classy-person__portrait">
+            {%- uj_member resolved.member.id, "image-tag", class="" -%}
+          </span>
+        </div>
 
-    <div class="mt-3" data-omega-reveal>
-      <span class="classy-chip">{{ resolved.member.position }}</span>
-    </div>
-
-    {% iftruthy resolved.member.links %}
-      <div class="d-flex justify-content-center gap-2 mt-4" data-omega-reveal>
-        {% for link in resolved.member.links %}
-          {% assign link_icon = link.id %}
-          {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
-          <a href="{{ link.url }}" class="classy-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
-            {% uj_icon link_icon, "fa-sm" %}
-          </a>
-        {% endfor %}
-      </div>
-    {% endiftruthy %}
-
-    {% iftruthy resolved.member.description %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.member.description }}</p>
-    {% endiftruthy %}
-  </div>
-</section>
-
-<!-- ═══ Facts row ═══ -->
-{% if resolved.member.location or resolved.member.joined or resolved.member.skills or resolved.member.hobbies %}
-  <section class="pt-0">
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-lg-10">
-          <div class="classy-facts" data-omega-reveal>
+        {% if resolved.member.location or resolved.member.joined %}
+          <div class="classy-rowlist">
             {% iftruthy resolved.member.location %}
-              <div class="classy-facts__item">
-                <span class="classy-micro classy-facts__label">Location</span>
-                <span class="classy-facts__value">{{ resolved.member.location }}</span>
+              <div class="classy-rowlist__item">
+                <span>{{ resolved.member.location }}</span>
+                <span class="classy-rowlist__meta">Location</span>
               </div>
             {% endiftruthy %}
             {% iftruthy resolved.member.joined %}
-              <div class="classy-facts__item">
-                <span class="classy-micro classy-facts__label">Joined</span>
-                <span class="classy-facts__value">{{ resolved.member.joined | date: "%B %Y" }}</span>
-              </div>
-            {% endiftruthy %}
-            {% iftruthy resolved.member.skills %}
-              <div class="classy-facts__item">
-                <span class="classy-micro classy-facts__label">Skills</span>
-                <span class="classy-facts__value">{{ resolved.member.skills | join: ", " }}</span>
-              </div>
-            {% endiftruthy %}
-            {% iftruthy resolved.member.hobbies %}
-              <div class="classy-facts__item">
-                <span class="classy-micro classy-facts__label">Hobbies</span>
-                <span class="classy-facts__value">{{ resolved.member.hobbies | join: ", " }}</span>
+              <div class="classy-rowlist__item">
+                <span>{{ resolved.member.joined | date: "%B %Y" }}</span>
+                <span class="classy-rowlist__meta">Joined</span>
               </div>
             {% endiftruthy %}
           </div>
-        </div>
+        {% endif %}
       </div>
-    </div>
-  </section>
-{% endif %}
 
-<!-- ═══ Bio ═══ -->
-<section class="pt-0">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-8" data-omega-reveal>
-        {%- capture member_name -%}{%- uj_member resolved.member.id, "name" -%}{%- endcapture -%}
-        {%- assign first_name = member_name | split: ' ' | first -%}
-        <div class="classy-section-head classy-section-head--center mb-4">
-          <span class="classy-micro">Bio</span>
-          <h2 class="classy-display classy-display--section">About <em>{{ first_name }}</em></h2>
+      <!-- Identity + bio -->
+      <div data-omega-reveal-stagger="80">
+        <h1 class="classy-display classy-display--page" data-omega-reveal>{{ member_name }}</h1>
+
+        <div class="d-flex align-items-center gap-3 flex-wrap mt-2 mb-4" data-omega-reveal>
+          <span class="classy-micro">{{ resolved.member.position }}</span>
+          {% iftruthy resolved.member.links %}
+            <span class="d-inline-flex gap-2">
+              {% for link in resolved.member.links %}
+                {% assign link_icon = link.id %}
+                {% if link.id == "website" %}{% assign link_icon = "globe" %}{% endif %}
+                <a href="{{ link.url }}" class="classy-icon-link" target="_blank" rel="nofollow noopener" title="{{ link.title }}">
+                  {% uj_icon link_icon, "fa-sm" %}
+                </a>
+              {% endfor %}
+            </span>
+          {% endiftruthy %}
         </div>
-        <div class="classy-prose">
+
+        {% iftruthy resolved.member.description %}
+          <p class="classy-statement mb-4" data-omega-reveal>{{ resolved.member.description }}</p>
+        {% endiftruthy %}
+
+        {% if resolved.member.skills or resolved.member.hobbies %}
+          <div class="classy-chip-cloud justify-content-start mb-4" data-omega-reveal>
+            {% for skill in resolved.member.skills %}
+              <span class="classy-chip">{{ skill }}</span>
+            {% endfor %}
+            {% for hobby in resolved.member.hobbies %}
+              <span class="classy-chip classy-chip--accent">{{ hobby }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="classy-prose" data-omega-reveal>
           {{ content | uj_content_format }}
         </div>
       </div>
     </div>
-  </div>
-</section>
-
-<!-- ═══ Back to team ═══ -->
-<section class="pt-0">
-  <div class="container text-center">
-    <a href="/team" class="btn btn-outline-adaptive btn-lg">
-      {% uj_icon "arrow-left", "fa-sm me-2" %}
-      Back to team
-    </a>
   </div>
 </section>

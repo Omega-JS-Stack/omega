@@ -36,36 +36,35 @@ prerender_icons:
   - name: "check"
 ---
 
-<!-- ═══ Page hero ═══ -->
-<section class="classy-page-hero classy-dotgrid">
-  <div class="container" data-omega-reveal-stagger="90">
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-    </h1>
-    {% iftruthy resolved.hero.subheadline %}
-      <p class="classy-page-hero__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
-    {% endiftruthy %}
-  </div>
-</section>
-
-<!-- ═══ Feedback form ═══ -->
-<section class="pt-0">
+<!-- ═══ Feedback — aside head + form panel ═══ -->
+<section class="classy-dotgrid">
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
-        <div class="card" data-omega-reveal>
-          <div class="card-body p-4 p-md-5">
-            <div class="classy-section-head classy-section-head--center mb-4">
-              {% iftruthy resolved.feedback_form.superheadline.text %}
-                <span class="classy-micro">{{ resolved.feedback_form.superheadline.text }}</span>
-              {% endiftruthy %}
-              <h2 class="classy-display classy-display--section">{{ resolved.feedback_form.headline }}</h2>
-              {% iftruthy resolved.feedback_form.subheadline %}
-                <p>{{ resolved.feedback_form.subheadline }}</p>
-              {% endiftruthy %}
-            </div>
+    <div class="classy-duo" style="--classy-duo-cols: 5fr 7fr;">
+      <!-- Aside: the ask, stated once -->
+      <div class="classy-duo__aside" data-omega-reveal-stagger="90">
+        <span class="classy-micro d-block mb-3" data-omega-reveal>Feedback</span>
+        <h1 class="classy-display classy-display--page" data-omega-reveal>
+          {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
+        </h1>
+        {% iftruthy resolved.hero.subheadline %}
+          <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
+        {% endiftruthy %}
+        <p class="small classy-quiet mt-4 mb-0" data-omega-reveal>
+          {% uj_icon "reply", "fa-xs me-1" %}
+          Every submission is read by a human — the sharp ones shape the roadmap.
+        </p>
+      </div>
 
-            <form id="feedback-form" autocomplete="off" data-form-state="initializing" onsubmit="return false">
+      <!-- The form -->
+      <div class="classy-form-panel" data-omega-reveal>
+        <div class="mb-4">
+          <h2 class="classy-display classy-display--section mb-2">{{ resolved.feedback_form.headline }}</h2>
+          {% iftruthy resolved.feedback_form.subheadline %}
+            <p class="text-muted mb-0">{{ resolved.feedback_form.subheadline }}</p>
+          {% endiftruthy %}
+        </div>
+
+        <form id="feedback-form" autocomplete="off" data-form-state="initializing" onsubmit="return false">
               <!-- Rating Selection -->
               <div class="feedback-rating-group mb-4">
                 <input type="hidden" name="rating" id="feedback-rating-input" required>
@@ -128,8 +127,6 @@ prerender_icons:
                 </button>
               </div>
             </form>
-          </div>
-        </div>
       </div>
     </div>
   </div>

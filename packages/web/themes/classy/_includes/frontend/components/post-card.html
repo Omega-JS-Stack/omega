@@ -1,15 +1,12 @@
 {% comment %}
   Classy v2 post card — the shared blog grid unit (index, related posts,
-  category and tag pages all render the SAME card). Usage:
-    {% include frontend/components/post-card.html post=post %}
-  where post is a posts-collection item (post.url, post.date, post.content,
-  post.post.{id,title,author,categories}).
+  category and tag pages all render the SAME card). UNBOXED (bronn pattern):
+  media panel, mono CATEGORY · DATE line, serif title, clamped excerpt.
+  Usage: {% include frontend/components/post-card.html post=post %}
 
   Media contract: post.image === false → designed no-media panel (serif
   monogram on dotgrid); post.image = "/path.jpg" → that image; absent →
   the legacy /assets/images/blog/post-<id>/ convention via uj_post.
-  Author contract: an author that resolves to no team member falls back to
-  the brand name with a neutral mark (no broken avatar row).
 {% endcomment %}
 {% assign _p = include.post %}
 <article class="classy-post-card">
@@ -25,36 +22,25 @@
   </a>
 
   <div class="classy-post-card__body">
-    {% if _p.post.categories[0] %}
-      <div>
-        <a href="{{ site.url }}/blog/categories/{{ _p.post.categories[0] | slugify }}" class="classy-chip classy-chip--accent text-decoration-none">
-          {{ _p.post.categories[0] | uj_title_case }}
-        </a>
-      </div>
-    {% endif %}
+    <div class="classy-post-card__eyebrow">
+      {% if _p.post.categories[0] %}
+        <a href="{{ site.url }}/blog/categories/{{ _p.post.categories[0] | slugify }}">{{ _p.post.categories[0] | uj_title_case }}</a>
+        <span>·</span>
+      {% endif %}
+      <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
+    </div>
 
     <h3 class="classy-post-card__title">
       <a href="{{ site.url }}{{ _p.url }}">{{ _p.post.title }}</a>
     </h3>
 
-    <div class="classy-post-card__meta">
-      {%- capture _author_name -%}{%- uj_member _p.post.author, "name" -%}{%- endcapture -%}
-      {% if _author_name != '' %}
-        <a href="{%- uj_member _p.post.author, "url" -%}" class="classy-post-card__avatar">
-          {%- uj_member _p.post.author, "image-tag", class="" -%}
-        </a>
-        <a href="{%- uj_member _p.post.author, "url" -%}">{{ _author_name }}</a>
-      {% else %}
-        <span class="classy-post-card__avatar classy-post-card__avatar--fallback" aria-hidden="true">
-          {% uj_icon "pen-nib", "fa-xs" %}
-        </span>
-        <span>{{ site.brand.name }}</span>
-      {% endif %}
-      <span class="ms-auto d-inline-flex align-items-center gap-2">
-        <time datetime="{{ _p.date | date_to_xmlschema }}">{{ _p.date | date: "%b %d, %Y" }}</time>
-        <span>·</span>
-        <span>{% uj_readtime _p.content %} min</span>
-      </span>
-    </div>
+    {%- capture _excerpt -%}{{ _p.post.description }}{%- endcapture -%}
+    {%- assign _excerpt = _excerpt | strip -%}
+    {%- if _excerpt == '' -%}
+      {%- capture _excerpt -%}{{ _p.content | strip_html | strip_newlines | truncate: 150 }}{%- endcapture -%}
+    {%- endif -%}
+    {% if _excerpt != '' %}
+      <p class="classy-post-card__excerpt">{{ _excerpt }}</p>
+    {% endif %}
   </div>
 </article>
