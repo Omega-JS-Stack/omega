@@ -48,17 +48,21 @@ two-property override.
 
 ## What ships custom (current tree)
 
+- **Chrome** (`_includes/frontend/sections/`): the MASTHEAD nav — a sticky
+  blurred-paper bar with a hairline ink rule, serif brand, uppercase pill
+  links; same `nav.json` data contract as classy, scroll state via the
+  shared motion engine (`data-omega-scroll-watch`). The footer deliberately
+  rides classy's include restyled as the editorial ink slab
+  (`css/layout/_general.scss`).
 - **Layouts** (`_layouts/frontend/`): base (ticker), homepage, blog
   index/post/categories/tags, pricing, about, contact, team, 404. Everything
   else falls through to Classy markup restyled by this theme's CSS.
 - **Page assets** (`css/pages/`, `js/pages/`): homepage rails/big-read band,
   blog index splash, blog post reading-progress + drop cap, pricing/about/404
   accents.
-- **Behaviors** (`js/`): masthead scroll shadow, Bootstrap tooltips. The
-  ticker and marquees are pure CSS.
-- The cp71-era serif masthead nav + ink-slab footer includes did NOT survive
-  the monorepo port (classy's chrome currently falls through) — being rebuilt
-  in the modernization arc.
+- **Behaviors** (`js/`): Bootstrap tooltips. The ticker rides the shared
+  motion engine's marquee; masthead scroll state is engine-stamped — no
+  bespoke theme JS.
 
 ## Conventions
 

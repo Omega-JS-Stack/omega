@@ -3,7 +3,9 @@ layout: frontend/core/base
 
 # Hero Section
 hero:
-  headline: "The {{ site.brand.name }}"
+  # No hardcoded article — brand names often carry their own ("The Daily
+  # Build wire", "OMEGA Playground wire" both read right).
+  headline: "{{ site.brand.name }}"
   headline_accent: "wire"
   subheadline: "Discover insights, tutorials, and news from our team"
 

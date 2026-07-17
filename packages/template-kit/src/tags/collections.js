@@ -144,12 +144,15 @@ const ujPost = {
       case 'image':
         return postImagePath(post);
       case 'image-tag': {
+        const src = postImagePath(post);
+        if (!src) return ''; // image: false — deliberately no media
+
         const options = parseImageOptions(args.slice(2), ctx.lookup);
         if (!options.alt) {
           const defaultAlt = (post.data.post && post.data.post.title) || post.data.title;
           if (defaultAlt) options.alt = defaultAlt;
         }
-        return buildImageHtml(postImagePath(post), options);
+        return buildImageHtml(src, options);
       }
       default:
         return (post.data.post && post.data.post[property]) || post.data[property] || '';
@@ -165,7 +168,16 @@ function formatPostDate(date) {
 }
 
 function postImagePath(post) {
-  const customId = (post.data.post && post.data.post.id) || String(post.id).replace(/^\/(\w+)\//, '');
+  // Media contract (same as memberImagePath + the classy includes): an
+  // explicit post.image wins (external URL or any asset path — the sample
+  // posts carry remote heroes), `image: false` means DELIBERATELY no media
+  // (empty — image-tag renders nothing), and the blog-assets convention
+  // stands otherwise.
+  const postData = (post.data && post.data.post) || {};
+  if (postData.image) return postData.image;
+  if (postData.image === false) return '';
+
+  const customId = postData.id || String(post.id).replace(/^\/(\w+)\//, '');
   const cleanId = String(post.id).replace(/^\/(\w+)\//, '');
   const slug = cleanId.replace(/^\d{4}-\d{2}-\d{2}-/, '');
   return `/assets/images/blog/post-${customId}/${slug}.jpg`;

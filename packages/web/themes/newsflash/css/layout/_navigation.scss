@@ -1,86 +1,70 @@
 // Newsflash Theme — Navigation
-// The inherited nav markup (.navbar-wrapper > .navbar.navbar-floating) is a
-// floating glass pill in Classy. Here it becomes the MASTHEAD: a sticky,
-// blurred-paper bar closed by a hairline ink rule, serif brand on the left,
-// uppercase pill links in the middle. The ticker (in base.html) sits above it
-// in-flow and scrolls away; the masthead stays.
+// The MASTHEAD (the theme's own _includes/frontend/sections/nav.html): a
+// sticky, blurred-paper bar closed by a hairline ink rule, serif brand on
+// the left, uppercase pill links in the middle, actions on the right. The
+// ticker (in base.html) sits above it in-flow and scrolls away; the
+// masthead stays. Scroll state comes from the shared motion engine
+// (data-omega-scroll-watch on the header → data-omega-scrolled).
 
-.navbar-wrapper {
+.masthead {
   position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 1030;
-
-  .navbar {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding-left: clamp(1rem, 4vw, 3rem);
-    padding-right: clamp(1rem, 4vw, 3rem);
-  }
-}
-
-.navbar.navbar-floating {
-  border-radius: 0;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  background: var(--nf-paper-translucent) !important;
+  background: var(--nf-paper-translucent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 0;
   border-bottom: var(--nf-border);
   transition: box-shadow 0.25s ease;
 
-  // Soft shadow only once scrolled — the shared motion engine stamps
-  // data-omega-scrolled on whatever carries data-omega-scroll-watch
-  // (the masthead markup stamps it; no theme JS).
   &[data-omega-scrolled='true'] {
     box-shadow: 0 8px 24px -16px rgba(23, 19, 16, 0.4);
   }
 
-  .container,
-  .container-fluid {
+  .navbar {
+    padding: 0.75rem clamp(1rem, 4vw, 3rem);
+  }
+
+  .navbar > .container-fluid {
     padding: 0;
   }
-}
 
-// Brand: the serif masthead title
-.navbar-brand {
-  font-family: $nf-font-display;
-  font-optical-sizing: auto;
-  font-weight: 600;
-  font-size: 1.5rem;
-  letter-spacing: -0.02em;
+  // Brand: the serif masthead title
+  .navbar-brand {
+    font-family: $nf-font-display;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+    color: var(--omega-ink);
 
-  .brand-logo { height: 32px; width: auto; margin-right: 0.5rem; }
-}
-
-// Nav links: uppercase grotesk pills. Hover fills ink; active fills vermilion.
-.navbar-nav .nav-link {
-  font-weight: 700;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.55rem 0.9rem;
-  margin: 0 0.1rem;
-  border-radius: 50rem;
-  color: var(--bs-body-color);
-  transition: $nf-transition;
-
-  // Hover + active need !important on color: the nav include puts Bootstrap's
-  // .text-body utility (!important) on every link, which otherwise wins and
-  // leaves ink text on the ink hover fill (unreadable).
-  &:hover {
-    background: var(--omega-ink);
-    color: var(--omega-ground) !important;
+    .brand-logo { height: 32px; width: auto; margin-right: 0.5rem; }
   }
 
-  // Active = vermilion pill.
-  &.active,
-  &.active.text-body {
-    background: var(--omega-accent) !important;
-    color: var(--omega-accent-ink) !important;
+  // Nav links: uppercase grotesk pills. Hover fills ink; active fills the
+  // accent. (The masthead include keeps its markup utility-free, so no
+  // !important arms race with .text-body here.)
+  .navbar-nav .nav-link {
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.55rem 0.9rem;
+    margin: 0 0.1rem;
+    border: 0;
+    border-radius: 50rem;
+    color: var(--omega-ink);
+    background: transparent;
+    transition: $nf-transition;
+
+    &:hover {
+      background: var(--omega-ink);
+      color: var(--omega-ground);
+    }
+
+    &.active {
+      background: var(--omega-accent);
+      color: var(--omega-accent-ink);
+    }
   }
 }
 

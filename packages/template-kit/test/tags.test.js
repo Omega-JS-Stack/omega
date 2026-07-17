@@ -356,3 +356,47 @@ test('uj_post finds docs by id / custom post.id across collections', () => {
 
   assert.strictEqual(TAGS.uj_post.render(ctx, '"ghost"'), '');
 });
+
+test('uj_post media contract: explicit post.image wins, image:false renders nothing (cp189)', () => {
+  // The classy includes honored post.image at the include level while
+  // postImagePath ignored it — every uj_post image-tag consumer (newsflash
+  // layouts) 404'd on remote-hero sample posts. The contract now lives in
+  // the tag, mirroring memberImagePath.
+  const posts = [
+    {
+      id: '/posts/2026-01-01-remote-hero',
+      url: '/blog/remote-hero',
+      data: { post: { id: 9000001, title: 'Remote', image: 'https://images.example.com/hero.jpg' } },
+    },
+    {
+      id: '/posts/2026-01-02-no-media',
+      url: '/blog/no-media',
+      data: { post: { id: 9000002, title: 'Quiet', image: false } },
+    },
+    {
+      id: '/posts/2026-01-03-conventional',
+      url: '/blog/conventional',
+      data: { post: { id: 9000003, title: 'Local' } },
+    },
+  ];
+  const ctx = makeCtx(
+    { page: {} },
+    {
+      getCollection: (name) => (name === 'posts' ? posts : []),
+      getCollectionNames: () => ['posts'],
+      siteConfig: { url: 'https://somiibo.com' },
+    }
+  );
+
+  // Explicit image (remote URL) wins for both properties — image-tag rides
+  // buildImageHtml's external branch (lazy-loaded, no local variants)
+  assert.strictEqual(TAGS.uj_post.render(ctx, '"remote-hero", "image"'), 'https://images.example.com/hero.jpg');
+  assert.ok(TAGS.uj_post.render(ctx, '"remote-hero", "image-tag"').includes('data-lazy="@src https://images.example.com/hero.jpg"'));
+
+  // image: false = deliberately no media — nothing rendered, no 404 bait
+  assert.strictEqual(TAGS.uj_post.render(ctx, '"no-media", "image"'), '');
+  assert.strictEqual(TAGS.uj_post.render(ctx, '"no-media", "image-tag"'), '');
+
+  // No image key → the blog-assets convention stands
+  assert.strictEqual(TAGS.uj_post.render(ctx, '"conventional", "image"'), '/assets/images/blog/post-9000003/conventional.jpg');
+});
