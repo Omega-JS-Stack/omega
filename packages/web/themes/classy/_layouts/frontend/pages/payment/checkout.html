@@ -1,11 +1,12 @@
 ---
 layout: frontend/core/cover
 
-# ═══ Checkout — classy-v2 (cp177), density pass (cp178, Ian's Shopify ref):
-# slim header ("Checkout" left, small brand right), and on MOBILE everything
-# collapses by default except the summary + pay buttons — Plan and Account
-# become one-line rows showing the bound selection (chevron expands), and the
-# price breakdown folds behind the total. Desktop keeps the open composition.
+# ═══ Checkout — classy-v2 (cp177), density (cp178), one-screen mobile (cp179):
+# slim header ("Checkout" left, small brand right). On MOBILE, Plan and Account
+# collapse to one-line rows showing the bound selection, the price rows stay
+# ALWAYS visible (Ian: never fold the numbers) but compact, the panel drops its
+# header chrome, wallet buttons pair up two-across, and the whole page fits a
+# phone screen with the pay buttons above the fold. Desktop stays open.
 # Every payment-engine hook is preserved verbatim: #checkout-form,
 # name="frequency" radios, data-payment-method/data-action buttons,
 # #discount-code, #switch-account, #checkout-help-button, the dev panel ids,
@@ -107,7 +108,7 @@ web_manager:
 <!-- Checkout Section (visible by default, hidden only when error is shown) -->
 <section id="checkout-content" class="col-12 col-xl-10 classy-checkout" data-wm-bind="@hide checkout.error.show">
   <!-- Slim header: title left, small brand right (cover pages carry no nav) -->
-  <header class="d-flex align-items-center justify-content-between gap-3 mb-4">
+  <header class="d-flex align-items-center justify-content-between gap-3 mb-3 mb-lg-4">
     <h1 class="classy-display classy-display--section mb-0">Checkout</h1>
     <div class="d-flex align-items-center gap-3">
       <a href="/" class="classy-checkout__brand">
@@ -170,7 +171,7 @@ web_manager:
 
   <!-- Main Checkout Form -->
   <form id="checkout-form" autocomplete="on" novalidate data-form-state="initializing" onsubmit="return false">
-    <div class="row g-4 g-lg-5">
+    <div class="row g-3 g-lg-5">
       <!-- Section 1: Billing cycle & account -->
       <div class="col-12 col-lg-7 order-1">
         <!-- Billing Cycle Selection (subscriptions only) -->
@@ -312,7 +313,7 @@ web_manager:
       <div class="col-12 col-lg-5 order-2">
         <div class="classy-checkout__sticky">
           <div class="classy-receipt__panel">
-            <div class="classy-receipt__row">
+            <div class="classy-receipt__row d-none d-lg-flex">
               <h2 class="classy-micro mb-0">Order summary</h2>
               <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" class="classy-checkout__mark filter-adaptive" alt="">
             </div>
@@ -342,71 +343,52 @@ web_manager:
               </div>
             </div>
 
-            <!-- Price detail (mobile: folded behind the total, Shopify-style) -->
-            <div class="collapse d-lg-block classy-checkout__pricedetail">
-              <div class="classy-receipt__row hairline-top wm-binding-skeleton" data-wm-bind="@show checkout">
-                <span class="classy-micro">Subtotal</span>
-                <span data-wm-bind="@text checkout.pricing.subtotal">$--</span>
-              </div>
+            <!-- Price detail — always visible (Ian: never fold the numbers); mobile compacts it -->
+            <div class="classy-receipt__row wm-binding-skeleton" data-wm-bind="@show checkout">
+              <span class="classy-micro">Subtotal</span>
+              <span data-wm-bind="@text checkout.pricing.subtotal">$--</span>
+            </div>
 
-              <div class="classy-receipt__row classy-checkout__row-ok"
-                   data-wm-bind="@show checkout.discount.hasDiscount"
-                   hidden>
-                <span class="classy-micro">Discount (<span data-wm-bind="@text checkout.discount.percent"></span>)</span>
-                <span>-$<span data-wm-bind="@text checkout.discount.amount"></span></span>
-              </div>
+            <div class="classy-receipt__row classy-checkout__row-ok"
+                 data-wm-bind="@show checkout.discount.hasDiscount"
+                 hidden>
+              <span class="classy-micro">Discount (<span data-wm-bind="@text checkout.discount.percent"></span>)</span>
+              <span>-$<span data-wm-bind="@text checkout.discount.amount"></span></span>
+            </div>
 
-              <div class="classy-receipt__row classy-checkout__row-ok"
-                   data-wm-bind="@show checkout.trial.hasFreeTrial"
-                   hidden>
-                <span class="classy-micro">Free trial</span>
-                <span>-$<span data-wm-bind="@text checkout.trial.discountAmount"></span></span>
-              </div>
+            <div class="classy-receipt__row classy-checkout__row-ok"
+                 data-wm-bind="@show checkout.trial.hasFreeTrial"
+                 hidden>
+              <span class="classy-micro">Free trial</span>
+              <span>-$<span data-wm-bind="@text checkout.trial.discountAmount"></span></span>
             </div>
 
             <div class="classy-receipt__row classy-receipt__row--total wm-binding-skeleton" data-wm-bind="@show checkout">
               <span class="classy-micro">Total due today</span>
-              <span class="d-inline-flex align-items-center gap-2">
-                <span class="classy-receipt__total" data-wm-bind="@text checkout.pricing.total">$--</span>
-                <button class="classy-checkout__details-toggle d-lg-none collapsed" type="button"
-                        data-bs-toggle="collapse" data-bs-target=".classy-checkout__pricedetail"
-                        aria-expanded="false" aria-label="Toggle price details">
-                  {% uj_icon "chevron-down", "fa-xs classy-checkout__rowtoggle-chev" %}
-                </button>
-              </span>
+              <span class="classy-receipt__total" data-wm-bind="@text checkout.pricing.total">$--</span>
             </div>
 
-            <div class="collapse d-lg-block classy-checkout__pricedetail">
-              <div class="classy-receipt__row hairline-top"
-                   data-wm-bind="@show checkout.product.isSubscription"
-                   hidden>
-                <span class="classy-micro">Recurring</span>
-                <span class="classy-checkout__recurring"><span data-wm-bind="@text checkout.pricing.recurringAmount">$--</span> <span data-wm-bind="@text checkout.pricing.recurringPeriod">monthly</span></span>
-              </div>
-
-              <!-- Subscription Terms -->
-              <div class="classy-receipt__note small"
-                   data-wm-bind="@show checkout.pricing.showTerms"
-                   hidden>
-                <span data-wm-bind="@text checkout.pricing.termsText"></span>
-              </div>
+            <div class="classy-receipt__row"
+                 data-wm-bind="@show checkout.product.isSubscription"
+                 hidden>
+              <span class="classy-micro">Recurring</span>
+              <span class="classy-checkout__recurring"><span data-wm-bind="@text checkout.pricing.recurringAmount">$--</span> <span data-wm-bind="@text checkout.pricing.recurringPeriod">monthly</span></span>
             </div>
-          </div>
 
-          <!-- Need Help -->
-          <div class="text-center mt-3">
-            <a href="javascript:;" class="classy-checkout__quiet-link small" id="checkout-help-button">
-              {% uj_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
-            </a>
+            <!-- Subscription Terms -->
+            <div class="classy-receipt__note small"
+                 data-wm-bind="@show checkout.pricing.showTerms"
+                 hidden>
+              <span data-wm-bind="@text checkout.pricing.termsText"></span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Section 3: Payment Method (Mobile only - after the summary) -->
+      <!-- Section 3: Payment Method (Mobile only — no heading, wallets pair up two-across) -->
       <div class="col-12 order-3 d-lg-none">
         <div class="classy-checkout__section classy-checkout__section--mobile-pay">
-          <h2 class="classy-micro mb-3">Payment</h2>
-          <div class="d-grid gap-2 wm-binding-skeleton" data-wm-bind="@show checkout.paymentMethods">
+          <div class="classy-checkout__paybuttons wm-binding-skeleton" data-wm-bind="@show checkout.paymentMethods">
             {{ payment_buttons_content }}
           </div>
         </div>
@@ -414,11 +396,16 @@ web_manager:
     </div>
   </form>
 
-  <!-- Trust foot -->
-  <div class="classy-checkout__trust mt-4 mt-lg-5">
+  <!-- Trust foot + help — one quiet line each, shared by both breakpoints -->
+  <div class="classy-checkout__trust mt-2 mt-lg-5">
     <span>{% uj_icon "lock", "fa-xs" %} SSL encrypted</span>
     <span>{% uj_icon "shield-halved", "fa-xs" %} 7-day money-back guarantee</span>
     <span>{% uj_icon "handshake", "fa-xs" %} Secure payments</span>
+  </div>
+  <div class="text-center mt-1 mt-lg-3">
+    <a href="javascript:;" class="classy-checkout__quiet-link small" id="checkout-help-button">
+      {% uj_icon "circle-question", "fa-sm me-1" %} Need help? Chat with us.
+    </a>
   </div>
 </section>
 

@@ -107,22 +107,93 @@
       padding-bottom: 1.25rem;
     }
   }
-}
 
-.classy-checkout__details-toggle {
-  padding: 0.125rem;
-  background: transparent;
-  border: 0;
-  color: var(--omega-ink-faint);
-  display: inline-flex;
-  align-items: center;
-
-  .classy-checkout__rowtoggle-chev {
-    transition: transform var(--omega-speed) var(--omega-ease);
+  // ── One-screen fit (Ian: pay button above the fold, page must not scroll) ──
+  // The cover shell's py-5 is desktop air — reclaim it on phones.
+  main.py-5 {
+    padding-top: 0.875rem !important;
+    padding-bottom: 0.625rem !important;
   }
 
-  &[aria-expanded='true'] .classy-checkout__rowtoggle-chev {
-    transform: rotate(180deg);
+  .classy-checkout .classy-display--section {
+    font-size: 1.5rem;
+  }
+
+  .classy-checkout__rowtoggle {
+    padding-block: 0.8125rem;
+  }
+
+  // Price rows stay visible (never folded) — they just tighten up
+  .classy-checkout .classy-receipt__panel {
+    padding: 0.125rem 1rem;
+  }
+
+  .classy-checkout .classy-receipt__row {
+    padding-block: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  // The panel header hides on phones (d-none) but still counts as a sibling —
+  // the first visible row must not carry its border.
+  .classy-checkout .classy-receipt__row.d-none + .classy-receipt__row {
+    border-top: 0;
+  }
+
+  .classy-checkout .classy-receipt__total {
+    font-size: 1.25rem;
+  }
+
+  .classy-checkout .classy-receipt__note {
+    padding-block: 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  .classy-checkout__discount .form-control,
+  .classy-checkout__discount .btn {
+    padding-block: 0.3125rem;
+    font-size: 0.875rem;
+  }
+
+  .classy-checkout__trust {
+    gap: 0.375rem 1.25rem;
+  }
+}
+
+// Short phones (SE-class ≤700px tall): same content, tighter rhythm — nothing
+// hides; the one-screen promise holds all the way down.
+@media (max-width: 991.98px) and (max-height: 700px) {
+  main.py-5 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  .classy-checkout header {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .classy-checkout__rowtoggle {
+    padding-block: 0.625rem;
+  }
+
+  .classy-checkout .row {
+    --bs-gutter-y: 0.75rem;
+  }
+
+  .classy-checkout .classy-receipt__row {
+    padding-block: 0.4375rem;
+  }
+
+  .classy-checkout .classy-receipt__note {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
+
+  .classy-checkout__paybuttons .payment-button {
+    padding-block: 0.5rem;
+  }
+
+  .classy-checkout__terms {
+    font-size: 0.6875rem;
   }
 }
 
@@ -285,6 +356,22 @@
     &:hover {
       color: var(--omega-accent);
     }
+  }
+}
+
+// Mobile payment stack — card leads full-width, wallets pair up two-across
+.classy-checkout__paybuttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+
+  .payment-button {
+    padding-block: 0.5625rem;
+  }
+
+  [data-payment-method='card'],
+  .classy-checkout__terms {
+    grid-column: 1 / -1;
   }
 }
 
