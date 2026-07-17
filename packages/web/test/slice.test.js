@@ -167,6 +167,11 @@ test('signed-in URL scheme: user app under /dashboard, staff app rooted at /admi
   assert.ok(account.includes('page-title'), 'sections open with the admin page-header anatomy');
   assert.ok(account.includes('card-header'), 'cards wear admin caps');
   assert.ok(!account.includes('classy-display--section'), 'marketing display voice does not leak into the app');
+  // cp185: one skeleton on every section — the rail/content row fills the
+  // panel and the rail column draws its full-height lane divider (the rail
+  // box must not track whichever column happens to be tallest).
+  assert.ok(account.includes('row flex-grow-1'), 'the rail/content row fills the panel');
+  assert.ok(/col-lg-3[^"]*hairline-end/.test(account), 'the rail draws its full-height lane divider');
   // the staff overview serves AT its root
   const admin = pages.get('/admin');
   assert.ok(admin && admin.includes('omega-shell'), 'admin overview serves at /admin');

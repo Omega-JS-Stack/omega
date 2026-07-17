@@ -145,32 +145,30 @@ badges:
 
 {% assign hidden_sections = "delete,data-request,refund" | split: "," %}
 
-<!-- Mobile Navigation Dropdown -->
+<!-- Mobile Navigation Dropdown (signing out lives in the topbar avatar menu) -->
 <div class="d-lg-none mb-4">
-  <div class="d-flex gap-2">
-    <select class="form-select flex-grow-1" id="mobile-nav-select" aria-label="Select account section">
-      {% for section in resolved.sections %}
-        {% unless hidden_sections contains section.id %}
-          <option value="{{ section.id }}" {% if forloop.first %}selected{% endif %}>
-            {{ section.name }}
-          </option>
-        {% endunless %}
-      {% endfor %}
-      <!-- Hidden section options are added dynamically by JavaScript when needed -->
-    </select>
-    <button class="btn btn-outline-adaptive auth-signout-btn" aria-label="Sign out">
-      {% uj_icon "arrow-right-from-bracket", "fa-sm" %}
-    </button>
-  </div>
+  <select class="form-select" id="mobile-nav-select" aria-label="Select account section">
+    {% for section in resolved.sections %}
+      {% unless hidden_sections contains section.id %}
+        <option value="{{ section.id }}" {% if forloop.first %}selected{% endif %}>
+          {{ section.name }}
+        </option>
+      {% endunless %}
+    {% endfor %}
+    <!-- Hidden section options are added dynamically by JavaScript when needed -->
+  </select>
 </div>
 
 <!-- Main Content with Sidebar -->
-<div class="container-fluid px-0">
-  <div class="row">
+<div class="container-fluid px-0 d-flex flex-column flex-grow-1">
+  <div class="row flex-grow-1">
     <!-- Section rail (page-owned: hash-driven, not the app sidebar) — speaks
          the shell sidebar dialect (classy-side__*) so the whole backend reads
-         as one surface; .nav-link stays purely as the JS hook. -->
-    <nav class="col-lg-3 d-none d-lg-block" aria-label="Account navigation">
+         as one surface; .nav-link stays purely as the JS hook. The row fills
+         the panel and the rail draws a full-height lane divider, so every
+         section shares ONE skeleton — the rail box must never track whichever
+         column happens to be tallest (cp185). -->
+    <nav class="col-lg-3 d-none d-lg-block hairline-end" aria-label="Account navigation">
       <div class="position-sticky" style="top: 1rem;">
         <span class="classy-side__label mt-0">Settings</span>
         <ul class="list-unstyled mb-0" id="account-nav" role="tablist" aria-label="Account sections">
@@ -186,13 +184,7 @@ badges:
             </li>
           {% endfor %}
         </ul>
-
-        <!-- Sign out (sidebar grammar: hairline, then a quiet item) -->
-        <div class="hairline-top my-2" aria-hidden="true"></div>
-        <button type="button" class="classy-side__item auth-signout-btn">
-          <span class="classy-side__icon">{% uj_icon "arrow-right-from-bracket", "fa-sm" %}</span>
-          <span class="button-text">Sign out</span>
-        </button>
+        <!-- No page-owned Sign out: the topbar avatar menu carries it (Ian, cp185) -->
       </div>
     </nav>
 

@@ -6,7 +6,6 @@
 // The rail sits on the main SURFACE (the sidebar sits on the darker ground),
 // so the sidebar's surface-colored active fill is invisible here — active and
 // hover step one level down the stack instead.
-#account-nav ~ button.classy-side__item,
 #account-nav .classy-side__item {
   &:hover:not(.active),
   &:focus-visible:not(.active) {

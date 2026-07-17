@@ -17,6 +17,10 @@
   border-bottom: 1px solid var(--omega-line);
 }
 
+.hairline-end {
+  border-inline-end: 1px solid var(--omega-line);
+}
+
 // ============================================
 // Ink panel — the always-dark slab (CTA band, code tiles). Deliberately
 // near-constant across modes: in light it's the contrast moment, in dark it
