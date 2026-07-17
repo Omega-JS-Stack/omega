@@ -42,20 +42,44 @@ const CLASSIC_PORTS = {
 const PORTS_FILE = 'ports.json';
 
 /**
- * Can we bind this port on 127.0.0.1? (Bind-probe, not connect-probe — a
- * server bound to 0.0.0.0 fails the bind even though connect-probing from
- * another interface might miss it.)
- * @param {number} port - Port to probe.
- * @returns {Promise<boolean>} True when the port is free.
+ * Attempt one bind (the probe primitive). On macOS/BSD, wildcard and
+ * specific-address listeners COEXIST on the same port — so no single bind
+ * can see every listener; isPortFree composes three.
+ * @param {object} listenOptions - net listen options ({ port } = wildcard).
+ * @param {boolean} [ignoreMissingFamily] - Treat address-family-unavailable
+ *   errors (no IPv6 on this host) as free rather than busy.
+ * @returns {Promise<boolean>} True when the bind succeeded.
  */
-function isPortFree(port) {
+function bindProbe(listenOptions, ignoreMissingFamily = false) {
   return new Promise((resolve) => {
     const server = net.createServer();
-    server.once('error', () => resolve(false));
-    server.listen({ port, host: '127.0.0.1' }, () => {
+    server.once('error', (error) => {
+      if (ignoreMissingFamily && ['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EINVAL'].includes(error.code)) {
+        return resolve(true);
+      }
+      resolve(false);
+    });
+    server.listen(listenOptions, () => {
       server.close(() => resolve(true));
     });
   });
+}
+
+/**
+ * Is this port free for a dev server to take? Bind-probe, not connect-probe
+ * — and THREE binds, because on macOS/BSD specific-address and wildcard
+ * listeners coexist per port: a 127.0.0.1 probe misses an IPv6-wildcard
+ * listener (`*:port`), a wildcard probe misses a 127.0.0.1-specific one,
+ * and a `localhost` server can sit on ::1 alone. Free means all of
+ * 127.0.0.1, ::1 (when the host has IPv6), and the wildcard bind succeed —
+ * matching what firebase-tools' own connect-probe will conclude at boot.
+ * @param {number} port - Port to probe.
+ * @returns {Promise<boolean>} True when the port is free.
+ */
+async function isPortFree(port) {
+  return (await bindProbe({ port, host: '127.0.0.1' }))
+    && (await bindProbe({ port, host: '::1' }, true))
+    && (await bindProbe({ port }));
 }
 
 /**

@@ -1,0 +1,6 @@
+// Tier-1 consumer entry (The Daily Build — second-skin brand). This file
+// WINS the layered main.scss lookup and pulls the whole stock chain via the
+// self-skipping omega:main import; brand-local overrides append below. Kept
+// stock on purpose: this brand's job is to render the NEWSFLASH theme as
+// shipped, so theme regressions show here undisguised.
+@use 'omega:main';

@@ -24,12 +24,13 @@ const {
   envPort,
 } = require('../src/ports.js');
 
-/** Bind a real blocker on a port; returns close(). */
-function block(port) {
+/** Bind a real blocker on a port; returns close(). host defaults to
+ * 127.0.0.1; pass null for a wildcard listener, '::1' for v6-loopback. */
+function block(port, host = '127.0.0.1') {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once('error', reject);
-    server.listen({ port, host: '127.0.0.1' }, () => {
+    server.listen(host === null ? { port } : { port, host }, () => {
       resolve(() => new Promise((done) => server.close(done)));
     });
   });
@@ -49,6 +50,43 @@ test('isPortFree: free port true, blocked port false', async () => {
   } finally {
     await close();
   }
+});
+
+test('isPortFree sees listeners on EVERY bind surface (macOS coexistence)', async () => {
+  // On macOS/BSD, wildcard and specific-address listeners coexist per port —
+  // a single-host probe false-positives and the stack crashes at the real
+  // bind (found live: the playground https proxy holds IPv6 *:5002; the
+  // second brand's allocator probed 127.0.0.1 only, handed 5002 to the
+  // functions emulator, and firebase's own connect-probe refused to boot).
+  const wildcard = await block(42802, null);
+  try {
+    assert.equal(await isPortFree(42802), false, 'wildcard listener must read busy');
+  } finally {
+    await wildcard();
+  }
+
+  const v4only = await block(42802, '127.0.0.1');
+  try {
+    assert.equal(await isPortFree(42802), false, 'v4-specific listener must read busy');
+  } finally {
+    await v4only();
+  }
+
+  let v6only;
+  try {
+    v6only = await block(42802, '::1');
+  } catch (error) {
+    v6only = null; // host without IPv6 — the ::1 leg is vacuously covered
+  }
+  if (v6only) {
+    try {
+      assert.equal(await isPortFree(42802), false, 'v6-loopback listener must read busy');
+    } finally {
+      await v6only();
+    }
+  }
+
+  assert.equal(await isPortFree(42802), true, 'all listeners closed → free again');
 });
 
 // ---- resolvePorts

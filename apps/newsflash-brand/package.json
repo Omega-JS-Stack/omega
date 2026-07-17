@@ -1,0 +1,13 @@
+{
+  "name": "newsflash-brand",
+  "private": true,
+  "description": "The Daily Build — the in-monorepo second-skin brand: a fictional dev-news publication wearing the newsflash theme (web + backend, offline demo-* Firebase). Test infrastructure, never production.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "start": "omega-manager",
+    "dev": "omega-manager dev",
+    "pipeline": "omega-manager pipeline --require=analytics,disperse,update,bookmark"
+  }
+}

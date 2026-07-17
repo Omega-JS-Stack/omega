@@ -1,0 +1,23 @@
+{
+  "name": "daily-build-backend",
+  "version": "0.0.1",
+  "description": "The Daily Build backend (second-skin brand Cloud Functions, offline demo project)",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "@omega.js/backend": "file:../../../../packages/backend",
+    "firebase-admin": "^13.10.0",
+    "firebase-functions": "^7.2.5"
+  },
+  "scripts": {
+    "start": "npx omega setup && npx omega serve",
+    "deploy": "npx omega setup && npx omega deploy",
+    "emulator": "npx omega setup && npx omega emulator",
+    "test": "npx omega setup && npx omega test",
+    "setup": "npx omega setup",
+    "test:offline": "npx omega test",
+    "build": "npx omega build"
+  }
+}

@@ -1,0 +1,8 @@
+// SEO sidecar (seo service) — parasite-SEO GitHub repos for this brand.
+// The Daily Build is an OFFLINE testbed: no GitHub org resources are ever
+// created for it, so the content list stays empty and the service skips.
+{
+  github: {
+    content: [],
+  },
+}

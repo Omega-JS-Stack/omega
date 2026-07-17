@@ -1,0 +1,19 @@
+{
+  "name": "daily-build-website",
+  "private": true,
+  "description": "The Daily Build web app (newsflash theme)",
+  "dependencies": {
+    "@omega.js/web": "file:../../../../packages/web"
+  },
+  "scripts": {
+    "setup": "omega setup",
+    "start": "omega dev",
+    "build": "omega build",
+    "test": "omega test",
+    "clean": "omega clean",
+    "deploy": "omega deploy"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
