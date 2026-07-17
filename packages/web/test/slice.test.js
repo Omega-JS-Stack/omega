@@ -160,6 +160,13 @@ test('signed-in URL scheme: user app under /dashboard, staff app rooted at /admi
   assert.ok(account, 'account serves at /dashboard/account');
   assert.ok(account.includes('omega-shell'), 'account wears the app shell');
   assert.ok(account.includes('id="account-nav"'), 'section rail contract intact');
+  // cp183: the account interior speaks the admin dialect — the rail reuses
+  // the shell sidebar recipe, sections open with the page-header anatomy,
+  // cards wear admin caps, and the marketing serif voice is gone.
+  assert.ok(account.includes('classy-side__item'), 'rail speaks the shell sidebar dialect');
+  assert.ok(account.includes('page-title'), 'sections open with the admin page-header anatomy');
+  assert.ok(account.includes('card-header'), 'cards wear admin caps');
+  assert.ok(!account.includes('classy-display--section'), 'marketing display voice does not leak into the app');
   // the staff overview serves AT its root
   const admin = pages.get('/admin');
   assert.ok(admin && admin.includes('omega-shell'), 'admin overview serves at /admin');

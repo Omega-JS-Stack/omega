@@ -3,6 +3,10 @@
 # → sidebar + topbar + main) instead of the old bespoke cover treatment with
 # its fixed header + close button. The base layout brings the authenticated
 # policy; the section rail below is page-owned (hash-driven JS contract).
+# The layout page-header stays OFF: each section stamps the same anatomy
+# (frontend/sections/account-section-header.html) so the visible title tracks
+# the active section, and the rail speaks the shell sidebar dialect
+# (classy-side__*) — one backend voice everywhere (cp183).
 layout: backend/core/minimal
 
 theme:
@@ -142,59 +146,53 @@ badges:
 {% assign hidden_sections = "delete,data-request,refund" | split: "," %}
 
 <!-- Mobile Navigation Dropdown -->
-<div class="d-lg-none mb-3">
-  <div class="container-fluid px-0">
-    <div class="card">
-      <div class="card-body p-3">
-        <div class="d-flex gap-2">
-          <select class="form-select flex-grow-1" id="mobile-nav-select" aria-label="Select account section">
-            {% for section in resolved.sections %}
-              {% unless hidden_sections contains section.id %}
-                <option value="{{ section.id }}" {% if forloop.first %}selected{% endif %}>
-                  {{ section.name }}
-                </option>
-              {% endunless %}
-            {% endfor %}
-            <!-- Hidden section options are added dynamically by JavaScript when needed -->
-          </select>
-          <button class="btn btn-outline-adaptive auth-signout-btn">
-            {% uj_icon "arrow-right-from-bracket", "fa-sm" %}
-          </button>
-        </div>
-      </div>
-    </div>
+<div class="d-lg-none mb-4">
+  <div class="d-flex gap-2">
+    <select class="form-select flex-grow-1" id="mobile-nav-select" aria-label="Select account section">
+      {% for section in resolved.sections %}
+        {% unless hidden_sections contains section.id %}
+          <option value="{{ section.id }}" {% if forloop.first %}selected{% endif %}>
+            {{ section.name }}
+          </option>
+        {% endunless %}
+      {% endfor %}
+      <!-- Hidden section options are added dynamically by JavaScript when needed -->
+    </select>
+    <button class="btn btn-outline-adaptive auth-signout-btn" aria-label="Sign out">
+      {% uj_icon "arrow-right-from-bracket", "fa-sm" %}
+    </button>
   </div>
 </div>
 
 <!-- Main Content with Sidebar -->
 <div class="container-fluid px-0">
   <div class="row">
-    <!-- Section rail (page-owned: hash-driven, not the app sidebar) -->
-    <nav class="col-lg-3 d-none d-lg-block px-3 pb-3 pt-0" aria-label="Account navigation">
-      <div class="card position-sticky" style="top: 1rem;">
-        <div class="card-body p-3">
-          <ul class="nav nav-pills flex-column" id="account-nav" role="tablist" aria-label="Account sections">
-            {% for section in resolved.sections %}
-              <li class="nav-item {% if hidden_sections contains section.id %}d-none{% endif %}" id="{{ section.id }}-nav-item">
-                <a class="nav-link d-flex align-items-center {% if forloop.first %}active{% endif %}"
-                  href="#{{ section.id }}"
-                  data-section="{{ section.id }}"
-                  role="tab">
-                  <span class="me-2 d-inline-flex align-items-center justify-content-center">{% uj_icon section.icon, "fa-lg" %}</span>
-                  <span>{{ section.name }}</span>
-                </a>
-              </li>
-            {% endfor %}
-          </ul>
+    <!-- Section rail (page-owned: hash-driven, not the app sidebar) — speaks
+         the shell sidebar dialect (classy-side__*) so the whole backend reads
+         as one surface; .nav-link stays purely as the JS hook. -->
+    <nav class="col-lg-3 d-none d-lg-block" aria-label="Account navigation">
+      <div class="position-sticky" style="top: 1rem;">
+        <span class="classy-side__label mt-0">Settings</span>
+        <ul class="list-unstyled mb-0" id="account-nav" role="tablist" aria-label="Account sections">
+          {% for section in resolved.sections %}
+            <li class="{% if hidden_sections contains section.id %}d-none{% endif %}" id="{{ section.id }}-nav-item">
+              <a class="nav-link classy-side__item {% if forloop.first %}active{% endif %}"
+                href="#{{ section.id }}"
+                data-section="{{ section.id }}"
+                role="tab">
+                <span class="classy-side__icon">{% uj_icon section.icon, "fa-sm" %}</span>
+                <span>{{ section.name }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
 
-          <!-- Sign out Button -->
-          <div class="mt-3 pt-3 border-top">
-            <button class="btn btn-outline-adaptive w-100 d-flex align-items-center justify-content-center auth-signout-btn">
-              {% uj_icon "arrow-right-from-bracket", "me-2" %}
-              <span class="button-text">Sign out</span>
-            </button>
-          </div>
-        </div>
+        <!-- Sign out (sidebar grammar: hairline, then a quiet item) -->
+        <div class="hairline-top my-2" aria-hidden="true"></div>
+        <button type="button" class="classy-side__item auth-signout-btn">
+          <span class="classy-side__icon">{% uj_icon "arrow-right-from-bracket", "fa-sm" %}</span>
+          <span class="button-text">Sign out</span>
+        </button>
       </div>
     </nav>
 
@@ -214,7 +212,7 @@ badges:
 
       <!-- Profile Section -->
       <section id="profile-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">My profile</h2>
+        {% include frontend/sections/account-section-header.html title="My profile" icon="user-circle" %}
 
         <form id="profile-form" novalidate data-form-state="initializing" onsubmit="return false">
           <!-- Avatar and Edit Button -->
@@ -249,9 +247,10 @@ badges:
 
           <!-- Account Details Section -->
           <div class="card mb-3">
+            <div class="card-header">
+              <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "id-card", "fa-md me-2" %} Account details</h6>
+            </div>
             <div class="card-body">
-              <h5 class="card-title text-body mb-3">Account details</h5>
-
               <!-- Email and UID Fields Row -->
               <div class="row g-3">
                 <!-- Email Field -->
@@ -281,9 +280,10 @@ badges:
 
           <!-- Personal Information Section -->
           <div class="card mb-3">
+            <div class="card-header">
+              <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "user-pen", "fa-md me-2" %} Personal information</h6>
+            </div>
             <div class="card-body">
-              <h5 class="card-title text-body mb-3">Personal information</h5>
-
               <!-- Name Fields Row -->
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
@@ -750,12 +750,14 @@ badges:
 
       <!-- Security Section -->
       <section id="security-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Security and data</h2>
+        {% include frontend/sections/account-section-header.html title="Security and data" icon="shield-halved" %}
 
         <!-- Sign-in Methods Section -->
         <div class="card mb-3">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "key", "fa-md me-2" %} Sign-in methods</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title">Sign-in methods</h5>
             <p class="text-muted mb-0">Manage how you sign in to your account. You can connect multiple methods for added convenience and security.</p>
 
             <div id="signin-methods-list">
@@ -815,19 +817,19 @@ badges:
         </div> -->
 
         <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "desktop", "fa-md me-2" %} Active sessions</h6>
+            <form id="signout-all-sessions-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
+              <input type="hidden" name="action" value="signout-all">
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                {% uj_icon "right-from-bracket", "me-1" %}
+                <span class="button-text">
+                  Sign out<span class="d-none d-md-inline"> of all sessions</span>
+                </span>
+              </button>
+            </form>
+          </div>
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="card-title mb-0">Active sessions</h5>
-              <form id="signout-all-sessions-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
-                <input type="hidden" name="action" value="signout-all">
-                <button type="submit" class="btn btn-outline-danger btn-sm">
-                  {% uj_icon "right-from-bracket", "me-1" %}
-                  <span class="button-text">
-                    Sign out<span class="d-none d-md-inline"> of all sessions</span>
-                  </span>
-                </button>
-              </form>
-            </div>
             <p class="card-text text-muted">Manage your active sessions across devices. Review and revoke access from unrecognized devices.</p>
 
             <div id="active-sessions-list" class="list-group list-group-flush mb-3">
@@ -911,11 +913,13 @@ badges:
 
       <!-- Connections Section -->
       <section id="connections-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Connected accounts</h2>
+        {% include frontend/sections/account-section-header.html title="Connected accounts" icon="link" %}
 
         <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "link", "fa-md me-2" %} Manage connections</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title">Manage connections</h5>
             <p class="text-muted mb-0">Connect your external accounts to access additional features.</p>
 
             <div id="connections-list">
@@ -971,33 +975,34 @@ badges:
 
       <!-- Billing Section -->
       <section id="billing-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Billing and usage</h2>
+        {% include frontend/sections/account-section-header.html title="Billing and usage" icon="credit-card" %}
 
         <!-- Plan Overview Card -->
         <div class="card mb-3">
+          <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h6 class="mb-0 d-inline-flex align-items-center">
+              {% uj_icon "credit-card", "fa-md me-2" %}
+              <span><span data-wm-bind="@text billing.plan.name" class="wm-binding-skeleton">Current</span>&nbsp;plan</span>
+            </h6>
+            <span class="classy-status wm-binding-skeleton" data-wm-bind="@attr class billing.status.badgeClass">
+              <span class="classy-dot classy-dot--muted" data-wm-bind="@attr class billing.status.dotClass"></span>
+              <span data-wm-bind="@text billing.status.label">&nbsp;</span>
+            </span>
+          </div>
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <div>
-                <h5 class="card-title mb-1 d-flex align-items-center flex-wrap gap-2">
-                  <span><span data-wm-bind="@text billing.plan.name" class="wm-binding-skeleton">Current</span> plan</span>
-                  <span class="classy-status wm-binding-skeleton" data-wm-bind="@attr class billing.status.badgeClass">
-                    <span class="classy-dot classy-dot--muted" data-wm-bind="@attr class billing.status.dotClass"></span>
-                    <span data-wm-bind="@text billing.status.label">&nbsp;</span>
-                  </span>
-                </h5>
-                <p class="card-text mb-0" data-wm-bind="@show billing.description.free" hidden>
-                  You are currently on the <strong data-wm-bind="@text billing.plan.name">Free</strong> plan. Upgrade to unlock premium features.
-                </p>
-                <p class="card-text mb-0" data-wm-bind="@show billing.description.active" hidden>
-                  You are currently on the <strong data-wm-bind="@text billing.plan.name">Current</strong> plan.
-                </p>
-                <p class="card-text mb-0" data-wm-bind="@show billing.description.suspended" hidden>
-                  Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has been suspended and access has been revoked due to a payment issue. Please update your payment method to restore access.
-                </p>
-                <p class="card-text mb-0" data-wm-bind="@show billing.description.cancelled" hidden>
-                  Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has ended. Resubscribe to regain access to premium features.
-                </p>
-              </div>
+            <div class="mb-2">
+              <p class="card-text mb-0" data-wm-bind="@show billing.description.free" hidden>
+                You are currently on the <strong data-wm-bind="@text billing.plan.name">Free</strong> plan. Upgrade to unlock premium features.
+              </p>
+              <p class="card-text mb-0" data-wm-bind="@show billing.description.active" hidden>
+                You are currently on the <strong data-wm-bind="@text billing.plan.name">Current</strong> plan.
+              </p>
+              <p class="card-text mb-0" data-wm-bind="@show billing.description.suspended" hidden>
+                Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has been suspended and access has been revoked due to a payment issue. Please update your payment method to restore access.
+              </p>
+              <p class="card-text mb-0" data-wm-bind="@show billing.description.cancelled" hidden>
+                Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has ended. Resubscribe to regain access to premium features.
+              </p>
             </div>
 
             <!-- Billing details (next billing, amount) -->
@@ -1063,8 +1068,10 @@ badges:
 
         <!-- Usage Metrics Card -->
         <div class="card mb-3">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-line", "fa-md me-2" %} Usage</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title">Usage</h5>
             <div id="usage-metrics-container">
               <div class="text-muted">Loading usage data...</div>
             </div>
@@ -1081,12 +1088,10 @@ badges:
 
         <div class="collapse" id="cancel-subscription-accordion">
           <div class="card card-form-border border-danger mt-4">
+            <div class="card-header">
+              <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% uj_icon "ban", "fa-md me-2" %} Cancel your subscription</h6>
+            </div>
             <div class="card-body">
-              <h5 class="card-title text-danger">
-                {% uj_icon "ban", "fa-lg me-2" %}
-                Cancel your subscription
-              </h5>
-
               <p class="card-text small text-muted">
                 If you cancel, your subscription will remain active until the end of your current billing period. After that, you'll be downgraded to the free plan and will lose access to premium features. You can resubscribe at any time.
               </p>
@@ -1140,12 +1145,14 @@ badges:
 
       <!-- Referrals Section -->
       <section id="referrals-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Referrals</h2>
+        {% include frontend/sections/account-section-header.html title="Referrals" icon="user-plus" %}
 
         <!-- Referral Code Card -->
         <div class="card mb-3">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "share-nodes", "fa-md me-2" %} Your referral code</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title">Your referral code</h5>
             <p class="card-text text-muted">Share your referral code with friends to earn rewards.</p>
 
             <div class="mb-0">
@@ -1161,41 +1168,40 @@ badges:
           </div>
         </div>
 
-        <!-- Referrals Stats Card -->
-        <div class="card">
-          <div class="card-body">
-            <h5 class="card-title">Referral statistics</h5>
-
-            <!-- Stats Summary -->
-            <div class="row text-center mb-4">
-              <div class="col">
-                <div class="h3 mb-0" id="total-referrals">0</div>
-                <div class="text-muted small">Total referrals</div>
-              </div>
-              <div class="col">
-                <div class="h3 mb-0" id="recent-referrals">0</div>
-                <div class="text-muted small">This month</div>
-              </div>
+        <!-- Referral stats (merged stat card — the admin App DNA) -->
+        <div class="classy-statgrid mb-3" style="--classy-statgrid-cols: 2;">
+          <div class="classy-statgrid__cell">
+            <div class="classy-statgrid__label">
+              <span class="classy-micro">Total referrals</span>
+              {% uj_icon "user-plus", "fa-sm" %}
             </div>
+            <h3 class="classy-statgrid__value mb-0" id="total-referrals">0</h3>
+          </div>
+          <div class="classy-statgrid__cell">
+            <div class="classy-statgrid__label">
+              <span class="classy-micro">This month</span>
+              {% uj_icon "calendar", "fa-sm" %}
+            </div>
+            <h3 class="classy-statgrid__value mb-0" id="recent-referrals">0</h3>
+          </div>
+        </div>
 
-            <!-- Referrals List Accordion -->
-            <div class="accordion" id="referrals-accordion">
-              <div class="accordion-item">
-                <h2 class="accordion-header" id="referrals-list-heading">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#referrals-list-collapse" aria-expanded="false" aria-controls="referrals-list-collapse">
-                    <span class="me-2">{% uj_icon "users", "fa-sm" %}</span>
-                    View referral details
-                    <span class="classy-chip ms-2" id="referrals-badge">0</span>
-                  </button>
-                </h2>
-                <div id="referrals-list-collapse" class="accordion-collapse collapse" aria-labelledby="referrals-list-heading" data-bs-parent="#referrals-accordion">
-                  <div class="accordion-body">
-                    <div id="referrals-list" class="list-group list-group-flush">
-                      <!-- Referrals will be loaded here -->
-                      <div class="text-center text-muted py-3">
-                        No referrals yet. Share your code to get started!
-                      </div>
-                    </div>
+        <!-- Referrals List Accordion -->
+        <div class="accordion" id="referrals-accordion">
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="referrals-list-heading">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#referrals-list-collapse" aria-expanded="false" aria-controls="referrals-list-collapse">
+                <span class="me-2">{% uj_icon "users", "fa-sm" %}</span>
+                View referral details
+                <span class="classy-chip ms-2" id="referrals-badge">0</span>
+              </button>
+            </h2>
+            <div id="referrals-list-collapse" class="accordion-collapse collapse" aria-labelledby="referrals-list-heading" data-bs-parent="#referrals-accordion">
+              <div class="accordion-body">
+                <div id="referrals-list" class="list-group list-group-flush">
+                  <!-- Referrals will be loaded here -->
+                  <div class="text-center text-muted py-3">
+                    No referrals yet. Share your code to get started!
                   </div>
                 </div>
               </div>
@@ -1206,20 +1212,19 @@ badges:
 
       <!-- Team Section -->
       <section id="team-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Team</h2>
+        {% include frontend/sections/account-section-header.html title="Team" icon="users" %}
 
         <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "users", "fa-md me-2" %} Team members</h6>
+            <button class="btn btn-adaptive btn-sm" id="invite-team-member-btn">
+              {% uj_icon "user-plus", "me-2" %}
+              <span class="button-text">
+                Invite<span class="d-none d-md-inline"> team member</span>
+              </span>
+            </button>
+          </div>
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="card-title mb-0">Team members</h5>
-              <button class="btn btn-adaptive btn-sm" id="invite-team-member-btn">
-                {% uj_icon "user-plus", "me-2" %}
-                <span class="button-text">
-                  Invite<span class="d-none d-md-inline"> team member</span>
-                </span>
-              </button>
-            </div>
-
             <div class="list-group" id="team-list">
               <div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-center">
@@ -1237,12 +1242,13 @@ badges:
 
       <!-- Notifications Section -->
       <section id="notifications-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Notifications</h2>
+        {% include frontend/sections/account-section-header.html title="Notifications" icon="bell" %}
 
         <div class="card">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "envelope", "fa-md me-2" %} Email preferences</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title">Email preferences</h5>
-
             <form id="marketing-emails-form" novalidate data-form-state="initializing" onsubmit="return false">
               <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" id="marketing-emails" name="enabled">
@@ -1260,11 +1266,11 @@ badges:
           </div>
         </div>
         <div class="card mt-3">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "bell", "fa-md me-2" %} Push notifications</h6>
+            <span id="push-notification-status"><span class="classy-chip">Checking...</span></span>
+          </div>
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <h5 class="card-title mb-0">Push notifications</h5>
-              <span id="push-notification-status"><span class="classy-chip">Checking...</span></span>
-            </div>
             <p class="text-muted small mb-3">Receive push notifications in your browser for important updates.</p>
 
             <form id="push-subscribe-form" novalidate data-form-state="initializing" onsubmit="return false" style="display:none">
@@ -1293,22 +1299,22 @@ badges:
 
       <!-- API Keys Section -->
       <section id="api-keys-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">API & MCP</h2>
+        {% include frontend/sections/account-section-header.html title="API & MCP" icon="key" %}
 
         <!-- API Key Card -->
         <div class="card mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "key", "fa-md me-2" %} Your API key</h6>
+            <form id="reset-api-key-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
+              <button type="submit" class="btn btn-outline-danger btn-sm" id="reset-api-key-btn">
+                {% uj_icon "rotate", "me-1" %}
+                <span class="button-text">
+                  Reset<span class="d-none d-md-inline"> API key</span>
+                </span>
+              </button>
+            </form>
+          </div>
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="card-title mb-0">Your API key</h5>
-              <form id="reset-api-key-form" class="d-inline" novalidate data-form-state="initializing" onsubmit="return false">
-                <button type="submit" class="btn btn-outline-danger btn-sm" id="reset-api-key-btn">
-                  {% uj_icon "rotate", "me-1" %}
-                  <span class="button-text">
-                    Reset<span class="d-none d-md-inline"> API key</span>
-                  </span>
-                </button>
-              </form>
-            </div>
             <p class="card-text text-muted">Use this private key to authenticate API requests. Keep it secure and never share it publicly.</p>
 
             <!-- API Key Display -->
@@ -1337,8 +1343,10 @@ badges:
 
         <!-- MCP Integration Card -->
         <div class="card" data-brand-id="{{ site.brand.id }}" id="mcp-card">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "plug", "fa-md me-2" %} MCP integration</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title mb-2">MCP integration</h5>
             <p class="card-text text-muted mb-3">Connect AI assistants to your account using the Model Context Protocol. Paste the URL below into your preferred AI tool.</p>
 
             <!-- MCP URL display -->
@@ -1544,15 +1552,14 @@ badges:
 
       <!-- Data Request Section (Hidden by default) -->
       <section id="data-request-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Request your data</h2>
+        {% include frontend/sections/account-section-header.html title="Request your data" icon="file-export" %}
 
         <!-- Info card (always shown) -->
         <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "file-export", "fa-md me-2" %} Data request policy</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title text-primary">
-              {% uj_icon "file-export", "fa-lg me-2" %}
-              Data request policy
-            </h5>
             <p class="card-text small text-muted">
               Under applicable data protection regulations including the General Data Protection Regulation (GDPR), the California Consumer Privacy Act (CCPA), and other similar legislative frameworks enacted by governmental bodies around the world, you may have the right to request a copy of the personal data we hold about you. This process is commonly referred to as a Subject Access Request (SAR) or a Data Portability Request. It is important that you understand the full scope, limitations, and procedural requirements of this request before proceeding. Please read the following information carefully and in its entirety before submitting a request.
             </p>
@@ -1594,11 +1601,13 @@ badges:
         <!-- Status area (shown when a request exists) -->
         <div id="data-request-status" class="d-none mb-4">
           <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">
-                {% uj_icon "clock", "fa-lg me-2" %}
+            <div class="card-header">
+              <h6 class="mb-0 d-inline-flex align-items-center">
+                {% uj_icon "clock", "fa-md me-2" %}
                 <span id="data-request-status-title">Request status</span>
-              </h5>
+              </h6>
+            </div>
+            <div class="card-body">
               <p id="data-request-status-message" class="card-text text-muted"></p>
               <div id="data-request-download" class="d-none">
                 <form id="data-request-download-form" data-form-state="initializing" onsubmit="return false">
@@ -1624,12 +1633,10 @@ badges:
         <div id="data-request-form-container">
           <div class="collapse" id="data-request-form-accordion">
             <div class="card card-form-border border-primary mt-4">
+              <div class="card-header">
+                <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "file-export", "fa-md me-2" %} Confirm data request</h6>
+              </div>
               <div class="card-body">
-                <h5 class="card-title text-primary">
-                  {% uj_icon "file-export", "fa-lg me-2" %}
-                  Confirm data request
-                </h5>
-
                 <form id="data-request-form" novalidate data-form-state="initializing" onsubmit="return false">
                   <div class="mb-3">
                     <div class="form-check">
@@ -1679,14 +1686,13 @@ badges:
 
       <!-- Delete Account Section (Hidden by default) -->
       <section id="delete-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Delete account</h2>
+        {% include frontend/sections/account-section-header.html title="Delete account" icon="trash" %}
 
         <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% uj_icon "trash", "fa-md me-2" %} Account deletion policy</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title text-danger">
-              {% uj_icon "trash", "fa-lg me-2" %}
-              Account deletion policy
-            </h5>
             <p class="card-text small text-muted">
               Under applicable data protection regulations including the General Data Protection Regulation (GDPR) and the California Consumer Privacy Act (CCPA), you have the right to request the deletion of the personal data we hold about you. Account deletion is a permanent, irreversible action that cannot be undone under any circumstances. Please read the following important information carefully before proceeding.
             </p>
@@ -1727,12 +1733,10 @@ badges:
 
         <div class="collapse" id="delete-form-accordion">
           <div class="card card-form-border border-danger mt-4">
+            <div class="card-header">
+              <h6 class="mb-0 d-inline-flex align-items-center text-danger">{% uj_icon "trash", "fa-md me-2" %} Confirm account deletion</h6>
+            </div>
             <div class="card-body">
-              <h5 class="card-title text-danger">
-                {% uj_icon "trash", "fa-lg me-2" %}
-                Confirm account deletion
-              </h5>
-
               <form id="delete-account-form" novalidate data-form-state="initializing" onsubmit="return false">
                 <div class="mb-3">
                   <label for="delete-reason" class="form-label">Reason for leaving</label>
@@ -1781,15 +1785,14 @@ badges:
 
       <!-- Refund Section (Hidden by default) -->
       <section id="refund-section" class="account-section d-none">
-        <h2 class="classy-display classy-display--section mb-4">Request a refund</h2>
+        {% include frontend/sections/account-section-header.html title="Request a refund" icon="rotate-left" %}
 
         <!-- Refund policy info card -->
         <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "rotate-left", "fa-md me-2" %} Refund policy</h6>
+          </div>
           <div class="card-body">
-            <h5 class="card-title text-primary">
-              {% uj_icon "rotate-left", "fa-lg me-2" %}
-              Refund policy
-            </h5>
             <p class="card-text small text-muted">
               We understand that circumstances may change after making a purchase, and we want to ensure that our refund process is as transparent and fair as possible. Before submitting a refund request, please carefully read the following information in its entirety. By proceeding with a refund request, you acknowledge that you have read, understood, and agree to the terms and conditions outlined below. Our refund policy is governed by and subject to our <a href="/legal/terms" target="_blank">Terms of Service</a> and <a href="/legal/privacy" target="_blank">Privacy Policy</a>.
             </p>
@@ -1855,12 +1858,10 @@ badges:
 
         <div class="collapse" id="refund-form-accordion">
           <div class="card card-form-border border-primary mt-4">
+            <div class="card-header">
+              <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "rotate-left", "fa-md me-2" %} Confirm refund request</h6>
+            </div>
             <div class="card-body">
-              <h5 class="card-title text-primary">
-                {% uj_icon "rotate-left", "fa-lg me-2" %}
-                Confirm refund request
-              </h5>
-
               <form id="refund-form" novalidate data-form-state="initializing" onsubmit="return false">
                 <!-- Refund reasons (randomized by JS) -->
                 <div class="mb-3">

@@ -262,9 +262,11 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 }
 
 // ── Rail collapse ────────────────────────────────────────────────────────────
-// Core hides every .omega-shell__label; classy centers what remains.
+// Core hides every .omega-shell__label; classy centers what remains. Scoped
+// under __sidebar: classy-side__* is also the dialect of in-page rails (the
+// account section nav), which the sidebar collapse must never squish.
 
-.omega-shell[data-shell-collapsed='true'] {
+.omega-shell[data-shell-collapsed='true'] .omega-shell__sidebar {
   .classy-side__brand,
   .classy-side__item {
     justify-content: center;
@@ -292,7 +294,7 @@ $shell-breakpoint: 1200px; // keep in lockstep with the core shell cutover
 
 // The drawer always shows at full width with labels (mirrors the core rule).
 @media (max-width: ($shell-breakpoint - 0.02px)) {
-  .omega-shell[data-shell-collapsed='true'] {
+  .omega-shell[data-shell-collapsed='true'] .omega-shell__sidebar {
     .classy-side__brand,
     .classy-side__item {
       justify-content: flex-start;

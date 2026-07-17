@@ -22,10 +22,5 @@
   }
 }
 
-// ============================================
-// Active Nav Link Underline
-// ============================================
-// Adds underline to active nav links for better visibility
-.nav-link.active {
-  text-decoration: underline !important;
-}
+// (The UJM-era forced underline on .nav-link.active is gone — every nav
+// component owns its active look: pills fill, tabs border, classy fills.)

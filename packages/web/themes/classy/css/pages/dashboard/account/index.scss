@@ -1,22 +1,21 @@
-// classy account — the user home: quiet rail (no blue pills), token list
-// surfaces, and hairlines instead of elevation. The core page css keeps the
-// functional floor; this layer replaces its bootstrap-default look.
+// classy account — the user home speaks the same dialect as the rest of the
+// backend: the section rail reuses the shell sidebar recipe (classy-side__*),
+// sections open with the admin page-header anatomy, and hairlines replace
+// elevation. The core page css keeps the functional floor.
 
-#account-nav {
-  --bs-nav-pills-link-active-bg: var(--omega-surface-2);
-  --bs-nav-pills-link-active-color: var(--omega-ink);
-  --bs-nav-link-color: var(--omega-ink-muted);
-  --bs-nav-link-hover-color: var(--omega-ink);
-
-  .nav-link {
-    border-radius: var(--omega-radius-m);
-    font-weight: 550;
-    transition: color var(--omega-speed) var(--omega-ease), background var(--omega-speed) var(--omega-ease);
-
-    &:hover:not(.active) {
-      background: color-mix(in srgb, var(--omega-surface-2) 55%, transparent);
-    }
+// The rail sits on the main SURFACE (the sidebar sits on the darker ground),
+// so the sidebar's surface-colored active fill is invisible here — active and
+// hover step one level down the stack instead.
+#account-nav ~ button.classy-side__item,
+#account-nav .classy-side__item {
+  &:hover:not(.active),
+  &:focus-visible:not(.active) {
+    background: color-mix(in srgb, var(--omega-surface-2) 55%, transparent);
   }
+}
+
+#account-nav .classy-side__item.active {
+  background: var(--omega-surface-2);
 }
 
 // Token list surfaces (sessions, referrals, team)
