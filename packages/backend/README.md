@@ -791,7 +791,7 @@ npx @omega.js/backend <command>
 | `mgr serve` | Start local Firebase emulator |
 | `mgr deploy` | Deploy functions to Firebase |
 | `mgr test [paths...]` | Run integration tests |
-| `mgr emulator` | Start Firebase emulator (keep-alive mode) |
+| `mgr emulator` | Start Firebase emulator (keep-alive mode; HTTPS proxy on the public port, `--no-https` for plain http) |
 | `mgr stripe` | Start Stripe CLI webhook forwarding to local server |
 | `mgr version`, `mgr v` | Show @omega.js/backend version |
 | `mgr clear` | Clear cache and temp files |
@@ -848,7 +848,7 @@ npx omega test
 
 `npx omega emulator` **seeds the test personas on boot** (same wipe-and-create pass the test runner uses), so an emulator-connected dev site is signin-able immediately — any persona email + the deterministic `TEST_ACCOUNT_PASSWORD` (`omega-test-password`). Pass `--no-seed` to boot without seeding. Seeding is non-fatal: if it fails (e.g. missing config), the emulator keeps running. See [docs/test-framework.md](docs/test-framework.md#personas-n6).
 
-**Ports auto-allocate (N7)**: boot resolves each emulator port from firebase.json, bumping +1 when taken — so a second brand's emulator runs ALONGSIDE the first instead of killing it (bumped runs boot via a generated, gitignored `firebase.resolved.json`; the committed firebase.json never changes). The resolved map publishes to `.temp/ports.json` (sibling processes — `omega test` reads it automatically) and `OMEGA_<NAME>_PORT` env (URL getters). Pin a port explicitly with the config `ports` section — pins never bump (busy pin = hard error). Single-brand dev on free defaults behaves exactly as before. `mgr serve` allocates the same way (`--port` pins) and publishes `https` (its mkcert proxy) + `hosting` (the internal plain-http port) so siblings — including `omega dev`'s page chrome — follow even a bumped serve; Stripe forwarding targets the resolved plain-http port.
+**Ports auto-allocate (N7)**: boot resolves each emulator port from firebase.json, bumping +1 when taken — so a second brand's emulator runs ALONGSIDE the first instead of killing it (bumped runs boot via a generated, gitignored `firebase.resolved.json`; the committed firebase.json never changes). The resolved map publishes to `.temp/ports.json` (sibling processes — `omega test` reads it automatically) and `OMEGA_<NAME>_PORT` env (URL getters). Pin a port explicitly with the config `ports` section — pins never bump (busy pin = hard error). Single-brand dev on free defaults behaves exactly as before. `mgr serve` and `mgr emulator` allocate the same way (`--port` pins) and publish `https` (the mkcert proxy on the public port) + `hosting` (the internal plain-http port) so siblings — including `omega dev`'s page chrome — follow even a bumped run; Stripe forwarding targets the resolved plain-http port. Pass `--no-https` (or run without mkcert installed) for plain http on the public port; the emulator an `omega test` run auto-starts is always plain.
 
 ### Extended Mode (real APIs)
 

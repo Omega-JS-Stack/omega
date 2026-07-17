@@ -54,7 +54,27 @@ module.exports = async function (options) {
   const { port, bumped } = await resolveWebsitePort(paths.root, Number(options.port) || null);
   const devPorts = { ...readSiblingPorts(paths.root), website: port };
 
-  applyDevSiteUrl(siteData, port);
+  // HTTPS (same contract as the backend's serve/emulator): the PUBLIC website
+  // port speaks TLS through the shared mkcert proxy; eleventy sits on an
+  // internal plain-http port behind it (WebSocket live-reload tunnels through).
+  // `--no-https` or no mkcert → plain http on the public port, as before.
+  const { ensureLocalHttpsCerts, startLocalHttpsProxy } = require('@omega.js/devkit/local-https');
+  let httpsCerts = null;
+  let internalPort = null;
+  if (options.https !== false) {
+    httpsCerts = await ensureLocalHttpsCerts({
+      certsDir: path.join(paths.root, '.temp', 'certs'),
+      log: (line) => logger.log(line),
+    });
+
+    if (httpsCerts) {
+      ({ ports: { internal: internalPort } } = await resolvePorts({ wanted: { internal: 4443 } }));
+    } else {
+      logger.log('HTTPS disabled — could not obtain certificates (install mkcert: brew install mkcert && mkcert -install)');
+    }
+  }
+
+  applyDevSiteUrl(siteData, port, httpsCerts !== null);
 
   const activeTheme = (siteData.theme && siteData.theme.id) || 'classy';
   const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: paths.root, themesDir: PATHS.themes });
@@ -183,10 +203,21 @@ module.exports = async function (options) {
 
   await elev.init();
   await elev.watch();
-  elev.serve(port);
+  elev.serve(httpsCerts ? internalPort : port);
+
+  // TLS terminator on the public port → eleventy on the internal one
+  if (httpsCerts) {
+    startLocalHttpsProxy({
+      port,
+      targetPort: internalPort,
+      certs: httpsCerts,
+      log: (line) => logger.log(line),
+    });
+  }
 
   // Publish the resolved website port for sibling tools (same contract as the
-  // backend emulator's ports file) and retract it on shutdown.
+  // backend emulator's ports file) and retract it on shutdown. The PUBLIC
+  // port is the published one — the internal eleventy port is plumbing.
   writePortsFile(paths.root, { website: port });
   process.on('exit', () => clearPortsFile(paths.root));
   process.on('SIGINT', () => process.exit(0));
@@ -194,7 +225,7 @@ module.exports = async function (options) {
   if (bumped) {
     logger.log(`Port ${CLASSIC_PORTS.website} was taken — bumped to ${port}`);
   }
-  logger.log(`Dev server: http://localhost:${port}`);
+  logger.log(`Dev server: ${httpsCerts ? 'https' : 'http'}://localhost:${port}`);
 };
 
 /**
@@ -261,9 +292,10 @@ function devCleanUrls(outDir) {
  * pages, nav — so pointing it at the local origin keeps every click in dev.
  * @param {object} siteData - the loaded site global (mutated)
  * @param {number} port - the resolved dev-server port
+ * @param {boolean} [https] - whether the public port speaks TLS (mkcert proxy)
  */
-function applyDevSiteUrl(siteData, port) {
-  siteData.url = `http://localhost:${port}`;
+function applyDevSiteUrl(siteData, port, https) {
+  siteData.url = `${https ? 'https' : 'http'}://localhost:${port}`;
 }
 
 /**

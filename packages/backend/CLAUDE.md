@@ -70,7 +70,7 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | Command | Description |
 |---|---|
 | `setup` | Bootstrap new projects (scaffolds config files + doc defaults), validate config, provision Firestore indexes |
-| `emulator` | Start Firebase emulators (auth/firestore/functions/database/storage) |
+| `emulator` | Start Firebase emulators (auth/firestore/functions/database/storage); fronts the public hosting port with the mkcert HTTPS proxy (`--no-https` for plain http) |
 | `serve` | Local Firebase serve (with auto Stripe webhook forwarding if keys set) |
 | `watch` | Auto-reload functions on file change |
 | `deploy` | Deploy Cloud Functions to Firebase |

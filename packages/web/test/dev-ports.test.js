@@ -149,4 +149,7 @@ test('applyDevSiteUrl: dev builds link to the local origin, never the live site'
 
   applyDevSiteUrl(siteData, 4001);
   assert.equal(siteData.url, 'http://localhost:4001', 'bumped port carries through');
+
+  applyDevSiteUrl(siteData, 4000, true);
+  assert.equal(siteData.url, 'https://localhost:4000', 'https flag flips the scheme (mkcert proxy live)');
 });

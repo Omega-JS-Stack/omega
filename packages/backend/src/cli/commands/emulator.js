@@ -55,8 +55,13 @@ class EmulatorCommand extends BaseCommand {
 
     // Keep-alive: boot emulators and wait for Ctrl+C. No "command" subprocess —
     // the emulator child IS the foreground process from the user's perspective.
+    // HTTPS default-on for the interactive command (--no-https disables); the
+    // `omega test` auto-start path never passes it — the harness talks plain
+    // http to hosting directly.
     try {
-      const { shutdown, emulatorPorts, bumped, exitPromise } = await this.startEmulators();
+      const { shutdown, emulatorPorts, bumped, exitPromise } = await this.startEmulators({
+        https: this.argv.https !== false,
+      });
 
       // Start Stripe webhook forwarding in background — AFTER boot so it
       // targets the RESOLVED hosting port, not a classic that may have bumped
@@ -189,9 +194,12 @@ class EmulatorCommand extends BaseCommand {
    * Resolves once the emulator hub is listening (i.e., emulators are ready).
    * Caller is responsible for calling shutdown() to send SIGTERM and wait for exit.
    *
+   * @param {object} [options]
+   * @param {boolean} [options.https] - Front the public hosting port with the
+   *   shared mkcert TLS proxy (interactive `omega emulator` default)
    * @returns {Promise<{ child: ChildProcess, shutdown: () => Promise<void>, emulatorPorts: object }>}
    */
-  async startEmulators() {
+  async startEmulators(options) {
     const projectDir = this.main.firebaseProjectPath;
 
     // dist/ is staged output (src/dist pillar): stage fresh (including
@@ -206,6 +214,28 @@ class EmulatorCommand extends BaseCommand {
     // behavior of KILLING the incumbent. Explicit config `ports` pins never
     // bump (busy pin = hard error).
     const wanted = loadEmulatorPorts(projectDir);
+
+    // HTTPS (the classic https://localhost:5002 contract, shared with `omega
+    // serve` + web's `omega dev` via @omega.js/devkit/local-https): the PUBLIC
+    // hosting port speaks TLS through the mkcert proxy; hosting itself moves
+    // to an internal plain-http port. No mkcert → plain http on the classic
+    // port, same fallback as serve.
+    let httpsCerts = null;
+    if (options?.https) {
+      const { ensureLocalHttpsCerts } = require('@omega.js/devkit/local-https');
+      httpsCerts = await ensureLocalHttpsCerts({
+        certsDir: path.join(this.getTempPath(), 'certs'),
+        log: (line) => this.log(chalk.gray(`  ${line}`)),
+      });
+
+      if (httpsCerts) {
+        wanted.https = wanted.hosting;
+        wanted.hosting = 5443;
+      } else {
+        this.log(chalk.yellow('  HTTPS disabled — could not obtain certificates.'));
+        this.log(chalk.yellow('  Install mkcert for trusted local HTTPS: brew install mkcert && mkcert -install\n'));
+      }
+    }
 
     // Crash leftovers first: a run that died without teardown leaves java
     // emulator grandchildren squatting the classic ports FOREVER — the
@@ -223,9 +253,10 @@ class EmulatorCommand extends BaseCommand {
 
     // Bumped ports can't ride the committed firebase.json — materialize a
     // patched copy NEXT TO it (same dir, so relative paths keep resolving)
-    // and boot with --config. Defaults-free runs spawn exactly as always.
+    // and boot with --config. The https flip ALWAYS materializes (hosting
+    // moved to the internal port). Defaults-free runs spawn exactly as always.
     let configFlag = '';
-    if (bumped.length > 0) {
+    if (bumped.length > 0 || httpsCerts) {
       const resolvedName = 'firebase.resolved.json';
       const firebaseConfig = JSON5.parse(jetpack.read(path.join(projectDir, 'firebase.json')));
       for (const [name, port] of Object.entries(emulatorPorts)) {
@@ -235,7 +266,12 @@ class EmulatorCommand extends BaseCommand {
       }
       jetpack.write(path.join(projectDir, resolvedName), JSON.stringify(firebaseConfig, null, 2));
       configFlag = ` --config ${resolvedName}`;
-      this.log(chalk.yellow(`  Ports in use — bumped: ${bumped.map((name) => `${name}→${emulatorPorts[name]}`).join(', ')} (booting via ${resolvedName})`));
+      if (bumped.length > 0) {
+        this.log(chalk.yellow(`  Ports in use — bumped: ${bumped.map((name) => `${name}→${emulatorPorts[name]}`).join(', ')} (booting via ${resolvedName})`));
+      }
+      if (httpsCerts) {
+        this.log(chalk.gray(`  Hosting moves to internal :${emulatorPorts.hosting} under the HTTPS proxy on :${emulatorPorts.https} (booting via ${resolvedName})`));
+      }
     }
 
     // Publish the resolved map: env for our own children (functions workers
@@ -244,6 +280,20 @@ class EmulatorCommand extends BaseCommand {
     // against a running emulator, `omega dev`, the e2e harness).
     Object.assign(process.env, portsToEnv(emulatorPorts));
     writePortsFile(projectDir, emulatorPorts);
+
+    // Start the TLS terminator now — requests 502 until hosting is up, then
+    // https://localhost:<https> serves the whole surface. Torn down with the
+    // emulator child (close handler below).
+    let httpsProxy = null;
+    if (httpsCerts) {
+      const { startLocalHttpsProxy } = require('@omega.js/devkit/local-https');
+      httpsProxy = startLocalHttpsProxy({
+        port: emulatorPorts.https,
+        targetPort: emulatorPorts.hosting,
+        certs: httpsCerts,
+        log: (line) => this.log(chalk.green(`  ${line}`)),
+      });
+    }
 
     // Wipe stale firebase-tools debug logs + any leftover @omega.js/backend logs from older versions.
     this.sweepStaleLogs();
@@ -298,6 +348,12 @@ class EmulatorCommand extends BaseCommand {
       FORCE_COLOR: '1',
       OMEGA_TEST_MODE: 'true',
     };
+
+    // Internal calls (Manager.getApiUrl) loop through the HTTPS proxy with a
+    // mkcert cert Node doesn't trust — same handoff as `omega serve`.
+    if (httpsCerts) {
+      env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    }
 
     // Spawn `firebase emulators:start` as a background child. Use `sh -c` so the
     // user's shell PATH resolves `firebase` consistently with the interactive shell.
@@ -360,6 +416,12 @@ class EmulatorCommand extends BaseCommand {
         currentStream.end();
       }
       try { fs.unlinkSync(resetSentinelPath); } catch (e) { /* ok */ }
+      // The TLS proxy lives in THIS process — release the public port with
+      // the stack (and drop any keep-alive sockets holding it open)
+      if (httpsProxy) {
+        httpsProxy.close();
+        httpsProxy.closeAllConnections?.();
+      }
       // Retract the published port map (clean shutdown). The resolved
       // firebase config is per-run scratch — remove it too.
       clearPortsFile(projectDir);
@@ -526,7 +588,11 @@ class EmulatorCommand extends BaseCommand {
       return;
     }
 
-    const ports = Object.values(emulatorPorts);
+    // `https` is OUR in-process TLS proxy (closed with the child), never an
+    // orphaned java emulator — sweeping it would SIGKILL this very process
+    // on a close-timing race.
+    const { https: _httpsPort, ...sweepable } = emulatorPorts;
+    const ports = Object.values(sweepable);
     if (sweepShared) {
       ports.push(4400, 9199);
     }

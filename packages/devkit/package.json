@@ -8,6 +8,7 @@
     ".": "./src/index.js",
     "./logger": "./src/logger.js",
     "./local": "./src/local.js",
+    "./local-https": "./src/local-https.js",
     "./safe-install": "./src/safe-install.js",
     "./attach-log-file": "./src/attach-log-file.js",
     "./cli-router": "./src/cli-router.js",

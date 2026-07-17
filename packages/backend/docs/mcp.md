@@ -154,12 +154,13 @@ module.exports = [
 
 ## HTTPS Local Development
 
-`npx omega serve` starts an HTTPS proxy on port 5002 (firebase serve runs internally on 5443). This enables Claude Desktop to connect locally since it requires HTTPS.
+`npx omega serve` AND `npx omega emulator` front the public port with an HTTPS proxy (the classic `https://localhost:5002` — firebase serves internally on 5443). This enables Claude Desktop to connect locally since it requires HTTPS.
 
 - Certificates are auto-generated via mkcert into `.temp/certs/`
 - `getApiUrl()` returns `https://localhost:5002` when the HTTPS proxy is active
-- Disable with `--no-https` to fall back to plain HTTP
+- Disable with `--no-https` to fall back to plain HTTP (the emulator an `omega test` run auto-starts is always plain — the harness talks http)
 - Install mkcert: `brew install mkcert && mkcert -install`
+- The cert + proxy machinery is the shared `@omega.js/devkit/local-https` module (vendored at prepare time) — the same engine behind web's `omega dev` HTTPS
 
 ## Hosting Rewrites
 
@@ -205,7 +206,7 @@ Add to `.claude/settings.json`:
 | Stdio server | `src/mcp/index.js` |
 | HTTP client | `src/mcp/client.js` |
 | CLI command | `src/cli/commands/mcp.js` |
-| HTTPS proxy for local dev | `src/cli/commands/serve.js` |
+| HTTPS proxy for local dev | `@omega.js/devkit/local-https` (wired in `src/cli/commands/serve.js` + `emulator.js`) |
 | MCP route interception | `src/manager/index.js` (`_handleMcp`, `resolveMcpRoutePath`) |
 | Hosting rewrites setup | `src/cli/commands/setup-tests/hosting-rewrites.js` |
 
