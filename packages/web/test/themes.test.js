@@ -74,6 +74,33 @@ test('tier 1: consumer main.scss pulls, configures, and overrides the chain via 
   assert.deepEqual(warnings, [], 'tier-1 compile stays warning-free');
 });
 
+// ─── The inheritance hatch (cp190): partial theme @forwards omega:theme ─────
+
+test('inheritance hatch: a partial theme @forwards omega:theme and inherits the classy chain (cp190)', () => {
+  const partialRoot = path.join(THEMING, 'partial-theme');
+  const layers = [partialRoot, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')];
+
+  const css = sass.compile(path.join(partialRoot, '_theme.scss'), {
+    importers: [layeredFileImporter(layers)],
+    loadPaths: layers,
+    quietDeps: true,
+    silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+
+  // The self-skip landed the @forward on classy — its full chain emitted
+  assert.ok(css.includes('.classy-auth'), 'classy auth vocabulary inherited');
+  assert.ok(css.includes('.classy-statgrid'), 'classy app vocabulary inherited');
+  assert.ok(css.includes('--bs-body-bg: var(--omega-ground)'), 'classy token bridge inherited');
+
+  // The partial theme's own rules land AFTER the chain so they win ties
+  assert.ok(css.includes('--partial-marker'), 'partial theme rules present');
+  assert.ok(
+    css.indexOf('--partial-marker') > css.lastIndexOf('.classy-statgrid'),
+    'partial rules land after the inherited chain',
+  );
+});
+
 // ─── Tier 2: consumer-local full theme through the engine ────────────────────
 
 test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall through to classy', async () => {

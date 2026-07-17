@@ -66,6 +66,34 @@ the tokens).
 Tier 2 stays: fork `themes/_template` for a full theme; classy remains the
 fall-through layer for anything the theme doesn't cover.
 
+### CSS fall-through — the two lanes (cp190, closes the audit's asymmetry)
+
+Layouts/includes fall through per-file, but a theme's `_theme.scss` never
+did — a non-classy theme rendered the shared `classy-*` vocabulary
+unstyled on fall-through pages. Two blessed lanes now cover it, both
+proven:
+
+- **Partial/consumer themes** (no Bootstrap of their own): put
+  `@forward 'omega:theme';` at the top of the theme's `_theme.scss` — the
+  importer resolves through the layer roots and SELF-SKIPS the requesting
+  file, so the forward lands on classy's `_theme.scss` and emits its whole
+  chain (Bootstrap included, configured through the forward); the theme's
+  own rules land after and win the cascade. Pinned in
+  `test/themes.test.js` ("inheritance hatch").
+- **Full sibling themes** (own Bootstrap config — newsflash): do NOT
+  inherit wholesale (two Bootstraps); import classy's app/auth partials
+  directly as the vocabulary FLOOR — they are deliberately TOKEN-PURE
+  (zero Sass config coupling), so they paint through the importing theme's
+  token re-values. The set: `layout/shell` (+ `.page-header`),
+  `app/panels` (table/statgrid/iconbtn/count), `pages/auth`,
+  `components/receipt`, `components/badges` (chips/dot-status). Import
+  EARLY (the floor sits UNDER the theme's voice, so later theme rules win
+  collisions like classy's `.badge` base). Live model:
+  `themes/newsflash/_theme.scss`.
+
+Rule for classy authors: app/auth vocabulary partials MUST stay token-pure
+— a Sass config dependency there breaks every sibling theme's floor.
+
 ## Content-page vocabulary (default pages + blueprints)
 
 Every classy frontend default page composes from one shared set

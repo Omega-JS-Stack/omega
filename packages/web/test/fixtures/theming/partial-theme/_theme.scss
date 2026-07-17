@@ -1,0 +1,12 @@
+// A PARTIAL consumer theme: ships no Bootstrap and no component system of
+// its own — it inherits the whole packaged chain and re-values on top.
+// `omega:theme` resolves through the layer roots and SELF-SKIPS this file,
+// so the @forward lands on classy's _theme.scss (the always-present base
+// layer) and emits its full css. This is the cp190-blessed inheritance
+// hatch for partial themes; full sibling themes import classy's token-pure
+// app/auth partials instead (see themes/newsflash/_theme.scss).
+@forward 'omega:theme';
+
+:root {
+  --partial-marker: 1;
+}
