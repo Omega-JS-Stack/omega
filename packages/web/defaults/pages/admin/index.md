@@ -1,7 +1,4 @@
 ---
-layout: modules/utilities/redirect
+layout: blueprint/admin/dashboard/index
 permalink: /admin
-
-redirect:
-  url: "/admin/dashboard"
 ---

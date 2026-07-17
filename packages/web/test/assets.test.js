@@ -48,10 +48,23 @@ test('layered page modules: site layer wins, core fills the rest, all content-ha
     assert.match(manifest.js.pages[key], /^\/assets\/js\/pages\/.+-[A-Z0-9]+\.js$/, `${key} is content-hashed`);
   }
   assert.ok(!manifest.js.pages['payment/checkout/modules/api'], 'helper modules are NOT entries');
-  assert.ok(!manifest.js.pages['account/sections/billing'], 'section helpers are NOT entries');
+  assert.ok(!manifest.js.pages['dashboard/account/sections/billing'], 'section helpers are NOT entries');
 
   const indexBundle = fs.readFileSync(path.join(OUT, manifest.js.pages.index.slice(1)), 'utf8');
   assert.ok(indexBundle.includes('consumer wins'), 'SITE layer index.js beat the core layer');
+});
+
+test('legacy module bundles emit at their fixed URLs (redirect pages script them)', async () => {
+  await build(['classy']);
+  // The redirect layout + ad units reference /assets/js/modules/<name>.bundle.js
+  // directly (uj_cachebreak query, no content hash) — the lane must emit them.
+  const redirect = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect.bundle.js'), 'utf8');
+  assert.ok(redirect.includes('redirect-config'), 'redirect module bundled at its fixed URL');
+  assert.ok(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)');
+  assert.ok(fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'popupads.bundle.js')), 'popupads.bundle.js emits (import-free)');
+  // vert.js imports @omega.js/client — bundling it standalone would inline a
+  // second client copy and break the singleton; it sits out of this lane.
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'vert.bundle.js')), 'client-importing modules are skipped');
 });
 
 // Read an entry bundle plus every chunk it transitively imports (the module

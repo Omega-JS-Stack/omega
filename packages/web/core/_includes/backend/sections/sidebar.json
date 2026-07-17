@@ -1,21 +1,19 @@
 {
+  // Default user-app nav: no Dashboard entry ships because no default
+  // homepage does (/dashboard forwards to account) — a brand that scaffolds
+  // its own /dashboard overrides this json and adds its nav alongside.
   logo: {
-    href: '/dashboard',
+    href: '/dashboard/account',
     class: 'filter-adaptive',
   },
   links: [
-    {
-      label: 'Dashboard',
-      href: '/dashboard',
-      icon: 'gauge-high'
-    },
     {
       header: true,
       label: 'General'
     },
     {
       label: 'Account',
-      href: '/account',
+      href: '/dashboard/account',
       icon: 'user-gear'
     },
     {

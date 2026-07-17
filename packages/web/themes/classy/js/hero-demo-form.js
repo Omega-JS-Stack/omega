@@ -7,14 +7,14 @@
 // principle be set to `javascript:...` by an attacker who can inject markup.
 // Anything that isn't a same-origin path or http(s) URL is rejected outright.
 function safeRedirect(raw) {
-  if (!raw || typeof raw !== 'string') return '/account';
+  if (!raw || typeof raw !== 'string') return '/dashboard/account';
   // Same-origin path — must start with `/` and NOT `//` (protocol-relative).
   if (raw.startsWith('/') && !raw.startsWith('//')) return raw;
   try {
     const parsed = new URL(raw, window.location.origin);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return raw;
   } catch (e) { /* fall through */ }
-  return '/account';
+  return '/dashboard/account';
 }
 
 /**

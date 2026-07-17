@@ -235,8 +235,8 @@ export default function devPalette() {
   links.className = 'omega-devbar__grid';
   [
     ['Components', '/test/components'],
-    ['Admin', '/admin/dashboard'],
-    ['Account', '/account'],
+    ['Admin', '/admin'],
+    ['Account', '/dashboard/account'],
     ['Emulator UI', 'http://127.0.0.1:4050'],
   ].forEach(([label, href]) => {
     const link = doc.createElement('a');

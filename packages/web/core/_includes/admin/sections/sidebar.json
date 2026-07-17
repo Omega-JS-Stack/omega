@@ -10,7 +10,7 @@
     dropdown: [
       {
         label: '{{ site.brand.name }}',
-        href: '/admin/dashboard',
+        href: '/admin',
         icon: 'circle-check'
       },
     ]
@@ -18,7 +18,7 @@
   links: [
     {
       label: 'Dashboard',
-      href: '/admin/dashboard',
+      href: '/admin',
       icon: 'gauge-high'
     },
     {

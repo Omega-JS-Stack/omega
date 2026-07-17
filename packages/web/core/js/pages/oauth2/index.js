@@ -85,7 +85,7 @@ function showSuccess() {
 
   // Redirect to account page after delay
   setTimeout(() => {
-    window.location.href = '/account#connections';
+    window.location.href = '/dashboard/account#connections';
   }, 500);
 }
 
@@ -104,5 +104,5 @@ function showError(message) {
   $errorMessage.textContent = message;
 
   // Default return URL
-  $returnButton.href = '/account#connections';
+  $returnButton.href = '/dashboard/account#connections';
 }

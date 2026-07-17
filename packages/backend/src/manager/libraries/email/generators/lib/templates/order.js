@@ -232,12 +232,12 @@ function _explanation(event, order, data, brand) {
       if (order.type === 'subscription') {
         if (isTrial) {
           html = `<p style="color: #718096;">Your free trial is active until <strong>${escape(computed.trialExpires || '')}</strong>. You may cancel at any time before then and you will not be charged. After your trial ends, your paid subscription will automatically begin and you will be charged <strong>$${chargeAmount}/${escape(payment.frequency || '')}</strong>.${promoNote}</p>
-          <p style="color: #718096;">If you cancel your subscription during the free trial period, you will be immediately downgraded to a basic account and <strong>lose access to all premium features</strong>. You can <a href="${brandUrl}/account#billing">cancel your subscription</a> at any time on our website.</p>`;
+          <p style="color: #718096;">If you cancel your subscription during the free trial period, you will be immediately downgraded to a basic account and <strong>lose access to all premium features</strong>. You can <a href="${brandUrl}/dashboard/account#billing">cancel your subscription</a> at any time on our website.</p>`;
         } else {
-          html = `<p style="color: #718096;">Your subscription to <strong>${escape(brandName)} ${escape(productName)}</strong> is now active. You'll be billed <strong>$${payment.price}/${escape(payment.frequency || '')}</strong> going forward.${promoNote} You can manage or cancel your subscription anytime from your <a href="${brandUrl}/account#billing">account</a>.</p>`;
+          html = `<p style="color: #718096;">Your subscription to <strong>${escape(brandName)} ${escape(productName)}</strong> is now active. You'll be billed <strong>$${payment.price}/${escape(payment.frequency || '')}</strong> going forward.${promoNote} You can manage or cancel your subscription anytime from your <a href="${brandUrl}/dashboard/account#billing">account</a>.</p>`;
         }
       } else {
-        html = `<p style="color: #718096;">Your payment of <strong>$${payment.price || computed.totalToday || '0.00'}</strong> has been processed successfully. You can view your order details and access your purchase from your <a href="${brandUrl}/account">account</a>.</p>`;
+        html = `<p style="color: #718096;">Your payment of <strong>$${payment.price || computed.totalToday || '0.00'}</strong> has been processed successfully. You can view your order details and access your purchase from your <a href="${brandUrl}/dashboard/account">account</a>.</p>`;
       }
       break;
 
@@ -252,7 +252,7 @@ function _explanation(event, order, data, brand) {
 
     case 'cancellation-requested':
       html = `<p style="color: #718096;">Your subscription is scheduled for cancellation at the end of your current billing period. You'll continue to have access until <strong>${escape(computed.cancellationDate || '')}</strong>.</p>
-      <p style="color: #718096;">Changed your mind? You can reactivate your subscription anytime before that date from your <a href="${brandUrl}/account#billing">account</a>.</p>`;
+      <p style="color: #718096;">Changed your mind? You can reactivate your subscription anytime before that date from your <a href="${brandUrl}/dashboard/account#billing">account</a>.</p>`;
       break;
 
     case 'cancelled':
@@ -275,7 +275,7 @@ function _explanation(event, order, data, brand) {
 
     case 'trial-ending':
       html = `<p style="color: #718096;">Your free trial ends on <strong>${escape(computed.trialExpires || '')}</strong>. After that, you will be charged <strong>$${chargeAmount}/${escape(payment.frequency || '')}</strong> automatically.</p>
-      <p style="color: #718096;">If you don't want to be charged, <a href="${brandUrl}/account#billing">cancel your subscription</a> before your trial ends. After your trial, no full refund will be issued.</p>`;
+      <p style="color: #718096;">If you don't want to be charged, <a href="${brandUrl}/dashboard/account#billing">cancel your subscription</a> before your trial ends. After your trial, no full refund will be issued.</p>`;
       break;
 
     case 'refunded':
@@ -306,14 +306,14 @@ function _ctaButton(event, brand, order) {
   const brandUrl = brand?.url || '#';
 
   const variants = {
-    'confirmation': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/account` },
-    'payment-failed': { text: 'Update payment method &rarr;', url: `${brandUrl}/account#billing` },
-    'payment-recovered': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/account` },
-    'cancellation-requested': { text: 'Manage subscription &rarr;', url: `${brandUrl}/account#billing` },
+    'confirmation': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/dashboard/account` },
+    'payment-failed': { text: 'Update payment method &rarr;', url: `${brandUrl}/dashboard/account#billing` },
+    'payment-recovered': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/dashboard/account` },
+    'cancellation-requested': { text: 'Manage subscription &rarr;', url: `${brandUrl}/dashboard/account#billing` },
     'cancelled': { text: 'Re-subscribe &rarr;', url: `${brandUrl}/pricing` },
-    'plan-changed': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/account` },
-    'trial-ending': { text: 'Manage subscription &rarr;', url: `${brandUrl}/account#billing` },
-    'refunded': { text: 'Go to your account &rarr;', url: `${brandUrl}/account` },
+    'plan-changed': { text: 'Go to your dashboard &rarr;', url: `${brandUrl}/dashboard/account` },
+    'trial-ending': { text: 'Manage subscription &rarr;', url: `${brandUrl}/dashboard/account#billing` },
+    'refunded': { text: 'Go to your account &rarr;', url: `${brandUrl}/dashboard/account` },
     'abandoned-cart': { text: 'Complete checkout &rarr;', url: order._computed?.checkoutUrl || `${brandUrl}/pricing` },
   };
 

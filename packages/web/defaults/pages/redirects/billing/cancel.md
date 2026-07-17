@@ -6,5 +6,5 @@ sitemap:
   include: false
 
 redirect:
-  url: "/account#billing"
+  url: "/dashboard/account#billing"
 ---

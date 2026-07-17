@@ -61,7 +61,7 @@ function build({ data }) {
         <mj-text padding="12px 0 0 0"><p>${escape(signoffGreeting)},<br>${escape(signoffName)}</p></mj-text>
         <mj-text padding="24px 0 0 0" font-size="11px" color="#aaaaaa">
           <a href="${unsubscribeUrl}" style="color:#aaaaaa;">Unsubscribe</a> &middot;
-          <a href="${brandUrl}/account" style="color:#aaaaaa;">Manage account</a> &middot;
+          <a href="${brandUrl}/dashboard/account" style="color:#aaaaaa;">Manage account</a> &middot;
           ${address}
           ${hiddenAsm}
           ${hiddenMeta}

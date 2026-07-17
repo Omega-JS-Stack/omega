@@ -91,6 +91,13 @@ const performRedirect = () => {
     console.log(`[Redirect] Forwarded ${currentUrl.searchParams.size} query parameters`);
   }
 
+  // Forward the fragment (#billing deep-links from emails/bookmarks) unless
+  // the target declares its own
+  if (currentUrl.hash && !redirectUrl.hash) {
+    redirectUrl.hash = currentUrl.hash;
+    console.log('[Redirect] Forwarded fragment:', currentUrl.hash);
+  }
+
   // Apply modifier function
   let finalUrl;
   try {

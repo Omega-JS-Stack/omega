@@ -60,7 +60,7 @@
         },
         {
           label: 'My account',
-          href: '/account',
+          href: '/dashboard/account',
         },
       ],
     },

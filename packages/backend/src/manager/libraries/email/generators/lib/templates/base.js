@@ -185,7 +185,7 @@ function footer(brand, email) {
     <mj-section padding="0 32px">
       <mj-column>
         <mj-text align="center" font-size="13px" color="#718096" padding="0">
-          <a href="${brandUrl}/account" style="color: #718096; text-decoration: underline;">Manage account</a> &middot;
+          <a href="${brandUrl}/dashboard/account" style="color: #718096; text-decoration: underline;">Manage account</a> &middot;
           <a href="${brandUrl}/terms" style="color: #718096; text-decoration: underline;">Terms</a> &middot;
           <a href="${brandUrl}/privacy" style="color: #718096; text-decoration: underline;">Privacy</a> &middot;
           <a href="${unsubscribeUrl}" style="color: #718096; text-decoration: underline;">Unsubscribe</a>

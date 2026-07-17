@@ -146,12 +146,28 @@ test('alternatives collection: permalink convention + comparison content', () =>
 });
 
 test('cover layout: page-level theme.main.align templates into main via resolved', () => {
-  // account asks for top alignment (theme.main.align: start); the cover
+  // checkout asks for top alignment (theme.main.align: start); the cover
   // layout's class template `align-items-{{ resolved.theme.main.align |
   // default: 'center' }}` must see the page's merged value…
-  assert.ok(/<main[^>]*align-items-start/.test(pages.get('/account')), 'account main is top-aligned');
+  assert.ok(/<main[^>]*align-items-start/.test(pages.get('/payment/checkout')), 'checkout main is top-aligned');
   // …while pages that set no align keep the cover default.
   assert.ok(/<main[^>]*align-items-center/.test(pages.get('/signin')), 'signin main stays centered');
+});
+
+test('signed-in URL scheme: user app under /dashboard, staff app rooted at /admin', () => {
+  // the account page is a page IN the user app: app shell + its rail contract
+  const account = pages.get('/dashboard/account');
+  assert.ok(account, 'account serves at /dashboard/account');
+  assert.ok(account.includes('omega-shell'), 'account wears the app shell');
+  assert.ok(account.includes('id="account-nav"'), 'section rail contract intact');
+  // the staff overview serves AT its root
+  const admin = pages.get('/admin');
+  assert.ok(admin && admin.includes('omega-shell'), 'admin overview serves at /admin');
+  assert.ok(admin.includes('id="stat-total-users"'), 'overview content present (stat cards)');
+  // permanent redirects keep every old link alive (module reads data-url)
+  assert.ok(pages.get('/account').includes('data-url="/dashboard/account"'), '/account redirects to the new home');
+  assert.ok(pages.get('/dashboard').includes('data-url="/dashboard/account"'), 'default /dashboard forwards to account (brand homepage suppresses)');
+  assert.ok(pages.get('/admin/dashboard').includes('data-url="/admin"'), '/admin/dashboard redirects to the root overview');
 });
 
 test('template-kit tags render inside Eleventy (uj_icon, urlmatches nav)', () => {

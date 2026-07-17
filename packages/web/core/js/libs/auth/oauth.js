@@ -139,7 +139,7 @@ export async function handleRedirectResult(ctx) {
       const authReturnUrl = url.searchParams.get('authReturnUrl');
       const redirectTo = authReturnUrl && omega.isValidRedirectUrl(authReturnUrl)
         ? authReturnUrl
-        : '/account';
+        : '/dashboard/account';
       console.log('[Auth] Simulated redirect to:', redirectTo);
       await new Promise(resolve => setTimeout(resolve, 1500));
       window.location.href = redirectTo;

@@ -55,7 +55,7 @@ test('key default pages land at their real URLs', () => {
   for (const rel of [
     '404.html', 'about.html', 'pricing.html', 'signin.html',
     'contact.html', 'blog.html', 'terms.html', 'team.html',
-    'careers.html', 'payment/checkout.html', 'admin/dashboard.html',
+    'careers.html', 'payment/checkout.html', 'admin.html', 'dashboard/account.html',
   ]) {
     assert.ok(fs.existsSync(path.join(PKG, '.omega', 'contract-classy', rel)), `classy builds ${rel}`);
   }
@@ -134,7 +134,7 @@ test('redirect shortlinks: auth + billing defaults emit their targets', () => {
     ['recover.html', '/reset?authSignout=true'],
     ['reset-password.html', '/reset?authSignout=true'],
     ['change-password.html', '/reset?authSignout=true'],
-    ['cancel.html', '/account#billing'],
+    ['cancel.html', '/dashboard/account#billing'],
     ['refund.html', '/terms'],
   ];
   for (const [file, target] of cases) {

@@ -2,7 +2,7 @@
   dropdown: [
     {
       label: 'Account',
-      href: '/account#profile',
+      href: '/dashboard/account#profile',
       icon: 'user-gear'
     },
     {
@@ -13,7 +13,7 @@
     },
     {
       label: 'Admin panel',
-      href: '/admin/dashboard',
+      href: '/admin',
       icon: 'shield-halved',
       attributes: [
         ['data-wm-bind', '@show auth.account.roles.admin']

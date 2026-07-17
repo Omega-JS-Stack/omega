@@ -37,7 +37,7 @@ By vising {{ brand }}, you agree to comply.
 - Blank Anchor URL: [#](#)
 
 ## Test Ignored URL
-- Account page: [/account](/account)
+- Account page: [/dashboard/account](/dashboard/account)
 - Admin page: [/admin](/admin)
 - Admin sub-page: [/admin/subpage](/admin/subpage)
 

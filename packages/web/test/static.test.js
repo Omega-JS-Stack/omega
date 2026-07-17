@@ -117,7 +117,7 @@ test('nav + footer render their section data (JSON5 json-in-_includes)', () => {
 });
 
 test('admin sidebar renders its section data too (was silently empty under JSON.parse)', () => {
-  const html = fs.readFileSync(path.join(OUT, 'admin', 'dashboard.html'), 'utf8');
+  const html = fs.readFileSync(path.join(OUT, 'admin.html'), 'utf8');
   assert.ok(html.includes('Dashboard'), 'admin sidebar labels render');
 });
 

@@ -18,7 +18,7 @@
 
 <aside class="omega-shell__sidebar" id="app-sidebar">
   <!-- Brand lockup -->
-  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
+  {% capture logo_href %}{% assign temp_href = data.logo.href | default: site.brand.href | default: '/dashboard/account' %}{% if temp_href and temp_href != '' and temp_href != 'null' %}{{ temp_href }}{% else %}javascript:void(0){% endif %}{% endcapture %}
   {% capture logo_src %}{% if data.logo.src %}{{ data.logo.src }}{% else %}{{ site.brand.images.brandmark | default: null }}{% endif %}{% endcapture %}
   {% capture logo_text %}{{ data.logo.text | default: site.brand.name | uj_liquify }}{% endcapture %}
 
@@ -226,7 +226,7 @@
         <span class="classy-side__user-name d-block text-truncate" data-wm-bind="@text auth.user.displayName">User</span>
         <span class="classy-side__user-email d-block text-truncate" data-wm-bind="@text auth.user.email">email@example.com</span>
       </span>
-      <a href="/account" class="btn-icon omega-shell__label" aria-label="Account settings">
+      <a href="/dashboard/account" class="btn-icon omega-shell__label" aria-label="Account settings">
         {% uj_icon "gear", "fa-sm" %}
       </a>
     </div>

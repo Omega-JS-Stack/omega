@@ -70,7 +70,7 @@ class AuthCommand extends BaseCommand {
       const user = await this.resolveUser(admin, identifier);
       const token = await admin.auth().createCustomToken(user.uid);
       const base = String(argv.url || 'http://localhost:4000').replace(/\/+$/, '');
-      const returnUrl = String(argv.return || '/account');
+      const returnUrl = String(argv.return || '/dashboard/account');
       const signinUrl = `${base}/signin?authCustomToken=${encodeURIComponent(token)}&authReturnUrl=${encodeURIComponent(returnUrl)}`;
 
       this.log(chalk.bold(`\n  Custom token for ${user.email || user.uid}${isEmulator ? chalk.gray(' (emulator)') : chalk.red(' (PRODUCTION)')}`));

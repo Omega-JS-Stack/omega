@@ -1,4 +1,4 @@
 ---
 layout: blueprint/account/index
-permalink: /account
+permalink: /dashboard/account
 ---

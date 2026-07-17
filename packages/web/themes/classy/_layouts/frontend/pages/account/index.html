@@ -1,14 +1,16 @@
 ---
-layout: frontend/core/cover
+# A page IN the user app (cp182): rides the omega-shell (backend/core/minimal
+# → sidebar + topbar + main) instead of the old bespoke cover treatment with
+# its fixed header + close button. The base layout brings the authenticated
+# policy; the section rail below is page-owned (hash-driven JS contract).
+layout: backend/core/minimal
 
 theme:
-  main:
-    align: "start"
-
-web_manager:
-  auth:
-    config:
-      policy: "authenticated"
+  header:
+    enabled: false
+    breadcrumbs:
+      items:
+        - label: "Account"
 
 prerender_icons:
   - name: "apple"
@@ -139,26 +141,8 @@ badges:
 
 {% assign hidden_sections = "delete,data-request,refund" | split: "," %}
 
-<!-- Fixed Header -->
-<header class="position-fixed top-0 start-0 w-100 bg-body-secondary border-bottom" style="z-index: 1030;">
-  <div class="container-fluid px-4">
-    <div class="d-flex align-items-center justify-content-between py-3">
-      <!-- Left: Brand -->
-      <a href="/" class="d-flex align-items-center text-decoration-none text-body">
-        <span class="avatar avatar-md me-3 filter-adaptive">
-          <img src="{{ site.brand.images.brandmark | uj_cachebreak }}" alt="{{ site.brand.name }}"/>
-        </span>
-        <h1 class="h5 mb-0 fw-semibold">{{ site.brand.name }} Account</h1>
-      </a>
-
-      <!-- Right: Close button -->
-      <button type="button" class="btn-close" aria-label="Close" onclick="window.location.href='/'"></button>
-    </div>
-  </div>
-</header>
-
 <!-- Mobile Navigation Dropdown -->
-<div class="d-lg-none pt-5">
+<div class="d-lg-none mb-3">
   <div class="container-fluid px-0">
     <div class="card">
       <div class="card-body p-3">
@@ -183,13 +167,11 @@ badges:
 </div>
 
 <!-- Main Content with Sidebar -->
-<div class="pt-3 d-lg-none"></div>
-<div class="pt-8 d-none d-lg-block"></div>
-<div class="container-fluid">
+<div class="container-fluid px-0">
   <div class="row">
-    <!-- Desktop Sidebar -->
+    <!-- Section rail (page-owned: hash-driven, not the app sidebar) -->
     <nav class="col-lg-3 d-none d-lg-block px-3 pb-3 pt-0" aria-label="Account navigation">
-      <div class="card position-sticky" style="top: 90px;">
+      <div class="card position-sticky" style="top: 1rem;">
         <div class="card-body p-3">
           <ul class="nav nav-pills flex-column" id="account-nav" role="tablist" aria-label="Account sections">
             {% for section in resolved.sections %}
@@ -1682,7 +1664,7 @@ badges:
                       </button>
                     </div>
                     <div class="col-12 col-md-6 order-md-1">
-                      <a href="/account" class="btn btn-adaptive w-100">
+                      <a href="/dashboard/account" class="btn btn-adaptive w-100">
                         {% uj_icon "arrow-left", "fa-sm me-2" %}
                         <span>Return to profile</span>
                       </a>
@@ -1785,7 +1767,7 @@ badges:
                     </button>
                   </div>
                   <div class="col-12 col-md-6 order-md-1">
-                    <a href="/account" class="btn btn-adaptive w-100" id="cancel-delete-btn">
+                    <a href="/dashboard/account" class="btn btn-adaptive w-100" id="cancel-delete-btn">
                       {% uj_icon "arrow-left", "fa-sm me-2" %}
                       <span>Return to profile</span>
                     </a>

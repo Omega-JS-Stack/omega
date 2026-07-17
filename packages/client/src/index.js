@@ -216,7 +216,7 @@ class Manager {
         config: {
           policy: null,
           redirects: {
-            authenticated: '/account',
+            authenticated: '/dashboard/account',
             unauthenticated: '/signup'
           }
         }
