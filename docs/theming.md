@@ -52,8 +52,10 @@ the tokens).
   / `--omega-font-display` directly. Default is the mix pairing — serif
   marketing display over sans UI.
 - **Fonts (D5, shipped)**: classy vendors **Inter** (UI grotesk) and
-  **Newsreader** (marketing serif) — variable woff2, latin + latin-ext, OFL —
-  in `themes/classy/fonts/`; the asset pipeline copies every layer's `fonts/`
+  **Newsreader** (marketing serif); newsflash vendors **Schibsted Grotesk**
+  and **Fraunces** the same way (cp187 — its Google Fonts CDN link is dead) —
+  variable woff2, latin + latin-ext, OFL —
+  in `themes/<theme>/fonts/`; the asset pipeline copies every layer's `fonts/`
   dir to `/assets/fonts` (first layer wins), `css/base/_fonts.scss` carries
   the `@font-face` blocks (`font-display: swap`), and `css/base/_root.scss`
   re-points `--omega-font-ui` / `--omega-font-serif` at them. The core token

@@ -131,6 +131,13 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
   assert.ok(classyCss.includes('.btn'), 'bootstrap compiled in via the theme config');
   assert.notStrictEqual(classy.css.main, newsflash.css.main, 'content hash differs per theme');
 
+  // cp190 floor: sibling themes carry classy's token-pure app/auth
+  // vocabulary so fall-through pages render styled (Lane B)
+  assert.ok(newsflashCss.includes('.classy-auth'), 'newsflash bundle carries the classy auth floor');
+  assert.ok(newsflashCss.includes('.classy-statgrid'), 'newsflash bundle carries the classy app floor');
+  // …and speaks the shared token contract after the cp187 rebase
+  assert.ok(newsflashCss.includes('--omega-ground: #F7F2E7') || newsflashCss.includes('--omega-ground: #f7f2e7'), 'newsflash re-values the omega sheet (paper ground)');
+
   // Page css namespaces: base pages from core, theme pages from the theme
   assert.ok(classy.css.pages['blog/post'], 'core page css entry (blog/post)');
   assert.ok(newsflash.css.themePages['blog/post'], 'newsflash theme page css for blog/post');
