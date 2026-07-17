@@ -28,6 +28,7 @@ const {
   readPortsFile, writePortsFile, clearPortsFile,
   findBrandRoot, hasOmegaConfig, loadConfig,
 } = require('@omega.js/config');
+const { emitIcons } = require('@omega.js/devkit/icons');
 const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
 const { resolveStaticDirs, copyStaticAssets } = require('../static-assets.js');
@@ -131,6 +132,14 @@ module.exports = async function (options) {
       imagesDir: path.join(paths.assets, 'images'),
     }),
     outDir: paths.out,
+  });
+
+  // Runtime icon set (/assets/fa/) — the browser-side auto-renderer fetches
+  // these on demand (JS-set fa-* markup, e.g. the share buttons); emitted once
+  // at boot like the statics (the set never changes mid-dev).
+  emitIcons({
+    outDir: paths.out,
+    coreIconsDir: path.join(PATHS.core, 'icons'),
   });
 
   // ---- Rebuild assets in place on source changes

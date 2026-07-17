@@ -15,8 +15,9 @@ theme:
      Rides the shared motion engine (data-omega-marquee: one authored set,
      the engine clones it for the seamless -50% loop, hover pauses, clones
      are aria-hidden + untabbable, reduced-motion/no-JS = static row).
-     Absent when the site has no posts. -->
-{% if site.posts.size > 0 %}
+     Absent when the site has no posts. Nav-chrome: pages that disable the
+     masthead (cover chain — 404, auth) drop the ticker with it. -->
+{% if site.posts.size > 0 and resolved.theme.nav.enabled != false %}
   <div class="ticker omega-marquee" data-omega-marquee="50">
     <div class="ticker-track omega-marquee__track">
       {% for post in site.posts limit: 5 %}

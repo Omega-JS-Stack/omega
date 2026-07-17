@@ -30,6 +30,10 @@
   letter-spacing: -0.015em;
   line-height: 1.1;
   margin: 0.75rem 0;
+  // The global heading ink beats the panel's inherited color — restate it,
+  // or the title vanishes ink-on-ink (the volt .text-accent was the only
+  // visible word).
+  color: var(--nf-panel-color);
 }
 
 .cta-desc {

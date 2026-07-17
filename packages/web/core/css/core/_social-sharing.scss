@@ -5,8 +5,20 @@
 // Share Button Interactions
 // ============================================
 
-// Button styles - minimal since Bootstrap handles most styling
+// Button styles - minimal since Bootstrap handles most styling.
+// Platform colors are CSS-owned (the js renderer only structures the button):
+// each button maps Bootstrap's btn vars onto ONE --share-color, so themes
+// restyle share buttons by re-valuing vars — no inline styles to fight.
 .social-share-btn {
+  --bs-btn-bg: var(--share-color);
+  --bs-btn-border-color: var(--share-color);
+  --bs-btn-hover-bg: var(--share-color);
+  --bs-btn-hover-border-color: var(--share-color);
+  --bs-btn-active-bg: var(--share-color);
+  --bs-btn-active-border-color: var(--share-color);
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-color: #fff;
   transition: opacity 0.2s ease;
 
   &:hover {
@@ -17,3 +29,13 @@
     opacity: 0.6;
   }
 }
+
+.social-share-facebook { --share-color: #1877F2; }
+.social-share-twitter { --share-color: #000000; }
+.social-share-linkedin { --share-color: #0077B5; }
+.social-share-pinterest { --share-color: #E60023; }
+.social-share-reddit { --share-color: #FF4500; }
+.social-share-whatsapp { --share-color: #25D366; }
+.social-share-telegram { --share-color: #0088CC; }
+.social-share-email { --share-color: #6c757d; }
+.social-share-copy { --share-color: #6c757d; }

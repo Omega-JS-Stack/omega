@@ -28,6 +28,7 @@
 // Partial/consumer themes take the whole-chain hatch instead
 // (`@forward 'omega:theme'` — see docs/theming.md).
 @import '../classy/css/layout/shell';
+@import '../classy/css/layout/footer';
 @import '../classy/css/app/panels';
 @import '../classy/css/pages/auth';
 @import '../classy/css/components/receipt';

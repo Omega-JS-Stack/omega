@@ -150,6 +150,28 @@
   li::marker {
     color: var(--omega-accent);
   }
+
+  // Code blocks read as framed paper-2 slabs
+  pre {
+    padding: 1rem 1.25rem;
+    background: var(--omega-surface-2);
+    border: 1px solid var(--omega-line);
+    border-radius: $nf-radius-sm;
+  }
+}
+
+// Share buttons — monochrome ink chips (the editorial page keeps one accent);
+// the core palette is css-var-owned, so re-valuing the btn vars is enough.
+.social-share-btn {
+  --share-color: transparent;
+  --bs-btn-color: var(--omega-ink);
+  --bs-btn-border-color: var(--omega-line-strong);
+  --bs-btn-hover-bg: var(--omega-ink);
+  --bs-btn-hover-border-color: var(--omega-ink);
+  --bs-btn-hover-color: var(--omega-ground);
+  --bs-btn-active-bg: var(--omega-ink);
+  --bs-btn-active-border-color: var(--omega-ink);
+  --bs-btn-active-color: var(--omega-ground);
 }
 
 // Tag row sits on a hairline rule

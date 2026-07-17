@@ -30,7 +30,7 @@ color), `overflow="visible"` (FA 7 glyphs may overdraw their viewBox).
 
 | Target | Resolver | Wired in |
 |--------|----------|----------|
-| Web pages | `fetch('/assets/fa/<style>/<name>.svg')` from the site's own origin | `runtime/boot.js` `initialize()` — every page, main bundle or not |
+| Web pages | `fetch('/assets/fa/<style>/<name>.svg')` from the site's own origin — `omega dev` emits the set at boot too (cp192; before that only production builds ran `emitIcons`, so runtime icons 404'd in dev) | `runtime/boot.js` `initialize()` — every page, main bundle or not |
 | Desktop renderers | IPC `desktop:fontawesome:get` → main's icon server (fs, works packaged/offline) | `renderer.js` `_wireFontAwesome` |
 | Extension pages | `fetch(chrome.runtime.getURL('assets/fa/…'))` — the packaged set (gulp `fontawesome` task emits it to `dist/assets/fa` at every brand build), fully offline | `src/lib/icons.js` (self-starting side-effect import) in popup/options/sidepanel/page |
 | Extension content scripts | NOT auto-wired on purpose — watching a HOST page's DOM would collide with sites using FA themselves. Injected UI imports `createIconRenderer` and `scan()`s its own container; `assets/fa/*` is in `web_accessible_resources` for exactly this | manual, per injected surface |

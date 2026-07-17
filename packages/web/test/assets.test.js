@@ -135,6 +135,9 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
   // vocabulary so fall-through pages render styled (Lane B)
   assert.ok(newsflashCss.includes('.classy-auth'), 'newsflash bundle carries the classy auth floor');
   assert.ok(newsflashCss.includes('.classy-statgrid'), 'newsflash bundle carries the classy app floor');
+  // cp192: the shared footer include speaks classy-footer vocabulary on every
+  // page — the floor supplies its structure, the theme re-inks it
+  assert.ok(newsflashCss.includes('.classy-footer'), 'newsflash bundle carries the classy footer floor');
   // …and speaks the shared token contract after the cp187 rebase
   assert.ok(newsflashCss.includes('--omega-ground: #F7F2E7') || newsflashCss.includes('--omega-ground: #f7f2e7'), 'newsflash re-values the omega sheet (paper ground)');
 

@@ -87,7 +87,9 @@ proven:
   directly as the vocabulary FLOOR — they are deliberately TOKEN-PURE
   (zero Sass config coupling), so they paint through the importing theme's
   token re-values. The set: `layout/shell` (+ `.page-header`),
-  `app/panels` (table/statgrid/iconbtn/count), `pages/auth`,
+  `layout/footer` (the shared footer include speaks `classy-footer`
+  vocabulary on every page — the floor supplies structure, the theme
+  re-inks it), `app/panels` (table/statgrid/iconbtn/count), `pages/auth`,
   `components/receipt`, `components/badges` (chips/dot-status). Import
   EARLY (the floor sits UNDER the theme's voice, so later theme rules win
   collisions like classy's `.badge` base). Live model:

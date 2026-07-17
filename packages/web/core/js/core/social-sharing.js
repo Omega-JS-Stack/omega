@@ -6,63 +6,53 @@ export default function () {
   // Configuration with defaults merged with supplied config
   const config = omega.config.socialSharing.config;
 
-  // CDN base URL for Font Awesome SVG icons
-  const ICON_BASE_URL = 'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.0.0/svgs';
-
-  // Platform configurations
+  // Platform configurations. Button colors are CSS-owned
+  // (core/_social-sharing.scss keys off the social-share-<platform> class) so
+  // themes can restyle without fighting inline styles.
   const platforms = {
     facebook: {
       name: 'Facebook',
       icon: 'brands/facebook',
-      color: '#1877F2',
       shareUrl: 'https://www.facebook.com/sharer/sharer.php?u={ url }'
     },
     twitter: {
       name: 'X',
       icon: 'brands/x-twitter',
-      color: '#000000',
       shareUrl: 'https://twitter.com/intent/tweet?url={ url }&text={ title }'
     },
     linkedin: {
       name: 'LinkedIn',
       icon: 'brands/linkedin',
-      color: '#0077B5',
       shareUrl: 'https://www.linkedin.com/sharing/share-offsite/?url={ url }'
     },
     pinterest: {
       name: 'Pinterest',
       icon: 'brands/pinterest',
-      color: '#E60023',
       shareUrl: 'https://pinterest.com/pin/create/button/?url={ url }&description={ title }'
     },
     reddit: {
       name: 'Reddit',
       icon: 'brands/reddit',
-      color: '#FF4500',
       shareUrl: 'https://reddit.com/submit?url={ url }&title={ title }'
     },
     whatsapp: {
       name: 'WhatsApp',
       icon: 'brands/whatsapp',
-      color: '#25D366',
       shareUrl: 'https://api.whatsapp.com/send?text={ title }%20{ url }'
     },
     telegram: {
       name: 'Telegram',
       icon: 'brands/telegram',
-      color: '#0088CC',
       shareUrl: 'https://t.me/share/url?url={ url }&text={ title }'
     },
     email: {
       name: 'Email',
       icon: 'regular/envelope',
-      color: '#6c757d',
       shareUrl: 'mailto:?subject={ title }&body={ title }%20{ url }'
     },
     copy: {
       name: 'Copy Link',
       icon: 'solid/link',
-      color: '#6c757d',
       handler: copyToClipboard
     }
   };
@@ -159,27 +149,14 @@ export default function () {
     // Add classes
     $button.className = `btn btn-${shareConfig.buttonSize} social-share-btn social-share-${platformKey} align-items-center justify-content-center ${config.buttonClass}`;
 
-    // Add custom styles for platform color
-    $button.style.backgroundColor = platform.color;
-    $button.style.borderColor = platform.color;
-    $button.style.color = '#ffffff';
-    // $button.style.display = 'inline-flex';
-
-    // Add hover effect inline (will be moved to CSS)
     $button.setAttribute('data-platform', platformKey);
 
-    // Create SVG icon
-    const $iconWrapper = document.createElement('span');
-    $iconWrapper.classList.add('fa', 'fa-md');
-
-    const $iconImg = document.createElement('img');
-    $iconImg.setAttribute('data-lazy', `@src ${ICON_BASE_URL}/${platform.icon}.svg`);
-    $iconImg.alt = '';
-    $iconImg.classList.add('filter-white');
-    $iconImg.setAttribute('data-icon-type', 'share');
-
-    $iconWrapper.appendChild($iconImg);
-    $button.appendChild($iconWrapper);
+    // Icon — plain fa-* markup; the client icon-renderer resolves it through
+    // the best-first asset chain (no hardcoded CDN URL — docs/icons.md).
+    const [iconFamily, iconName] = platform.icon.split('/');
+    const $icon = document.createElement('i');
+    $icon.classList.add(`fa-${iconFamily}`, `fa-${iconName}`, 'fa-md');
+    $button.appendChild($icon);
 
     // Add tooltip for accessibility
     $button.setAttribute('title', `Share on ${platform.name}`);
