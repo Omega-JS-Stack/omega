@@ -1,134 +1,235 @@
-// Newsflash Theme — CSS Custom Properties
-// Bridges SCSS config into runtime CSS variables so light/dark mode switching
-// works without recompilation. Components read these var(--nf-*) tokens, never
-// the raw SCSS values, so dark mode is a single block of overrides.
+// Newsflash root — the editorial skin re-VALUED onto the shared --omega-*
+// token contract (core/css/tokens/_index.scss). The core sheet ships classy
+// values as placeholders; this file restamps the same NAMES with paper/ink,
+// so core chrome (shell, motion, fall-through app surfaces) and newsflash
+// components all paint editorial without a parallel token economy. Genuinely
+// newsflash-only extras (volt, ink panels, hard-offset shadows, grain) keep
+// the --nf-* namespace.
+//
+// Plumbing mirrors the core sheet exactly (three stamps: OS preference via
+// media query, appearance.js's data-bs-theme attribute beats it both ways),
+// and the Bootstrap bridge mirrors classy's _root.scss: the
+// `:root[data-bs-theme]` arm (0,1,1) outranks Bootstrap's own compiled
+// [data-bs-theme='dark'] block (0,1,0) regardless of load order — which is
+// what the cp71-era doubled-selector hack did, retired here.
+//
+// brand.color: when the consumer sets it, head.html emits inline accent
+// ramps AFTER the css bundles — those win over the vermilion placeholders
+// stamped here, exactly as the contract intends.
+
+// Vendored faces take over the font tokens (scheme-agnostic — one :root
+// stamp). Everything below (Bootstrap bridge, typography, components) reads
+// THESE tokens, so a consumer re-points fonts by redefining two properties.
+// --omega-font-marketing already defaults to the serif slot (the "mix"
+// pairing) — exactly newsflash's voice; app display stays grotesk.
+:root {
+  --omega-font-ui: 'Schibsted Grotesk', -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, 'Helvetica Neue', arial, sans-serif;
+  --omega-font-serif: 'Fraunces', ui-serif, georgia, 'Times New Roman', times, serif;
+}
+
+// Dark-mode accent derives from the COMPILE-TIME $primary so a consumer's
+// Sass brand override survives dark mode (the stock vermilion keeps its
+// hand-tuned brightening; any other color gets a generic white-mix lift).
+// brand.color consumers get the real per-mode ramp from head.html instead.
+$nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mix(white, $primary, 15%));
 
 // ============================================
-// Light Mode (default)
+// The editorial token sheet (light / dark)
 // ============================================
-// DOUBLED selectors (:root:root / [data-bs-theme][data-bs-theme]) on purpose:
-// every theme page bundle re-emits Bootstrap's own :root/[data-bs-theme=dark]
-// variable blocks (because page SCSS @uses config → Bootstrap) and those load
-// AFTER the main bundle. The doubled selector (0,2,0) beats Bootstrap's
-// (0,1,0) regardless of load order, so the paper/ink surfaces always win.
-:root:root,
-[data-bs-theme="light"][data-bs-theme="light"] {
-  // Paper & ink
-  --nf-paper: #{$nf-paper};
-  --nf-paper-2: #{$nf-paper-2};
-  --nf-ink: #{$nf-ink};
-  --nf-ink-soft: #{$nf-ink-soft};
+// Values compute from the _config.scss knobs so a consumer's Sass overrides
+// flow into the runtime tokens automatically.
+@mixin nf-light-tokens {
+  --omega-ground: #{$nf-paper};
+  --omega-surface: #{$nf-paper}; // cards sit ON the paper — ink frames, not tint, mark the edge
+  --omega-surface-2: #{$nf-paper-2};
+  --omega-ink: #{$nf-ink};
+  --omega-ink-muted: #{$nf-ink-soft};
+  --omega-ink-faint: #{mix($nf-ink-soft, $nf-paper, 65%)};
+  --omega-line: #{rgba($nf-ink, 0.16)}; // soft in-content dividers
+  --omega-line-strong: #{$nf-ink}; // FULL ink — hairline frames are the identity
+  --omega-accent: #{$nf-vermilion}; // placeholder — brand.color wins at build
+  --omega-accent-hover: #{mix(black, $nf-vermilion, 10%)};
+  --omega-accent-active: #{mix(black, $nf-vermilion, 16%)};
+  --omega-accent-subtle: #{rgba($nf-vermilion, 0.12)};
+  --omega-accent-ink: #{$nf-ink}; // ink-on-vermilion (the ramp's WCAG pick too)
+  --omega-accent-ring: #{rgba($nf-vermilion, 0.35)};
+  --omega-ok: #2e7d4f;
+  --omega-warn: #b45309; // true status amber — volt is a highlight, never a warning
+  --omega-danger: #c81e1e;
+  --omega-chart-2: #0f8fa9; // the CVD-validated teal (contract value)
+  --omega-shadow-1: 0 1px 2px rgb(23 19 16 / 8%);
+  --omega-shadow-2: #{$nf-shadow-pop};
 
-  // Translucent paper for the blurred sticky masthead
-  --nf-paper-translucent: #{rgba($nf-paper, 0.88)};
-
-  // Soft hairline for in-content dividers (feed rows, hr, table rules) —
-  // frames use the full-strength ink via --nf-border-color instead.
-  --nf-line: #{rgba($nf-ink, 0.16)};
-
-  // Accents
-  --nf-vermilion: #{$nf-vermilion};
+  // Editorial extras that flip with the scheme
   --nf-blue: #{$nf-blue};
-  --nf-volt: #{$nf-volt};
-  --nf-volt-ink: #{$nf-volt-ink};
-
-  // Ink panels (ticker, footer, big-read band) — dark slabs in both modes
   --nf-panel-bg: #{$nf-panel-bg};
   --nf-panel-color: #{$nf-panel-color};
-
-  // Frame + shadow color follow the ink
-  --nf-border-color: var(--nf-ink);
-  --nf-shadow-color: var(--nf-ink);
-
-  // Frame + shadow recipes (used by components)
-  --nf-border-width: #{$nf-border-width};
-  --nf-border: #{$nf-border-width} solid var(--nf-border-color);
-  --nf-shadow-hard: #{$nf-shadow-offset} #{$nf-shadow-offset} 0 var(--nf-shadow-color);
-  --nf-shadow-hard-hover: #{$nf-shadow-offset-hover} #{$nf-shadow-offset-hover} 0 var(--nf-shadow-color);
-  --nf-shadow-pop: #{$nf-shadow-pop};
-
-  // Film grain strength (see _utilities.scss)
+  --nf-paper-translucent: #{rgba($nf-paper, 0.88)};
   --nf-grain-opacity: 0.05;
+}
 
-  // INTERACTIVE accent — the single token every hover/active fill points at
-  // (nav links, dropdown items, pagination). It tracks the rendered primary
-  // (--bs-primary), NOT the raw SCSS value, so consumer overrides flow through.
-  --nf-accent-interactive: var(--bs-primary);
-  --nf-accent-interactive-ink: #ffffff; // readable text on the interactive fill
+@mixin nf-dark-tokens {
+  --omega-ground: #{$nf-paper-dark};
+  --omega-surface: #{$nf-paper-2-dark}; // cards lift a step off the dark paper
+  --omega-surface-2: #{$nf-paper-2-dark};
+  --omega-ink: #{$nf-ink-dark};
+  --omega-ink-muted: #{$nf-ink-soft-dark};
+  --omega-ink-faint: #{mix($nf-ink-soft-dark, $nf-paper-dark, 65%)};
+  --omega-line: #{rgba($nf-ink-dark, 0.18)};
+  --omega-line-strong: #{$nf-ink-dark}; // cream frames on dark paper
+  --omega-accent: #{$nf-primary-dark-mode};
+  --omega-accent-hover: #{mix(black, $nf-primary-dark-mode, 10%)};
+  --omega-accent-active: #{mix(black, $nf-primary-dark-mode, 16%)};
+  --omega-accent-subtle: #{rgba($nf-primary-dark-mode, 0.16)};
+  --omega-accent-ink: #{$nf-ink}; // still ink — the brightened accent stays a light fill
+  --omega-accent-ring: #{rgba($nf-primary-dark-mode, 0.35)};
+  --omega-ok: #3fbf83;
+  --omega-warn: #f5a524;
+  --omega-danger: #f0574d;
+  --omega-chart-2: #1f9fb4;
+  --omega-shadow-1: 0 1px 2px rgb(0 0 0 / 35%);
+  --omega-shadow-2: 0 18px 40px -18px rgb(0 0 0 / 80%); // pop barely reads on dark paper — deeper, tighter
 
-  // Map onto Bootstrap surfaces. The -rgb companions MUST be remapped too —
-  // Bootstrap's .bg-body-* / .text-body-* utilities paint from
-  // rgba(var(--bs-*-rgb), opacity), not the hex vars.
-  --bs-body-bg: #{$nf-paper};
-  --bs-body-bg-rgb: #{red($nf-paper)}, #{green($nf-paper)}, #{blue($nf-paper)};
-  --bs-body-color: #{$nf-ink};
-  --bs-body-color-rgb: #{red($nf-ink)}, #{green($nf-ink)}, #{blue($nf-ink)};
-  --bs-secondary-color: #{$nf-ink-soft};      // .text-body-secondary / muted metas
-  --bs-secondary-color-rgb: #{red($nf-ink-soft)}, #{green($nf-ink-soft)}, #{blue($nf-ink-soft)};
-  --bs-secondary-bg: #{$nf-paper-2};
-  --bs-secondary-bg-rgb: #{red($nf-paper-2)}, #{green($nf-paper-2)}, #{blue($nf-paper-2)};
-  --bs-tertiary-bg: #{$nf-paper-2};
-  --bs-tertiary-bg-rgb: #{red($nf-paper-2)}, #{green($nf-paper-2)}, #{blue($nf-paper-2)};
-  --bs-border-color: var(--nf-line);          // soft dividers; frames opt into full ink
-  --bs-card-bg: #{$nf-paper};
-  --bs-emphasis-color: #{$nf-ink};
-  --bs-emphasis-color-rgb: #{red($nf-ink)}, #{green($nf-ink)}, #{blue($nf-ink)};
+  --nf-blue: #{$nf-blue-dark-mode};
+  --nf-panel-bg: #{$nf-panel-bg-dark};
+  --nf-panel-color: #{$nf-panel-color-dark};
+  --nf-paper-translucent: #{rgba($nf-paper-dark, 0.88)};
+  --nf-grain-opacity: 0.07;
+}
+
+:root {
+  @include nf-light-tokens;
+
+  // Shape + motion (scheme-agnostic re-values of the core slots)
+  --omega-radius-xs: 8px;
+  --omega-radius-s: 10px;
+  --omega-radius-m: #{$nf-radius-sm};
+  --omega-radius-l: #{$nf-radius};
+  --omega-radius-xl: 24px;
+  --omega-speed: 200ms;
+  --omega-speed-slow: 600ms;
+  --omega-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  // Editorial constants (deliberately identical in both modes)
+  --nf-volt: #{$nf-volt};
+  --nf-volt-ink: #{$nf-volt-ink};
+  --nf-border-width: #{$nf-border-width};
+
+  // Frame + hard-shadow recipes — ink-colored, so they auto-flip to cream
+  // in dark mode through the tokens they reference.
+  --nf-border: var(--nf-border-width) solid var(--omega-line-strong);
+  --nf-shadow-hard: #{$nf-shadow-offset} #{$nf-shadow-offset} 0 var(--omega-ink);
+  --nf-shadow-hard-hover: #{$nf-shadow-offset-hover} #{$nf-shadow-offset-hover} 0 var(--omega-ink);
+}
+
+// OS preference carries when no explicit choice is stamped…
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include nf-dark-tokens;
+  }
+}
+
+// …and the appearance.js stamp beats the OS in BOTH directions.
+:root[data-bs-theme='dark'] {
+  @include nf-dark-tokens;
+}
+
+:root[data-bs-theme='light'] {
+  @include nf-light-tokens;
 }
 
 // ============================================
-// Dark Mode
+// Bootstrap bridge
 // ============================================
-// Paper flips to deep warm near-black, ink to cream; vermilion/blue brighten
-// for contrast; volt stays vibrant. Frames + hard shadows auto-flip because
-// they reference var(--nf-border-color) → var(--nf-ink).
-// Doubled selector: see the light-mode block note.
+// Bootstrap's CSS variables re-pointed at the tokens (classy's pattern), so
+// mode switching, brand ramps, and consumer token overrides restyle every
+// Bootstrap component with ZERO recompilation.
+:root,
+:root[data-bs-theme] {
+  // Surfaces + text
+  --bs-body-bg: var(--omega-ground);
+  --bs-body-color: var(--omega-ink);
+  --bs-emphasis-color: var(--omega-ink);
+  --bs-secondary-color: var(--omega-ink-muted);
+  --bs-tertiary-color: var(--omega-ink-faint);
+  --bs-secondary-bg: var(--omega-surface-2);
+  --bs-tertiary-bg: var(--omega-surface-2); // wells are paper-2 — newsflash has no white tier
+  --bs-heading-color: var(--omega-ink);
 
-// Dark-mode primary derives from the COMPILE-TIME $primary so a consumer's
-// brand override survives dark mode (the stock vermilion keeps its hand-tuned
-// brightening; any other brand color gets a generic white-mix lift).
-$nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mix(white, $primary, 15%));
+  // Lines — soft dividers by default; frames opt into full ink via --nf-border
+  --bs-border-color: var(--omega-line);
+  --bs-border-color-translucent: var(--omega-line);
 
-[data-bs-theme="dark"][data-bs-theme="dark"] {
-  --nf-paper: #{$nf-paper-dark};
-  --nf-paper-2: #{$nf-paper-2-dark};
-  --nf-ink: #{$nf-ink-dark};
-  --nf-ink-soft: #{$nf-ink-soft-dark};
+  // Accent + links track the ramp (replaces the cp71 dark-block primary hack)
+  --bs-primary: var(--omega-accent);
+  --bs-link-color: var(--omega-accent);
+  --bs-link-hover-color: var(--omega-accent-hover);
 
-  --nf-paper-translucent: #{rgba($nf-paper-dark, 0.88)};
-  --nf-line: #{rgba($nf-ink-dark, 0.18)};
+  // Type
+  --bs-body-font-family: var(--omega-font-ui);
+  --bs-font-monospace: var(--omega-font-mono);
 
-  --nf-vermilion: #{$nf-vermilion-dark-mode};
-  --nf-blue: #{$nf-blue-dark-mode};
+  // Focus
+  --bs-focus-ring-color: var(--omega-accent-ring);
 
-  --nf-panel-bg: #{$nf-panel-bg-dark};
-  --nf-panel-color: #{$nf-panel-color-dark};
+  // Code
+  --bs-code-color: var(--omega-ink);
+}
 
-  // Pop shadows barely read on dark paper; lean on a deeper, tighter blur.
-  --nf-shadow-pop: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+// RGB triplets (Bootstrap's translucency utilities paint from
+// rgba(var(--bs-*-rgb), opacity), which var() can't feed) — computed from
+// the Sass knobs, same three-stamp plumbing as the sheet.
+@mixin nf-light-rgb {
+  --bs-body-bg-rgb: #{red($nf-paper)}, #{green($nf-paper)}, #{blue($nf-paper)};
+  --bs-body-color-rgb: #{red($nf-ink)}, #{green($nf-ink)}, #{blue($nf-ink)};
+  --bs-emphasis-color-rgb: #{red($nf-ink)}, #{green($nf-ink)}, #{blue($nf-ink)};
+  --bs-secondary-color-rgb: #{red($nf-ink-soft)}, #{green($nf-ink-soft)}, #{blue($nf-ink-soft)};
+  --bs-secondary-bg-rgb: #{red($nf-paper-2)}, #{green($nf-paper-2)}, #{blue($nf-paper-2)};
+  --bs-tertiary-bg-rgb: #{red($nf-paper-2)}, #{green($nf-paper-2)}, #{blue($nf-paper-2)};
+  --bs-primary-rgb: #{red($nf-vermilion)}, #{green($nf-vermilion)}, #{blue($nf-vermilion)};
+  --bs-link-color-rgb: #{red($nf-vermilion)}, #{green($nf-vermilion)}, #{blue($nf-vermilion)};
+}
 
-  --nf-grain-opacity: 0.07;
-
-  // Brighten the rendered primary so it stays vivid on dark paper
-  // (--bs-primary is compile-time; these runtime link/button reads cover the
-  // places that matter most for legibility).
-  --bs-primary: #{$nf-primary-dark-mode};
-  --bs-primary-rgb: #{red($nf-primary-dark-mode)}, #{green($nf-primary-dark-mode)}, #{blue($nf-primary-dark-mode)};
-  --bs-link-color: #{$nf-primary-dark-mode};
-  --bs-link-color-rgb: #{red($nf-primary-dark-mode)}, #{green($nf-primary-dark-mode)}, #{blue($nf-primary-dark-mode)};
-  --bs-link-hover-color: #{lighten($nf-primary-dark-mode, 8%)};
-
-  --bs-body-bg: #{$nf-paper-dark};
+@mixin nf-dark-rgb {
   --bs-body-bg-rgb: #{red($nf-paper-dark)}, #{green($nf-paper-dark)}, #{blue($nf-paper-dark)};
-  --bs-body-color: #{$nf-ink-dark};
   --bs-body-color-rgb: #{red($nf-ink-dark)}, #{green($nf-ink-dark)}, #{blue($nf-ink-dark)};
-  --bs-secondary-color: #{$nf-ink-soft-dark};
-  --bs-secondary-color-rgb: #{red($nf-ink-soft-dark)}, #{green($nf-ink-soft-dark)}, #{blue($nf-ink-soft-dark)};
-  --bs-secondary-bg: #{$nf-paper-2-dark};
-  --bs-secondary-bg-rgb: #{red($nf-paper-2-dark)}, #{green($nf-paper-2-dark)}, #{blue($nf-paper-2-dark)};
-  --bs-tertiary-bg: #{$nf-paper-2-dark};
-  --bs-tertiary-bg-rgb: #{red($nf-paper-2-dark)}, #{green($nf-paper-2-dark)}, #{blue($nf-paper-2-dark)};
-  --bs-border-color: var(--nf-line);
-  --bs-card-bg: #{$nf-paper-2-dark};
-  --bs-emphasis-color: #{$nf-ink-dark};
   --bs-emphasis-color-rgb: #{red($nf-ink-dark)}, #{green($nf-ink-dark)}, #{blue($nf-ink-dark)};
+  --bs-secondary-color-rgb: #{red($nf-ink-soft-dark)}, #{green($nf-ink-soft-dark)}, #{blue($nf-ink-soft-dark)};
+  --bs-secondary-bg-rgb: #{red($nf-paper-2-dark)}, #{green($nf-paper-2-dark)}, #{blue($nf-paper-2-dark)};
+  --bs-tertiary-bg-rgb: #{red($nf-paper-2-dark)}, #{green($nf-paper-2-dark)}, #{blue($nf-paper-2-dark)};
+  --bs-primary-rgb: #{red($nf-primary-dark-mode)}, #{green($nf-primary-dark-mode)}, #{blue($nf-primary-dark-mode)};
+  --bs-link-color-rgb: #{red($nf-primary-dark-mode)}, #{green($nf-primary-dark-mode)}, #{blue($nf-primary-dark-mode)};
+}
+
+:root {
+  @include nf-light-rgb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    @include nf-dark-rgb;
+  }
+}
+
+:root[data-bs-theme='dark'] {
+  @include nf-dark-rgb;
+}
+
+:root[data-bs-theme='light'] {
+  @include nf-light-rgb;
+}
+
+// Component surfaces ride the tokens too. (Volt ::selection lives in
+// css/base/_utilities.scss with the rest of the editorial garnish.)
+.card,
+.modal-content,
+.offcanvas,
+.toast,
+.popover {
+  --bs-card-bg: var(--omega-surface);
+  --bs-card-border-color: var(--omega-line);
+  --bs-modal-bg: var(--omega-surface);
+  --bs-offcanvas-bg: var(--omega-surface);
+  --bs-toast-bg: var(--omega-surface);
+  --bs-popover-bg: var(--omega-surface);
 }

@@ -47,9 +47,9 @@
   &.btn-dark,
   &.btn-adaptive,
   &.btn-adaptive-inverse {
-    border-color: var(--nf-border-color);
-    --bs-btn-hover-border-color: var(--nf-border-color);
-    --bs-btn-active-border-color: var(--nf-border-color);
+    border-color: var(--omega-line-strong);
+    --bs-btn-hover-border-color: var(--omega-line-strong);
+    --bs-btn-active-border-color: var(--omega-line-strong);
   }
 
   // SOLID buttons: freeze hover/active fill to the resting color so the lift
@@ -73,7 +73,7 @@
 .btn.btn-adaptive {
   --bs-btn-color: #{$nf-paper};
   --bs-btn-bg: #{$nf-ink};
-  --bs-btn-border-color: var(--nf-border-color);
+  --bs-btn-border-color: var(--omega-line-strong);
 }
 [data-bs-theme="dark"] .btn.btn-adaptive {
   --bs-btn-color: #{$nf-paper-dark};
@@ -82,7 +82,7 @@
 .btn.btn-adaptive-inverse {
   --bs-btn-color: #{$nf-paper-dark};
   --bs-btn-bg: #{$nf-ink-dark};
-  --bs-btn-border-color: var(--nf-border-color);
+  --bs-btn-border-color: var(--omega-line-strong);
 }
 [data-bs-theme="dark"] .btn.btn-adaptive-inverse {
   --bs-btn-color: #{$nf-paper};
@@ -109,18 +109,18 @@
 [class*="btn-outline-"][class*="btn-outline-"] {
   box-shadow: none;
   background: transparent;
-  border-color: var(--nf-border-color);
+  border-color: var(--omega-line-strong);
   color: var(--bs-body-color);
-  --bs-btn-hover-bg: var(--nf-ink);
-  --bs-btn-hover-color: var(--nf-paper);
-  --bs-btn-hover-border-color: var(--nf-border-color);
-  --bs-btn-active-bg: var(--nf-ink);
-  --bs-btn-active-color: var(--nf-paper);
-  --bs-btn-active-border-color: var(--nf-border-color);
+  --bs-btn-hover-bg: var(--omega-ink);
+  --bs-btn-hover-color: var(--omega-ground);
+  --bs-btn-hover-border-color: var(--omega-line-strong);
+  --bs-btn-active-bg: var(--omega-ink);
+  --bs-btn-active-color: var(--omega-ground);
+  --bs-btn-active-border-color: var(--omega-line-strong);
 
   &:hover {
-    color: var(--nf-paper);
-    background: var(--nf-ink);
+    color: var(--omega-ground);
+    background: var(--omega-ink);
   }
 }
 

@@ -67,10 +67,9 @@
 {% endcapture %}
 
 <!-- Prefetch and Preconnect -->
-<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin/>
-<link rel="dns-prefetch" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link rel="dns-prefetch" href="https://fonts.gstatic.com"/>
+<!-- First-party themes VENDOR their webfonts (D5) — no font-CDN warmup by
+     default. A theme that CDN-loads faces adds its own preconnect alongside
+     its stylesheet link via theme.head.content. -->
 <!-- <link rel="preconnect" href="https://cdn.jsdelivr.net"/> -->
 <!-- <link rel="preconnect" href="https://cdnjs.cloudflare.com"/> -->
 <!-- <link rel="dns-prefetch" href="https://cdn.jsdelivr.net"/> -->

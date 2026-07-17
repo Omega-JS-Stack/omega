@@ -70,15 +70,15 @@
   // .text-body utility (!important) on every link, which otherwise wins and
   // leaves ink text on the ink hover fill (unreadable).
   &:hover {
-    background: var(--nf-ink);
-    color: var(--nf-paper) !important;
+    background: var(--omega-ink);
+    color: var(--omega-ground) !important;
   }
 
   // Active = vermilion pill.
   &.active,
   &.active.text-body {
-    background: var(--nf-accent-interactive) !important;
-    color: var(--nf-accent-interactive-ink) !important;
+    background: var(--omega-accent) !important;
+    color: var(--omega-accent-ink) !important;
   }
 }
 
@@ -90,7 +90,7 @@
   @include nf-border();
   transition: $nf-transition;
 
-  &:hover { background: var(--nf-paper-2); }
+  &:hover { background: var(--omega-surface-2); }
   &:focus { box-shadow: 0 0 0 3px var(--nf-volt); }
 
   .navbar-toggler-icon {
@@ -140,8 +140,8 @@
     // text-color utilities from the shared includes — same trap as nav links.
     &:hover,
     &:focus {
-      background: var(--nf-ink);
-      color: var(--nf-paper) !important;
+      background: var(--omega-ink);
+      color: var(--omega-ground) !important;
 
       // Child text spans with their own utility colors flip with the item
       [class*="text-"] {
@@ -151,13 +151,13 @@
 
     &.active,
     &:active {
-      background: var(--nf-accent-interactive);
-      color: var(--nf-accent-interactive-ink) !important;
+      background: var(--omega-accent);
+      color: var(--omega-accent-ink) !important;
     }
   }
 
   .dropdown-divider {
-    border-top: 1px solid var(--nf-line);
+    border-top: 1px solid var(--omega-line);
     opacity: 1;
     margin: 0.4rem 0;
   }

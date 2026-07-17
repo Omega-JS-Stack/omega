@@ -32,13 +32,13 @@
     transition: $nf-transition;
 
     &:hover {
-      background: var(--nf-paper-2);
+      background: var(--omega-surface-2);
     }
   }
 
   .btn-check:checked + .billing-option {
-    background: var(--nf-ink);
-    color: var(--nf-paper);
+    background: var(--omega-ink);
+    color: var(--omega-ground);
   }
 
   .billing-save {
@@ -77,7 +77,7 @@
   padding: 1.75rem;
 
   &--popular {
-    border-color: var(--bs-primary);
+    border-color: var(--omega-accent);
     border-width: 2.5px;
     box-shadow: var(--nf-shadow-hard-hover);
   }
@@ -132,7 +132,7 @@
 
   .price-per-unit {
     font-weight: 700;
-    color: var(--bs-primary);
+    color: var(--omega-accent);
   }
 }
 
@@ -171,7 +171,7 @@
   }
 
   .pricing-plan-feature-icon {
-    color: var(--bs-primary);
+    color: var(--omega-accent);
     flex: none;
   }
 }

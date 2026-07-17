@@ -5,7 +5,7 @@
 
 // Hairline frame in the current ink color.
 @mixin nf-border($width: var(--nf-border-width)) {
-  border: $width solid var(--nf-border-color);
+  border: $width solid var(--omega-line-strong);
 }
 
 // Small hard offset shadow (no blur) — the resting state of controls.
@@ -14,8 +14,9 @@
 }
 
 // Soft "pop" shadow — depth for frames and panels (hero art, signup rail).
+// Rides the shared big-shadow slot, which the root re-values editorially.
 @mixin nf-shadow-pop() {
-  box-shadow: var(--nf-shadow-pop);
+  box-shadow: var(--omega-shadow-2);
 }
 
 // The signature interaction: the element rests on a small hard shadow, then
@@ -31,13 +32,13 @@
 
   &:active {
     transform: translate(0, 0);
-    box-shadow: 1px 1px 0 var(--nf-shadow-color);
+    box-shadow: 1px 1px 0 var(--omega-ink);
   }
 }
 
 // Headline hover underline — an accent rule that grows from the left under
 // the text (the editorial "this is a link" affordance on serif headlines).
-@mixin nf-underline-grow($color: var(--bs-primary), $thickness: 2px) {
+@mixin nf-underline-grow($color: var(--omega-accent), $thickness: 2px) {
   background-image: linear-gradient($color, $color);
   background-repeat: no-repeat;
   background-size: 0% $thickness;

@@ -28,7 +28,7 @@ section {
 // Hero sections ship as .bg-gradient-rainbow with light text; flatten to a
 // paper-2 well closed by an ink rule, and pull the text back to ink.
 section.bg-gradient-rainbow {
-  background-color: var(--nf-paper-2) !important;
+  background-color: var(--omega-surface-2) !important;
   color: var(--bs-body-color) !important;
   border-radius: 0 !important;
   border-bottom: var(--nf-border);
@@ -43,7 +43,7 @@ section.bg-gradient-rainbow {
 
   // The hero tagline becomes a vermilion kicker line
   .text-uppercase {
-    color: var(--bs-primary) !important;
+    color: var(--omega-accent) !important;
     font-weight: 800;
     letter-spacing: 0.14em;
     opacity: 1 !important;
@@ -56,7 +56,7 @@ section.bg-gradient-rainbow {
   -webkit-background-clip: initial !important;
   background-clip: initial !important;
   -webkit-text-fill-color: currentColor !important;
-  color: var(--bs-primary) !important;
+  color: var(--omega-accent) !important;
   font-family: $nf-font-display;
   font-style: italic;
 }
@@ -64,7 +64,7 @@ section.bg-gradient-rainbow {
 // Decorative gradient borders → hairline ink
 .border-gradient-rainbow {
   border-image: none !important;
-  border-color: var(--nf-line) !important;
+  border-color: var(--omega-line) !important;
 }
 
 // Glassy panels → framed paper
@@ -81,7 +81,7 @@ section.bg-gradient-rainbow {
 .card.bg-gradient,
 .card.bg-primary {
   background-image: none !important;
-  background-color: var(--bs-primary) !important;
+  background-color: var(--omega-accent) !important;
   color: #fff !important;
   @include nf-border();
   box-shadow: var(--nf-shadow-hard-hover) !important;
@@ -91,8 +91,8 @@ section.bg-gradient-rainbow {
 // Shadow utilities → editorial pop (soft depth; frames carry the ink)
 // ============================================
 .shadow-sm { box-shadow: 0 8px 20px -14px rgba(23, 19, 16, 0.35) !important; }
-.shadow    { box-shadow: var(--nf-shadow-pop) !important; }
-.shadow-lg { box-shadow: var(--nf-shadow-pop) !important; }
+.shadow    { box-shadow: var(--omega-shadow-2) !important; }
+.shadow-lg { box-shadow: var(--omega-shadow-2) !important; }
 
 // Cards that ship with .border-0 (e.g. the auth card) lose the frame; give it
 // back on elevated cards so the ink outline + pop shadow read as one object.
@@ -106,7 +106,7 @@ section.bg-gradient-rainbow {
 // Rules — hr reads as a soft editorial divider
 // ============================================
 hr {
-  border-top: 1px solid var(--nf-line);
+  border-top: 1px solid var(--omega-line);
   opacity: 1;
 }
 
@@ -244,7 +244,7 @@ footer {
 
   &:focus {
     box-shadow: none;
-    border-color: var(--nf-border-color);
+    border-color: var(--omega-line-strong);
   }
 }
 

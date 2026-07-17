@@ -11,7 +11,10 @@
 // @import (not @use) so the mixins land in the global scope the @imports share.
 @import 'css/base/mixins';
 
-// CSS custom properties (light/dark bridge)
+// Vendored webfonts (Fraunces + Schibsted Grotesk — D5)
+@import 'css/base/fonts';
+
+// Token re-value + Bootstrap bridge (--omega-* contract, light/dark)
 @import 'css/base/root';
 
 // Base styles

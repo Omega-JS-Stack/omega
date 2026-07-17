@@ -6,6 +6,11 @@
 // vermilion accents with volt highlights; serif display type over a clean
 // grotesk; pill controls sitting on small hard offset shadows that "lift"
 // on hover. An editorial newsroom — modern front page, not a brochure.
+//
+// Compile-time knobs live here; RUNTIME paint reads the shared --omega-*
+// tokens, which css/base/_root.scss re-values editorially (consumers can
+// also override them per-mode in plain CSS). brand.color in omega.json5
+// recolors the accent family without touching either.
 
 // ============================================
 // Bootstrap Color Overrides
@@ -71,6 +76,8 @@ $nf-shadow-pop: 0 18px 40px -18px rgba(23, 19, 16, .35) !default;
 // Typography
 // ============================================
 // Fraunces (optical-sized serif) for display; Schibsted Grotesk for body/UI.
+// Both VENDORED in the theme's fonts/ dir (D5 — css/base/_fonts.scss); the
+// runtime reads the --omega-font-* tokens, which _root.scss re-points.
 $font-family-sans-serif: 'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !default;
 $nf-font-display: 'Fraunces', Georgia, 'Times New Roman', serif !default;
 
@@ -81,7 +88,9 @@ $font-weight-bold: 700 !default;
 // ============================================
 // Motion — smooth editorial easing
 // ============================================
-$nf-transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1) !default;
+// Rides the shared motion tokens (the root re-values them to the editorial
+// curve), so consumer token overrides retime every transition at once.
+$nf-transition: all var(--omega-speed) var(--omega-ease) !default;
 
 // ============================================
 // Component Sizing

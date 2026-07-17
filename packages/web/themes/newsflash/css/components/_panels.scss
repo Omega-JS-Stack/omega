@@ -47,7 +47,7 @@
   width: 520px;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: repeating-radial-gradient(circle, var(--nf-vermilion) 0 2px, transparent 2px 34px);
+  background: repeating-radial-gradient(circle, var(--omega-accent) 0 2px, transparent 2px 34px);
   opacity: 0.7;
   transform: translateY(-50%);
   animation: cta-rings-spin 60s linear infinite;
@@ -87,5 +87,5 @@
   font-size: clamp(2.6rem, 5vw, 3.6rem);
   line-height: 1.1;
   color: transparent;
-  -webkit-text-stroke: 1.5px var(--nf-ink);
+  -webkit-text-stroke: 1.5px var(--omega-ink);
 }

@@ -45,7 +45,7 @@
   background:
     radial-gradient(110% 90% at 88% 8%, #FFB36B 0%, rgba(255, 179, 107, 0) 52%),
     radial-gradient(120% 110% at 8% 95%, var(--nf-blue) 0%, rgba(39, 66, 245, 0) 56%),
-    linear-gradient(155deg, var(--nf-vermilion) 10%, #FF7A3D 90%);
+    linear-gradient(155deg, var(--omega-accent) 10%, #FF7A3D 90%);
 }
 
 // ============================================
@@ -60,7 +60,7 @@
   font-size: 3.2rem;
   line-height: 1;
   color: transparent;
-  -webkit-text-stroke: 1.5px var(--nf-ink);
+  -webkit-text-stroke: 1.5px var(--omega-ink);
 }
 
 // On rundown rows the numeral replaces the thumbnail — shrink its column
@@ -93,7 +93,7 @@
     content: "";
     flex: 1;
     height: var(--nf-border-width);
-    background: var(--nf-border-color);
+    background: var(--omega-line-strong);
   }
 }
 
@@ -107,7 +107,7 @@
     gap: 1rem;
     align-items: flex-start;
     padding: 0.8rem 0;
-    border-bottom: 1px solid var(--nf-line);
+    border-bottom: 1px solid var(--omega-line);
 
     &:first-child { padding-top: 0; }
     &:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -120,15 +120,15 @@
       font-size: 2rem;
       line-height: 1;
       color: transparent;
-      -webkit-text-stroke: 1.3px var(--nf-ink);
+      -webkit-text-stroke: 1.3px var(--omega-ink);
       flex: none;
       width: 1.2em;
       transition: $nf-transition;
     }
 
     &:hover::before {
-      color: var(--bs-primary);
-      -webkit-text-stroke-color: var(--bs-primary);
+      color: var(--omega-accent);
+      -webkit-text-stroke-color: var(--omega-accent);
     }
   }
 
@@ -140,7 +140,7 @@
     text-decoration: none;
 
     &:hover {
-      color: var(--bs-primary);
+      color: var(--omega-accent);
     }
   }
 }

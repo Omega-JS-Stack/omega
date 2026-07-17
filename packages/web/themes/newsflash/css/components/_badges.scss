@@ -41,9 +41,9 @@
     transition: $nf-transition;
 
     &:hover {
-      background: var(--nf-ink);
-      color: var(--nf-paper);
-      border-color: var(--nf-border-color);
+      background: var(--omega-ink);
+      color: var(--omega-ground);
+      border-color: var(--omega-line-strong);
     }
 
     &:focus {
@@ -52,14 +52,14 @@
   }
 
   .page-item.active .page-link {
-    background: var(--nf-accent-interactive);
-    color: var(--nf-accent-interactive-ink);
-    border-color: var(--nf-border-color);
+    background: var(--omega-accent);
+    color: var(--omega-accent-ink);
+    border-color: var(--omega-line-strong);
   }
 
   .page-item.disabled .page-link {
     background: transparent;
-    border-color: var(--nf-line);
+    border-color: var(--omega-line);
     color: var(--bs-secondary-color);
   }
 }
