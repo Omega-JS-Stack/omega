@@ -12,29 +12,21 @@ theme:
 ---
 
 <!-- News ticker — the latest headlines marquee above the masthead.
-     Pure CSS animation; the track is duplicated once (aria-hidden) so the
-     -50% keyframe loops seamlessly. Absent when the site has no posts. -->
+     Rides the shared motion engine (data-omega-marquee: one authored set,
+     the engine clones it for the seamless -50% loop, hover pauses, clones
+     are aria-hidden + untabbable, reduced-motion/no-JS = static row).
+     Absent when the site has no posts. -->
 {% if site.posts.size > 0 %}
-  <div class="ticker">
-    <div class="ticker-track">
+  <div class="ticker omega-marquee" data-omega-marquee="50">
+    <div class="ticker-track omega-marquee__track">
       {% for post in site.posts limit: 5 %}
-        <span class="ticker-item">
+        <span class="ticker-item omega-marquee__item">
           {% if forloop.first %}
             <span class="live-dot"></span><b>LATEST</b>
           {% else %}
             {% uj_icon "bolt" %}
           {% endif %}
           <a href="{{ site.url }}{{ post.url }}">{{ post.post.title }}</a>
-        </span>
-      {% endfor %}
-      {% for post in site.posts limit: 5 %}
-        <span class="ticker-item" aria-hidden="true">
-          {% if forloop.first %}
-            <span class="live-dot"></span><b>LATEST</b>
-          {% else %}
-            {% uj_icon "bolt" %}
-          {% endif %}
-          <a href="{{ site.url }}{{ post.url }}" tabindex="-1">{{ post.post.title }}</a>
         </span>
       {% endfor %}
     </div>

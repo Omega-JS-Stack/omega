@@ -135,7 +135,7 @@ desktop/extension at C4 exactly like icon-renderer.
 | `data-omega-reveal-stagger="60"` (parent) | staggers child reveals (ms step) |
 | `data-omega-countup` | counts to the number already in the markup |
 | `data-omega-rotate="2600"` | children cycle (hero word rotator, quotes) |
-| `data-omega-marquee` + `.omega-marquee__track/__item` | seamless loop — the set is cloned until half the track covers the container (never runs dry), constant px/s (attr value overrides) |
+| `data-omega-marquee` + `.omega-marquee__track/__item` | seamless loop — the set is cloned until half the track covers the container (never runs dry), constant px/s (attr value overrides); clones are `aria-hidden` with focusables detabbed (`tabindex=-1`, still mouse-clickable) so interactive sets (newsflash ticker headlines) stay accessible |
 | `data-omega-scroll-watch="24"` | stamps `data-omega-scrolled` (glassy nav) |
 | `data-omega-segmented` | gliding-thumb segmented control: engine injects `.omega-segmented__thumb` and tracks the checked/`.active` segment (billing toggle, platform rails, footer appearance) |
 | `data-omega-dotfield="22"` | canvas dot grid (value = px spacing): slow traveling wave, dots tint along ONE drifting rainbow gradient, pointer glow (tracked window-level so the fixed nav can't blind it); static CSS dots remain for no-JS/reduced-motion |

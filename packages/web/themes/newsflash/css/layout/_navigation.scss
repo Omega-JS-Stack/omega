@@ -32,8 +32,10 @@
   border-bottom: var(--nf-border);
   transition: box-shadow 0.25s ease;
 
-  // Soft shadow only once scrolled (set by js/masthead-scroll.js)
-  &.scrolled {
+  // Soft shadow only once scrolled — the shared motion engine stamps
+  // data-omega-scrolled on whatever carries data-omega-scroll-watch
+  // (the masthead markup stamps it; no theme JS).
+  &[data-omega-scrolled='true'] {
     box-shadow: 0 8px 24px -16px rgba(23, 19, 16, 0.4);
   }
 

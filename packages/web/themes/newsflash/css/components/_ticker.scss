@@ -1,13 +1,15 @@
 // Newsflash Theme — News Ticker
 // The signature strip above the masthead: an ink bar marquee-scrolling the
-// latest headlines with a pulsing live dot. Pure CSS animation — the track
-// content is duplicated once in the layout, so -50% loops seamlessly.
+// latest headlines with a pulsing live dot. The SKIN lives here; the loop
+// mechanics (cloning, constant px/s, hover pause, reduced-motion off) ride
+// the shared motion engine — base.html stamps data-omega-marquee.
 // Genuinely novel UI (no Bootstrap equivalent) → universal semantic classes.
 
 .ticker {
+  --omega-marquee-gap: 0; // items self-space via padding
+
   background: var(--nf-panel-bg);
   color: var(--nf-panel-color);
-  overflow: hidden;
   white-space: nowrap;
   font-size: 0.78rem;
   font-weight: 600;
@@ -24,13 +26,7 @@
 }
 
 .ticker-track {
-  display: inline-flex;
   padding: 0.55em 0;
-  animation: ticker-scroll 36s linear infinite;
-}
-
-.ticker:hover .ticker-track {
-  animation-play-state: paused;
 }
 
 .ticker-item {
@@ -54,17 +50,18 @@
   animation: live-pulse 1.4s ease-in-out infinite;
 }
 
-@keyframes ticker-scroll {
-  to { transform: translateX(-50%); }
-}
-
 @keyframes live-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.8); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticker-track { animation: none; }
+  // The engine stops the loop; the static row stays scrollable by hand
+  // (and sheds the engine's edge mask so no headline fades out).
   .live-dot { animation: none; }
-  .ticker { overflow-x: auto; }
+
+  .ticker {
+    overflow-x: auto;
+    mask-image: none;
+  }
 }

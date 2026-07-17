@@ -13,15 +13,12 @@ window.bootstrap = bootstrap;
 }
 /* @dev-only:end */
 
-// Theme behaviors
-import setupMastheadScroll from './js/masthead-scroll.js';
+// Theme behaviors (masthead scroll state rides the shared motion engine's
+// data-omega-scroll-watch — no theme JS)
 import initializeTooltips from './js/initialize-tooltips.js';
 
 // Initialize when DOM is ready
 domReady().then(() => {
-  // Newsflash behaviors
-  setupMastheadScroll();
-
   // Generic Bootstrap initializations
   initializeTooltips();
 });

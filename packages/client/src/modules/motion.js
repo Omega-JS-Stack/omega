@@ -315,6 +315,16 @@ function createMotion() {
       while (track.children.length < total) {
         const clone = setItems[track.children.length % setItems.length].cloneNode(true);
         clone.setAttribute('aria-hidden', 'true');
+        // Clones stay mouse-clickable (they occupy most of the viewport as
+        // the track scrolls) but must not duplicate the tab order — so
+        // focusables get tabindex=-1, NOT inert.
+        const FOCUSABLE = 'a, button, input, select, textarea, [tabindex]';
+        if (clone.matches(FOCUSABLE)) {
+          clone.setAttribute('tabindex', '-1');
+        }
+        clone.querySelectorAll(FOCUSABLE).forEach(($focusable) => {
+          $focusable.setAttribute('tabindex', '-1');
+        });
         track.appendChild(clone);
       }
 
