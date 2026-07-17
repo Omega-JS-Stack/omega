@@ -16,7 +16,8 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { acquireWatchLock, releaseWatchLock } = require('@omega.js/devkit/local');
+const { acquireWatchLock, releaseWatchLock, startVendorPropagation } = require('@omega.js/devkit/local');
+const { VENDORABLE_PACKAGES } = require('@omega.js/devkit/vendor');
 
 // Constants
 const ROOT = path.resolve(__dirname, '..');
@@ -84,12 +85,28 @@ function main() {
     });
   }
 
+  // The per-package watches above only see their OWN src — but the vendorable
+  // shared packages (devkit, config, account) live inside every framework's
+  // dist/vendor/*, copied at prepare time. Watch their srcs too and re-prepare
+  // every watchable package when one changes, so a devkit edit can't strand
+  // dist-running frameworks on stale vendored code.
+  const propagation = startVendorPropagation({
+    packagesDir: PACKAGES_DIR,
+    packages: VENDORABLE_PACKAGES,
+    dependents: watchable,
+    log: (line) => console.log(`[shared] ${line}`),
+  });
+  if (propagation.watched.length > 0) {
+    console.log(`Watching ${propagation.watched.length} shared packages (change → re-prepare all): ${propagation.watched.join(', ')}`);
+  }
+
   const shutdown = () => {
     if (shuttingDown) {
       return;
     }
     shuttingDown = true;
     console.log('\nStopping watches...');
+    propagation.close();
     for (const child of children) {
       child.kill('SIGTERM');
     }

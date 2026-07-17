@@ -206,3 +206,214 @@ test('startMonorepoWatch declines to double-start when the lock is held', () => 
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+// ---- Vendor propagation
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Poll until check() is true or fail with what after timeoutMs. */
+async function waitUntil(check, what, timeoutMs = 5000) {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`timed out waiting for ${what}`);
+    }
+    await sleep(25);
+  }
+}
+
+/** Scratch packages/ tree with a devkit-like src dir. Caller removes scratch. */
+function vendorScratch() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-vendor-prop-'));
+  const packagesDir = path.join(scratch, 'packages');
+  fs.mkdirSync(path.join(packagesDir, 'devkit', 'src'), { recursive: true });
+  return { scratch, packagesDir };
+}
+
+// The pass/debounce/coalesce logic is tested through poke() — the documented
+// seam the real fs watchers feed (macOS FSEvents streams activate
+// asynchronously, so a write landing right after fs.watch() can be lost;
+// the one integration test below covers the fs layer flake-free).
+
+test('startVendorPropagation watches only packages with an existing src/', () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit', 'config', 'account'], // only devkit/src exists in the scratch
+    dependents: [],
+  });
+  try {
+    assert.deepEqual(propagation.watched, ['devkit']);
+  } finally {
+    propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('a change re-prepares every dependent, in order', async () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const calls = [];
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit'],
+    dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
+    runPrepare: async (dependent) => { calls.push(dependent.name); },
+    debounceMs: 25,
+  });
+  try {
+    propagation.poke('devkit');
+    await waitUntil(() => calls.length >= 2, 'the pass to cover both dependents');
+    await sleep(150); // settle: a single change must not schedule another pass
+    assert.deepEqual(calls, ['backend', 'client']);
+  } finally {
+    propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('rapid changes inside the debounce window coalesce into one pass', async () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const calls = [];
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit'],
+    dependents: [{ name: 'backend', dir: '/x' }],
+    runPrepare: async (dependent) => { calls.push(dependent.name); },
+    debounceMs: 50,
+  });
+  try {
+    propagation.poke('devkit');
+    propagation.poke('devkit');
+    propagation.poke('devkit');
+    await waitUntil(() => calls.length >= 1, 'the coalesced pass');
+    await sleep(200); // settle: the burst must not schedule further passes
+    assert.deepEqual(calls, ['backend']);
+  } finally {
+    propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('a change landing mid-pass queues exactly one follow-up pass', async () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const calls = [];
+  const resolvers = [];
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit'],
+    dependents: [{ name: 'backend', dir: '/x' }],
+    runPrepare: (dependent) => new Promise((resolve) => {
+      calls.push(dependent.name);
+      resolvers.push(resolve);
+    }),
+    debounceMs: 25,
+  });
+  try {
+    propagation.poke('devkit');
+    await waitUntil(() => calls.length === 1, 'the first pass to start');
+
+    // Two more changes while the first pass is still blocked in runPrepare —
+    // they must fold into ONE follow-up, not one pass per change
+    propagation.poke('devkit');
+    propagation.poke('devkit');
+    await sleep(100); // let their debounce fire and mark the run pending
+    resolvers.shift()();
+
+    await waitUntil(() => calls.length === 2, 'the follow-up pass');
+    resolvers.shift()();
+    await sleep(200); // settle: no third pass
+    assert.equal(calls.length, 2);
+  } finally {
+    propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('a failing prepare is contained — the rest of the pass still runs', async () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const calls = [];
+  const logs = [];
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit'],
+    dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
+    runPrepare: async (dependent) => {
+      calls.push(dependent.name);
+      if (dependent.name === 'backend') {
+        throw new Error('boom');
+      }
+    },
+    log: (line) => logs.push(line),
+    debounceMs: 25,
+  });
+  try {
+    propagation.poke('devkit');
+    await waitUntil(() => calls.length >= 2, 'the pass to reach the second dependent');
+    assert.deepEqual(calls, ['backend', 'client']);
+    assert.ok(logs.some((line) => line.includes('backend') && line.includes('boom')), 'failure surfaced in the log');
+  } finally {
+    propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('close() stops the watch — later changes trigger nothing', async () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const calls = [];
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit'],
+    dependents: [{ name: 'backend', dir: '/x' }],
+    runPrepare: async (dependent) => { calls.push(dependent.name); },
+    debounceMs: 25,
+  });
+  propagation.close();
+  try {
+    propagation.poke('devkit');
+    await sleep(150);
+    assert.deepEqual(calls, []);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('the real fs watch feeds the same pipeline (recursive, by package name)', async () => {
+  const { scratch, packagesDir } = vendorScratch();
+  const calls = [];
+  const propagation = local.startVendorPropagation({
+    packagesDir,
+    packages: ['devkit'],
+    dependents: [{ name: 'backend', dir: '/x' }, { name: 'client', dir: '/y' }],
+    runPrepare: async (dependent) => { calls.push(dependent.name); },
+    debounceMs: 25,
+  });
+  try {
+    // A nested dir proves recursive: true carries. FSEvents activates
+    // asynchronously, so keep editing until the pipeline reacts instead of
+    // trusting the first write to be seen.
+    const deepDir = path.join(packagesDir, 'devkit', 'src', 'nested');
+    fs.mkdirSync(deepDir, { recursive: true });
+    const target = path.join(deepDir, 'deep.js');
+    const start = Date.now();
+    let version = 0;
+    while (calls.length === 0) {
+      if (Date.now() - start > 10000) {
+        throw new Error('fs.watch never delivered an event');
+      }
+      fs.writeFileSync(target, `// v${version += 1}\n`);
+      await sleep(200);
+    }
+
+    // Late events may run extra passes — assert structure, not pass count:
+    // every completed pass covers both dependents in order.
+    await waitUntil(() => calls.length >= 2, 'the first pass to complete');
+    await sleep(300);
+    assert.ok(calls.length >= 2, 'at least one full pass ran');
+    for (let i = 0; i + 1 < calls.length; i += 2) {
+      assert.deepEqual(calls.slice(i, i + 2), ['backend', 'client'], `pass ${i / 2} covers both dependents in order`);
+    }
+  } finally {
+    propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});

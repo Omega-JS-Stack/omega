@@ -9,10 +9,12 @@
  * - linkLocalPackages()    — file:-install those from the monorepo (idempotent)
  * - startMonorepoWatch()   — spawn the monorepo's src→dist watch (`npm start`)
  * - acquireWatchLock() / releaseWatchLock() — single-instance guard for the watch
+ * - startVendorPropagation() — re-prepare dist-building frameworks when a
+ *   vendored shared package (devkit, config, account) changes
  *
  * Consumers: `omega dev --local` (@omega.js/web), `mgr i local`
  * (@omega.js/backend, @omega.js/desktop, @omega.js/extension), and the monorepo's
- * own scripts/watch-all.js (lock helpers).
+ * own scripts/watch-all.js (lock helpers + vendor propagation).
  */
 
 // Libraries
@@ -351,6 +353,122 @@ function startMonorepoWatch(options) {
   return { alreadyRunning: false, pid: child.pid, child };
 }
 
+/**
+ * Propagate vendored shared-package edits to the frameworks that embed them:
+ * watch each vendorable package's src/ and re-run `npm run prepare` in every
+ * dependent when one changes. A framework's own prepare:watch only sees its
+ * OWN src, while the devkit/config/account copies inside its dist/vendor/*
+ * refresh only on a full prepare — without this, a shared-package edit strands
+ * every dist-running framework on stale vendored code until a manual rebuild.
+ * Edits inside the debounce window fold into one pass; edits landing mid-pass
+ * queue exactly one follow-up pass. A dependent's prepare failing is logged
+ * and never stops the rest of the pass.
+ * @param {object} options
+ * @param {string} options.packagesDir - The monorepo's packages/ directory.
+ * @param {string[]} options.packages - Vendorable package dir names to watch (missing src/ dirs are skipped).
+ * @param {Array<{name: string, dir: string}>} options.dependents - Packages to re-prepare, in order.
+ * @param {function} [options.runPrepare] - (dependent) => Promise; defaults to spawning `npm run prepare` in dependent.dir.
+ * @param {function} [options.log] - Line logger (silent when omitted).
+ * @param {number} [options.debounceMs] - Quiet window before a pass (default 400).
+ * @returns {{watched: string[], poke: function, close: function}} poke(name)
+ *   injects a change event without the fs (test seam — the fs watchers call
+ *   the same path).
+ */
+function startVendorPropagation(options) {
+  const { packagesDir, packages, dependents, log = () => {}, debounceMs = 400 } = options;
+
+  const runPrepare = options.runPrepare || ((dependent) => new Promise((resolve) => {
+    const child = spawn('npm', ['run', 'prepare'], { cwd: dependent.dir, stdio: ['ignore', 'pipe', 'pipe'] });
+
+    // Quiet on success — surface output only when the prepare fails
+    let output = '';
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.stderr.on('data', (chunk) => { output += chunk; });
+
+    child.on('error', (error) => {
+      log(`prepare failed to spawn in ${dependent.name}: ${error.message}`);
+      resolve();
+    });
+    child.on('exit', (code) => {
+      if (code !== 0) {
+        log(`prepare exited ${code} in ${dependent.name}:\n${output.trim()}`);
+      } else {
+        log(`re-prepared ${dependent.name}`);
+      }
+      resolve();
+    });
+  }));
+
+  let timer = null;
+  let running = false;
+  let pending = false;
+  let closed = false;
+  const dirty = new Set();
+
+  const pass = async () => {
+    running = true;
+    do {
+      pending = false;
+      log(`${[...dirty].join(', ')} changed — re-preparing ${dependents.map((d) => d.name).join(', ')}`);
+      dirty.clear();
+
+      for (const dependent of dependents) {
+        if (closed) {
+          break;
+        }
+        try {
+          await runPrepare(dependent);
+        } catch (error) {
+          log(`prepare failed in ${dependent.name}: ${error.message}`);
+        }
+      }
+    } while (pending && !closed);
+    running = false;
+  };
+
+  const trigger = () => {
+    if (closed) {
+      return;
+    }
+    if (running) {
+      pending = true;
+      return;
+    }
+    pass();
+  };
+
+  const onSourceEvent = (name) => {
+    if (closed) {
+      return;
+    }
+    dirty.add(name);
+    clearTimeout(timer);
+    timer = setTimeout(trigger, debounceMs);
+  };
+
+  const watchers = [];
+  const watched = [];
+  for (const name of packages) {
+    const srcDir = path.join(packagesDir, name, 'src');
+    if (!fs.existsSync(srcDir)) {
+      continue;
+    }
+
+    watchers.push(fs.watch(srcDir, { recursive: true }, () => onSourceEvent(name)));
+    watched.push(name);
+  }
+
+  return {
+    watched,
+    poke: onSourceEvent,
+    close: () => {
+      closed = true;
+      clearTimeout(timer);
+      watchers.forEach((watcher) => watcher.close());
+    },
+  };
+}
+
 // Exports
 module.exports = {
   DEFAULT_MONOREPO,
@@ -363,6 +481,7 @@ module.exports = {
   frameworkPackagesOf,
   linkLocalPackages,
   startMonorepoWatch,
+  startVendorPropagation,
   readLiveWatchPid,
   acquireWatchLock,
   releaseWatchLock,

@@ -446,3 +446,6 @@ function vendorPackages(options) {
 }
 
 module.exports = vendorPackages;
+// The canonical vendorable list — watch-all's vendor propagation watches
+// exactly the packages this tool folds into dists.
+module.exports.VENDORABLE_PACKAGES = VENDORABLE_PACKAGES;

@@ -12,6 +12,7 @@ Watching 4 packages (src→dist): backend, client, desktop, extension
 ```
 
 - **Discovery, not hardcoding**: any `packages/*` with a `prepare:watch` script is watched. Packages without one (`account`, `config`, `devkit`, `manager`, `template-kit`, `web`) serve `src/` directly — file:-linked consumers see those edits live with no watch at all.
+- **Vendor propagation**: a per-package `prepare:watch` only sees its OWN src, but the vendorable shared packages (`devkit`, `config`, `account`) also live as copies inside every framework's `dist/vendor/*`. The orchestrator watches those srcs too (`startVendorPropagation`) and re-runs `npm run prepare` in every watchable package on change — debounced, coalescing, one failure never stops the pass. Without it, a devkit edit strands dist-running frameworks on stale vendored code until a manual rebuild (the cp184 `http://localhost:5002` no-redirect bug). Running processes still need a restart to load the fresh dist, same as any src edit.
 - **Single-instance**: the orchestrator takes `.omega/dev-watch.lock` (pid inside). A second `npm start` — or an `omega dev --local` session — sees the live lock and exits cleanly instead of double-watching. Stale locks (dead pid) are swept automatically.
 - **Shutdown**: SIGINT/SIGTERM kills every watch child and releases the lock. A watch child dying on its own is announced loudly; the others stay up.
 
@@ -66,4 +67,5 @@ The vendor tool derives the split from the host's package.json: anything in `dep
 | `frameworkPackagesOf(appDir)` | `@omega.js/*` deps incl. `functions/package.json`, with dev/prod placement + owning dir |
 | `linkLocalPackages({ dir, monorepoRoot, logger, dryRun })` | idempotent file:-install; returns `[{ name, dir, target, action: link\|skip\|missing }]` |
 | `startMonorepoWatch({ monorepoRoot, logger })` | lock-aware spawn of the root watch; `{ alreadyRunning, pid, child }` |
+| `startVendorPropagation({ packagesDir, packages, dependents, runPrepare?, log?, debounceMs? })` | watch vendorable srcs → re-prepare dependents (debounced, coalescing); `{ watched, poke, close }` — `poke` is the fs-free test seam |
 | `acquireWatchLock` / `releaseWatchLock` / `readLiveWatchPid` | the `.omega/dev-watch.lock` single-instance protocol (owned by watch-all) |
