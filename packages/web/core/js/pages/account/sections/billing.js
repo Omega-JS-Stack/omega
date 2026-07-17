@@ -22,14 +22,14 @@ const CANCEL_REASONS = [
   'Other',
 ];
 
-// Status display configuration
+// Status display configuration (classy status pill: dot + label, never color alone)
 const STATUS_CONFIG = {
-  free:       { label: 'Free',      badgeClass: 'badge bg-secondary' },
-  active:     { label: 'Active',    badgeClass: 'badge bg-success' },
-  trialing:   { label: 'Active',    badgeClass: 'badge bg-success' },
-  cancelling: { label: 'Active',    badgeClass: 'badge bg-success' },
-  suspended:  { label: 'Suspended', badgeClass: 'badge bg-danger' },
-  cancelled:  { label: 'Cancelled', badgeClass: 'badge bg-secondary' },
+  free:       { label: 'Free',      badgeClass: 'classy-status',                       dotClass: 'classy-dot classy-dot--muted' },
+  active:     { label: 'Active',    badgeClass: 'classy-status classy-status--ok',     dotClass: 'classy-dot classy-dot--ok' },
+  trialing:   { label: 'Active',    badgeClass: 'classy-status classy-status--ok',     dotClass: 'classy-dot classy-dot--ok' },
+  cancelling: { label: 'Active',    badgeClass: 'classy-status classy-status--ok',     dotClass: 'classy-dot classy-dot--ok' },
+  suspended:  { label: 'Suspended', badgeClass: 'classy-status classy-status--danger', dotClass: 'classy-dot classy-dot--danger' },
+  cancelled:  { label: 'Cancelled', badgeClass: 'classy-status',                       dotClass: 'classy-dot classy-dot--muted' },
 };
 
 const FREQUENCY_LABELS = { daily: 'day', weekly: 'week', monthly: 'month', annually: 'year' };
@@ -116,6 +116,7 @@ function buildBillingState(account) {
       status: {
         label: config.label,
         badgeClass: config.badgeClass,
+        dotClass: config.dotClass,
       },
       description: {
         free: !isPaid,

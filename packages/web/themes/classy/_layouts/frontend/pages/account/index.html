@@ -109,38 +109,38 @@ badges:
   - id: "member"
     name: "Member"
     icon: "sailboat"
-    bg_class: "bg-primary"
+    chip_class: "classy-chip"
     always_visible: true
   - id: "admin"
     name: "Admin"
     icon: "hat-wizard"
-    bg_class: "bg-danger"
+    chip_class: "classy-chip classy-chip--ink"
   - id: "premium"
     name: "Premium"
     icon: "crown"
-    bg_class: "bg-success"
+    chip_class: "classy-chip classy-chip--accent"
   - id: "beta"
     name: "Beta"
     icon: "bolt"
-    bg_color: "#6f42c1"
+    chip_class: "classy-chip"
   - id: "coder"
     name: "Developer"
     icon: "code"
-    bg_color: "#20c997"
+    chip_class: "classy-chip"
   - id: "moderator"
     name: "Moderator"
     icon: "shield-halved"
-    bg_color: "#fd7e14"
+    chip_class: "classy-chip"
   - id: "vip"
     name: "VIP"
     icon: "award"
-    bg_color: "#ffc107"
+    chip_class: "classy-chip classy-chip--accent"
 ---
 
 {% assign hidden_sections = "delete,data-request,refund" | split: "," %}
 
 <!-- Fixed Header -->
-<header class="position-fixed top-0 start-0 w-100 bg-body-secondary border-bottom shadow-sm" style="z-index: 1030;">
+<header class="position-fixed top-0 start-0 w-100 bg-body-secondary border-bottom" style="z-index: 1030;">
   <div class="container-fluid px-4">
     <div class="d-flex align-items-center justify-content-between py-3">
       <!-- Left: Brand -->
@@ -173,7 +173,7 @@ badges:
             {% endfor %}
             <!-- Hidden section options are added dynamically by JavaScript when needed -->
           </select>
-          <button class="btn btn-danger auth-signout-btn">
+          <button class="btn btn-outline-adaptive auth-signout-btn">
             {% uj_icon "arrow-right-from-bracket", "fa-sm" %}
           </button>
         </div>
@@ -207,7 +207,7 @@ badges:
 
           <!-- Sign out Button -->
           <div class="mt-3 pt-3 border-top">
-            <button class="btn btn-danger w-100 d-flex align-items-center justify-content-center auth-signout-btn">
+            <button class="btn btn-outline-adaptive w-100 d-flex align-items-center justify-content-center auth-signout-btn">
               {% uj_icon "arrow-right-from-bracket", "me-2" %}
               <span class="button-text">Sign out</span>
             </button>
@@ -257,7 +257,7 @@ badges:
             <!-- Role Badges -->
             <div id="role-badges" class="mt-2 d-flex gap-2 flex-wrap">
               {% for badge in resolved.badges %}
-                <span id="badge-{{ badge.id }}" class="badge {{ badge.bg_class }} {% unless badge.always_visible %}d-none{% endunless %}" {% iftruthy badge.bg_color %}style="background-color: {{ badge.bg_color }};"{% endiftruthy %}>
+                <span id="badge-{{ badge.id }}" class="{{ badge.chip_class }} {% unless badge.always_visible %}d-none{% endunless %}">
                   {% uj_icon badge.icon, "fa-sm" %}
                   {{ badge.name }}
                 </span>
@@ -917,7 +917,7 @@ badges:
                 </div>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-danger" id="signin-link-generate-btn" disabled>
+                <button type="button" class="btn btn-adaptive" id="signin-link-generate-btn" disabled>
                   {% uj_icon "key", "me-1" %}
                   <span class="button-text">Generate link</span>
                 </button>
@@ -998,7 +998,10 @@ badges:
               <div>
                 <h5 class="card-title mb-1 d-flex align-items-center flex-wrap gap-2">
                   <span><span data-wm-bind="@text billing.plan.name" class="wm-binding-skeleton">Current</span> plan</span>
-                  <span data-wm-bind="@attr class billing.status.badgeClass, @text billing.status.label" class="badge bg-secondary wm-binding-skeleton">&nbsp;</span>
+                  <span class="classy-status wm-binding-skeleton" data-wm-bind="@attr class billing.status.badgeClass">
+                    <span class="classy-dot classy-dot--muted" data-wm-bind="@attr class billing.status.dotClass"></span>
+                    <span data-wm-bind="@text billing.status.label">&nbsp;</span>
+                  </span>
                 </h5>
                 <p class="card-text mb-0" data-wm-bind="@show billing.description.free" hidden>
                   You are currently on the <strong data-wm-bind="@text billing.plan.name">Free</strong> plan. Upgrade to unlock premium features.
@@ -1200,7 +1203,7 @@ badges:
                   <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#referrals-list-collapse" aria-expanded="false" aria-controls="referrals-list-collapse">
                     <span class="me-2">{% uj_icon "users", "fa-sm" %}</span>
                     View referral details
-                    <span class="badge bg-primary ms-2" id="referrals-badge">0</span>
+                    <span class="classy-chip ms-2" id="referrals-badge">0</span>
                   </button>
                 </h2>
                 <div id="referrals-list-collapse" class="accordion-collapse collapse" aria-labelledby="referrals-list-heading" data-bs-parent="#referrals-accordion">
@@ -1242,7 +1245,7 @@ badges:
                     <strong>You</strong>
                     <small class="text-muted d-block">Owner</small>
                   </div>
-                  <span class="badge bg-primary">Owner</span>
+                  <span class="classy-chip classy-chip--ink">Owner</span>
                 </div>
               </div>
             </div>
@@ -1278,7 +1281,7 @@ badges:
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-1">
               <h5 class="card-title mb-0">Push notifications</h5>
-              <span id="push-notification-status"><span class="badge bg-secondary">Checking...</span></span>
+              <span id="push-notification-status"><span class="classy-chip">Checking...</span></span>
             </div>
             <p class="text-muted small mb-3">Receive push notifications in your browser for important updates.</p>
 
@@ -1782,7 +1785,7 @@ badges:
                     </button>
                   </div>
                   <div class="col-12 col-md-6 order-md-1">
-                    <a href="/account" class="btn btn-danger w-100" id="cancel-delete-btn">
+                    <a href="/account" class="btn btn-adaptive w-100" id="cancel-delete-btn">
                       {% uj_icon "arrow-left", "fa-sm me-2" %}
                       <span>Return to profile</span>
                     </a>

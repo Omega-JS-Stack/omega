@@ -1,0 +1,22 @@
+// classy admin — Firebase explorer: collection rail + JSON surfaces on the
+// token sheet. The core page css keeps the functional floor (viewer sizing);
+// this layer replaces the unthemed bootstrap surfaces with omega tokens.
+
+.collection-nav .nav-link {
+  color: var(--omega-ink-muted);
+  transition: color var(--omega-speed) var(--omega-ease), background var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    color: var(--omega-ink);
+    background: var(--omega-surface-2);
+  }
+
+  &.active {
+    color: var(--omega-ink);
+    background: var(--omega-surface-2);
+  }
+}
+
+.json-viewer {
+  background: var(--omega-surface-2);
+}

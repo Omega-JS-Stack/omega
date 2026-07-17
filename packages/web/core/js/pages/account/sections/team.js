@@ -46,7 +46,7 @@ function updateMembersList(members) {
           <small class="text-muted">${getRoleLabel(member.role)}</small>
         </div>
         <div class="d-flex align-items-center">
-          <span class="badge bg-${getRoleBadgeColor(member.role)} me-2">${getRoleLabel(member.role)}</span>
+          <span class="${getRoleChipClass(member.role)} me-2">${getRoleLabel(member.role)}</span>
           ${member.role !== 'owner' ? getActionButtons(member) : ''}
         </div>
       </div>
@@ -92,14 +92,14 @@ function getRoleLabel(role) {
 }
 
 // Get role badge color
-function getRoleBadgeColor(role) {
-  const colors = {
-    owner: 'primary',
-    admin: 'success',
-    member: 'secondary',
-    viewer: 'light'
+function getRoleChipClass(role) {
+  const chips = {
+    owner: 'classy-chip classy-chip--ink',
+    admin: 'classy-chip classy-chip--accent',
+    member: 'classy-chip',
+    viewer: 'classy-chip'
   };
-  return colors[role] || 'secondary';
+  return chips[role] || 'classy-chip';
 }
 
 // Get action buttons for member

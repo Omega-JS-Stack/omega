@@ -33,7 +33,7 @@ meta:
   <div class="col-lg-7">
     <div class="card">
       <div class="card-header">
-        <h5 class="mb-0">Create new user</h5>
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "user-plus", "fa-md me-2" %} Create new user</h6>
       </div>
       <div class="card-body">
         <form id="create-user-form" novalidate data-form-state="initializing" onsubmit="return false">
@@ -70,7 +70,7 @@ meta:
   <div class="col-lg-5">
     <div class="card">
       <div class="card-body">
-        <h6 class="mb-3">{% uj_icon "circle-info", "fa-sm me-2" %} How it works</h6>
+        <h6 class="mb-3 d-inline-flex align-items-center">{% uj_icon "circle-info", "fa-sm me-2" %} How it works</h6>
         <ul class="small text-muted mb-0">
           <li class="mb-2">A Firebase Auth account is created with the provided email and password</li>
           <li class="mb-2">The backend automatically creates the Firestore user document</li>

@@ -151,19 +151,19 @@ function update2FAStatus(twoFactorData) {
 
   if (twoFactorData?.enabled) {
     if ($2faStatus) {
-      $2faStatus.innerHTML = '<span class="badge bg-success">Enabled</span>';
+      $2faStatus.innerHTML = '<span class="classy-status classy-status--ok"><span class="classy-dot classy-dot--ok"></span>Enabled</span>';
     }
     if ($2faBtn) {
       $2faBtn.textContent = 'Manage 2FA';
-      $2faBtn.className = 'btn btn-outline-primary';
+      $2faBtn.className = 'btn btn-outline-adaptive';
     }
   } else {
     if ($2faStatus) {
-      $2faStatus.innerHTML = '<span class="badge bg-secondary">Disabled</span>';
+      $2faStatus.innerHTML = '<span class="classy-status"><span class="classy-dot classy-dot--muted"></span>Disabled</span>';
     }
     if ($2faBtn) {
       $2faBtn.textContent = 'Enable 2FA';
-      $2faBtn.className = 'btn btn-primary';
+      $2faBtn.className = 'btn btn-adaptive';
     }
   }
 }
@@ -303,7 +303,7 @@ async function updateActiveSessions(account) {
         </div>
         <div class="text-end">
           <small class="text-muted">${omega.utilities().escapeHTML(formatDate(session.timestamp || (session.timestampUNIX * 1000)))}</small>
-          ${session.isCurrent ? '<span class="badge bg-primary ms-2">Current</span>' : ''}
+          ${session.isCurrent ? '<span class="classy-chip classy-chip--accent ms-2">Current</span>' : ''}
         </div>
       </div>
     </div>

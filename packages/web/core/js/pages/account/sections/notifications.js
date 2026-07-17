@@ -110,20 +110,20 @@ function updatePushUI() {
   let state;
   if (stored.subscribed && stored.token) {
     state = 'subscribed';
-    $status.innerHTML = '<span class="badge bg-success">Subscribed</span>';
+    $status.innerHTML = '<span class="classy-status classy-status--ok"><span class="classy-dot classy-dot--ok"></span>Subscribed</span>';
     if ($tokenInput) { $tokenInput.value = stored.token; }
     if (pushFormManager) { pushFormManager._setDisabled(true); }
   } else if (!notifications.isSupported()) {
     state = 'not-supported';
-    $status.innerHTML = '<span class="badge bg-warning">Not supported</span>';
+    $status.innerHTML = '<span class="classy-status classy-status--warn"><span class="classy-dot classy-dot--warn"></span>Not supported</span>';
     if (pushFormManager) { pushFormManager._setDisabled(true); }
   } else if (permission === 'denied') {
     state = 'denied';
-    $status.innerHTML = '<span class="badge bg-danger">Denied</span>';
+    $status.innerHTML = '<span class="classy-status classy-status--danger"><span class="classy-dot classy-dot--danger"></span>Denied</span>';
     if (pushFormManager) { pushFormManager._setDisabled(true); }
   } else {
     state = 'not-subscribed';
-    $status.innerHTML = '<span class="badge bg-secondary">Not subscribed</span>';
+    $status.innerHTML = '<span class="classy-status"><span class="classy-dot classy-dot--muted"></span>Not subscribed</span>';
     if ($tokenInput) { $tokenInput.value = ''; }
     if (pushFormManager) { pushFormManager.ready(); }
   }
