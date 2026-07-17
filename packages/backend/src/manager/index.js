@@ -278,10 +278,13 @@ Manager.prototype.init = function (exporter, options) {
     // to localhost. NOTE: getParentApiUrl/getParentUrl are intentionally NOT changed —
     // the parent is a real remote server with no localhost equivalent.
     const isDev = env === 'development' || (!env && (self.isDevelopment() || self.isTesting()));
-    // http, not https: `omega dev` (Eleventy) serves plain http — the https
-    // form was a legacy browsersync-mkcert assumption no dev server speaks.
+    // Scheme follows the local https stack (cp176): ONE mkcert install fronts
+    // backend AND web dev alike, so this process's own proxy presence
+    // (OMEGA_HTTPS_PORT) is the honest signal for the website's scheme too —
+    // --no-https / missing mkcert drops both sides back to plain http.
+    const websiteScheme = process.env.OMEGA_HTTPS_PORT ? 'https' : 'http';
     return isDev
-      ? `http://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`
+      ? `${websiteScheme}://localhost:${process.env.OMEGA_WEBSITE_PORT || 4000}`
       : self.config.brand?.url || '';
   };
 

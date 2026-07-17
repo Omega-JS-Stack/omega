@@ -199,16 +199,33 @@ module.exports = {
     {
       name: 'getWebsiteUrl: localhost:4000 in development AND testing, brand.url otherwise',
       async run({ Manager, assert }) {
-        withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
-          assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'dev → localhost:4000');
-        });
-        withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
-          assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'testing → localhost:4000');
-        });
-        withEnv({ ENVIRONMENT: 'production' }, () => {
-          const url = Manager.getWebsiteUrl();
-          assert.equal(url.startsWith('https://localhost'), false, 'prod → NOT localhost');
-        });
+        // The scheme follows the local https stack (cp177): OMEGA_HTTPS_PORT set
+        // (this process runs behind the mkcert proxy) → the website dev server
+        // shares the same mkcert default → https. Unset → both sides plain http.
+        // Controlled explicitly in BOTH directions so ambient env can't skew it.
+        const savedHttpsPort = process.env.OMEGA_HTTPS_PORT;
+        try {
+          delete process.env.OMEGA_HTTPS_PORT;
+          withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
+            assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'dev → localhost:4000');
+          });
+          withEnv({ OMEGA_TEST_MODE: 'true' }, () => {
+            assert.equal(Manager.getWebsiteUrl(), 'http://localhost:4000', 'testing → localhost:4000');
+          });
+
+          process.env.OMEGA_HTTPS_PORT = '5002';
+          withEnv({ FUNCTIONS_EMULATOR: 'true' }, () => {
+            assert.equal(Manager.getWebsiteUrl(), 'https://localhost:4000', 'dev behind the https proxy → https website');
+          });
+
+          withEnv({ ENVIRONMENT: 'production' }, () => {
+            const url = Manager.getWebsiteUrl();
+            assert.equal(url.includes('localhost'), false, 'prod → NOT localhost');
+          });
+        } finally {
+          if (savedHttpsPort === undefined) delete process.env.OMEGA_HTTPS_PORT;
+          else process.env.OMEGA_HTTPS_PORT = savedHttpsPort;
+        }
       },
     },
 

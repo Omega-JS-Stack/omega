@@ -57,6 +57,8 @@ Manager.getApiUrl()  // this brand's API URL — the SSOT for calling the @omega
 
 Resolving local in test mode is required because tests hit the local emulator — without it, internal @omega.js/backend→@omega.js/backend calls (and tests calling `getApiUrl()`) would leak to the live production server. Pass an explicit `env` arg (`getApiUrl('production')`) only to force a specific environment regardless of the current one — rarely needed, and mainly used by tests to pin a specific environment's mapping.
 
+**Local scheme follows the https stack:** when this process runs behind the mkcert TLS proxy (`omega serve` / `omega emulator` set `OMEGA_HTTPS_PORT`), the local URLs carry `https` — `getApiUrl()` → `https://localhost:5002`, and `getWebsiteUrl()` follows the same signal for the website dev server (`https://localhost:4000`), since one mkcert install drives web and backend dev alike. Without the proxy (`--no-https` / no mkcert) both stay plain `http`.
+
 > `getFunctionsUrl()` (raw Cloud Functions URL) exists for the ONE internal case that must name a specific deployed function by its raw address (`assistant.tryUrl()`). Application/route code should never need it — use `getApiUrl()`.
 
 **Exception — parent helpers stay live:** `Manager.getParentApiUrl()` / `getParentUrl()` ALWAYS return the live production URL, even in dev/test. The parent @omega.js/backend is a real remote server with no localhost equivalent, so cross-brand parent calls are never redirected to localhost.

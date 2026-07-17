@@ -20,8 +20,9 @@ export function calculatePrices({ product, frequency, discountPercent, trialElig
   if (isSubscription) {
     basePrice = resolvePrice(product.prices, frequency);
   } else {
-    // One-time: use amount if available, else fall back to monthly
-    basePrice = resolvePrice(product.prices, 'amount')
+    // One-time: `once` is the catalog key; `amount`/`monthly` are legacy shapes
+    basePrice = resolvePrice(product.prices, 'once')
+      || resolvePrice(product.prices, 'amount')
       || resolvePrice(product.prices, 'monthly')
       || 0;
   }

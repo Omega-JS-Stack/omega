@@ -1,0 +1,289 @@
+// classy checkout — the commitment moment. Quiet hairline sections on the
+// ground (no card-in-card chrome), pricing tiles with a real radio glyph,
+// and the order summary composed from the shared receipt vocabulary
+// (components/_receipt.scss) so checkout and confirmation read as one story.
+
+.classy-checkout {
+  max-width: 72rem;
+}
+
+// ── Brand row (cover pages have no nav) ─────────────────────────────────────
+.classy-checkout__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--omega-ink);
+  font-size: 0.9375rem;
+  text-decoration: none;
+  transition: opacity var(--omega-speed) var(--omega-ease);
+
+  img {
+    width: 1.75rem;
+    height: 1.75rem;
+    object-fit: contain;
+    border-radius: var(--omega-radius-s);
+  }
+
+  &:hover {
+    color: var(--omega-ink);
+    opacity: 0.75;
+  }
+}
+
+// ── Quiet links (change plan, switch account, help) ─────────────────────────
+.classy-checkout__quiet-link {
+  color: var(--omega-ink-muted);
+  text-decoration: none;
+  transition: color var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    color: var(--omega-accent);
+  }
+}
+
+// ── Sections — hairline rhythm, no boxes ────────────────────────────────────
+.classy-checkout__section {
+  padding-block: 1.75rem;
+  border-top: 1px solid var(--omega-line);
+
+  &:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  &:last-child {
+    padding-bottom: 0;
+  }
+
+  // One-time products hide the billing section via bindings — the next
+  // section then opens the column and must not carry an orphan hairline.
+  &[hidden] + & {
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+// ── Billing cycle tiles ─────────────────────────────────────────────────────
+.classy-checkout__tile {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 1rem 1.125rem;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+  cursor: pointer;
+  transition: border-color var(--omega-speed) var(--omega-ease), box-shadow var(--omega-speed) var(--omega-ease);
+
+  &:hover {
+    border-color: var(--omega-line-strong);
+  }
+}
+
+.btn-check:checked + .classy-checkout__tile {
+  border-color: var(--omega-ink);
+  box-shadow: 0 0 0 1px var(--omega-ink);
+}
+
+.btn-check:focus-visible + .classy-checkout__tile {
+  outline: 2px solid var(--omega-accent);
+  outline-offset: 2px;
+}
+
+.classy-checkout__tile-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+}
+
+.classy-checkout__tile-radio {
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1.5px solid var(--omega-line-strong);
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: border-color var(--omega-speed) var(--omega-ease), background var(--omega-speed) var(--omega-ease);
+
+  .btn-check:checked + .classy-checkout__tile & {
+    border-color: var(--omega-accent);
+    background: var(--omega-accent);
+    box-shadow: inset 0 0 0 3.5px var(--omega-surface);
+  }
+}
+
+.classy-checkout__tile-name {
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--omega-ink);
+}
+
+.classy-checkout__tile-price {
+  display: block;
+  font-family: var(--omega-font-marketing);
+  font-size: 1.5rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--omega-ink);
+}
+
+.classy-checkout__tile-per {
+  font-family: var(--omega-font-display);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--omega-ink-muted);
+  margin-left: 2px;
+}
+
+.classy-checkout__cadence {
+  color: var(--omega-ink-muted);
+}
+
+// ── Inline notes (guarantee / trial) — quiet, not alert boxes ───────────────
+.classy-checkout__note {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--omega-ink-muted);
+
+  &--ok .classy-icon-chip {
+    color: var(--omega-ok);
+    border-color: color-mix(in srgb, var(--omega-ok) 35%, var(--omega-line));
+    background: color-mix(in srgb, var(--omega-ok) 8%, var(--omega-surface));
+  }
+}
+
+// ── Payment buttons ─────────────────────────────────────────────────────────
+.payment-button {
+  padding-block: 0.8125rem;
+  font-weight: 600;
+  border-radius: var(--omega-radius-m);
+}
+
+// Apple Pay — ink slab (black in light, near-white in dark; both sanctioned looks)
+.payment-button--apple {
+  background: var(--omega-ink);
+  color: var(--omega-ground);
+  border-color: var(--omega-ink);
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, var(--omega-ink) 86%, var(--omega-ground));
+    color: var(--omega-ground);
+    border-color: transparent;
+  }
+}
+
+// Google Pay — white per brand guidelines (the gstatic mark is dark)
+.payment-button--gpay {
+  background: #fff;
+  color: #3c4043;
+  border-color: var(--omega-line-strong);
+
+  &:hover,
+  &:focus-visible {
+    background: #f6f5f3;
+    color: #3c4043;
+    border-color: var(--omega-line-strong);
+  }
+}
+
+// PayPal — brand yellow (kept from the pre-classy sheet)
+.btn-paypal {
+  --bs-btn-color: #333;
+  --bs-btn-bg: #ffc439;
+  --bs-btn-border-color: #ffc439;
+  --bs-btn-hover-color: #333;
+  --bs-btn-hover-bg: #eabc53;
+  --bs-btn-hover-border-color: #eabc53;
+  --bs-btn-focus-shadow-rgb: 246, 198, 87;
+  --bs-btn-active-color: #333;
+  --bs-btn-active-bg: #e8ad2e;
+  --bs-btn-active-border-color: #e8ad2e;
+  --bs-btn-disabled-color: #333;
+  --bs-btn-disabled-bg: #ffc439;
+  --bs-btn-disabled-border-color: #ffc439;
+}
+
+.classy-checkout__terms {
+  margin-top: 0.375rem;
+  text-align: center;
+  color: var(--omega-ink-faint);
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--omega-accent);
+    }
+  }
+}
+
+// ── Order summary (receipt panel extras) ────────────────────────────────────
+.classy-checkout__sticky {
+  position: sticky;
+  top: 2rem;
+}
+
+@media (max-width: 991.98px) {
+  .classy-checkout__sticky {
+    position: static;
+  }
+}
+
+.classy-checkout__mark {
+  width: 1.375rem;
+  height: 1.375rem;
+  object-fit: contain;
+}
+
+// Negative rows (discount / trial credit) — the good kind of red ink
+.classy-checkout__row-ok {
+  color: var(--omega-ok);
+  font-variant-numeric: tabular-nums;
+}
+
+.classy-checkout__recurring {
+  color: var(--omega-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+// ── Trust foot ──────────────────────────────────────────────────────────────
+.classy-checkout__trust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.625rem 1.75rem;
+  font-size: 0.78125rem;
+  color: var(--omega-ink-faint);
+
+  svg {
+    opacity: 0.7;
+    margin-right: 0.25rem;
+  }
+}
+
+// ── Dev toggle (dev builds only) ────────────────────────────────────────────
+.classy-checkout__dev-toggle {
+  width: 2.125rem;
+  height: 2.125rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+// ── reCAPTCHA badge — bottom left, out of the payment column's way ──────────
+.grecaptcha-badge {
+  bottom: 0.5rem !important;
+  left: 0.5rem !important;
+  right: auto !important;
+  width: 50px !important;
+}
