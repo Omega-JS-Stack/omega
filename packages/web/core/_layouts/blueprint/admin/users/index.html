@@ -29,6 +29,8 @@ prerender_icons:
   - name: "circle-check"
   - name: "arrow-up-right-from-square"
   - name: "circle-xmark"
+  - name: "ban"
+  - name: "unlock"
 ---
 
 <!-- Page Header Actions -->
@@ -36,7 +38,7 @@ prerender_icons:
   <div class="col">
     <div class="d-flex justify-content-between align-items-center">
       <div>
-        <p class="text-muted mb-0">Search users by email or UID</p>
+        <p class="text-muted mb-0">Newest accounts first — filter by email prefix or paste a UID</p>
       </div>
       <div>
         <button class="btn btn-outline-adaptive" id="btn-refresh-users">
@@ -90,7 +92,7 @@ prerender_icons:
         <span class="input-group-text">
           {% uj_icon "magnifying-glass", "fa-sm" %}
         </span>
-        <input type="text" class="form-control" name="search.query" placeholder="Search by email or UID..." aria-label="Search users" required minlength="1" autofocus>
+        <input type="text" class="form-control" name="search.query" placeholder="Filter by email prefix, or paste a UID..." aria-label="Filter users" autofocus>
         <button type="submit" class="btn btn-adaptive">
           <span class="button-text">Search</span>
         </button>
@@ -102,14 +104,8 @@ prerender_icons:
 <!-- Users Table -->
 <div class="card">
   <div class="card-body p-0">
-    <!-- Search Prompt (default state) -->
-    <div id="users-prompt" class="text-center text-muted py-5">
-      {% uj_icon "magnifying-glass", "fa-2xl mb-3 d-block" %}
-      Enter an email or UID above to search
-    </div>
-
     <!-- Loading -->
-    <div id="users-loading" class="text-center text-muted py-5 d-none">
+    <div id="users-loading" class="text-center text-muted py-5">
       <span class="spinner-border spinner-border-sm"></span>
     </div>
 
@@ -125,8 +121,9 @@ prerender_icons:
           <tr>
             <th>User</th>
             <th>Plan</th>
-            <th>Expires</th>
-            <th>Updated</th>
+            <th>Sign-in</th>
+            <th>Status</th>
+            <th>Created</th>
             <th style="width: 40px;"></th>
           </tr>
         </thead>
@@ -137,7 +134,12 @@ prerender_icons:
 
   <!-- Footer -->
   <div class="card-footer d-none" id="users-footer">
-    <div class="small text-muted" id="users-count"></div>
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="small text-muted" id="users-count"></div>
+      <button class="btn btn-sm btn-outline-adaptive d-none" id="btn-load-more">
+        <span class="button-text">Load more</span>
+      </button>
+    </div>
   </div>
 </div>
 

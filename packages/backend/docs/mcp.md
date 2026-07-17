@@ -14,13 +14,13 @@ Every tool has a `role` that controls who can see and call it:
 
 | Role | Who sees it | Tool count | Examples |
 |------|-------------|------------|---------|
-| `admin` | Admin key connections only | 22 | `firestore_read`, `send_email`, `cancel_subscription` |
+| `admin` | Admin key connections only | 24 | `firestore_read`, `send_email`, `cancel_subscription` |
 | `user` | Authenticated users + admins | 2 | `get_user`, `get_subscription` |
 | `public` | Everyone (after OAuth) | 1 | `health_check` |
 
 Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying @omega.js/backend route still rejects.
 
-## Available Tools (25)
+## Available Tools (27)
 
 | Tool | Role | Route | Description |
 |------|------|-------|-------------|
@@ -32,6 +32,8 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections g
 | `get_user` | user | `GET /user` | Get authenticated user info |
 | `get_subscription` | user | `GET /user/subscription` | Get subscription info for a user |
 | `sync_users` | admin | `POST /admin/users/sync` | Sync user data across systems |
+| `list_users` | admin | `GET /admin/users/list` | List users newest-first with the Auth join (providers, verified, disabled, last sign-in), email/uid prefix search, cursor pagination |
+| `set_user_disabled` | admin | `POST /admin/users/disable` | Disable or re-enable a user at the Auth level (disable also revokes refresh tokens) |
 | `list_campaigns` | admin | `GET /marketing/campaign` | List marketing campaigns |
 | `create_campaign` | admin | `POST /marketing/campaign` | Create a marketing campaign |
 | `get_stats` | admin | `GET /admin/stats` | Get system statistics |
@@ -85,7 +87,7 @@ The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves 
 ### Admin (Stdio)
 
 ```bash
-npx omega mcp    # Reads OMEGA_ADMIN_KEY from functions/.env — sees all 25 tools
+npx omega mcp    # Reads OMEGA_ADMIN_KEY from functions/.env — sees all 27 tools
 ```
 
 ### User (Stdio)

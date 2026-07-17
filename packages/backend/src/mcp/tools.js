@@ -207,6 +207,23 @@ module.exports = [
     },
   },
 
+  {
+    name: 'set_user_disabled',
+    description: 'Disable or re-enable a user account at the Firebase Auth level. Disabling blocks sign-in and revokes refresh tokens (live sessions end at their next token refresh); disabled: false re-enables. Read the flag back via list_users.',
+    role: 'admin',
+    method: 'POST',
+    path: 'admin/users/disable',
+    annotations: { title: 'Disable or re-enable a user', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uid: { type: 'string', description: 'Target user uid' },
+        disabled: { type: 'boolean', description: 'true to disable (default), false to re-enable' },
+      },
+      required: ['uid'],
+    },
+  },
+
   // --- Marketing Campaigns ---
   {
     name: 'list_campaigns',

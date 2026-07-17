@@ -1,5 +1,11 @@
 /**
  * Admin Users Index Page JavaScript
+ *
+ * A real user directory: loads immediately (newest first) from
+ * GET /admin/users/list — the backend route that joins Firebase Auth
+ * records (providers, verification, disabled, last sign-in) the client
+ * SDK can never read. Search = email prefix or exact UID; pagination
+ * rides the route's uid cursor.
  */
 
 // Libraries
@@ -13,9 +19,24 @@ import omega from '@omega.js/client';
 let formManager = null;
 let editFormManager = null;
 let editingUid = null;
-let searchResults = [];
+let rows = [];
+let nextCursor = null;
+let currentSearch = '';
+let loadingMore = false;
 
-const SEARCH_LIMIT = 50;
+const PAGE_SIZE = 25;
+
+// Human labels for Firebase Auth provider ids
+const PROVIDER_LABELS = {
+  'password': 'Password',
+  'google.com': 'Google',
+  'apple.com': 'Apple',
+  'github.com': 'GitHub',
+  'facebook.com': 'Facebook',
+  'twitter.com': 'X',
+  'microsoft.com': 'Microsoft',
+  'phone': 'Phone',
+};
 
 // Module
 export default () => {
@@ -28,7 +49,9 @@ export default () => {
       }
 
       initForm();
+      initControls();
       loadStatCards();
+      fetchPage();
     });
 
     return resolve();
@@ -43,14 +66,23 @@ function initForm() {
   });
 
   formManager.on('submit', async ({ data }) => {
-    const term = data?.search?.query?.trim();
-    if (!term) {
-      return;
-    }
+    currentSearch = (data?.search?.query || '').trim();
 
-    showLoading();
-    await searchUsers(term);
+    await fetchPage();
   });
+}
+
+// Wire refresh + load-more
+function initControls() {
+  const $refresh = document.getElementById('btn-refresh-users');
+  if ($refresh) {
+    $refresh.addEventListener('click', () => fetchPage());
+  }
+
+  const $loadMore = document.getElementById('btn-load-more');
+  if ($loadMore) {
+    $loadMore.addEventListener('click', () => fetchPage({ append: true }));
+  }
 }
 
 // Load stat card counts
@@ -73,191 +105,249 @@ async function loadStatCards() {
   setStatValue('stat-active-users', activeUsers);
 }
 
-// Search users by email prefix or UID prefix
-// Uses Firestore >= / \uf8ff range trick for prefix matching on both
-async function searchUsers(term) {
-  const firestore = omega.firestore();
-  const results = new Map();
-  const prefixEnd = term + '\uf8ff';
+// Fetch a directory page from the backend (auth-joined rows)
+async function fetchPage(options) {
+  const append = options?.append === true;
 
-  // Run email prefix search and UID prefix search in parallel
-  await Promise.allSettled([
-    // 1) Email prefix match
-    firestore.collection('users')
-      .where('auth.email', '>=', term)
-      .where('auth.email', '<=', prefixEnd)
-      .limit(SEARCH_LIMIT)
-      .get()
-      .then((snapshot) => {
-        snapshot.docs.forEach((doc) => {
-          results.set(doc.id, { id: doc.id, ...doc.data() });
-        });
-      }),
-
-    // 2) UID prefix match
-    firestore.collection('users')
-      .where('__name__', '>=', term)
-      .where('__name__', '<=', prefixEnd)
-      .limit(SEARCH_LIMIT)
-      .get()
-      .then((snapshot) => {
-        snapshot.docs.forEach((doc) => {
-          results.set(doc.id, { id: doc.id, ...doc.data() });
-        });
-      }),
-  ]);
-
-  searchResults = Array.from(results.values());
-
-  if (searchResults.length === 0) {
-    showEmpty('No users match your search');
-    return;
+  if (append) {
+    if (loadingMore || !nextCursor) {
+      return;
+    }
+    loadingMore = true;
+    setLoadMoreBusy(true);
+  } else {
+    showLoading();
   }
 
-  renderUsers();
+  try {
+    const url = new URL(`${omega.getApiUrl()}/omega/admin/users/list`);
+    url.searchParams.set('limit', PAGE_SIZE);
+    if (currentSearch) {
+      url.searchParams.set('search', currentSearch);
+    }
+    if (append && nextCursor) {
+      url.searchParams.set('startAfter', nextCursor);
+    }
+
+    const response = await authorizedFetch(url.toString(), {
+      method: 'GET',
+      timeout: 30000,
+      response: 'json',
+      tries: 1,
+      log: true,
+    });
+
+    const users = Array.isArray(response?.users) ? response.users : [];
+
+    rows = append ? rows.concat(users) : users;
+    nextCursor = response?.nextCursor || null;
+
+    if (rows.length === 0) {
+      showEmpty(currentSearch ? 'No users match your search' : 'No users yet');
+      return;
+    }
+
+    renderUsers();
+  } catch (error) {
+    console.error('Failed to load users:', error);
+    showEmpty(`Failed to load users: ${error.message || 'Unknown error'}`);
+  } finally {
+    loadingMore = false;
+    setLoadMoreBusy(false);
+  }
 }
 
 // Render users table
 function renderUsers() {
-  const $prompt = document.getElementById('users-prompt');
   const $loading = document.getElementById('users-loading');
   const $empty = document.getElementById('users-empty');
   const $table = document.getElementById('users-table');
   const $tbody = document.getElementById('users-tbody');
   const $footer = document.getElementById('users-footer');
   const $count = document.getElementById('users-count');
+  const $loadMore = document.getElementById('btn-load-more');
 
   if ($loading) $loading.classList.add('d-none');
-  if ($prompt) $prompt.classList.add('d-none');
   if ($empty) $empty.classList.add('d-none');
   if ($table) $table.classList.remove('d-none');
   if ($footer) $footer.classList.remove('d-none');
   if ($tbody) $tbody.innerHTML = '';
 
-  searchResults.forEach((user) => {
-    const email = user?.auth?.email || 'Unknown';
-    const uid = user.id;
-    const resolved = omega.auth().resolveSubscription(user);
-    const plan = resolved.plan;
-    const isPaid = plan !== 'basic';
-    const expiresUNIX = user?.subscription?.expires?.timestampUNIX;
-    const updatedUNIX = user?.metadata?.updated?.timestampUNIX;
-
-    let expiresText = '—';
-    if (expiresUNIX) {
-      const now = Math.floor(Date.now() / 1000);
-      if (expiresUNIX < now) {
-        expiresText = 'Expired';
-      } else {
-        expiresText = new Date(expiresUNIX * 1000).toLocaleDateString();
-      }
-    }
-
-    const updatedText = updatedUNIX ? formatTimeAgo(updatedUNIX * 1000) : '—';
-    const badgeClass = isPaid ? 'bg-success text-white' : 'bg-body-tertiary text-body';
-
-    const $row = document.createElement('tr');
-    $row.innerHTML = `
-      <td>
-        <div class="d-flex align-items-center">
-          ${getPrerenderedIcon('user', 'fa-sm me-2 text-muted')}
-          <div>
-            <div class="text-truncate" style="max-width: 220px;">${omega.utilities().escapeHTML(email)}</div>
-            <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${omega.utilities().escapeHTML(uid)}</div>
-          </div>
-        </div>
-      </td>
-      <td><span class="badge ${badgeClass}">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
-      <td class="small ${expiresText === 'Expired' ? 'text-danger' : 'text-muted'}">${expiresText}</td>
-      <td class="text-muted small">${updatedText}</td>
-      <td>
-        <div class="dropdown">
-          <button class="btn btn-sm btn-adaptive rounded-circle" type="button" data-bs-toggle="dropdown">
-            ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item small btn-view-user" href="#">
-              ${getPrerenderedIcon('eye', 'fa-sm me-2')}
-              View details
-            </a></li>
-            <li><a class="dropdown-item small btn-edit-user" href="#">
-              ${getPrerenderedIcon('pen', 'fa-sm me-2')}
-              Edit user
-            </a></li>
-            <li><a class="dropdown-item small btn-copy-uid" href="#">
-              ${getPrerenderedIcon('copy', 'fa-sm me-2')}
-              Copy UID
-            </a></li>
-            <li><a class="dropdown-item small btn-view-firebase" href="#">
-              ${getPrerenderedIcon('fire', 'fa-sm me-2')}
-              View in Explorer
-            </a></li>
-            <li><a class="dropdown-item small btn-signin-as" href="#">
-              ${getPrerenderedIcon('right-to-bracket', 'fa-sm me-2')}
-              Sign in as user
-            </a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item small text-danger btn-delete-user" href="#">
-              ${getPrerenderedIcon('trash', 'fa-sm me-2')}
-              Delete user
-            </a></li>
-          </ul>
-        </div>
-      </td>
-    `;
-
-    // Wire up action buttons
-    $row.querySelector('.btn-view-user').addEventListener('click', (e) => {
-      e.preventDefault();
-      viewUser(uid, user);
-    });
-
-    $row.querySelector('.btn-edit-user').addEventListener('click', (e) => {
-      e.preventDefault();
-      editUser(uid, user);
-    });
-
-    $row.querySelector('.btn-copy-uid').addEventListener('click', (e) => {
-      e.preventDefault();
-      navigator.clipboard.writeText(uid);
-    });
-
-    $row.querySelector('.btn-view-firebase').addEventListener('click', (e) => {
-      e.preventDefault();
-      window.location.href = `/admin/firebase?collection=users&doc=${uid}`;
-    });
-
-    $row.querySelector('.btn-signin-as').addEventListener('click', (e) => {
-      e.preventDefault();
-      signInAsUser(uid, email);
-    });
-
-    $row.querySelector('.btn-delete-user').addEventListener('click', (e) => {
-      e.preventDefault();
-      deleteUser(uid, email);
-    });
-
-    $tbody.appendChild($row);
+  rows.forEach((row) => {
+    $tbody.appendChild(renderRow(row));
   });
 
   if ($count) {
-    $count.textContent = `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`;
+    $count.textContent = currentSearch
+      ? `${rows.length} match${rows.length !== 1 ? 'es' : ''} for “${currentSearch}”`
+      : `${rows.length} user${rows.length !== 1 ? 's' : ''} shown · newest first`;
   }
+
+  if ($loadMore) {
+    $loadMore.classList.toggle('d-none', !nextCursor);
+  }
+}
+
+// Build one directory row
+function renderRow(row) {
+  const escape = omega.utilities().escapeHTML;
+  const email = row.email || 'Unknown';
+  const uid = row.uid;
+  const plan = row.plan || 'basic';
+  const isPaid = plan !== 'basic';
+  const auth = row.auth;
+
+  // Plan cell
+  const badgeClass = isPaid ? 'bg-success text-white' : 'bg-body-tertiary text-body';
+  const subStatus = row.subscriptionStatus && isPaid
+    ? `<div class="text-muted" style="font-size: 0.7rem;">${escape(row.subscriptionStatus)}</div>`
+    : '';
+
+  // Sign-in cell (providers + last sign-in)
+  const providers = (auth?.providers || [])
+    .map((id) => `<span class="badge bg-body-tertiary text-body fw-normal">${escape(PROVIDER_LABELS[id] || id)}</span>`)
+    .join(' ');
+  const lastSignIn = auth?.lastSignIn
+    ? `<div class="text-muted" style="font-size: 0.7rem;">${escape(formatTimeAgo(new Date(auth.lastSignIn).getTime()))}</div>`
+    : '';
+  const signInCell = auth
+    ? `${providers || '<span class="text-muted small">—</span>'}${lastSignIn}`
+    : '<span class="text-muted small">—</span>';
+
+  // Status cell (verification + disabled)
+  let statusCell = '<span class="text-muted small">—</span>';
+  if (auth) {
+    statusCell = auth.emailVerified
+      ? '<small class="text-success">Verified</small>'
+      : '<small class="text-muted">Unverified</small>';
+
+    if (auth.disabled) {
+      statusCell += ' <span class="badge bg-danger text-white ms-1">Disabled</span>';
+    }
+  }
+
+  // Created cell
+  const createdText = row.created ? new Date(row.created).toLocaleDateString() : '—';
+
+  const $row = document.createElement('tr');
+  $row.innerHTML = `
+    <td>
+      <div class="d-flex align-items-center">
+        ${getPrerenderedIcon('user', 'fa-sm me-2 text-muted')}
+        <div>
+          <div class="text-truncate" style="max-width: 220px;">${escape(email)}</div>
+          <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${escape(uid)}</div>
+        </div>
+      </div>
+    </td>
+    <td>
+      <span class="badge ${badgeClass}">${escape(capitalize(plan))}</span>
+      ${subStatus}
+    </td>
+    <td>${signInCell}</td>
+    <td>${statusCell}</td>
+    <td class="text-muted small">${escape(createdText)}</td>
+    <td>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-adaptive rounded-circle" type="button" data-bs-toggle="dropdown">
+          ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item small btn-view-user" href="#">
+            ${getPrerenderedIcon('eye', 'fa-sm me-2')}
+            View details
+          </a></li>
+          <li><a class="dropdown-item small btn-edit-user" href="#">
+            ${getPrerenderedIcon('pen', 'fa-sm me-2')}
+            Edit user
+          </a></li>
+          <li><a class="dropdown-item small btn-copy-uid" href="#">
+            ${getPrerenderedIcon('copy', 'fa-sm me-2')}
+            Copy UID
+          </a></li>
+          <li><a class="dropdown-item small btn-view-firebase" href="#">
+            ${getPrerenderedIcon('fire', 'fa-sm me-2')}
+            View in Explorer
+          </a></li>
+          <li><a class="dropdown-item small btn-signin-as" href="#">
+            ${getPrerenderedIcon('right-to-bracket', 'fa-sm me-2')}
+            Sign in as user
+          </a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item small btn-toggle-disabled" href="#">
+            ${auth?.disabled
+              ? `${getPrerenderedIcon('unlock', 'fa-sm me-2')} Enable user`
+              : `${getPrerenderedIcon('ban', 'fa-sm me-2')} Disable user`}
+          </a></li>
+          <li><a class="dropdown-item small text-danger btn-delete-user" href="#">
+            ${getPrerenderedIcon('trash', 'fa-sm me-2')}
+            Delete user
+          </a></li>
+        </ul>
+      </div>
+    </td>
+  `;
+
+  // Wire up action buttons
+  $row.querySelector('.btn-view-user').addEventListener('click', (e) => {
+    e.preventDefault();
+    viewUser(uid, email);
+  });
+
+  $row.querySelector('.btn-edit-user').addEventListener('click', (e) => {
+    e.preventDefault();
+    editUser(uid, email);
+  });
+
+  $row.querySelector('.btn-copy-uid').addEventListener('click', (e) => {
+    e.preventDefault();
+    navigator.clipboard.writeText(uid);
+  });
+
+  $row.querySelector('.btn-view-firebase').addEventListener('click', (e) => {
+    e.preventDefault();
+    window.location.href = `/admin/firebase?collection=users&doc=${uid}`;
+  });
+
+  $row.querySelector('.btn-signin-as').addEventListener('click', (e) => {
+    e.preventDefault();
+    signInAsUser(uid, email);
+  });
+
+  $row.querySelector('.btn-toggle-disabled').addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleDisabled(row);
+  });
+
+  $row.querySelector('.btn-delete-user').addEventListener('click', (e) => {
+    e.preventDefault();
+    deleteUser(uid, email);
+  });
+
+  return $row;
 }
 
 // ============================================
 // User Actions
 // ============================================
-function viewUser(uid, userData) {
+
+// Fetch the full Firestore doc on demand (the directory rows are lean)
+async function fetchFullUser(uid) {
+  const doc = await omega.firestore().doc(`users/${uid}`).get();
+
+  return doc.exists ? { id: uid, ...doc.data() } : null;
+}
+
+async function viewUser(uid, email) {
   const $label = document.getElementById('user-detail-modal-label');
   const $json = document.getElementById('user-detail-json');
 
   if ($label) {
-    $label.textContent = `${userData?.auth?.email || uid}`;
+    $label.textContent = email || uid;
   }
 
   if ($json) {
-    $json.textContent = JSON.stringify(userData, null, 2);
+    $json.textContent = 'Loading...';
   }
 
   // Wire modal footer buttons
@@ -273,9 +363,49 @@ function viewUser(uid, userData) {
     };
   }
 
-  // Show modal
+  // Show modal, then fill with the full doc
   const modal = new bootstrap.Modal(document.getElementById('user-detail-modal'));
   modal.show();
+
+  try {
+    const userData = await fetchFullUser(uid);
+    if ($json) {
+      $json.textContent = userData ? JSON.stringify(userData, null, 2) : 'No Firestore document for this user';
+    }
+  } catch (error) {
+    if ($json) {
+      $json.textContent = `Failed to load user: ${error.message || 'Unknown error'}`;
+    }
+  }
+}
+
+async function toggleDisabled(row) {
+  const disabled = !(row.auth?.disabled);
+  const email = row.email || row.uid;
+
+  if (disabled && !confirm(`Disable ${email}?\n\nThey will be signed out and blocked from signing in until re-enabled.`)) {
+    return;
+  }
+
+  try {
+    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/admin/users/disable`, {
+      method: 'POST',
+      timeout: 30000,
+      response: 'json',
+      tries: 1,
+      log: true,
+      body: { uid: row.uid, disabled: disabled },
+    });
+
+    // Reflect the new state in the cached row
+    row.auth = row.auth || {};
+    row.auth.disabled = response?.disabled === true;
+
+    renderUsers();
+  } catch (error) {
+    console.error('Failed to update user:', error);
+    alert(`Failed to ${disabled ? 'disable' : 'enable'} user: ${error.message || 'Unknown error'}`);
+  }
 }
 
 async function signInAsUser(uid, email) {
@@ -393,10 +523,10 @@ async function deleteUser(uid, email) {
     });
 
     // Remove from results and re-render
-    searchResults = searchResults.filter((u) => u.id !== uid);
+    rows = rows.filter((u) => u.uid !== uid);
 
-    if (searchResults.length === 0) {
-      showEmpty('No users match your search');
+    if (rows.length === 0) {
+      showEmpty(currentSearch ? 'No users match your search' : 'No users yet');
     } else {
       renderUsers();
     }
@@ -406,31 +536,22 @@ async function deleteUser(uid, email) {
   }
 }
 
-function editUser(uid, userData) {
+async function editUser(uid, email) {
   editingUid = uid;
 
   // Populate read-only fields
   const $uid = document.getElementById('edit-uid');
   const $email = document.getElementById('edit-email');
   if ($uid) $uid.value = uid;
-  if ($email) $email.value = userData?.auth?.email || '';
+  if ($email) $email.value = email || '';
 
-  // Populate editable fields
+  // Clear editable fields until the full doc arrives
   const $admin = document.getElementById('edit-role-admin');
-  if ($admin) $admin.checked = !!userData?.roles?.admin;
-
   const $plan = document.getElementById('edit-plan');
-  if ($plan) $plan.value = userData?.subscription?.product?.id || 'basic';
-
   const $expires = document.getElementById('edit-expires');
-  if ($expires) {
-    const expiresUNIX = userData?.subscription?.expires?.timestampUNIX;
-    if (expiresUNIX) {
-      $expires.value = new Date(expiresUNIX * 1000).toISOString().split('T')[0];
-    } else {
-      $expires.value = '';
-    }
-  }
+  if ($admin) $admin.checked = false;
+  if ($plan) $plan.value = '';
+  if ($expires) $expires.value = '';
 
   // Init FormManager on first use
   if (!editFormManager) {
@@ -441,6 +562,21 @@ function editUser(uid, userData) {
 
   const modal = new bootstrap.Modal(document.getElementById('user-edit-modal'));
   modal.show();
+
+  // Fill from the full Firestore doc
+  try {
+    const userData = await fetchFullUser(uid);
+
+    if ($admin) $admin.checked = !!userData?.roles?.admin;
+    if ($plan) $plan.value = userData?.subscription?.product?.id || 'basic';
+
+    if ($expires) {
+      const expiresUNIX = userData?.subscription?.expires?.timestampUNIX;
+      $expires.value = expiresUNIX ? new Date(expiresUNIX * 1000).toISOString().split('T')[0] : '';
+    }
+  } catch (error) {
+    console.error('Failed to load user for editing:', error);
+  }
 }
 
 function initEditForm() {
@@ -480,17 +616,11 @@ function initEditForm() {
 
     await firestore.doc(`users/${editingUid}`).set(update, { merge: true });
 
-    // Update local search results cache
-    const idx = searchResults.findIndex((u) => u.id === editingUid);
-    if (idx !== -1) {
-      // Deep merge the update into cached user
-      const user = searchResults[idx];
-      user.roles = { ...user.roles, ...update.roles };
-      user.subscription = user.subscription || {};
-      user.subscription.product = { ...user.subscription.product, ...update.subscription.product };
-      if (update.subscription.expires) {
-        user.subscription.expires = { ...user.subscription.expires, ...update.subscription.expires };
-      }
+    // Update the cached directory row
+    const row = rows.find((u) => u.uid === editingUid);
+    if (row) {
+      row.plan = update.subscription.product.id;
+      row.roles = { ...row.roles, ...update.roles };
     }
 
     // Close modal and re-render
@@ -517,8 +647,21 @@ function showEmpty(message) {
   }
 }
 
+function setLoadMoreBusy(busy) {
+  const $loadMore = document.getElementById('btn-load-more');
+  if (!$loadMore) {
+    return;
+  }
+
+  $loadMore.disabled = busy;
+  const $text = $loadMore.querySelector('.button-text');
+  if ($text) {
+    $text.textContent = busy ? 'Loading...' : 'Load more';
+  }
+}
+
 function hideAll() {
-  ['users-loading', 'users-empty', 'users-prompt'].forEach((id) => {
+  ['users-loading', 'users-empty'].forEach((id) => {
     const $el = document.getElementById(id);
     if ($el) $el.classList.add('d-none');
   });
