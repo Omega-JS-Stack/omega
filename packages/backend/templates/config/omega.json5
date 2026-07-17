@@ -164,9 +164,13 @@
       // a URL = external parent (e.g. 'https://api.itwcreativeworks.com') —
       // used by the newsletter generator to pull sources; '' = no parent
       parent: '',
+      // The website repo the content routes (admin/post CMS, content/post)
+      // commit to — e.g. 'https://github.com/your-org/your-website-repo'.
+      // Deliberately empty by default so the routes' "not configured" guard
+      // fires instead of aiming a real GH_TOKEN at a placeholder repo.
       github: {
-        user: 'username',
-        repo_website: 'https://github.com/username/omega',
+        user: '',
+        repo_website: '',
       },
       marketing: {
         campaigns: {

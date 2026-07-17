@@ -1,0 +1,157 @@
+---
+layout: admin/core/minimal
+
+theme:
+  header:
+    title:
+      content: "Post editor"
+      icon: "pen-nib"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Posts"
+          href: "/admin/posts"
+        - label: "Editor"
+
+meta:
+  title: "Post editor - Admin"
+  description: "Write and edit blog posts"
+  breadcrumb: "Editor"
+---
+
+<!-- Page Header -->
+<div class="row mb-4">
+  <div class="col">
+    <div class="d-flex justify-content-between align-items-center">
+      <p class="text-muted mb-0" id="editor-mode-note">Write a new post — it commits straight to the website repo</p>
+      <a class="btn btn-outline-adaptive" href="/admin/posts">
+        {% uj_icon "arrow-left", "fa-md me-2" %}
+        All posts
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Edit-mode load state -->
+<div id="editor-loading" class="text-center text-muted py-5 d-none">
+  <span class="spinner-border spinner-border-sm me-2"></span>
+  Fetching the post from GitHub...
+</div>
+
+<!-- Edit-mode load error -->
+<div id="editor-load-error" class="alert alert-danger d-none" role="alert">
+  <strong>Couldn't load the post.</strong>
+  <span id="editor-load-error-message"></span>
+</div>
+
+<!-- Success panel -->
+<div id="editor-success" class="card d-none">
+  <div class="card-body text-center py-5">
+    <div class="rounded-circle d-inline-flex align-items-center justify-content-center p-3 bg-success bg-opacity-10 mx-auto mb-3">
+      {% uj_icon "circle-check", "fa-2xl text-success" %}
+    </div>
+    <h5 class="mb-2" id="editor-success-title">Post committed</h5>
+    <p class="text-muted mb-4" id="editor-success-detail"></p>
+    <div class="d-flex justify-content-center gap-2">
+      <a class="btn btn-sm btn-outline-adaptive" href="/admin/posts">
+        Back to posts
+      </a>
+      <a class="btn btn-sm btn-adaptive" id="btn-view-post" href="#" target="_blank" rel="noopener">
+        {% uj_icon "arrow-up-right-from-square", "fa-sm me-2" %}
+        View on site
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Editor Form -->
+<div class="card" id="editor-form-card">
+  <div class="card-body">
+    <form id="post-editor-form" data-form-state="initializing" onsubmit="return false">
+      <div class="row">
+        <!-- Title -->
+        <div class="col-md-8 mb-3">
+          <label for="editor-title" class="form-label small">Title</label>
+          <input type="text" class="form-control" id="editor-title" name="post.title" placeholder="A headline readers can't skip" required>
+        </div>
+
+        <!-- Author (create only) -->
+        <div class="col-md-4 mb-3 create-only">
+          <label for="editor-author" class="form-label small">Author</label>
+          <input type="text" class="form-control" id="editor-author" name="post.author" placeholder="Defaults to the brand">
+        </div>
+      </div>
+
+      <!-- Slug (create only) -->
+      <div class="mb-3 create-only">
+        <label for="editor-slug" class="form-label small">URL slug</label>
+        <div class="input-group">
+          <span class="input-group-text">/blog/</span>
+          <input type="text" class="form-control font-monospace" id="editor-slug" name="post.url" placeholder="my-post" required>
+        </div>
+        <small class="text-muted">Follows the title — edit to override</small>
+      </div>
+
+      <!-- Description (create only) -->
+      <div class="mb-3 create-only">
+        <label for="editor-description" class="form-label small">Description</label>
+        <textarea class="form-control" id="editor-description" name="post.description" rows="2" placeholder="One or two sentences for search results and social cards" required></textarea>
+      </div>
+
+      <!-- Header image (create only) -->
+      <div class="mb-3 create-only">
+        <label for="editor-header-image" class="form-label small">Header image URL</label>
+        <input type="url" class="form-control" id="editor-header-image" name="post.headerImageURL" placeholder="https://images.unsplash.com/..." required>
+        <small class="text-muted">Must resolve to a JPEG — it's downloaded, resized, and committed as the post's hero</small>
+      </div>
+
+      <div class="row create-only">
+        <!-- Categories -->
+        <div class="col-md-6 mb-3">
+          <label for="editor-categories" class="form-label small">Categories</label>
+          <input type="text" class="form-control" id="editor-categories" name="post.categories" placeholder="news, product">
+          <small class="text-muted">Comma-separated</small>
+        </div>
+
+        <!-- Tags -->
+        <div class="col-md-6 mb-3">
+          <label for="editor-tags" class="form-label small">Tags</label>
+          <input type="text" class="form-control" id="editor-tags" name="post.tags" placeholder="launch, update">
+          <small class="text-muted">Comma-separated</small>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="mb-3">
+        <label for="editor-body" class="form-label small">Body</label>
+        <textarea class="form-control font-monospace" id="editor-body" name="post.body" rows="16" placeholder="Markdown. No need to repeat the title as a heading — the layout renders it." required></textarea>
+        <small class="text-muted">Markdown. Images referenced by URL (<code>![alt](https://...)</code>) are downloaded, resized, and committed with the post.</small>
+      </div>
+
+      <!-- Frontmatter (edit mode, read-only) -->
+      <details class="mb-3 d-none" id="editor-frontmatter-details">
+        <summary class="small text-muted">Frontmatter (preserved on save)</summary>
+        <pre class="mt-2 p-3 mb-0 small" style="background: var(--bs-tertiary-bg); max-height: 240px; overflow-y: auto;"><code id="editor-frontmatter"></code></pre>
+      </details>
+
+      <hr>
+
+      <!-- Deploy toggle -->
+      <div class="form-check form-switch mb-4">
+        <input class="form-check-input" type="checkbox" id="editor-deploy" name="post.deploy" checked>
+        <label class="form-check-label" for="editor-deploy">Dispatch a site build after saving</label>
+        <small class="text-muted d-block">The post is committed either way — uncheck to batch several changes into one build</small>
+      </div>
+
+      <!-- Submit -->
+      <div class="d-flex justify-content-end gap-2">
+        <a class="btn btn-outline-adaptive" href="/admin/posts">Cancel</a>
+        <button type="submit" class="btn btn-adaptive">
+          {% uj_icon "check", "fa-sm me-2" %}
+          <span class="button-text" id="editor-submit-text">Publish post</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

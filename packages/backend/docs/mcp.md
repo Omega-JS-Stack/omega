@@ -16,11 +16,11 @@ Every tool has a `role` that controls who can see and call it:
 |------|-------------|------------|---------|
 | `admin` | Admin key connections only | 24 | `firestore_read`, `send_email`, `cancel_subscription` |
 | `user` | Authenticated users + admins | 2 | `get_user`, `get_subscription` |
-| `public` | Everyone (after OAuth) | 1 | `health_check` |
+| `public` | Everyone (after OAuth) | 2 | `health_check`, `get_post` |
 
 Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections get a 401 that triggers the OAuth flow — there is no unauthenticated tool access. Defense-in-depth: even if someone calls an admin tool by name, the underlying @omega.js/backend route still rejects.
 
-## Available Tools (27)
+## Available Tools (28)
 
 | Tool | Role | Route | Description |
 |------|------|-------|-------------|
@@ -47,6 +47,7 @@ Admin sees ALL tools. User sees `user` + `public`. Unauthenticated connections g
 | `run_cron` | admin | `POST /admin/cron` | Trigger a cron job by ID |
 | `create_post` | admin | `POST /admin/post` | Create a blog post |
 | `update_post` | admin | `PUT /admin/post` | Update an existing blog post |
+| `get_post` | public | `GET /content/post` | Fetch a post's markdown + frontmatter by URL (pairs with `update_post`) |
 | `create_backup` | admin | `POST /admin/backup` | Create a Firestore backup |
 | `run_hook` | admin | `POST /admin/hook` | Execute a custom hook |
 | `generate_uuid` | admin | `POST /general/uuid` | Generate a UUID |
@@ -87,13 +88,13 @@ The consumer auth URL is resolved from `Manager.getWebsiteUrl()` (auto-resolves 
 ### Admin (Stdio)
 
 ```bash
-npx omega mcp    # Reads OMEGA_ADMIN_KEY from functions/.env — sees all 27 tools
+npx omega mcp    # Reads OMEGA_ADMIN_KEY from functions/.env — sees all 28 tools
 ```
 
 ### User (Stdio)
 
 ```bash
-npx omega mcp --token <api-key>    # User-level — sees 3 tools (2 user + 1 public)
+npx omega mcp --token <api-key>    # User-level — sees 4 tools (2 user + 2 public)
 ```
 
 ## Consumer MCP Tools

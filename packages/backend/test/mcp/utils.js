@@ -216,11 +216,9 @@ module.exports = {
     // --- Real tools verification ---
 
     {
-      name: 'all 19 built-in tools have a role assigned',
+      name: 'every built-in tool has a role assigned',
       async run({ assert }) {
         const tools = require('../../src/mcp/tools.js');
-
-        assert.equal(tools.length, 25, 'Should have 25 tools');
 
         const missing = tools.filter((t) => !t.role);
         assert.equal(missing.length, 0, `All tools should have roles, missing: ${missing.map((t) => t.name).join(', ')}`);
@@ -236,9 +234,10 @@ module.exports = {
         const user = tools.filter((t) => t.role === 'user');
         const pub = tools.filter((t) => t.role === 'public');
 
-        assert.equal(admin.length, 22, `Should have 22 admin tools, got ${admin.length}`);
+        assert.equal(admin.length, 24, `Should have 24 admin tools, got ${admin.length}`);
         assert.equal(user.length, 2, `Should have 2 user tools, got ${user.length}`);
-        assert.equal(pub.length, 1, `Should have 1 public tool, got ${pub.length}`);
+        assert.equal(pub.length, 2, `Should have 2 public tools, got ${pub.length}`);
+        assert.equal(admin.length + user.length + pub.length, tools.length, 'Every tool is in a known role bucket');
       },
     },
   ],

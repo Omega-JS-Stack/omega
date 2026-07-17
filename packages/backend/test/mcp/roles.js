@@ -6,6 +6,10 @@
  */
 const fetch = require('wonderful-fetch');
 
+// The tool SSOT — expected counts derive from it so the suite catches drift
+// between the served tools and src without going stale on hardcoded numbers
+const TOOLS = require('../../src/mcp/tools.js');
+
 const MCP_ENDPOINT = 'http://localhost:5002/omega/mcp';
 
 function parseSSE(text) {
@@ -59,7 +63,7 @@ module.exports = {
 
   tests: [
     {
-      name: 'admin sees all 19 tools',
+      name: 'admin sees every built-in tool',
       async run({ assert }) {
         const key = process.env.OMEGA_ADMIN_KEY;
         const response = await mcpRequest('tools/list', {}, key);
@@ -67,7 +71,7 @@ module.exports = {
         assert.ok(response?.result?.tools, 'Should return tools list');
 
         const tools = response.result.tools;
-        assert.equal(tools.length, 25, `Admin should see all 25 tools, got ${tools.length}`);
+        assert.equal(tools.length, TOOLS.length, `Admin should see all ${TOOLS.length} tools, got ${tools.length}`);
 
         const names = tools.map((t) => t.name);
         assert.ok(names.includes('firestore_read'), 'Admin should see firestore_read');
@@ -87,7 +91,7 @@ module.exports = {
         assert.ok(response?.result?.tools, 'Should return tools list');
 
         const tools = response.result.tools;
-        assert.equal(tools.length, 25, `Admin-role user should see all 25 tools, got ${tools.length}`);
+        assert.equal(tools.length, TOOLS.length, `Admin-role user should see all ${TOOLS.length} tools, got ${tools.length}`);
 
         const names = tools.map((t) => t.name);
         assert.ok(names.includes('firestore_read'), 'Should see admin tool firestore_read');
@@ -122,7 +126,8 @@ module.exports = {
         assert.ok(!names.includes('cancel_subscription'), 'User should NOT see cancel_subscription');
         assert.ok(!names.includes('generate_uuid'), 'User should NOT see generate_uuid');
 
-        assert.equal(tools.length, 3, `User should see 3 tools (2 user + 1 public), got ${tools.length}`);
+        const expected = TOOLS.filter((t) => t.role === 'user' || t.role === 'public').length;
+        assert.equal(tools.length, expected, `User should see ${expected} tools (user + public), got ${tools.length}`);
       },
     },
 

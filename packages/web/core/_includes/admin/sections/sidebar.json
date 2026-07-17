@@ -61,6 +61,23 @@
       label: 'Content'
     },
     {
+      label: 'Posts',
+      href: null,
+      icon: 'newspaper',
+      dropdown: [
+        {
+          label: 'All posts',
+          href: '/admin/posts',
+          icon: 'list'
+        },
+        {
+          label: 'New post',
+          href: '/admin/posts/editor',
+          icon: 'plus'
+        }
+      ]
+    },
+    {
       label: 'Animation Studio',
       href: '/admin/studio',
       icon: 'clapperboard',

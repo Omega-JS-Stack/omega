@@ -1,0 +1,132 @@
+---
+layout: admin/core/minimal
+
+theme:
+  header:
+    title:
+      content: "Posts"
+      icon: "newspaper"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Posts"
+
+meta:
+  title: "Posts - Admin"
+  description: "Manage blog posts"
+  breadcrumb: "All posts"
+
+prerender_icons:
+  - name: "newspaper"
+  - name: "pen"
+  - name: "copy"
+  - name: "arrow-up-right-from-square"
+  - name: "ellipsis-vertical"
+---
+
+<!-- Page Header Actions -->
+<div class="row mb-4">
+  <div class="col">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <p class="text-muted mb-0">What's live on the blog — sourced from the site's own feed, newest first</p>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-adaptive" id="btn-refresh-posts">
+          {% uj_icon "rotate", "fa-md me-2" %}
+          Refresh
+        </button>
+        <a class="btn btn-adaptive" href="/admin/posts/editor">
+          {% uj_icon "plus", "fa-md me-2" %}
+          New post
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Merged stat card (App DNA) -->
+<div class="classy-statgrid mb-4" style="--classy-statgrid-cols: 3;">
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Published posts</span>
+      {% uj_icon "newspaper", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-total-posts">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+  </div>
+
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Latest post</span>
+      {% uj_icon "clock", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-latest-post">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+    <small class="text-muted text-truncate d-block" id="stat-latest-title"></small>
+  </div>
+
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Categories in use</span>
+      {% uj_icon "tags", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-categories">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="row mb-3">
+  <div class="col">
+    <div class="input-group">
+      <span class="input-group-text">
+        {% uj_icon "magnifying-glass", "fa-sm" %}
+      </span>
+      <input type="text" class="form-control" id="posts-filter" placeholder="Filter by title, category, or URL..." aria-label="Filter posts">
+    </div>
+  </div>
+</div>
+
+<!-- Posts Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <!-- Loading -->
+    <div id="posts-loading" class="text-center text-muted py-5">
+      <span class="spinner-border spinner-border-sm"></span>
+    </div>
+
+    <!-- Empty State -->
+    <div id="posts-empty" class="text-center text-muted py-5 d-none">
+      No posts yet
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 d-none" id="posts-table">
+        <thead>
+          <tr>
+            <th>Post</th>
+            <th>Author</th>
+            <th>Categories</th>
+            <th>Published</th>
+            <th style="width: 40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="posts-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="card-footer d-none" id="posts-footer">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="small text-muted" id="posts-count"></div>
+      <div class="small text-muted">New and edited posts appear here after the next site build</div>
+    </div>
+  </div>
+</div>

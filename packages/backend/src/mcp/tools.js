@@ -472,6 +472,21 @@ module.exports = [
       required: ['url', 'body'],
     },
   },
+  {
+    name: 'get_post',
+    description: 'Fetch a blog post by its public URL — returns the markdown body, raw frontmatter, parsed metadata (title, description, author, tags, categories), and the GitHub path/sha. Use before update_post to edit an existing post.',
+    role: 'public',
+    method: 'GET',
+    path: 'content/post',
+    annotations: { title: 'Get a blog post', readOnlyHint: true, openWorldHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Full public URL of the post (e.g. https://site.com/blog/my-post)' },
+      },
+      required: ['url'],
+    },
+  },
 
   // --- Backup ---
   {
