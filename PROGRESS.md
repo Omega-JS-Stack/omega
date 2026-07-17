@@ -2,7 +2,8 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **SKIN PASS — round-5 batch LANDED (cp164–173, Ian 2026-07-16 big list)**: dev-links-local root fix (cp164) · quick fixes + REAL wordmark wall (cp165) · pagination + sample updates (cp166) · REIMAGINE arc: download/extension manus-grade (cp167), legal editorial trio + brand.company (cp168), 404 moment/status console/updates timeline (cp169), team voice + article rail/progress (cp170), receipt moment + quiet email-prefs + pricing rhythm (cp171) · consistency sweep: bento icons + quiet alerts (cp172) · dashboard decision (NO default user dashboard → /account) + admin list-users engine w/ auth join + list_users MCP tool (cp173) — Ian re-reviews at localhost:4000. QUEUED: admin arc pt2 (users table wiring + CMS seed), checkout polish, HTTPS :5002 proxy, NEWSFLASH
+- **SKIN PASS — round-5 batch LANDED (cp164–173, Ian 2026-07-16 big list)**: dev-links-local root fix (cp164) · quick fixes + REAL wordmark wall (cp165) · pagination + sample updates (cp166) · REIMAGINE arc: download/extension manus-grade (cp167), legal editorial trio + brand.company (cp168), 404 moment/status console/updates timeline (cp169), team voice + article rail/progress (cp170), receipt moment + quiet email-prefs + pricing rhythm (cp171) · consistency sweep: bento icons + quiet alerts (cp172) · dashboard decision (NO default user dashboard → /account) + admin list-users engine w/ auth join + list_users MCP tool (cp173) — Ian re-reviews at https://localhost:4000
+- **Round-6 in flight**: cp174 `/admin/users` live directory + disable switch and cp176 HTTPS everywhere LANDED (browser-proven; dev URLs are https now) — NEXT: cp175 admin CMS seed (posts manager over the existing admin/post routes), then checkout composition polish, then the NEWSFLASH arc
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
 1. **NEWSFLASH modernization (Ian queued 2026-07-16)** — migrate/modernize the newsflash theme onto the classy-v2 engine so TWO themes are proven good-looking (also the live testbed for the parked CSS fall-through direction call)
@@ -46,6 +47,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 174+176 round-6 opening — /admin/users live directory (auth-join columns, search, cursor pagination, disable/enable + token revoke, `set_user_disabled` MCP, mcp.md true-up to 27 tools) + HTTPS everywhere via `@omega.js/devkit/local-https` (serve/emulator :5002 + `omega dev` :4000, WS-tunneled live-reload; browser-proven over https) (`e4ff60bf`, `8a051591`) → CHANGELOG
 - [x] 148–153 reference-bar remake — pricing/blog/contact/team (5667e22), download/extension/app/alternatives (22ce4ec), status/updates/legal/404 (326c9cb), auth + /signup split (ce4efa0), account/payment/portal (e9227b3), dashboard/admin App DNA + brandmark v2 (cff3df2) → CHANGELOG
 - [x] 147 remake mandate opens — chrome (footer/nav/redirect) + dev sample posts + about/contact/pricing recomposed + countup year fix (`8920e52`) → CHANGELOG
 - [x] 146 default pages + blueprints skinned — shared content vocabulary, themePages override slot, /blog alive post-less (`4a478f9`) → CHANGELOG
@@ -64,4 +66,4 @@
 - [x] 129 config-truth pass — MrLogo brandmark ladder (assets.brandmark options GONE; SA→API-key→token, BEM wire verified), reverse-DNS bundle ids (wizard-derived; playground → com.itwcreativeworks), `gcp` key, targets-last SSOT; Apple terms accepted → leg ran LIVE (bundle id CREATED + 2 profiles minted); mgr 655 / config 109 / corpus 1225 (1952448) → CHANGELOG
 - [x] Phases 0–2 + cp33–128 — bootstrap, extractions, renames, config/wire/env harmonization, C1–C5, D12–D15, N1–N7, manage-cycle dogfood, live playground provisioning (116 site LIVE · 119 first full pipeline PASS · 121–123 seeds/brandmark/src-dist pillar/live-site gaps · 124–126 findings sweep + 2b mints + core graduations · 128 board-clear + sound root `npm test`) → CHANGELOG + git log
 
-*Last updated: 2026-07-16 (cp153b: reference-bar remake milestone — root suite green; brandmark tips rounded)*
+*Last updated: 2026-07-16 (round-6 opening landed: cp174 admin directory + cp176 HTTPS everywhere)*
