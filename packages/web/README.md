@@ -21,7 +21,8 @@ npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
                     #   --port=N or config ports.website PINS it (busy = hard error)
                     #   HTTPS by default via mkcert (https://localhost:4000; Eleventy
                     #   serves an internal port behind the TLS proxy, live-reload WS
-                    #   tunneled) — --no-https or no mkcert falls back to plain http
+                    #   tunneled; plain http://localhost:4000 307s to https) —
+                    #   --no-https or no mkcert falls back to plain http
                     #   and site.url follows the scheme (canonical/og stay honest)
                     #   dev pages auto-connect the REAL Auth+Firestore SDKs to the local
                     #   emulators (zero flags; never live Firebase) — start them from the

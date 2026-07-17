@@ -15,7 +15,7 @@ Chart.register(DoughnutController, BarController, ArcElement, BarElement, Catego
 
 // State
 let planChart = null;
-let frequencyChart = null;
+let signupsChart = null;
 
 // Module
 export default () => {
@@ -40,6 +40,9 @@ async function loadDashboard() {
   const results = await Promise.allSettled([
     loadStatCards(),
     loadSubscriberData(),
+    loadSignupsTrend(),
+    loadAttention(),
+    loadContent(),
     loadRecentUsers(),
     loadRecentOrders(),
   ]);
@@ -60,17 +63,94 @@ async function loadStatCards() {
   const now = Math.floor(Date.now() / 1000);
   const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
 
-  const [totalUsers, newUsers, totalNotifications, newNotifications] = await Promise.allSettled([
+  const [totalUsers, newUsers, totalNotifications, newNotifications, recentOrders, totalOrders] = await Promise.allSettled([
     getCountFromServer(collection(db, 'users')),
     getCountFromServer(query(collection(db, 'users'), where('metadata.created.timestampUNIX', '>=', thirtyDaysAgo))),
     getCountFromServer(collection(db, 'notifications')),
     getCountFromServer(query(collection(db, 'notifications'), where('metadata.created.timestampUNIX', '>=', thirtyDaysAgo))),
+    getCountFromServer(query(collection(db, 'payments-orders'), where('metadata.created.timestampUNIX', '>=', thirtyDaysAgo))),
+    getCountFromServer(collection(db, 'payments-orders')),
   ]);
 
   setStatValue('stat-total-users', totalUsers);
   setStatSubValue('stat-new-users', newUsers, 'in 30d');
   setStatValue('stat-notifications', totalNotifications);
   setStatSubValue('stat-new-notifications', newNotifications, 'in 30d');
+  setStatValue('stat-orders', recentOrders);
+  setStatSubValue('stat-orders-sub', totalOrders, 'all time');
+}
+
+// ============================================
+// Needs Attention (actionable counts — all single-field queries)
+// ============================================
+async function loadAttention() {
+  const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
+  const db = omega.firebaseFirestore;
+  const now = Math.floor(Date.now() / 1000);
+  const sevenDaysOut = now + (7 * 24 * 60 * 60);
+
+  const [carts, expiring, suspended] = await Promise.allSettled([
+    getCountFromServer(query(collection(db, 'payments-carts'), where('status', '==', 'pending'))),
+    getCountFromServer(query(
+      collection(db, 'users'),
+      where('subscription.expires.timestampUNIX', '>=', now),
+      where('subscription.expires.timestampUNIX', '<=', sevenDaysOut),
+    )),
+    getCountFromServer(query(collection(db, 'users'), where('subscription.status', '==', 'suspended'))),
+  ]);
+
+  setAttentionCount('att-carts', carts);
+  setAttentionCount('att-expiring', expiring);
+  setAttentionCount('att-suspended', suspended);
+}
+
+// Fill an attention counter; non-zero counts get the warn tint
+function setAttentionCount(id, settled) {
+  const $el = document.getElementById(id);
+  if (!$el) {
+    return;
+  }
+
+  if (settled.status !== 'fulfilled') {
+    $el.textContent = '—';
+    return;
+  }
+
+  const count = settled.value.data().count;
+  $el.textContent = count.toLocaleString();
+  $el.classList.toggle('classy-count--warn', count > 0);
+}
+
+// ============================================
+// Signups Trend (14 daily counts → bar chart)
+// ============================================
+async function loadSignupsTrend() {
+  const { collection, query, where, getCountFromServer } = await import('firebase/firestore');
+  const db = omega.firebaseFirestore;
+
+  const DAYS = 14;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const buckets = Array.from({ length: DAYS }, (_, i) => {
+    const start = new Date(startOfToday.getTime() - (DAYS - 1 - i) * dayMs);
+    return {
+      label: start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      startUNIX: Math.floor(start.getTime() / 1000),
+      endUNIX: Math.floor((start.getTime() + dayMs) / 1000),
+    };
+  });
+
+  const counts = await Promise.all(buckets.map((bucket) =>
+    getCountFromServer(query(
+      collection(db, 'users'),
+      where('metadata.created.timestampUNIX', '>=', bucket.startUNIX),
+      where('metadata.created.timestampUNIX', '<', bucket.endUNIX),
+    )).then((snap) => snap.data().count).catch(() => 0)
+  ));
+
+  renderSignupsChart(buckets.map((b) => b.label), counts);
 }
 
 // ============================================
@@ -100,19 +180,13 @@ async function loadSubscriberData() {
 
   // Build chart data from counts
   const plans = {};
-  const frequencies = {};
 
-  results.forEach(({ planId, frequency, count }) => {
+  results.forEach(({ planId, count }) => {
     if (count === 0) {
       return;
     }
 
     plans[planId] = (plans[planId] || 0) + count;
-
-    if (!frequencies[planId]) {
-      frequencies[planId] = Object.fromEntries(frequencyIds.map((f) => [f, 0]));
-    }
-    frequencies[planId][frequency] = count;
   });
 
   // Calculate MRR from counts × product prices
@@ -145,27 +219,29 @@ async function loadSubscriberData() {
   }
 
   renderPlanChart(plans);
-  renderFrequencyChart(frequencies, frequencyIds);
 }
 
 // ============================================
 // Charts
 // ============================================
 function getChartColors() {
+  // Paint from the classy token sheet so charts follow the brand ramp + mode
   const style = getComputedStyle(document.documentElement);
+  const token = (name) => style.getPropertyValue(name).trim();
+
+  const accent = token('--omega-accent') || '#2563eb';
+
   return {
-    text: style.getPropertyValue('--bs-body-color').trim(),
-    border: style.getPropertyValue('--bs-border-color').trim(),
-    muted: style.getPropertyValue('--bs-secondary-color').trim(),
+    text: token('--omega-ink-muted') || token('--bs-body-color'),
+    border: token('--omega-line') || token('--bs-border-color'),
+    accent: accent,
     palette: [
-      '#0d6efd', // primary/blue
-      '#198754', // success/green
-      '#0dcaf0', // info/cyan
-      '#ffc107', // warning/yellow
-      '#dc3545', // danger/red
-      '#6f42c1', // purple
-      '#fd7e14', // orange
-      '#20c997', // teal
+      accent,
+      token('--omega-ok') || '#198754',
+      token('--omega-warn') || '#ffc107',
+      token('--omega-danger') || '#dc3545',
+      token('--omega-ink-faint') || '#6c757d',
+      token('--omega-accent-active') || accent,
     ],
   };
 }
@@ -226,19 +302,10 @@ function renderPlanChart(plans) {
   });
 }
 
-function renderFrequencyChart(frequencies, frequencyIds) {
-  const $loading = document.getElementById('chart-frequency-loading');
-  const $canvas = document.getElementById('chart-frequency');
+function renderSignupsChart(labels, counts) {
+  const $loading = document.getElementById('chart-signups-loading');
+  const $canvas = document.getElementById('chart-signups');
   if (!$canvas) {
-    return;
-  }
-
-  const planIds = Object.keys(frequencies);
-
-  if (planIds.length === 0) {
-    if ($loading) {
-      $loading.innerHTML = '<span class="text-muted">No subscription data</span>';
-    }
     return;
   }
 
@@ -249,15 +316,17 @@ function renderFrequencyChart(frequencies, frequencyIds) {
   }
   $canvas.classList.remove('d-none');
 
-  frequencyChart = new Chart($canvas, {
+  signupsChart = new Chart($canvas, {
     type: 'bar',
     data: {
-      labels: planIds.map(capitalize),
-      datasets: frequencyIds.map((freq, i) => ({
-        label: capitalize(freq),
-        data: planIds.map((id) => frequencies[id]?.[freq] || 0),
-        backgroundColor: colors.palette[i % colors.palette.length],
-      })),
+      labels: labels,
+      datasets: [{
+        label: 'Signups',
+        data: counts,
+        backgroundColor: colors.accent,
+        borderRadius: 4,
+        maxBarThickness: 28,
+      }],
     },
     options: {
       responsive: true,
@@ -265,7 +334,7 @@ function renderFrequencyChart(frequencies, frequencyIds) {
       scales: {
         x: {
           ticks: { color: colors.text },
-          grid: { color: colors.border },
+          grid: { display: false },
         },
         y: {
           beginAtZero: true,
@@ -277,13 +346,65 @@ function renderFrequencyChart(frequencies, frequencyIds) {
         },
       },
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: colors.text, padding: 16 },
-        },
+        legend: { display: false },
       },
     },
   });
+}
+
+// ============================================
+// Content (reads the site's own JSON feed — what's actually live)
+// ============================================
+async function loadContent() {
+  const $loading = document.getElementById('content-loading');
+  const $empty = document.getElementById('content-empty');
+  const $list = document.getElementById('content-list');
+  const $footer = document.getElementById('content-footer');
+  const escape = omega.utilities().escapeHTML;
+
+  const response = await fetch('/feeds/posts.json', { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`Feed returned ${response.status}`);
+  }
+
+  const feed = await response.json();
+  const items = (Array.isArray(feed?.items) ? feed.items : [])
+    .slice()
+    .sort((a, b) => new Date(b.date_published || 0) - new Date(a.date_published || 0));
+
+  if ($loading) {
+    $loading.classList.add('d-none');
+  }
+
+  if (items.length === 0) {
+    if ($empty) $empty.classList.remove('d-none');
+    return;
+  }
+
+  if ($list) {
+    $list.classList.remove('d-none');
+    $list.innerHTML = items.slice(0, 3).map((item) => {
+      const url = item.url || item.id || '';
+      const pathname = url ? new URL(url, window.location.origin).pathname : '';
+      const published = item.date_published ? formatTimeAgo(new Date(item.date_published).getTime()) : '';
+      const editorHref = `/admin/posts/editor?post=${encodeURIComponent(url)}`;
+
+      return `
+        <div class="classy-activity__row align-items-center">
+          <div class="classy-activity__body">
+            <div class="classy-activity__title text-truncate"><a href="${escape(editorHref)}" class="text-decoration-none">${escape(item.title || 'Untitled')}</a></div>
+            <p class="classy-activity__desc font-monospace text-truncate">${escape(pathname)}</p>
+          </div>
+          <span class="classy-activity__time">${escape(published)}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if ($footer) {
+    $footer.classList.remove('d-none');
+    $footer.textContent = `${items.length} post${items.length === 1 ? '' : 's'} in the live feed`;
+  }
 }
 
 // ============================================
@@ -323,10 +444,11 @@ async function loadRecentUsers() {
     const created = data?.metadata?.created?.timestampUNIX;
     const timeAgo = created ? formatTimeAgo(created * 1000) : 'Unknown';
 
+    const isPaid = plan !== 'basic';
     const $row = document.createElement('tr');
     $row.innerHTML = `
       <td class="text-truncate" style="max-width: 200px;">${omega.utilities().escapeHTML(email)}</td>
-      <td><span class="badge bg-body-secondary text-body">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
+      <td><span class="classy-chip${isPaid ? ' classy-chip--accent' : ''}">${omega.utilities().escapeHTML(capitalize(plan))}</span></td>
       <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;
     $tbody.appendChild($row);
@@ -374,7 +496,7 @@ async function loadRecentOrders() {
     const $row = document.createElement('tr');
     $row.innerHTML = `
       <td class="font-monospace small text-truncate" style="max-width: 120px;" title="${omega.utilities().escapeHTML(orderId)}">${omega.utilities().escapeHTML(orderId)}</td>
-      <td><span class="badge bg-body-secondary text-body">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
+      <td><span class="classy-chip classy-chip--accent">${omega.utilities().escapeHTML(capitalize(product))}</span></td>
       <td class="small">${omega.utilities().escapeHTML(capitalize(processor))}</td>
       <td class="text-muted small">${omega.utilities().escapeHTML(timeAgo)}</td>
     `;

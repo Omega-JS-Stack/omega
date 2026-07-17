@@ -11,10 +11,14 @@
  *   THIS machine's trusted CA. No mkcert installed → null, and callers
  *   fall back to plain http.
  *
- * - startLocalHttpsProxy({ port, targetPort, certs, log }) → https.Server
+ * - startLocalHttpsProxy({ port, targetPort, certs, log }) → net.Server
  *   TLS terminator forwarding every request to localhost:targetPort with
  *   x-forwarded-proto/host set. WebSocket upgrades tunnel as raw sockets
- *   (dev-server live-reload keeps working through the proxy).
+ *   (dev-server live-reload keeps working through the proxy). The public
+ *   port is polyglot: the first byte decides TLS vs plain http, and plain
+ *   http gets a 307 redirect to https on the same host — anyone typing
+ *   http://localhost:<port> lands in the right place instead of a browser
+ *   connection error.
  */
 const fs = require('fs');
 const path = require('path');
@@ -163,12 +167,14 @@ function generateMkcertCerts(certsDir, log = NOOP) {
  * Start the TLS-terminating forwarder: https://localhost:port →
  * http://localhost:targetPort. Handles plain requests AND WebSocket
  * upgrades (raw tunnel), so dev-server live-reload sockets survive.
+ * The listener is a polyglot front: TLS handshakes (first byte 0x16) go to
+ * the TLS server, plain http gets a 307 to https on the same host.
  * @param {object} options
  * @param {number} options.port - Public TLS port
  * @param {number} options.targetPort - Internal plain-http port
  * @param {{ key: string, cert: string }} options.certs - Cert file paths
  * @param {function} [options.log] - Line logger
- * @returns {import('https').Server}
+ * @returns {import('net').Server}
  */
 function startLocalHttpsProxy({ port, targetPort, certs, log = NOOP }) {
   const options = {
@@ -228,16 +234,41 @@ function startLocalHttpsProxy({ port, targetPort, certs, log = NOOP }) {
     socket.on('close', () => upstream.destroy());
   });
 
-  proxy.listen(port, () => {
-    log(`HTTPS proxy listening on https://localhost:${port}`);
-    log(`Forwarding to http://localhost:${targetPort}`);
+  // Plain-http answers on the SAME port: whatever the path, bounce the
+  // browser to https on the host it asked for (Host carries the port).
+  const redirect = http.createServer((req, res) => {
+    const host = req.headers.host || `localhost:${port}`;
+    res.writeHead(307, { Location: `https://${host}${req.url}` });
+    res.end();
   });
 
-  proxy.on('error', (err) => {
+  // Polyglot front — peek the first byte without consuming it: a TLS
+  // handshake record starts with 0x16, anything else is treated as plain
+  // http. The byte goes back via unshift before the real server takes over.
+  const front = net.createServer((socket) => {
+    socket.on('error', () => socket.destroy());
+
+    socket.once('data', (firstChunk) => {
+      socket.pause();
+      socket.unshift(firstChunk);
+
+      const target = firstChunk[0] === 0x16 ? proxy : redirect;
+      target.emit('connection', socket);
+
+      process.nextTick(() => socket.resume());
+    });
+  });
+
+  front.listen(port, () => {
+    log(`HTTPS proxy listening on https://localhost:${port}`);
+    log(`Forwarding to http://localhost:${targetPort} (plain http redirects to https)`);
+  });
+
+  front.on('error', (err) => {
     log(`HTTPS proxy error: ${err.message}`);
   });
 
-  return proxy;
+  return front;
 }
 
 module.exports = {

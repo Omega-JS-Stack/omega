@@ -197,32 +197,34 @@ function renderRow(row) {
   const isPaid = plan !== 'basic';
   const auth = row.auth;
 
-  // Plan cell
-  const badgeClass = isPaid ? 'bg-success text-white' : 'bg-body-tertiary text-body';
+  // Plan cell — accent chip for paid plans, quiet chip for basic
+  const planChip = isPaid
+    ? `<span class="classy-chip classy-chip--accent">${escape(capitalize(plan))}</span>`
+    : `<span class="classy-chip">${escape(capitalize(plan))}</span>`;
   const subStatus = row.subscriptionStatus && isPaid
-    ? `<div class="text-muted" style="font-size: 0.7rem;">${escape(row.subscriptionStatus)}</div>`
+    ? `<div class="text-muted mt-1" style="font-size: 0.7rem;">${escape(row.subscriptionStatus)}</div>`
     : '';
 
   // Sign-in cell (providers + last sign-in)
   const providers = (auth?.providers || [])
-    .map((id) => `<span class="badge bg-body-tertiary text-body fw-normal">${escape(PROVIDER_LABELS[id] || id)}</span>`)
+    .map((id) => `<span class="classy-chip">${escape(PROVIDER_LABELS[id] || id)}</span>`)
     .join(' ');
   const lastSignIn = auth?.lastSignIn
-    ? `<div class="text-muted" style="font-size: 0.7rem;">${escape(formatTimeAgo(new Date(auth.lastSignIn).getTime()))}</div>`
+    ? `<div class="text-muted mt-1" style="font-size: 0.7rem;">${escape(formatTimeAgo(new Date(auth.lastSignIn).getTime()))}</div>`
     : '';
   const signInCell = auth
     ? `${providers || '<span class="text-muted small">—</span>'}${lastSignIn}`
     : '<span class="text-muted small">—</span>';
 
-  // Status cell (verification + disabled)
+  // Status cell — dot + label (never color alone); disabled wins the eye
   let statusCell = '<span class="text-muted small">—</span>';
   if (auth) {
     statusCell = auth.emailVerified
-      ? '<small class="text-success">Verified</small>'
-      : '<small class="text-muted">Unverified</small>';
+      ? '<span class="classy-status"><span class="classy-dot classy-dot--ok"></span>Verified</span>'
+      : '<span class="classy-status"><span class="classy-dot"></span>Unverified</span>';
 
     if (auth.disabled) {
-      statusCell += ' <span class="badge bg-danger text-white ms-1">Disabled</span>';
+      statusCell += ' <span class="classy-status ms-1"><span class="classy-dot classy-dot--danger"></span>Disabled</span>';
     }
   }
 
@@ -232,16 +234,16 @@ function renderRow(row) {
   const $row = document.createElement('tr');
   $row.innerHTML = `
     <td>
-      <div class="d-flex align-items-center">
-        ${getPrerenderedIcon('user', 'fa-sm me-2 text-muted')}
-        <div>
-          <div class="text-truncate" style="max-width: 220px;">${escape(email)}</div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="classy-icon-chip classy-icon-chip--neutral">${getPrerenderedIcon('user', 'fa-sm')}</span>
+        <div class="min-w-0">
+          <div class="text-truncate fw-semibold" style="max-width: 220px;">${escape(email)}</div>
           <div class="font-monospace text-muted text-truncate" style="max-width: 220px; font-size: 0.7rem;">${escape(uid)}</div>
         </div>
       </div>
     </td>
     <td>
-      <span class="badge ${badgeClass}">${escape(capitalize(plan))}</span>
+      ${planChip}
       ${subStatus}
     </td>
     <td>${signInCell}</td>
@@ -249,7 +251,7 @@ function renderRow(row) {
     <td class="text-muted small">${escape(createdText)}</td>
     <td>
       <div class="dropdown">
-        <button class="btn btn-sm btn-adaptive rounded-circle" type="button" data-bs-toggle="dropdown">
+        <button class="classy-iconbtn" type="button" data-bs-toggle="dropdown" aria-label="User actions">
           ${getPrerenderedIcon('ellipsis-vertical', 'fa-sm')}
         </button>
         <ul class="dropdown-menu dropdown-menu-end">

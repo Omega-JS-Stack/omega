@@ -27,7 +27,7 @@ prerender_icons:
 ---
 
 <!-- Merged stat card (App DNA) -->
-<div class="classy-statgrid mb-4" style="--classy-statgrid-cols: 3;">
+<div class="classy-statgrid mb-4" style="--classy-statgrid-cols: 4;">
   <div class="classy-statgrid__cell">
     <div class="classy-statgrid__label">
       <span class="classy-micro">Total users</span>
@@ -52,6 +52,17 @@ prerender_icons:
 
   <div class="classy-statgrid__cell">
     <div class="classy-statgrid__label">
+      <span class="classy-micro">Orders (30d)</span>
+      {% uj_icon "receipt", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-orders">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+    <small class="text-muted" id="stat-orders-sub"></small>
+  </div>
+
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
       <span class="classy-micro">Push subscribers</span>
       {% uj_icon "bell", "fa-sm" %}
     </div>
@@ -62,34 +73,61 @@ prerender_icons:
   </div>
 </div>
 
-<!-- Charts -->
+<!-- Pulse row: signup trend + what needs a human -->
 <div class="row g-3 mb-4">
-  <!-- Plan Distribution -->
-  <div class="col-lg-5">
+  <!-- Signups (14 days) -->
+  <div class="col-lg-7">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-pie", "fa-md me-2" %} Plan distribution</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-line", "fa-md me-2" %} Signups — last 14 days</h6>
       </div>
       <div class="card-body d-flex align-items-center justify-content-center">
-        <div id="chart-plans-loading" class="text-center text-muted py-4">
+        <div id="chart-signups-loading" class="text-center text-muted py-4">
           <span class="spinner-border spinner-border-sm"></span>
         </div>
-        <canvas id="chart-plans" class="d-none"></canvas>
+        <canvas id="chart-signups" class="d-none"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- Billing Frequency -->
-  <div class="col-lg-7">
+  <!-- Needs attention -->
+  <div class="col-lg-5">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-bar", "fa-md me-2" %} Billing frequency</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "circle-exclamation", "fa-md me-2" %} Needs attention</h6>
       </div>
-      <div class="card-body d-flex align-items-center justify-content-center">
-        <div id="chart-frequency-loading" class="text-center text-muted py-4">
-          <span class="spinner-border spinner-border-sm"></span>
+      <div class="card-body py-2">
+        <div class="classy-activity">
+          <div class="classy-activity__row align-items-center">
+            <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "cart-shopping", "fa-sm" %}</span>
+            <div class="classy-activity__body">
+              <div class="classy-activity__title">Abandoned carts</div>
+              <p class="classy-activity__desc">Pending checkouts that never converted</p>
+            </div>
+            <span class="classy-count" id="att-carts"><span class="spinner-border spinner-border-sm"></span></span>
+            <a class="classy-iconbtn" href="/admin/firebase?collection=payments-carts" aria-label="Review abandoned carts">{% uj_icon "arrow-right", "fa-sm" %}</a>
+          </div>
+
+          <div class="classy-activity__row align-items-center">
+            <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "hourglass-half", "fa-sm" %}</span>
+            <div class="classy-activity__body">
+              <div class="classy-activity__title">Expiring within 7 days</div>
+              <p class="classy-activity__desc">Subscriptions about to lapse</p>
+            </div>
+            <span class="classy-count" id="att-expiring"><span class="spinner-border spinner-border-sm"></span></span>
+            <a class="classy-iconbtn" href="/admin/users" aria-label="Review expiring subscriptions">{% uj_icon "arrow-right", "fa-sm" %}</a>
+          </div>
+
+          <div class="classy-activity__row align-items-center">
+            <span class="classy-icon-chip classy-icon-chip--neutral">{% uj_icon "triangle-exclamation", "fa-sm" %}</span>
+            <div class="classy-activity__body">
+              <div class="classy-activity__title">Suspended subscriptions</div>
+              <p class="classy-activity__desc">Payment failed — plan on hold</p>
+            </div>
+            <span class="classy-count" id="att-suspended"><span class="spinner-border spinner-border-sm"></span></span>
+            <a class="classy-iconbtn" href="/admin/users" aria-label="Review suspended subscriptions">{% uj_icon "arrow-right", "fa-sm" %}</a>
+          </div>
         </div>
-        <canvas id="chart-frequency" class="d-none"></canvas>
       </div>
     </div>
   </div>
@@ -112,7 +150,7 @@ prerender_icons:
           No users found
         </div>
         <div class="table-responsive">
-          <table class="table table-hover mb-0 d-none" id="recent-users-table">
+          <table class="table classy-table d-none" id="recent-users-table">
             <thead>
               <tr>
                 <th>Email</th>
@@ -141,7 +179,7 @@ prerender_icons:
           No orders found
         </div>
         <div class="table-responsive">
-          <table class="table table-hover mb-0 d-none" id="recent-orders-table">
+          <table class="table classy-table d-none" id="recent-orders-table">
             <thead>
               <tr>
                 <th>Order</th>
@@ -158,42 +196,88 @@ prerender_icons:
   </div>
 </div>
 
-<!-- Quick Actions -->
+<!-- Content + plan mix -->
 <div class="row g-3 mb-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "bolt", "fa-md me-2" %} Quick actions</h6>
-      </div>
-      <div class="card-body">
-        <div class="d-flex flex-wrap gap-2">
-          <a href="/admin/users" class="btn btn-outline-adaptive">
-            {% uj_icon "users", "fa-md me-2" %}
-            Manage users
-          </a>
-          <a href="/admin/notifications/new" class="btn btn-outline-adaptive">
-            {% uj_icon "bell", "fa-md me-2" %}
-            Send notification
-          </a>
-          <a href="/admin/firebase" class="btn btn-outline-adaptive">
-            {% uj_icon "fire", "fa-md me-2" %}
-            Firebase explorer
-          </a>
+  <!-- Content -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "newspaper", "fa-md me-2" %} Content</h6>
+        <div class="d-flex gap-2">
+          <a href="/admin/posts/editor" class="btn btn-sm btn-adaptive">{% uj_icon "plus", "fa-sm me-1" %} New post</a>
+          <a href="/admin/posts" class="btn btn-sm btn-outline-adaptive">{% uj_icon "arrow-right", "fa-sm me-1" %} All posts</a>
         </div>
+      </div>
+      <div class="card-body py-2">
+        <div id="content-loading" class="text-center text-muted py-4">
+          <span class="spinner-border spinner-border-sm"></span>
+        </div>
+        <div id="content-empty" class="text-center text-muted py-4 d-none">
+          No posts yet — write the first one
+        </div>
+        <div class="classy-activity d-none" id="content-list"></div>
+      </div>
+      <div class="card-footer small text-muted d-none" id="content-footer"></div>
+    </div>
+  </div>
+
+  <!-- Plan Distribution -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "chart-pie", "fa-md me-2" %} Plan distribution</h6>
+      </div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <div id="chart-plans-loading" class="text-center text-muted py-4">
+          <span class="spinner-border spinner-border-sm"></span>
+        </div>
+        <canvas id="chart-plans" class="d-none"></canvas>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Admin Tools -->
+<!-- Quick actions + maintenance -->
 <div class="row g-3">
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "clock", "fa-md me-2" %} Cron jobs</h6>
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "bolt", "fa-md me-2" %} Quick actions</h6>
       </div>
       <div class="card-body">
-        <p class="text-muted small mb-3">Manually trigger scheduled cron jobs</p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="/admin/users" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "users", "fa-sm me-2" %}
+            Manage users
+          </a>
+          <a href="/admin/posts/editor" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "pen", "fa-sm me-2" %}
+            Write a post
+          </a>
+          <a href="/admin/notifications/new" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "bell", "fa-sm me-2" %}
+            Send notification
+          </a>
+          <a href="/admin/firebase" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "fire", "fa-sm me-2" %}
+            Firebase explorer
+          </a>
+          <a href="/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-adaptive">
+            {% uj_icon "arrow-up-right-from-square", "fa-sm me-2" %}
+            View live site
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "screwdriver-wrench", "fa-md me-2" %} Maintenance</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Trigger scheduled crons or export Firestore to Cloud Storage</p>
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-sm btn-outline-adaptive btn-run-cron" data-cron-id="daily">
             {% uj_icon "calendar-day", "fa-sm me-2" %}
@@ -203,26 +287,14 @@ prerender_icons:
             {% uj_icon "rotate", "fa-sm me-2" %}
             <span class="btn-run-cron-text">Run frequent</span>
           </button>
+          <button class="btn btn-sm btn-outline-adaptive" id="btn-run-backup">
+            {% uj_icon "cloud-arrow-up", "fa-sm me-2" %}
+            <span id="btn-run-backup-text">Run backup</span>
+          </button>
         </div>
         <div id="cron-result" class="mt-3 d-none"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="card h-100">
-      <div class="card-header">
-        <h6 class="mb-0 d-inline-flex align-items-center">{% uj_icon "cloud-arrow-up", "fa-md me-2" %} Backup</h6>
-      </div>
-      <div class="card-body">
-        <p class="text-muted small mb-3">Export Firestore database to Cloud Storage</p>
-        <button class="btn btn-sm btn-outline-adaptive" id="btn-run-backup">
-          {% uj_icon "cloud-arrow-up", "fa-sm me-2" %}
-          <span id="btn-run-backup-text">Run backup</span>
-        </button>
         <div id="backup-result" class="mt-3 d-none"></div>
       </div>
     </div>
   </div>
 </div>
-

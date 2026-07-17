@@ -64,6 +64,85 @@
   }
 }
 
+// ── Data table — the App-DNA table voice (admin directories, activity) ──────
+// Composes WITH Bootstrap's .table: kills its body-bg paint so rows sit on
+// the card's surface, micro-caps header on surface-2, hairline rows, quiet
+// hover. Use as `table classy-table` (drop table-hover — hover lives here).
+.classy-table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--omega-ink);
+  --bs-table-border-color: var(--omega-line);
+  --bs-table-hover-bg: var(--omega-surface-2);
+  --bs-table-hover-color: var(--omega-ink);
+
+  margin-bottom: 0;
+
+  thead th {
+    padding: 0.6875rem 1rem;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--omega-ink-faint);
+    background: var(--omega-surface-2);
+    border-bottom: 1px solid var(--omega-line);
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 0.8125rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--omega-line);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  tbody tr {
+    transition: background var(--omega-speed) var(--omega-ease);
+
+    &:hover td {
+      background: var(--omega-surface-2);
+    }
+  }
+}
+
+// ── Inline count — attention rows, list tallies ─────────────────────────────
+.classy-count {
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--omega-ink);
+
+  &--warn {
+    color: var(--omega-warn);
+  }
+}
+
+// ── Ghost icon button — quiet ⋮ / inline actions ────────────────────────────
+.classy-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--omega-ink-muted);
+  transition: background var(--omega-speed) var(--omega-ease), color var(--omega-speed) var(--omega-ease);
+
+  &:hover,
+  &:focus-visible,
+  &[aria-expanded='true'] {
+    background: var(--omega-surface-2);
+    color: var(--omega-ink);
+  }
+}
+
 // ── Panel head — the 14/650 card title voice ────────────────────────────────
 .classy-panel-title {
   margin-bottom: 1rem;

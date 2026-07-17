@@ -114,6 +114,27 @@ test('proxy round-trip: TLS in, plain http out, x-forwarded headers set', { skip
   upstream.closeAllConnections?.();
 });
 
+test('plain http on the TLS port → 307 redirect to https (same host + path)', { skip: !hasMkcert }, async () => {
+  const dir = tmpDir('redirect');
+  const certs = await ensureLocalHttpsCerts({ certsDir: dir });
+  assert.ok(certs, 'certs available');
+
+  // No upstream needed — the redirect answers at the front door
+  const proxy = startLocalHttpsProxy({ port: 0, targetPort: 9, certs });
+  await once(proxy, 'listening');
+  const proxyPort = proxy.address().port;
+
+  const res = await new Promise((resolve, reject) => {
+    http.get(`http://localhost:${proxyPort}/payment/checkout?product=premium`, resolve).on('error', reject);
+  });
+
+  assert.equal(res.statusCode, 307, 'temporary, method-preserving redirect');
+  assert.equal(res.headers.location, `https://localhost:${proxyPort}/payment/checkout?product=premium`);
+  res.resume();
+
+  proxy.close();
+});
+
 test('proxy tunnels WebSocket upgrades (dev-server live-reload)', { skip: !hasMkcert }, async () => {
   const dir = tmpDir('ws');
   const certs = await ensureLocalHttpsCerts({ certsDir: dir });
