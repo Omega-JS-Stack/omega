@@ -138,6 +138,20 @@ test('alternatives collection: permalink convention + comparison content', () =>
   assert.ok(html.includes('MiniCo vs'), 'site brand in the layout-default hero headline');
   assert.ok(html.includes('Acme Growth'), 'competitor name via resolved-templated layout defaults');
   assert.ok(html.includes('Automation depth'), 'comparison rows');
+  // resolved refs in layout FRONTMATTER VALUES are per-page: the hero accent
+  // is `{{ resolved.alternative.competitor.name }}` in alternative.html's
+  // frontmatter — it must render THIS page's competitor, not empty/cached.
+  assert.ok(html.includes('<em>Acme Growth</em>'), 'resolved-ref frontmatter value renders per page (hero accent)');
+  assert.ok(html.includes('Looking for a Acme Growth alternative'), 'resolved-ref inside a longer frontmatter value');
+});
+
+test('cover layout: page-level theme.main.align templates into main via resolved', () => {
+  // account asks for top alignment (theme.main.align: start); the cover
+  // layout's class template `align-items-{{ resolved.theme.main.align |
+  // default: 'center' }}` must see the page's merged value…
+  assert.ok(/<main[^>]*align-items-start/.test(pages.get('/account')), 'account main is top-aligned');
+  // …while pages that set no align keep the cover default.
+  assert.ok(/<main[^>]*align-items-center/.test(pages.get('/signin')), 'signin main stays centered');
 });
 
 test('template-kit tags render inside Eleventy (uj_icon, urlmatches nav)', () => {

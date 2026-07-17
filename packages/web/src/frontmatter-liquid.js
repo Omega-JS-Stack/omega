@@ -4,8 +4,9 @@
  * `{{ site.* }}` refs in values ("… - {{ site.brand.name }}") and the legacy
  * bracket hack in layout values (`themes/[ site.theme.id ]/frontend/core/base`).
  *
- * The scope is the CONSTANT site global, so rendered strings are cached by
- * their raw source — across 1030 posts most frontmatter templates repeat.
+ * Site-only values render against the CONSTANT site global and cache by raw
+ * source — across 1030 posts most frontmatter templates repeat. Per-page
+ * values (`page.*`, `resolved.*`) bypass the cache entirely.
  */
 const { Liquid } = require('liquidjs');
 
@@ -20,6 +21,13 @@ const DEFAULT_SKIP = new Set([
 // Legacy bracket refs ([ site.theme.id ] → {{ site.theme.id }})
 const BRACKET_RE = /\[\s*(site\.[a-zA-Z0-9_.]+)\s*\]/g;
 
+// Per-page refs: `page.*` (the real sweet-saucy recipe meta) and `resolved.*`
+// (layout defaults templating on the merged cascade — cover's align knob,
+// the classy alternative competitor values). These render UNCACHED against
+// the caller's per-page scope; the raw-string cache would serve the first
+// page's rendering to every page.
+const PER_PAGE_RE = /\b(?:page|resolved)\./;
+
 /**
  * Create a resolver bound to a site global.
  * @param {object} options
@@ -33,19 +41,19 @@ function createFrontmatterResolver(options) {
 
   /**
    * Render a single frontmatter string value (bracket refs + Liquid), cached.
-   * Values that reference `page.*` (the real sweet-saucy recipe layout puts
-   * `{{ page.recipe.title }}` in its meta values) render UNCACHED against
-   * `extraScope` — they are page-dependent, so the raw-string cache would
-   * serve the first page's rendering to every page.
+   * Per-page values (PER_PAGE_RE: `page.*` recipe meta, `resolved.*` layout
+   * defaults) render UNCACHED against `extraScope`; site-only values are
+   * build-constant and cache by raw source.
    * @param {string} value
-   * @param {object} [extraScope] - per-page scope ({ page }) for page refs
+   * @param {object} [extraScope] - per-page scope ({ resolved, page })
    * @returns {string}
    */
   function render(value, extraScope) {
-    if (/\bpage\./.test(value)) {
-      // Page-dependent: WITHOUT a page scope, defer (leave raw) — the
-      // Eleventy preprocessor sees the full cascade, so rendering here would
-      // both empty the refs and mutate layout objects SHARED across pages.
+    if (PER_PAGE_RE.test(value)) {
+      // Per-page: WITHOUT a page scope, defer (leave raw) — the engine's
+      // `resolved` computed re-renders with { resolved, page } once the
+      // cascade is merged; rendering here would empty the refs (no scope)
+      // and mutate layout objects SHARED across pages.
       if (!extraScope) return value;
       const source = value.replace(BRACKET_RE, '{{ $1 }}');
       return engine.parseAndRenderSync(source, { ...scope, ...extraScope });
