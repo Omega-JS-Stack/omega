@@ -200,6 +200,14 @@ test('wave 3: the shared cta union renders page-owned variants (accent em, nudge
   assert.ok(alternatives.includes('btn-outline-adaptive btn-lg"'), 'non-nudged secondary stays plain');
 });
 
+test('wave 4: the newsletter band renders through the section (form-manager dialect intact)', async () => {
+  const pages = await buildWith(miniData);
+  const blog = pages.get('/blog');
+  assert.ok(blog, 'blog index built');
+  assert.ok(blog.includes('Never miss a post'), 'newsletter copy rode the data bridge');
+  assert.ok(blog.includes('id="newsletter-form"') && blog.includes('data-form-state="initializing"'), 'the JS contract markup survives extraction');
+});
+
 test('body-call lane: a consumer page composes the section with YAML args', async () => {
   const pages = await buildWith(miniData);
   const demo = pages.get('/sections-demo');

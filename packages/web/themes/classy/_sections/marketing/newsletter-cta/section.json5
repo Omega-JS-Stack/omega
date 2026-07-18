@@ -1,0 +1,14 @@
+{
+  description: 'The ink newsletter band — email capture over the classy CTA panel, speaking the client form-manager dialect (data-form-state; the page JS binds #newsletter-form — one instance per page until the section-JS lane lands, spec §7). SHARED band: defaults stay neutral, every page passes its own copy.',
+
+  args: {
+    superheadline: 'object',
+    headline: 'string',
+    subheadline: 'string',
+    button: 'object',
+    form: 'object',
+    section_class: 'string',
+  },
+
+  defaults: {},
+}

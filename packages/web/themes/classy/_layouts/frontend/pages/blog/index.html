@@ -235,54 +235,5 @@ newsletter_cta:
 </section>
 
 <!-- ═══ Newsletter CTA band ═══ -->
-<section class="pt-0">
-  <div class="container">
-    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-      {% iftruthy resolved.newsletter_cta.superheadline.text %}
-        <span class="classy-micro d-block mb-3">{{ resolved.newsletter_cta.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-cta__headline">{{ resolved.newsletter_cta.headline }}</h2>
-      {% iftruthy resolved.newsletter_cta.subheadline %}
-        <p class="classy-cta__sub">{{ resolved.newsletter_cta.subheadline }}</p>
-      {% endiftruthy %}
-
-      <!-- Newsletter Form -->
-      <form id="newsletter-form" class="newsletter-form mt-4" novalidate data-form-state="initializing" onsubmit="return false">
-        <div class="row g-3 justify-content-center">
-          <div class="col-md-5">
-            <input
-              type="email"
-              class="form-control form-control-lg"
-              placeholder="{{ resolved.newsletter_cta.form.placeholder }}"
-              name="email"
-              required
-              pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
-              autocomplete="email"
-            >
-            <div class="invalid-feedback text-start">
-              Please enter a valid email address.
-            </div>
-          </div>
-          <div class="col-md-auto">
-            <button type="submit" class="btn btn-adaptive btn-lg px-4">
-              {% uj_icon "paper-plane", "fa-sm me-2" %}
-              <span class="button-text">{{ resolved.newsletter_cta.button.text }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Success/Error Messages -->
-        <div class="newsletter-success-alert alert alert-success mt-3 d-none" role="alert">
-          {% uj_icon "check-circle", "me-2" %}
-          {{ resolved.newsletter_cta.form.success_message }}
-        </div>
-        <div class="newsletter-error-alert alert alert-danger mt-3 d-none" role="alert">
-          {% uj_icon "exclamation-circle", "me-2" %}
-          <span class="error-message">{{ resolved.newsletter_cta.form.error_message }}</span>
-        </div>
-      </form>
-    </div>
-  </div>
-</section>
-
+{% section "marketing/newsletter-cta", data: resolved.newsletter_cta, section_class: "pt-0" %}
 {{ content | uj_content_format }}
