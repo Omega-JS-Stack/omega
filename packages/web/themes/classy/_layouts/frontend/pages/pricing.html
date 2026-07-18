@@ -413,13 +413,9 @@ faqs:
 <section class="pt-0">
   <div class="container">
     <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-      <h2 class="classy-display classy-display--section">
-        {{ resolved.pricing.one_time_headline | default: "One-time" }}
-        <em>{{ resolved.pricing.one_time_headline_accent | default: "purchases" }}</em>
-      </h2>
-      <p>
-        {{ resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever — no subscription required." }}
-      </p>
+      {% comment %} resolved.pricing is engine-composed from payment.products
+      (C2) — copy defaults stay INLINE filter args, never frontmatter. {% endcomment %}
+      {% component "heading/section-head", headline: resolved.pricing.one_time_headline | default: "One-time", headline_accent: resolved.pricing.one_time_headline_accent | default: "purchases", sub: resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever — no subscription required." %}
     </div>
 
     <div class="row g-4 justify-content-center" data-omega-reveal-stagger="80">
@@ -483,14 +479,7 @@ faqs:
 <section class="classy-compare">
   <div class="container">
     <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-      <span class="classy-micro">{{ resolved.feature_comparison.superheadline.text | default: "Compare" }}</span>
-      <h2 class="classy-display classy-display--section">
-        {{ resolved.feature_comparison.headline | default: "Compare all" }}
-        <em>{{ resolved.feature_comparison.headline_accent | default: "plans" }}</em>
-      </h2>
-      <p>
-        {{ resolved.feature_comparison.subheadline | default: "See exactly what's included in each plan" }}
-      </p>
+      {% component "heading/section-head", superheadline: resolved.feature_comparison.superheadline.text | default: "Compare", headline: resolved.feature_comparison.headline | default: "Compare all", headline_accent: resolved.feature_comparison.headline_accent | default: "plans", sub: resolved.feature_comparison.subheadline | default: "See exactly what's included in each plan" %}
       <!-- Mobile scroll indicator -->
       <div class="d-md-none">
         <small class="text-muted">
@@ -586,15 +575,7 @@ faqs:
   <div class="container">
     <div class="classy-duo">
       <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        {% iftruthy resolved.faqs.superheadline.text %}
-          <span class="classy-micro">{{ resolved.faqs.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">
-          {{ resolved.faqs.headline | default: "Frequently asked <em>questions</em>" }}
-        </h2>
-        {% iftruthy resolved.faqs.subheadline %}
-          <p>{{ resolved.faqs.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: resolved.faqs.superheadline.text, headline: resolved.faqs.headline | default: "Frequently asked <em>questions</em>", sub: resolved.faqs.subheadline %}
 
         <!-- The guarantee, as an object (no invented numbers — C2) -->
         <div class="classy-object position-relative pe-4 mt-4 d-none d-lg-block">

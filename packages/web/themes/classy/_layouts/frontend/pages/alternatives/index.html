@@ -98,13 +98,7 @@ cta:
   <div class="container">
     <div class="classy-duo">
       <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        {% iftruthy resolved.alternatives.superheadline.text %}
-          <span class="classy-micro">{{ resolved.alternatives.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">{{ resolved.alternatives.headline }}</h2>
-        {% iftruthy resolved.alternatives.subheadline %}
-          <p>{{ resolved.alternatives.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: resolved.alternatives.superheadline.text, headline: resolved.alternatives.headline, sub: resolved.alternatives.subheadline %}
       </div>
 
       <div>
@@ -148,10 +142,7 @@ cta:
     <div class="container">
       <div class="classy-duo">
         <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-          {% iftruthy resolved.value_props.superheadline.text %}
-            <span class="classy-micro">{{ resolved.value_props.superheadline.text }}</span>
-          {% endiftruthy %}
-          <h2 class="classy-display classy-display--section">{{ resolved.value_props.headline }}</h2>
+          {% component "heading/section-head", superheadline: resolved.value_props.superheadline.text, headline: resolved.value_props.headline %}
         </div>
 
         <div class="classy-rowlist" data-omega-reveal-stagger="60">

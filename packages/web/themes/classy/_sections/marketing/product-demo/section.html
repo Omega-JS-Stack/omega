@@ -2,13 +2,7 @@
   <section>
     <div class="container">
       <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-        {% iftruthy args.superheadline.text %}
-          <span class="classy-micro">{{ args.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">{{ args.headline }}</h2>
-        {% iftruthy args.subheadline %}
-          <p>{{ args.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: args.superheadline.text, headline: args.headline, sub: args.subheadline %}
       </div>
 
       <!-- Tab Buttons -->

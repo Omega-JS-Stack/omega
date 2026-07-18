@@ -22,3 +22,11 @@ items:
   - question: "Does the dom_id knob namespace the collapse wiring?"
     answer: "Every id and data-bs hook below says demoFaq."
 {% endsection %}
+{% comment %} Ship enabled: false by default, so their heads render nowhere
+else in the corpus — flipped on here to keep them golden-covered. {% endcomment %}
+{% section "marketing/showcase" %}
+enabled: true
+{% endsection %}
+{% section "marketing/product-demo" %}
+enabled: true
+{% endsection %}

@@ -124,10 +124,15 @@ lanes, classy's marketing library (hero, trusted-by, bento, product-demo,
 showcase, stats, testimonials, cta, newsletter-cta, faq — the homepage and
 every CTA/testimonial/newsletter/FAQ band across classy pages render through
 them; pricing's FAQ stays inline: its aside embeds a bespoke guarantee
-object), and the first real component: `heading/masthead` — the
-interior-page head cluster (eyebrow + display h1 + sub) composed inside
-~17 layouts' own band shells (sub_class/h1_class knobs carry the per-page
-class variants; breadcrumb pages pass no eyebrow).
+object), and the heading components: `heading/masthead` — the interior-page
+head cluster (eyebrow + display h1 + sub) composed inside ~17 layouts' own
+band shells (sub_class/h1_class knobs carry the per-page class variants;
+breadcrumb pages pass no eyebrow) — and `heading/section-head` — the h2-band
+cluster serving ~18 layout bands AND the sections themselves (bento,
+product-demo, showcase, faq compose it from their markup: **nested
+composition** — sections render on the same engine, so `{% component %}`
+works inside section markup, args evaluating against the section's own
+`{ args }` scope).
 newsletter-cta is the §7 reference consumer: its `section.js` owns the
 FormManager binding (`export default (el, { manager, options })`), its root
 carries `data-omega-section="marketing/newsletter-cta"`, and any page

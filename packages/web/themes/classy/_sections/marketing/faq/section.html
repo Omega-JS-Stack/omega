@@ -3,16 +3,7 @@ right) by default; variant: "center" stacks a centered head over a narrowed
 accordion. Bootstrap collapse wires by DOM id — dom_id namespaces them so two
 instances on one page can coexist. {% endcomment %}
 {%- capture _head -%}
-{% iftruthy args.superheadline.text %}
-  <span class="classy-micro">{{ args.superheadline.text }}</span>
-{% endiftruthy %}
-<h2 class="classy-display classy-display--section">{% if args.headline_accent != blank %}
-  {{ args.headline }}
-  <em>{{ args.headline_accent }}</em>
-{% else %}{{ args.headline }}{% endif %}</h2>
-{% iftruthy args.subheadline %}
-  <p>{{ args.subheadline }}</p>
-{% endiftruthy %}
+{% component "heading/section-head", superheadline: args.superheadline.text, headline: args.headline, headline_accent: args.headline_accent, sub: args.subheadline %}
 {%- endcapture -%}
 {%- capture _accordion -%}
 <div class="classy-faq accordion" id="{{ args.dom_id }}Accordion" data-omega-reveal>

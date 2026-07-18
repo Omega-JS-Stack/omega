@@ -199,12 +199,7 @@ cta:
 <section id="platforms" class="pt-5">
   <div class="container">
     <div class="classy-section-head text-center mx-auto mb-5" data-omega-reveal>
-      <span class="classy-micro">{{ resolved.downloads.superheadline.text }}</span>
-      <h2 class="classy-display classy-display--section">
-        {{ resolved.downloads.headline }}
-        {% iftruthy resolved.downloads.headline_accent %}<em>{{ resolved.downloads.headline_accent }}</em>{% endiftruthy %}
-      </h2>
-      <p>{{ resolved.downloads.subheadline }}</p>
+      {% component "heading/section-head", superheadline: resolved.downloads.superheadline.text, headline: resolved.downloads.headline, headline_accent: resolved.downloads.headline_accent, sub: resolved.downloads.subheadline %}
     </div>
 
     <div class="row g-4 justify-content-center" data-omega-reveal-stagger="90">
@@ -324,15 +319,7 @@ cta:
   <div class="container">
     <div class="classy-duo">
       <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        {% iftruthy resolved.features.superheadline.text %}
-          <span class="classy-micro">{{ resolved.features.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">
-          {{ resolved.features.headline }}
-          {% iftruthy resolved.features.headline_accent %}
-            <em>{{ resolved.features.headline_accent }}</em>
-          {% endiftruthy %}
-        </h2>
+        {% component "heading/section-head", superheadline: resolved.features.superheadline.text, headline: resolved.features.headline, headline_accent: resolved.features.headline_accent %}
       </div>
 
       <div class="classy-rowlist" data-omega-reveal-stagger="60">
@@ -355,18 +342,7 @@ cta:
   <div class="container">
     <div class="classy-duo">
       <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        {% iftruthy resolved.system_requirements.superheadline.text %}
-          <span class="classy-micro">{{ resolved.system_requirements.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">
-          {{ resolved.system_requirements.headline }}
-          {% iftruthy resolved.system_requirements.headline_accent %}
-            <em>{{ resolved.system_requirements.headline_accent }}</em>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy resolved.system_requirements.subheadline %}
-          <p>{{ resolved.system_requirements.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: resolved.system_requirements.superheadline.text, headline: resolved.system_requirements.headline, headline_accent: resolved.system_requirements.headline_accent, sub: resolved.system_requirements.subheadline %}
       </div>
 
       <div class="row g-5" data-omega-reveal>

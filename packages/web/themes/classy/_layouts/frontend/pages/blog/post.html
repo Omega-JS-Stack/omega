@@ -217,12 +217,7 @@ newsletter:
 <section class="pt-0">
   <div class="container">
     <div class="classy-section-head mb-5" data-omega-reveal>
-      {% iftruthy resolved.related_posts.superheadline %}
-        <span class="classy-micro">{{ resolved.related_posts.superheadline }}</span>
-      {% endiftruthy %}
-      {% iftruthy resolved.related_posts.headline %}
-        <h2 class="classy-display classy-display--section">{{ resolved.related_posts.headline }}</h2>
-      {% endiftruthy %}
+      {% component "heading/section-head", superheadline: resolved.related_posts.superheadline, headline: resolved.related_posts.headline %}
     </div>
 
     <div class="row g-4 gy-5" data-omega-reveal-stagger="60">

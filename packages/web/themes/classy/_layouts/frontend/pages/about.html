@@ -186,13 +186,7 @@ team_cta:
   <div class="container">
     <div class="classy-duo">
       <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        {% iftruthy resolved.story.superheadline.text %}
-          <span class="classy-micro">{{ resolved.story.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">{{ resolved.story.headline }}</h2>
-        {% iftruthy resolved.story.subheadline %}
-          <p>{{ resolved.story.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: resolved.story.superheadline.text, headline: resolved.story.headline, sub: resolved.story.subheadline %}
       </div>
 
       <div class="classy-timeline" data-omega-reveal-stagger="80">
@@ -240,13 +234,7 @@ team_cta:
 <section>
   <div class="container">
     <div class="classy-section-head mb-5" data-omega-reveal>
-      {% iftruthy resolved.values.superheadline.text %}
-        <span class="classy-micro">{{ resolved.values.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-display classy-display--section">{{ resolved.values.headline }}</h2>
-      {% iftruthy resolved.values.subheadline %}
-        <p>{{ resolved.values.subheadline }}</p>
-      {% endiftruthy %}
+      {% component "heading/section-head", superheadline: resolved.values.superheadline.text, headline: resolved.values.headline, sub: resolved.values.subheadline %}
     </div>
 
     <div class="classy-numbered" data-omega-reveal-stagger="70">

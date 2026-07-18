@@ -279,6 +279,35 @@ test('wave 6: heading/masthead — the first REAL component serves the interior-
   assert.ok(alt.includes('<em>Acme Growth</em>'), 'component args liquify at call site (the dropped uj_liquify)');
 });
 
+test('wave 7: heading/section-head — nested composition (sections call it) + layout heads', async () => {
+  const pages = await buildWith(miniData);
+  const demo = pages.get('/sections-demo');
+  assert.ok(demo, 'sections-demo built');
+  assert.ok(demo.includes('What makes MiniCo different'), 'showcase head renders through the NESTED component');
+  assert.ok(demo.includes('>Showcase</span>'), 'nested superheadline string arg renders');
+  const hero = pages.get('/test/components/hero-demo-input');
+  assert.ok(hero.includes('Everything you need.'), 'bento head (plain-string superheadline) survives');
+  const alt = pages.get('/alternatives/acme-growth');
+  assert.ok(alt.includes('<em>compare</em>'), 'alternative comparison accent liquifies without the dropped uj_liquify');
+  const post = pages.get('/blog/first-post');
+  assert.ok(post.includes('Related <em>posts</em>'), 'related-posts head: em-in-string headline through the guarded h2');
+  // The pricing one-time/comparison bands are catalog-gated and the mini
+  // corpus has no payment config — build once WITH a catalog so the inline
+  // | default: filter-arg call lines actually render.
+  const paid = await buildWith({
+    ...miniData,
+    payment: { products: [
+      { id: 'starter', name: 'Starter', prices: { monthly: 9, annually: 90 }, features: ['Alpha', 'Beta'] },
+      { id: 'growth', name: 'Growth', prices: { monthly: 29, annually: 290 }, features: ['Alpha', 'Beta', 'Gamma'] },
+      { id: 'kit', name: 'Launch Kit', type: 'one-time', prices: { once: 49 }, features: ['Alpha'] },
+    ] },
+  });
+  const pricing = paid.get('/pricing');
+  assert.ok(pricing, 'pricing built with a catalog');
+  assert.ok(pricing.includes('One-time') && pricing.includes('<em>purchases</em>'), 'one-time head renders from inline | default: args');
+  assert.ok(pricing.includes('Compare all') && pricing.includes('<em>plans</em>'), 'comparison head renders from inline | default: args');
+});
+
 test('body-call lane: a consumer page composes the section with YAML args', async () => {
   const pages = await buildWith(miniData);
   const demo = pages.get('/sections-demo');

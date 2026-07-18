@@ -111,11 +111,7 @@ join_cta:
   <div class="container">
     <div class="classy-duo">
       <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        <span class="classy-micro">{{ resolved.principles.superheadline }}</span>
-        <h2 class="classy-display classy-display--section">
-          {{ resolved.principles.headline }}
-          {% iftruthy resolved.principles.headline_accent %}<em>{{ resolved.principles.headline_accent }}</em>{% endiftruthy %}
-        </h2>
+        {% component "heading/section-head", superheadline: resolved.principles.superheadline, headline: resolved.principles.headline, headline_accent: resolved.principles.headline_accent %}
       </div>
 
       <div class="classy-rowlist" data-omega-reveal-stagger="60">

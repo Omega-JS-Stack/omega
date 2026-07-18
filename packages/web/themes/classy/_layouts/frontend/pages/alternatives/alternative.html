@@ -165,18 +165,7 @@ alternative:
   <section class="pt-0">
     <div class="container">
       <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-        {% iftruthy alt.comparison.superheadline.text %}
-          <span class="classy-micro">{{ alt.comparison.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">
-          {{ alt.comparison.headline | uj_liquify }}
-          {% iftruthy alt.comparison.headline_accent %}
-            <em>{{ alt.comparison.headline_accent | uj_liquify }}</em>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy alt.comparison.subheadline %}
-          <p>{{ alt.comparison.subheadline | uj_liquify }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: alt.comparison.superheadline.text, headline: alt.comparison.headline, headline_accent: alt.comparison.headline_accent, sub: alt.comparison.subheadline %}
       </div>
 
       <div class="row justify-content-center">
@@ -234,18 +223,7 @@ alternative:
   <section>
     <div class="container">
       <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-        {% iftruthy alt.why_switch.superheadline.text %}
-          <span class="classy-micro">{{ alt.why_switch.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">
-          {{ alt.why_switch.headline | uj_liquify }}
-          {% iftruthy alt.why_switch.headline_accent %}
-            <em>{{ alt.why_switch.headline_accent | uj_liquify }}</em>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy alt.why_switch.subheadline %}
-          <p>{{ alt.why_switch.subheadline | uj_liquify }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: alt.why_switch.superheadline.text, headline: alt.why_switch.headline, headline_accent: alt.why_switch.headline_accent, sub: alt.why_switch.subheadline %}
       </div>
 
       {% for item in why_switch_items %}
@@ -284,18 +262,7 @@ alternative:
   <section>
     <div class="container">
       <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-        {% iftruthy alt.video.superheadline.text %}
-          <span class="classy-micro">{{ alt.video.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-display classy-display--section">
-          {{ alt.video.headline | uj_liquify }}
-          {% iftruthy alt.video.headline_accent %}
-            <em>{{ alt.video.headline_accent | uj_liquify }}</em>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy alt.video.subheadline %}
-          <p>{{ alt.video.subheadline | uj_liquify }}</p>
-        {% endiftruthy %}
+        {% component "heading/section-head", superheadline: alt.video.superheadline.text, headline: alt.video.headline, headline_accent: alt.video.headline_accent, sub: alt.video.subheadline %}
       </div>
 
       <div class="row justify-content-center">
