@@ -1,9 +1,15 @@
-<section>
+<section{% if args.section_class != blank %} class="{{ args.section_class }}"{% endif %}>
   <div class="container">
     <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-      <h2 class="classy-cta__headline">{{ args.headline }}</h2>
-      {% iftruthy args.description %}
-        <p class="classy-cta__sub">{{ args.description }}</p>
+      {% iftruthy args.superheadline.text %}
+        <span class="classy-micro d-block mb-3">{{ args.superheadline.text }}</span>
+      {% endiftruthy %}
+      <h2 class="classy-cta__headline">{% if args.headline_accent != blank %}
+        {{ args.headline }}
+        <em>{{ args.headline_accent }}</em>
+      {% else %}{{ args.headline }}{% endif %}</h2>
+      {% iftruthy args.subheadline %}
+        <p class="classy-cta__sub">{{ args.subheadline }}</p>
       {% endiftruthy %}
       <div class="classy-cta__ctas">
         {% iftruthy args.primary_button.text %}
@@ -18,9 +24,16 @@
           </a>
         {% endiftruthy %}
         {% iftruthy args.secondary_button.text %}
-          <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
-            {{ args.secondary_button.text }}
-          </a>
+          {% if args.secondary_button.nudge %}
+            <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
+              {{ args.secondary_button.text }}
+              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+            </a>
+          {% else %}
+            <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+              {{ args.secondary_button.text }}
+            </a>
+          {% endif %}
         {% endiftruthy %}
       </div>
     </div>

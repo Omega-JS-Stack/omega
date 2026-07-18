@@ -108,9 +108,8 @@ team_cta:
     text: "People"
   headline: "Meet the people behind {{ site.brand.name }}"
   subheadline: "The people who build and run it, every day."
-  button:
+  primary_button:
     text: "Meet the team"
-    icon: "arrow-right"
     href: "/team"
 ---
 
@@ -273,24 +272,6 @@ team_cta:
 </section>
 
 <!-- ═══ Team CTA band ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-      {% iftruthy resolved.team_cta.superheadline.text %}
-        <span class="classy-micro d-block mb-3">{{ resolved.team_cta.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-cta__headline">{{ resolved.team_cta.headline }}</h2>
-      {% iftruthy resolved.team_cta.subheadline %}
-        <p class="classy-cta__sub">{{ resolved.team_cta.subheadline }}</p>
-      {% endiftruthy %}
-      <div class="classy-cta__ctas">
-        <a href="{{ resolved.team_cta.button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-          {{ resolved.team_cta.button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/cta", data: resolved.team_cta %}
 
 {{ content | uj_content_format }}

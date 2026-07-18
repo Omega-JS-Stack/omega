@@ -188,6 +188,18 @@ test('wave 2: the index composition renders every extracted band from its defaul
   assert.ok(!page.includes('dashboard-pane'), 'product-demo stays suppressed (enabled: false default)');
 });
 
+test('wave 3: the shared cta union renders page-owned variants (accent em, nudged + plain secondaries)', async () => {
+  const pages = await buildWith(miniData);
+  const download = pages.get('/download');
+  assert.ok(download, 'download page built');
+  assert.ok(download.includes('<em>install?</em>'), 'headline_accent renders as the em form');
+  assert.ok(download.includes('btn-outline-adaptive btn-lg omega-hover-nudge'), 'secondary_button.nudge: true adds the arrow form');
+  const alternatives = pages.get('/alternatives');
+  assert.ok(alternatives, 'alternatives page built');
+  assert.ok(alternatives.includes('Ready to make the switch?'), 'alternatives cta copy rode its own data bridge');
+  assert.ok(alternatives.includes('btn-outline-adaptive btn-lg"'), 'non-nudged secondary stays plain');
+});
+
 test('body-call lane: a consumer page composes the section with YAML args', async () => {
   const pages = await buildWith(miniData);
   const demo = pages.get('/sections-demo');

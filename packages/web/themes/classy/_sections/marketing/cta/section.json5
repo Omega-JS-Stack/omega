@@ -1,23 +1,17 @@
 {
-  description: 'The ink CTA band — headline + optional description over primary button / mono command / secondary button (each renders only when set). Always renders (no enable flag).',
+  description: 'The ink CTA band — optional superheadline micro label, headline with optional <em> accent, optional subheadline, then primary button / mono command / secondary button (each renders only when set; secondary_button.nudge: true adds the arrow). A SHARED band (index, about, pricing, download, extension, team, alternatives) — defaults stay NEUTRAL and every page passes its own copy over the data bridge (spec §6 shared-band ruling).',
 
   args: {
+    superheadline: 'object',
     headline: 'string',
-    description: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
     primary_button: 'object',
     secondary_button: 'object',
     command: 'string',
     command_href: 'string',
+    section_class: 'string',
   },
 
-  defaults: {
-    headline: 'Ready to build something people remember?',
-    description: 'Join thousands of teams already shipping with {{ site.brand.name }}.',
-    primary_button: {
-      text: 'Start free today',
-      href: '/signup',
-    },
-    command: 'npx omega setup',
-    command_href: '/download',
-  },
+  defaults: {},
 }

@@ -63,7 +63,7 @@ cta:
     icon: "rocket"
     text: "Get started"
   headline: "Ready to make the switch?"
-  description: "Join thousands of happy users who chose {{ site.brand.name }}. Start your free trial today — no credit card required."
+  subheadline: "Join thousands of happy users who chose {{ site.brand.name }}. Start your free trial today — no credit card required."
   primary_button:
     text: "Start free trial"
     href: "/pricing"
@@ -200,37 +200,7 @@ cta:
 
 <!-- ═══ CTA band ═══ -->
 {% iftruthy resolved.cta.headline %}
-  <section>
-    <div class="container">
-      <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-        {% iftruthy resolved.cta.superheadline.text %}
-          <span class="classy-micro d-block mb-3">{{ resolved.cta.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-cta__headline">
-          {{ resolved.cta.headline }}
-          {% iftruthy resolved.cta.headline_accent %}
-            <em>{{ resolved.cta.headline_accent }}</em>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy resolved.cta.description %}
-          <p class="classy-cta__sub">{{ resolved.cta.description }}</p>
-        {% endiftruthy %}
-        <div class="classy-cta__ctas">
-          {% iftruthy resolved.cta.primary_button.text %}
-            <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-              {{ resolved.cta.primary_button.text }}
-              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-            </a>
-          {% endiftruthy %}
-          {% iftruthy resolved.cta.secondary_button.text %}
-            <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
-              {{ resolved.cta.secondary_button.text }}
-            </a>
-          {% endiftruthy %}
-        </div>
-      </div>
-    </div>
-  </section>
+  {% section "marketing/cta", data: resolved.cta %}
 {% endiftruthy %}
 
 {{ content | uj_content_format }}

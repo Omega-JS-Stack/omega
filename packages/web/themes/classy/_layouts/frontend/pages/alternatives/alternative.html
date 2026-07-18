@@ -110,7 +110,7 @@ alternative:
       text: "Make the switch"
     headline: "Ready to leave"
     headline_accent: "{{ resolved.alternative.competitor.name }} behind?"
-    description: "Join thousands who chose {{ site.brand.name }}. Start your free trial today — no credit card required."
+    subheadline: "Join thousands who chose {{ site.brand.name }}. Start your free trial today — no credit card required."
     primary_button:
       text: "Start free trial"
       href: "/pricing"
@@ -399,37 +399,7 @@ alternative:
 
 <!-- ═══ CTA band ═══ -->
 {% iftruthy alt.cta.headline %}
-  <section>
-    <div class="container">
-      <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-        {% iftruthy alt.cta.superheadline.text %}
-          <span class="classy-micro d-block mb-3">{{ alt.cta.superheadline.text }}</span>
-        {% endiftruthy %}
-        <h2 class="classy-cta__headline">
-          {{ alt.cta.headline | uj_liquify }}
-          {% iftruthy alt.cta.headline_accent %}
-            <em>{{ alt.cta.headline_accent | uj_liquify }}</em>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy alt.cta.description %}
-          <p class="classy-cta__sub">{{ alt.cta.description | uj_liquify }}</p>
-        {% endiftruthy %}
-        <div class="classy-cta__ctas">
-          {% iftruthy alt.cta.primary_button.text %}
-            <a href="{{ alt.cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-              {{ alt.cta.primary_button.text }}
-              <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-            </a>
-          {% endiftruthy %}
-          {% iftruthy alt.cta.secondary_button.text %}
-            <a href="{{ alt.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
-              {{ alt.cta.secondary_button.text }}
-            </a>
-          {% endiftruthy %}
-        </div>
-      </div>
-    </div>
-  </section>
+  {% section "marketing/cta", data: alt.cta %}
 {% endiftruthy %}
 
 {{ content | uj_content_format }}

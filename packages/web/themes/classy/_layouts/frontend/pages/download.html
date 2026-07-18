@@ -164,6 +164,7 @@ cta:
     text: "Release notes"
     icon: "book"
     href: "/updates"
+    nudge: true
 ---
 
 <!-- ═══ Hero: the page already picked your button ═══ -->
@@ -447,36 +448,7 @@ cta:
 </section>
 
 <!-- ═══ CTA band ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-      {% iftruthy resolved.cta.superheadline.text %}
-        <span class="classy-micro d-block mb-3">{{ resolved.cta.superheadline.text }}</span>
-      {% endiftruthy %}
-      <h2 class="classy-cta__headline">
-        {{ resolved.cta.headline }}
-        {% iftruthy resolved.cta.headline_accent %}
-          <em>{{ resolved.cta.headline_accent }}</em>
-        {% endiftruthy %}
-      </h2>
-      {% iftruthy resolved.cta.subheadline %}
-        <p class="classy-cta__sub">{{ resolved.cta.subheadline }}</p>
-      {% endiftruthy %}
-      <div class="classy-cta__ctas">
-        <a href="{{ resolved.cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-          {{ resolved.cta.primary_button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-        </a>
-        {% iftruthy resolved.cta.secondary_button.text %}
-          <a href="{{ resolved.cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
-            {{ resolved.cta.secondary_button.text }}
-            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-          </a>
-        {% endiftruthy %}
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/cta", data: resolved.cta %}
 
 <!-- Onboarding Modal -->
 <div class="modal fade" id="onboardingModal" tabindex="-1" aria-labelledby="onboardingModalLabel" aria-hidden="true">

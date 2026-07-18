@@ -7,13 +7,14 @@ theme:
     class: "pt-0"
 
 # Page sections: extracted to _sections/marketing/* (hero, trusted-by, bento,
-# product-demo, showcase, stats, cta — each section.json5 owns the defaults;
+# product-demo, showcase, stats — each section.json5 owns the defaults;
 # consumer frontmatter keys still override via the data/items bridges below —
 # plans/omega-sections-spec.md).
 
-# Testimonials Section — page copy stays HERE: marketing/testimonials is a
-# SHARED band (pricing/alternatives pass their own), so its json5 defaults
-# stay neutral and every page owns its quotes.
+# Testimonials + CTA — page copy stays HERE: marketing/testimonials and
+# marketing/cta are SHARED bands (pricing/alternatives/about/team/... pass
+# their own), so their json5 defaults stay neutral and every page owns its
+# copy (spec §6 shared-band ruling).
 testimonials:
   superheadline: "Testimonials"
   items:
@@ -29,6 +30,16 @@ testimonials:
       author: "Emily Davis"
       role: "Director, Creative Studio"
       initial: "E"
+
+# CTA Section — the ink band
+cta:
+  headline: "Ready to build something people remember?"
+  subheadline: "Join thousands of teams already shipping with {{ site.brand.name }}."
+  primary_button:
+    text: "Start free today"
+    href: "/signup"
+  command: "npx omega setup"
+  command_href: "/download"
 ---
 
 {% section "marketing/hero", data: resolved.hero %}

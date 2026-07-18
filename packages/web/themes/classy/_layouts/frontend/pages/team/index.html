@@ -36,6 +36,7 @@ join_cta:
   secondary_button:
     text: "Get in touch"
     href: "/contact"
+    nudge: true
 ---
 
 <!-- ═══ Masthead ═══ -->
@@ -183,27 +184,7 @@ join_cta:
 {% endif %}
 
 <!-- ═══ Join CTA band ═══ -->
-<section{% if _team_count == 0 %} class="pt-0"{% endif %}>
-  <div class="container">
-    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-      <h2 class="classy-cta__headline">{{ resolved.join_cta.headline }}</h2>
-      {% iftruthy resolved.join_cta.subheadline %}
-        <p class="classy-cta__sub">{{ resolved.join_cta.subheadline }}</p>
-      {% endiftruthy %}
-      <div class="classy-cta__ctas">
-        <a href="{{ resolved.join_cta.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-          {{ resolved.join_cta.primary_button.text }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-        </a>
-        {% iftruthy resolved.join_cta.secondary_button.text %}
-          <a href="{{ resolved.join_cta.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg omega-hover-nudge">
-            {{ resolved.join_cta.secondary_button.text }}
-            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-          </a>
-        {% endiftruthy %}
-      </div>
-    </div>
-  </div>
-</section>
+{% capture join_cta_class %}{% if _team_count == 0 %}pt-0{% endif %}{% endcapture %}
+{% section "marketing/cta", data: resolved.join_cta, section_class: join_cta_class %}
 
 {{ content | uj_content_format }}

@@ -22,6 +22,15 @@ social_proof:
       label: "G2"
       show_stars: true
 
+# CTA Section — the page's copy (shared marketing/cta band; the old inline
+# | default: fallbacks in markup live here now)
+cta:
+  headline: "Need help finding the right plan?"
+  subheadline: "Talk to our support team — we'll point you to exactly what you need."
+  primary_button:
+    text: "Talk to us"
+    href: "/contact"
+
 # Testimonials Section
 testimonials:
   superheadline: "Testimonials"
@@ -564,22 +573,7 @@ faqs:
 {% endiftruthy %}
 
 <!-- CTA Section -->
-<section>
-  <div class="container">
-    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-      <h2 class="classy-cta__headline">
-        {{ resolved.cta.headline | default: "Need help finding the right plan?" }}
-      </h2>
-      <p class="classy-cta__sub">{{ resolved.cta.subheadline | default: "Talk to our support team — we'll point you to exactly what you need." }}</p>
-      <div class="classy-cta__ctas">
-        <a href="{{ resolved.cta.button.href | default: '/contact' }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
-          {{ resolved.cta.button.text | default: "Talk to us" }}
-          <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/cta", data: resolved.cta %}
 
 {% iftruthy resolved.testimonials.items %}
   {% section "marketing/testimonials", data: resolved.testimonials %}
