@@ -113,6 +113,10 @@ test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall th
   const about = pages.get('/about');
   assert.ok(about && about.length > 0, 'pages the toy theme does not cover still render');
   assert.ok(about.includes('<html'), 'fallback pages render through the classy base chain');
+  assert.ok(
+    about.includes('/assets/fonts/inter-normal-latin.woff2'),
+    'toy theme vendors no fonts — preloads fall through to the classy base faces (cp200)',
+  );
 });
 
 // ─── Font preloads (cp198): first-paint faces discovered from theme fonts/ ──

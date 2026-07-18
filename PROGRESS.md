@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **cp198 sweep + cp199 Fable review LANDED**: FOUC killed (theme-aware font preloads, deterministic order), permalinkOf hardened to frontmatter-only scan (body text can't suppress defaults), SW cached-404 closed (verified: no fetch handler, install unbrickable), sandbox e2e promoted to root `npm test` — web 183/0, corpus 7/7, backend 1242, e2e PASSED
+- **cp198–200 LANDED (sweep → Fable review → Ian's rulings)**: FOUC killed (theme-aware font preloads, deterministic, layer fall-through), permalinkOf frontmatter-only, sandbox e2e in root `npm test`, dead SW cache-warming REMOVED (SW = push + takeover only, NO fetch handler by design) — web 183/0, corpus 7/7, backend 1242, e2e PASSED
 - **Both skins await Ian's eyes**: classy (cp147–185, playground) · The Daily Build (cp186–193, dark/light/mobile swept) — stacks not currently running; `npm start` at each brand root boots them; fall-through two-lane direction stands unchallenged; playground CMS creates land once the source repo's `main` is born (arc close)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
@@ -43,7 +43,8 @@
 - ~~Theme CSS fall-through asymmetry~~ **RESOLVED cp190**: two blessed lanes — partial themes `@forward 'omega:theme'` (self-skip hatch, now test-pinned), full sibling themes import classy's TOKEN-PURE app/auth partials as the floor (newsflash = the live model; classy app-vocab partials must stay token-pure) → docs/theming.md; Ian re-litigates at reconvene if he wants a different direction
 - ~~SW can serve a cached 404 for assets (182)~~ **CLOSED cp198**: no fetch handler exists in the SW — it only does cache-warming (`cache.addAll`, which rejects non-ok by spec) and push notifications; the feared cache-serve-404 pattern cannot manifest
 - ~~permalinkOf regex (155)~~ **FIXED cp198, hardened cp199**: frontmatter-only scan + quote/comment handling — body-text `permalink:` lines can no longer suppress framework defaults; 15-test pin
-- **SW cache-warming is write-only (cp199 review find)**: no fetch handler ever reads the cache — every install fetches `/` + main js/css into a dead cache; drop the warming or wire it when an offline lane lands
+- ~~SW cache-warming is write-only (cp199 review find)~~ **REMOVED cp200 (Ian: page speed wins)**: SW = push + takeover + eviction only; NO fetch handler on purpose (header-pinned — fastest SW config, offline deliberately not wanted)
+- **Extension background cache is write-only too (cp200 find)**: packages/extension `background.js` warms a cache nothing reads (one `caches.open`, zero reads) — same removal treatment on the extension surface's next pass
 - **Sibling-theme builds ship the classy base layer's woff2s (cp199 review find)**: assets fonts-union copies all layers — unreferenced, never fetched, artifact fat only (~350KB in newsflash builds); prune at arc close if it bothers
 - **Font-preload breadth = whole-site (cp199 design flag, Ian's call)**: classy preloads Inter 73KB + Newsreader 132KB on EVERY page — right for marketing first-paint, wasted on app-shell pages; per-layout preload lists are the refinement
 - ~~First-paint blank flash (116/123)~~ **FIXED cp198**: theme-aware font preloads — engine scans active theme's normal-latin faces and emits `<link rel="preload">` before the stylesheet; both themes pinned + corpus invariant
@@ -52,6 +53,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 200 dead SW cache-warming removed (Ian: page speed wins) · preload layer fall-through pinned · build-meta assets trimmed · SW bundle-proven (no warm, push+takeover intact); web 183/0, corpus 7/7, e2e PASSED → CHANGELOG
 - [x] 199 Fable review of cp198 — permalinkOf frontmatter-only + comment/quote handling (5 new pins) · preload order sorted deterministic · SW/e2e/preload mechanics confirmed clean · 3 findings parked; web 183/0, corpus 7/7, backend 1242, e2e PASSED → CHANGELOG
 - [x] 198 parked-findings sweep — FOUC killed (theme-aware font preloads, both themes pinned, corpus invariant) · permalinkOf regex fixed (10-test pin) · SW cached-404 CLOSED (no fetch handler) · sandbox e2e promoted to root `npm test` (`OMEGA_SKIP_E2E=1` knob); web 178/0, corpus 7/7, sandbox 1242/0 → CHANGELOG
 - [x] 197 brand-SHAPE corpus — 7 offline cells opening `test:corpus`; caught the LATENT cp157 red → swept to JOURNEY_ACCOUNTS, corpus green → CHANGELOG
@@ -65,4 +67,4 @@
 - [x] 184 round-10c 5002-no-redirect + vendor propagation → CHANGELOG
 - [x] Phases 0–2 + cp33–183 — bootstrap through account dialect → CHANGELOG + git log
 
-*Last updated: 2026-07-18 (cp199: Fable review of cp198 — permalink scan hardened, preload order pinned, 3 findings parked)*
+*Last updated: 2026-07-18 (cp200: dead SW cache-warming removed — SW = push + takeover only; preload fall-through pinned)*

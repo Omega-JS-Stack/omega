@@ -88,7 +88,6 @@ async function buildServiceWorker(options) {
  * @param {string} options.outDir
  * @param {string} [options.environment] - 'development' | 'production'
  * @param {string} [options.version] - the consumer package version
- * @param {object} [options.manifest] - buildAssets() manifest (main bundle URLs for the SW cache warm)
  * @returns {object} the emitted meta
  */
 function writeBuildMeta(options) {
@@ -103,10 +102,6 @@ function writeBuildMeta(options) {
     timestamp: now.toISOString(),
     buildTime: now.toISOString(),
     cacheBreaker: now.getTime(),
-    assets: {
-      js: options.manifest?.js?.main || null,
-      css: options.manifest?.css?.main || null,
-    },
     firebase: site.cloud?.config || null,
   };
 

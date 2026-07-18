@@ -11,6 +11,11 @@
  * browser install this worker fresh: skipWaiting + clients.claim take the
  * scope over immediately, and initialize() evicts every cache that doesn't
  * carry this brand+build's name. One project per origin, self-healing.
+ *
+ * ⚠️ NO fetch handler, ON PURPOSE (Ian 2026-07-18: page speed wins) — with
+ * no fetch listener the browser skips SW startup for navigations entirely,
+ * so pages load at full network speed. Adding offline caching means adding
+ * a fetch handler, which taxes EVERY request through the worker; don't.
  */
 const sw = self;
 
@@ -58,55 +63,20 @@ class Manager {
     // Properties
     this.serviceWorker = sw;
 
-    // Setup instance-specific message handlers
-    this.setupInstanceHandlers();
-
     // Initialize Firebase
     this.initializeFirebase();
 
     // Evict caches that don't belong to this brand+build — a previous build's
     // caches, or a DIFFERENT project's caches left on this origin (the
-    // localhost:4000 case). Then warm this build's cache.
+    // localhost:4000 case). Nothing here writes caches anymore, so this only
+    // ever clears leftovers from older builds and legacy workers.
     await this.cleanCaches();
-    this.updateCache();
 
     // Log
     console.log(`[service-worker] Initialized: ${this.cache.name} (${this.environment})`, sw.location.pathname);
 
     // Return
     return sw;
-  }
-
-  // Setup instance-specific message handlers
-  setupInstanceHandlers() {
-    sw.addEventListener('message', (event) => {
-      // Get the data
-      const data = event.data || {};
-
-      // Parse the data
-      const command = data.command || '';
-      const payload = data.payload || {};
-
-      // Quit if no command
-      if (!command) {
-        return;
-      }
-
-      // Log
-      console.log('[service-worker] message', command, payload);
-
-      // Handle commands
-      if (command === 'update-cache') {
-        const pages = payload.pages || [];
-        this.updateCache(pages)
-          .then(() => {
-            event.ports[0]?.postMessage({ status: 'success' });
-          })
-          .catch((error) => {
-            event.ports[0]?.postMessage({ status: 'error', error: error.message });
-          });
-      }
-    });
   }
 
   // Setup Firebase init
@@ -171,24 +141,6 @@ class Manager {
       .catch((error) => console.error('[service-worker] Failed to clean caches:', error));
   }
 
-  // Setup cache update
-  updateCache(pages) {
-    // Set default resources to cache: the home page + the main bundles
-    // (their URLs ride /build.js — hashed names in production builds)
-    const defaults = ['/', this.config.assets?.js, this.config.assets?.css].filter(Boolean);
-
-    // Ensure pages is an array
-    pages = pages || [];
-
-    // Merge with additional pages
-    const pagesToCache = [...new Set([...defaults, ...pages])];
-
-    // Open cache and add pages
-    return caches.open(this.cache.name)
-      .then((cache) => cache.addAll(pagesToCache))
-      .then(() => console.log('[service-worker] Cached resources:', pagesToCache))
-      .catch((error) => console.error('[service-worker] Failed to cache resources:', error));
-  }
 }
 
 // Helper: Setup global listeners
