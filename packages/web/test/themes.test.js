@@ -114,3 +114,25 @@ test('tier 2: consumer-local theme layouts win the farm; uncovered pages fall th
   assert.ok(about && about.length > 0, 'pages the toy theme does not cover still render');
   assert.ok(about.includes('<html'), 'fallback pages render through the classy base chain');
 });
+
+// ─── Font preloads (cp198): first-paint faces discovered from theme fonts/ ──
+
+test('font preloads: classy emits Inter + Newsreader normal-latin preloads (cp198)', async () => {
+  const pages = await buildWith(miniData);
+  const home = pages.get('/');
+
+  assert.ok(home.includes('rel="preload"'), 'at least one preload link present');
+  assert.ok(home.includes('/assets/fonts/inter-normal-latin.woff2'), 'Inter normal latin preloaded');
+  assert.ok(home.includes('/assets/fonts/newsreader-normal-latin.woff2'), 'Newsreader normal latin preloaded');
+  assert.ok(home.includes('as="font"'), 'as=font attribute present');
+  assert.ok(home.includes('crossorigin'), 'crossorigin attribute present');
+});
+
+test('font preloads: newsflash emits Fraunces + Schibsted normal-latin preloads (cp198)', async () => {
+  const pages = await buildWith({ ...miniData, theme: { id: 'newsflash' } });
+  const home = pages.get('/');
+
+  assert.ok(home.includes('/assets/fonts/fraunces-normal-latin.woff2'), 'Fraunces normal latin preloaded');
+  assert.ok(home.includes('/assets/fonts/schibsted-grotesk-normal-latin.woff2'), 'Schibsted Grotesk normal latin preloaded');
+  assert.ok(!home.includes('inter-normal-latin'), 'classy fonts not present in newsflash build');
+});

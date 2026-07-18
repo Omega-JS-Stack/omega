@@ -110,6 +110,16 @@ function configureOmega(eleventyConfig, options) {
   const themeLayers = resolveThemeLayers({ activeTheme, consumerDir: options.consumerDir, themesDir });
   const layers = [...themeLayers, coreDir];
 
+  // Font preloads: the active theme's normal-weight latin faces are the
+  // first-paint fonts — preloading them eliminates the FOUT (system-font
+  // flash on a cold cache). Scan the winning theme layer's fonts/ dir.
+  const themeFontsDir = path.join(themeLayers[0], 'fonts');
+  site.fontPreloads = fs.existsSync(themeFontsDir)
+    ? fs.readdirSync(themeFontsDir)
+        .filter((f) => f.endsWith('-normal-latin.woff2'))
+        .map((f) => `/assets/fonts/${f}`)
+    : [];
+
   // ---- LiquidJS: Jekyll include syntax + layered include roots.
   // timezoneOffset 0: filename dates are UTC midnights; rendering them in UTC
   // matches CI-built Jekyll output (Actions runners are UTC).

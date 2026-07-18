@@ -123,6 +123,10 @@ function assertWebInvariants(cell, pages) {
   need(pages.has('/sitemap.xml'), 'sitemap.xml');
   need(pages.has('/robots.txt'), 'robots.txt');
 
+  if (home) {
+    need(home.includes('rel="preload"') && home.includes('as="font"'), 'font preload links present');
+  }
+
   if (cell.post) {
     const blogUrl = [...pages.keys()].find((url) => url.startsWith('/blog'));
     need(blogUrl && pages.get(blogUrl).includes(POST_MARKER), `blog lists "${POST_MARKER}"`);

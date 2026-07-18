@@ -14,7 +14,7 @@ const path = require('node:path');
  *   slash-free legacy UJM shape) or null
  */
 function permalinkOf(raw) {
-  const match = raw.match(/^permalink:\s*(\S+)\s*$/m);
+  const match = raw.match(/^permalink:\s*(.+?)\s*$/m);
   if (!match) return null;
 
   let url = match[1].replace(/^["']|["']$/g, '');

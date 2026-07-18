@@ -13,7 +13,7 @@
   },
   "scripts": {
     "start": "node scripts/watch-all.js",
-    "test": "node scripts/test-workspaces.js && npm run test:corpus && node scripts/e2e-journey.js",
+    "test": "node scripts/test-workspaces.js && npm run test:corpus && npm run test:e2e && node scripts/e2e-journey.js",
     "test:packages": "node scripts/test-workspaces.js",
     "test:corpus": "node scripts/corpus-shapes.js && npm run test:backend -w sandbox-brand",
     "test:e2e": "npm run test -w sandbox-brand",

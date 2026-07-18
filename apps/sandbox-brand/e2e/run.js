@@ -6,6 +6,12 @@
  * brand-specific browser steps via puppeteer.
  */
 const path = require('path');
+
+if (process.env.OMEGA_SKIP_E2E === '1') {
+  console.log('⏭ OMEGA_SKIP_E2E=1 — skipping sandbox e2e');
+  process.exit(0);
+}
+
 const { E2eHarness } = require('@omega.js/devkit/test/e2e-harness');
 
 const BRAND_ROOT = path.join(__dirname, '..');

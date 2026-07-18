@@ -191,6 +191,14 @@
   {{ page-ie-script }}
 <![endif]-->
 
+<!-- Font preloads: first-paint faces discovered from the active theme's
+     fonts/ dir — fetched in parallel with the stylesheet so glyphs are ready
+     by the time the layout paints (eliminates the system-font flash on cold
+     cache). crossorigin is required for font preloads per spec. -->
+{% for font in site.fontPreloads %}
+<link rel="preload" href="{{ font }}" as="font" type="font/woff2" crossorigin/>
+{% endfor %}
+
 <!-- CSS Bundles: content-hashed by the asset pipeline, mapped via the manifest -->
 <!-- Note: media="print" onload="this.media='all'" does NOT improve performance -->
 <link rel="stylesheet" type="text/css" href="{{ assetManifest.css.main }}"/>

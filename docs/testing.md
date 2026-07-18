@@ -5,11 +5,12 @@
 | Tier | What | Command | When |
 |------|------|---------|------|
 | 1 — Package suites | Each package's own `node --test` (config, devkit, manager, web, client, backend boot, …) | `npm test` in the package, or `npm run test:packages` at the root | Every checkpoint |
-| 2 — Corpus (automated consumers) | The **brand-shape corpus** (7+ generated brand shapes: real onboard + real Eleventy builds with per-shape invariants — themes, target combos, content; offline, no installs) then the sandbox **backend corpus** (framework routes/events/rules through a REAL consumer + real emulator) + the **cross-stack e2e** (browser → website → backend) | `npm run test:corpus` / `npm run test:e2e` at the root | Every checkpoint that touches runtime behavior |
+| 2 — Corpus (automated consumers) | The **brand-shape corpus** (7+ generated brand shapes: real onboard + real Eleventy builds with per-shape invariants — themes, target combos, content, font preloads; offline, no installs) then the sandbox **backend corpus** (framework routes/events/rules through a REAL consumer + real emulator) | `npm run test:corpus` at the root | Every checkpoint that touches runtime behavior |
+| 2a — Sandbox e2e | The **cross-stack e2e** (puppeteer browser → website → backend: signup/signin/subscribe/cancel/refund/data-request/delete lifecycle) | `npm run test:e2e` at the root | Every checkpoint; `OMEGA_SKIP_E2E=1` to skip |
 | 2.5 — Wizard journey (outside-monorepo consumer) | The FULL consumer story in a temp brand born OUTSIDE the monorepo: real onboard wizard (flags) → `i local` tree link → every framework setup → `omega dev` boot + branded-homepage probe → headless creds-scrubbed manage (update must build every app) | `npm run test:journey` at the root (also the tail of root `npm test`) | The full sequence, and any change to onboard/linking/setup/boot plumbing |
 | 3 — Playground (live rehearsal) | The 24-service manage pipeline against REAL cloud (Firebase, Cloudflare, SendGrid, …) | `npm run pipeline` in `apps/omega-playground` | SPARINGLY — Ian-authorized (real infra, real cost) |
 
-**Root `npm test` runs tiers 1 + 2 + 2.5 in one shot** (all workspace suites → backend corpus → wizard journey, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the journey brand is `demo-*`/`.invalid`-scoped and creds-scrubbed; the playground is the only tier that touches real cloud.
+**Root `npm test` runs tiers 1 + 2 + 2a + 2.5 in one shot** (all workspace suites → corpus → sandbox e2e → wizard journey, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the journey brand is `demo-*`/`.invalid`-scoped and creds-scrubbed; the playground is the only tier that touches real cloud.
 
 ## The brand-shape corpus (cp197)
 
