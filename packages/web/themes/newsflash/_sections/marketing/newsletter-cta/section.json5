@@ -17,6 +17,37 @@
 
   defaults: {},
 
+  // Showcase variants (spec §9) — both presentations, generic copy.
+  demo: [
+    {
+      label: 'Slab band',
+      args: {
+        superheadline: { icon: 'envelope', text: 'Newsletter' },
+        headline: 'Never miss an',
+        headline_accent: 'issue',
+        subheadline: 'One email a week — the best of the desk, nothing else.',
+        button: { text: 'Subscribe' },
+        form: {
+          placeholder: 'you@example.com',
+          success_message: 'Thanks — check your inbox to confirm.',
+          error_message: 'Something went wrong. Please try again.',
+        },
+      },
+    },
+    {
+      label: 'Rail card',
+      args: {
+        variant: 'rail',
+        headline: 'The morning brief',
+        subheadline: 'The day in five minutes, in your inbox by six.',
+        button: { text: 'Sign up' },
+        form: { placeholder: 'you@example.com' },
+        disclaimer: 'Free forever. Unsubscribe anytime.',
+        anchor: 'demo-signup',
+      },
+    },
+  ],
+
   // §7: this override replaces markup, not behavior — keep the base layer's
   // section.js (classy's FormManager binding) in the bundle.
   inherit: ['js'],

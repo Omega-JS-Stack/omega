@@ -11,4 +11,39 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9) — demo desks pass explicit hrefs so the
+  // cards never point at category pages the site may not have.
+  demo: [
+    {
+      label: 'Three desks',
+      args: {
+        superheadline: { text: 'The desks' },
+        headline: 'Coverage that',
+        headline_accent: 'compounds',
+        subheadline: 'Three beats, one standard.',
+        items: [
+          {
+            icon: 'microchip',
+            title: 'Technology',
+            description: 'Chips, code, and the people shipping both.',
+            href: '/blog',
+          },
+          {
+            icon: 'chart-line',
+            title: 'Markets',
+            description: 'What moved, why it moved, who moved it.',
+            href: '/blog',
+          },
+          {
+            icon: 'landmark',
+            title: 'Policy',
+            description: 'The rules being written while you read this.',
+            href: '/blog',
+          },
+        ],
+        cta_button: { icon: 'rss', text: 'Browse all coverage', href: '/blog' },
+      },
+    },
+  ],
 }

@@ -11,4 +11,23 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
+  // the demo carries its own generic copy.
+  demo: [
+    {
+      label: 'Capture band',
+      args: {
+        superheadline: { text: 'Newsletter' },
+        headline: 'Stay in the loop',
+        subheadline: 'One email a month — product updates, guides, and nothing else.',
+        button: { text: 'Subscribe' },
+        form: {
+          placeholder: 'you@example.com',
+          success_message: 'Thanks — check your inbox to confirm.',
+          error_message: 'Something went wrong. Please try again.',
+        },
+      },
+    },
+  ],
 }

@@ -21,7 +21,7 @@ themes/classy/_sections/marketing/hero/
   section.html    ← markup (Liquid). Renders against { args } ONLY.
   section.scss    ← styles (optional) — compiles into the main sheet
   section.js      ← behavior (optional) — bundles behind DOM-presence init
-  section.json5   ← { description, args, defaults } (+ demo, later)
+  section.json5   ← { description, args, defaults, demo }
 ```
 
 Ids are kebab-case category paths (`marketing/hero`, `frame/browser`) —
@@ -71,6 +71,12 @@ items:
 Using both forms on one call is an error. No args → the section's json5
 defaults render.
 
+The name is usually a quoted literal; a bare expression resolving to an id
+string is also legal (`{% section entry.id, data: variant.args %}`) — the
+showcase's mechanism, and how data-driven composition stays one tag. The
+expression runs up to the first comma (a filter taking comma-separated
+params needs a `{% capture %}` first).
+
 ### The `data:` bridge
 
 `data:` is reserved: it deep-spreads an object BETWEEN defaults and named
@@ -91,10 +97,11 @@ while markup stays portable to every framework surface.
 
 ## Schemas & validation
 
-`section.json5` declares `args` (name → type or `{ type, description }`) and
-`defaults`. Build-time validation is warn-only: unknown args warn with
-did-you-mean, type mismatches warn, nothing throws. Schema names are API —
-renames follow deprecation discipline.
+`section.json5` declares `args` (name → type or `{ type, description }`),
+`defaults`, and `demo` (showcase variants — see §9 below). Build-time
+validation is warn-only: unknown args warn with did-you-mean, type
+mismatches warn, nothing throws. Schema names are API — renames follow
+deprecation discipline.
 
 **Defaults ownership**: a single-page section lifts that page's default copy
 into its json5 (hero). A section SHARED by multiple pages (testimonials, cta,
@@ -132,6 +139,40 @@ another page's words.
 A fork whose json5 declares `inherit` keeps those lanes flowing from the
 layer below — the one opt-back-in to the update stream (the collector
 resolves the base file live, so base js/scss updates still reach the fork).
+
+## Showcase & docs (spec §9) — auto-generated
+
+`/test/sections` is the library's living reference: an index over every
+RESOLVED entry (grouped by kind + category folder) plus one page per entry
+carrying the args table (generated from the schema — name, type,
+description), the pretty-printed defaults, and every `demo` variant rendered
+LIVE through the real tag. New folder → new pages, zero authoring. The
+engine computes the `sectionLibrary` global (`buildSectionLibrary`: same
+first-match-wins resolution as the tags) and the pages paginate over it;
+each entry chips its owning layer, so overrides say `newsflash` and
+fallthrough ids say `classy` — the override doctrine, visible.
+
+- **Development builds only** (the sample-content gate): a page rendering
+  every section would keep every section's CSS alive through the PurgeCSS
+  content scan and quietly defeat §7 self-trimming. Production never builds
+  it; the pages are also collection-excluded, so sitemap.xml and pages.json
+  never carry them. A theme with its own sections gets exactly that many
+  extra entry pages — the one sanctioned cross-theme page-count delta
+  (pinned in the contract suite, derived from the collector).
+- **`demo` variants** — `[{ label, args?, stage_class? }]`: args ride the
+  data bridge over the entry's defaults (exactly the consumer experience)
+  and liquify at the call site; `stage_class` supplies the wrapper a
+  component's caller normally owns (section-head's shell). Shared bands
+  carry generic demo copy — neutral defaults stay neutral (§6).
+- **Docs display is RAW**: description/args/defaults strings arrive
+  HTML-escaped from the collector (including `{` → `&#123;`), so the docs
+  show the `{{ site.brand.name }}` tokens a consumer would see in the file.
+  Load-bearing, not cosmetic — the library rides the page data cascade,
+  whose frontmatter/resolved walkers liquify any string containing `{{`
+  (the walkers also skip the `sectionLibrary` key wholesale).
+- **Lookup-driven entries demo nothing by design** (news/story-card,
+  news/byline resolve posts/members from live site content) — their pages
+  document args only.
 
 ## Landed vs pending
 
@@ -210,5 +251,11 @@ contract). Newsflash pins live in `test/sections-newsflash.test.js` on a
 theme-override build lane over the posts-rich fixture (17 posts — every
 index slot lit).
 
-Pending (spec §13): `omega customize <url>`, the auto-generated showcase +
-docs, `[id].js` wildcard page modules, auto-generated sample content.
+The showcase lane (cp219): the auto-generated `/test/sections` surface —
+see "Showcase & docs" above. Landing it added the expression-name tag form,
+the `sectionLibrary` global, demo variants across all 17 demoable entries
+(the two lookup-driven components document args only), and the
+development-only default-page injection lane.
+
+Pending (spec §13): `omega customize <url>`, `[id].js` wildcard page
+modules, auto-generated sample content.

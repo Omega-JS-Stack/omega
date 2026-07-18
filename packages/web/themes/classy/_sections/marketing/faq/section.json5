@@ -16,4 +16,53 @@
     // instance on one page passes its own namespace.
     dom_id: 'faq',
   },
+
+  // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
+  // the demo carries its own generic copy. Both variants render on one page,
+  // so each passes its own dom_id (exactly what the knob is for).
+  demo: [
+    {
+      label: 'Duo layout',
+      args: {
+        superheadline: { text: 'FAQ' },
+        headline: 'Common questions',
+        subheadline: 'Short answers to the things people ask first.',
+        dom_id: 'demoFaqDuo',
+        items: [
+          {
+            question: 'Do I need a credit card to start?',
+            answer: 'No — the free plan needs only an email address.',
+          },
+          {
+            question: 'Can I bring my own domain?',
+            answer: 'Yes. Point your DNS at us and certificates are handled automatically.',
+          },
+          {
+            question: 'What happens if I cancel?',
+            answer: 'Your site keeps running until the end of the billing period, and your content exports any time.',
+          },
+        ],
+      },
+    },
+    {
+      label: 'Centered',
+      args: {
+        variant: 'center',
+        superheadline: { text: 'FAQ' },
+        headline: 'Questions,',
+        headline_accent: 'answered',
+        dom_id: 'demoFaqCenter',
+        items: [
+          {
+            question: 'Is there a free tier?',
+            answer: 'Yes — free forever for personal projects.',
+          },
+          {
+            question: 'How do upgrades work?',
+            answer: 'One click from the dashboard; changes prorate automatically.',
+          },
+        ],
+      },
+    },
+  ],
 }

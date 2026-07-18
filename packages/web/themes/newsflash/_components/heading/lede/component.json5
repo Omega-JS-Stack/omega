@@ -8,4 +8,16 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9)
+  demo: [
+    {
+      label: 'Accent + subheadline',
+      args: {
+        headline: 'The week in',
+        headline_accent: 'review',
+        subheadline: 'A standfirst under the lede, set in the body voice.',
+      },
+    },
+  ],
 }

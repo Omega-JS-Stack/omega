@@ -8,4 +8,16 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9)
+  demo: [
+    {
+      label: 'Label only',
+      args: { text: 'Top stories' },
+    },
+    {
+      label: 'With view-all link',
+      args: { text: 'The latest', link_text: 'View all', link_href: '/blog' },
+    },
+  ],
 }

@@ -14,4 +14,28 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
+  // the demo carries its own generic copy.
+  demo: [
+    {
+      label: 'Full band',
+      args: {
+        superheadline: { icon: 'bolt', text: 'Get started' },
+        headline: 'Ready to ship',
+        headline_accent: 'something great?',
+        subheadline: 'Start free and grow into every surface your product needs.',
+        primary_button: { text: 'Start free', href: '/signup', icon: 'rocket' },
+        command: 'npx acme setup',
+        secondary_button: { text: 'Talk to sales', href: '/contact', nudge: true },
+      },
+    },
+    {
+      label: 'Minimal',
+      args: {
+        headline: 'Try it today',
+        primary_button: { text: 'Get started', href: '/signup' },
+      },
+    },
+  ],
 }

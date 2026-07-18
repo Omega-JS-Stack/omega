@@ -9,4 +9,19 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9) — stage_class supplies the wrapper the
+  // caller normally owns, so the demo renders in its natural shell.
+  demo: [
+    {
+      label: 'Full cluster',
+      stage_class: 'classy-section-head',
+      args: {
+        superheadline: 'Features',
+        headline: 'Built for',
+        headline_accent: 'momentum',
+        sub: 'A supporting line under the section head.',
+      },
+    },
+  ],
 }

@@ -13,4 +13,19 @@
       { number: '4.9', label: 'Average rating', sublabel: 'Across review platforms' },
     ],
   },
+
+  // Showcase variants (spec §9)
+  demo: [
+    { label: 'Default four' },
+    {
+      label: 'Three stats',
+      args: {
+        items: [
+          { number: '12ms', label: 'Median response', sublabel: 'Global edge' },
+          { number: '3x', label: 'Faster launches', sublabel: 'Versus hand-rolled' },
+          { number: '100%', label: 'Static output', sublabel: 'Nothing to patch' },
+        ],
+      },
+    },
+  ],
 }

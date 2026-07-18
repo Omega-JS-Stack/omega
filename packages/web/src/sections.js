@@ -22,6 +22,11 @@
  * top-level args validate against the schema (warn + did-you-mean, never
  * throw).
  *
+ * The name is usually a quoted literal; a bare expression that resolves to
+ * an id string is also legal ({% section entry.id, data: variant.args %}) —
+ * the auto-generated showcase's mechanism (spec §9), and how data-driven
+ * composition stays one tag. The expression runs up to the first comma.
+ *
  * Context-free rule (load-bearing): the markup renders against `{ args }`
  * ONLY — no page globals. Interpolation happens at the CALL site instead:
  * string values (passed or default) containing Liquid render against the
@@ -280,6 +285,138 @@ function collectSectionAssets(baseDirs, options = {}) {
 }
 
 /**
+ * The resolved library with meta, for the auto-generated showcase + schema
+ * docs (spec §9). Same first-match-wins resolution as the tags — the entry a
+ * page composing that id would actually render — with the winning folder's
+ * json5 normalized for template consumption:
+ *
+ *   argsTable    — [{ name, type, description }] rows (the reference docs;
+ *                  a shorthand `name: 'string'` schema yields type only)
+ *   defaultsJson — pretty-printed defaults ('' when none): display copy for
+ *                  the docs, showing the raw {{ site.brand.name }} tokens a
+ *                  consumer would see in the file
+ *
+ * Display strings (description, argsTable descriptions, defaultsJson) are
+ * HTML-ESCAPED here, including `{` → &#123; — templates print them verbatim
+ * (no | escape). That's load-bearing, not cosmetic: the library rides the
+ * page data cascade, whose frontmatter/resolved walkers liquify any string
+ * containing {{ — raw tokens would either render (wrong: docs must show the
+ * contract) or throw (JSON.stringify's escaped quotes inside a token are
+ * invalid Liquid). Demo args stay RAW — they liquify at the tag's call site
+ * like every real composition.
+ *   demo         — [{ label, args?, stage_class? }] variants, rendered live
+ *                  by the showcase entry page (args ride the data bridge, so
+ *                  json5 defaults still apply underneath — exactly the
+ *                  consumer experience); malformed variants warn + drop
+ *   source       — which layer owns the entry: 'consumer' or the layer dir's
+ *                  basename ('classy', 'newsflash')
+ *   inherit      — declared §7 inherit lanes, for the docs chip
+ *
+ * `groups` clusters entries by (kind, category folder) for the index page —
+ * sections first, then components, categories alphabetical (the spec §2
+ * "the showcase groups by folder automatically").
+ *
+ * @param {object} options
+ * @param {string[]} options.baseDirs - resolution bases in precedence order
+ *   (registerSectionTags' order: consumer dir first, then theme layers)
+ * @param {string} [options.consumerDir] - labeled 'consumer' when it wins
+ * @param {function} [options.warn] - warning sink (default console.warn)
+ * @returns {{ entries: Array<object>, groups: Array<{kind: string, category: string, entries: Array<object>}> }}
+ */
+function buildSectionLibrary(options) {
+  const warn = options.warn || console.warn;
+  const entries = new Map(); // `${kind}:${id}` → entry
+
+  // Display-ready HTML text (see the JSDoc: the { escape makes the string
+  // liquid-inert, which the data-cascade walkers require).
+  const escapeHtml = (text) => String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/{/g, '&#123;');
+
+  const normalizeMeta = (meta, label) => {
+    const argsTable = Object.entries(meta.args || {}).map(([name, spec]) => ({
+      name,
+      type: typeof spec === 'string' ? spec : (spec && spec.type) || '',
+      description: escapeHtml((spec && typeof spec === 'object' && spec.description) || ''),
+    }));
+    let demo = [];
+    if (meta.demo !== undefined) {
+      if (!Array.isArray(meta.demo)) {
+        warn(`[sections] showcase ${label}: demo must be an array of { label, args } variants — ignoring`);
+      } else {
+        demo = meta.demo.filter((variant) => {
+          const ok = variant && typeof variant === 'object' && typeof variant.label === 'string' && variant.label;
+          if (!ok) warn(`[sections] showcase ${label}: demo variant without a label — dropped`);
+          return ok;
+        });
+      }
+    }
+    return {
+      description: escapeHtml(meta.description || ''),
+      argsTable,
+      defaultsJson: meta.defaults && Object.keys(meta.defaults).length
+        ? escapeHtml(JSON.stringify(meta.defaults, null, 2))
+        : '',
+      demo,
+      inherit: Array.isArray(meta.inherit) ? meta.inherit : [],
+    };
+  };
+
+  const walk = (source, dir, kind, prefix) => {
+    const basename = KINDS[kind].basename;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!item.isDirectory()) continue;
+      const id = prefix ? `${prefix}/${item.name}` : item.name;
+      if (!NAME_SHAPE.test(id)) continue;
+      const entryDir = path.join(dir, item.name);
+      if (!fs.existsSync(path.join(entryDir, `${basename}.html`))) {
+        walk(source, entryDir, kind, id);
+        continue;
+      }
+      const key = `${kind}:${id}`;
+      if (entries.has(key)) continue; // a higher layer already won
+      let meta = {};
+      const metaPath = path.join(entryDir, `${basename}.json5`);
+      if (fs.existsSync(metaPath)) {
+        try {
+          meta = JSON5.parse(fs.readFileSync(metaPath, 'utf8'));
+        } catch (error) {
+          warn(`[sections] showcase: unreadable ${metaPath} (${error.message}) — listing with empty meta`);
+        }
+      }
+      entries.set(key, { kind, id, source, ...normalizeMeta(meta, key) });
+    }
+  };
+
+  for (const root of options.baseDirs) {
+    const source = root === options.consumerDir ? 'consumer' : path.basename(root);
+    for (const kind of Object.keys(KINDS)) {
+      const dir = path.join(root, KINDS[kind].dirname);
+      if (fs.existsSync(dir)) walk(source, dir, kind, '');
+    }
+  }
+
+  const sorted = [...entries.values()].sort((a, b) => (a.kind + a.id).localeCompare(b.kind + b.id));
+
+  const groupMap = new Map(); // `${kind}:${category}` → group
+  for (const entry of sorted) {
+    const category = entry.id.includes('/') ? entry.id.split('/').slice(0, -1).join('/') : '';
+    const key = `${entry.kind}:${category}`;
+    if (!groupMap.has(key)) groupMap.set(key, { kind: entry.kind, category, entries: [] });
+    groupMap.get(key).entries.push(entry);
+  }
+  const groups = [...groupMap.values()].sort((a, b) => (
+    a.kind === b.kind ? a.category.localeCompare(b.category) : (a.kind === 'section' ? -1 : 1)
+  ));
+
+  return { entries: sorted, groups };
+}
+
+/**
  * Register the {% section %} and {% component %} tags on a LiquidJS engine.
  * @param {object} engine - LiquidJS engine (Eleventy's, via amendLibrary)
  * @param {object} options
@@ -356,8 +493,25 @@ function registerSectionTags(engine, options) {
 
       * render(context, emitter) {
         const nameMatch = this.markup.match(/^"([^"]+)"|^'([^']+)'/);
-        if (!nameMatch) throw new Error(`{% ${tagName} %} needs a quoted name: {% ${tagName} "marketing/hero" %}`);
-        const name = nameMatch[1] ?? nameMatch[2];
+        let name;
+        let rest;
+        if (nameMatch) {
+          name = nameMatch[1] ?? nameMatch[2];
+          rest = this.markup.slice(nameMatch[0].length);
+        } else {
+          // Expression name (the showcase's lane): everything up to the
+          // first comma evaluates against the caller's scope and must yield
+          // an id string. Bare paths only — a filter taking comma-separated
+          // params needs a {% capture %} first.
+          const comma = this.markup.indexOf(',');
+          const expr = (comma === -1 ? this.markup : this.markup.slice(0, comma)).trim();
+          if (!expr) throw new Error(`{% ${tagName} %} needs a name: {% ${tagName} "marketing/hero" %} (or an expression resolving to an id)`);
+          name = yield this.liquid.evalValue(expr, context);
+          if (typeof name !== 'string' || !name) {
+            throw new Error(`{% ${tagName} ${expr} %}: the name expression must resolve to an entry id string — got ${JSON.stringify(name)}`);
+          }
+          rest = comma === -1 ? '' : this.markup.slice(comma);
+        }
         if (!NAME_SHAPE.test(name)) throw new Error(`{% ${tagName} "${name}" %}: ids are kebab-case category paths (marketing/hero)`);
 
         const entry = resolveEntry(name);
@@ -366,7 +520,7 @@ function registerSectionTags(engine, options) {
         }
 
         // ---- gather passed args (inline XOR block body)
-        const inlinePairs = parseInlineArgs(this.markup.slice(nameMatch[0].length));
+        const inlinePairs = parseInlineArgs(rest);
         if (this.bodyText !== null && this.bodyText.trim() && inlinePairs.length) {
           throw new Error(`{% ${tagName} "${name}" %}: use inline args OR a YAML body, not both`);
         }
@@ -430,4 +584,4 @@ function registerSectionTags(engine, options) {
   return engine;
 }
 
-module.exports = { registerSectionTags, collectSectionAssets, parseInlineArgs, levenshtein, KINDS };
+module.exports = { registerSectionTags, collectSectionAssets, buildSectionLibrary, parseInlineArgs, levenshtein, KINDS };

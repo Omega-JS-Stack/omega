@@ -9,4 +9,20 @@
   defaults: {
     head: 'By the numbers',
   },
+
+  // Showcase variants (spec §9) — items ride the demo (the base contract);
+  // the head default is the theme's own.
+  demo: [
+    {
+      label: 'Masthead numbers',
+      args: {
+        items: [
+          { number: '2M+', label: 'Monthly readers', sublabel: 'And climbing' },
+          { number: '48', label: 'States covered', sublabel: 'Plus the territories' },
+          { number: '6am', label: 'Daily deadline', sublabel: 'Never missed' },
+          { number: '12', label: 'Desks', sublabel: 'One newsroom' },
+        ],
+      },
+    },
+  ],
 }

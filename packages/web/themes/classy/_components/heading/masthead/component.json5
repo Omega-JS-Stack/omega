@@ -13,4 +13,17 @@
   defaults: {
     sub_class: 'classy-hero-split__sub',
   },
+
+  // Showcase variants (spec §9)
+  demo: [
+    {
+      label: 'Eyebrow + accent + sub',
+      args: {
+        eyebrow: 'Guides',
+        headline: 'Everything about',
+        headline_accent: 'getting started',
+        sub: 'A short standfirst under the display headline.',
+      },
+    },
+  ],
 }

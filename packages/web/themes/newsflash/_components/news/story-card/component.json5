@@ -12,4 +12,9 @@
   },
 
   defaults: {},
+
+  // No demo (spec §9, deliberate): the tile resolves its art through uj_post
+  // (and its byline through uj_member) against live site content — a
+  // showcase page can't fabricate those lookups, so the entry documents
+  // args only.
 }

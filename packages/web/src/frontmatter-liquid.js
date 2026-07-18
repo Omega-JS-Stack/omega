@@ -13,9 +13,13 @@ const { Liquid } = require('liquidjs');
 // Engine-machinery keys the frontmatter walker must never enter: dynamic
 // permalinks belong to Eleventy, and the rest hold globals or other
 // templates' raw content (which may contain unregistered tags).
+// sectionLibrary is the showcase's data source — its demo args liquify at
+// the section tag's CALL SITE, never at frontmatter time (walking here would
+// bake the first page's rendering into the shared global).
 const DEFAULT_SKIP = new Set([
   'permalink', 'pagination', 'collections', 'eleventy', 'pkg', 'page',
   'content', 'site', 'assetManifest', 'eleventyComputed', 'resolved',
+  'sectionLibrary',
 ]);
 
 // Legacy bracket refs ([ site.theme.id ] → {{ site.theme.id }})

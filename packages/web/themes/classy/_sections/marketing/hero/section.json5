@@ -71,4 +71,23 @@
       },
     },
   },
+
+  // Showcase variants (spec §9) — args ride the data bridge over the
+  // defaults above, exactly like a consumer composition.
+  demo: [
+    { label: 'Default' },
+    {
+      label: 'Email capture',
+      args: {
+        demo: { enabled: true },
+      },
+    },
+    {
+      label: 'No frame, second button',
+      args: {
+        frame: { enabled: false },
+        secondary_button: { enabled: true },
+      },
+    },
+  ],
 }

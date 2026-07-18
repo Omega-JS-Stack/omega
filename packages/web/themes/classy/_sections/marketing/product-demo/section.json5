@@ -33,4 +33,13 @@
       },
     ],
   },
+
+  // Showcase variants (spec §9) — the band is off by default, so the demo
+  // flips it on and the default tabs render.
+  demo: [
+    {
+      label: 'Two tabs',
+      args: { enabled: true },
+    },
+  ],
 }

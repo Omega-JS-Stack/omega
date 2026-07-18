@@ -46,9 +46,21 @@ test('every theme builds the full default page set for a bare consumer', () => {
   for (const theme of THEMES) {
     assert.ok(builds[theme].htmlCount >= 60, `${theme}: ${builds[theme].htmlCount} pages (full default set)`);
   }
-  // Identical page sets across themes — fallback fills every gap
-  assert.strictEqual(builds.neobrutalism.htmlCount, builds.classy.htmlCount, 'neobrutalism = classy page count');
-  assert.strictEqual(builds.newsflash.htmlCount, builds.classy.htmlCount, 'newsflash = classy page count');
+  // Identical page sets across themes — fallback fills every gap. The ONE
+  // sanctioned delta (cp219): the showcase documents each theme's RESOLVED
+  // library, so a theme shipping its own sections gets exactly that many
+  // extra entry pages. Derived from the collector, never hardcoded — a new
+  // theme-only section moves both sides together.
+  const { buildSectionLibrary } = require('../src/sections.js');
+  const libSize = (...layers) => buildSectionLibrary({
+    baseDirs: layers.map((layer) => path.join(PKG, 'themes', layer)),
+  }).entries.length;
+  assert.strictEqual(builds.neobrutalism.htmlCount, builds.classy.htmlCount, 'neobrutalism = classy page count (no own sections)');
+  assert.strictEqual(
+    builds.newsflash.htmlCount - builds.classy.htmlCount,
+    libSize('newsflash', 'classy') - libSize('classy'),
+    'newsflash delta = its own showcase entries, nothing else',
+  );
 });
 
 test('key default pages land at their real URLs', () => {

@@ -12,7 +12,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { Liquid } = require('liquidjs');
 
-const { registerSectionTags, collectSectionAssets, parseInlineArgs } = require('../src/sections.js');
+const { registerSectionTags, collectSectionAssets, buildSectionLibrary, parseInlineArgs } = require('../src/sections.js');
 const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'sections-test');
@@ -363,4 +363,84 @@ test('body-call lane: a consumer page composes the section with YAML args', asyn
   assert.ok(demo.includes('a body call'), 'body-call rotating item rendered');
   assert.ok(!demo.includes('classy-mock'), 'frame.enabled: false suppressed the product frame');
   assert.ok(demo.includes('npx omega setup'), 'unset command still rides the defaults');
+});
+
+// ─── cp219: expression names (the showcase's lane) ───────────────────────────
+
+test('cp219: expression name resolves like the quoted form, inline args intact', async () => {
+  const { engine, warnings } = makeEngine();
+  const html = await engine.parseAndRender(
+    '{% section page.which, headline: page.h %}',
+    { ...SITE, page: { which: 'marketing/hero', h: 'By Expression' } },
+  );
+  assert.ok(html.includes('<h1>By Expression</h1>'), 'expression-named section renders with inline args');
+  assert.ok(html.includes('<span>default-tag</span>'), 'defaults still merge under');
+  assert.deepEqual(warnings, []);
+});
+
+test('cp219: expression name must resolve to an id string', async () => {
+  const { engine } = makeEngine();
+  await assert.rejects(
+    () => engine.parseAndRender('{% section page.missing %}', SITE),
+    /must resolve to an entry id string/,
+  );
+  await assert.rejects(
+    () => engine.parseAndRender('{% section page.n %}', { page: { n: 42 } }),
+    /must resolve to an entry id string/,
+  );
+});
+
+// ─── cp219: buildSectionLibrary (the showcase/docs data source) ──────────────
+
+const THEMES = path.join(__dirname, '..', 'themes');
+
+test('cp219: buildSectionLibrary — resolved entries over the real classy chain', () => {
+  const { entries, groups } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'classy')] });
+  assert.equal(entries.length, 12, `classy chain: 10 sections + 2 components, got ${entries.length}`);
+  assert.ok(entries.every((entry) => entry.source === 'classy'), 'every entry owned by the classy layer');
+
+  const hero = entries.find((entry) => entry.id === 'marketing/hero' && entry.kind === 'section');
+  assert.ok(hero.argsTable.some((row) => row.name === 'rotating' && row.type === 'array'), 'args rows normalized');
+  assert.equal(hero.demo.length, 3, 'hero demo variants ride through');
+  assert.ok(!hero.defaultsJson.includes('{{'), 'defaultsJson is liquid-inert (escaped braces)');
+  assert.ok(hero.defaultsJson.includes('&#123;&#123; site.brand.name }}'), 'raw tokens display in escaped form');
+
+  // Groups: sections before components, categories clustered
+  assert.equal(groups[0].kind, 'section');
+  assert.equal(groups[0].category, 'marketing');
+  assert.ok(groups.some((group) => group.kind === 'component' && group.category === 'heading'));
+});
+
+test('cp219: buildSectionLibrary — the newsflash chain resolves overrides and fallthroughs honestly', () => {
+  const { entries } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'newsflash'), path.join(THEMES, 'classy')] });
+  assert.equal(entries.length, 18, `nf chain: 12 shared ids + 6 nf-only, got ${entries.length}`);
+
+  const cta = entries.find((entry) => entry.id === 'marketing/cta');
+  assert.equal(cta.source, 'newsflash', 'the override wins the entry');
+  const hero = entries.find((entry) => entry.id === 'marketing/hero');
+  assert.equal(hero.source, 'classy', 'fallthrough ids show the base layer (the doctrine, visible)');
+  const newsletter = entries.find((entry) => entry.id === 'marketing/newsletter-cta');
+  assert.deepEqual(newsletter.inherit, ['js'], 'declared inherit lanes surface for the docs chip');
+  const byline = entries.find((entry) => entry.id === 'news/byline');
+  assert.equal(byline.demo.length, 0, 'lookup-driven components stay demo-less by design');
+});
+
+test('cp219: buildSectionLibrary — malformed demo warns and drops, never throws', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-lib-'));
+  const entryDir = path.join(dir, '_sections', 'demo', 'bad');
+  fs.mkdirSync(entryDir, { recursive: true });
+  fs.writeFileSync(path.join(entryDir, 'section.html'), '<div></div>');
+  fs.writeFileSync(path.join(entryDir, 'section.json5'), '{ demo: { not: "an array" } }');
+  const entryDir2 = path.join(dir, '_sections', 'demo', 'unlabeled');
+  fs.mkdirSync(entryDir2, { recursive: true });
+  fs.writeFileSync(path.join(entryDir2, 'section.html'), '<div></div>');
+  fs.writeFileSync(path.join(entryDir2, 'section.json5'), '{ demo: [{ args: {} }, { label: "ok" }] }');
+
+  const warnings = [];
+  const { entries } = buildSectionLibrary({ baseDirs: [dir], warn: (message) => warnings.push(message) });
+  assert.equal(entries.find((entry) => entry.id === 'demo/bad').demo.length, 0, 'non-array demo ignored');
+  assert.deepEqual(entries.find((entry) => entry.id === 'demo/unlabeled').demo.map((v) => v.label), ['ok'], 'unlabeled variant dropped, labeled kept');
+  assert.ok(warnings.some((message) => message.includes('demo must be an array')), 'non-array warned');
+  assert.ok(warnings.some((message) => message.includes('without a label')), 'unlabeled warned');
+  fs.rmSync(dir, { recursive: true, force: true });
 });

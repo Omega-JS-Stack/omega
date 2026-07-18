@@ -11,4 +11,8 @@
   defaults: {
     p_class: 'small text-body-secondary mb-0',
   },
+
+  // No demo (spec §9, deliberate): the component resolves its author through
+  // uj_member against live site content — a showcase page can't fabricate
+  // that lookup, so the entry documents args only.
 }

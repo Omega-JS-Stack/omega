@@ -1,0 +1,70 @@
+---
+layout: frontend/core/base
+permalink: /test/sections
+
+eleventyExcludeFromCollections: true
+sitemap:
+  include: false
+meta:
+  title: "Section library"
+  description: "The auto-generated section/component showcase — every entry in the resolved library, grouped by folder, with live demos and schema docs."
+  breadcrumb: "Section library"
+  index: false
+---
+
+{% comment %}
+  The section showcase index (spec §9) — auto-generated from the resolved
+  library: iterates sectionLibrary.groups, so a new section/component folder
+  appears here with zero authoring. Development builds only (the engine gates
+  the injection): production never renders every section at once, which is
+  what keeps PurgeCSS §7 self-trimming meaningful. Neutral Bootstrap
+  vocabulary on purpose — this page renders under whichever theme is active.
+{% endcomment %}
+
+<!-- ═══ Masthead ═══ -->
+<section class="pb-4">
+  <div class="container">
+    <span class="text-uppercase small fw-bold text-muted d-block mb-2">Auto-generated</span>
+    <h1 class="mb-3">Section library</h1>
+    <p class="lead mb-2">
+      Every section and component the active layer chain resolves — {{ sectionLibrary.entries.size }} entries, rendered from their own schemas.
+    </p>
+    <p class="text-muted mb-0">
+      Each entry page carries the args reference and live demo variants. New folders appear here automatically; overrides show which layer won.
+    </p>
+  </div>
+</section>
+
+{% for group in sectionLibrary.groups %}
+  <!-- ═══ {{ group.kind }}s · {{ group.category }} ═══ -->
+  <section class="pt-0">
+    <div class="container">
+      <div class="d-flex align-items-baseline gap-2 border-bottom pb-2 mb-4">
+        <h2 class="h4 mb-0 text-capitalize">{{ group.kind }}s</h2>
+        <code class="text-muted">{{ group.category }}/</code>
+      </div>
+
+      <div class="row g-4">
+        {% for entry in group.entries %}
+          <div class="col-md-6 col-xl-4">
+            <a href="/test/sections/{{ entry.kind }}/{{ entry.id }}" class="card h-100 text-decoration-none">
+              <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                  <code>{{ entry.id }}</code>
+                  <span class="badge text-bg-secondary">{{ entry.source }}</span>
+                </div>
+                {% comment %} description arrives HTML-escaped from the collector — print verbatim {% endcomment %}
+                <p class="card-text small text-muted mb-3">{{ entry.description | truncate: 200 }}</p>
+                <p class="card-text small text-body-secondary mb-0">
+                  {{ entry.argsTable.size }} args
+                  · {{ entry.demo.size }} demo{% if entry.demo.size != 1 %}s{% endif %}
+                  {% if entry.inherit.size > 0 %}· inherits {{ entry.inherit | join: ", " }}{% endif %}
+                </p>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endfor %}

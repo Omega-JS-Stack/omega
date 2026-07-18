@@ -19,4 +19,20 @@
       { name: 'GitHub', logo: 'github' },
     ],
   },
+
+  // Showcase variants (spec §9)
+  demo: [
+    { label: 'Default wall' },
+    {
+      label: 'Three logos, one per mode',
+      args: {
+        headline: 'Backed by',
+        logos: [
+          { name: 'Google', logo: 'google' },
+          { name: 'GitHub', icon: 'github' },
+          { name: 'Initech' },
+        ],
+      },
+    },
+  ],
 }

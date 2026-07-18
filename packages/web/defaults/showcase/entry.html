@@ -1,0 +1,118 @@
+---
+layout: frontend/core/base
+
+# One page per resolved library entry (spec §9): pagination over the
+# sectionLibrary global the engine computes from the layer chain.
+pagination:
+  data: sectionLibrary.entries
+  size: 1
+  alias: entry
+permalink: "/test/sections/{{ entry.kind }}/{{ entry.id }}.html"
+eleventyExcludeFromCollections: true
+sitemap:
+  include: false
+# resolved.* refs — the pagination alias reaches frontmatter strings through
+# the resolved scope (the per-page re-render lane), not as a bare name.
+meta:
+  title: "{{ resolved.entry.id }} · Section library"
+  description: "Auto-generated reference and live demos for the {{ resolved.entry.id }} {{ resolved.entry.kind }}."
+  breadcrumb: "Section library"
+  index: false
+---
+
+{% comment %}
+  The per-entry showcase page (spec §9) — the schema IS the docs: the args
+  table and defaults render from the entry's own json5, and each demo variant
+  renders LIVE through the real tag (expression name — {% section entry.id %})
+  with variant args riding the data bridge over the entry's defaults, exactly
+  the consumer experience. Docs display stays RAW (escaped, never liquified —
+  a default like "Introducing {{ site.brand.name }}" shows its tokens); the
+  live demos liquify at the call site like every real composition. Display
+  strings (description, arg descriptions, defaultsJson) arrive HTML-escaped
+  from the collector — printed verbatim, no | escape. Neutral Bootstrap
+  vocabulary — this page renders under whichever theme is active, and an
+  overridden id demos the override (what a page composing it gets).
+{% endcomment %}
+
+<!-- ═══ Head ═══ -->
+<section class="pb-4">
+  <div class="container">
+    <p class="mb-3"><a href="/test/sections" class="small text-decoration-none">&larr; Section library</a></p>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      <h1 class="mb-0"><code>{{ entry.id }}</code></h1>
+      <span class="badge text-bg-secondary">{{ entry.kind }}</span>
+      <span class="badge text-bg-secondary">{{ entry.source }}</span>
+      {% if entry.inherit.size > 0 %}
+        <span class="badge text-bg-secondary">inherits {{ entry.inherit | join: ", " }}</span>
+      {% endif %}
+    </div>
+    {% if entry.description != "" %}
+      <p class="lead mb-0">{{ entry.description }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═══ Args reference (generated from the schema) ═══ -->
+<section class="pt-0">
+  <div class="container">
+    <h2 class="h4 mb-3">Args</h2>
+    {% if entry.argsTable.size > 0 %}
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in entry.argsTable %}
+              <tr>
+                <td><code>{{ row.name }}</code></td>
+                <td>{% if row.type != "" %}<code>{{ row.type }}</code>{% else %}<span class="text-muted">any</span>{% endif %}</td>
+                <td class="small">{{ row.description }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">No declared args.</p>
+    {% endif %}
+
+    {% if entry.defaultsJson != "" %}
+      <details class="mt-2">
+        <summary class="fw-bold">Defaults</summary>
+        <pre class="border rounded p-3 mt-2 small overflow-auto"><code>{{ entry.defaultsJson }}</code></pre>
+      </details>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═══ Live demos ═══ -->
+{% if entry.demo.size > 0 %}
+  {% for variant in entry.demo %}
+    <div class="container mt-4">
+      <div class="border-top pt-4 d-flex align-items-center gap-2">
+        <span class="badge text-bg-secondary">demo</span>
+        <h2 class="h5 mb-0">{{ variant.label }}</h2>
+      </div>
+    </div>
+    {% if entry.kind == "section" %}
+      {% section entry.id, data: variant.args %}
+    {% else %}
+      <div class="container mt-4 mb-5">
+        <div class="border rounded p-4{% if variant.stage_class %} {{ variant.stage_class }}{% endif %}">
+          {% component entry.id, data: variant.args %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% else %}
+  <div class="container mb-5">
+    <p class="text-muted mb-0">
+      No demo data — this entry documents its args only (lookup-driven entries render from live site content, which a showcase page can't fabricate).
+    </p>
+  </div>
+{% endif %}

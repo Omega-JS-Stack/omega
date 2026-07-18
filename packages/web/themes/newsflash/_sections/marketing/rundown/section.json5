@@ -10,4 +10,31 @@
   },
 
   defaults: {},
+
+  // Showcase variants (spec §9)
+  demo: [
+    {
+      label: 'Three-step playbook',
+      args: {
+        superheadline: { text: 'The rundown' },
+        headline: 'How the newsroom',
+        headline_accent: 'ships',
+        subheadline: 'The playbook, in the order it actually happens.',
+        items: [
+          {
+            title: 'Report it',
+            description: 'Every story starts at a desk, with a byline on the hook.',
+          },
+          {
+            title: 'Edit it',
+            description: 'Two reads minimum — copy first, then the desk editor.',
+          },
+          {
+            title: 'Publish it',
+            description: 'One verb ships it to every edition at once.',
+          },
+        ],
+      },
+    },
+  ],
 }

@@ -54,4 +54,36 @@
       color: '{{ site.brand.color | default: "#2563EB" }}',
     },
   },
+
+  // Showcase variants (spec §9)
+  demo: [
+    { label: 'Default grid' },
+    {
+      label: 'Three tiles',
+      args: {
+        headline: 'The essentials',
+        subheadline: 'A tighter grid — layout self-adjusts to the item count.',
+        items: [
+          {
+            type: 'terminal',
+            icon: 'terminal',
+            title: 'One-verb deploys',
+            description: 'Build, verify, and publish from a single command.',
+          },
+          {
+            type: 'default',
+            icon: 'bolt',
+            title: 'Fast by default',
+            description: 'Static output, tuned assets, nothing to babysit.',
+          },
+          {
+            type: 'default',
+            icon: 'lock',
+            title: 'Secure sessions',
+            description: 'Auth and account flows ready on day one.',
+          },
+        ],
+      },
+    },
+  ],
 }

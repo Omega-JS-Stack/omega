@@ -18,7 +18,7 @@ const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
-const { registerSectionTags } = require('./sections.js');
+const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections } = require('./collections.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
@@ -32,7 +32,7 @@ const { PATHS } = require('./paths.js');
 const RESOLVED_OMIT = new Set([
   'collections', 'content', 'page', 'eleventy', 'pkg', 'eleventyComputed',
   'resolved', 'permalink', 'layout', 'tags', 'pagination', 'site', 'assetManifest',
-  'paginator', 'pageAssets', 'jekyll',
+  'paginator', 'pageAssets', 'jekyll', 'sectionLibrary',
 ]);
 
 // Site keys that do NOT seed `resolved` (bulk/runtime values templates read
@@ -191,6 +191,14 @@ function configureOmega(eleventyConfig, options) {
   // never vendored) as the always-present floor; the richest metadata
   // resolves legacy aliases (search → magnifying-glass).
   const fa = resolveFontAwesomeRoots();
+
+  // The resolved library with meta — the showcase/docs data source (spec §9).
+  // Registered unconditionally (deterministic data model, ~20 json5 reads);
+  // only the PAGES consuming it are development-gated below.
+  eleventyConfig.addGlobalData('sectionLibrary', buildSectionLibrary({
+    baseDirs: [options.consumerDir, ...themeLayers],
+    consumerDir: options.consumerDir,
+  }));
 
   eleventyConfig.amendLibrary('liquid', (engine) => {
     // The section/component library tags resolve through the same precedence
@@ -423,6 +431,21 @@ function configureOmega(eleventyConfig, options) {
       for (const [rel, abs] of collectLayered([path.join(defaultsDir, samplesDir)])) {
         eleventyConfig.addTemplate(`omega-defaults/${collectionDir}/${rel}`, fs.readFileSync(abs, 'utf8'));
       }
+    }
+
+    // ---- The section showcase (development only, same gate): auto-generated
+    // pages over the resolved library — /test/sections + one page per entry
+    // (spec §9). Production builds omit them entirely: a page rendering EVERY
+    // section would keep every section's CSS alive through the PurgeCSS
+    // content scan and quietly defeat §7 self-trimming.
+    for (const [rel, abs] of collectLayered([path.join(defaultsDir, 'showcase')])) {
+      const raw = fs.readFileSync(abs, 'utf8');
+      const url = permalinkOf(raw);
+      if (url && consumerUrls.has(url)) {
+        suppressed.push(url);
+        continue;
+      }
+      eleventyConfig.addTemplate(`omega-defaults/showcase/${rel}`, raw);
     }
   }
 

@@ -13,4 +13,51 @@
     // context-freeness).
     placeholder: '{{ site.uj.placeholder.src }}',
   },
+
+  // Showcase variants (spec §9) — a SHARED band keeps neutral defaults, so
+  // the demo carries its own generic copy. The two variants also exercise
+  // both superheadline shapes (bare string vs { text }).
+  demo: [
+    {
+      label: 'Single quote (static)',
+      args: {
+        superheadline: 'What customers say',
+        items: [
+          {
+            quote: 'We replaced three tools the first week. It just ships.',
+            author: 'Avery Quinn',
+            role: 'CTO',
+            company: 'Fieldnote',
+          },
+        ],
+      },
+    },
+    {
+      label: 'Rotating trio',
+      args: {
+        superheadline: { text: 'Loved by teams' },
+        items: [
+          {
+            quote: 'Setup took an afternoon. The polish took zero.',
+            author: 'Sam Rivera',
+            role: 'Founder',
+            company: 'Northwind Labs',
+            initial: 'S',
+          },
+          {
+            quote: 'The first platform our designers and engineers both like.',
+            author: 'Priya Patel',
+            role: 'Head of Product',
+            company: 'Contoso',
+          },
+          {
+            quote: 'We shipped the rebrand in a weekend.',
+            author: 'Jordan Lee',
+            role: 'Engineering Lead',
+            company: 'Initech',
+          },
+        ],
+      },
+    },
+  ],
 }
