@@ -55,7 +55,7 @@ test('feeds/posts.xml: RSS with every fixture post, absolute guids, rendered con
   assert.ok(rss.includes('MiniCo Blog'), 'channel title from brand');
 
   const items = rss.match(/<item>/g) || [];
-  assert.strictEqual(items.length, 2, 'both fixture posts in the feed');
+  assert.strictEqual(items.length, 17, 'every fixture post in the feed (2 + the 15-post cp214 enrichment)');
   assert.ok(rss.includes('First post') && rss.includes('Second post'), 'post titles');
   assert.ok(/<guid isPermaLink="true">\s*https:\/\/mini\.example\.com\/blog\//.test(rss), 'absolute post guids');
   assert.ok(rss.includes('Alpha bravo charlie'), 'rendered post content in content:encoded');
@@ -67,7 +67,7 @@ test('feeds/posts.json: VALID JSON Feed (legacy trailing-comma bug impossible)',
   const feed = JSON.parse(pages.get('/feeds/posts.json'));
   assert.strictEqual(feed.version, 'https://jsonfeed.org/version/1');
   assert.strictEqual(feed.title, 'MiniCo Blog');
-  assert.strictEqual(feed.items.length, 2);
+  assert.strictEqual(feed.items.length, 17);
 
   const first = feed.items[0];
   assert.ok(first.url.startsWith('https://mini.example.com/blog/'));
