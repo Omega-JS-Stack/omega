@@ -122,7 +122,7 @@ team_cta:
   headline: "The people behind the"
   headline_accent: "bylines"
   subheadline: "Get to know the reporters and editors of {{ site.brand.name }} who chase the stories that matter every day"
-  button:
+  primary_button:
     text: "Meet the team"
     icon: "arrow-right"
     href: "/team"
@@ -272,34 +272,7 @@ team_cta:
   </section>
 {% endiftruthy %}
 
-<!-- Team CTA — the dark big-read band -->
-<section class="pt-0">
-  <div class="container">
-    <div class="cta-panel" data-lazy="@class animation-slide-up">
-      <div class="cta-rings" aria-hidden="true"></div>
-      <div class="position-relative">
-        {% iftruthy resolved.team_cta.superheadline.text %}
-          <span class="kicker mb-3">
-            {% uj_icon resolved.team_cta.superheadline.icon, "me-1" %}{{ resolved.team_cta.superheadline.text }}
-          </span>
-        {% endiftruthy %}
-        <h2 class="cta-title">
-          {{ resolved.team_cta.headline }}
-          {% iftruthy resolved.team_cta.headline_accent %}
-            <span class="text-accent">{{ resolved.team_cta.headline_accent }}</span>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy resolved.team_cta.subheadline %}
-          <p class="cta-desc">{{ resolved.team_cta.subheadline }}</p>
-        {% endiftruthy %}
-        <div class="d-flex flex-wrap gap-3">
-          <a href="{{ resolved.team_cta.button.href }}" class="btn btn-warning btn-lg">
-            {% uj_icon resolved.team_cta.button.icon, "me-2" %}{{ resolved.team_cta.button.text }}
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- Team CTA — the dark big-read band (shared marketing/cta, nf override) -->
+{% section "marketing/cta", data: resolved.team_cta, section_class: "pt-0" %}
 
 {{ content | uj_content_format }}

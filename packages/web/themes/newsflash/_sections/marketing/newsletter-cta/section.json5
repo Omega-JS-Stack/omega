@@ -1,5 +1,5 @@
 {
-  description: 'The vermilion newsletter slab — email capture on the primary card, speaking the client form-manager dialect (data-form-state; the §7 presence init binds the form). Theme-layer OVERRIDE of classy\'s band: newsflash markup, inherited behavior — classy\'s FormManager section.js keeps riding the bundle via inherit, and its DOM contract (form.newsletter-form under the data-omega-section root, .button-text, the alert divs) is part of this markup. SHARED band: defaults stay neutral, every caller passes its own copy.',
+  description: 'The vermilion newsletter capture, two presentations — the default slab band (primary card in a full section) and variant: "rail", the compact sidebar signup card with no section wrapper (composes inside an aside). Both speak the client form-manager dialect (data-form-state; the §7 presence init binds the form). Theme-layer OVERRIDE of classy\'s band: newsflash markup, inherited behavior — classy\'s FormManager section.js keeps riding the bundle via inherit, and its DOM contract (form.newsletter-form under the data-omega-section root, .button-text) is part of this markup. SHARED band: defaults stay neutral, every caller passes its own copy.',
 
   args: {
     superheadline: 'object',
@@ -10,6 +10,9 @@
     form: 'object',
     section_class: 'string',
     narrow: { type: 'boolean', description: 'wrap the card in the centered col-xl-8 column (the post-page variant)' },
+    variant: { type: 'string', description: 'presentation family: unset renders the slab band; "rail" renders the compact sidebar card (no section/container wrapper)' },
+    anchor: { type: 'string', description: 'optional id on the root element — a deep-link target (e.g. the hero\'s #signup button)' },
+    disclaimer: { type: 'string', description: 'small print under the form (rail presentation only)' },
   },
 
   defaults: {},

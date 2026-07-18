@@ -33,6 +33,20 @@ faqs:
       answer: "Always. The Reader tier is free forever — our core coverage and the daily briefing stay open to everyone. Memberships unlock the extras and keep the lights on."
     - question: "Do memberships really fund the journalism?"
       answer: "Directly. Reader memberships are our primary source of revenue, which is exactly why no advertiser or owner gets a say in what we publish."
+
+# CTA Section — the big-read band (shared marketing/cta; this copy lived
+# inline as | default: filters before the band composed the section)
+cta:
+  superheadline:
+    icon: "comments"
+    text: "Support"
+  headline: "Need help finding the right plan for your"
+  headline_accent: "needs?"
+  subheadline: "Talk to our support team"
+  primary_button:
+    text: "Talk to us"
+    icon: "headset"
+    href: "/contact"
 ---
 
 {% comment %}
@@ -380,27 +394,8 @@ faqs:
 {% endiftruthy %}
 
 <!-- ============================================ -->
-<!-- CTA — the dark big-read band -->
+<!-- CTA — the dark big-read band (shared marketing/cta, nf override) -->
 <!-- ============================================ -->
-<section class="pt-0">
-  <div class="container">
-    <div class="cta-panel" data-lazy="@class animation-slide-up">
-      <div class="cta-rings" aria-hidden="true"></div>
-      <div class="position-relative">
-        <span class="kicker mb-3">{% uj_icon "comments", "me-1" %}{{ resolved.cta.superheadline.text | default: "Support" }}</span>
-        <h2 class="cta-title">
-          {{ resolved.cta.headline | default: "Need help finding the right plan for your" }}
-          <span class="text-accent">{{ resolved.cta.headline_accent | default: "needs?" }}</span>
-        </h2>
-        <p class="cta-desc">{{ resolved.cta.subheadline | default: "Talk to our support team" }}</p>
-        <div class="d-flex flex-wrap gap-3">
-          <a href="{{ resolved.cta.button.href | default: '/contact' }}" class="btn btn-warning btn-lg">
-            {% uj_icon "headset", "me-2" %}{{ resolved.cta.button.text | default: "Talk to us" }}
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/cta", data: resolved.cta, section_class: "pt-0" %}
 
 {{ content | uj_content_format }}

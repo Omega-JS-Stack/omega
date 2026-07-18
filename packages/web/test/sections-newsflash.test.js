@@ -1,13 +1,12 @@
 /**
  * Newsflash section-library lane (cp213+) — builds the mini fixture with the
  * newsflash theme active (the classy-corpus tests never render newsflash
- * layouts) and pins the theme-layer conversions: the marketing/stats
- * OVERRIDE (first theme-layer section override), the newsflash-specific
- * rundown/desks sections, the rule-head + lede components — plus the two
- * contracts the conversion must NOT change yet: fallthrough pages keep
- * classy's cta band (the marketing/cta "goes native" override is a separate
- * declared step), and a body-called marketing/hero still resolves to the
- * classy base.
+ * layouts) and pins the theme-layer conversions: the marketing/stats,
+ * newsletter-cta, and cta OVERRIDES, the newsflash-specific rundown/desks
+ * sections, the rule-head + lede components, and the standing fallthrough
+ * doctrine — a shared id is overridden only when the band exists in the
+ * theme's own design vocabulary (hero does not: lede/splash serve that role,
+ * so a body-called marketing/hero deliberately resolves to the classy base).
  */
 const assert = require('node:assert');
 const path = require('node:path');
@@ -114,17 +113,46 @@ test('cp217: §7 inherit over the real tree — the nf override keeps classy\'s 
   assert.equal(entry.scss, null, 'no scss on either layer — nothing invented');
 });
 
-test('cp213: contracts deliberately NOT flipped — fallthrough cta + body-called hero stay classy', async () => {
+test('cp218: the flip decision executed — marketing/cta goes native on fallthrough pages', async () => {
   const pages = await buildWith(nfData);
 
-  // /download falls through to the converted classy layout; its cta band must
-  // keep classy markup until the declared marketing/cta override step.
+  // /download still falls through to the converted classy LAYOUT, but its
+  // cta band now resolves to the nf override — the dark big-read panel —
+  // and the icon keys classy's markup ignored finally render.
   const download = pages.get('/download');
-  assert.ok(download.includes('classy-cta'), 'fallthrough page renders the classy cta band');
+  assert.ok(!download.includes('classy-cta'), 'classy cta markup gone from the fallthrough page');
+  assert.ok(download.includes('cta-panel'), 'nf big-read panel serves the shared contract');
+  assert.ok(download.includes('data-icon="headset"'), 'button icon from the data renders under nf (classy ignored it)');
+});
 
-  // A body-called {% section "marketing/hero" %} resolves consumer → nf →
-  // classy; nf ships no hero, so the classy base serves.
+test('cp218: the doctrine half that stays — body-called hero deliberately falls through to classy', async () => {
+  const pages = await buildWith(nfData);
+
+  // nf composes no hero in its own vocabulary (the lede/splash family serves
+  // that role), so {% section "marketing/hero" %} resolves consumer → nf →
+  // classy and the base serves. Override only what the theme's design
+  // vocabulary actually has.
   const demo = pages.get('/sections-demo');
   assert.ok(demo.includes('classy-hero'), 'body-called hero falls through to the classy base');
   assert.ok(!demo.includes('hero-title'), 'nf hero vocabulary absent — no nf hero section exists');
+});
+
+test('cp218: the rail signup card — the third dead form dies (newsletter-cta rail variant)', async () => {
+  const pages = await buildWith(nfData);
+  const home = pages.get('/test/components/hero-demo-input'); // rides the index layout
+
+  // The old inline card posted to action="/email-subscription" — a page that
+  // doesn't exist. The rail variant of the nf newsletter-cta override rides
+  // instead: managed dialect, §7-bound through its own root, no section/
+  // container wrapper (it composes inside the aside rail).
+  assert.ok(!home.includes('email-subscription'), 'the dead action-form dialect died on the index rail');
+  assert.ok(home.includes('data-omega-section="marketing/newsletter-cta"'), 'rail card is a §7-bound instance of the shared section');
+  assert.ok(home.includes('data-form-state="initializing"'), 'rail speaks the form-manager dialect');
+  assert.ok(home.includes('button-text'), 'button text swaps through the managed span');
+  assert.ok(home.includes('id="signup"'), 'anchor knob keeps the hero deep link');
+  assert.ok(home.includes('Free forever. Unsubscribe anytime.'), 'disclaimer rides the bridge');
+
+  // The index cta band composes the same override the fallthrough pages get.
+  assert.ok(home.includes('<section class="cta">'), 'section_class knob keeps the band class');
+  assert.ok(home.includes('cta-panel'), 'big-read panel through the section');
 });

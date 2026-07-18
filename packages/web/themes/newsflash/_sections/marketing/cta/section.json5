@@ -1,0 +1,17 @@
+{
+  description: "The dark big-read band — cta-panel + spinning rings, italic serif title with the vermilion accent, warning-yellow primary button. Theme-layer override of classy's marketing/cta serving the same contract; icons render when the data carries them (classy ignores icon keys), and command renders as the mono $ button in panel idiom. A SHARED band — defaults stay NEUTRAL and every caller passes its own copy (spec §6 shared-band ruling).",
+
+  args: {
+    superheadline: 'object',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    primary_button: 'object',
+    secondary_button: 'object',
+    command: 'string',
+    command_href: 'string',
+    section_class: 'string',
+  },
+
+  defaults: {},
+}

@@ -155,7 +155,7 @@ carries `data-omega-section="marketing/newsletter-cta"`, and any page
 composing the band gets the working managed form — live-proven on blog index
 AND posts (whose old plain-action form posted to a nonexistent page).
 
-The newsflash lane (cp213–217): the FIRST theme-layer section override —
+The newsflash lane (cp213–218): the FIRST theme-layer section override —
 `themes/newsflash/_sections/marketing/stats/` serves the same items
 contract with newsflash markup (whole-folder wins, so its json5 carries the
 theme's own head default — theme defaults are part of the theme's
@@ -186,15 +186,29 @@ FormManager `section.js` inherited into the bundle, binding through the
 override's own `data-omega-section` root. Landing it killed TWO live dead
 forms: nf posts still carried the plain `action="/email-subscription"`
 form (the cp209 bug), and the blog index's inline slab spoke the managed
-dialect with NO presence-init root — nothing ever bound it. (The homepage
-rail signup card still posts to that dead route — parked for the
-index-band step.) Deliberately NOT overridden: `marketing/cta` and
-`marketing/hero` — a same-id override would flip every fallthrough page's
-band to newsflash markup, so that "goes native" step is its own declared
-change. Newsflash pins live in `test/sections-newsflash.test.js` on a
+dialect with NO presence-init root — nothing ever bound it.
+Override #3 + the flip decision (cp218): `marketing/cta` — the dark
+big-read band — went native. The cta-panel idiom that repeated inline
+across the index/about/pricing layouts is now the theme's override
+serving classy's exact contract, so those three bands compose it AND
+every fallthrough page (download, extension, alternatives ×2) flips from
+classy markup to the panel — with the icon keys classy's markup ignores
+(`superheadline.icon`, `*_button.icon`) finally rendering, and `command`
+served as the mono $ button in panel idiom. The newsletter-cta override
+gained a second presentation the same checkpoint, `variant: "rail"` — the
+compact sidebar signup card with NO section/container wrapper, composed
+by the index aside (`anchor`/`disclaimer` knobs) — killing the THIRD dead
+form: the rail card posted to the dead route since birth; it now speaks
+the managed dialect through its own §7 root. The standing doctrine the
+flip settled: **a theme overrides a shared id only when the band exists
+in its own design vocabulary** — hero, bento, product-demo, showcase,
+testimonials, trusted-by, and faq deliberately fall through to the classy
+base under newsflash (the lede/splash family serves the hero role) and
+the skin styles them; team's charter slab and join band stay inline
+(per-page uniques borrowing the panel visual, not instances of the
+contract). Newsflash pins live in `test/sections-newsflash.test.js` on a
 theme-override build lane over the posts-rich fixture (17 posts — every
 index slot lit).
 
-Pending (spec §13): the fallthrough-flip decision, `omega customize <url>`,
-the auto-generated showcase + docs, `[id].js` wildcard page modules,
-auto-generated sample content.
+Pending (spec §13): `omega customize <url>`, the auto-generated showcase +
+docs, `[id].js` wildcard page modules, auto-generated sample content.
