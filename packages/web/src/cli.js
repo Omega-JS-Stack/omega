@@ -13,6 +13,7 @@ const { createCliRouter } = require('@omega.js/devkit/cli-router');
 // Command name → positional/flag aliases (UJM alias table, adapted)
 const ALIASES = {
   setup: ['-s', '--setup'],
+  install: ['-i', 'i', '--install'],
   dev: ['serve', 'start', '--dev'],
   build: ['-b', '--build'],
   deploy: ['-d', '--deploy'],

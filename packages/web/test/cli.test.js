@@ -31,8 +31,9 @@ test('dispatch table: every aliased command has a command file', () => {
     assert.ok(fs.existsSync(path.join(commandsDir, `${name}.js`)), `commands/${name}.js exists`);
   }
 
-  // The full B3 surface is present
-  for (const name of ['setup', 'dev', 'build', 'deploy', 'translate', 'audit', 'test', 'clean', 'version']) {
+  // The full B3 surface is present (+ install — the `mgr i local` parity
+  // gap the wizard rehearsal caught, cp194)
+  for (const name of ['setup', 'install', 'dev', 'build', 'deploy', 'translate', 'audit', 'test', 'clean', 'version']) {
     assert.ok(aliases[name], `${name} is routed`);
   }
 });

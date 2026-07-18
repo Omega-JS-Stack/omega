@@ -1,0 +1,4 @@
+---
+layout: blueprint/index
+permalink: /
+---

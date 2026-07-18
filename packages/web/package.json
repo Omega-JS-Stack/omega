@@ -6,7 +6,9 @@
   "main": "./src/index.js",
   "bin": {
     "omega": "./bin/omega",
-    "omg": "./bin/omg"
+    "omg": "./bin/omg",
+    "mgr": "./bin/omega",
+    "omega-web": "./bin/omega-web"
   },
   "exports": {
     ".": "./src/index.js",

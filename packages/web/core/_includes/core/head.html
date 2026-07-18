@@ -124,8 +124,11 @@
 <!-- Keywords -->
 <meta name="keywords" content="{{ page-keywords }}"/>
 
-<!-- Web app manifest (part of the minted favicon set — static-assets channel) -->
-<link rel="manifest" href="{{ favicon-path | append: '/site.webmanifest' | uj_cachebreak }}"/>
+<!-- Web app manifest (part of the minted favicon set — static-assets channel;
+     no minted set → no link, a virgin brand serves zero dangling refs) -->
+{% if assetManifest.favicons %}
+  <link rel="manifest" href="{{ favicon-path | append: '/site.webmanifest' | uj_cachebreak }}"/>
+{% endif %}
 
 <!-- Title -->
 <title>{{ page-title }}</title>
@@ -172,10 +175,12 @@
 
 <!-- Favicon — exactly the minted set (manager assets service → .omega/assets/favicon,
      bridged to /assets/images/favicon by the static-assets channel) -->
-<link rel="apple-touch-icon" sizes="180x180" href="{{ favicon-path | append: '/apple-touch-icon.png' | uj_cachebreak }}"/>
-<link rel="icon" type="image/png" sizes="32x32" href="{{ favicon-path | append: '/favicon-32x32.png' | uj_cachebreak }}"/>
-<link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | uj_cachebreak }}"/>
-<link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | uj_cachebreak }}"/>
+{% if assetManifest.favicons %}
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ favicon-path | append: '/apple-touch-icon.png' | uj_cachebreak }}"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ favicon-path | append: '/favicon-32x32.png' | uj_cachebreak }}"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ favicon-path | append: '/favicon-16x16.png' | uj_cachebreak }}"/>
+  <link rel="shortcut icon" type="image/x-icon" href="{{ favicon-path | append: '/favicon.ico' | uj_cachebreak }}"/>
+{% endif %}
 <meta name="theme-color" content="{{ resolved.favicon.theme-color }}"/>
 
 <!-- Browser Support -->

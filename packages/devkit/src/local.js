@@ -221,39 +221,86 @@ function isLinkedTo(dir, name, targetDir) {
 }
 
 /**
- * file:-install an app's @omega.js dependencies from the local monorepo.
- * Idempotent: dependencies already resolving to the monorepo copy are skipped.
+ * Rewrite one dependency's spec in a manifest, preserving its dev/prod
+ * placement (the same in-place rewrite npm does on --save).
+ * @param {string} appDir - Directory holding the package.json.
+ * @param {string} name - Dependency name.
+ * @param {boolean} dev - Whether the entry lives in devDependencies.
+ * @param {string} spec - New spec value.
+ */
+function setDependencySpec(appDir, name, dev, spec) {
+  const manifestPath = path.join(appDir, 'package.json');
+  const pkg = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  pkg[dev ? 'devDependencies' : 'dependencies'][name] = spec;
+  fs.writeFileSync(manifestPath, `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
+/**
+ * file: spec path — relative to the declaring manifest, forward slashes.
+ * Computed from REAL paths on both ends: symlinks resolve physically, so a
+ * spec relativized through an aliased view (macOS /var → /private/var, a
+ * symlinked brand dir) would count the wrong number of ups and dangle.
+ */
+function relativeSpecPath(fromDir, target) {
+  return path.relative(fs.realpathSync(fromDir), fs.realpathSync(target)).split(path.sep).join('/');
+}
+
+/**
+ * file:-install a brand's @omega.js dependencies from the local monorepo.
+ *
+ * Tree-wide by construction: npm resolves the WHOLE workspace tree on any
+ * install anchored in a brand monorepo, so linking one app while a SIBLING
+ * app still carries an unpublished registry spec (`@omega.js/backend: *`)
+ * 404s before anything links (the cp194 wizard-rehearsal catch — only
+ * reachable in a brand OUTSIDE the omega monorepo, the real consumer
+ * topology). Every app's @omega.js specs are therefore flipped to file:
+ * first (dev/prod placement preserved — the entry is edited in place), then
+ * ONE `npm install` materializes the links for the whole tree. Standalone
+ * apps degenerate to themselves.
+ *
+ * Idempotent: dependencies already resolving to the monorepo copy are
+ * skipped, and when nothing needs linking no install runs.
  * @param {object} options
- * @param {string} options.dir - App directory to link.
+ * @param {string} options.dir - App directory to link from (any app in the brand).
  * @param {string} options.monorepoRoot - Monorepo root path.
  * @param {object} [options.logger] - Logger with log/warn (silent when omitted).
- * @param {boolean} [options.dryRun] - Plan only, run no installs.
+ * @param {boolean} [options.dryRun] - Plan only, write and install nothing.
  * @returns {Promise<Array<{name: string, dir: string, target: string, action: 'link'|'skip'|'missing'}>>}
  */
 async function linkLocalPackages(options) {
   const { dir, monorepoRoot, logger, dryRun } = options;
   const actions = [];
 
-  for (const entry of frameworkPackagesOf(dir)) {
-    const target = packageDir(monorepoRoot, entry.name);
+  const installRoot = findBrandRoot(dir);
+  let installNeeded = false;
 
-    if (!fs.existsSync(path.join(target, 'package.json'))) {
-      actions.push({ name: entry.name, dir: entry.dir, target, action: 'missing' });
-      logger && logger.warn(`${entry.name}: no monorepo package at ${target} — skipping`);
-      continue;
-    }
+  for (const appDir of discoverApps(installRoot)) {
+    for (const entry of frameworkPackagesOf(appDir)) {
+      const target = packageDir(monorepoRoot, entry.name);
 
-    if (isLinkedTo(entry.dir, entry.name, target)) {
-      actions.push({ name: entry.name, dir: entry.dir, target, action: 'skip' });
-      logger && logger.log(`${entry.name}: already linked to the monorepo`);
-      continue;
-    }
+      if (!fs.existsSync(path.join(target, 'package.json'))) {
+        actions.push({ name: entry.name, dir: entry.dir, target, action: 'missing' });
+        logger && logger.warn(`${entry.name}: no monorepo package at ${target} — skipping`);
+        continue;
+      }
 
-    actions.push({ name: entry.name, dir: entry.dir, target, action: 'link' });
-    logger && logger.log(`${entry.name}: linking → ${target}`);
-    if (!dryRun) {
-      await safeInstall(`npm install ${target}${entry.dev ? ' --save-dev' : ''}`, { log: true, config: { cwd: entry.dir } });
+      if (isLinkedTo(entry.dir, entry.name, target)) {
+        actions.push({ name: entry.name, dir: entry.dir, target, action: 'skip' });
+        logger && logger.log(`${entry.name}: already linked to the monorepo`);
+        continue;
+      }
+
+      actions.push({ name: entry.name, dir: entry.dir, target, action: 'link' });
+      logger && logger.log(`${entry.name}: linking → ${target}`);
+      installNeeded = true;
+      if (!dryRun) {
+        setDependencySpec(entry.dir, entry.name, entry.dev, `file:${relativeSpecPath(entry.dir, target)}`);
+      }
     }
+  }
+
+  if (installNeeded && !dryRun) {
+    await safeInstall('npm install', { log: true, config: { cwd: installRoot } });
   }
 
   return actions;

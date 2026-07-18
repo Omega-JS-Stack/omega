@@ -18,6 +18,11 @@ const DEPENDENCY_MAP = {
   gulp: 'dev',
   electron: 'dev',
   'electron-builder': 'dev',
+  // The synced build/package/publish scripts all run `npx cross-env` — it
+  // must be DECLARED in the consumer or an outside-the-monorepo brand has
+  // nothing to resolve (cp194 wizard-rehearsal catch; in-monorepo brands
+  // were saved by root hoisting)
+  'cross-env': 'dev',
 };
 
 module.exports = async function (options) {

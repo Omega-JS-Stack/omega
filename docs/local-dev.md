@@ -45,7 +45,9 @@ Then the standard `omega dev` loop runs. Result: edit any framework's `src/` and
 
 ## Per-app linking: `mgr i local`
 
-Unchanged contract for consumers, now monorepo-backed: `mgr i local` (desktop, extension) and `mgr i local` / `mgr install --local` (backend) call the same `linkLocalPackages()` for **that app only** — every declared `@omega.js/*` dep is linked from the monorepo, idempotently. Backend links where the dep is declared (`functions/package.json`) regardless of where `mgr` was invoked. `mgr i live/prod` still installs from the registry and is untouched.
+Unchanged contract for consumers, now monorepo-backed: `mgr i local` (web, desktop, extension — web gained its install command in cp194) and `mgr i local` / `mgr install --local` (backend) call the same `linkLocalPackages()`. Backend links where the dep is declared (`functions/package.json`) regardless of where `mgr` was invoked. `mgr i live/prod` still installs from the registry and is untouched.
+
+**Linking is brand-tree-wide by construction (cp194):** npm resolves the WHOLE workspace tree on any install anchored in a brand monorepo, so linking one app while a sibling still carries an unpublished registry spec (`@omega.js/backend: *`) 404s before anything links — only reachable in a brand OUTSIDE the omega monorepo, the real consumer topology. `linkLocalPackages()` therefore flips every app's `@omega.js/*` specs to `file:` first (dev/prod placement preserved; specs computed from REAL paths so symlinked/aliased dirs can't dangle), then runs ONE `npm install` for the tree. One call from any app links the whole brand; reruns all-skip.
 
 ## Vendoring vs runtime deps (what ships where)
 
@@ -65,7 +67,7 @@ The vendor tool derives the split from the host's package.json: anything in `dep
 | `resolveMonorepoRoot()` | env → self-location walk-up → conventional path; throws with guidance if none |
 | `findBrandRoot(dir)` / `discoverApps(root)` | brand-root walk-up / brand root + `apps/*` list |
 | `frameworkPackagesOf(appDir)` | `@omega.js/*` deps incl. `functions/package.json`, with dev/prod placement + owning dir |
-| `linkLocalPackages({ dir, monorepoRoot, logger, dryRun })` | idempotent file:-install; returns `[{ name, dir, target, action: link\|skip\|missing }]` |
+| `linkLocalPackages({ dir, monorepoRoot, logger, dryRun })` | idempotent brand-tree file:-link (spec flip + one install); returns `[{ name, dir, target, action: link\|skip\|missing }]` across the tree |
 | `startMonorepoWatch({ monorepoRoot, logger })` | lock-aware spawn of the root watch; `{ alreadyRunning, pid, child }` |
 | `startVendorPropagation({ packagesDir, packages, dependents, runPrepare?, log?, debounceMs? })` | watch vendorable srcs → re-prepare dependents (debounced, coalescing); `{ watched, poke, close }` — `poke` is the fs-free test seam |
 | `acquireWatchLock` / `releaseWatchLock` / `readLiveWatchPid` | the `.omega/dev-watch.lock` single-instance protocol (owned by watch-all) |

@@ -179,13 +179,20 @@ function getSettings() {
           exclude: /node_modules/,
           use: [
             {
-              loader: 'babel-loader',
+              // Absolute like stripDevBlocksLoader below — resolveLoader's
+              // consumer-anchored paths can't see the framework's own deps
+              // in an outside-the-monorepo brand (cp194)
+              loader: require.resolve('babel-loader'),
               options: {
                 sourceMaps: !Manager.actLikeProduction(),
                 presets: [
-                  [require.resolve('@babel/preset-env', {
-                    paths: [path.resolve(process.cwd(), 'node_modules', package.name, 'node_modules')]
-                  }), {
+                  // Resolve from THIS file's real location — the preset is the
+                  // framework's own dependency, so the framework's node_modules
+                  // chain is the correct root everywhere (registry install,
+                  // file:-link, monorepo). Pinning paths to the CONSUMER's tree
+                  // only ever worked via hoist-luck (cp194 wizard-rehearsal
+                  // catch: outside brands have no hoisted copy → build died).
+                  [require.resolve('@babel/preset-env'), {
                     exclude: [
                       // Prevent lighthouse error in 2025 about Legacy JavaScript
                       // 'es.array.from',

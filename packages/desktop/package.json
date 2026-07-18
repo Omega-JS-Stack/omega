@@ -108,6 +108,7 @@
   "author": "ITW Creative Works",
   "license": "MIT",
   "peerDependencies": {
+    "cross-env": ">=10",
     "electron": ">=42",
     "electron-builder": ">=26",
     "gulp": "^5.0.1"

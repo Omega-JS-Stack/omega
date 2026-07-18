@@ -3,8 +3,10 @@
 // Real-execution only (no mocks): monorepo resolution runs against THIS repo
 // (the tests live inside it, so self-location must find it), brand/app
 // detection runs against committed fixtures, and linking is exercised in
-// dryRun mode plus a real-symlink skip case in a temp dir. Actual `npm install`
-// runs are left to the live sandbox proof — too heavy for a unit test.
+// dryRun mode plus a real-symlink skip case in a temp dir. ONE real
+// `npm install` runs (cp194): the tree-wide link regression lives in npm's
+// workspace resolution itself, so only a real install can pin it — it's
+// offline by construction (file: specs only) and cheap.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -126,14 +128,15 @@ test('frameworkPackagesOf is empty for a package with no @omega.js deps', () => 
 
 // ---- linkLocalPackages (dryRun + real-symlink skip detection)
 
-test('linkLocalPackages plans link for unlinked deps and missing for absent packages', async () => {
+test('linkLocalPackages plans the WHOLE brand tree: sibling apps included (cp194)', async () => {
   const site = path.join(FIXTURES, 'brand', 'apps', 'site');
   const actions = await local.linkLocalPackages({ dir: site, monorepoRoot: FAKE_MONOREPO, dryRun: true });
   assert.deepEqual(
     actions.map(({ name, action }) => ({ name, action })),
     [
-      { name: '@omega.js/client', action: 'link' }, // fake monorepo has packages/client
-      { name: '@omega.js/web', action: 'missing' }, // ...but no packages/web
+      { name: '@omega.js/backend', action: 'missing' }, // sibling app scanned too — npm resolves the whole workspace tree
+      { name: '@omega.js/client', action: 'link' },     // fake monorepo has packages/client
+      { name: '@omega.js/web', action: 'missing' },     // ...but no packages/web
     ]
   );
 });
@@ -152,6 +155,60 @@ test('linkLocalPackages skips deps already resolving to the monorepo copy', asyn
     assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
       { name: '@omega.js/client', action: 'skip' },
     ]);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('linkLocalPackages links a fresh outside brand with ONE real install — unpublished sibling specs cannot 404 (cp194)', async () => {
+  // Two apps whose @omega.js deps exist ONLY in the fake monorepo: with the
+  // old per-dep `npm install <path>` mechanics, linking app-a died on app-b's
+  // registry-unresolvable spec. The tree-wide flip must link both offline.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-local-brand-'));
+  try {
+    fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({
+      name: 'scratch-brand', private: true, workspaces: ['apps/*'],
+    }));
+    const appA = path.join(scratch, 'apps', 'app-a');
+    const appB = path.join(scratch, 'apps', 'app-b');
+    fs.mkdirSync(appA, { recursive: true });
+    fs.mkdirSync(appB, { recursive: true });
+    fs.writeFileSync(path.join(appA, 'package.json'), JSON.stringify({
+      name: 'scratch-app-a', private: true, dependencies: { '@omega.js/client': '*' },
+    }));
+    fs.writeFileSync(path.join(appB, 'package.json'), JSON.stringify({
+      name: 'scratch-app-b', private: true, devDependencies: { '@omega.js/devkit': '*' },
+    }));
+
+    const actions = await local.linkLocalPackages({ dir: appA, monorepoRoot: FAKE_MONOREPO });
+    assert.deepEqual(actions.map(({ name, action }) => ({ name, action })), [
+      { name: '@omega.js/client', action: 'link' },
+      { name: '@omega.js/devkit', action: 'link' },
+    ]);
+
+    // Specs flipped in place, placement preserved
+    const pkgA = JSON.parse(fs.readFileSync(path.join(appA, 'package.json'), 'utf8'));
+    const pkgB = JSON.parse(fs.readFileSync(path.join(appB, 'package.json'), 'utf8'));
+    assert.match(pkgA.dependencies['@omega.js/client'], /^file:/, 'app-a dep flipped to file:');
+    assert.match(pkgB.devDependencies['@omega.js/devkit'], /^file:/, 'app-b devDep flipped to file: in place');
+
+    // The one real install materialized links for BOTH apps (hoisted)
+    assert.equal(
+      fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'client')),
+      fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'client')),
+      'client resolves to the monorepo copy'
+    );
+    assert.equal(
+      fs.realpathSync(path.join(scratch, 'node_modules', '@omega.js', 'devkit')),
+      fs.realpathSync(path.join(FAKE_MONOREPO, 'packages', 'devkit')),
+      'sibling devkit resolves to the monorepo copy'
+    );
+
+    // Rerun converges: everything skips, no manifest churn
+    const before = fs.readFileSync(path.join(appA, 'package.json'), 'utf8');
+    const again = await local.linkLocalPackages({ dir: appA, monorepoRoot: FAKE_MONOREPO });
+    assert.deepEqual(again.map(({ action }) => action), ['skip', 'skip'], 'second run all-skip');
+    assert.equal(fs.readFileSync(path.join(appA, 'package.json'), 'utf8'), before, 'no rewrite on rerun');
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }

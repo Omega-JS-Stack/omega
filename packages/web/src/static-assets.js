@@ -45,6 +45,20 @@ function resolveStaticDirs(options) {
 }
 
 /**
+ * Whether a favicon set will ship with these static copies — the head only
+ * renders its favicon/manifest links when the minted set (or a consumer-
+ * authored one) actually exists, so a virgin brand serves zero dangling
+ * links (cp194 wizard-rehearsal catch).
+ * @param {Array<{ src: string, dest: string }>} staticDirs - From resolveStaticDirs().
+ * @returns {boolean}
+ */
+function hasFaviconSet(staticDirs) {
+  return (staticDirs || []).some(({ src, dest }) =>
+    (dest === 'assets/images/favicon' && jetpack.exists(path.join(src, 'site.webmanifest')) === 'file')
+    || (dest === 'assets/images' && jetpack.exists(path.join(src, 'favicon', 'site.webmanifest')) === 'file'));
+}
+
+/**
  * Copy the resolved entries into the build output, in order (later entries
  * overwrite earlier ones — that's the consumer-wins contract).
  * @param {object} options
@@ -63,4 +77,4 @@ function copyStaticAssets(options) {
   return { copied };
 }
 
-module.exports = { resolveStaticDirs, copyStaticAssets };
+module.exports = { resolveStaticDirs, copyStaticAssets, hasFaviconSet };

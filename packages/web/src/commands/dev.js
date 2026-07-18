@@ -31,7 +31,7 @@ const {
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { buildAssets } = require('../assets.js');
 const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
-const { resolveStaticDirs, copyStaticAssets } = require('../static-assets.js');
+const { resolveStaticDirs, copyStaticAssets, hasFaviconSet } = require('../static-assets.js');
 const { devImageFallback } = require('../imagemin.js');
 const { configureOmega } = require('../engine.js');
 const { resolveThemeLayers } = require('../layers.js');
@@ -99,7 +99,15 @@ module.exports = async function (options) {
     only,
   });
 
+  // Static images (minted brand identity + src/assets/images) resolve up
+  // front — the manifest's favicon flag depends on what will ship
+  const staticDirs = resolveStaticDirs({
+    brandRoot: findBrandRoot(paths.root),
+    imagesDir: path.join(paths.assets, 'images'),
+  });
+
   const manifest = await build();
+  manifest.favicons = hasFaviconSet(staticDirs);
   jetpack.write(paths.manifest, JSON.stringify(manifest, null, 2));
   logger.log('Assets built (dev mode: stable names, no minify)');
 
@@ -124,13 +132,10 @@ module.exports = async function (options) {
   };
   await buildSw();
 
-  // Static images (minted brand identity + src/assets/images) — copied once
-  // at boot; they change rarely, so no watcher (restart to pick up new ones)
+  // Copied once at boot; they change rarely, so no watcher (restart to pick
+  // up new ones)
   copyStaticAssets({
-    staticDirs: resolveStaticDirs({
-      brandRoot: findBrandRoot(paths.root),
-      imagesDir: path.join(paths.assets, 'images'),
-    }),
+    staticDirs,
     outDir: paths.out,
   });
 

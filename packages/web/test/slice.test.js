@@ -38,6 +38,7 @@ async function buildMini(overrides = {}) {
         assetManifest: {
           js: { main: '/assets/js/main-TEST.js', pages: { 'signin/index': '/assets/js/pages/signin/index-TEST.js' } },
           css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          favicons: true,
         },
         ...overrides,
       });
@@ -97,6 +98,46 @@ test('default pages render when the consumer has no same-URL file', () => {
   assert.ok(signin.includes('/assets/js/pages/signin/index-TEST.js'), 'pageAssets script from the manifest');
   assert.ok(pages.get('/signup').includes('id="auth-form"'), 'signup default');
   assert.ok(pages.get('/404').includes('id="page-url"'), '404 default (flat url, 404.html file)');
+});
+
+test('zero-page consumer still gets a homepage at / (cp194 wizard-rehearsal catch)', async () => {
+  // A wizard-born brand has NO consumer pages at all — the first thing its
+  // owner sees must be the branded default homepage, not a 404. (The mini
+  // fixture owns /, so the suite's first test doubles as the suppression pin.)
+  const os = require('node:os');
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bare-site-'));
+  try {
+    const Eleventy = require('@11ty/eleventy').default;
+    const elev = new Eleventy(bare, path.join(PKG, '.omega', 'test-out-bare'), {
+      quietMode: true,
+      configPath: false,
+      config: (eleventyConfig) => {
+        eleventyConfig.setUseTemplateCache(false);
+        return configureOmega(eleventyConfig, {
+          consumerDir: bare,
+          siteData,
+          farmDir: path.join(PKG, '.omega', 'layout-farm'),
+          assetManifest: {
+            js: { main: '/assets/js/main-TEST.js', pages: {} },
+            css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
+          },
+        });
+      },
+    });
+    const results = await elev.toJSON();
+    const home = results.find((r) => r.url === '/');
+    assert.ok(home, 'default homepage exists at /');
+    assert.ok(home.content.includes('MiniCo'), 'homepage branded from site config');
+    assert.ok(home.content.includes('data-theme-id="classy"'), 'rides the active theme');
+    // No minted favicon set → the head renders zero dangling favicon links
+    assert.ok(!home.content.includes('site.webmanifest'), 'no manifest link without a favicon set');
+    assert.ok(!home.content.includes('favicon-32x32'), 'no icon links without a favicon set');
+    // …while the mini build (favicons: true) carries the full set
+    assert.ok(pages.get('/').includes('site.webmanifest'), 'minted set renders the manifest link');
+    assert.ok(pages.get('/').includes('favicon-32x32'), 'minted set renders the icon links');
+  } finally {
+    fs.rmSync(bare, { recursive: true, force: true });
+  }
 });
 
 test('resolved site seed: site sections surface as resolved.* (Configuration block)', () => {
