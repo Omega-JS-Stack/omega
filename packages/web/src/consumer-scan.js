@@ -8,16 +8,24 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 /**
- * Extract and normalize the `permalink:` value from raw frontmatter.
- * @param {string} raw
+ * Extract and normalize the `permalink:` value from a page's leading
+ * frontmatter block. Only the block is scanned — a `permalink:` line in the
+ * BODY (docs prose, fenced code samples) must never claim a URL, because a
+ * bogus claim silently suppresses the framework default at that URL.
+ * @param {string} raw - full page source
  * @returns {string|null} normalized URL (`/about/` → `/about`, the canonical
  *   slash-free legacy UJM shape) or null
  */
 function permalinkOf(raw) {
-  const match = raw.match(/^permalink:\s*(.+?)\s*$/m);
+  const fm = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fm) return null;
+
+  const match = fm[1].match(/^permalink:\s*(.+?)\s*$/m);
   if (!match) return null;
 
-  let url = match[1].replace(/^["']|["']$/g, '');
+  // Quoted values win verbatim; unquoted values lose any trailing YAML comment
+  const quoted = match[1].match(/^"([^"]*)"|^'([^']*)'/);
+  let url = quoted ? (quoted[1] ?? quoted[2]) : match[1].replace(/\s+#.*$/, '');
   if (url.length > 1) url = url.replace(/\/+$/, '');
   return url;
 }

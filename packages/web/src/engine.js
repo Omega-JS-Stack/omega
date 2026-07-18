@@ -113,10 +113,13 @@ function configureOmega(eleventyConfig, options) {
   // Font preloads: the active theme's normal-weight latin faces are the
   // first-paint fonts — preloading them eliminates the FOUT (system-font
   // flash on a cold cache). Scan the winning theme layer's fonts/ dir.
+  // Sorted: readdir order is filesystem-dependent and the emitted HTML
+  // must be deterministic.
   const themeFontsDir = path.join(themeLayers[0], 'fonts');
   site.fontPreloads = fs.existsSync(themeFontsDir)
     ? fs.readdirSync(themeFontsDir)
         .filter((f) => f.endsWith('-normal-latin.woff2'))
+        .sort()
         .map((f) => `/assets/fonts/${f}`)
     : [];
 
