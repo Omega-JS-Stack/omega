@@ -1,0 +1,28 @@
+<section>
+  <div class="container">
+    <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
+      <h2 class="classy-cta__headline">{{ args.headline }}</h2>
+      {% iftruthy args.description %}
+        <p class="classy-cta__sub">{{ args.description }}</p>
+      {% endiftruthy %}
+      <div class="classy-cta__ctas">
+        {% iftruthy args.primary_button.text %}
+          <a href="{{ args.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">
+            {{ args.primary_button.text }}
+            <span class="omega-nudge ms-2">{% uj_icon "arrow-right", "fa-sm" %}</span>
+          </a>
+        {% endiftruthy %}
+        {% iftruthy args.command %}
+          <a href="{{ args.command_href | default: '/download' }}" class="btn btn-cmd btn-lg">
+            <span class="classy-cmd-prompt">$</span>{{ args.command }}
+          </a>
+        {% endiftruthy %}
+        {% iftruthy args.secondary_button.text %}
+          <a href="{{ args.secondary_button.href }}" class="btn btn-outline-adaptive btn-lg">
+            {{ args.secondary_button.text }}
+          </a>
+        {% endiftruthy %}
+      </div>
+    </div>
+  </div>
+</section>

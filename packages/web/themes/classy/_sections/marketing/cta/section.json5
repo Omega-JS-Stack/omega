@@ -1,0 +1,23 @@
+{
+  description: 'The ink CTA band — headline + optional description over primary button / mono command / secondary button (each renders only when set). Always renders (no enable flag).',
+
+  args: {
+    headline: 'string',
+    description: 'string',
+    primary_button: 'object',
+    secondary_button: 'object',
+    command: 'string',
+    command_href: 'string',
+  },
+
+  defaults: {
+    headline: 'Ready to build something people remember?',
+    description: 'Join thousands of teams already shipping with {{ site.brand.name }}.',
+    primary_button: {
+      text: 'Start free today',
+      href: '/signup',
+    },
+    command: 'npx omega setup',
+    command_href: '/download',
+  },
+}

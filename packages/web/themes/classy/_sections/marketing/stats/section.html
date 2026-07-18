@@ -1,0 +1,17 @@
+{% if args.items and args.items.size > 0 %}
+  <section>
+    <div class="container">
+      <div class="classy-stats" data-omega-reveal-stagger="80">
+        {% for stat in args.items %}
+          <div class="classy-stat" data-omega-reveal>
+            <div class="classy-stat__num" data-omega-countup>{{ stat.number }}</div>
+            <div class="classy-stat__label">{{ stat.label }}</div>
+            {% iftruthy stat.sublabel %}
+              <div class="classy-stat__sub">{{ stat.sublabel }}</div>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}

@@ -81,6 +81,7 @@ items:
 - Declares: args (name, type: string/number/bool/array/object/enum, default, description), demo data for the showcase (variants allowed).
 - Build-time validation: unknown arg → warning with did-you-mean (`hero.headlin` → `headline`); type mismatch → warning. This is the typed-props benefit without changing engines.
 - Schema names are **API** — renames are breaking and follow deprecation discipline (warn one minor, remove later).
+- **Defaults ownership (cp205 ruling)**: a section used by ONE page lifts that page's default copy into its json5 (hero precedent); a section SHARED by multiple pages (testimonials: index + pricing + alternatives) keeps json5 defaults NEUTRAL — mechanical knobs only (e.g. the avatar placeholder frame) — and every caller passes its own copy over the data bridge, so no page can ever inherit another page's words.
 
 ## 7. Assets
 

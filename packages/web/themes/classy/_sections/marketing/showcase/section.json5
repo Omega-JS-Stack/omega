@@ -1,0 +1,36 @@
+{
+  description: 'Optional alternating image/text feature rows. Off by default (enabled: false); superheadline is an object ({ text }); image_ratio/image_object_position tune every row.',
+
+  args: {
+    enabled: 'boolean',
+    superheadline: 'object',
+    headline: 'string',
+    subheadline: 'string',
+    image_ratio: 'string',
+    image_object_position: 'string',
+    items: 'array',
+  },
+
+  defaults: {
+    enabled: false,
+    superheadline: {
+      text: 'Showcase',
+    },
+    headline: 'What makes {{ site.brand.name }} different',
+    subheadline: 'Powerful features designed to accelerate your success',
+    image_ratio: '4x3',
+    image_object_position: 'center',
+    items: [
+      {
+        title: 'Seamless integration',
+        description: 'Connect with your existing tools and platforms effortlessly.',
+        image: 'https://cdn.itwcreativeworks.com/assets/sample/images/demos/1x1/sample-demo-1.svg',
+      },
+      {
+        title: 'Data-driven insights',
+        description: 'Make informed decisions with real-time analytics and actionable insights.',
+        image: 'https://cdn.itwcreativeworks.com/assets/sample/images/demos/1x1/sample-demo-2.svg',
+      },
+    ],
+  },
+}

@@ -1,0 +1,22 @@
+{
+  description: 'Logo marquee — the "trusted by" wall. Per logo: `logo` = combomark slug (core/logos, the REAL wordmark lockups); `icon` = FA brands slug (mark + name lockup); `src` = custom image; name-only falls back to the typographic word. Empty logos suppresses the band.',
+
+  args: {
+    headline: 'string',
+    logos: 'array',
+  },
+
+  defaults: {
+    headline: 'Trusted by teams at',
+    logos: [
+      { name: 'Amazon', logo: 'amazon' },
+      { name: 'Google', logo: 'google' },
+      { name: 'HubSpot', logo: 'hubspot' },
+      { name: 'PayPal', logo: 'paypal' },
+      { name: 'Slack', logo: 'slack' },
+      { name: 'Shopify', logo: 'shopify' },
+      { name: 'Stripe', logo: 'stripe' },
+      { name: 'GitHub', logo: 'github' },
+    ],
+  },
+}

@@ -1,0 +1,16 @@
+{
+  description: 'Stats band — serif numbers with count-up on reveal. Callers with a bare frontmatter array pass it as the items named arg ({% section "marketing/stats", items: resolved.stats %}); empty items suppresses the band.',
+
+  args: {
+    items: 'array',
+  },
+
+  defaults: {
+    items: [
+      { number: '50,000+', label: 'Active users', sublabel: 'From 120+ countries' },
+      { number: '99.98%', label: 'Uptime', sublabel: 'Last 12 months' },
+      { number: '200+', label: 'Releases shipped', sublabel: 'And counting' },
+      { number: '4.9', label: 'Average rating', sublabel: 'Across review platforms' },
+    ],
+  },
+}

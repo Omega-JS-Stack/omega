@@ -1,0 +1,68 @@
+{% if args.enabled %}
+  <section>
+    <div class="container">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+        {% iftruthy args.superheadline.text %}
+          <span class="classy-micro">{{ args.superheadline.text }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ args.headline }}</h2>
+        {% iftruthy args.subheadline %}
+          <p>{{ args.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+
+      <!-- Tab Buttons -->
+      <div class="d-flex flex-wrap justify-content-center mb-4" data-omega-reveal>
+        <div class="classy-billing-toggle" role="tablist" data-omega-segmented>
+          {% for tab in args.tabs %}
+            <button
+              class="btn {% if forloop.first %}active{% endif %}"
+              id="{{ tab.id }}-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#{{ tab.id }}-pane"
+              type="button"
+              role="tab"
+              aria-controls="{{ tab.id }}-pane"
+              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+            >
+              {% iftruthy tab.icon %}
+                {% uj_icon tab.icon, "fa-sm me-2" %}
+              {% endiftruthy %}
+              {{ tab.label }}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="tab-content" data-omega-reveal>
+        {% for tab in args.tabs %}
+          <div
+            class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+            id="{{ tab.id }}-pane"
+            role="tabpanel"
+            aria-labelledby="{{ tab.id }}-tab"
+            tabindex="0"
+          >
+            <!-- Feature Checkmarks -->
+            <div class="d-flex flex-wrap justify-content-center gap-3 gap-md-4 mb-4">
+              {% for feature in tab.features %}
+                <div class="d-flex align-items-center">
+                  {% uj_icon "check", "text-success me-2" %}
+                  <span>{{ feature }}</span>
+                </div>
+              {% endfor %}
+            </div>
+
+            <!-- Video Player -->
+            <div class="card overflow-hidden">
+              <div class="ratio ratio-16x9">
+                {% uj_video tab.video, class="w-100 d-block object-fit-cover border-0", style="", controls="false", loop="true", autoplay="true", playsinline="true", muted="true", preload="metadata" %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}

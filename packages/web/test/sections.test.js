@@ -103,6 +103,13 @@ test('data: undefined (no consumer overrides) is a clean defaults render', async
   assert.deepEqual(warnings, []);
 });
 
+test('named arg evaluating undefined keeps the default (the bare-array bridge: items: resolved.stats)', async () => {
+  const { engine, warnings } = makeEngine();
+  const html = await engine.parseAndRender('{% section "marketing/hero", headline: resolved.missing %}', SITE);
+  assert.ok(html.includes('<h1>Default ACME</h1>'), 'undefined named arg fell through to the default');
+  assert.deepEqual(warnings, []);
+});
+
 // ─── schema warnings ─────────────────────────────────────────────────────────
 
 test('unknown arg warns with did-you-mean; type mismatch warns; neither throws', async () => {
@@ -163,6 +170,22 @@ test('frontmatter bridge: hero-demo page keeps its own keys AND the section defa
   assert.ok(demo.includes('Create your logo in'), 'page frontmatter headline survived the bridge');
   assert.ok(demo.includes('Introducing MiniCo'), 'unset badge fell through to the json5 default, brand-liquified');
   assert.ok(demo.includes('npx omega setup'), 'unset command fell through to the json5 default');
+});
+
+test('wave 2: the index composition renders every extracted band from its defaults', async () => {
+  const pages = await buildWith(miniData);
+  // The hero-demo pages ride the full classy index layout (the mini homepage
+  // is its own custom page) — every band except their hero.* overrides
+  // renders from section defaults.
+  const page = pages.get('/test/components/hero-demo-input');
+  assert.ok(page, 'index-composition page built');
+  assert.ok(page.includes('Trusted by teams at'), 'trusted-by default headline');
+  assert.ok(page.includes('Everything you need.'), 'bento default headline');
+  assert.ok(page.includes(`tok-v">'MiniCo'</span>`), 'bento config_demo.name liquified with the brand');
+  assert.ok(page.includes('50,000+'), 'stats defaults rode the items named-arg bridge (resolved.stats undefined)');
+  assert.ok(page.includes('Sarah Johnson'), 'testimonials page copy rode the data bridge from layout frontmatter');
+  assert.ok(page.includes('Ready to build something people remember?'), 'cta default headline');
+  assert.ok(!page.includes('dashboard-pane'), 'product-demo stays suppressed (enabled: false default)');
 });
 
 test('body-call lane: a consumer page composes the section with YAML args', async () => {

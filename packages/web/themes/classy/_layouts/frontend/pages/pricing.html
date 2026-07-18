@@ -582,7 +582,7 @@ faqs:
 </section>
 
 {% iftruthy resolved.testimonials.items %}
-  {% include frontend/components/testimonial-scroll.html testimonials=resolved.testimonials %}
+  {% section "marketing/testimonials", data: resolved.testimonials %}
 {% endiftruthy %}
 
 <!-- FAQ Section (consumer-provided: faqs.items) -->

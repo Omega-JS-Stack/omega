@@ -1,0 +1,30 @@
+{% if args.logos and args.logos.size > 0 %}
+  <section class="classy-logos overflow-hidden pt-0">
+    <div class="container-fluid px-0" data-omega-reveal="fade">
+      <span class="classy-micro">{{ args.headline }}</span>
+      <!-- 60 px/s — unhurried logo wall (Ian 2026-07-16: 75% of the 80px/s default) -->
+      <div class="omega-marquee" data-omega-marquee="60">
+        <div class="omega-marquee__track">
+          {% for logo in args.logos %}
+            <div class="omega-marquee__item">
+              {% if logo.src %}
+                <img src="{{ logo.src | uj_cachebreak }}" alt="{{ logo.name }}" loading="lazy"/>
+              {% elsif logo.logo %}
+                <span class="classy-logos__mark" role="img" aria-label="{{ logo.name }}">
+                  {% uj_logo logo.logo, "combomarks" %}
+                </span>
+              {% elsif logo.icon %}
+                <span class="classy-logos__lockup">
+                  {% uj_icon logo.icon %}
+                  <span>{{ logo.name }}</span>
+                </span>
+              {% else %}
+                <span class="classy-logos__word">{{ logo.name }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+{% endif %}

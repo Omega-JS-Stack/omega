@@ -1,0 +1,57 @@
+{
+  description: 'The hairline feature grid — mixed-size tiles (span: big/tall/wide) with typed demo bodies (type: code/terminal/split/brand/default). Empty items suppresses the band.',
+
+  args: {
+    superheadline: 'string',
+    headline: 'string',
+    subheadline: 'string',
+    items: 'array',
+    config_demo: 'object',
+  },
+
+  defaults: {
+    superheadline: 'Why {{ site.brand.name }}',
+    headline: "Everything you need. <em>Nothing you don't.</em>",
+    subheadline: 'A complete foundation that stays out of your way — configure once, ship everywhere.',
+    items: [
+      {
+        type: 'code',
+        span: 'big',
+        icon: 'sliders',
+        title: 'One config, every surface',
+        description: 'A single file drives your brand, targets, and integrations — change it once and every page follows.',
+      },
+      {
+        type: 'split',
+        span: 'tall',
+        icon: 'circle-half-stroke',
+        title: 'Light & dark, born together',
+        description: 'Every component ships in both modes from day one — no bolted-on dark theme.',
+      },
+      {
+        type: 'terminal',
+        icon: 'terminal',
+        title: 'Deploy in one verb',
+        description: 'Build, verify, and publish from a single command.',
+      },
+      {
+        type: 'brand',
+        icon: 'palette',
+        title: 'Your brand, everywhere',
+        description: 'One brand color recolors every accent surface — buttons, links, focus rings, charts.',
+      },
+      {
+        type: 'default',
+        icon: 'shield-halved',
+        title: 'Auth & accounts built in',
+        description: 'Sign-in, subscriptions, and billing flows ready on day one.',
+      },
+    ],
+    // The fake-config demo panel inside the 'code' tile (previously hardcoded
+    // {{ site.brand.* }} in markup — now args, per context-freeness).
+    config_demo: {
+      name: '{{ site.brand.name }}',
+      color: '{{ site.brand.color | default: "#2563EB" }}',
+    },
+  },
+}

@@ -1,11 +1,12 @@
 {% comment %}
   Classy v2 testimonial quote — one large serif quote with italic emphasis
   (draft-2 marketing DNA). Multiple items cycle via the shared word-rotator
-  mechanic; a single item renders static. Consumers pass the same data as
-  ever: include with testimonials=resolved.testimonials
-  (items: quote / author / role / company / initial).
+  mechanic; a single item renders static. A SHARED band: index, pricing, and
+  alternatives all pass their own copy (items: quote / author / role /
+  company / initial / avatar) — so json5 defaults stay NEUTRAL and page copy
+  rides the data bridge, never the section.
 {% endcomment %}
-{% assign _t = include.testimonials %}
+{% assign _t = args %}
 {% if _t.items and _t.items.size > 0 %}
 <section>
   <div class="container">
@@ -24,7 +25,7 @@
             <p class="classy-quote__text">&ldquo;{{ item.quote }}&rdquo;</p>
             <div class="classy-quote__attr">
               {% iftruthy item.avatar %}
-                <span class="classy-quote__avatar"><img src="{{ site.uj.placeholder.src }}" data-lazy="@src {{ item.avatar }}" alt="{{ item.author }}"/></span>
+                <span class="classy-quote__avatar"><img src="{{ args.placeholder }}" data-lazy="@src {{ item.avatar }}" alt="{{ item.author }}"/></span>
               {% endiftruthy %}
               {% iffalsy item.avatar %}
                 <span class="classy-quote__avatar">{{ item.initial | default: item.author | slice: 0 }}</span>

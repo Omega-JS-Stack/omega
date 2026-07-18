@@ -1,0 +1,64 @@
+{% if args.items and args.items.size > 0 %}
+  <section>
+    <div class="container">
+      <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
+        {% iftruthy args.superheadline %}
+          <span class="classy-micro">{{ args.superheadline }}</span>
+        {% endiftruthy %}
+        <h2 class="classy-display classy-display--section">{{ args.headline }}</h2>
+        {% iftruthy args.subheadline %}
+          <p>{{ args.subheadline }}</p>
+        {% endiftruthy %}
+      </div>
+
+      <div class="classy-bento" data-omega-reveal-stagger="70">
+        {% for item in args.items %}
+          {% capture span_class %}{% if item.span == 'big' %}classy-tile--big{% elsif item.span == 'tall' %}classy-tile--tall{% elsif item.span == 'wide' %}classy-tile--wide{% endif %}{% endcapture %}
+          <div class="classy-tile {{ span_class }}" data-omega-reveal>
+            <div class="classy-tile__head">
+              {% iftruthy item.icon %}
+                <span class="classy-icon-chip">{% uj_icon item.icon, "fa-sm" %}</span>
+              {% endiftruthy %}
+              <span class="classy-tile__title">{{ item.title }}</span>
+            </div>
+            <p class="classy-tile__desc">{{ item.description }}</p>
+
+            {% case item.type %}
+              {% when 'code' %}
+                <div class="classy-tile__code classy-ink-panel"><span class="tok-c">// omega.json5 — one file, every target</span>
+{ brand: { name: <span class="tok-v">'{{ args.config_demo.name }}'</span>,
+           color: <span class="tok-a">'{{ args.config_demo.color }}'</span> },
+  targets: { <span class="tok-k">web</span>: {…}, <span class="tok-k">backend</span>: {…},
+             <span class="tok-k">desktop</span>: {…}, <span class="tok-k">extension</span>: {…} } }</div>
+              {% when 'terminal' %}
+                <div class="classy-tile__term classy-ink-panel">
+                  <div><span class="classy-term__prompt">$</span> omega deploy</div>
+                  <div class="classy-term__out">→ building 42 pages · hashing assets</div>
+                  <div class="classy-term__out"><span class="classy-term__ok">✓</span> live in 38s<span class="omega-caret"></span></div>
+                </div>
+              {% when 'split' %}
+                <div class="classy-tile__demo">
+                  <div class="classy-tile__split">
+                    <div class="classy-tile__split-pane">
+                      <div class="classy-tile__split-card">Revenue<span class="classy-tile__split-num">$24.3k</span></div>
+                    </div>
+                    <div class="classy-tile__split-pane">
+                      <div class="classy-tile__split-card">Revenue<span class="classy-tile__split-num">$24.3k</span></div>
+                    </div>
+                  </div>
+                </div>
+              {% when 'brand' %}
+                <div class="classy-tile__brandrow">
+                  <span class="classy-tile__swatch active" style="background: var(--omega-accent);"></span>
+                  <span class="classy-tile__swatch" style="background: #d6336c;"></span>
+                  <span class="classy-tile__swatch" style="background: #0f8fa9;"></span>
+                  <span class="classy-tile__swatch" style="background: #c47206;"></span>
+                  <span class="classy-tile__swatch" style="background: #12925c;"></span>
+                </div>
+            {% endcase %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endif %}

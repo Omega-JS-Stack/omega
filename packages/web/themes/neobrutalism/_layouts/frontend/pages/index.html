@@ -77,9 +77,6 @@ testimonials:
   superheadline:
     icon: "megaphone"
     text: "Testimonials"
-  headline: "People {% uj_icon \"heart\", \"text-danger\" %} "
-  headline_accent: "{{ site.brand.name }}"
-  subheadline: "Hear from real people who have transformed their business with us"
   items:
     - quote: "This platform transformed my business. The support is incredible!"
       author: "Sarah Johnson"
@@ -308,7 +305,7 @@ cta:
   </div>
 </section>
 
-{% include frontend/components/testimonial-scroll.html testimonials=resolved.testimonials %}
+{% section "marketing/testimonials", data: resolved.testimonials %}
 
 <!-- ============================================ -->
 <!-- CTA — full-bleed ink block -->

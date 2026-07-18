@@ -1,0 +1,36 @@
+{
+  description: 'Optional video demo tabs — segmented tab buttons, per-tab feature checkmarks + autoplaying video. Off by default (enabled: false); superheadline is an object ({ text }).',
+
+  args: {
+    enabled: 'boolean',
+    superheadline: 'object',
+    headline: 'string',
+    subheadline: 'string',
+    tabs: 'array',
+  },
+
+  defaults: {
+    enabled: false,
+    superheadline: {
+      text: 'Demo',
+    },
+    headline: 'See {{ site.brand.name }} in action',
+    subheadline: 'Explore powerful features that help you succeed',
+    tabs: [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: 'gauge-high',
+        video: 'https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-1.webm',
+        features: ['Easy setup', 'Powerful tools', 'Real-time updates'],
+      },
+      {
+        id: 'analytics',
+        label: 'Analytics',
+        icon: 'chart-line',
+        video: 'https://cdn.itwcreativeworks.com/assets/sample/videos/demos/16x9/sample-demo-2.webm',
+        features: ['Advanced analytics', 'Custom reports', 'Data insights'],
+      },
+    ],
+  },
+}

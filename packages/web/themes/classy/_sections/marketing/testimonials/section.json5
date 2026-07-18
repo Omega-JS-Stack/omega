@@ -1,0 +1,16 @@
+{
+  description: 'Serif quote rotator — one large quote cycling via the shared word-rotator (single item renders static). SHARED across pages (index, pricing, alternatives each pass their own copy), so defaults carry no copy: page quotes ride the data bridge. superheadline accepts a string or { text } (no schema type on purpose).',
+
+  args: {
+    superheadline: { description: 'string or { text } — both render as the micro label' },
+    items: 'array',
+    placeholder: 'string',
+  },
+
+  defaults: {
+    // Lazy-avatar placeholder frame (previously a hardcoded
+    // {{ site.uj.placeholder.src }} read in markup — now an arg, per
+    // context-freeness).
+    placeholder: '{{ site.uj.placeholder.src }}',
+  },
+}

@@ -54,9 +54,6 @@ alternative:
     superheadline:
       icon: "bullhorn"
       text: "Testimonials"
-    headline: "People love"
-    headline_accent: "{{ site.brand.name }}"
-    subheadline: "Hear from real users who made the switch"
     items:
       - quote: "We made the switch and the difference is <em>night and day</em>. Everything just works faster."
         author: "Sarah Johnson"
@@ -330,7 +327,7 @@ alternative:
 <!-- ═══ Testimonials ═══ -->
 {% assign testimonials_size = alt.testimonials.items | size %}
 {% if testimonials_size > 0 %}
-  {% include frontend/components/testimonial-scroll.html testimonials=alt.testimonials %}
+  {% section "marketing/testimonials", data: alt.testimonials %}
 {% endif %}
 
 <!-- ═══ Stats band ═══ -->
