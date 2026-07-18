@@ -33,6 +33,17 @@
  * caller's scope before the section sees them, so defaults like
  * "Introducing {{ site.brand.name }}" work while markup stays portable to
  * any surface any framework builds.
+ *
+ * {% composition %}…{% endcomposition %} (spec §8) wraps a page layout's
+ * default section composition. Three page states, all byte-parity with the
+ * `{{ content | uj_content_format }}` layout line the wrap replaces:
+ *   - empty page → the wrapped one-liners render (absence is the spine)
+ *   - body content → renders BELOW the composition (the legacy append
+ *     contract, preserved verbatim)
+ *   - body content + `composition: true` frontmatter → the body REPLACES
+ *     the composition — what `omega customize <url>` materializes, so a
+ *     customized composition supersedes the default while the sections
+ *     inside keep flowing from the theme.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -580,6 +591,62 @@ function registerSectionTags(engine, options) {
       },
     });
   }
+
+  // ---- {% composition %}…{% endcomposition %} (spec §8): the page-body
+  // replacement guard. Wraps a layout's default composition; page content
+  // (blank for every default page) picks the branch. Parity templates parse
+  // lazily per engine so the non-blank branch renders the exact line the
+  // wrap replaced.
+  let contentParity = null;
+  engine.registerTag('composition', {
+    parse(tagToken, remainTokens) {
+      this.tpls = [];
+      let closed = false;
+      while (remainTokens.length) {
+        const token = remainTokens.shift();
+        if (token.name === 'endcomposition') {
+          closed = true;
+          break;
+        }
+        this.tpls.push(this.liquid.parser.parseToken(token, remainTokens));
+      }
+      if (!closed) throw new Error('{% composition %} not closed with {% endcomposition %}');
+    },
+
+    * render(context, emitter) {
+      const read = (key) => {
+        try {
+          return context.getSync([key]);
+        } catch {
+          return undefined;
+        }
+      };
+      const content = read('content');
+      const blank = typeof content !== 'string' || content.trim() === '';
+
+      // A page declaring `composition: true` owns its body AS the composition
+      // (what `omega customize` materializes) — content REPLACES the default.
+      // Without the flag, body content keeps the legacy contract: it renders
+      // BELOW the default composition, exactly like the
+      // `{{ content | uj_content_format }}` line this wrap replaced.
+      if (!blank && read('composition')) {
+        if (!contentParity) contentParity = this.liquid.parse('{{ content | uj_content_format }}');
+        emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
+        return;
+      }
+
+      emitter.write(yield this.liquid.renderer.renderTemplates(this.tpls, context));
+      if (blank) {
+        // Blank content still flows through (it is only whitespace) — byte-
+        // parity with the replaced layout line, which emitted the chain's
+        // newlines.
+        if (typeof content === 'string') emitter.write(content);
+      } else {
+        if (!contentParity) contentParity = this.liquid.parse('{{ content | uj_content_format }}');
+        emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
+      }
+    },
+  });
 
   return engine;
 }

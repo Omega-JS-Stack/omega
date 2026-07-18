@@ -38,6 +38,12 @@ npx omega test      # PROJECT scope: production build + smoke checks + consumer 
 npx omega deploy    # THE publish verb (D13): sync (push triggers nothing) → dispatch
                     #   build.yml so CI builds + publishes; --dry-run prints the exact
                     #   POST, --local builds only (docs/deploys.md in the Omega repo)
+npx omega customize <url>  # materialize a default page into src/pages/ (spec §8):
+                    #   composition-wrapped pages prefill the theme's section
+                    #   one-liners (no copy inlined — sections keep flowing),
+                    #   everything else copies the thin default verbatim for
+                    #   frontmatter-args customization; no URL lists every
+                    #   customizable URL + lane (docs/sections.md in the Omega repo)
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
 npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place
@@ -68,6 +74,8 @@ see the harness README for the honest before/after numbers.
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
+| [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/sections.md in the Omega repo) |
+| [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass |
 | [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`) |
 | [build.js](src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |

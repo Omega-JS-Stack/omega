@@ -41,7 +41,7 @@ cta:
   command: "npx omega setup"
   command_href: "/download"
 ---
-
+{% composition %}
 {% section "marketing/hero", data: resolved.hero %}
 <!-- ═══ Trusted-by marquee ═══ -->
 {% section "marketing/trusted-by", data: resolved.trusted_by %}
@@ -60,4 +60,4 @@ cta:
 
 <!-- ═══ CTA band ═══ -->
 {% section "marketing/cta", data: resolved.cta %}
-{{ content | uj_content_format }}
+{% endcomposition %}

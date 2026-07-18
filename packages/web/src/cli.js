@@ -18,6 +18,7 @@ const ALIASES = {
   build: ['-b', '--build'],
   deploy: ['-d', '--deploy'],
   migrate: ['-m', '--migrate', 'migration'],
+  customize: ['-cz', '--customize'],
   translate: ['-t', '--translate', 'translation'],
   audit: ['-a', '--audit'],
   purge: ['-cf', '--purge', 'cloudflare-purge'],

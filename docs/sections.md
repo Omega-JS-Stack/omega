@@ -174,6 +174,50 @@ fallthrough ids say `classy` — the override doctrine, visible.
   news/byline resolve posts/members from live site content) — their pages
   document args only.
 
+## Customize (spec §8) — `omega customize <url>`
+
+Materializes a default page into `src/pages/` so it can diverge — without
+owning anything it didn't change. No URL → lists every customizable default
+URL with its lane. Idempotent: an existing consumer page at the URL is never
+overwritten; both lanes carry a YAML comment header (frontmatter comments
+never render) and deleting the file returns the URL to the packaged default.
+
+- **composition lane** — the page's theme layout wraps a pure section
+  composition in `{% composition %}…{% endcomposition %}` (classy's home
+  today; more as extraction continues — the lane is detected from the tag,
+  never a hardcoded list). The materialized file = the default page's thin
+  frontmatter + `composition: true` + the wrapped one-liners verbatim:
+  **no copy inlined**. The layout chain stays intact, so shared-band words
+  (testimonials, cta) keep flowing from the theme's frontmatter through
+  `resolved.*` — the consumer file renders "Sarah Johnson" without ever
+  containing it. The consumer owns the composition order plus whatever args
+  they add; everything else keeps updating. Written `.html` regardless of
+  the default's extension — section output must never pass through
+  markdown.
+- **shell lane** — the theme layout still carries one-off page markup (not
+  yet a pure composition, or shadowed by a theme's own hand-crafted layout,
+  e.g. newsflash's home). The materialized file is a verbatim copy of the
+  thin default page (layout pointer + permalink): customization happens
+  through frontmatter args over `resolved.*`, and everything keeps flowing.
+
+The `{% composition %}` wrap is tri-state, byte-parity with the
+`{{ content | uj_content_format }}` line it replaces in the layout:
+
+| Page state | Renders |
+|---|---|
+| No body content | The wrapped default composition |
+| Body content | Default composition, content appended BELOW (the legacy contract, preserved verbatim) |
+| Body content + `composition: true` | The body REPLACES the composition (what customize materializes) |
+
+Materialize-then-build is identity: the only sanctioned output delta is
+blank-line runs (the materialized body passes through the blueprint's
+content wrap, which frames it with one extra newline each side). Pinned in
+`test/customize.test.js`, along with divergence (an added frontmatter arg
+lands; a deleted one-liner drops exactly that band) and the theme-honest
+lanes. The update-semantics table above is unchanged — customize writes
+once, at the consumer's explicit request; the update stream never writes
+consumer files.
+
 ## Landed vs pending
 
 Landed: the tags, resolution, schemas/validation, data bridge, §7 asset
@@ -257,5 +301,15 @@ the `sectionLibrary` global, demo variants across all 17 demoable entries
 (the two lookup-driven components document args only), and the
 development-only default-page injection lane.
 
-Pending (spec §13): `omega customize <url>`, `[id].js` wildcard page
-modules, auto-generated sample content.
+The customize lane (cp220): `omega customize <url>` + the
+`{% composition %}` wrap — see "Customize" above. Classy's home is the
+first composition-lane page (the one pure-composition layout); every other
+URL rides the shell lane until its one-off bands extract. The wrap's
+tri-state guard preserved the legacy append contract verbatim (a consumer
+page with body content on a blueprint still renders the composition with
+its content below — the slice-suite pin caught the first over-eager
+version), and replacement is opt-in via `composition: true`, which the
+materializer writes.
+
+Pending (spec §13): `[id].js` wildcard page modules, auto-generated sample
+content.
