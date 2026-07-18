@@ -4,7 +4,6 @@ const wonderfulVersion = require('wonderful-version');
 const powertools = require('node-powertools');
 const Npm = require('npm-api');
 const helpers = require('./helpers');
-const { safeInstall } = require('../../utils/safe-install');
 
 class OmegaBackendTest extends BaseTest {
   getName() {
@@ -47,34 +46,6 @@ class OmegaBackendTest extends BaseTest {
           resolve('0.0.0');
         });
     });
-  }
-
-  async installPkg(name, version, type) {
-    let v;
-    let t;
-    if (name.indexOf('file:') > -1) {
-      v = '';
-    } else if (!version) {
-      v = '@latest';
-    } else {
-      v = version;
-    }
-
-    if (!type) {
-      t = '';
-    } else if (type === 'dev' || type === '--save-dev') {
-      t = ' --save-dev';
-    }
-
-    // Build the command
-    const command = `npm i ${name}${v}${t}`;
-
-    // Log
-    console.log('Running ', command);
-
-    // Execute at the APP ROOT — runtime deps live on the app manifest
-    // (src/dist pillar), never inside the staged functions/ tree
-    await safeInstall(command, { log: true, config: { cwd: this.self.firebaseProjectPath } });
   }
 }
 

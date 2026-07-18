@@ -27,6 +27,7 @@
     "./test/extended-mode-warning": "./src/test/extended-mode-warning.js",
     "./test/prompt-streams": "./src/test/prompt-streams.js",
     "./test/e2e-harness": "./src/test/e2e-harness.js",
+    "./test/journey-harness": "./src/test/journey-harness.js",
     "./vendor": "./tools/vendor.js",
     "./omega-bin": "./src/omega-bin.js"
   },

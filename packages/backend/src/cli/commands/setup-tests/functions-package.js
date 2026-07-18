@@ -29,11 +29,14 @@ class FunctionsPackageTest extends BaseTest {
   }
 
   async fix() {
-    this.context.package.dependencies = this.context.package.dependencies || {};
-    this.context.package.version = this.context.package.version || '0.0.1';
-    this.context.package.private = true;
+    // Fresh-read first: npm-driven fixes rewrote the manifest earlier in
+    // this run — mutating the boot-time snapshot would clobber their work
+    const app = this.readAppManifest();
+    app.dependencies = app.dependencies || {};
+    app.version = app.version || '0.0.1';
+    app.private = true;
 
-    jetpack.write(`${this.self.firebaseProjectPath}/package.json`, JSON.stringify(this.context.package, null, 2));
+    this.writeAppManifest();
     this.restage();
   }
 }

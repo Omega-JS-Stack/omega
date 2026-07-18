@@ -1,6 +1,4 @@
 const BaseTest = require('./base-test');
-const jetpack = require('fs-jetpack');
-const path = require('path');
 
 class NpmProjectScriptsTest extends BaseTest {
   getName() {
@@ -26,19 +24,18 @@ class NpmProjectScriptsTest extends BaseTest {
     const bemPackage = require('../../../../package.json');
     const projectScripts = bemPackage.projectScripts || {};
 
-    // Ensure scripts object exists
-    this.context.package.scripts = this.context.package.scripts || {};
+    // Fresh-read first: npm-driven fixes rewrote the manifest earlier in
+    // this run — writing the boot-time snapshot would clobber their installs
+    // (cp195 journey catch: this exact fix erased firebase-admin/functions)
+    const app = this.readAppManifest();
+    app.scripts = app.scripts || {};
 
     // Copy all projectScripts to consumer
     for (const [name, command] of Object.entries(projectScripts)) {
-      this.context.package.scripts[name] = command;
+      app.scripts[name] = command;
     }
 
-    // Write the updated APP MANIFEST (app root — src/dist pillar)
-    jetpack.write(
-      path.join(this.self.firebaseProjectPath, 'package.json'),
-      JSON.stringify(this.context.package, null, 2)
-    );
+    this.writeAppManifest();
   }
 }
 

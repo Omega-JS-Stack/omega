@@ -178,6 +178,13 @@ function renderRootPackageJson(answers) {
     scripts: {
       start: 'omega-manager',
     },
+    // Brand-level verbs (`omega dev`, manage, the `start` script above) resolve
+    // @omega.js/manager FROM THE BRAND ROOT (omega-bin dispatch) — without this
+    // declaration nothing installs it outside the monorepo and every brand-root
+    // command dies (cp195 journey catch).
+    devDependencies: {
+      '@omega.js/manager': '*',
+    },
   }, null, 2)}\n`;
 }
 

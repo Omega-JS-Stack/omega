@@ -130,6 +130,10 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   assert.equal(pkg.name, 'acme');
   assert.equal(pkg.private, true);
   assert.deepEqual(pkg.workspaces, ['apps/*']);
+  // Brand-root verbs resolve the manager FROM the brand root (omega-bin) —
+  // the scaffold must declare it or nothing installs it outside the monorepo
+  // (cp195 journey catch)
+  assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': '*' });
 
   const appPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'website', 'package.json'), 'utf8'));
   assert.equal(appPkg.name, 'acme-website');

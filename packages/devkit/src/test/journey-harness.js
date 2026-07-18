@@ -1,0 +1,527 @@
+/**
+ * The standing wizard-journey e2e — the full consumer story, outside the
+ * monorepo, as one repeatable lane (cp195; the scripted form of cp194's
+ * hand rehearsal):
+ *
+ *   birth   → the REAL onboard wizard (flags mode) in a temp dir OUTSIDE
+ *             the monorepo — where hoist-luck can't save anything
+ *   link    → `omega i local` from the website app (tree-wide file: flip +
+ *             ONE brand-root install; also links @omega.js/manager at the
+ *             brand root so brand-level verbs exist at all)
+ *   setup   → every scaffolded app's framework setup, headless
+ *   boot    → `omega dev` at the brand root (web + backend emulator, N7
+ *             ports), probe the rendered homepage over the announced URL
+ *   manage  → headless creds-scrubbed manage; scorecard from the run file
+ *             (.omega/runs/*.json): update must succeed, no service may
+ *             error except the allowed set (testing probes the live URL of
+ *             a never-deployed brand — designed to fail pre-first-deploy)
+ *
+ * Spec-driven ({ id, url, targets, expect }) so a corpus of brand shapes
+ * can reuse it. Heavy by design — real registry installs, real builds —
+ * so preconditions (network, java) SKIP the run cleanly when unmet unless
+ * { strict }. Install-machinery legs (onboard/link/setup) inherit the
+ * machine env; runtime legs (dev boot, manage) run with credential-shaped
+ * vars scrubbed — the journey must never reach a real cloud.
+ *
+ * Layering: this module spawns framework/manager BINS by path and never
+ * requires @omega.js/manager (the manager depends on devkit, not the
+ * reverse).
+ */
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const http = require('node:http');
+const https = require('node:https');
+const { spawn, spawnSync } = require('node:child_process');
+
+// Ceilings, not expectations — cold-cache registry installs and the four
+// real app builds dominate; a warm rerun finishes far inside them.
+const TIMEOUTS = {
+  onboard: 120000,
+  link: 1800000,
+  setup: 1200000,
+  bootReady: 420000,
+  probe: 120000,
+  manage: 2400000,
+};
+
+// Setup/boot ordering preference (cosmetic — matches the rehearsal); apps
+// themselves come from the scaffold output on disk, never from a map here.
+const APP_ORDER = ['website', 'backend', 'desktop', 'extension', 'mobile'];
+
+// Lockstep with @omega.js/backend cli/commands/emulator.js (same marker the
+// devkit e2e-harness waits for — it fires AFTER persona seeding).
+const EMULATOR_READY = /Emulator ready\. Press Ctrl\+C/i;
+// The web dev server's announce line (packages/web src/commands/dev.js).
+const DEV_SERVER_URL = /Dev server: (https?:\/\/localhost:\d+)/;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Strip credential-shaped variables from an env copy — the runtime legs of
+ * the journey (dev boot, manage) must prove themselves without any machine
+ * credentials in reach.
+ *
+ * @param {Object} env - Source environment (not mutated)
+ * @returns {Object} Scrubbed copy
+ */
+function scrubCredentialEnv(env) {
+  const CREDENTIAL_SHAPE = /(TOKEN|SECRET|PASSWORD|PASSPHRASE|API_KEY|APIKEY|_KEY$|CLIENT_ID|CLIENT_SECRET|ACCESS_KEY|PRIVATE_KEY|CREDENTIALS|AUTH)/i;
+  const scrubbed = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (!CREDENTIAL_SHAPE.test(name)) {
+      scrubbed[name] = value;
+    }
+  }
+  return scrubbed;
+}
+
+/**
+ * Journey preconditions — the run needs the npm registry (framework dep
+ * trees install for real) and java (the Firestore/Database emulators).
+ *
+ * @returns {Promise<{ ok: boolean, missing: string[] }>}
+ */
+async function checkPreconditions() {
+  const missing = [];
+
+  const online = await new Promise((resolve) => {
+    const request = https.get('https://registry.npmjs.org/-/ping', { timeout: 8000 }, (response) => {
+      response.resume();
+      resolve(response.statusCode > 0);
+    });
+    request.on('timeout', () => { request.destroy(); resolve(false); });
+    request.on('error', () => resolve(false));
+  });
+  if (!online) {
+    missing.push('npm registry unreachable (network)');
+  }
+
+  const java = spawnSync('java', ['-version'], { stdio: 'ignore' });
+  if (java.status !== 0) {
+    missing.push('java (firestore/database emulators)');
+  }
+
+  return { ok: missing.length === 0, missing };
+}
+
+/** Newest run file in <brandRoot>/.omega/runs (ISO-stamped names sort). */
+function latestRunFile(brandRoot) {
+  const runsDir = path.join(brandRoot, '.omega', 'runs');
+  let names;
+  try {
+    names = fs.readdirSync(runsDir).filter((name) => name.endsWith('.json')).sort();
+  } catch (e) {
+    return null;
+  }
+  return names.length > 0 ? path.join(runsDir, names.at(-1)) : null;
+}
+
+/** The brand's app dirs (scaffold output truth), in APP_ORDER. */
+function discoverBrandApps(brandRoot) {
+  const appsDir = path.join(brandRoot, 'apps');
+  let entries;
+  try {
+    entries = fs.readdirSync(appsDir);
+  } catch (e) {
+    return [];
+  }
+  return entries
+    .filter((name) => fs.existsSync(path.join(appsDir, name, 'package.json')))
+    .sort((a, b) => {
+      const rank = (name) => { const i = APP_ORDER.indexOf(name); return i === -1 ? APP_ORDER.length : i; };
+      return rank(a) - rank(b) || a.localeCompare(b);
+    })
+    .map((name) => path.join(appsDir, name));
+}
+
+/** GET a URL (self-signed ok), resolving { status, body }. */
+function fetchPage(url) {
+  const client = url.startsWith('https:') ? https : http;
+  return new Promise((resolve, reject) => {
+    const request = client.get(url, { rejectUnauthorized: false, timeout: 15000 }, (response) => {
+      let body = '';
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => resolve({ status: response.statusCode, body }));
+    });
+    request.on('timeout', () => { request.destroy(new Error(`timeout fetching ${url}`)); });
+    request.on('error', reject);
+  });
+}
+
+class JourneyRun {
+  constructor(options) {
+    this.monorepoRoot = fs.realpathSync(options.monorepoRoot);
+    this.spec = options.spec;
+    this.keep = Boolean(options.keep);
+    this.logDir = options.logDir;
+    this.log = options.log || console.log;
+
+    this.tempRoot = null;
+    this.brandRoot = null;
+    this.devStack = null; // live `omega dev` handle
+    this.steps = [];
+    this.logIndex = 0;
+  }
+
+  /** E2eHarness-style step: ✓/✗ line, collected result, throw on failure. */
+  async step(name, fn) {
+    const startedAt = Date.now();
+    try {
+      const detail = await fn();
+      this.steps.push({ name, ok: true });
+      this.log(`  ✓ ${name}${detail ? ` (${detail})` : ''} [${Math.round((Date.now() - startedAt) / 1000)}s]`);
+    } catch (error) {
+      this.steps.push({ name, ok: false, error: error.message });
+      this.log(`  ✗ ${name}\n      ${error.message}`);
+      throw error;
+    }
+  }
+
+  logFile(stage) {
+    this.logIndex += 1;
+    return path.join(this.logDir, `${String(this.logIndex).padStart(2, '0')}-${stage}.log`);
+  }
+
+  /**
+   * Spawn a child (own process group), tee output to a stage log, and
+   * resolve on exit — rejecting on timeout or nonzero exit.
+   */
+  runToExit(stage, command, args, options) {
+    const logFile = this.logFile(stage);
+    const logStream = fs.createWriteStream(logFile);
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    });
+    child.stdout.on('data', (chunk) => logStream.write(chunk));
+    child.stderr.on('data', (chunk) => logStream.write(chunk));
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        stopGroup(child); // graceful escalation continues in the background
+        reject(new Error(`${stage} exceeded ${options.timeout / 60000} min (log: ${logFile})`));
+      }, options.timeout);
+      child.on('error', (error) => { clearTimeout(timer); reject(error); });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        logStream.end();
+        if (code === 0 || (code !== null && options.allowNonzeroExit)) {
+          resolve({ code, logFile });
+        } else {
+          reject(new Error(`${stage} exited ${code} (log: ${logFile})`));
+        }
+      });
+    });
+  }
+
+  /**
+   * Spawn a long-lived server child and resolve once every ready pattern
+   * has matched a line of its output. Returns { child, matches, stop }.
+   */
+  startServer(stage, command, args, options) {
+    const logFile = this.logFile(stage);
+    const logStream = fs.createWriteStream(logFile);
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    });
+
+    const matches = {};
+    const pending = new Map(Object.entries(options.readyPatterns));
+    let buffered = '';
+
+    const ready = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        stopGroup(child); // graceful escalation continues in the background
+        reject(new Error(`${stage} not ready after ${options.timeout / 60000} min — waiting on: ${[...pending.keys()].join(', ')} (log: ${logFile})`));
+      }, options.timeout);
+
+      const scan = (chunk) => {
+        const text = chunk.toString();
+        logStream.write(text);
+        buffered = (buffered + text).slice(-65536);
+        for (const [name, pattern] of pending) {
+          const match = buffered.match(pattern);
+          if (match) {
+            matches[name] = match;
+            pending.delete(name);
+          }
+        }
+        if (pending.size === 0) {
+          clearTimeout(timer);
+          resolve();
+        }
+      };
+
+      child.stdout.on('data', scan);
+      child.stderr.on('data', scan);
+      child.on('exit', (code) => {
+        clearTimeout(timer);
+        if (pending.size > 0) {
+          reject(new Error(`${stage} exited early (code ${code}, log: ${logFile})`));
+        }
+      });
+    });
+
+    const stop = () => stopGroup(child);
+
+    return { child, matches, ready, stop, logFile };
+  }
+
+  /** The consumer entrypoint: the brand's own hoisted dispatcher bin. */
+  dispatcherBin(fromDir) {
+    for (const dir of [fromDir, this.brandRoot]) {
+      const bin = path.join(dir, 'node_modules', '.bin', 'omega');
+      if (fs.existsSync(bin)) return bin;
+    }
+    throw new Error(`no omega bin under ${fromDir} or the brand root — did the link leg run?`);
+  }
+
+  childEnv(extra, { scrub = false } = {}) {
+    const base = scrub ? scrubCredentialEnv(process.env) : { ...process.env };
+    return { ...base, OMEGA_MONOREPO: this.monorepoRoot, ...extra };
+  }
+}
+
+function killGroup(child, signal = 'SIGKILL') {
+  try {
+    process.kill(-child.pid, signal);
+  } catch (e) {
+    try { child.kill(signal); } catch (e2) { /* already gone */ }
+  }
+}
+
+/**
+ * Graceful group shutdown: SIGINT first (firebase-tools reaps its java
+ * emulators on SIGINT; an immediate SIGKILL orphans them — cp195 leak),
+ * escalate to SIGKILL only if the group is still alive after the grace
+ * window.
+ */
+async function stopGroup(child, graceMs = 20000) {
+  if (child.exitCode !== null) return;
+  const exited = new Promise((resolve) => child.once('exit', resolve));
+  killGroup(child, 'SIGINT');
+  const outcome = await Promise.race([exited.then(() => 'clean'), sleep(graceMs)]);
+  if (outcome !== 'clean') {
+    killGroup(child, 'SIGKILL');
+    await Promise.race([exited, sleep(5000)]);
+  }
+}
+
+/**
+ * Run the full wizard journey for one brand spec.
+ *
+ * @param {Object} options
+ * @param {string} options.monorepoRoot - The omega monorepo (framework source)
+ * @param {Object} options.spec - { id, url, targets: string[], expect: { brandName, themeId } }
+ * @param {string} options.logDir - Where stage logs land (created; survives the run)
+ * @param {boolean} [options.keep] - Keep the temp brand even on success
+ * @param {boolean} [options.strict] - Unmet preconditions fail instead of skip
+ * @param {Function} [options.log] - Line sink (default console.log)
+ * @returns {Promise<{ status: 'passed'|'failed'|'skipped', reason?: string, steps: Array, brandRoot: ?string }>}
+ */
+async function runJourney(options) {
+  const run = new JourneyRun(options);
+  const { spec } = run;
+  fs.mkdirSync(run.logDir, { recursive: true });
+
+  run.log(`\nWizard journey — brand ${spec.id} (${spec.targets.join(', ')}) OUTSIDE the monorepo`);
+  run.log(`  logs: ${run.logDir}\n`);
+
+  // Preconditions — skip cleanly (not red) when the machine can't run this
+  const preconditions = await checkPreconditions();
+  if (!preconditions.ok) {
+    const reason = `preconditions unmet: ${preconditions.missing.join('; ')}`;
+    if (!options.strict) {
+      run.log(`  ⊘ SKIPPED — ${reason}`);
+      return { status: 'skipped', reason, steps: run.steps, brandRoot: null };
+    }
+    run.log(`  ✗ ${reason} (strict)`);
+    return { status: 'failed', reason, steps: run.steps, brandRoot: null };
+  }
+
+  let failed = false;
+  try {
+    // ── Birth — the real wizard, flags mode, in-place ─────────────────────
+    await run.step(`onboard scaffolds ${spec.id}`, async () => {
+      run.tempRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'omega-journey-'));
+      run.brandRoot = path.join(run.tempRoot, spec.id);
+      fs.mkdirSync(run.brandRoot);
+
+      const managerBin = path.join(run.monorepoRoot, 'packages', 'manager', 'bin', 'omega-manager');
+      await run.runToExit('onboard', process.execPath, [
+        managerBin, 'onboard',
+        `--id=${spec.id}`, `--url=${spec.url}`, `--targets=${spec.targets.join(',')}`,
+      ], { cwd: run.brandRoot, env: run.childEnv(), timeout: TIMEOUTS.onboard });
+
+      for (const file of ['config/omega.json5', 'package.json', '.env', '.gitignore']) {
+        if (!fs.existsSync(path.join(run.brandRoot, file))) {
+          throw new Error(`scaffold missing ${file}`);
+        }
+      }
+      return run.brandRoot;
+    });
+
+    const apps = discoverBrandApps(run.brandRoot);
+
+    // ── Link — one `i local` from the website app links the whole tree ────
+    await run.step('`omega i local` links every framework + the manager (one tree install)', async () => {
+      const linkFrom = apps.find((dir) => path.basename(dir) === 'website') || apps[0];
+      const webBin = path.join(run.monorepoRoot, 'packages', 'web', 'bin', 'omega');
+      await run.runToExit('link', process.execPath, [webBin, 'i', 'local'],
+        { cwd: linkFrom, env: run.childEnv(), timeout: TIMEOUTS.link });
+
+      // Every app's framework — and the brand root's manager — must resolve
+      // to the monorepo copy (realpath through the hoisted symlinks).
+      const resolveFrom = (dir, name) => {
+        let current = dir;
+        while (true) {
+          const candidate = path.join(current, 'node_modules', name);
+          if (fs.existsSync(path.join(candidate, 'package.json'))) return fs.realpathSync(candidate);
+          const parent = path.dirname(current);
+          if (parent === current) return null;
+          current = parent;
+        }
+      };
+      const misses = [];
+      for (const dir of [run.brandRoot, ...apps]) {
+        const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+        for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
+          if (!name.startsWith('@omega.js/')) continue;
+          const real = resolveFrom(dir, name);
+          if (!real || !real.startsWith(run.monorepoRoot)) {
+            misses.push(`${path.basename(dir)}:${name} → ${real || 'unresolved'}`);
+          }
+        }
+      }
+      if (misses.length > 0) {
+        throw new Error(`not linked to the monorepo: ${misses.join(', ')}`);
+      }
+      return `${apps.length} apps + brand root`;
+    });
+
+    // ── Setups — each app's framework, headless, via the consumer bin ─────
+    for (const appDir of apps) {
+      const appName = path.basename(appDir);
+      await run.step(`${appName} setup`, async () => {
+        await run.runToExit(`setup-${appName}`, run.dispatcherBin(appDir), ['setup'], {
+          cwd: appDir,
+          env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }),
+          timeout: TIMEOUTS.setup,
+        });
+      });
+    }
+
+    // ── Boot — `omega dev` at the brand root, probe the homepage ──────────
+    const bootsWeb = apps.some((dir) => path.basename(dir) === 'website');
+    const bootsBackend = apps.some((dir) => path.basename(dir) === 'backend');
+    if (bootsWeb || bootsBackend) {
+      await run.step(`\`omega dev\` boots${bootsWeb ? ' web' : ''}${bootsBackend ? ' + backend emulator' : ''}`, async () => {
+        const readyPatterns = {};
+        if (bootsWeb) readyPatterns.web = DEV_SERVER_URL;
+        if (bootsBackend) readyPatterns.backend = EMULATOR_READY;
+
+        run.devStack = run.startServer('dev', run.dispatcherBin(run.brandRoot), ['dev'], {
+          cwd: run.brandRoot,
+          env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }, { scrub: true }),
+          readyPatterns,
+          timeout: TIMEOUTS.bootReady,
+        });
+        await run.devStack.ready;
+        return bootsWeb ? run.devStack.matches.web[1] : 'emulator ready';
+      });
+
+      if (bootsWeb) {
+        await run.step('homepage renders branded + themed', async () => {
+          const url = run.devStack.matches.web[1];
+          const deadline = Date.now() + TIMEOUTS.probe;
+          let last = null;
+          while (Date.now() < deadline) {
+            try {
+              const page = await fetchPage(`${url}/`);
+              last = `status ${page.status}`;
+              if (page.status === 200
+                && page.body.includes(spec.expect.brandName)
+                && page.body.includes(`data-theme-id="${spec.expect.themeId}"`)) {
+                return `${url}/ → 200, "${spec.expect.brandName}", theme ${spec.expect.themeId}`;
+              }
+              if (page.status === 200) {
+                const missing = [
+                  !page.body.includes(spec.expect.brandName) && `brand name "${spec.expect.brandName}"`,
+                  !page.body.includes(`data-theme-id="${spec.expect.themeId}"`) && `theme id "${spec.expect.themeId}"`,
+                ].filter(Boolean);
+                last = `200 but missing ${missing.join(' + ')}`;
+              }
+            } catch (error) {
+              last = error.message;
+            }
+            await sleep(2000);
+          }
+          throw new Error(`homepage never satisfied the probe (last: ${last})`);
+        });
+      }
+
+      await run.step('dev stack shuts down cleanly', async () => {
+        await run.devStack.stop();
+        run.devStack = null;
+      });
+    }
+
+    // ── Manage — headless, creds scrubbed, judged by the run file ─────────
+    await run.step('headless manage: update builds every app; no service errors beyond the allowed set', async () => {
+      // Exit code is judged via the run file — a designed testing-service
+      // error (live probe of a never-deployed brand) may flip the exit.
+      await run.runToExit('manage', run.dispatcherBin(run.brandRoot), [], {
+        cwd: run.brandRoot,
+        env: run.childEnv({ OMEGA_NON_INTERACTIVE: '1' }, { scrub: true }),
+        timeout: TIMEOUTS.manage,
+        allowNonzeroExit: true,
+      });
+
+      const runFile = latestRunFile(run.brandRoot);
+      if (!runFile) {
+        throw new Error('manage left no .omega/runs/*.json run file');
+      }
+      const services = (JSON.parse(fs.readFileSync(runFile, 'utf8')).services || []);
+      const byName = Object.fromEntries(services.map((entry) => [entry.service, entry]));
+
+      if (byName.update?.status !== 'success') {
+        throw new Error(`update service ${byName.update ? byName.update.status : 'missing'} — ${byName.update?.error || 'no error detail'} (${runFile})`);
+      }
+      const allowedErrors = new Set(spec.allowedServiceErrors || ['testing']);
+      const unexpected = services.filter((entry) => entry.status === 'error' && !allowedErrors.has(entry.service));
+      if (unexpected.length > 0) {
+        throw new Error(`unexpected service errors: ${unexpected.map((entry) => `${entry.service} (${entry.error || 'no detail'})`).join(', ')} (${runFile})`);
+      }
+
+      if (bootsWeb && !fs.existsSync(path.join(run.brandRoot, 'apps', 'website', 'dist', 'index.html'))) {
+        throw new Error('update reported success but apps/website/dist/index.html is missing');
+      }
+      return `${services.length} services; update success; errors only in {${[...allowedErrors].join(', ')}}`;
+    });
+  } catch (error) {
+    failed = true;
+  } finally {
+    if (run.devStack) {
+      await run.devStack.stop().catch(() => {});
+      run.devStack = null;
+    }
+  }
+
+  // Teardown — keep the brand on failure (or by request) for debugging
+  if (run.tempRoot && !failed && !run.keep) {
+    fs.rmSync(run.tempRoot, { recursive: true, force: true });
+  } else if (run.tempRoot) {
+    run.log(`\n  brand kept for inspection: ${run.brandRoot}`);
+  }
+
+  run.log(failed ? '\n  Wizard journey FAILED\n' : '\n  Wizard journey PASSED\n');
+  return { status: failed ? 'failed' : 'passed', steps: run.steps, brandRoot: failed || run.keep ? run.brandRoot : null };
+}
+
+module.exports = { runJourney, scrubCredentialEnv, checkPreconditions, latestRunFile, discoverBrandApps };

@@ -3,7 +3,6 @@ const chalk = require('chalk').default;
 const wonderfulVersion = require('wonderful-version');
 const powertools = require('node-powertools');
 const helpers = require('./helpers');
-const { safeInstall } = require('../../utils/safe-install');
 
 class FirebaseAdminTest extends BaseTest {
   getName() {
@@ -44,34 +43,6 @@ class FirebaseAdminTest extends BaseTest {
     if (wonderfulVersion.greaterThan(latest, current)) {
       console.log(chalk.yellow(`${packageName} needs to be updated in @omega.js/backend: ${current} => ${latest}`));
     }
-  }
-
-  async installPkg(name, version, type) {
-    let v;
-    let t;
-    if (name.indexOf('file:') > -1) {
-      v = '';
-    } else if (!version) {
-      v = '@latest';
-    } else {
-      v = version;
-    }
-
-    if (!type) {
-      t = '';
-    } else if (type === 'dev' || type === '--save-dev') {
-      t = ' --save-dev';
-    }
-
-    // Build the command
-    const command = `npm i ${name}${v}${t}`;
-
-    // Log
-    console.log('Running ', command);
-
-    // Execute at the APP ROOT — runtime deps live on the app manifest
-    // (src/dist pillar), never inside the staged functions/ tree
-    await safeInstall(command, { log: true, config: { cwd: this.self.firebaseProjectPath } });
   }
 }
 

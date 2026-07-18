@@ -10,6 +10,11 @@ const omegaConfig = require('@omega.js/config');
 // Rules-marker regex shared with the rules setup tests (used by getRulesFile)
 const { omegaAllRulesRegex } = require('./setup-tests/helpers.js');
 
+// The framework's own manifest — its engines.node is the pinned Cloud
+// Functions runtime every consumer app inherits (SSOT with the .nvmrc
+// lockstep in setup-tests/nvmrc-version.js)
+const frameworkPackage = require('../../../package.json');
+
 class SetupCommand extends BaseCommand {
   async execute() {
     const self = this.main;
@@ -220,9 +225,13 @@ class SetupCommand extends BaseCommand {
     const ui = this.ui;
 
     // engines.node on the APP manifest — the stage step carries it into the
-    // derived functions/package.json (Cloud Functions runtime detection)
+    // derived functions/package.json (Cloud Functions runtime detection).
+    // Derived from the FRAMEWORK's pinned runtime, never the ambient node:
+    // setup must produce the same app under any shell (cp195 journey catch —
+    // an ambient-24 setup stamped 24 against the v22/* .nvmrc and boot died
+    // on the Manager.init version mismatch)
     if (!self.package.engines || !self.package.engines.node) {
-      const nodeVer = String(parseInt(process.versions.node, 10));
+      const nodeVer = String(parseInt(frameworkPackage.engines.node, 10));
       self.package.engines = self.package.engines || {};
       self.package.engines.node = nodeVer;
       jetpack.write(`${self.firebaseProjectPath}/package.json`, JSON.stringify(self.package, null, 2));

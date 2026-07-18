@@ -6,9 +6,20 @@
 |------|------|---------|------|
 | 1 — Package suites | Each package's own `node --test` (config, devkit, manager, web, client, backend boot, …) | `npm test` in the package, or `npm run test:packages` at the root | Every checkpoint |
 | 2 — Sandbox brand (automated consumer) | The backend **corpus** (framework routes/events/rules through a REAL consumer + real emulator) + the **cross-stack e2e** (browser → website → backend) | `npm run test:corpus` / `npm run test:e2e` at the root | Every checkpoint that touches runtime behavior |
+| 2.5 — Wizard journey (outside-monorepo consumer) | The FULL consumer story in a temp brand born OUTSIDE the monorepo: real onboard wizard (flags) → `i local` tree link → every framework setup → `omega dev` boot + branded-homepage probe → headless creds-scrubbed manage (update must build every app) | `npm run test:journey` at the root (also the tail of root `npm test`) | The full sequence, and any change to onboard/linking/setup/boot plumbing |
 | 3 — Playground (live rehearsal) | The 24-service manage pipeline against REAL cloud (Firebase, Cloudflare, SendGrid, …) | `npm run pipeline` in `apps/omega-playground` | SPARINGLY — Ian-authorized (real infra, real cost) |
 
-**Root `npm test` runs tiers 1 + 2 in one shot** (all workspace suites → sandbox e2e → backend corpus, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the playground is the only tier that touches real cloud.
+**Root `npm test` runs tiers 1 + 2 + 2.5 in one shot** (all workspace suites → backend corpus → wizard journey, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the journey brand is `demo-*`/`.invalid`-scoped and creds-scrubbed; the playground is the only tier that touches real cloud.
+
+## The wizard journey lane (cp195)
+
+The scripted form of the cp194 hand rehearsal — proof that a consumer OUTSIDE the monorepo (where hoist-luck can't save anything) can live the whole story. Mechanics: `@omega.js/devkit/test/journey-harness` (spec-driven: `{ id, url, targets, expect }` — a corpus of brand shapes can reuse it); runner: [scripts/e2e-journey.js](../scripts/e2e-journey.js).
+
+- **Preconditions skip, never lie**: no network or no java → the lane prints SKIPPED and exits 0 (`OMEGA_JOURNEY_STRICT=1` turns that into a failure). `OMEGA_SKIP_JOURNEY=1` skips outright.
+- **Runtime legs run creds-scrubbed**: `omega dev` and manage children get credential-shaped env vars stripped — the journey must never reach a real cloud. Install legs (onboard/link/setup) keep the machine env.
+- **The manage scorecard** comes from the brand's `.omega/runs/*.json`: `update` must succeed and no service may error except the allowed set (default `{testing}` — the live-URL probe of a never-deployed `.invalid` brand fails by design).
+- **Artifacts**: stage logs in `.temp/journey/`; on failure the temp brand is KEPT and its path printed (`OMEGA_JOURNEY_KEEP=1` keeps it on success too).
+- Heavy by design (registry installs, all-four app builds) — that's the point; it caught brand-root manager resolution (#8), the ambient-Node engines stamp (#9), and the stale-manifest clobber + linked-prepare destruction (#10) on its first runs.
 
 # Test scoping (`omega test`) — the C5 grammar
 

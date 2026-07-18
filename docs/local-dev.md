@@ -49,6 +49,8 @@ Unchanged contract for consumers, now monorepo-backed: `mgr i local` (web, deskt
 
 **Linking is brand-tree-wide by construction (cp194):** npm resolves the WHOLE workspace tree on any install anchored in a brand monorepo, so linking one app while a sibling still carries an unpublished registry spec (`@omega.js/backend: *`) 404s before anything links — only reachable in a brand OUTSIDE the omega monorepo, the real consumer topology. `linkLocalPackages()` therefore flips every app's `@omega.js/*` specs to `file:` first (dev/prod placement preserved; specs computed from REAL paths so symlinked/aliased dirs can't dangle), then runs ONE `npm install` for the tree. One call from any app links the whole brand; reruns all-skip.
 
+**The brand root itself is part of the tree (cp195):** onboard scaffolds `@omega.js/manager` into the brand root's devDependencies — the omega-bin dispatcher resolves brand-level verbs (`omega dev`, manage, the scaffolded `start` script) FROM the brand root, and without the declaration nothing installs the manager outside the monorepo (inside it, workspace hoisting masked the gap). `linkLocalPackages()` links it like any app dep (`discoverApps` already includes the brand root).
+
 ## Vendoring vs runtime deps (what ships where)
 
 Two different mechanisms keep consumers working:
