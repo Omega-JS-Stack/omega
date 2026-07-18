@@ -1,7 +1,6 @@
 # OMEGA Sections & Components — Architecture Spec
 
-> **STATUS: DRAFT — awaiting Ian's ratification (designed with Ian, 2026-07-18).**
-> Once ratified: extraction begins (corpus-pinned), and this doc's durable parts migrate to `docs/sections.md`.
+> **STATUS: RATIFIED (Ian, 2026-07-18 — same night as the design).** Extraction underway; durable parts migrate to `docs/sections.md` as pieces land.
 > Scope: ALL frameworks (web, desktop, extension, future) — this design is made once and never redesigned. No backwards compat anywhere (standing rule).
 
 ## 0. Why (the ruling that produced this)
@@ -90,8 +89,13 @@ items:
 ## 8. Pages model — blueprints stay, absence is the spine
 
 - **No file → theme/blueprint default renders** (Ian's loved behavior, preserved verbatim). Default pages become section compositions internally; pricing/contact/TOS keep filling from config.
-- **`omega customize <url>`** (verb name TBC with Ian): materializes the page prefilled with the default composition as clean one-liners (no copy inlined) — consumer adds args only where they diverge. Nobody starts blank; nobody owns what they didn't change.
+- **`omega customize <url>`** (verb SETTLED, Ian 2026-07-18): materializes the page prefilled with the default composition as clean one-liners (no copy inlined) — consumer adds args only where they diverge. Nobody starts blank; nobody owns what they didn't change.
 - Deep escape hatch unchanged: consumer-local theme file override = own that file forever (documented cost: its updates freeze).
+
+### Sample content (Ian 2026-07-18)
+
+- Posts/teammates/updates-style filler stays **SHARED across themes** — never per-theme. Scope = that filler only; anything bigger goes back to Ian.
+- It becomes **auto-generated with rolling current dates** (a virgin blog always looks alive, never "6 months stale") and materializes only under a **gitignored test path** in the consumer tree — never committed, never mixed with real brand content.
 
 ### Update semantics (the truth table)
 
@@ -130,7 +134,7 @@ Only schema renames can bite the middle row — governed by §6 deprecation + wa
 
 ## 13. Sequencing (the locked map, updated)
 
-1. **Ian ratifies this spec** (adjustments welcome — this doc is the negotiation surface)
+1. ~~Ian ratifies this spec~~ **RATIFIED 2026-07-18**
 2. **Extraction refactor**: classy + newsflash layouts → section/component libraries. `packages/web` only (playground-freeze-safe); corpus/golden-master pins output identical
 3. **Content pass A — omega-ify the playground**: real framework pitch as compositions/args; playground = the living draft of the real site
 4. **Content pass B — genericize classy**: sweep omega dev-accents from theme defaults (theme speaks generic SaaS; promoting OMEGA is a brand's job); optional per-theme sample posts/team
@@ -138,8 +142,8 @@ Only schema renames can bite the middle row — governed by §6 deprecation + wa
 6. **Arc close — THE FORK**: real omegajs.dev sub-brand born fresh outside the monorepo on published omega (fresh repo, fresh production Firebase, omegajs.dev zone, CI deploys); playground's polished content copies over 1:1. **The playground stays in the monorepo forever as the dedicated live test brand** (real Firebase, zero customer risk, break it freely)
 7. Post-arc: company umbrella brand + sub-brand rebuilds (existing hard gates unchanged; the config `company` layer already models the umbrella)
 
-## 14. Open items for Ian
+## 14. Open items — ALL RESOLVED (Ian, 2026-07-18)
 
-- `omega customize <url>` — verb name (customize / eject / edit?)
-- Per-theme sample content (news articles for newsflash, SaaS-ish posts for classy) — in pass B or parked?
-- Arc-close sub-decision (parked): outside `omega-playground` repo = one-way deploy mirror vs playground keeping simpler direct deploys once the real brand carries the CI story
+- Verb name → **`omega customize <url>`**
+- Per-theme sample content → **NO — shared filler stays shared**, but it becomes auto-generated + gitignored-test-path isolated (see §8)
+- Playground deploys after the fork → **BOTH lanes**: simple direct push is the normal lane (CI runs cost real money), and the full CI-dispatch path gets deliberately exercised every once in a while so it stays proven
