@@ -1,0 +1,14 @@
+{% comment %}
+  The newsflash band head — micro h2 + horizontal rule + optional view-all
+  link (arrow-right built in: it is the idiom, not a knob). The h2 renders
+  only when text is set; the link only when link_text is set.
+{% endcomment %}
+<div class="section-head" data-lazy="@class animation-slide-up">
+  {% iftruthy args.text %}
+    <h2>{{ args.text }}</h2>
+  {% endiftruthy %}
+  <span class="rule"></span>
+  {% iftruthy args.link_text %}
+    <a href="{{ args.link_href }}">{{ args.link_text }} {% uj_icon "arrow-right", "ms-1" %}</a>
+  {% endiftruthy %}
+</div>

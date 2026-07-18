@@ -1,0 +1,11 @@
+{
+  description: 'Newsflash band head — micro h2 + horizontal rule + optional view-all link (arrow-right is part of the idiom). h2 suppressed when text is blank; the link renders only when link_text is set.',
+
+  args: {
+    text: 'string',
+    link_text: 'string',
+    link_href: 'string',
+  },
+
+  defaults: {},
+}

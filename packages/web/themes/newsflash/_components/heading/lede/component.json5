@@ -1,0 +1,11 @@
+{
+  description: 'Newsflash lede — the big section header under a rule head: h1-sized h2 with optional text-accent span, then an optional lead paragraph. Callers keep their own <header> shell.',
+
+  args: {
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+  },
+
+  defaults: {},
+}

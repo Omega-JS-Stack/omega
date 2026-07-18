@@ -138,6 +138,22 @@ FormManager binding (`export default (el, { manager, options })`), its root
 carries `data-omega-section="marketing/newsletter-cta"`, and any page
 composing the band gets the working managed form — live-proven on blog index
 AND posts (whose old plain-action form posted to a nonexistent page).
-Pending (spec §13): remaining classy pages + newsflash extraction,
-`omega customize <url>`, the auto-generated showcase + docs, `[id].js`
-wildcard page modules, auto-generated sample content.
+
+The newsflash lane (cp213): the FIRST theme-layer section override —
+`themes/newsflash/_sections/marketing/stats/` serves the same items
+contract with newsflash markup (whole-folder wins, so its json5 carries the
+theme's own head default — theme defaults are part of the theme's
+identity) — plus newsflash-specific sections (`marketing/rundown`,
+`marketing/desks`) and the theme's head components (`heading/rule-head` —
+the h2 + rule + view-all idiom; `heading/lede` — the h1-sized header
+cluster), composed by the newsflash index. Deliberately NOT overridden:
+`marketing/cta` and `marketing/hero` — a same-id override would flip every
+fallthrough page's band to newsflash markup, so that "goes native" step is
+its own declared change. Newsflash pins live in
+`test/sections-newsflash.test.js` on a theme-override build lane.
+
+Pending (spec §13): newsflash posts-driven bands + remaining layouts (the
+story-card/feed vocabulary needs a digested plain-args contract — raw post
+objects can't flow through call-site liquification), the fallthrough-flip
+decision, `omega customize <url>`, the auto-generated showcase + docs,
+`[id].js` wildcard page modules, auto-generated sample content.

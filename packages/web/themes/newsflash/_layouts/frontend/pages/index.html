@@ -125,7 +125,10 @@ cta:
   newsroom's numbered three-step playbook, coverage-desk cards (linked to
   their category pages), a masthead numbers strip, "more to chew on" story
   tiles, and a dark big-read CTA band. (Reader quotes live on the about page.)
-  Every section is rendered by this layout — no classy includes. The
+  The rundown, desks, and stats bands render through the section library
+  (newsflash-layer sections; marketing/stats OVERRIDES the classy base — the
+  first theme-layer override); the posts-driven bands and the CTA are still
+  rendered by this layout. The
   frontmatter defaults are NEWS-genre copy — a theme's defaults are part of
   its identity (see docs/themes.md "Frontmatter defaults are part of the
   theme's identity"). Universal sections (hero, stats, cta, newsletter) keep
@@ -330,118 +333,17 @@ cta:
 <!-- ============================================ -->
 <!-- THE RUNDOWN — the newsroom's numbered three-step playbook -->
 <!-- ============================================ -->
-<section class="section-rundown pt-0">
-  <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.rundown.superheadline.text %}
-        <h2>{{ resolved.rundown.superheadline.text }}</h2>
-      {% endiftruthy %}
-      <span class="rule"></span>
-    </div>
-
-    <header class="mb-4" data-lazy="@class animation-slide-up">
-      <h2 class="h1 mb-2">
-        {{ resolved.rundown.headline }}
-        {% iftruthy resolved.rundown.headline_accent %}
-          <span class="text-accent">{{ resolved.rundown.headline_accent }}</span>
-        {% endiftruthy %}
-      </h2>
-      {% iftruthy resolved.rundown.subheadline %}
-        <p class="lead mb-0">{{ resolved.rundown.subheadline }}</p>
-      {% endiftruthy %}
-    </header>
-
-    <div class="row">
-      <div class="col-lg-9">
-        {% for item in resolved.rundown.items %}
-          <article class="feed-item" data-lazy="@class animation-slide-up">
-            <div class="feed-num" aria-hidden="true">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</div>
-            <div>
-              <h3 class="h4 mb-2">{{ item.title }}</h3>
-              <p class="text-body-secondary mb-0">{{ item.description }}</p>
-            </div>
-          </article>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-</section>
+{% section "marketing/rundown", data: resolved.rundown %}
 
 <!-- ============================================ -->
 <!-- THE DESKS — coverage cards in a paper well -->
 <!-- ============================================ -->
-<section class="bg-body-tertiary">
-  <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.desks.superheadline.text %}
-        <h2>{{ resolved.desks.superheadline.text }}</h2>
-      {% endiftruthy %}
-      <span class="rule"></span>
-    </div>
-
-    <header class="mb-5" data-lazy="@class animation-slide-up">
-      <h2 class="h1 mb-2">
-        {{ resolved.desks.headline }}
-        {% iftruthy resolved.desks.headline_accent %}
-          <span class="text-accent">{{ resolved.desks.headline_accent }}</span>
-        {% endiftruthy %}
-      </h2>
-      {% iftruthy resolved.desks.subheadline %}
-        <p class="lead mb-0">{{ resolved.desks.subheadline }}</p>
-      {% endiftruthy %}
-    </header>
-
-    <div class="row g-4">
-      {% for desk in resolved.desks.items %}
-        {% comment %} Each desk card links to its category page (href overrides the slugified title) {% endcomment %}
-        {% capture desk_href %}{% if desk.href %}{{ desk.href }}{% else %}/blog/categories/{{ desk.title | slugify }}{% endif %}{% endcapture %}
-        <div class="col-md-4" data-lazy="@class animation-slide-up">
-          <a href="{{ desk_href }}" class="card story-card h-100 p-4 text-decoration-none">
-            <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
-              {% uj_icon desk.icon %}
-            </span>
-            <h3 class="h4 mb-2">{{ desk.title }}</h3>
-            <p class="text-body-secondary mb-0">{{ desk.description }}</p>
-            <span class="small fw-bold text-primary mt-3">Read the desk {% uj_icon "arrow-right", "ms-1" %}</span>
-          </a>
-        </div>
-      {% endfor %}
-    </div>
-
-    {% iftruthy resolved.desks.cta_button %}
-      <div class="text-center mt-5" data-lazy="@class animation-slide-up">
-        <a href="{{ resolved.desks.cta_button.href }}" class="btn btn-primary btn-lg">
-          {% uj_icon resolved.desks.cta_button.icon, "me-2" %}{{ resolved.desks.cta_button.text }}
-        </a>
-      </div>
-    {% endiftruthy %}
-  </div>
-</section>
+{% section "marketing/desks", data: resolved.desks %}
 
 <!-- ============================================ -->
 <!-- STATS — masthead numbers, stroked numerals -->
 <!-- ============================================ -->
-{% iftruthy resolved.stats %}
-  <section>
-    <div class="container">
-      <div class="section-head" data-lazy="@class animation-slide-up">
-        <h2>By the numbers</h2>
-        <span class="rule"></span>
-      </div>
-      <div class="row g-4 text-center">
-        {% for stat in resolved.stats %}
-          <div class="col-6 col-lg-3" data-lazy="@class animation-slide-up">
-            <div class="stat-num">{{ stat.number }}</div>
-            <div class="fw-bold">{{ stat.label }}</div>
-            {% iftruthy stat.sublabel %}
-              <div class="small text-body-secondary">{{ stat.sublabel }}</div>
-            {% endiftruthy %}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  </section>
-{% endiftruthy %}
+{% section "marketing/stats", items: resolved.stats %}
 
 <!-- ============================================ -->
 <!-- MORE TO CHEW ON — extra story tiles before the big read -->

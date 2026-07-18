@@ -1,0 +1,14 @@
+{
+  description: 'The desks — coverage-area cards in a paper well: rule head, lede header, icon story-cards linking to their category pages (desk.href overrides the slugified title), optional cta_button. Newsflash-specific; the index passes its copy over the data bridge.',
+
+  args: {
+    superheadline: 'object',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    items: 'array',
+    cta_button: 'object',
+  },
+
+  defaults: {},
+}

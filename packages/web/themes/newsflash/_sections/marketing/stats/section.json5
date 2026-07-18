@@ -1,0 +1,12 @@
+{
+  description: 'Newsflash override of the stats band — masthead numbers with stroked numerals under a rule head. Same items contract as the classy base (number/label/sublabel); absent items suppresses the band. head is the rule-head label — a theme default, part of the newsflash identity.',
+
+  args: {
+    items: 'array',
+    head: 'string',
+  },
+
+  defaults: {
+    head: 'By the numbers',
+  },
+}

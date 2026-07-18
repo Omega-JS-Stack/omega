@@ -1,0 +1,14 @@
+{% comment %}
+  The newsflash lede — the big section header under a rule head: h1-sized h2
+  with optional accent span, then an optional lead paragraph. Callers keep
+  their own <header> shell (margins vary per band).
+{% endcomment %}
+<h2 class="h1 mb-2">
+  {{ args.headline }}
+  {% iftruthy args.headline_accent %}
+    <span class="text-accent">{{ args.headline_accent }}</span>
+  {% endiftruthy %}
+</h2>
+{% iftruthy args.subheadline %}
+  <p class="lead mb-0">{{ args.subheadline }}</p>
+{% endiftruthy %}

@@ -1,0 +1,39 @@
+{% comment %}
+  The desks — coverage-area cards in a paper well: rule head, lede header,
+  icon story-cards linking to their category pages, optional CTA button.
+  Newsflash-specific section; the index passes its copy over the data bridge.
+{% endcomment %}
+<section class="bg-body-tertiary">
+  <div class="container">
+    {% component "heading/rule-head", text: args.superheadline.text %}
+
+    <header class="mb-5" data-lazy="@class animation-slide-up">
+      {% component "heading/lede", headline: args.headline, headline_accent: args.headline_accent, subheadline: args.subheadline %}
+    </header>
+
+    <div class="row g-4">
+      {% for desk in args.items %}
+        {% comment %} Each desk card links to its category page (href overrides the slugified title) {% endcomment %}
+        {% capture desk_href %}{% if desk.href %}{{ desk.href }}{% else %}/blog/categories/{{ desk.title | slugify }}{% endif %}{% endcapture %}
+        <div class="col-md-4" data-lazy="@class animation-slide-up">
+          <a href="{{ desk_href }}" class="card story-card h-100 p-4 text-decoration-none">
+            <span class="feature-icon d-inline-flex align-items-center justify-content-center rounded-circle text-bg-primary mb-3">
+              {% uj_icon desk.icon %}
+            </span>
+            <h3 class="h4 mb-2">{{ desk.title }}</h3>
+            <p class="text-body-secondary mb-0">{{ desk.description }}</p>
+            <span class="small fw-bold text-primary mt-3">Read the desk {% uj_icon "arrow-right", "ms-1" %}</span>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% iftruthy args.cta_button %}
+      <div class="text-center mt-5" data-lazy="@class animation-slide-up">
+        <a href="{{ args.cta_button.href }}" class="btn btn-primary btn-lg">
+          {% uj_icon args.cta_button.icon, "me-2" %}{{ args.cta_button.text }}
+        </a>
+      </div>
+    {% endiftruthy %}
+  </div>
+</section>

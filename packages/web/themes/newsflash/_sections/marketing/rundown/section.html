@@ -1,0 +1,28 @@
+{% comment %}
+  The rundown — the newsroom playbook: rule head, lede header, then a
+  numbered feed of items (big stroked numerals). Newsflash-specific section;
+  the index passes its copy over the data bridge.
+{% endcomment %}
+<section class="section-rundown pt-0">
+  <div class="container">
+    {% component "heading/rule-head", text: args.superheadline.text %}
+
+    <header class="mb-4" data-lazy="@class animation-slide-up">
+      {% component "heading/lede", headline: args.headline, headline_accent: args.headline_accent, subheadline: args.subheadline %}
+    </header>
+
+    <div class="row">
+      <div class="col-lg-9">
+        {% for item in args.items %}
+          <article class="feed-item" data-lazy="@class animation-slide-up">
+            <div class="feed-num" aria-hidden="true">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</div>
+            <div>
+              <h3 class="h4 mb-2">{{ item.title }}</h3>
+              <p class="text-body-secondary mb-0">{{ item.description }}</p>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>

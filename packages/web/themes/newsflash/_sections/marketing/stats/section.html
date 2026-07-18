@@ -1,0 +1,23 @@
+{% comment %}
+  Newsflash override of marketing/stats — masthead numbers with stroked
+  numerals under a rule head. Same items contract as the classy base
+  (number / label / sublabel); absent items suppresses the whole band.
+{% endcomment %}
+{% iftruthy args.items %}
+  <section>
+    <div class="container">
+      {% component "heading/rule-head", text: args.head %}
+      <div class="row g-4 text-center">
+        {% for stat in args.items %}
+          <div class="col-6 col-lg-3" data-lazy="@class animation-slide-up">
+            <div class="stat-num">{{ stat.number }}</div>
+            <div class="fw-bold">{{ stat.label }}</div>
+            {% iftruthy stat.sublabel %}
+              <div class="small text-body-secondary">{{ stat.sublabel }}</div>
+            {% endiftruthy %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endiftruthy %}

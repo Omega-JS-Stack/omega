@@ -1,0 +1,13 @@
+{
+  description: 'The rundown — the newsroom playbook: rule head, lede header, then a numbered feed of items. Newsflash-specific; the index passes its copy over the data bridge (superheadline.icon rides the data but the head renders text only).',
+
+  args: {
+    superheadline: 'object',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    items: 'array',
+  },
+
+  defaults: {},
+}
