@@ -280,10 +280,8 @@ faqs:
 <!-- ============================================ -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      <h2>{{ resolved.pricing.one_time_headline | default: "One-time" }} {{ resolved.pricing.one_time_headline_accent | default: "purchases" }}</h2>
-      <span class="rule"></span>
-    </div>
+    {% capture one_time_head %}{{ resolved.pricing.one_time_headline | default: "One-time" }} {{ resolved.pricing.one_time_headline_accent | default: "purchases" }}{% endcapture %}
+    {% component "heading/rule-head", text: one_time_head %}
     <p class="lead mb-4" data-lazy="@class animation-slide-up">{{ resolved.pricing.one_time_subheadline | default: "Pay once, keep it forever — no subscription required." }}</p>
 
     <div class="pricing-plan-grid">
@@ -333,10 +331,7 @@ faqs:
 {% iftruthy resolved.social_proof.items %}
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      <h2>The receipts</h2>
-      <span class="rule"></span>
-    </div>
+    {% component "heading/rule-head", text: "The receipts" %}
     <div class="row g-4 text-center">
       {% for item in resolved.social_proof.items %}
         <div class="col-6 col-lg-3" data-lazy="@class animation-slide-up">
@@ -358,19 +353,10 @@ faqs:
     <div class="row justify-content-center">
       <div class="col-lg-9">
         {% iftruthy resolved.faqs.superheadline.text %}
-          <div class="section-head" data-lazy="@class animation-slide-up">
-            <h2>{{ resolved.faqs.superheadline.text }}</h2>
-            <span class="rule"></span>
-          </div>
+          {% component "heading/rule-head", text: resolved.faqs.superheadline.text %}
         {% endiftruthy %}
         <header class="mb-4" data-lazy="@class animation-slide-up">
-          <h2 class="h1 mb-2">
-            {{ resolved.faqs.headline | default: "Frequently asked" }}
-            <span class="text-accent">{{ resolved.faqs.headline_accent | default: "questions" }}</span>
-          </h2>
-          {% iftruthy resolved.faqs.subheadline %}
-            <p class="lead mb-0">{{ resolved.faqs.subheadline }}</p>
-          {% endiftruthy %}
+          {% component "heading/lede", headline: resolved.faqs.headline | default: "Frequently asked", headline_accent: resolved.faqs.headline_accent | default: "questions", subheadline: resolved.faqs.subheadline %}
         </header>
 
         <div class="accordion" id="faqAccordion">

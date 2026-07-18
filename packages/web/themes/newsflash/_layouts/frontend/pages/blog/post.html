@@ -199,16 +199,8 @@ newsletter:
 <!-- Read Next -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      <h2>
-        {{ resolved.related_posts.headline }}
-        {% iftruthy resolved.related_posts.headline_accent %}
-          {{ resolved.related_posts.headline_accent }}
-        {% endiftruthy %}
-      </h2>
-      <span class="rule"></span>
-      <a href="{{ site.url }}/blog">View all {% uj_icon "arrow-right", "ms-1" %}</a>
-    </div>
+    {% capture related_head %}{{ resolved.related_posts.headline }}{% iftruthy resolved.related_posts.headline_accent %} {{ resolved.related_posts.headline_accent }}{% endiftruthy %}{% endcapture %}
+    {% component "heading/rule-head", text: related_head, link_text: "View all", link_href: site.url | append: "/blog" %}
     <div class="row g-4">
       <!-- Loop through posts based on configured limit -->
       {% assign count = 0 %}

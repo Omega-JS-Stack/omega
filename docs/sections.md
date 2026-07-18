@@ -146,7 +146,13 @@ theme's own head default — theme defaults are part of the theme's
 identity) — plus newsflash-specific sections (`marketing/rundown`,
 `marketing/desks`) and the theme's head components (`heading/rule-head` —
 the h2 + rule + view-all idiom; `heading/lede` — the h1-sized header
-cluster), composed by the newsflash index. The posts-driven tile family:
+cluster), composed by the newsflash index — and, since the cp216 sweep,
+by EVERY newsflash layout: all 23 band heads and 8 ledes render through
+the two components (composite heads join via `{% capture %}`; the
+rule-head link slot serves index top-stories/the-latest and post
+related; its doc comment trims its trailing newline so calls adjacent
+to whitespace-trimmed tags keep glued joins). The posts-driven tile
+family:
 `news/story-card` (framed art + kicker + h5 + byline — 6 identical grid
 instances across index/blog/category/tag/related) nests `news/byline`
 (component-IN-component; the byline alone also serves the lead splash via

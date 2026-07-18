@@ -46,10 +46,7 @@ company_values:
 <!-- ============================================ -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      <h2>The newsroom</h2>
-      <span class="rule"></span>
-    </div>
+    {% component "heading/rule-head", text: "The newsroom" %}
 
     <div class="row g-4 justify-content-center">
       {% for member in site.team %}
@@ -156,10 +153,7 @@ company_values:
 <!-- ============================================ -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      <h2>How we work</h2>
-      <span class="rule"></span>
-    </div>
+    {% component "heading/rule-head", text: "How we work" %}
 
     <div class="row g-4">
       {% for value in resolved.company_values %}

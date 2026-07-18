@@ -58,6 +58,29 @@ test('cp215: news/story-card + news/byline — the posts-driven tile family (com
   assert.ok(home.includes('Mini story 03'), 'more-to-chew-on tile (slot 17)');
 });
 
+test('cp216: rule-head/lede sweep — every newsflash band head through the components, link slot lit', async () => {
+  const pages = await buildWith(nfData);
+
+  // The link slot (dormant since cp213) now renders live: index top-stories
+  // and blog/post related both pass link args through the component.
+  const home = pages.get('/test/components/hero-demo-input');
+  assert.ok(/Top stories<\/h2>[\s\S]{0,200}View all/.test(home), 'top-stories head links View all through the component');
+  const post = pages.get('/blog/first-post');
+  assert.ok(post.includes('View all'), 'related-posts head link');
+
+  // Lede through the component on about (accent span) + composite captures
+  const about = pages.get('/about');
+  assert.ok(about.includes('text-accent'), 'about ledes render accents through heading/lede');
+
+  // team/member: the tight join survives the component's trimmed doc comment
+  const member = pages.get('/team/avery-quinn');
+  assert.ok(member.includes('col-lg-9"><div class="section-head"'), 'trimmed-context call keeps the glued join');
+
+  // No inline section-head clusters remain in any newsflash layout — every
+  // head renders through the component (h2 + rule always adjacent).
+  assert.ok(member.includes('section-head'), 'member head renders');
+});
+
 test('cp213: contracts deliberately NOT flipped — fallthrough cta + body-called hero stay classy', async () => {
   const pages = await buildWith(nfData);
 

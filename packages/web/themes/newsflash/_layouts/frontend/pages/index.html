@@ -208,11 +208,7 @@ cta:
 {% if site.posts.size > 1 %}
   <section class="pt-4">
     <div class="container">
-      <div class="section-head" data-lazy="@class animation-slide-up">
-        <h2>Top stories</h2>
-        <span class="rule"></span>
-        <a href="{{ site.url }}/blog">View all {% uj_icon "arrow-right", "ms-1" %}</a>
-      </div>
+      {% component "heading/rule-head", text: "Top stories", link_text: "View all", link_href: site.url | append: "/blog" %}
       <div class="row g-4">
         {% for post in site.posts offset: 1 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">
@@ -239,15 +235,7 @@ cta:
 {% if site.posts.size > 4 %}
 <section class="section-feed">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.latest.superheadline.text %}
-        <h2>{{ resolved.latest.superheadline.text }}</h2>
-      {% endiftruthy %}
-      <span class="rule"></span>
-      {% iftruthy resolved.latest.view_all %}
-        <a href="{{ resolved.latest.view_all.href }}">{{ resolved.latest.view_all.text }} {% uj_icon "arrow-right", "ms-1" %}</a>
-      {% endiftruthy %}
-    </div>
+    {% component "heading/rule-head", text: resolved.latest.superheadline.text, link_text: resolved.latest.view_all.text, link_href: resolved.latest.view_all.href %}
 
     <div class="row g-4 g-lg-5">
       <!-- The feed: posts 5-9 (hero + top stories show 1-4) -->
@@ -334,12 +322,7 @@ cta:
 {% if site.posts.size > 14 %}
   <section class="pt-0">
     <div class="container">
-      <div class="section-head" data-lazy="@class animation-slide-up">
-        {% iftruthy resolved.more_stories.superheadline.text %}
-          <h2>{{ resolved.more_stories.superheadline.text }}</h2>
-        {% endiftruthy %}
-        <span class="rule"></span>
-      </div>
+      {% component "heading/rule-head", text: resolved.more_stories.superheadline.text %}
       <div class="row g-4">
         {% for post in site.posts offset: 14 limit: 3 %}
           <div class="col-md-4" data-lazy="@class animation-slide-up">

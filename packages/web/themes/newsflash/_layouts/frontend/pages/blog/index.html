@@ -76,10 +76,7 @@ newsletter_cta:
     {% if paginator.posts.size > 0 %}
       <!-- Lead story splash -->
       {% assign lead = paginator.posts.first %}
-      <div class="section-head" data-lazy="@class animation-slide-up">
-        <h2>Lead story</h2>
-        <span class="rule"></span>
-      </div>
+      {% component "heading/rule-head", text: "Lead story" %}
       <a href="{{ site.url }}{{ lead.url }}" class="story-card story-card--lead mb-5" data-lazy="@class animation-slide-up">
         <div class="row g-4 g-lg-5 align-items-center">
           <div class="col-lg-7">
@@ -101,10 +98,7 @@ newsletter_cta:
 
       <!-- The rest of this page's posts -->
       {% if paginator.posts.size > 1 %}
-        <div class="section-head" data-lazy="@class animation-slide-up">
-          <h2>More stories</h2>
-          <span class="rule"></span>
-        </div>
+        {% component "heading/rule-head", text: "More stories" %}
         <div class="row g-4 mb-4">
           {% for post in paginator.posts offset: 1 %}
             <div class="col-xl-4 col-lg-6 col-md-12" data-lazy="@class animation-slide-up">

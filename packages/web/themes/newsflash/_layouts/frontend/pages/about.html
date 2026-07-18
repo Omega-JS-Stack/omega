@@ -152,19 +152,9 @@ team_cta:
 <!-- Story timeline -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.story.superheadline.text %}
-        <h2>{{ resolved.story.superheadline.text }}</h2>
-      {% endiftruthy %}
-      <span class="rule"></span>
-    </div>
+    {% component "heading/rule-head", text: resolved.story.superheadline.text %}
     <header class="mb-5" data-lazy="@class animation-slide-up">
-      <h2 class="h1 mb-2">
-        {{ resolved.story.headline }} <span class="text-accent">{{ resolved.story.headline_accent }}</span>
-      </h2>
-      {% iftruthy resolved.story.subheadline %}
-        <p class="lead mb-0">{{ resolved.story.subheadline }}</p>
-      {% endiftruthy %}
+      {% component "heading/lede", headline: resolved.story.headline, headline_accent: resolved.story.headline_accent, subheadline: resolved.story.subheadline %}
     </header>
 
     <div class="row justify-content-center">
@@ -215,22 +205,9 @@ team_cta:
 <!-- Stats -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.stats.superheadline.text %}
-        <h2>{{ resolved.stats.superheadline.text }}</h2>
-      {% endiftruthy %}
-      <span class="rule"></span>
-    </div>
+    {% component "heading/rule-head", text: resolved.stats.superheadline.text %}
     <header class="mb-5" data-lazy="@class animation-slide-up">
-      <h2 class="h1 mb-2">
-        {{ resolved.stats.headline }}
-        {% iftruthy resolved.stats.headline_accent %}
-          <span class="text-accent">{{ resolved.stats.headline_accent }}</span>
-        {% endiftruthy %}
-      </h2>
-      {% iftruthy resolved.stats.subheadline %}
-        <p class="lead mb-0">{{ resolved.stats.subheadline }}</p>
-      {% endiftruthy %}
+      {% component "heading/lede", headline: resolved.stats.headline, headline_accent: resolved.stats.headline_accent, subheadline: resolved.stats.subheadline %}
     </header>
 
     <div class="row text-center g-4">
@@ -247,19 +224,9 @@ team_cta:
 <!-- Values -->
 <section class="pt-0">
   <div class="container">
-    <div class="section-head" data-lazy="@class animation-slide-up">
-      {% iftruthy resolved.values.superheadline.text %}
-        <h2>{{ resolved.values.superheadline.text }}</h2>
-      {% endiftruthy %}
-      <span class="rule"></span>
-    </div>
+    {% component "heading/rule-head", text: resolved.values.superheadline.text %}
     <header class="mb-5" data-lazy="@class animation-slide-up">
-      <h2 class="h1 mb-2">
-        {{ resolved.values.headline }} <span class="text-accent">{{ resolved.values.headline_accent }}</span>
-      </h2>
-      {% iftruthy resolved.values.subheadline %}
-        <p class="lead mb-0">{{ resolved.values.subheadline }}</p>
-      {% endiftruthy %}
+      {% component "heading/lede", headline: resolved.values.headline, headline_accent: resolved.values.headline_accent, subheadline: resolved.values.subheadline %}
     </header>
 
     <div class="row g-4">
@@ -282,23 +249,10 @@ team_cta:
 {% iftruthy resolved.testimonials %}
   <section class="pt-0">
     <div class="container">
-      <div class="section-head" data-lazy="@class animation-slide-up">
-        {% iftruthy resolved.testimonials.superheadline.text %}
-          <h2>{{ resolved.testimonials.superheadline.text }}</h2>
-        {% endiftruthy %}
-        <span class="rule"></span>
-      </div>
+      {% component "heading/rule-head", text: resolved.testimonials.superheadline.text %}
 
       <header class="mb-5" data-lazy="@class animation-slide-up">
-        <h2 class="h1 mb-2">
-          {{ resolved.testimonials.headline }}
-          {% iftruthy resolved.testimonials.headline_accent %}
-            <span class="text-accent">{{ resolved.testimonials.headline_accent }}</span>
-          {% endiftruthy %}
-        </h2>
-        {% iftruthy resolved.testimonials.subheadline %}
-          <p class="lead mb-0">{{ resolved.testimonials.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/lede", headline: resolved.testimonials.headline, headline_accent: resolved.testimonials.headline_accent, subheadline: resolved.testimonials.subheadline %}
       </header>
 
       <div class="row g-4">
