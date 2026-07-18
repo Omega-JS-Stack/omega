@@ -29,6 +29,8 @@ newsletter:
     text: "Submit"
   form:
     placeholder: "jonsnow@gmail.com"
+    success_message: "Thank you for subscribing! Check your email to confirm."
+    error_message: "Something went wrong. Please try again."
 ---
 
 <!-- Reading progress — accent hairline pinned under the nav (post JS drives width) -->
@@ -240,33 +242,5 @@ newsletter:
   </div>
 </section>
 
-<!-- ═══ Newsletter band ═══ -->
-<section class="pt-0">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-xl-9 col-lg-10 col-md-12 col-12">
-        <div class="classy-cta classy-ink-panel" data-omega-reveal="scale">
-          {% iftruthy resolved.newsletter.superheadline.text %}
-            <span class="classy-micro d-block mb-3">{{ resolved.newsletter.superheadline.text }}</span>
-          {% endiftruthy %}
-          {% iftruthy resolved.newsletter.headline %}
-            <h2 class="classy-cta__headline">{{ resolved.newsletter.headline }}</h2>
-          {% endiftruthy %}
-          {% iftruthy resolved.newsletter.subheadline %}
-            <p class="classy-cta__sub">{{ resolved.newsletter.subheadline }}</p>
-          {% endiftruthy %}
-
-          <form class="row g-3 justify-content-center needs-validation mt-2" action="/email-subscription">
-            <div class="col-md-7">
-              <label for="newsletter-email" class="visually-hidden">Email address</label>
-              <input type="email" name="email" id="newsletter-email" class="form-control form-control-lg" placeholder="{% iftruthy resolved.newsletter.form.placeholder %}{{ resolved.newsletter.form.placeholder }}{% endiftruthy %}" autocomplete="email" required>
-            </div>
-            <div class="col-md-auto">
-              <button type="submit" class="btn btn-adaptive btn-lg px-4">{% uj_icon "paper-plane", "fa-sm me-2" %}{% iftruthy resolved.newsletter.button.text %}{{ resolved.newsletter.button.text }}{% endiftruthy %}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- ═══ Newsletter band (shared; full-width now matches the blog index — flag for skin review if the old narrowed look mattered) ═══ -->
+{% section "marketing/newsletter-cta", data: resolved.newsletter, section_class: "pt-0" %}

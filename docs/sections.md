@@ -122,7 +122,12 @@ another page's words.
 Landed: the tags, resolution, schemas/validation, data bridge, §7 asset
 lanes, classy's marketing library (hero, trusted-by, bento, product-demo,
 showcase, stats, testimonials, cta, newsletter-cta — the homepage and every
-CTA/testimonial band across classy pages render through them).
+CTA/testimonial/newsletter band across classy pages render through them).
+newsletter-cta is the §7 reference consumer: its `section.js` owns the
+FormManager binding (`export default (el, { manager, options })`), its root
+carries `data-omega-section="marketing/newsletter-cta"`, and any page
+composing the band gets the working managed form — live-proven on blog index
+AND posts (whose old plain-action form posted to a nonexistent page).
 Pending (spec §13): remaining classy pages + newsflash extraction,
 `omega customize <url>`, the auto-generated showcase + docs, `[id].js`
 wildcard page modules, auto-generated sample content.

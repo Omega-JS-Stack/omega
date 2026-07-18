@@ -3,53 +3,23 @@
  */
 
 // Libraries
-import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 
 // Module
+// (The newsletter form binding moved to the section that renders it —
+// themes/classy/_sections/marketing/newsletter-cta/section.js, initialized
+// by the §7 presence init on any page composing the band.)
 export default () => {
   return new Promise(async function (resolve) {
     // Initialize when DOM is ready
     await omega.dom().ready();
 
-    setupNewsletterForm();
     setupSearch();
 
     // Resolve after initialization
     return resolve();
   });
 };
-
-// Setup newsletter form
-function setupNewsletterForm() {
-  const $form = document.getElementById('newsletter-form');
-
-  if (!$form) {
-    return;
-  }
-
-  const formManager = new FormManager('#newsletter-form', {
-    allowResubmit: false,
-    resetOnSuccess: true,
-    submittingText: 'Subscribing...',
-    submittedText: 'Subscribed!',
-  });
-
-  formManager.on('submit', async ({ data }) => {
-    console.log('Newsletter subscription:', data.email);
-
-    // Here you would integrate with your newsletter service
-    // For example: Mailchimp, SendGrid, ConvertKit, etc.
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Track signup
-    trackNewsletterSignup();
-
-    formManager.showSuccess('Thank you for subscribing! Check your email to confirm.');
-  });
-}
 
 // Setup blog search functionality
 function setupSearch() {
@@ -124,23 +94,6 @@ function performSearch(query, $blogPosts, $searchResults) {
 }
 
 // Tracking functions
-function trackNewsletterSignup() {
-  gtag('event', 'newsletter_signup', {
-    event_category: 'engagement',
-    event_label: 'blog_page',
-    value: 1,
-  });
-  fbq('track', 'Lead', {
-    content_name: 'Newsletter',
-    status: 'success',
-  });
-  ttq.track('Subscribe', {
-    content_id: 'newsletter-blog',
-    content_type: 'product',
-    content_name: 'Newsletter',
-  });
-}
-
 function trackBlogSearch(query) {
   gtag('event', 'search', {
     search_term: query,

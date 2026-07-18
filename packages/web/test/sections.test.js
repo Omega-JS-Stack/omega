@@ -228,6 +228,17 @@ test('wave 4: the newsletter band renders through the section (form-manager dial
   assert.ok(blog, 'blog index built');
   assert.ok(blog.includes('Never miss a post'), 'newsletter copy rode the data bridge');
   assert.ok(blog.includes('id="newsletter-form"') && blog.includes('data-form-state="initializing"'), 'the JS contract markup survives extraction');
+  assert.ok(blog.includes('data-omega-section="marketing/newsletter-cta"'), 'the §7 presence-init attribute rides the band');
+});
+
+test('cp209: blog posts compose the SHARED newsletter band — the dead /email-subscription form is gone', async () => {
+  const pages = await buildWith(miniData);
+  const post = pages.get('/blog/first-post');
+  assert.ok(post, 'post built');
+  assert.ok(!post.includes('email-subscription'), 'the dead action-form dialect died');
+  assert.ok(post.includes('Stay in the loop'), 'post-owned copy rode the data bridge');
+  assert.ok(post.includes('data-form-state="initializing"'), 'posts now speak the form-manager dialect');
+  assert.ok(post.includes('data-omega-section="marketing/newsletter-cta"'), 'presence init reaches post pages');
 });
 
 test('body-call lane: a consumer page composes the section with YAML args', async () => {
