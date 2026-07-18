@@ -21,12 +21,15 @@ const MONOREPO_ROOT = path.join(__dirname, '..');
 
 // The full consumer shape: every framework target, classy defaults. The
 // .invalid URL (RFC 2606) guarantees the never-deployed live probe can never
-// false-pass on someone else's real domain.
+// false-pass on someone else's real domain. allowedServiceErrors is EMPTY
+// since cp196: a never-deployed brand's live checks nudge (warn), so NO
+// service may error on a virgin brand.
 const SPEC = {
   id: 'journey-brand',
   url: 'https://journey-brand.invalid',
   targets: ['web', 'backend', 'desktop', 'extension'],
   expect: { brandName: 'Journey Brand', themeId: 'classy' },
+  allowedServiceErrors: [],
 };
 
 async function main() {

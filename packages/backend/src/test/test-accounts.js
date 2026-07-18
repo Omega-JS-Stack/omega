@@ -156,37 +156,21 @@ const STATIC_ACCOUNTS = {
       affiliate: { code: 'TESTREF', referrals: [] },
     },
   },
-  referred: {
-    id: 'referred',
-    uid: '_test-referred',
-    email: '_test.referred@{domain}',
-    properties: {
-      roles: {},
-      subscription: { product: { id: 'basic' }, status: 'active' },
-    },
-  },
-  'referred-invalid': {
-    id: 'referred-invalid',
-    uid: '_test-referred-invalid',
-    email: '_test.referred-invalid@{domain}',
-    properties: {
-      roles: {},
-      subscription: { product: { id: 'basic' }, status: 'active' },
-    },
-  },
-  'referred-disposable': {
-    id: 'referred-disposable',
-    uid: '_test-referred-disposable',
-    email: '_test.referred-disposable@mailinator.com',
-    properties: {
-      roles: {},
-      subscription: { product: { id: 'basic' }, status: 'active' },
-    },
-  },
-  // The two `consent-*` accounts use the `_test.allow_*` prefix so they bypass
-  // the `_test.*` marketing-block in blocked-local-patterns.js. They're the
-  // live-provider integration sentinels — they intentionally round-trip through
-  // SendGrid + Beehiiv to verify the consent gate works end-to-end.
+};
+
+/**
+ * Journey test accounts - for testing subscription/payment flows
+ * These accounts transition through states via webhook tests
+ */
+const JOURNEY_ACCOUNTS = {
+  // EVERY account the signup suites sign up lives here — journey, not
+  // static: a static seed stamps flags.signupProcessed + consent (cp157),
+  // which 400s the very signup these accounts exist to exercise (cp197
+  // corpus catch — latently red since cp157; `referrer` stays static, the
+  // pre-existing affiliate owner must be established before signups run).
+  // The two `consent-*` allow-accounts keep the `_test.allow_*` prefix so
+  // the EXTENDED-mode lifecycle test can round-trip SendGrid + Beehiiv
+  // (it establishes its own consent state — no seed needed).
   'consent-granted': {
     id: 'consent-granted',
     uid: '_test-allow-consent-granted',
@@ -239,13 +223,33 @@ const STATIC_ACCOUNTS = {
       subscription: { product: { id: 'basic' }, status: 'active' },
     },
   },
-};
-
-/**
- * Journey test accounts - for testing subscription/payment flows
- * These accounts transition through states via webhook tests
- */
-const JOURNEY_ACCOUNTS = {
+  referred: {
+    id: 'referred',
+    uid: '_test-referred',
+    email: '_test.referred@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'referred-invalid': {
+    id: 'referred-invalid',
+    uid: '_test-referred-invalid',
+    email: '_test.referred-invalid@{domain}',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
+  'referred-disposable': {
+    id: 'referred-disposable',
+    uid: '_test-referred-disposable',
+    email: '_test.referred-disposable@mailinator.com',
+    properties: {
+      roles: {},
+      subscription: { product: { id: 'basic' }, status: 'active' },
+    },
+  },
   'journey-payments-upgrade': {
     id: 'journey-payments-upgrade',
     uid: '_test-journey-payments-upgrade',

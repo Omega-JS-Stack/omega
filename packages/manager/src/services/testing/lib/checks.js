@@ -20,6 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
+const { recordDeploy, readDeployRecord } = require('@omega.js/devkit/deploy-record');
 
 const MAX_RETRIES = 3;
 const MAX_FILES_SHOWN = 10;
@@ -307,14 +308,23 @@ async function checkHomepage(recorder, app, ctx) {
     return;
   }
 
+  // No deploy record → a live miss means "not deployed yet", not an outage
+  // (never-deployed vs deployed-but-down — Ian 2026-07-17). A live HIT on a
+  // record-less brand adopts: the record is per-machine, so fresh clones of
+  // deployed brands self-heal here.
+  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: app.target });
   const { response, duration, error } = await fetchWithRetry(ctx, url);
+  const live = !error && response.status >= 200 && response.status < 400;
 
-  if (error) {
-    recorder.fail(name, `${url} → ${error}`);
-  } else if (response.status >= 200 && response.status < 400) {
+  if (live) {
     recorder.pass(name, `${url} → ${response.status} (${duration}ms)`);
+    if (!deployed) {
+      recordDeploy({ dir: ctx.brandRoot, target: app.target, detail: { adopted: true } });
+    }
+  } else if (!deployed) {
+    recorder.warn(name, `not deployed yet — run \`omega deploy\` when ready (${url})`);
   } else {
-    recorder.fail(name, `${url} → ${response.status}`);
+    recorder.fail(name, `${url} → ${error || response.status}`);
   }
 }
 
@@ -346,19 +356,24 @@ async function checkApiHealth(recorder, app, ctx) {
     return;
   }
 
+  // Same never-deployed vs deployed-but-down split as checkHomepage
+  const deployRecord = readDeployRecord({ dir: ctx.brandRoot, target: app.target });
   const { response, duration, error } = await fetchWithRetry(ctx, apiUrl);
+  const live = !error && response.status >= 200 && response.status < 400;
 
-  if (error) {
-    recorder.fail(name, `${apiUrl} → ${error}`);
-    return;
-  }
-
-  if (response.status < 200 || response.status >= 400) {
-    recorder.fail(name, `${apiUrl} → ${response.status}`);
+  if (!live) {
+    if (!deployRecord) {
+      recorder.warn(name, `not deployed yet — run \`omega deploy\` when ready (${apiUrl})`);
+    } else {
+      recorder.fail(name, `${apiUrl} → ${error || response.status}`);
+    }
     return;
   }
 
   recorder.pass(name, `${apiUrl} → ${response.status} (${duration}ms)`);
+  if (!deployRecord) {
+    recordDeploy({ dir: ctx.brandRoot, target: app.target, detail: { adopted: true } });
+  }
 
   // Deployed-version comparison from the health payload
   let data = null;

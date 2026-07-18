@@ -1,0 +1,203 @@
+/**
+ * The brand-SHAPE corpus (cp197, Ian 2026-07-17: "do corpus") — tier A of
+ * `npm run test:corpus`, and part of root `npm test` through it.
+ *
+ * Every cell births a brand through the REAL onboard (in-process, flags
+ * mode) in a temp dir, proves the config validates and git initializes,
+ * and — for web cells — runs the REAL Eleventy build via the monorepo's own
+ * @omega.js/web (the same no-install engine lane the zero-page pin uses)
+ * with per-cell invariants: branded homepage, active theme id, /blog,
+ * sitemap + robots meta-files, and post listing for the content cell.
+ *
+ * Fully OFFLINE by construction: no npm installs, no emulators, no live
+ * calls (Ian's corpus stance — real code against real local infra only;
+ * the outside-monorepo install/boot/manage story is the journey lane's job).
+ *
+ * Future axes live here: add a cell, not a new harness (company-mode child,
+ * extra content shapes, more themes as they're born).
+ */
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const MONOREPO_ROOT = path.join(__dirname, '..');
+const { runOnboard } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'onboard.js'));
+const { TARGET_APP_DIRS } = require(path.join(MONOREPO_ROOT, 'packages', 'manager', 'src', 'config.js'));
+const { configureOmega, loadSiteData } = require('@omega.js/web');
+
+// One row per brand shape. targets: null = the non-interactive derivation
+// default (web+backend). theme flips the seeded config. post drops a real
+// _posts entry before the build.
+const CELLS = [
+  { id: 'shape-web-only', targets: 'web' },
+  { id: 'shape-default-derivation', targets: null },
+  { id: 'shape-all-four', targets: 'web,backend,desktop,extension' },
+  { id: 'shape-newsflash', targets: 'web,backend', theme: 'newsflash' },
+  { id: 'shape-backend-only', targets: 'backend' },
+  { id: 'shape-desktop-extension', targets: 'desktop,extension' },
+  { id: 'shape-with-post', targets: 'web', post: true },
+];
+
+const POST_MARKER = 'Corpus Post Alpha';
+
+function deriveName(id) {
+  return id.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function expectedTargets(cell) {
+  return cell.targets ? cell.targets.split(',') : ['web', 'backend'];
+}
+
+/** Flip the seeded theme id in the cell's config (scaffold seeds classy). */
+function flipTheme(brandRoot, themeId) {
+  const configPath = path.join(brandRoot, 'config', 'omega.json5');
+  const raw = fs.readFileSync(configPath, 'utf8');
+  const flipped = raw.replace(/id: "classy"/, `id: "${themeId}"`);
+  if (flipped === raw) {
+    throw new Error(`could not flip theme to ${themeId} — the scaffold's classy seed line moved`);
+  }
+  fs.writeFileSync(configPath, flipped);
+}
+
+function writePost(webAppDir) {
+  const postPath = path.join(webAppDir, '_posts', '2026', '2026-07-01-corpus-post.md');
+  fs.mkdirSync(path.dirname(postPath), { recursive: true });
+  fs.writeFileSync(postPath, [
+    '---',
+    'layout: blueprint/blog/post',
+    'post:',
+    `  title: "${POST_MARKER}"`,
+    '  description: "A corpus content-shape post"',
+    '  author: corpus',
+    '  id: 1000001',
+    '  tags: ["corpus"]',
+    '  categories: ["Corpus"]',
+    '---',
+    'Corpus post body.',
+    '',
+  ].join('\n'));
+}
+
+/** Real Eleventy build of a cell's website app; returns results by URL. */
+async function buildWebApp(brandRoot) {
+  const Eleventy = require('@11ty/eleventy').default;
+  const webAppDir = path.join(brandRoot, 'apps', 'website');
+  const siteData = loadSiteData(webAppDir); // the REAL config chain (throws on invalid)
+
+  const elev = new Eleventy(webAppDir, path.join(brandRoot, '.corpus-out'), {
+    quietMode: true,
+    configPath: false,
+    config: (eleventyConfig) => {
+      // Cells share one process — never let Eleventy's template cache
+      // bleed one brand's layouts into the next (slice-test precedent)
+      eleventyConfig.setUseTemplateCache(false);
+      return configureOmega(eleventyConfig, {
+        consumerDir: webAppDir,
+        siteData,
+        farmDir: path.join(brandRoot, '.corpus-farm'),
+        assetManifest: {
+          js: { main: '/assets/js/main-CORPUS.js', pages: {} },
+          css: { main: '/assets/css/main-CORPUS.css', pages: {}, themePages: {} },
+        },
+      });
+    },
+  });
+
+  const results = await elev.toJSON();
+  return new Map(results.map((entry) => [entry.url, entry.content]));
+}
+
+function assertWebInvariants(cell, pages) {
+  const name = deriveName(cell.id);
+  const theme = cell.theme || 'classy';
+  const failures = [];
+  const need = (condition, label) => { if (!condition) failures.push(label); };
+
+  const home = pages.get('/');
+  need(home, 'homepage at /');
+  if (home) {
+    need(home.includes(name), `homepage branded "${name}"`);
+    need(home.includes(`data-theme-id="${theme}"`), `theme ${theme} active`);
+  }
+  need([...pages.keys()].some((url) => url.startsWith('/blog')), '/blog present');
+  need(pages.has('/sitemap.xml'), 'sitemap.xml');
+  need(pages.has('/robots.txt'), 'robots.txt');
+
+  if (cell.post) {
+    const blogUrl = [...pages.keys()].find((url) => url.startsWith('/blog'));
+    need(blogUrl && pages.get(blogUrl).includes(POST_MARKER), `blog lists "${POST_MARKER}"`);
+  }
+
+  return failures;
+}
+
+async function runCell(cell) {
+  const tempRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'omega-corpus-'));
+  const brandRoot = path.join(tempRoot, cell.id);
+  fs.mkdirSync(brandRoot);
+  const failures = [];
+
+  try {
+    const report = await runOnboard(brandRoot, {
+      id: cell.id,
+      url: `https://${cell.id}.invalid`,
+      ...(cell.targets ? { targets: cell.targets } : {}),
+      manage: false,
+    });
+
+    if (!report.valid) failures.push('config invalid');
+    if (!report.git?.initialized) failures.push('git not initialized');
+
+    const targets = expectedTargets(cell);
+    for (const target of targets) {
+      const dir = TARGET_APP_DIRS[target] || target;
+      if (!fs.existsSync(path.join(brandRoot, 'apps', dir, 'package.json'))) {
+        failures.push(`apps/${dir} missing for target ${target}`);
+      }
+    }
+    const scaffoldedApps = fs.readdirSync(path.join(brandRoot, 'apps'));
+    if (scaffoldedApps.length !== targets.length) {
+      failures.push(`expected ${targets.length} apps, found ${scaffoldedApps.length} (${scaffoldedApps.join(', ')})`);
+    }
+
+    if (targets.includes('web')) {
+      if (cell.theme) flipTheme(brandRoot, cell.theme);
+      if (cell.post) writePost(path.join(brandRoot, 'apps', 'website'));
+      failures.push(...assertWebInvariants(cell, await buildWebApp(brandRoot)));
+    }
+  } catch (error) {
+    failures.push(`crashed: ${error.message}`);
+  }
+
+  if (failures.length === 0) {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+  return { cell, failures, brandRoot };
+}
+
+async function main() {
+  console.log(`\nBrand-shape corpus — ${CELLS.length} cells (offline: real onboard + real web builds, no installs)\n`);
+  const outcomes = [];
+
+  for (const [index, cell] of CELLS.entries()) {
+    const outcome = await runCell(cell);
+    outcomes.push(outcome);
+    const label = `[${index + 1}/${CELLS.length}] ${cell.id}`;
+    if (outcome.failures.length === 0) {
+      console.log(`  ✓ ${label}`);
+    } else {
+      console.log(`  ✗ ${label}\n      ${outcome.failures.join('\n      ')}\n      kept: ${outcome.brandRoot}`);
+    }
+  }
+
+  const failed = outcomes.filter((outcome) => outcome.failures.length > 0);
+  console.log(failed.length === 0
+    ? `\n  Shape corpus PASSED (${CELLS.length}/${CELLS.length})\n`
+    : `\n  Shape corpus FAILED — ${failed.length}/${CELLS.length} cells\n`);
+  if (failed.length > 0) process.exitCode = 1;
+}
+
+main().catch((error) => {
+  console.error(`\nShape corpus crashed: ${error.stack}\n`);
+  process.exitCode = 1;
+});

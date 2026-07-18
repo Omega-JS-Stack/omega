@@ -19,7 +19,7 @@
  */
 
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
@@ -296,6 +296,39 @@ function answersFromBrand(brandRoot) {
   };
 }
 
+/**
+ * Ensure the born brand is a git repository: init + stage + first commit
+ * when the brand root isn't already inside one (Ian 2026-07-17 — a brand
+ * should be committable from minute one, and the extension package task's
+ * source-zip step wants a repo). The scaffolded .gitignore is on disk
+ * before this runs, so the first commit can never capture .env/.omega.
+ * Inside an existing work tree ("Use this template" clones, brands in a
+ * monorepo) this is a clean skip.
+ *
+ * @param {string} brandRoot - The brand root directory
+ * @param {string} brandName - Display name for the first-commit message
+ * @returns {{ initialized: boolean, committed?: boolean, reason?: string }}
+ */
+function ensureGitRepo(brandRoot, brandName) {
+  const git = (args) => spawnSync('git', args, { cwd: brandRoot, stdio: 'ignore' });
+
+  if (git(['rev-parse', '--is-inside-work-tree']).status === 0) {
+    return { initialized: false, reason: 'existing repository' };
+  }
+  if (git(['init']).status !== 0) {
+    return { initialized: false, reason: 'git init failed (is git installed?)' };
+  }
+  git(['add', '-A']);
+
+  // Commit with the owner's identity; machines without one get a neutral
+  // fallback so the first commit never blocks onboarding
+  const hasIdentity = git(['config', 'user.email']).status === 0;
+  const identity = hasIdentity ? [] : ['-c', 'user.name=OMEGA Onboard', '-c', 'user.email=onboard@localhost'];
+  const commit = git([...identity, 'commit', '-m', `Initial commit — ${brandName} born via omega onboard`]);
+
+  return { initialized: true, committed: commit.status === 0 };
+}
+
 /** Run manage in the new brand exactly as a user would — a real child process. */
 function spawnManage(brandRoot) {
   return new Promise((resolve) => {
@@ -411,6 +444,14 @@ async function runOnboard(cwd, options = {}) {
     console.log(`${chalk.red('✗')} Config problem: ${brand.configError || brand.configErrors.join('; ')}`);
   }
 
+  // Git — a born brand is committable from minute one
+  const git = ensureGitRepo(brandRoot, answers.name);
+  if (git.initialized) {
+    console.log(`${chalk.green('✓')} git repository initialized ${chalk.dim(git.committed ? '(first commit made)' : '(commit skipped — set your git identity and commit)')}`);
+  } else {
+    console.log(`${chalk.dim('•')} git ${chalk.dim(`(${git.reason})`)}`);
+  }
+
   printNextSteps(answers);
 
   // Manage handoff — never in a dry run, never implicitly without a TTY
@@ -427,7 +468,7 @@ async function runOnboard(cwd, options = {}) {
     manageExitCode = await spawnManage(brandRoot);
   }
 
-  return { brandRoot, mode, ...results, valid, manageExitCode };
+  return { brandRoot, mode, ...results, valid, git, manageExitCode };
 }
 
 module.exports = { runOnboard, deriveId, deriveName, deriveUrl };

@@ -5,11 +5,15 @@
 | Tier | What | Command | When |
 |------|------|---------|------|
 | 1 — Package suites | Each package's own `node --test` (config, devkit, manager, web, client, backend boot, …) | `npm test` in the package, or `npm run test:packages` at the root | Every checkpoint |
-| 2 — Sandbox brand (automated consumer) | The backend **corpus** (framework routes/events/rules through a REAL consumer + real emulator) + the **cross-stack e2e** (browser → website → backend) | `npm run test:corpus` / `npm run test:e2e` at the root | Every checkpoint that touches runtime behavior |
+| 2 — Corpus (automated consumers) | The **brand-shape corpus** (7+ generated brand shapes: real onboard + real Eleventy builds with per-shape invariants — themes, target combos, content; offline, no installs) then the sandbox **backend corpus** (framework routes/events/rules through a REAL consumer + real emulator) + the **cross-stack e2e** (browser → website → backend) | `npm run test:corpus` / `npm run test:e2e` at the root | Every checkpoint that touches runtime behavior |
 | 2.5 — Wizard journey (outside-monorepo consumer) | The FULL consumer story in a temp brand born OUTSIDE the monorepo: real onboard wizard (flags) → `i local` tree link → every framework setup → `omega dev` boot + branded-homepage probe → headless creds-scrubbed manage (update must build every app) | `npm run test:journey` at the root (also the tail of root `npm test`) | The full sequence, and any change to onboard/linking/setup/boot plumbing |
 | 3 — Playground (live rehearsal) | The 24-service manage pipeline against REAL cloud (Firebase, Cloudflare, SendGrid, …) | `npm run pipeline` in `apps/omega-playground` | SPARINGLY — Ian-authorized (real infra, real cost) |
 
 **Root `npm test` runs tiers 1 + 2 + 2.5 in one shot** (all workspace suites → backend corpus → wizard journey, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the journey brand is `demo-*`/`.invalid`-scoped and creds-scrubbed; the playground is the only tier that touches real cloud.
+
+## The brand-shape corpus (cp197)
+
+Tier 2's opening act ([scripts/corpus-shapes.js](../scripts/corpus-shapes.js)): a matrix of brand SHAPES — target combos (web-only, default web+backend derivation, all-four, backend-only, desktop+extension), themes (classy, newsflash), content (a real `_posts` entry the blog must list) — each born through the REAL onboard in a temp dir (config validates, git initializes) and, for web cells, built by the REAL Eleventy engine straight from the monorepo (no installs — the zero-page-pin lane) with per-cell invariants: branded homepage, `data-theme-id`, `/blog`, sitemap + robots. Fully offline; failing cells keep their temp brand for autopsy. A new shape = a new `CELLS` row, never a new harness. The journey lane (below) covers the one axis this can't: the outside-monorepo install/boot/manage story.
 
 ## The wizard journey lane (cp195)
 

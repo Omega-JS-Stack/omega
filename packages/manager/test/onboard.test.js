@@ -82,6 +82,38 @@ test('deriveId/deriveName/deriveUrl: dir names → wizard defaults', () => {
 
 // ─── Non-interactive (flags + derivation) ────────────────────────────────────
 
+test('fresh onboard initializes git with a first commit that honors .gitignore (cp196)', async () => {
+  const root = tempDir();
+
+  const report = await runOnboard(root, { id: 'gitful', manage: false });
+
+  assert.equal(report.git.initialized, true);
+  assert.equal(report.git.committed, true);
+  assert.ok(fs.existsSync(path.join(root, '.git')), '.git exists');
+
+  const { spawnSync } = require('node:child_process');
+  const count = spawnSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' });
+  assert.equal(count.stdout.trim(), '1', 'exactly one commit');
+
+  const tracked = spawnSync('git', ['-C', root, 'ls-files'], { encoding: 'utf8' }).stdout;
+  assert.ok(tracked.includes('config/omega.json5'), 'config committed');
+  assert.ok(tracked.includes('package.json'), 'manifest committed');
+  assert.ok(!tracked.includes('.env'), '.env never committed (scaffolded .gitignore is live before the commit)');
+});
+
+test('onboard inside an existing work tree skips git init (cp196)', async () => {
+  const root = tempDir();
+  const { spawnSync } = require('node:child_process');
+  spawnSync('git', ['-C', root, 'init'], { stdio: 'ignore' });
+
+  const report = await runOnboard(root, { id: 'nested', manage: false });
+
+  assert.equal(report.git.initialized, false);
+  assert.equal(report.git.reason, 'existing repository');
+  const count = spawnSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' });
+  assert.notEqual(count.stdout.trim(), '1', 'no commit was made on the existing repo');
+});
+
 test('non-interactive: full flags scaffold the complete brand monorepo', async () => {
   const root = tempDir();
 

@@ -27,6 +27,7 @@ module.exports = async function (options) {
   const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });
 
   if (dispatched) {
+    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'extension', detail: { method: 'dispatch' } });
     logger.log(`Dispatched ${WORKFLOW} — CI builds, publishes to stores, and attaches the zip to a GitHub release.`);
     logger.log(`Watch: ${plan.runsUrl}`);
   } else {

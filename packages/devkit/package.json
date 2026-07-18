@@ -19,6 +19,7 @@
     "./merge-line-files": "./src/merge-line-files.js",
     "./translate": "./src/translate/index.js",
     "./deploy": "./src/deploy.js",
+    "./deploy-record": "./src/deploy-record.js",
     "./clean-dirs": "./src/clean-dirs.js",
     "./parse-audit": "./src/parse-audit.js",
     "./test/runner-core": "./src/test/runner-core.js",

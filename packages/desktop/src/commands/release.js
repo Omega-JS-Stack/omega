@@ -78,6 +78,7 @@ module.exports = async function release(options = {}) {
   }
 
   logger.log(`Run started: ${run.html_url}`);
+  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: projectRoot, target: 'desktop', detail: { method: 'release-dispatch' } });
 
   // 4. Set up the CI log tee.
   const logsDir = path.join(projectRoot, 'logs');

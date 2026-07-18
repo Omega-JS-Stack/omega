@@ -47,6 +47,8 @@ engines treat workflow files as framework-owned overwrites).
 
 Real deploys refuse `file:` deps (web); dry-runs always show the plan.
 
+**Every successful deploy records itself (cp196)**: `deploy.<target>` in the brand's `.omega/state.json` via `@omega.js/devkit/deploy-record` (`recordDeploy`/`readDeployRecord` — brand-root-resolved from any app dir; gitignored, per-machine). The manager's testing service reads it to split **never deployed** (live-URL checks warn with a "run `omega deploy` when ready" nudge) from **deployed but down** (an honest error), and ADOPTS a record when a record-less brand's live URL answers — so fresh clones of long-deployed brands self-heal on their first manage run. Dry-runs never record.
+
 ### Backend: local-package staging
 
 Cloud Build only installs what's inside the uploaded functions folder, and its

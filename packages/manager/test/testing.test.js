@@ -30,6 +30,16 @@ function stageBrand() {
   return mkdtempSync(join(tmpdir(), 'omega-testing-'));
 }
 
+/**
+ * Mark targets as deployed (cp196): live-check failures only ERROR when a
+ * deploy record exists — record-less brands get the "not deployed yet"
+ * nudge instead.
+ */
+function seedDeployRecord(root, ...targets) {
+  const deploy = Object.fromEntries(targets.map((target) => [target, { at: '2026-07-17T00:00:00.000Z' }]));
+  jetpack.write(join(root, '.omega', 'state.json'), { deploy });
+}
+
 function brandConfig(overrides = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url: HOMEPAGE },
@@ -270,8 +280,9 @@ test('testing: framework declared via file: but not installed → dim note, npm 
 
 // ─── Homepage ────────────────────────────────────────────────────────────────
 
-test('testing: homepage network error retries 3× then fails the service', async () => {
+test('testing: homepage network error on a DEPLOYED brand retries 3× then fails the service', async () => {
   const root = stageBrand();
+  seedDeployRecord(root, 'web');
   const apps = [stageWebApp(root)];
   const fetch = fakeFetch({ [HOMEPAGE]: new Error('getaddrinfo ENOTFOUND fixture-brand.test') });
   const exec = fakeExec({ [GIT_CMD]: '' });
@@ -327,8 +338,9 @@ test('testing: deployed backend older than npm latest → warned', async () => {
   ]);
 });
 
-test('testing: API returning 503 retries 3× then fails', async () => {
+test('testing: API returning 503 on a DEPLOYED brand retries 3× then fails', async () => {
   const root = stageBrand();
+  seedDeployRecord(root, 'backend');
   const apps = [stageBackendApp(root, { installed: null })];
   const fetch = fakeFetch({ [API_URL]: { status: 503 } });
   const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
@@ -340,6 +352,39 @@ test('testing: API returning 503 retries 3× then fails', async () => {
   assert.deepEqual(report.output.results.failed, [
     { name: 'backend: API health', error: `${API_URL} → 503` },
   ]);
+});
+
+// ─── Never-deployed vs deployed-but-down (cp196, Ian's call) ─────────────────
+
+test('testing: never-deployed brand — live misses NUDGE (warned), never error', async () => {
+  const root = stageBrand();
+  const apps = [stageWebApp(root), stageBackendApp(root)];
+  const fetch = fakeFetch({
+    [HOMEPAGE]: new Error('getaddrinfo ENOTFOUND fixture-brand.test'),
+    [API_URL]: new Error('getaddrinfo ENOTFOUND api.fixture-brand.test'),
+  });
+  const exec = fakeExec({ 'npm view @omega.js/backend version': '5.9.0\n', [GIT_CMD]: '' });
+
+  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+
+  assert.equal(report.status, 'warned');
+  assert.deepEqual(report.output.results.failed, []);
+  const nudges = report.output.results.warned.filter((w) => /not deployed yet/.test(w.warning));
+  assert.deepEqual(nudges.map((w) => w.name), ['website: homepage', 'backend: API health']);
+  assert.match(nudges[0].warning, /omega deploy/);
+});
+
+test('testing: record-less brand with a LIVE site passes and ADOPTS the deploy record', async () => {
+  const root = stageBrand();
+  const apps = [stageWebApp(root)];
+  const fetch = fakeFetch({ [HOMEPAGE]: { status: 200 } });
+  const exec = fakeExec({ [GIT_CMD]: '' });
+
+  const report = await runService(brandConfig(), { root, apps, fetch, exec });
+
+  assert.equal(report.status, 'success');
+  const state = jetpack.read(join(root, '.omega', 'state.json'), 'json');
+  assert.equal(state.deploy.web.adopted, true, 'live hit on a record-less brand writes the record (fresh clones self-heal)');
 });
 
 test('testing: no brand.url → homepage and API health warn, zero fetches', async () => {

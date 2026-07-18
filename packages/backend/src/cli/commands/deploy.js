@@ -55,6 +55,8 @@ class DeployCommand extends BaseCommand {
         child.stderr.on('data', (data) => process.stderr.write(data));
       });
 
+      require('@omega.js/devkit/deploy-record').recordDeploy({ dir: self.firebaseProjectPath, target: 'backend', detail: { method: 'firebase' } });
+
       // After successful deploy, ensure HTTP functions are publicly invocable
       await this.ensurePublicInvoker();
     } finally {
