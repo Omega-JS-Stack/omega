@@ -163,6 +163,55 @@ function matchesType(value, type) {
 }
 
 /**
+ * Collect every section/component ASSET (section.scss / section.js and the
+ * component.* twins) across the layer chain — the spec §7 asset lanes. Same
+ * resolution semantics as the tags: first root owning the entry's .html wins
+ * the WHOLE entry (markup + assets travel together — a consumer overriding a
+ * section owns its styles/behavior too). Sorted (kind, id) for deterministic
+ * sheet/bundle order.
+ * @param {string[]} baseDirs - resolution bases in precedence order
+ *   (consumer dir first, then theme layers — registerSectionTags' order)
+ * @returns {Array<{kind: string, id: string, scss: string|null, js: string|null}>}
+ */
+function collectSectionAssets(baseDirs) {
+  const entries = new Map(); // `${kind}:${id}` → {kind, id, scss, js}
+
+  const walk = (root, dir, kind, prefix) => {
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!item.isDirectory()) continue;
+      const id = prefix ? `${prefix}/${item.name}` : item.name;
+      if (!NAME_SHAPE.test(id)) continue;
+      const entryDir = path.join(dir, item.name);
+      const html = path.join(entryDir, `${KINDS[kind].basename}.html`);
+      if (fs.existsSync(html)) {
+        const key = `${kind}:${id}`;
+        if (!entries.has(key)) {
+          const scss = path.join(entryDir, `${KINDS[kind].basename}.scss`);
+          const js = path.join(entryDir, `${KINDS[kind].basename}.js`);
+          entries.set(key, {
+            kind,
+            id,
+            scss: fs.existsSync(scss) ? scss : null,
+            js: fs.existsSync(js) ? js : null,
+          });
+        }
+      } else {
+        walk(root, entryDir, kind, id);
+      }
+    }
+  };
+
+  for (const root of baseDirs) {
+    for (const kind of Object.keys(KINDS)) {
+      const dir = path.join(root, KINDS[kind].dirname);
+      if (fs.existsSync(dir)) walk(root, dir, kind, '');
+    }
+  }
+
+  return [...entries.values()].sort((a, b) => (a.kind + a.id).localeCompare(b.kind + b.id));
+}
+
+/**
  * Register the {% section %} and {% component %} tags on a LiquidJS engine.
  * @param {object} engine - LiquidJS engine (Eleventy's, via amendLibrary)
  * @param {object} options
@@ -313,4 +362,4 @@ function registerSectionTags(engine, options) {
   return engine;
 }
 
-module.exports = { registerSectionTags, parseInlineArgs, levenshtein, KINDS };
+module.exports = { registerSectionTags, collectSectionAssets, parseInlineArgs, levenshtein, KINDS };

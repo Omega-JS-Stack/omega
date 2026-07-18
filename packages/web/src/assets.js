@@ -35,6 +35,7 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const sass = require('sass');
 const { collectLayered } = require('./layers.js');
+const { collectSectionAssets } = require('./sections.js');
 
 // A page file is an ENTRY when it's a per-page index.js/index.scss, or a flat
 // file at most two segments below pages/ (pages/index.js, pages/blog/post.js).
@@ -59,6 +60,12 @@ function pageKey(rel) {
  * @param {string} options.coreDir - the core layer root (for __main_assets__)
  * @param {string} options.outDir - the site output dir (_site)
  * @param {string} options.clientEntry - path to @omega.js/client's entry (aliased as `@omega.js/client`)
+ * @param {string[]} [options.sectionRoots] - section/component resolution bases
+ *   (consumer dir, then theme layers — registerSectionTags' order). Feeds the
+ *   spec §7 asset lanes: every entry's section.scss compiles into the main
+ *   sheet via `omega:sections` (PurgeCSS self-trims unused ones) and every
+ *   section.js bundles into the main bundle behind DOM-presence init
+ *   (data-omega-section/-component attributes, boot.js bootSections)
  * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
  *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
  * @param {'css'|'js'} [options.only] - rebuild just one half (dev watcher
@@ -72,6 +79,7 @@ async function buildAssets(options) {
   // Explicit (resolveThemeLayers output) — a consumer-local theme dir can't
   // be recognized by its parent dir, so callers name the theme roots.
   const themeRoots = options.themeRoots;
+  const sectionAssets = collectSectionAssets(options.sectionRoots || []);
 
   if (options.only !== 'css') {
     // ---- JS entries: layered union of page modules + the main bundle
@@ -105,14 +113,25 @@ async function buildAssets(options) {
         }));
         build.onLoad({ filter: /.*/, namespace: 'omega-boot' }, (args) => {
           const isMain = args.path === mainJs;
-          return {
-            resolveDir: path.dirname(args.path),
-            contents: [
-              `import { ${isMain ? 'bootMain' : 'bootPage'} } from ${JSON.stringify(bootRuntime)};`,
-              `import mod from ${JSON.stringify(args.path)};`,
-              `${isMain ? 'bootMain' : 'bootPage'}(mod);`,
-            ].join('\n'),
-          };
+          const lines = [
+            `import { ${isMain ? 'bootMain' : 'bootPage'} } from ${JSON.stringify(bootRuntime)};`,
+            `import mod from ${JSON.stringify(args.path)};`,
+            `${isMain ? 'bootMain' : 'bootPage'}(mod);`,
+          ];
+          // §7 section-JS lane: the main stub imports every section.js and
+          // registers the id → init map; bootSections inits per
+          // [data-omega-<kind>="<id>"] element after the main boot.
+          const jsEntries = isMain ? sectionAssets.filter((entry) => entry.js) : [];
+          if (jsEntries.length) {
+            lines[0] = `import { bootMain, bootSections } from ${JSON.stringify(bootRuntime)};`;
+            const registry = { section: [], component: [] };
+            jsEntries.forEach((entry, i) => {
+              lines.push(`import sectionInit${i} from ${JSON.stringify(entry.js)};`);
+              registry[entry.kind].push(`${JSON.stringify(entry.id)}: sectionInit${i}`);
+            });
+            lines.push(`bootSections({ section: { ${registry.section.join(', ')} }, component: { ${registry.component.join(', ')} } });`);
+          }
+          return { resolveDir: path.dirname(args.path), contents: lines.join('\n') };
         });
 
         // UJM asset-aliases: __main_assets__ → core layer / themes dir; __theme__ → active theme (classy fallback)
@@ -198,7 +217,7 @@ async function buildAssets(options) {
   // importing file first — beating any layering — so layered lookups use an
   // explicit scheme, which sass never resolves relatively).
   const cssDirs = options.layers.map((layer) => path.join(layer, 'css')).filter((dir) => fs.existsSync(dir));
-  const importers = [layeredFileImporter(options.layers)];
+  const importers = [layeredFileImporter(options.layers), sectionsImporter(sectionAssets)];
   const emitCss = (css, rel) => {
     const hash = crypto.createHash('md5').update(css).digest('hex').slice(0, 8);
     const outRel = path.join('assets', 'css', options.dev ? `${rel}.css` : rel.replace(/(\.css)?$/, `-${hash}.css`));
@@ -287,6 +306,31 @@ async function purgeCss(options) {
  * @param {string[]} layers - layer roots
  * @returns {object}
  */
+/**
+ * Sass importer synthesizing `omega:sections` — the §7 css lane. The module
+ * body is a generated @use list over every layer-resolved section.scss /
+ * component.scss (deterministic kind+id order), so core main.scss pulls the
+ * whole library with ONE line and PurgeCSS self-trims sections a site never
+ * renders. Empty library → empty module (the @use is always safe).
+ * @param {Array<{scss: string|null}>} sectionAssets - collectSectionAssets output
+ * @returns {object}
+ */
+function sectionsImporter(sectionAssets) {
+  const { pathToFileURL } = require('node:url');
+  return {
+    canonicalize(url) {
+      return url === 'omega:sections' ? new URL(url) : null;
+    },
+    load() {
+      const contents = sectionAssets
+        .filter((entry) => entry.scss)
+        .map((entry, i) => `@use ${JSON.stringify(pathToFileURL(entry.scss).href)} as omega-section-${i};`)
+        .join('\n');
+      return { contents, syntax: 'scss' };
+    },
+  };
+}
+
 function layeredFileImporter(layers) {
   const { pathToFileURL, fileURLToPath } = require('node:url');
   return {
@@ -310,4 +354,4 @@ function layeredFileImporter(layers) {
   };
 }
 
-module.exports = { buildAssets, purgeCss, layeredFileImporter };
+module.exports = { buildAssets, purgeCss, layeredFileImporter, sectionsImporter };

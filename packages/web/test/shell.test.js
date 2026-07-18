@@ -13,7 +13,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const sass = require('sass');
 
-const { layeredFileImporter } = require('../src/assets.js');
+const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
 const { buildWith: sharedBuildWith, miniData, PKG } = require('./lib/build.js');
 
 // Namespace this file's Eleventy output dirs (test files run concurrently)
@@ -61,7 +61,7 @@ test('core bundle carries the shell through the classy chain, warning set unchan
 
   const warnings = [];
   const css = sass.compile(path.join(PKG, 'core', 'css', 'main.scss'), {
-    importers: [layeredFileImporter(layers)],
+    importers: [layeredFileImporter(layers), sectionsImporter([])],
     loadPaths: layers,
     quietDeps: true,
     silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],

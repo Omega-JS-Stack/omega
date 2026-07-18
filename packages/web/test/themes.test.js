@@ -16,7 +16,7 @@ const { test } = require('node:test');
 const sass = require('sass');
 
 const { resolveThemeLayers } = require('../src/layers.js');
-const { layeredFileImporter } = require('../src/assets.js');
+const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
 const { buildWith: sharedBuildWith, miniData, MINI, PKG } = require('./lib/build.js');
 
 // Namespace this file's Eleventy output dirs (test files run concurrently)
@@ -56,7 +56,7 @@ test('tier 1: consumer main.scss pulls, configures, and overrides the chain via 
 
   const warnings = [];
   const css = sass.compile(path.join(consumerRoot, 'css', 'main.scss'), {
-    importers: [layeredFileImporter(layers)],
+    importers: [layeredFileImporter(layers), sectionsImporter([])],
     loadPaths: layers,
     quietDeps: true,
     silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
@@ -81,7 +81,7 @@ test('inheritance hatch: a partial theme @forwards omega:theme and inherits the 
   const layers = [partialRoot, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')];
 
   const css = sass.compile(path.join(partialRoot, '_theme.scss'), {
-    importers: [layeredFileImporter(layers)],
+    importers: [layeredFileImporter(layers), sectionsImporter([])],
     loadPaths: layers,
     quietDeps: true,
     silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],

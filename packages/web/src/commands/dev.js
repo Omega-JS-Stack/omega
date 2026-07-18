@@ -91,6 +91,7 @@ module.exports = async function (options) {
   const build = (only) => buildAssets({
     layers,
     themeRoots: themeLayerDirs,
+    sectionRoots: [paths.src, ...themeLayerDirs],
     themesDir: PATHS.themes,
     coreDir: PATHS.core,
     outDir: paths.out,
@@ -153,6 +154,11 @@ module.exports = async function (options) {
     ...themeLayerDirs,
     path.join(PATHS.core, 'js'),
     path.join(PATHS.core, 'css'),
+    // Consumer-local section/component assets (§7) live OUTSIDE the asset
+    // trees (src/_sections) — theme-layer sections are covered by the theme
+    // roots above.
+    path.join(paths.src, '_sections'),
+    path.join(paths.src, '_components'),
   ].filter((dir) => fs.existsSync(dir));
 
   // Narrowed rebuilds: a css-only change set rebuilds just the stylesheets —

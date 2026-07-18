@@ -66,6 +66,7 @@ async function buildSite(options) {
         coreDir,
       ],
       themeRoots: themeLayerDirs,
+      sectionRoots: [options.consumerDir, ...themeLayerDirs],
       themesDir,
       coreDir,
       outDir: options.outDir,

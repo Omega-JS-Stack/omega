@@ -10,7 +10,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { Liquid } = require('liquidjs');
 
-const { registerSectionTags, parseInlineArgs } = require('../src/sections.js');
+const { registerSectionTags, collectSectionAssets, parseInlineArgs } = require('../src/sections.js');
 const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 
 const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'sections-test');
@@ -159,6 +159,28 @@ test('sections are context-free: caller scope never leaks into the markup', asyn
   const { engine } = makeEngine();
   const html = await engine.parseAndRender('{% section "marketing/hero" %}', { ...SITE, secret: 'LEAK' });
   assert.ok(html.includes('<b></b>'), `bare {{ secret }} in section markup rendered empty, got: ${html}`);
+});
+
+// ─── §7 asset collection ─────────────────────────────────────────────────────
+
+test('collectSectionAssets: first root wins the WHOLE entry; deterministic order; absent assets are null', () => {
+  const entries = collectSectionAssets([CONSUMER, THEME]);
+  const byKey = new Map(entries.map((entry) => [`${entry.kind}:${entry.id}`, entry]));
+
+  // consumer hero wins outright — its scss/js, never the theme's
+  const hero = byKey.get('section:marketing/hero');
+  assert.ok(hero.scss.includes(`${path.sep}consumer${path.sep}`), 'consumer scss won');
+  assert.ok(hero.js.includes(`${path.sep}consumer${path.sep}`), 'consumer js won');
+
+  // markup-only entries appear with null assets (they still resolve as tags)
+  const plain = byKey.get('section:plain');
+  assert.equal(plain.scss, null);
+  assert.equal(plain.js, null);
+  assert.ok(byKey.has('component:frame/box'), 'components collect through the same walk');
+
+  // deterministic kind+id order (sheet/bundle stability)
+  const keys = entries.map((entry) => `${entry.kind}:${entry.id}`);
+  assert.deepEqual(keys, [...keys].sort(), 'sorted output');
 });
 
 // ─── build-level pins (the real classy hero through the real engine) ─────────

@@ -104,3 +104,34 @@ export function bootPage(mod) {
     })
     .catch((e) => console.error('Page module error:', e));
 }
+
+/**
+ * Boot the section-JS registry (spec §7): after the main boot, init every
+ * section/component whose markup is PRESENT on the page — one init call per
+ * [data-omega-section="<id>"] / [data-omega-component="<id>"] element, with
+ * the element and the shared context. Absent sections cost nothing; one
+ * section's failure never blocks another's.
+ * @param {{section: object, component: object}} registry - id → init fn maps
+ *   (generated into the main boot stub by the asset pipeline)
+ * @returns {Promise<void>}
+ */
+export function bootSections(registry) {
+  if (!ready) ready = initialize();
+
+  return ready
+    .then(async () => {
+      const { manager, options } = getContext();
+      for (const [kind, inits] of Object.entries(registry)) {
+        for (const [id, init] of Object.entries(inits)) {
+          for (const el of document.querySelectorAll(`[data-omega-${kind}="${id}"]`)) {
+            try {
+              await init(el, { manager, options });
+            } catch (e) {
+              console.error(`Section init error (${kind} "${id}"):`, e);
+            }
+          }
+        }
+      }
+    })
+    .catch((e) => console.error('Section boot error:', e));
+}

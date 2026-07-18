@@ -31,6 +31,9 @@ function build(themeIds) {
       path.join(PKG, 'core'),
     ],
     themeRoots,
+    // §7 lanes: the fixture site doubles as the consumer dir (its _sections
+    // carries the demo/probe entry); real theme roots ride behind it.
+    sectionRoots: [path.join(__dirname, 'fixtures', 'site-assets'), ...themeRoots],
     themesDir: path.join(PKG, 'themes'),
     coreDir: path.join(PKG, 'core'),
     outDir: OUT,
@@ -52,6 +55,24 @@ test('layered page modules: site layer wins, core fills the rest, all content-ha
 
   const indexBundle = fs.readFileSync(path.join(OUT, manifest.js.pages.index.slice(1)), 'utf8');
   assert.ok(indexBundle.includes('consumer wins'), 'SITE layer index.js beat the core layer');
+});
+
+test('§7 asset lanes: section.scss joins the main sheet, section.js boots behind DOM presence', async () => {
+  const manifest = await build(['classy']);
+
+  // css lane: the fixture's section.scss compiled in via omega:sections
+  const mainCss = fs.readFileSync(path.join(OUT, manifest.css.main.slice(1)), 'utf8');
+  assert.ok(mainCss.includes('.section-assets-probe'), 'section.scss landed in the main sheet');
+
+  // js lane: the main boot stub carries the registry + presence-init runtime
+  const graph = readGraph(manifest.js.main);
+  assert.ok(graph.includes('demo/probe'), 'registry carries the section id');
+  assert.ok(graph.includes('sectionProbed'), 'the section.js module body bundled');
+  assert.ok(graph.includes('data-omega-'), 'presence-init selector rides the bundle');
+
+  // page bundles stay clean — sections ride the MAIN stub only
+  const pageGraph = readGraph(manifest.js.pages['blog/post']);
+  assert.ok(!pageGraph.includes('sectionProbed'), 'page stubs carry no section registry');
 });
 
 test('legacy module bundles emit at their fixed URLs (redirect pages script them)', async () => {

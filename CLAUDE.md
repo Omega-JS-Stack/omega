@@ -46,6 +46,10 @@ One Font Awesome mechanism everywhere: plain `fa-*` markup (static or set via JS
 
 One design-system contract: the `--omega-*` token sheet (names = stable API; light+dark plumbing built in), `brand.color` → light + dark accent ramps emitted into every head, the `.omega-shell` app chrome, and the shared motion library (`@omega.js/client` motion engine + `data-omega-*` attributes; no-JS and reduced-motion safe). classy v2 is the flagship skin: warm-paper/charcoal neutrals, zero gradients, ink primaries, serif marketing display; consumers customize colors/vibe/type from their main.scss (or fork `themes/_template`). Full contract: [docs/theming.md](docs/theming.md). Visual spec: [plans/classy-v2/DIRECTION.md](plans/classy-v2/DIRECTION.md).
 
+## Sections & components
+
+Pages are compositions of `{% section %}`/`{% component %}` calls; each entry is a folder owning markup + scss + js + json5 schema (resolution: consumer `_sections` → active theme → classy base, whole-folder first-wins). Markup is context-free (`{ args }` only; call-site liquification), section scss/js ride the §7 asset lanes (main sheet via `omega:sections`, main bundle behind DOM-presence init), and SHARED bands keep neutral json5 defaults — every page owns its copy. Full contract: [docs/sections.md](docs/sections.md). Spec/sequencing: [plans/omega-sections-spec.md](plans/omega-sections-spec.md).
+
 ## The plan
 
 The full redesign plan (context, architecture, phases, gates, amendments): [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) — vendored in-repo so it survives chat resets. Live status: [PROGRESS.md](PROGRESS.md).
