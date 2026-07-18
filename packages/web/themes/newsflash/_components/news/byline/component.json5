@@ -1,0 +1,14 @@
+{
+  description: 'Newsflash byline — author name (uj_member lookup from the author id) · pre-formatted date · readtime in minutes. Callers pre-capture readtime (uj_readtime needs post content, which never rides args). p_class carries the variant.',
+
+  args: {
+    author: 'string',
+    date: 'string',
+    readtime: 'string',
+    p_class: 'string',
+  },
+
+  defaults: {
+    p_class: 'small text-body-secondary mb-0',
+  },
+}

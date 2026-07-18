@@ -139,21 +139,32 @@ carries `data-omega-section="marketing/newsletter-cta"`, and any page
 composing the band gets the working managed form — live-proven on blog index
 AND posts (whose old plain-action form posted to a nonexistent page).
 
-The newsflash lane (cp213): the FIRST theme-layer section override —
+The newsflash lane (cp213–215): the FIRST theme-layer section override —
 `themes/newsflash/_sections/marketing/stats/` serves the same items
 contract with newsflash markup (whole-folder wins, so its json5 carries the
 theme's own head default — theme defaults are part of the theme's
 identity) — plus newsflash-specific sections (`marketing/rundown`,
 `marketing/desks`) and the theme's head components (`heading/rule-head` —
 the h2 + rule + view-all idiom; `heading/lede` — the h1-sized header
-cluster), composed by the newsflash index. Deliberately NOT overridden:
-`marketing/cta` and `marketing/hero` — a same-id override would flip every
-fallthrough page's band to newsflash markup, so that "goes native" step is
-its own declared change. Newsflash pins live in
-`test/sections-newsflash.test.js` on a theme-override build lane.
+cluster), composed by the newsflash index. The posts-driven tile family:
+`news/story-card` (framed art + kicker + h5 + byline — 6 identical grid
+instances across index/blog/category/tag/related) nests `news/byline`
+(component-IN-component; the byline alone also serves the lead splash via
+its `p_class` knob, feed items, and the hero cover). Posts stay out of
+args entirely — raw post objects can never ride call-site liquification
+(no circularity guard; content strings may carry literal braces). The
+pattern: `uj_post`/`uj_member` are scope-independent (injected site
+adapter), so components own image/name lookups from plain id args;
+readtime pre-captures at the call site; kickers pass display-ready with
+`| default: "" | uj_title_case` so absence suppresses instead of
+rendering "Undefined". Deliberately NOT overridden: `marketing/cta` and
+`marketing/hero` — a same-id override would flip every fallthrough page's
+band to newsflash markup, so that "goes native" step is its own declared
+change. Newsflash pins live in `test/sections-newsflash.test.js` on a
+theme-override build lane over the posts-rich fixture (17 posts — every
+index slot lit).
 
-Pending (spec §13): newsflash posts-driven bands + remaining layouts (the
-story-card/feed vocabulary needs a digested plain-args contract — raw post
-objects can't flow through call-site liquification), the fallthrough-flip
-decision, `omega customize <url>`, the auto-generated showcase + docs,
-`[id].js` wildcard page modules, auto-generated sample content.
+Pending (spec §13): the rule-head/lede sweep across the remaining
+newsflash layouts, the fallthrough-flip decision, `omega customize <url>`,
+the auto-generated showcase + docs, `[id].js` wildcard page modules,
+auto-generated sample content.

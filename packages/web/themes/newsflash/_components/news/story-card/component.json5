@@ -1,0 +1,15 @@
+{
+  description: 'Newsflash story tile — framed art (uj_post image-tag from the post id), optional display-ready kicker, h5 headline, nested news/byline. url arrives absolute (site.url | append: post.url); date pre-formatted; readtime pre-captured.',
+
+  args: {
+    url: 'string',
+    id: 'string',
+    kicker: 'string',
+    title: 'string',
+    author: 'string',
+    date: 'string',
+    readtime: 'string',
+  },
+
+  defaults: {},
+}

@@ -37,6 +37,27 @@ test('cp213: newsflash index bands render through the section library', async ()
   assert.ok(home.includes('/blog/categories/tech'), 'desk href to its category page');
 });
 
+test('cp215: news/story-card + news/byline — the posts-driven tile family (component-in-component)', async () => {
+  const pages = await buildWith(nfData);
+
+  // Blog index grid: tiles render through the component (byline nested inside)
+  const blog = pages.get('/blog');
+  assert.ok(blog.includes('story-card'), 'tile markup present');
+  assert.ok(blog.includes('Mini story 17'), 'enriched posts in the grid');
+  assert.ok(blog.includes('Dec 15, 2023'), 'pre-formatted date arg');
+  assert.ok(blog.includes('min read'), 'captured readtime through the byline');
+  assert.ok(!blog.includes('>Undefined<'), 'kicker default-guard: no "Undefined" from title-casing a missing category');
+
+  // Category page passes its own kicker (resolved.category.name, verbatim)
+  const growth = pages.get('/blog/categories/growth');
+  assert.ok(growth.includes('kicker mb-1">Growth<'), 'category-name kicker through the component');
+
+  // Index bands: top stories + more-to-chew-on tiles via the same component
+  const home = pages.get('/test/components/hero-demo-input');
+  assert.ok(home.includes('Mini story 16'), 'top-stories tile (slot 3)');
+  assert.ok(home.includes('Mini story 03'), 'more-to-chew-on tile (slot 17)');
+});
+
 test('cp213: contracts deliberately NOT flipped — fallthrough cta + body-called hero stay classy', async () => {
   const pages = await buildWith(nfData);
 
