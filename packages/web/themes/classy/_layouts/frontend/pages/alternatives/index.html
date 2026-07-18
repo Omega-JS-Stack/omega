@@ -75,15 +75,7 @@ cta:
 <!-- ═══ Masthead ═══ -->
 <section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
-    {% iftruthy resolved.hero.tagline %}
-      <span class="classy-micro d-block mb-3" data-omega-reveal>{{ resolved.hero.tagline }}</span>
-    {% endiftruthy %}
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-    </h1>
-    {% iftruthy resolved.hero.description %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", eyebrow: resolved.hero.tagline, headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
     <div class="d-flex flex-wrap gap-3 mt-4" data-omega-reveal>
       {% iftruthy resolved.hero.primary_button.text %}
         <a href="{{ resolved.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">

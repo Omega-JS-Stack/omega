@@ -140,12 +140,7 @@ alternative:
       <span>/</span>
       <span>{{ alt.competitor.name }}</span>
     </div>
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ alt.hero.headline | uj_liquify }} <em>{{ alt.hero.headline_accent | uj_liquify }}</em>
-    </h1>
-    {% iftruthy alt.hero.description %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ alt.hero.description | uj_liquify }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", headline: alt.hero.headline, headline_accent: alt.hero.headline_accent, sub: alt.hero.description %}
     <div class="d-flex flex-wrap gap-3 mt-4" data-omega-reveal>
       {% iftruthy alt.hero.primary_button.text %}
         <a href="{{ alt.hero.primary_button.href }}" class="btn btn-adaptive btn-lg omega-hover-nudge">

@@ -260,6 +260,25 @@ test('wave 5: the faq union — duo + center variants, converged ids, dom_id kno
     && demo.includes('data-bs-parent="#demoFaqAccordion"'), 'dom_id namespaces every Bootstrap collapse hook');
 });
 
+test('wave 6: heading/masthead — the first REAL component serves the interior-page heads', async () => {
+  const pages = await buildWith(miniData);
+  const pricing = pages.get('/pricing');
+  assert.ok(pricing, 'pricing built');
+  assert.ok(pricing.includes('<em>for the right price</em>'), 'pricing copy moved from inline | default: to frontmatter intact');
+  assert.ok(pricing.includes('>Pricing</span>'), 'literal eyebrow arg renders the micro label');
+  assert.ok(pricing.includes('classy-hero__sub mx-auto'), 'sub_class knob carries the centered variant');
+  const about = pages.get('/about-blueprint');
+  assert.ok(about, 'about blueprint page built');
+  assert.ok(about.includes('>About MiniCo</span>'), 'eyebrow | default: fallback fires when superheadline is unset');
+  const blog = pages.get('/blog');
+  assert.ok(blog.includes('classy-display--page mb-0'), 'h1_class knob appends to the display classes');
+  assert.ok(blog.includes('classy-hero-split__sub mt-3 mb-0'), 'blog sub_class variant rides through');
+  const terms = pages.get('/terms');
+  assert.ok(terms.includes('>Legal</span>') && terms.includes('classy-legal__sub classy-quiet'), 'legal head converges with its own knobs');
+  const alt = pages.get('/alternatives/acme-growth');
+  assert.ok(alt.includes('<em>Acme Growth</em>'), 'component args liquify at call site (the dropped uj_liquify)');
+});
+
 test('body-call lane: a consumer page composes the section with YAML args', async () => {
   const pages = await buildWith(miniData);
   const demo = pages.get('/sections-demo');

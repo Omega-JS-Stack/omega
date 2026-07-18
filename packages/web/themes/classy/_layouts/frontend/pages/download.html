@@ -170,13 +170,7 @@ cta:
 <!-- ═══ Hero: the page already picked your button ═══ -->
 <section class="classy-dotgrid pb-0" data-omega-dotfield>
   <div class="container text-center" data-omega-reveal-stagger="90">
-    <span class="classy-micro d-block mb-3" data-omega-reveal>Download</span>
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
-    </h1>
-    {% iftruthy resolved.hero.description %}
-      <p class="classy-hero__sub mx-auto" data-omega-reveal>{{ resolved.hero.description }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", eyebrow: "Download", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description, sub_class: "classy-hero__sub mx-auto" %}
 
     <div class="classy-dl-hero" data-omega-reveal>
       <!-- Filled by the detection JS: your platform's primary download -->

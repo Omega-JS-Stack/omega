@@ -42,13 +42,7 @@ join_cta:
 <!-- ═══ Masthead ═══ -->
 <section class="classy-dotgrid pb-4" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
-    <span class="classy-micro d-block mb-3" data-omega-reveal>Team</span>
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-    </h1>
-    {% iftruthy resolved.hero.description %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", eyebrow: "Team", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
 
     {% assign _team_count = site.team | size %}
     {% if _team_count > 0 %}

@@ -27,13 +27,7 @@ newsletter_cta:
   <div class="container">
     <div class="classy-masthead" data-omega-reveal-stagger="90">
       <div>
-        <span class="classy-micro d-block mb-3" data-omega-reveal>Blog</span>
-        <h1 class="classy-display classy-display--page mb-0" data-omega-reveal>
-          {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-        </h1>
-        {% iftruthy resolved.hero.subheadline %}
-          <p class="classy-hero-split__sub mt-3 mb-0" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/masthead", eyebrow: "Blog", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, h1_class: "mb-0", sub: resolved.hero.subheadline, sub_class: "classy-hero-split__sub mt-3 mb-0" %}
       </div>
 
       <div class="classy-masthead__actions" data-omega-reveal>

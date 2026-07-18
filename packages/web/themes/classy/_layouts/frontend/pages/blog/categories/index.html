@@ -16,12 +16,7 @@ hero:
       <span>/</span>
       <span>Categories</span>
     </div>
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-    </h1>
-    {% iftruthy resolved.hero.subheadline %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
   </div>
 </section>
 

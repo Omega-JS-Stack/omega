@@ -118,18 +118,8 @@ team_cta:
   <div class="container">
     <div class="classy-hero-split">
       <div data-omega-reveal-stagger="90">
-        {% iftruthy resolved.hero.superheadline.text %}
-          <span class="classy-micro d-block mb-3" data-omega-reveal>{{ resolved.hero.superheadline.text }}</span>
-        {% endiftruthy %}
-        {% iffalsy resolved.hero.superheadline.text %}
-          <span class="classy-micro d-block mb-3" data-omega-reveal>About {{ site.brand.name }}</span>
-        {% endiffalsy %}
-        <h1 class="classy-display classy-display--page" data-omega-reveal>
-          {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
-        </h1>
-        {% iftruthy resolved.hero.description %}
-          <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.description }}</p>
-        {% endiftruthy %}
+        {% capture _eyebrow_fallback %}About {{ site.brand.name }}{% endcapture %}
+        {% component "heading/masthead", eyebrow: resolved.hero.superheadline.text | default: _eyebrow_fallback, headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
       </div>
 
       {% if resolved.stats.items %}

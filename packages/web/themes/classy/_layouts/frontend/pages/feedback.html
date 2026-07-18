@@ -42,13 +42,7 @@ prerender_icons:
     <div class="classy-duo" style="--classy-duo-cols: 5fr 7fr;">
       <!-- Aside: the ask, stated once -->
       <div class="classy-duo__aside" data-omega-reveal-stagger="90">
-        <span class="classy-micro d-block mb-3" data-omega-reveal>Feedback</span>
-        <h1 class="classy-display classy-display--page" data-omega-reveal>
-          {{ resolved.hero.headline }} <em>{{ resolved.hero.headline_accent }}</em>
-        </h1>
-        {% iftruthy resolved.hero.subheadline %}
-          <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
-        {% endiftruthy %}
+        {% component "heading/masthead", eyebrow: "Feedback", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
         <p class="small classy-quiet mt-4 mb-0" data-omega-reveal>
           {% uj_icon "reply", "fa-xs me-1" %}
           Every submission is read by a human — the sharp ones shape the roadmap.

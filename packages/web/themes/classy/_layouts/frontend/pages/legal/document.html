@@ -19,13 +19,7 @@ theme:
 <!-- ═══ Document header ═══ -->
 <section class="classy-legal__head pb-4">
   <div class="container" data-omega-reveal-stagger="80">
-    <span class="classy-micro d-block mb-3" data-omega-reveal>Legal</span>
-    <h1 class="classy-display classy-display--page mb-2" data-omega-reveal>
-      {{ resolved.meta.breadcrumb }}
-    </h1>
-    {% iftruthy resolved.meta.description %}
-      <p class="classy-legal__sub classy-quiet" data-omega-reveal>{{ resolved.meta.description }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", eyebrow: "Legal", headline: resolved.meta.breadcrumb, h1_class: "mb-2", sub: resolved.meta.description, sub_class: "classy-legal__sub classy-quiet" %}
 
     <!-- The legal hub: every policy one hop away, current one marked -->
     <nav class="classy-legal__hub" aria-label="Legal documents" data-omega-reveal>

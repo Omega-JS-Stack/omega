@@ -63,13 +63,7 @@ faqs:
 <!-- ═══ Masthead ═══ -->
 <section class="classy-dotgrid pb-0" data-omega-dotfield>
   <div class="container" data-omega-reveal-stagger="90">
-    <span class="classy-micro d-block mb-3" data-omega-reveal>Contact</span>
-    <h1 class="classy-display classy-display--page" data-omega-reveal>
-      {{ resolved.hero.headline }}{% iftruthy resolved.hero.headline_accent %} <em>{{ resolved.hero.headline_accent }}</em>{% endiftruthy %}
-    </h1>
-    {% iftruthy resolved.hero.subheadline %}
-      <p class="classy-hero-split__sub" data-omega-reveal>{{ resolved.hero.subheadline }}</p>
-    {% endiftruthy %}
+    {% component "heading/masthead", eyebrow: "Contact", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline %}
   </div>
 </section>
 

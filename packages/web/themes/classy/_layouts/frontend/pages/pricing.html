@@ -6,6 +6,13 @@ layout: frontend/core/base
 # consumer-overridable). PLANS never live here: payment.products is the only
 # pricing source (C2).
 
+# Hero Section — the page's copy (shared heading/masthead cluster; the old
+# inline | default: fallbacks in markup live here now)
+hero:
+  headline: "The right plans,"
+  headline_accent: "for the right price"
+  subheadline: "Simple and affordable pricing. No hidden fees, no surprises."
+
 # Social Proof Section
 social_proof:
   items:
@@ -118,13 +125,7 @@ faqs:
   <div class="container">
     <div class="row justify-content-center text-center">
       <div class="col-lg-10" data-omega-reveal-stagger="90">
-        <span class="classy-micro d-block mb-3" data-omega-reveal>Pricing</span>
-        <h1 class="classy-display classy-display--page" data-omega-reveal>
-          {{ resolved.hero.headline | default: "The right plans," }} <em>{{ resolved.hero.headline_accent | default: "for the right price" }}</em>
-        </h1>
-        <p class="classy-hero__sub mx-auto" data-omega-reveal>
-          {{ resolved.hero.subheadline | default: "Simple and affordable pricing. No hidden fees, no surprises." }}
-        </p>
+        {% component "heading/masthead", eyebrow: "Pricing", headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.subheadline, sub_class: "classy-hero__sub mx-auto" %}
       </div>
     </div>
   </div>
