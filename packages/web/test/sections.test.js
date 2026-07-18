@@ -1,0 +1,176 @@
+/**
+ * The section/component library machinery (plans/omega-sections-spec.md):
+ * dual-form {% section %}/{% component %} tags, layer resolution, defaults ←
+ * data ← args merge, call-site liquification, schema warnings, and the
+ * context-free render — plus build-level pins for the frontmatter bridge
+ * (hero-demo pages) and the body-call authoring lane.
+ */
+const assert = require('node:assert');
+const path = require('node:path');
+const { test } = require('node:test');
+const { Liquid } = require('liquidjs');
+
+const { registerSectionTags, parseInlineArgs } = require('../src/sections.js');
+const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
+
+const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 'sections-test');
+
+const FIXTURES = path.join(__dirname, 'fixtures', 'sections');
+const THEME = path.join(FIXTURES, 'theme');
+const CONSUMER = path.join(FIXTURES, 'consumer');
+
+/** Fresh engine over the fixture layers with a captured warn sink. */
+function makeEngine(baseDirs = [THEME]) {
+  const warnings = [];
+  const engine = new Liquid();
+  registerSectionTags(engine, { baseDirs, warn: (message) => warnings.push(message) });
+  return { engine, warnings };
+}
+
+const SITE = { site: { brand: { name: 'ACME' } } };
+
+// ─── parseInlineArgs ─────────────────────────────────────────────────────────
+
+test('parseInlineArgs: quote-aware pairs — commas inside quoted values never split', () => {
+  assert.deepEqual(parseInlineArgs(', headline: "a, b", n: 3, ref: resolved.hero'), [
+    { key: 'headline', expr: '"a, b"' },
+    { key: 'n', expr: '3' },
+    { key: 'ref', expr: 'resolved.hero' },
+  ]);
+  assert.deepEqual(parseInlineArgs(''), []);
+  assert.throws(() => parseInlineArgs(', not a pair'), /expected key: value/);
+  assert.throws(() => parseInlineArgs(', empty:'), /has no value/);
+});
+
+// ─── defaults + call-site liquification ──────────────────────────────────────
+
+test('no args → json5 defaults render, liquified against the CALLER scope', async () => {
+  const { engine, warnings } = makeEngine();
+  const html = await engine.parseAndRender('{% section "marketing/hero" %}', SITE);
+  assert.ok(html.includes('<h1>Default ACME</h1>'), 'default headline liquified with site.brand.name');
+  assert.ok(html.includes('<span>default-tag</span>'), 'plain default untouched');
+  assert.deepEqual(warnings, []);
+});
+
+test('inline args: literal + variable ref override defaults, unset keys keep defaults', async () => {
+  const { engine } = makeEngine();
+  const html = await engine.parseAndRender(
+    '{% section "marketing/hero", headline: page.h %}',
+    { ...SITE, page: { h: 'From Page' } },
+  );
+  assert.ok(html.includes('<h1>From Page</h1>'));
+  assert.ok(html.includes('<span>default-tag</span>'));
+});
+
+// ─── block YAML form ─────────────────────────────────────────────────────────
+
+test('block form: YAML body with arrays; liquid output tokens in values render at call scope', async () => {
+  const { engine, warnings } = makeEngine();
+  const html = await engine.parseAndRender(
+    '{% section "marketing/hero" %}\nheadline: "Why {{ site.brand.name }}"\nitems:\n  - label: one\n  - label: two\n{% endsection %}AFTER',
+    SITE,
+  );
+  assert.ok(html.includes('<h1>Why ACME</h1>'), 'output token inside YAML value liquified');
+  assert.ok(html.includes('<li>one</li>') && html.includes('<li>two</li>'), 'array items rendered');
+  assert.ok(html.endsWith('AFTER'), 'content after endsection unaffected');
+  assert.deepEqual(warnings, []);
+});
+
+test('inline args AND a YAML body on one call is an error', async () => {
+  const { engine } = makeEngine();
+  await assert.rejects(
+    engine.parseAndRender('{% section "marketing/hero", tag: "x" %}\nheadline: y\n{% endsection %}', SITE),
+    /not both/,
+  );
+});
+
+// ─── the data bridge ─────────────────────────────────────────────────────────
+
+test('merge order: defaults ← data ← named args', async () => {
+  const { engine } = makeEngine();
+  const html = await engine.parseAndRender(
+    '{% section "marketing/hero", data: d, tag: "explicit" %}',
+    { ...SITE, d: { headline: 'DataH', tag: 'DataTag' } },
+  );
+  assert.ok(html.includes('<h1>DataH</h1>'), 'data beats defaults');
+  assert.ok(html.includes('<span>explicit</span>'), 'named args beat data');
+});
+
+test('data: undefined (no consumer overrides) is a clean defaults render', async () => {
+  const { engine, warnings } = makeEngine();
+  const html = await engine.parseAndRender('{% section "marketing/hero", data: resolved.hero %}', SITE);
+  assert.ok(html.includes('<h1>Default ACME</h1>'));
+  assert.deepEqual(warnings, []);
+});
+
+// ─── schema warnings ─────────────────────────────────────────────────────────
+
+test('unknown arg warns with did-you-mean; type mismatch warns; neither throws', async () => {
+  const { engine, warnings } = makeEngine();
+  const html = await engine.parseAndRender(
+    '{% section "marketing/hero", headlin: "typo", items: "not-an-array" %}',
+    SITE,
+  );
+  assert.ok(html.includes('data-sec="theme-hero"'), 'render still succeeds');
+  assert.ok(warnings.some((w) => w.includes('unknown arg "headlin"') && w.includes('did you mean "headline"')), warnings.join(' | '));
+  assert.ok(warnings.some((w) => w.includes('"items" should be array')), warnings.join(' | '));
+});
+
+// ─── resolution ──────────────────────────────────────────────────────────────
+
+test('layer precedence: consumer _sections beats the theme; theme serves when consumer absent', async () => {
+  const layered = makeEngine([CONSUMER, THEME]);
+  const consumerHtml = await layered.engine.parseAndRender('{% section "marketing/hero", headline: "H" %}', SITE);
+  assert.ok(consumerHtml.includes('data-sec="consumer-hero"'), 'consumer layer wins');
+
+  const themeOnly = makeEngine([THEME]);
+  const themeHtml = await themeOnly.engine.parseAndRender('{% section "marketing/hero" %}', SITE);
+  assert.ok(themeHtml.includes('data-sec="theme-hero"'));
+
+  // single-segment ids work; the consumer layer has no "plain" → falls through
+  const plain = await layered.engine.parseAndRender('{% section "plain" %}', {});
+  assert.ok(plain.includes('data-sec="plain"'));
+});
+
+test('unknown section throws naming the id; traversal-shaped ids rejected', async () => {
+  const { engine } = makeEngine();
+  await assert.rejects(engine.parseAndRender('{% section "missing/thing" %}', {}), /missing\/thing/);
+  await assert.rejects(engine.parseAndRender('{% section "../evil" %}', {}), /kebab-case/);
+});
+
+// ─── components ──────────────────────────────────────────────────────────────
+
+test('{% component %} rides the same machinery from _components', async () => {
+  const { engine } = makeEngine();
+  assert.equal(await engine.parseAndRender('{% component "frame/box" %}', {}), '<div data-comp="box">boxed</div>\n');
+  assert.equal(await engine.parseAndRender('{% component "frame/box", label: "custom" %}', {}), '<div data-comp="box">custom</div>\n');
+});
+
+// ─── context-free render ─────────────────────────────────────────────────────
+
+test('sections are context-free: caller scope never leaks into the markup', async () => {
+  const { engine } = makeEngine();
+  const html = await engine.parseAndRender('{% section "marketing/hero" %}', { ...SITE, secret: 'LEAK' });
+  assert.ok(html.includes('<b></b>'), `bare {{ secret }} in section markup rendered empty, got: ${html}`);
+});
+
+// ─── build-level pins (the real classy hero through the real engine) ─────────
+
+test('frontmatter bridge: hero-demo page keeps its own keys AND the section defaults (deep merge end-to-end)', async () => {
+  const pages = await buildWith(miniData);
+  const demo = pages.get('/test/components/hero-demo-input');
+  assert.ok(demo, 'hero-demo-input built');
+  assert.ok(demo.includes('Create your logo in'), 'page frontmatter headline survived the bridge');
+  assert.ok(demo.includes('Introducing MiniCo'), 'unset badge fell through to the json5 default, brand-liquified');
+  assert.ok(demo.includes('npx omega setup'), 'unset command fell through to the json5 default');
+});
+
+test('body-call lane: a consumer page composes the section with YAML args', async () => {
+  const pages = await buildWith(miniData);
+  const demo = pages.get('/sections-demo');
+  assert.ok(demo, 'sections-demo built');
+  assert.ok(demo.includes('Composed from'), 'body-call headline rendered');
+  assert.ok(demo.includes('a body call'), 'body-call rotating item rendered');
+  assert.ok(!demo.includes('classy-mock'), 'frame.enabled: false suppressed the product frame');
+  assert.ok(demo.includes('npx omega setup'), 'unset command still rides the defaults');
+});

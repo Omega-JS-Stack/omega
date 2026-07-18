@@ -18,6 +18,7 @@ const { createFrontmatterResolver } = require('./frontmatter-liquid.js');
 const { collectLayered, resolveThemeLayers } = require('./layers.js');
 const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
+const { registerSectionTags } = require('./sections.js');
 const { registerCollections } = require('./collections.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
@@ -40,19 +41,9 @@ const RESOLVED_OMIT = new Set([
 // would make every page's resolved walk all 1,030 post docs).
 const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'updates', 'alternatives']);
 
-// Plain-object deep merge (b wins) — fresh containers, never mutates either side.
-// Deliberately NOT @omega.js/config's deepMerge: the resolved-data cascade
-// merges VALUES pairwise (deepMerge(out[key], data[key])), so an explicit null
-// in later data must REPLACE — config's variadic merge would skip it as a
-// falsy layer.
-function deepMerge(a, b) {
-  if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
-    const out = { ...a };
-    for (const key of Object.keys(b)) out[key] = deepMerge(a[key], b[key]);
-    return out;
-  }
-  return b === undefined ? a : b;
-}
+// Deep merge shared with the section tag's defaults ← data ← args chain —
+// one semantics for both override lanes (see src/merge.js).
+const { deepMerge } = require('./merge.js');
 
 /**
  * Configure an Eleventy instance as an OMEGA web engine.
@@ -202,6 +193,10 @@ function configureOmega(eleventyConfig, options) {
   const fa = resolveFontAwesomeRoots();
 
   eleventyConfig.amendLibrary('liquid', (engine) => {
+    // The section/component library tags resolve through the same precedence
+    // as every other layer: consumer-local _sections/_components → active
+    // theme → classy base (plans/omega-sections-spec.md).
+    registerSectionTags(engine, { baseDirs: [options.consumerDir, ...themeLayers] });
     registerLiquid(engine, {
       site,
       getCollection: (name) => collectionsHolder.get(name) || [],
@@ -240,6 +235,12 @@ function configureOmega(eleventyConfig, options) {
   // built the same way; the bare `**/` form covers cwd-contained inputs.
   eleventyConfig.ignores.add('**/_layouts/**');
   eleventyConfig.ignores.add(path.join(path.relative(process.cwd(), options.consumerDir), '_layouts', '**'));
+  // Consumer-local section/component folders are template machinery too —
+  // without the ignore, Eleventy would emit every section.html as content.
+  for (const machineryDir of ['_sections', '_components']) {
+    eleventyConfig.ignores.add(`**/${machineryDir}/**`);
+    eleventyConfig.ignores.add(path.join(path.relative(process.cwd(), options.consumerDir), machineryDir, '**'));
+  }
   if (layoutMode === 'farm') {
     composeSymlinkFarm(layoutMap, options.farmDir);
     eleventyConfig.setIncludesDirectory(path.relative(options.consumerDir, options.farmDir));

@@ -17,12 +17,16 @@ Both tiers share the same anatomy, resolution, and asset rules.
 ## 2. Anatomy — a section is a folder that owns everything about itself
 
 ```
-themes/classy/sections/marketing/hero/
+themes/classy/_sections/marketing/hero/
   section.html    ← markup (Liquid). The args are the data contract.
   section.scss    ← its styles (optional)
   section.js      ← its behavior (optional — most sections have none)
   section.json5   ← meta: arg schema + defaults + showcase demo data
 ```
+
+(Naming amendment, cp204: the folder families are `_sections`/`_components` —
+the Jekyll-family underscore marks template machinery, matching
+`_layouts`/`_includes`, and keeps Eleventy from processing them as content.)
 
 Components identical with `component.*` filenames. Standard filenames (not `<name>.html`) so tooling/resolvers are predictable.
 
@@ -38,9 +42,9 @@ Components identical with `component.*` filenames. Standard filenames (not `<nam
 
 For `{% section "marketing/hero" %}`, first match wins:
 
-1. **Consumer-local**: `<app>/src/sections/marketing/hero/` — consumers author their own sections here (their git holds ONLY their own work)
-2. **Active theme**: `themes/<active>/sections/...`
-3. **Base theme (classy)**: `themes/classy/sections/...` — the floor, same as the theming two-lane model
+1. **Consumer-local**: `<src>/_sections/marketing/hero/` — consumers author their own sections here (their git holds ONLY their own work)
+2. **Active theme**: `themes/<active>/_sections/...`
+3. **Base theme (classy)**: `themes/classy/_sections/...` — the floor, same as the theming two-lane model
 
 Theme sections live inside the installed package (never scaffolded into the consumer repo) — consumer git stays clean; framework updates flow.
 

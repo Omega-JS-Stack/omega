@@ -2,7 +2,7 @@
 > Status board — one line per item. Detail lives in CHANGELOG.md (shipped), docs/ + package READMEs (behavior), and commit messages (journey). Master plan: [plans/omega-redesign-master-plan.md](plans/omega-redesign-master-plan.md) (Phases 0–5 + amendments header).
 
 ## 🎯 Now
-- **SECTIONS SPEC RATIFIED (cp202/203, Ian 2026-07-18) — extraction refactor IN FLIGHT**: [plans/omega-sections-spec.md](plans/omega-sections-spec.md) is binding (all §14 items resolved: verb = `omega customize`, sample filler stays shared but goes auto-generated + gitignored-test-path, playground deploys = direct push normally + occasional deliberate CI exercise); extraction = packages/web only, freeze-safe, corpus-pinned output-identical
+- **SECTIONS SPEC RATIFIED (cp202/203, Ian 2026-07-18) — extraction IN FLIGHT, cp204 LANDED**: [plans/omega-sections-spec.md](plans/omega-sections-spec.md) is binding (verb = `omega customize`, sample filler shared + auto-generated later, playground deploys = direct push + occasional CI exercise); cp204 = the `{% section %}`/`{% component %}` machinery (dual-form, layer-resolved, schema-warned, context-free) + classy hero extracted — **96-page golden proof output-identical (control-validated)**, web 197/0, corpus 7/7; next: remaining classy sections → newsflash
 - **Both skins await Ian's eyes**: classy (cp147–185, playground) · The Daily Build (cp186–193, dark/light/mobile swept) — stacks not currently running; `npm start` at each brand root boots them; fall-through two-lane direction stands unchallenged; playground CMS creates land once the source repo's `main` is born (arc close)
 
 ## 🗺 Next (order = Ian's directives > master plan > this queue; reorder freely)
@@ -49,6 +49,7 @@
 - ~~Font-preload breadth = whole-site (cp199 design flag)~~ **CLOSED cp201 (Ian: keep as-is)**: whole-site preloads stand — one-time ~205KB per visitor, cached after; per-layout lists deliberately not built
 - ~~First-paint blank flash (116/123)~~ **FIXED cp198**: theme-aware font preloads — engine scans active theme's normal-latin faces and emits `<link rel="preload">` before the stylesheet; both themes pinned + corpus invariant
 - blogify/optimize NOT ported (cp140 verdict): blogify = fake-post test generator (the corpus generator covers it), optimize = GPT content-rewrite authoring tool — revisit post-launch if Ian wants them (140)
+- **sitemap.xml/pages.json entry ORDER is nondeterministic across builds (cp204 golden control find)**: two builds of the SAME tree list URLs in different orders (Eleventy render concurrency) — harmless to consumers, but deterministic-build hygiene says sort at emission; fix when the meta-files surface next opens
 - devkit e2e-harness rare flake (~1-in-15, mechanism uncaptured): isolated two-pass runner + one retry that SAVES the failing output to .temp/ — the next firing names the mechanism; a real regression still fails twice (124)
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 

@@ -1,0 +1,74 @@
+{
+  description: 'Serif display hero — rotating italic second line, ink CTA + mono command, floating product frame, optional demo capture (input/custom). The classy homepage opener.',
+
+  // Top-level arg contract (validation is warn-only; names are API — renames
+  // follow deprecation discipline, spec §6)
+  args: {
+    badge: 'object',
+    headline: 'string',
+    headline_accent: 'string',
+    rotating: 'array',
+    description: 'string',
+    primary_button: 'object',
+    command: 'string',
+    command_href: 'string',
+    secondary_button: 'object',
+    meta: 'array',
+    frame: 'object',
+    demo: 'object',
+  },
+
+  // Every key consumer-overridable; string values liquify at the call site
+  // (so {{ site.brand.name }} resolves against the calling page's scope).
+  defaults: {
+    badge: {
+      text: 'Introducing {{ site.brand.name }}',
+      href: null,
+    },
+    headline: 'The platform for',
+    rotating: [
+      'modern business',
+      'shipping faster',
+      'scaling your team',
+    ],
+    description: 'Everything you need to launch, measure, and grow — auth, payments, analytics, and every surface of your product in one place.',
+    primary_button: {
+      text: 'Get started free',
+      href: '/signup',
+    },
+    command: 'npx omega setup',
+    command_href: '/download',
+    secondary_button: {
+      enabled: false,
+      text: 'See pricing',
+      href: '/pricing',
+    },
+    meta: [
+      'Free plan',
+      'No credit card required',
+      'Set up in minutes',
+    ],
+    frame: {
+      enabled: true,
+      title: '{{ site.brand.name }} · Overview',
+    },
+    demo: {
+      enabled: false,
+      type: 'input',
+      placement: 'bottom',
+      options: {
+        class: 'mw-md',
+        placeholder: 'Enter your email',
+        name: 'email',
+        input_type: 'email',
+        required: true,
+        redirect: '/dashboard/account',
+        subtext: 'No credit card required',
+        button: {
+          text: 'Start free trial',
+          class: 'btn-adaptive',
+        },
+      },
+    },
+  },
+}
