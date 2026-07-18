@@ -355,46 +355,7 @@ alternative:
 <!-- ═══ FAQ ═══ -->
 {% assign faqs_size = alt.faqs.items | size %}
 {% if faqs_size > 0 %}
-  <section>
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-lg-8">
-          <div class="classy-section-head classy-section-head--center mb-5" data-omega-reveal>
-            {% iftruthy alt.faqs.superheadline.text %}
-              <span class="classy-micro">{{ alt.faqs.superheadline.text }}</span>
-            {% endiftruthy %}
-            <h2 class="classy-display classy-display--section">
-              {{ alt.faqs.headline | uj_liquify }}
-              {% iftruthy alt.faqs.headline_accent %}
-                <em>{{ alt.faqs.headline_accent | uj_liquify }}</em>
-              {% endiftruthy %}
-            </h2>
-            {% iftruthy alt.faqs.subheadline %}
-              <p>{{ alt.faqs.subheadline | uj_liquify }}</p>
-            {% endiftruthy %}
-          </div>
-
-          <div class="classy-faq accordion" id="faqAccordion" data-omega-reveal>
-            {% for faq in alt.faqs.items %}
-              <div class="accordion-item">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.index }}" aria-expanded="false" aria-controls="faq{{ forloop.index }}">
-                    {{ faq.question | uj_liquify }}
-                  </button>
-                </h2>
-                <div id="faq{{ forloop.index }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-                  <div class="accordion-body">
-                    {{ faq.answer | uj_liquify }}
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </section>
+  {% section "marketing/faq", data: alt.faqs, variant: "center" %}
 {% endif %}
 
 <!-- ═══ CTA band ═══ -->

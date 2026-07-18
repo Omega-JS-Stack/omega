@@ -121,8 +121,10 @@ another page's words.
 
 Landed: the tags, resolution, schemas/validation, data bridge, §7 asset
 lanes, classy's marketing library (hero, trusted-by, bento, product-demo,
-showcase, stats, testimonials, cta, newsletter-cta — the homepage and every
-CTA/testimonial/newsletter band across classy pages render through them).
+showcase, stats, testimonials, cta, newsletter-cta, faq — the homepage and
+every CTA/testimonial/newsletter/FAQ band across classy pages render through
+them; pricing's FAQ stays inline: its aside embeds a bespoke guarantee
+object).
 newsletter-cta is the §7 reference consumer: its `section.js` owns the
 FormManager binding (`export default (el, { manager, options })`), its root
 carries `data-omega-section="marketing/newsletter-cta"`, and any page

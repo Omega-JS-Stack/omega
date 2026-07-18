@@ -241,6 +241,25 @@ test('cp209: blog posts compose the SHARED newsletter band — the dead /email-s
   assert.ok(post.includes('data-omega-section="marketing/newsletter-cta"'), 'presence init reaches post pages');
 });
 
+test('wave 5: the faq union — duo + center variants, converged ids, dom_id knob', async () => {
+  const pages = await buildWith(miniData);
+  const download = pages.get('/download');
+  assert.ok(download, 'download page built');
+  assert.ok(download.includes('id="faqAccordion"'), 'per-page accordion ids converged to the default namespace');
+  assert.ok(!download.includes('downloadFaqAccordion'), 'the old page-prefixed id died');
+  assert.ok(download.includes('Is MiniCo free to download?'), 'faq items rode the data bridge, brand-liquified');
+  const alt = pages.get('/alternatives/acme-growth');
+  assert.ok(alt, 'alternative page built');
+  assert.ok(alt.includes('classy-section-head--center'), 'variant: "center" renders the stacked shell');
+  assert.ok(alt.includes('How long does a MiniCo migration take?'), 'call-site liquification replaced the explicit uj_liquify');
+  assert.ok(alt.includes('<em>switching</em>'), 'accent em renders in the center head');
+  // The multi-instance knob rides the body-call lane on the demo page.
+  const demo = pages.get('/sections-demo');
+  assert.ok(demo, 'sections-demo built');
+  assert.ok(demo.includes('id="demoFaqAccordion"') && demo.includes('data-bs-target="#demoFaq1"')
+    && demo.includes('data-bs-parent="#demoFaqAccordion"'), 'dom_id namespaces every Bootstrap collapse hook');
+});
+
 test('body-call lane: a consumer page composes the section with YAML args', async () => {
   const pages = await buildWith(miniData);
   const demo = pages.get('/sections-demo');
