@@ -10,8 +10,10 @@
  * classy base.
  */
 const assert = require('node:assert');
+const path = require('node:path');
 const { test } = require('node:test');
 
+const { collectSectionAssets } = require('../src/sections.js');
 const { buildWith: sharedBuildWith, miniData } = require('./lib/build.js');
 
 const nfData = { ...miniData, theme: { id: 'newsflash' } };
@@ -79,6 +81,37 @@ test('cp216: rule-head/lede sweep — every newsflash band head through the comp
   // No inline section-head clusters remain in any newsflash layout — every
   // head renders through the component (h2 + rule always adjacent).
   assert.ok(member.includes('section-head'), 'member head renders');
+});
+
+test('cp217: the newsletter slab renders through the nf override — BOTH dead forms fixed', async () => {
+  const pages = await buildWith(nfData);
+
+  // Post pages: the plain action="/email-subscription" form posted to a page
+  // that doesn't exist (the cp209 bug, still live here) — the managed
+  // form-manager dialect rides instead, inside the narrow centered column.
+  const post = pages.get('/blog/first-post');
+  assert.ok(!post.includes('email-subscription'), 'the dead action-form dialect died');
+  assert.ok(post.includes('data-omega-section="marketing/newsletter-cta"'), 'presence-init root reaches nf posts');
+  assert.ok(post.includes('data-form-state="initializing"'), 'posts speak the form-manager dialect');
+  assert.ok(post.includes('Thank you for subscribing! Check your email to confirm.'), 'post-owned alert copy rode the bridge');
+  assert.ok(post.includes('<div class="row justify-content-center"><div class="col-xl-8 col-lg-8 col-md-12 col-12">'), 'narrow knob wraps the card in the centered column');
+
+  // Blog index: the inline slab had the managed markup but NO presence-init
+  // root, so nothing ever bound it (frozen at "initializing", no-op submit).
+  // Composing the section is what turns the binding on.
+  const blog = pages.get('/blog');
+  assert.ok(blog.includes('data-omega-section="marketing/newsletter-cta"'), 'index slab is now §7-bound');
+  assert.ok(blog.includes('Never miss a'), 'index copy rode the bridge');
+  assert.ok(!blog.includes('<div class="row justify-content-center"><div class="col-xl-8'), 'index stays full-width (narrow off)');
+});
+
+test('cp217: §7 inherit over the real tree — the nf override keeps classy\'s FormManager js in the bundle', () => {
+  const themes = path.join(__dirname, '..', 'themes');
+  const entries = collectSectionAssets([path.join(themes, 'newsflash'), path.join(themes, 'classy')]);
+  const entry = entries.find((item) => item.kind === 'section' && item.id === 'marketing/newsletter-cta');
+  assert.ok(entry, 'entry collected');
+  assert.ok(entry.js && entry.js.includes(`${path.sep}classy${path.sep}`), `js inherited from the classy base, got: ${entry.js}`);
+  assert.equal(entry.scss, null, 'no scss on either layer — nothing invented');
 });
 
 test('cp213: contracts deliberately NOT flipped — fallthrough cta + body-called hero stay classy', async () => {

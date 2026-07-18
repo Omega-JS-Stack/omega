@@ -1,0 +1,4 @@
+{
+  description: 'Override folder that ships its own scss but keeps the lower layer\'s js — the §7 inherit lane (collectSectionAssets test fixture).',
+  inherit: ['js'],
+}

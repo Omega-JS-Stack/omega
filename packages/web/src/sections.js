@@ -162,38 +162,102 @@ function matchesType(value, type) {
   }
 }
 
+// The §7 lanes an override folder may declare `inherit` for. html can't be
+// inherited (not overriding it IS inheritance) and json5 can't (the folder is
+// its own manifest — theme defaults are theme identity).
+const INHERITABLE_LANES = new Set(['js', 'scss']);
+
+/**
+ * Read an entry folder's declared inherit lanes from its json5. Absent file,
+ * unreadable file (resolveEntry warns that at render time), or no `inherit`
+ * key → []. A malformed declaration throws — a contradictory manifest is a
+ * structural error, like traversal ids.
+ * @param {string} entryDir
+ * @param {string} basename - 'section' | 'component'
+ * @returns {string[]} validated lane names
+ */
+function readInheritLanes(entryDir, basename) {
+  const metaPath = path.join(entryDir, `${basename}.json5`);
+  if (!fs.existsSync(metaPath)) return [];
+  let meta;
+  try {
+    meta = JSON5.parse(fs.readFileSync(metaPath, 'utf8'));
+  } catch {
+    return [];
+  }
+  if (meta.inherit === undefined) return [];
+  if (!Array.isArray(meta.inherit) || meta.inherit.some((lane) => !INHERITABLE_LANES.has(lane))) {
+    throw new Error(`[sections] ${metaPath}: inherit must be an array drawn from ${[...INHERITABLE_LANES].join('/')} — got ${JSON.stringify(meta.inherit)}`);
+  }
+  return meta.inherit;
+}
+
 /**
  * Collect every section/component ASSET (section.scss / section.js and the
  * component.* twins) across the layer chain — the spec §7 asset lanes. Same
  * resolution semantics as the tags: first root owning the entry's .html wins
  * the WHOLE entry (markup + assets travel together — a consumer overriding a
- * section owns its styles/behavior too). Sorted (kind, id) for deterministic
- * sheet/bundle order.
+ * section owns its styles/behavior too), with ONE declared exception: the
+ * winning folder's json5 may carry `inherit: ['js']` (and/or 'scss') — lanes
+ * it deliberately leaves to the chain, filled from the first LOWER full entry
+ * (a folder owning the .html) that has the file. That's how a theme override
+ * replaces markup while keeping the base section's behavior riding the
+ * bundle without a copy (the newsflash newsletter-cta pattern — the base
+ * js's DOM contract becomes part of the override's markup contract).
+ * Declaring a lane the folder also ships throws (contradictory manifest);
+ * a declaration no lower layer can fill warns and stays null. Sorted
+ * (kind, id) for deterministic sheet/bundle order.
  * @param {string[]} baseDirs - resolution bases in precedence order
  *   (consumer dir first, then theme layers — registerSectionTags' order)
+ * @param {object} [options]
+ * @param {function} [options.warn] - warning sink (default console.warn)
  * @returns {Array<{kind: string, id: string, scss: string|null, js: string|null}>}
  */
-function collectSectionAssets(baseDirs) {
+function collectSectionAssets(baseDirs, options = {}) {
+  const warn = options.warn || console.warn;
   const entries = new Map(); // `${kind}:${id}` → {kind, id, scss, js}
+  const pending = new Map(); // `${kind}:${id}` → Set of inherit lanes still unfilled
 
   const walk = (root, dir, kind, prefix) => {
+    const basename = KINDS[kind].basename;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
       if (!item.isDirectory()) continue;
       const id = prefix ? `${prefix}/${item.name}` : item.name;
       if (!NAME_SHAPE.test(id)) continue;
       const entryDir = path.join(dir, item.name);
-      const html = path.join(entryDir, `${KINDS[kind].basename}.html`);
+      const html = path.join(entryDir, `${basename}.html`);
       if (fs.existsSync(html)) {
         const key = `${kind}:${id}`;
         if (!entries.has(key)) {
-          const scss = path.join(entryDir, `${KINDS[kind].basename}.scss`);
-          const js = path.join(entryDir, `${KINDS[kind].basename}.js`);
-          entries.set(key, {
+          const scss = path.join(entryDir, `${basename}.scss`);
+          const js = path.join(entryDir, `${basename}.js`);
+          const entry = {
             kind,
             id,
             scss: fs.existsSync(scss) ? scss : null,
             js: fs.existsSync(js) ? js : null,
-          });
+          };
+          const lanes = readInheritLanes(entryDir, basename);
+          for (const lane of lanes) {
+            if (entry[lane]) {
+              throw new Error(`[sections] ${entryDir}: declares inherit "${lane}" but ships its own ${basename}.${lane} — remove one`);
+            }
+          }
+          entries.set(key, entry);
+          if (lanes.length) pending.set(key, new Set(lanes));
+        } else if (pending.has(key)) {
+          // A LOWER layer's full entry at the same id — fill declared lanes
+          // from the first layer that has each file (the chain continues past
+          // layers lacking it).
+          const lanes = pending.get(key);
+          for (const lane of [...lanes]) {
+            const file = path.join(entryDir, `${basename}.${lane}`);
+            if (fs.existsSync(file)) {
+              entries.get(key)[lane] = file;
+              lanes.delete(lane);
+            }
+          }
+          if (!lanes.size) pending.delete(key);
         }
       } else {
         walk(root, entryDir, kind, id);
@@ -206,6 +270,10 @@ function collectSectionAssets(baseDirs) {
       const dir = path.join(root, KINDS[kind].dirname);
       if (fs.existsSync(dir)) walk(root, dir, kind, '');
     }
+  }
+
+  for (const [key, lanes] of pending) {
+    warn(`[sections] ${key}: declares inherit ${[...lanes].join(', ')} but no lower layer owns the file — nothing inherited`);
   }
 
   return [...entries.values()].sort((a, b) => (a.kind + a.id).localeCompare(b.kind + b.id));

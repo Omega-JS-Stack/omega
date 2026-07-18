@@ -1,0 +1,77 @@
+{% comment %}
+  The vermilion newsletter slab — email capture on the primary card, speaking
+  the client form-manager dialect. Theme-layer OVERRIDE of classy's
+  marketing/newsletter-cta: same args contract (+ headline_accent and the
+  narrow column knob), same BEHAVIOR — the json5 declares inherit: ['js'], so
+  classy's section.js (the FormManager binding) keeps riding the §7 bundle
+  and binds through the data-omega-section root. That makes the inherited
+  js's DOM contract part of this markup: form.newsletter-form inside the
+  root, .button-text, the success/error alert divs. SHARED band: defaults
+  stay neutral, every caller passes its own copy.
+{% endcomment %}
+<section{% if args.section_class != blank %} class="{{ args.section_class }}"{% endif %} data-omega-section="marketing/newsletter-cta">
+  <div class="container">
+    {% if args.narrow %}<div class="row justify-content-center"><div class="col-xl-8 col-lg-8 col-md-12 col-12">{% endif %}
+    <div class="card bg-primary text-white p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
+      <div class="position-relative">
+        {% iftruthy args.superheadline.text %}
+          <span class="badge bg-body-tertiary p-2 mb-3">
+            {% iftruthy args.superheadline.icon %}
+              {% uj_icon args.superheadline.icon, "me-1" %}
+            {% endiftruthy %}
+            {{ args.superheadline.text }}
+          </span>
+        {% endiftruthy %}
+
+        {% iftruthy args.headline %}
+          <h2 class="h2 fst-italic mb-3">
+            {{ args.headline }}
+            {% iftruthy args.headline_accent %}
+              {{ args.headline_accent }}
+            {% endiftruthy %}
+          </h2>
+        {% endiftruthy %}
+
+        {% iftruthy args.subheadline %}
+          <p class="lead text-white mb-4">{{ args.subheadline }}</p>
+        {% endiftruthy %}
+
+        <!-- Newsletter Form -->
+        <form id="newsletter-form" class="newsletter-form" novalidate data-form-state="initializing" onsubmit="return false">
+          <div class="row g-3 justify-content-center">
+            <div class="col-md-7">
+              <input
+                type="email"
+                class="form-control form-control-lg"
+                placeholder="{{ args.form.placeholder }}"
+                name="email"
+                required
+                pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                autocomplete="email"
+              >
+              <div class="invalid-feedback text-start">
+                Please enter a valid email address.
+              </div>
+            </div>
+            <div class="col-md-auto">
+              <button type="submit" class="btn btn-dark btn-lg px-4">
+                <span class="button-text">{{ args.button.text }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Success/Error Messages -->
+          <div class="newsletter-success-alert alert alert-success mt-3 d-none" role="alert">
+            {% uj_icon "check-circle", "me-2" %}
+            {{ args.form.success_message }}
+          </div>
+          <div class="newsletter-error-alert alert alert-danger mt-3 d-none" role="alert">
+            {% uj_icon "exclamation-circle", "me-2" %}
+            <span class="error-message">{{ args.form.error_message }}</span>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% if args.narrow %}</div></div>{% endif %}
+  </div>
+</section>

@@ -29,9 +29,10 @@ newsletter_cta:
   NEWSFLASH BLOG INDEX
   The newspaper front page: serif masthead title + pill search, a framed lead
   story splash, an editorial tile grid for the rest of the page's posts, pill
-  pagination, category/tag chips, and the vermilion newsletter slab. Preserves
-  classy's contracts: paginator, /search/cse form, #newsletter-form + alert
-  classes (wired by the main-layer page JS), and the adsense include.
+  pagination, category/tag chips, and the vermilion newsletter slab (the
+  shared marketing/newsletter-cta band — the nf override inherits classy's
+  §7 FormManager section.js). Preserves classy's contracts: paginator,
+  /search/cse form, the form-manager dialect, and the adsense include.
 {% endcomment %}
 
 <!-- Page head: serif title + dek + search -->
@@ -285,68 +286,7 @@ newsletter_cta:
   </div>
 </section>
 
-<!-- Newsletter CTA — the vermilion slab -->
-<section>
-  <div class="container">
-    <div class="card bg-primary text-white p-4 p-md-5 text-center position-relative overflow-hidden" data-lazy="@class animation-slide-up">
-      <div class="position-relative">
-        {% iftruthy resolved.newsletter_cta.superheadline.text %}
-          <span class="badge bg-body-tertiary p-2 mb-3">
-            {% iftruthy resolved.newsletter_cta.superheadline.icon %}
-              {% uj_icon resolved.newsletter_cta.superheadline.icon, "me-1" %}
-            {% endiftruthy %}
-            {{ resolved.newsletter_cta.superheadline.text }}
-          </span>
-        {% endiftruthy %}
-
-        <h2 class="h2 fst-italic mb-3">
-          {{ resolved.newsletter_cta.headline }}
-          {% iftruthy resolved.newsletter_cta.headline_accent %}
-            {{ resolved.newsletter_cta.headline_accent }}
-          {% endiftruthy %}
-        </h2>
-
-        {% iftruthy resolved.newsletter_cta.subheadline %}
-          <p class="lead text-white mb-4">{{ resolved.newsletter_cta.subheadline }}</p>
-        {% endiftruthy %}
-
-        <!-- Newsletter Form -->
-        <form id="newsletter-form" class="newsletter-form" novalidate data-form-state="initializing" onsubmit="return false">
-          <div class="row g-3 justify-content-center">
-            <div class="col-md-7">
-              <input
-                type="email"
-                class="form-control form-control-lg"
-                placeholder="{{ resolved.newsletter_cta.form.placeholder }}"
-                name="email"
-                required
-                pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
-                autocomplete="email"
-              >
-              <div class="invalid-feedback text-start">
-                Please enter a valid email address.
-              </div>
-            </div>
-            <div class="col-md-auto">
-              <button type="submit" class="btn btn-dark btn-lg px-4">
-                <span class="button-text">{{ resolved.newsletter_cta.button.text }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Success/Error Messages -->
-          <div class="newsletter-success-alert alert alert-success mt-3 d-none" role="alert">
-            {% uj_icon "check-circle", "me-2" %}
-            {{ resolved.newsletter_cta.form.success_message }}
-          </div>
-          <div class="newsletter-error-alert alert alert-danger mt-3 d-none" role="alert">
-            {% uj_icon "exclamation-circle", "me-2" %}
-            <span class="error-message">{{ resolved.newsletter_cta.form.error_message }}</span>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- Newsletter CTA — the vermilion slab (shared marketing/newsletter-cta, nf override) -->
+{% section "marketing/newsletter-cta", data: resolved.newsletter_cta %}
 
 {{ content | uj_content_format }}

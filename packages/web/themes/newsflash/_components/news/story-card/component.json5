@@ -3,7 +3,7 @@
 
   args: {
     url: 'string',
-    id: 'string',
+    id: { description: 'post id — string or number (uj_post resolves either; posts carry numeric ids by convention)' },
     kicker: 'string',
     title: 'string',
     author: 'string',

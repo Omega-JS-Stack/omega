@@ -36,6 +36,18 @@ theme → classy base. A consumer overriding a section owns ALL of it (markup +
 assets travel together). Theme sections live inside the installed package —
 consumer git holds only the consumer's own work.
 
+One declared exception: an override folder's json5 may carry
+`inherit: ['js']` (and/or `'scss'`) — §7 asset lanes it deliberately leaves
+to the chain, filled from the first LOWER full entry that has the file (the
+chain continues past layers lacking it). That's how a theme override replaces
+markup while keeping the base section's behavior riding the bundle without a
+copy — and it makes the inherited js's DOM contract (the selectors it
+queries) part of the override's markup contract. Declaring a lane the folder
+also ships is a build error; a declaration no lower layer can fill warns and
+inherits nothing. html and json5 are never inheritable: not overriding markup
+IS inheritance, and the folder is its own manifest (theme defaults are theme
+identity).
+
 ## Authoring — one tag, two forms
 
 Inline (simple args — values are real Liquid expressions):
@@ -117,6 +129,10 @@ another page's words.
 | Composition + args | Section internals flow; framework never writes consumer files | Their args + composition |
 | Forked section/theme file | Nothing flows for that entry | Everything (frozen) |
 
+A fork whose json5 declares `inherit` keeps those lanes flowing from the
+layer below — the one opt-back-in to the update stream (the collector
+resolves the base file live, so base js/scss updates still reach the fork).
+
 ## Landed vs pending
 
 Landed: the tags, resolution, schemas/validation, data bridge, §7 asset
@@ -139,7 +155,7 @@ carries `data-omega-section="marketing/newsletter-cta"`, and any page
 composing the band gets the working managed form — live-proven on blog index
 AND posts (whose old plain-action form posted to a nonexistent page).
 
-The newsflash lane (cp213–215): the FIRST theme-layer section override —
+The newsflash lane (cp213–217): the FIRST theme-layer section override —
 `themes/newsflash/_sections/marketing/stats/` serves the same items
 contract with newsflash markup (whole-folder wins, so its json5 carries the
 theme's own head default — theme defaults are part of the theme's
@@ -163,14 +179,22 @@ pattern: `uj_post`/`uj_member` are scope-independent (injected site
 adapter), so components own image/name lookups from plain id args;
 readtime pre-captures at the call site; kickers pass display-ready with
 `| default: "" | uj_title_case` so absence suppresses instead of
-rendering "Undefined". Deliberately NOT overridden: `marketing/cta` and
+rendering "Undefined". Override #2 (cp217): `marketing/newsletter-cta` —
+the vermilion slab — is the inherit lane's first consumer: newsflash
+markup (adds `headline_accent` + the `narrow` post-column knob), classy's
+FormManager `section.js` inherited into the bundle, binding through the
+override's own `data-omega-section` root. Landing it killed TWO live dead
+forms: nf posts still carried the plain `action="/email-subscription"`
+form (the cp209 bug), and the blog index's inline slab spoke the managed
+dialect with NO presence-init root — nothing ever bound it. (The homepage
+rail signup card still posts to that dead route — parked for the
+index-band step.) Deliberately NOT overridden: `marketing/cta` and
 `marketing/hero` — a same-id override would flip every fallthrough page's
 band to newsflash markup, so that "goes native" step is its own declared
 change. Newsflash pins live in `test/sections-newsflash.test.js` on a
 theme-override build lane over the posts-rich fixture (17 posts — every
 index slot lit).
 
-Pending (spec §13): the rule-head/lede sweep across the remaining
-newsflash layouts, the fallthrough-flip decision, `omega customize <url>`,
+Pending (spec §13): the fallthrough-flip decision, `omega customize <url>`,
 the auto-generated showcase + docs, `[id].js` wildcard page modules,
 auto-generated sample content.

@@ -1,0 +1,20 @@
+{
+  description: 'The vermilion newsletter slab — email capture on the primary card, speaking the client form-manager dialect (data-form-state; the §7 presence init binds the form). Theme-layer OVERRIDE of classy\'s band: newsflash markup, inherited behavior — classy\'s FormManager section.js keeps riding the bundle via inherit, and its DOM contract (form.newsletter-form under the data-omega-section root, .button-text, the alert divs) is part of this markup. SHARED band: defaults stay neutral, every caller passes its own copy.',
+
+  args: {
+    superheadline: 'object',
+    headline: 'string',
+    headline_accent: 'string',
+    subheadline: 'string',
+    button: 'object',
+    form: 'object',
+    section_class: 'string',
+    narrow: { type: 'boolean', description: 'wrap the card in the centered col-xl-8 column (the post-page variant)' },
+  },
+
+  defaults: {},
+
+  // §7: this override replaces markup, not behavior — keep the base layer's
+  // section.js (classy's FormManager binding) in the bundle.
+  inherit: ['js'],
+}

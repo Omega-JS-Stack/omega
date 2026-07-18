@@ -6,6 +6,8 @@
  * (hero-demo pages) and the body-call authoring lane.
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const { Liquid } = require('liquidjs');
@@ -181,6 +183,51 @@ test('collectSectionAssets: first root wins the WHOLE entry; deterministic order
   // deterministic kind+id order (sheet/bundle stability)
   const keys = entries.map((entry) => `${entry.kind}:${entry.id}`);
   assert.deepEqual(keys, [...keys].sort(), 'sorted output');
+});
+
+test('§7 inherit: a declared lane fills from the layer below while undeclared lanes stay the winner\'s', () => {
+  const entries = collectSectionAssets([CONSUMER, THEME]);
+  const demo = entries.find((entry) => entry.kind === 'section' && entry.id === 'marketing/inherit-demo');
+  assert.ok(demo.scss.includes(`${path.sep}consumer${path.sep}`), 'own scss stays the override folder\'s');
+  assert.ok(demo.js.includes(`${path.sep}theme${path.sep}`), 'declared js lane inherited from the layer below');
+});
+
+test('§7 inherit: contradictions and malformed declarations throw; unfulfilled warns and stays null; the chain skips layers lacking the file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-inherit-'));
+  const make = (layer, id, files) => {
+    const dir = path.join(root, layer, '_sections', id);
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), content);
+    return path.join(root, layer);
+  };
+  try {
+    // own file + inherit of the same lane = contradictory manifest
+    const a = make('contra', 'x/y', { 'section.html': '<i></i>', 'section.js': 'export default () => {};', 'section.json5': "{ inherit: ['js'] }" });
+    assert.throws(() => collectSectionAssets([a]), /ships its own section\.js/);
+
+    // malformed declarations
+    const b = make('bad-string', 'x/y', { 'section.html': '<i></i>', 'section.json5': "{ inherit: 'js' }" });
+    assert.throws(() => collectSectionAssets([b]), /inherit must be an array/);
+    const c = make('bad-lane', 'x/y', { 'section.html': '<i></i>', 'section.json5': "{ inherit: ['html'] }" });
+    assert.throws(() => collectSectionAssets([c]), /inherit must be an array drawn from/);
+
+    // declared but nothing below owns the file → warn, stays null
+    const d = make('orphan', 'x/y', { 'section.html': '<i></i>', 'section.json5': "{ inherit: ['js'] }" });
+    const warnings = [];
+    const orphaned = collectSectionAssets([d], { warn: (message) => warnings.push(message) });
+    assert.equal(orphaned.find((entry) => entry.id === 'x/y').js, null, 'nothing inherited');
+    assert.ok(warnings.some((w) => w.includes('x/y') && w.includes('nothing inherited')), warnings.join(' | '));
+
+    // chain continuation: the middle layer owns the html but not the js —
+    // the fill comes from the layer below it
+    const top = make('chain-top', 'x/y', { 'section.html': '<i></i>', 'section.json5': "{ inherit: ['js'] }" });
+    const mid = make('chain-mid', 'x/y', { 'section.html': '<i></i>' });
+    const bottom = make('chain-bottom', 'x/y', { 'section.html': '<i></i>', 'section.js': 'export default () => {};' });
+    const chained = collectSectionAssets([top, mid, bottom]);
+    assert.ok(chained.find((entry) => entry.id === 'x/y').js.includes('chain-bottom'), 'chain continued past the js-less layer');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 // ─── build-level pins (the real classy hero through the real engine) ─────────
