@@ -1,30 +1,51 @@
 /**
  * @omega.js/config repo — the SINGLE derivation of the brand's GitHub repo
- * name, shared by every surface that targets the brand repo (web
+ * (owner + name), shared by every surface that targets the brand repo (web
  * `omega deploy --direct`, the manager's github service setup/repo/pages).
  *
- * Chain: explicit `github.repo` → the `github.repo_website` URL's last path
- * segment → `brand.id`. repo_website already names the site repo for the
- * CMS routes, so a brand whose repo name differs from its brand id needs no
- * extra key. Born from the 2026-07-18 launch-night collision: the bare
- * brand-id fallback resolved brand "omega" to Omega-JS-Stack/omega — the
- * framework MONOREPO — instead of the brand repo omegajs.dev.
+ * Name chain: explicit `github.repo` → the `repo_website` URL's repo →
+ * `brand.id`. Owner chain: the `repo_website` URL's account → `github.org`.
+ * This mirrors the legacy omega-manager orgMain/orgWebsite split (Ian
+ * 2026-07-19): most ITW brands house the WEBSITE repo under the paid
+ * company org (itw-creative-works) while the brand's own org carries its
+ * public profile — here `github.org` keeps naming the brand's own org for
+ * org-profile reconciliation and `repo_website` fully names the site repo.
+ * Born from the 2026-07-18 launch-night collision: the bare brand-id
+ * fallback resolved brand "omega" to Omega-JS-Stack/omega — the framework
+ * MONOREPO — instead of the brand repo omegajs.dev.
  */
 
 /**
- * The brand repo's bare name (no owner; the owner is always github.org).
+ * Parse a GitHub repo URL (https or ssh; .git / trailing-slash tolerant).
+ *
+ * @param {string} url - e.g. https://github.com/ITW-Creative-Works/omegajs.dev
+ * @returns {{ owner: string, name: string }} Empty strings when not a GitHub repo URL.
+ */
+function parseRepoWebsite(url) {
+  const match = (url || '').match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
+  return match ? { owner: match[1], name: match[2] } : { owner: '', name: '' };
+}
+
+/**
+ * The brand repo's bare name (no owner).
  *
  * @param {object} config - Composed omega config (brand + app layers).
  * @returns {string} Repo name ('' when nothing in the chain resolves).
  */
 function brandRepoName(config) {
   const github = config?.github || {};
-  const fromUrl = (github.repo_website || '')
-    .replace(/\.git$/, '')
-    .replace(/\/+$/, '')
-    .split('/')
-    .pop();
-  return github.repo || fromUrl || config?.brand?.id || '';
+  return github.repo || parseRepoWebsite(github.repo_website).name || config?.brand?.id || '';
 }
 
-module.exports = { brandRepoName };
+/**
+ * The brand repo's owner (GitHub org or user).
+ *
+ * @param {object} config - Composed omega config (brand + app layers).
+ * @returns {string} Owner ('' when nothing in the chain resolves).
+ */
+function brandRepoOwner(config) {
+  const github = config?.github || {};
+  return parseRepoWebsite(github.repo_website).owner || github.org || '';
+}
+
+module.exports = { parseRepoWebsite, brandRepoName, brandRepoOwner };

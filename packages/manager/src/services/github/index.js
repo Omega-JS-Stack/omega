@@ -13,7 +13,7 @@
  *   location — org profile location; only reconciled when set.
  */
 const chalk = require('chalk').default;
-const { brandRepoName } = require('@omega.js/config');
+const { brandRepoName, brandRepoOwner } = require('@omega.js/config');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { GitHubAPI } = require('./lib/github-api.js');
 
@@ -35,7 +35,8 @@ module.exports.run = createServiceRunner({
     }
 
     const repoName = brandRepoName(context.brandConfig);
-    console.log(`    Repo: ${chalk.cyan(`${github.org}/${repoName}`)}${github.shared === true ? chalk.dim(' (shared org)') : ''}`);
+    const repoOwner = brandRepoOwner(context.brandConfig);
+    console.log(`    Repo: ${chalk.cyan(`${repoOwner}/${repoName}`)}${github.shared === true ? chalk.dim(' (shared org)') : ''}`);
 
     // Tests inject a fake client via context.githubApi; the real one verifies
     // gh is installed + authenticated at construction

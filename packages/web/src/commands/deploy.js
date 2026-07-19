@@ -37,17 +37,18 @@ function pagesHost(config) {
 
 /**
  * The direct-deploy plan from the app's composed config: the brand repo
- * (shared @omega.js/config derivation: github.repo → repo_website's repo →
- * brand.id) and the Pages custom domain (brand.url's host).
+ * (shared @omega.js/config derivation — name: github.repo → repo_website's
+ * repo → brand.id; owner: repo_website's account → github.org) and the
+ * Pages custom domain (brand.url's host).
  *
  * @param {object} config - Composed omega config (brand + app layers).
  * @returns {{ repo: string, pushUrl: string, branch: string, cname: string }}
  */
 function buildDirectPlan(config) {
-  const { brandRepoName } = require('@omega.js/config');
-  const github = config.github || {};
-  if (!github.org) {
-    throw new Error('Direct deploy needs github.org in config/omega.json5 (the brand repo owner) — or use the CI dispatch deploy');
+  const { brandRepoName, brandRepoOwner } = require('@omega.js/config');
+  const owner = brandRepoOwner(config);
+  if (!owner) {
+    throw new Error('Direct deploy needs github.org (or an owner in github.repo_website) in config/omega.json5 — or use the CI dispatch deploy');
   }
 
   const repoName = brandRepoName(config);
@@ -60,7 +61,7 @@ function buildDirectPlan(config) {
     throw new Error('Direct deploy needs brand.url (the Pages custom domain)');
   }
 
-  const repo = `${github.org}/${repoName}`;
+  const repo = `${owner}/${repoName}`;
   return { repo, pushUrl: `https://github.com/${repo}.git`, branch: 'gh-pages', cname };
 }
 

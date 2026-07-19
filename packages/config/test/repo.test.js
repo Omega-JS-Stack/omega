@@ -7,7 +7,7 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const { brandRepoName } = require('../src/index.js');
+const { brandRepoName, brandRepoOwner } = require('../src/index.js');
 
 test('brandRepoName: explicit github.repo wins over everything', () => {
   assert.equal(
@@ -29,4 +29,17 @@ test('brandRepoName: brand.id fallback; empty when nothing resolves', () => {
   assert.equal(brandRepoName({ github: {}, brand: { id: 'my-brand' } }), 'my-brand');
   assert.equal(brandRepoName({ brand: { id: 'my-brand' } }), 'my-brand');
   assert.equal(brandRepoName({}), '');
+});
+
+test('brandRepoOwner: repo_website account wins (legacy orgWebsite — site repo under the paid company org)', () => {
+  assert.equal(
+    brandRepoOwner({ github: { org: 'Omega-JS-Stack', repo_website: 'https://github.com/ITW-Creative-Works/omegajs.dev' } }),
+    'ITW-Creative-Works',
+  );
+});
+
+test('brandRepoOwner: github.org fallback; empty when nothing resolves', () => {
+  assert.equal(brandRepoOwner({ github: { org: 'Org' } }), 'Org');
+  assert.equal(brandRepoOwner({ github: { org: 'Org', repo_website: 'not a url' } }), 'Org');
+  assert.equal(brandRepoOwner({}), '');
 });

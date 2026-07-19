@@ -36,6 +36,14 @@ test('direct plan: repo_website names the repo when github.repo is unset (launch
   assert.equal(plan.pushUrl, 'https://github.com/Omega-JS-Stack/omegajs.dev.git');
 });
 
+test('direct plan: owner + name both derive from repo_website (ITW-housed site repo, org still the brand org)', () => {
+  const plan = buildDirectPlan({
+    github: { org: 'Omega-JS-Stack', repo_website: 'https://github.com/ITW-Creative-Works/omegajs.dev' },
+    brand: { id: 'omega', url: 'https://omegajs.dev' },
+  });
+  assert.equal(plan.repo, 'ITW-Creative-Works/omegajs.dev');
+});
+
 test('direct plan: repo defaults to brand.id when neither repo nor repo_website is set', () => {
   const plan = buildDirectPlan({ github: { org: 'Org' }, brand: { id: 'my-brand', url: 'https://my.brand' } });
   assert.equal(plan.repo, 'Org/my-brand');

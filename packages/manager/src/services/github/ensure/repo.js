@@ -10,7 +10,7 @@
  * later services (analytics, seo, …) read the repo identity from here.
  */
 const chalk = require('chalk').default;
-const { brandRepoName } = require('@omega.js/config');
+const { brandRepoName, brandRepoOwner } = require('@omega.js/config');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureRepo(context) {
@@ -18,11 +18,12 @@ module.exports = async function ensureRepo(context) {
 
   const github = brandConfig.github;
   const repoName = brandRepoName(brandConfig);
-  const fullName = `${github.org}/${repoName}`;
+  const repoOwner = brandRepoOwner(brandConfig);
+  const fullName = `${repoOwner}/${repoName}`;
   const isPrivate = github.private !== false;
   const homepage = brandConfig.brand?.url || '';
 
-  const repo = api.getRepo(github.org, repoName);
+  const repo = api.getRepo(repoOwner, repoName);
 
   // ── Missing: create it ─────────────────────────────────────────────────────
   if (!repo) {
@@ -33,7 +34,7 @@ module.exports = async function ensureRepo(context) {
     console.log(`      Creating ${chalk.cyan(fullName)}...`);
 
     try {
-      const created = api.createRepo(github.org, repoName, {
+      const created = api.createRepo(repoOwner, repoName, {
         isPrivate,
         description: brandConfig.brand?.description || '',
         homepage,
@@ -78,7 +79,7 @@ module.exports = async function ensureRepo(context) {
   }
 
   try {
-    api.updateRepo(github.org, repoName, updates);
+    api.updateRepo(repoOwner, repoName, updates);
     console.log(`      ${chalk.green('✓')} ${chalk.cyan(fullName)} updated`);
     return { status: 'success', state, output: { repo: { updated: Object.keys(updates) } } };
   } catch (error) {

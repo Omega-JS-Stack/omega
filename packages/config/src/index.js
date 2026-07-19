@@ -30,7 +30,7 @@ const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js')
 const { renderBrandAppSeed, resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
-const { brandRepoName } = require('./repo.js');
+const { parseRepoWebsite, brandRepoName, brandRepoOwner } = require('./repo.js');
 const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, envName, portsToEnv, envPort } = require('./ports.js');
 
 module.exports = {
@@ -69,8 +69,11 @@ module.exports = {
   // Template surface
   toSiteGlobal,
 
-  // Brand repo derivation (github.repo → repo_website URL → brand.id)
+  // Brand repo derivation (name: github.repo → repo_website URL → brand.id;
+  // owner: repo_website URL → github.org — legacy orgMain/orgWebsite split)
+  parseRepoWebsite,
   brandRepoName,
+  brandRepoOwner,
 
   // Validation
   validateConfig,

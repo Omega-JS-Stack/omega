@@ -314,7 +314,13 @@ async function translateSite(options) {
       rewriteLinks($, lang, baseUrl, isExcluded);
       insertAlternates($, settings.languages, settings.default, route, baseUrl);
 
-      jetpack.write(path.join(outDir, lang, relPath), $.html());
+      // Canonical URLs are extensionless (about.html ↔ /about), so the
+      // language HOME must land as <lang>.html for /es to resolve as a FILE.
+      // An es/index.html forces GitHub Pages' directory redirect (/es →
+      // /es/), which fights the zone's strip-trailing-slash rule into a
+      // 301 loop (live find, launch night 2026-07-19).
+      const targetRel = relPath === 'index.html' ? `${lang}.html` : path.join(lang, relPath);
+      jetpack.write(path.join(outDir, targetRel), $.html());
       producedLangs.push(lang);
     }
 

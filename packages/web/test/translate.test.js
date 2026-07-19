@@ -75,17 +75,21 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
 
   const stats = await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend(calls) });
 
-  // Copies exist for translatable pages only
-  assert.ok(fs.existsSync(path.join(dist, 'es', 'index.html')));
+  // Copies exist for translatable pages only. The language HOME lands as
+  // <lang>.html (a FILE, matching the extensionless canonical /es) — an
+  // es/index.html would force Pages' directory redirect (/es → /es/) into
+  // a 301 loop with the zone's strip-trailing-slash rule.
+  assert.ok(fs.existsSync(path.join(dist, 'es.html')));
+  assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'language home is a file, not a directory index');
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
-  assert.ok(fs.existsSync(path.join(dist, 'ar', 'index.html')));
+  assert.ok(fs.existsSync(path.join(dist, 'ar.html')));
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'checkout')), 'system route excluded');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'admin')), 'system folder excluded');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'skipme')), 'config exclude honored');
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'twitter.html')), 'socials redirect excluded');
   assert.strictEqual(stats.pages, 2);
 
-  const es = fs.readFileSync(path.join(dist, 'es', 'index.html'), 'utf8');
+  const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
 
   // Text + title + meta translated; opt-out and hidden input untouched
   assert.ok(es.includes('Welcome home·es'), 'title translated');
@@ -112,7 +116,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   assert.ok(es.includes('https://external.example/x'));
 
   // RTL
-  const ar = fs.readFileSync(path.join(dist, 'ar', 'index.html'), 'utf8');
+  const ar = fs.readFileSync(path.join(dist, 'ar.html'), 'utf8');
   assert.ok(ar.includes('lang="ar"') && ar.includes('dir="rtl"'));
 
   // Originals gained hreflang alternates for exactly the produced languages
@@ -140,7 +144,7 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   cache[hashKey('Welcome home')] = 'Bienvenido a casa';
   fs.writeFileSync(cacheFile, JSON.stringify(cache));
   await translateSite({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('no calls'); } });
-  const esAgain = fs.readFileSync(path.join(dist, 'es', 'index.html'), 'utf8');
+  const esAgain = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
   assert.ok(esAgain.includes('Bienvenido a casa'), 'hand-edited cache value sticks');
 
   fs.rmSync(root, { recursive: true, force: true });
@@ -154,7 +158,7 @@ test('translateSite: only-filter limits the run to one page', async () => {
 
   assert.strictEqual(stats.pages, 1);
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
-  assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'home not translated under only-filter');
+  assert.ok(!fs.existsSync(path.join(dist, 'es.html')), 'home not translated under only-filter');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -178,7 +182,7 @@ test('translateSite: provider failure falls back to source text and reports', as
   assert.ok(stats.failures.every((f) => f.startsWith('ar ')), 'only ar failed');
 
   // The ar page still ships, carrying the source text
-  const ar = fs.readFileSync(path.join(dist, 'ar', 'index.html'), 'utf8');
+  const ar = fs.readFileSync(path.join(dist, 'ar.html'), 'utf8');
   assert.ok(ar.includes('Grow faster with MiniCo'), 'source text kept on failure');
   assert.ok(ar.includes('lang="ar"'), 'chrome still localized');
 
