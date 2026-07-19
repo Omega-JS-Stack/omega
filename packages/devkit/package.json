@@ -1,6 +1,6 @@
 {
   "name": "@omega.js/devkit",
-  "version": "1.2.0",
+  "version": "1.0.0",
   "description": "Shared build-time internals for the OMEGA frameworks — private workspace package, vendored into each framework's dist at prepare time",
   "private": true,
   "main": "./src/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@omega.js/manager",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "The OMEGA orchestration engine — walks every service in dependency order and reconciles each to the brand's omega.json5, idempotently, against a brand monorepo. omega-manager's brains, ported service by service. Private until first publish.",
   "private": true,
   "main": "./src/index.js",

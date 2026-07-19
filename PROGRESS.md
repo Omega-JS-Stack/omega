@@ -57,6 +57,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats — `{{ backend-manager }}` rules placeholder, `# BEM>>>` gitignore markers, `///---backend-manager---///` rules markers, and the cp72–74 interim `///---omega---///` flavor — evergreen `mgr setup` only speaks the one marker family now (75)
 
 ## ✅ Done (recent — full history: CHANGELOG.md + git log; the fat pre-slim tracker: `git show 99dc015:PROGRESS.md`)
+- [x] 228 EVERY PACKAGE 1.0.0 (Ian 2026-07-18) — 7 versions reset + `@omega.js/client` ^1.0.0 in both consumers; full battery green, goldens byte-zero both themes → CHANGELOG
 - [x] 227 parked-findings sweep #2 — meta-files deterministic (`allByUrl`), extension cache flag-off (SW precedent), dead newsletter alerts culled; goldens 0 unexplained both themes (1 declared lane), web 248 + ext 105, corpus, e2e + journey → CHANGELOG
 - [x] 201 Ian's rulings — warming back as DISABLED-behind-flag (single-flag re-enable, bundle-proven) · preload breadth CLOSED (keep whole-site); web 183/0, e2e PASSED → CHANGELOG
 - [x] 200 dead SW cache-warming removed (Ian: page speed wins) · preload layer fall-through pinned · build-meta assets trimmed · SW bundle-proven (no warm, push+takeover intact); web 183/0, corpus 7/7, e2e PASSED → CHANGELOG
@@ -71,4 +72,4 @@
 - [x] 186 The Daily Build born — second-skin brand by COPY → CHANGELOG
 - [x] Phases 0–2 + cp33–185 — bootstrap through account dialect + rounds 10c/10d → CHANGELOG + git log
 
-*Last updated: 2026-07-18 (cp227: parked-findings sweep #2 — three ledger items closed; sections arc still waits only on THE FORK)*
+*Last updated: 2026-07-18 (cp228: every package 1.0.0 — the version foundation of the local-era fork; cp229 birth in flight)*
