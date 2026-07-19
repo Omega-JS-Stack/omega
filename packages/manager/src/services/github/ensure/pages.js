@@ -9,10 +9,11 @@
  * cloudflare port.
  */
 const chalk = require('chalk').default;
+const { brandRepoName } = require('@omega.js/config');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensurePages(context) {
-  const { brandId, brand, brandConfig, options = {}, githubApi: api } = context;
+  const { brand, brandConfig, options = {}, githubApi: api } = context;
 
   if (!brand.targets.includes('web')) {
     console.log(`      ${chalk.dim('⊘ No web target — Pages not needed')}`);
@@ -20,7 +21,7 @@ module.exports = async function ensurePages(context) {
   }
 
   const github = brandConfig.github;
-  const repoName = github.repo || brandId;
+  const repoName = brandRepoName(brandConfig);
   const domain = (brandConfig.brand?.url || '').replace(/^https?:\/\//, '');
 
   // The branch only exists once the site has deployed at least once

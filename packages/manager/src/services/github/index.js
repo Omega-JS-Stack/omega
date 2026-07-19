@@ -7,11 +7,13 @@
  * Config (brand omega.json5 `github` key):
  *   org      — repo owner (GitHub org or user). No default; unset = service skips.
  *   shared   — org shared with other brands → org-level reconciliation skipped.
- *   repo     — repo name; defaults to the brand id.
+ *   repo     — repo name; defaults to repo_website's repo, then the brand id
+ *              (@omega.js/config brandRepoName — shared with deploy --direct).
  *   private  — repo visibility (manager default: true).
  *   location — org profile location; only reconciled when set.
  */
 const chalk = require('chalk').default;
+const { brandRepoName } = require('@omega.js/config');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { GitHubAPI } = require('./lib/github-api.js');
 
@@ -32,7 +34,7 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no github.org configured (set github.org in config/omega.json5)' };
     }
 
-    const repoName = github.repo || context.brandId;
+    const repoName = brandRepoName(context.brandConfig);
     console.log(`    Repo: ${chalk.cyan(`${github.org}/${repoName}`)}${github.shared === true ? chalk.dim(' (shared org)') : ''}`);
 
     // Tests inject a fake client via context.githubApi; the real one verifies

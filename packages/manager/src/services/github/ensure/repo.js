@@ -10,13 +10,14 @@
  * later services (analytics, seo, …) read the repo identity from here.
  */
 const chalk = require('chalk').default;
+const { brandRepoName } = require('@omega.js/config');
 const { dryRunPlan } = require('../../../lib/run-gates.js');
 
 module.exports = async function ensureRepo(context) {
-  const { brandId, brandConfig, options = {}, githubApi: api } = context;
+  const { brandConfig, options = {}, githubApi: api } = context;
 
   const github = brandConfig.github;
-  const repoName = github.repo || brandId;
+  const repoName = brandRepoName(brandConfig);
   const fullName = `${github.org}/${repoName}`;
   const isPrivate = github.private !== false;
   const homepage = brandConfig.brand?.url || '';
