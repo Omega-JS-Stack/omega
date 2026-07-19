@@ -350,5 +350,25 @@ becomes an identity transform (the cp222 goldens are byte-zero against
 cp221) — while the wizard journey proves live rolling: a wizard-born brand's
 newest sample post lands ~10 days before today, unpinned.
 
-Pending (spec §13): the extraction tail — remaining classy one-off bands
-(per-page uniques stay unless repeated).
+The extraction close (cp223, spec §13 step 2 COMPLETE): a full-page audit of
+every classy layout found ONE remaining true duplicate — alternatives/index's
+inline stats band, a byte-level copy of `marketing/stats` — now a section
+call (classy goldens byte-zero; under newsflash the band correctly flips to
+the theme's stats override, the last band newsflash couldn't reskin on that
+page). Everything else that *looks* repeated was audited and stays, each for
+a reason: alternative.html's stats+CTA composite and pricing's social-proof
+stats (star rows) and FAQ+guarantee panel are divergent per-page composites,
+not instances of the shared contracts; status's subscribe band is its own
+compact idiom, not newsletter-cta; the team portrait card repeats only as an
+SCSS pattern (`classy-person` — the index variant carries a links row the
+member page deliberately drops), like the rowlist/hairline idiom. The
+boundary doctrine the audit settled: **sections/components are for
+composable bands with data-only args; context-bound partials stay includes**
+(post-card, nav/footer, account-section-header — they need `site.*`/liquid
+tags a context-free render can't see, the same reason posts never ride
+args); **plumbing pages stay layouts** (auth flows, blog taxonomy twins,
+payment, portal — generated-page machinery brands override at the layout
+layer, not compositions brands remix).
+
+Pending (spec §13): content pass A — omega-ify the playground (Ian-gated:
+playground freeze lift).
