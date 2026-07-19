@@ -64,6 +64,15 @@ module.exports = async function (options) {
 
   logger.log(`Built ${result.htmlCount} pages in ${result.timings.total.toFixed(2)}s → ${path.relative(paths.root, paths.out)}/`);
 
+  // GH Pages custom domain: every production build carries dist/CNAME so
+  // BOTH deploy lanes publish it — the CI workflow passes no cname to its
+  // gh-pages action, and a push without the file clears the Pages domain
+  // (UJM auto-created it; omega parity).
+  const cname = require('./deploy.js').pagesHost(siteData);
+  if (cname) {
+    jetpack.write(path.join(paths.out, 'CNAME'), cname);
+  }
+
   // Post-build translation (site.* IS the resolved config shape).
   // Default: translate EVERYTHING — warm strings from the committed cache
   // (instant), cold strings live through the provider, so a build always

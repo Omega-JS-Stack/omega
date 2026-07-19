@@ -7,7 +7,14 @@
 const assert = require('node:assert');
 const { test } = require('node:test');
 
-const { buildDirectPlan } = require('../src/commands/deploy.js');
+const { buildDirectPlan, pagesHost } = require('../src/commands/deploy.js');
+
+test('pagesHost: bare host from brand.url; empty when unset (feeds plan cname + build CNAME emission)', () => {
+  assert.equal(pagesHost({ brand: { url: 'https://www.example.com/landing' } }), 'www.example.com');
+  assert.equal(pagesHost({ brand: { url: 'http://omegajs.dev' } }), 'omegajs.dev');
+  assert.equal(pagesHost({ brand: {} }), '');
+  assert.equal(pagesHost({}), '');
+});
 
 test('direct plan: org + explicit repo + cname from brand.url host', () => {
   const plan = buildDirectPlan({

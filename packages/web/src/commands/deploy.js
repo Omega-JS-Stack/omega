@@ -23,6 +23,19 @@ const logger = new Logger('omega:deploy');
 const WORKFLOW = 'build.yml';
 
 /**
+ * The GitHub Pages custom domain: brand.url's bare host. Shared by the
+ * direct-deploy plan AND `omega build`'s dist/CNAME emission (both deploy
+ * lanes must publish the file — a gh-pages push without it clears the
+ * Pages domain).
+ *
+ * @param {object} config - Composed omega config (brand + app layers).
+ * @returns {string} Bare host ('' when brand.url is unset).
+ */
+function pagesHost(config) {
+  return (config.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+}
+
+/**
  * The direct-deploy plan from the app's composed config: the brand repo
  * (github service derivation — org + repo || brand id) and the Pages
  * custom domain (brand.url's host).
@@ -41,7 +54,7 @@ function buildDirectPlan(config) {
     throw new Error('Direct deploy needs github.repo or brand.id to name the brand repo');
   }
 
-  const cname = (config.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const cname = pagesHost(config);
   if (!cname) {
     throw new Error('Direct deploy needs brand.url (the Pages custom domain)');
   }
@@ -166,3 +179,4 @@ module.exports = async function (options) {
 };
 
 module.exports.buildDirectPlan = buildDirectPlan;
+module.exports.pagesHost = pagesHost;
