@@ -3,6 +3,7 @@
  * Admin/blogger endpoint to write files to GitHub
  */
 const { Octokit } = require('@octokit/rest');
+const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
 module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
 
@@ -21,13 +22,13 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
     return assistant.respond('GitHub API key not configured.', { code: 500 });
   }
 
-  if (!Manager.config?.github?.repoWebsite) {
-    return assistant.respond('GitHub repoWebsite not configured.', { code: 500 });
+  if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
+    return assistant.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
   }
 
   assistant.log('main(): settings', settings);
 
-  const bemRepo = assistant.parseRepo(Manager.config.github.repoWebsite);
+  const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
 
   // Setup Octokit
   const octokit = new Octokit({

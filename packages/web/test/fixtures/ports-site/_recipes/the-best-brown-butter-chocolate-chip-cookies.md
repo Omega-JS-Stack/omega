@@ -2,6 +2,10 @@
 # Migration wiring (was Jekyll _config.yml collection defaults + site config):
 # layout/permalink came from `defaults: { type: recipes, values: {...} }`,
 # date was Jekyll-implicit, advertising placement is brand config.
+# Lives in _recipes/ (was pages/recipes/): a recipe is a content ENTRY whose
+# frontmatter IS the document — the 2026-07-19 meta-only page rule moves such
+# docs to collection dirs (a mechanical path move; explicit permalink keeps
+# the URL byte-identical).
 layout: ports/recipe
 permalink: /recipes/the-best-brown-butter-chocolate-chip-cookies
 date: 2024-06-01

@@ -18,6 +18,7 @@
  * rewrites a shared project's settings.
  */
 const { googleTokenStorePath } = require('../../lib/google-auth.js');
+const { isDemoProject } = require('@omega.js/config');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
@@ -59,6 +60,14 @@ module.exports.run = createServiceRunner({
     }
     if (!projectId) {
       return { skip: true, reason: 'no firebase.projectId configured (rerun interactively to select/create the project)' };
+    }
+
+    // demo-* = emulator-only by Firebase's own convention: no real GCP
+    // project exists to reconcile (found live 2026-07-19 — the omega brand's
+    // offline demo-omega id sent the ensure at real Google APIs → 403,
+    // killing the whole manage boot).
+    if (isDemoProject(projectId)) {
+      return { skip: true, reason: `${projectId} is a demo-* (emulator-only) project — no real cloud to reconcile` };
     }
 
     if (!haveCreds) {

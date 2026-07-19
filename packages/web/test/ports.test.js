@@ -4,7 +4,9 @@
  * recipe 412L + the real adsense include, somiibo index 456L + its hero-demo
  * include), built through the engine with ONLY the mechanical transforms the
  * B4 codemod would apply (page.resolved.→resolved., canonical/slug/content
- * forms, include leading slash, interpolated-tag-arg fix-forward).
+ * forms, include leading slash, interpolated-tag-arg fix-forward, and
+ * content-entry pages → collection dirs: the recipe doc lives in _recipes/
+ * because page frontmatter is meta-only since 2026-07-19).
  * Assertions target REAL data: the UJM default team member via uj_member,
  * adsense slots via include params, and the full JSON-LD Recipe schema.
  *

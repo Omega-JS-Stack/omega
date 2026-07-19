@@ -116,23 +116,33 @@ params needs a `{% capture %}` first).
 `data:` is reserved: it deep-spreads an object BETWEEN defaults and named
 args — `defaults ← data ← named args` (shared `deepMerge` semantics with the
 resolved cascade: b wins, explicit `null` removes, `undefined` keeps).
-Layouts pass `data: resolved.hero` so consumer frontmatter key-overrides keep
-working unchanged. Bare frontmatter ARRAYS bridge as a named arg
+Layouts pass `data: resolved.hero` to bridge the THEME's own defaults (and
+the consumer's site-wide directory-data lane). Bare ARRAYS bridge as a named arg
 (`{% section "marketing/stats", items: resolved.stats %}`) — an undefined
 named arg keeps the default, so absence semantics survive.
 
-**Page-wins parity (repaired cp225)**: Eleventy's own data-cascade merge
-CONCATS a page array onto a layout-default array and lets a layout-default
-object beat a page scalar — which broke the inject-properties.rb contract
-(a page's four story items rendered as layout's-four-plus-theirs, and a
-documented kill switch like `gallery: false` could never fire). The engine
-now re-applies the page's OWN frontmatter (re-parsed from source) over the
-cascade with the shared `deepMerge` inside the `resolved` computed, so a
-page always wins its own keys outright: arrays replace, scalars beat
-objects, partial object overrides still keep layout siblings. Virtual
-templates (blueprints, sample content) have no source file and keep pure
-cascade behavior. Pinned in `test/resolved-page-wins.test.js` against the
-real about layout.
+**Consumer page frontmatter is META-ONLY — enforced (Ian 2026-07-19: "not
+only no more frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter")**:
+a real file under `pages/` may carry only `layout`, `permalink`, `meta`,
+`schema`, `theme`, `sitemap`, `append` (+ engine plumbing). Any other key is
+content-in-frontmatter and FAILS the build with a move-it-into-sections
+message (`frontmatter-guard.test.js`). Content lives in the page BODY as
+`{% section %}` calls; site-wide overrides live in directory data; theme
+voice lives in layout frontmatter.
+
+**Doc-wins parity — collections lane (repaired cp225, rescoped cp235)**:
+Eleventy's own data-cascade merge CONCATS a doc array onto a layout-default
+array and lets a layout-default object beat a doc scalar — breaking the
+inject-properties.rb contract for content ENTRIES (`_posts`, `_team`,
+`_alternatives`, … — docs whose frontmatter IS the document; the guard never
+touches them). The engine re-applies the doc's OWN frontmatter (re-parsed
+from source) over the cascade with the shared `deepMerge` inside the
+`resolved` computed, so a doc always wins its own keys outright: arrays
+replace, scalars beat objects, partial object overrides keep layout
+siblings. Virtual templates (blueprints, sample content) have no source
+file and keep pure cascade behavior. Pinned in
+`test/resolved-page-wins.test.js` against the real classy alternative
+layout.
 
 ### Context-freeness (load-bearing)
 
@@ -275,8 +285,9 @@ The `{% composition %}` wrap is tri-state, byte-parity with the
 Materialize-then-build is identity: the only sanctioned output delta is
 blank-line runs (the materialized body passes through the blueprint's
 content wrap, which frames it with one extra newline each side). Pinned in
-`test/customize.test.js`, along with divergence (an added frontmatter arg
-lands; a deleted one-liner drops exactly that band) and the theme-honest
+`test/customize.test.js`, along with divergence (a call-site arg
+override lands — frontmatter is meta-only; a deleted one-liner drops exactly
+that band) and the theme-honest
 lanes. The update-semantics table above is unchanged — customize writes
 once, at the consumer's explicit request; the update stream never writes
 consumer files.

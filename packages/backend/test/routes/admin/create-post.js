@@ -2,7 +2,7 @@
  * Test: POST /admin/post
  * Tests the admin create post endpoint
  * Creates blog posts via GitHub with image extraction and @post/ body rewriting
- * Requires admin/blogger role, GitHub API key, and repoWebsite config
+ * Requires admin/blogger role, GitHub API key, and a resolvable github repo (github.repo slug or github.org + brand.id)
  */
 const { Octokit } = require('@octokit/rest');
 const sharp = require('sharp');
@@ -116,17 +116,14 @@ module.exports = {
           return;
         }
 
-        if (!config.github?.repoWebsite) {
-          assert.fail('githubRepoWebsite not configured');
+        const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+        if (!brandRepoOwner(config) || !brandRepoName(config)) {
+          assert.fail('github repo not resolvable (github.repo slug or github.org + brand.id)');
           return;
         }
 
         // Parse owner/repo for cleanup later
-        const repoMatch = config.github?.repoWebsite.match(/github\.com\/([^/]+)\/([^/]+)/);
-        if (!repoMatch) {
-          assert.fail('Could not parse githubRepoWebsite');
-          return;
-        }
+        const repoMatch = [null, brandRepoOwner(config), brandRepoName(config)];
 
         state.owner = repoMatch[1];
         state.repo = repoMatch[2];

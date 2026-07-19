@@ -1,5 +1,6 @@
 const { Octokit } = require('@octokit/rest');
 const { parse } = require('yaml');
+const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
 function Module() {
 
@@ -18,8 +19,8 @@ Module.prototype.main = function () {
       return reject(assistant.errorify(`GitHub API key not configured.`, {code: 500}));
     }
 
-    if (!Manager.config?.github?.repoWebsite) {
-      return reject(assistant.errorify(`GitHub repoWebsite not configured.`, {code: 500}));
+    if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
+      return reject(assistant.errorify(`GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).`, {code: 500}));
     }
 
     // Setup Octokit
@@ -44,7 +45,7 @@ Module.prototype.main = function () {
 
     // Get the post
     const filename = url.pathname.replace(/blog|\//ig, '')
-    const repoInfo = assistant.parseRepo(self?.Manager?.config?.github?.repoWebsite);
+    const repoInfo = { user: brandRepoOwner(self.Manager.config), name: brandRepoName(self.Manager.config) };
     const query = `title+repo:${repoInfo.user}/${repoInfo.name}+filename:${filename}`;
 
     assistant.log('Running search', query, repoInfo);

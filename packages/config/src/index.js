@@ -30,7 +30,8 @@ const { applyCanonicalOrder, CANONICAL_TOP_LEVEL_ORDER } = require('./order.js')
 const { renderBrandAppSeed, resolveSeedMode } = require('./seed.js');
 const { resolveHook, loadHook } = require('./hooks.js');
 const { toSiteGlobal } = require('./site-global.js');
-const { parseRepoWebsite, brandRepoName, brandRepoOwner } = require('./repo.js');
+const { parseRepoSlug, brandRepoName, brandRepoOwner } = require('./repo.js');
+const { isDemoProject } = require('./demo.js');
 const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, envName, portsToEnv, envPort } = require('./ports.js');
 
 module.exports = {
@@ -69,9 +70,13 @@ module.exports = {
   // Template surface
   toSiteGlobal,
 
-  // Brand repo derivation (name: github.repo → repoWebsite URL → brand.id;
-  // owner: repoWebsite URL → github.org — legacy orgMain/orgWebsite split)
-  parseRepoWebsite,
+  // Brand repo derivation from the optional github.repo slug ("owner/name"
+  // or bare name; name → brand.id, owner → github.org — the legacy
+  // orgMain/orgWebsite split rides the slug's owner)
+  parseRepoSlug,
+  // demo-* project ids are emulator-only (Firebase's convention) — cloud
+  // surfaces short-circuit on this instead of 403ing at Google
+  isDemoProject,
   brandRepoName,
   brandRepoOwner,
 

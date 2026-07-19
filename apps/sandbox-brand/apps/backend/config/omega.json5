@@ -7,9 +7,10 @@
   targets: {
     backend: {
       parent: '',
+      // No `repo` slug — offline fixture; the routes' "not configured"
+      // guard is the correct behavior here.
       github: {
         user: 'ITW-Creative-Works',
-        repoWebsite: 'https://github.com/ITW-Creative-Works/omega',
       },
       marketing: {
         campaigns: {

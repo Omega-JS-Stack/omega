@@ -5,6 +5,7 @@ const powertools = require('node-powertools');
 const uuidv4 = require('uuid').v4;
 const path = require('path');
 const { Octokit } = require('@octokit/rest');
+const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
 function Module() {
 
@@ -29,8 +30,8 @@ Module.prototype.main = function () {
         return reject(assistant.errorify(`GitHub API key not configured.`, {code: 500}));
       }
 
-      if (!Manager.config?.github?.repoWebsite) {
-        return reject(assistant.errorify(`GitHub repoWebsite not configured.`, {code: 500}));
+      if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
+        return reject(assistant.errorify(`GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).`, {code: 500}));
       }
 
       // Log payload
@@ -38,7 +39,7 @@ Module.prototype.main = function () {
 
       // Set now
       const now = assistant.meta.startTime.timestamp;
-      const bemRepo = assistant.parseRepo(Manager.config.github.repoWebsite);
+      const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
 
       // Setup Octokit
       self.octokit = new Octokit({

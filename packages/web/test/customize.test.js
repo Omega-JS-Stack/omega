@@ -179,16 +179,18 @@ test('cp220: materialize-then-build identity, then divergence — args land, ban
   assert.ok(after.get('/').includes('classy-hero'), 'the composition renders from the page body now');
   assert.ok(after.get('/').includes('Sarah Johnson'), 'theme words flow through resolved.* — never inlined');
 
-  // Diverge: an arg override in frontmatter + one band deleted from the body
+  // Diverge the new-world way (frontmatter is meta-only): an arg override on
+  // the section CALL (args beat data in the section merge chain) + one band
+  // deleted from the body.
   const diverged = homeFile
-    .replace('permalink: /\n', 'permalink: /\ncta:\n  headline: "MiniCo custom close"\n')
+    .replace('{% section "marketing/cta", data: resolved.cta %}', '{% section "marketing/cta", data: resolved.cta, headline: "MiniCo custom close" %}')
     .replace('{% section "marketing/stats", items: resolved.stats %}\n', '');
   assert.notStrictEqual(diverged, homeFile);
   fs.writeFileSync(home.target, diverged);
 
   const custom = await buildConsumer(SCRATCH, 'customize-c');
   const customHome = custom.get('/');
-  assert.ok(customHome.includes('MiniCo custom close'), 'the frontmatter arg lands');
+  assert.ok(customHome.includes('MiniCo custom close'), 'the call-site arg override lands');
   assert.ok(!customHome.includes('classy-stats'), 'the deleted one-liner drops exactly that band');
   assert.ok(customHome.includes('Sarah Johnson'), 'untouched bands keep their theme words');
   for (const [url, content] of after) {

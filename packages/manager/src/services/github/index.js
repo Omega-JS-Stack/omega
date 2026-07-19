@@ -7,8 +7,9 @@
  * Config (brand omega.json5 `github` key):
  *   org      — repo owner (GitHub org or user). No default; unset = service skips.
  *   shared   — org shared with other brands → org-level reconciliation skipped.
- *   repo     — repo name; defaults to repoWebsite's repo, then the brand id
- *              (@omega.js/config brandRepoName — shared with deploy --direct).
+ *   repo     — optional "owner/name" slug or bare name; name defaults to the
+ *              brand id, owner to github.org (@omega.js/config brandRepoName/
+ *              brandRepoOwner — shared with deploy --direct).
  *   private  — repo visibility (manager default: true).
  *   location — org profile location; only reconciled when set.
  */

@@ -44,6 +44,20 @@ const RESOLVED_OMIT = new Set([
 // would make every page's resolved walk all 1,030 post docs).
 const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'updates', 'alternatives']);
 
+// Consumer PAGE frontmatter is meta-only (Ian's rule, 2026-07-19: content
+// lives in {% section %} calls — and nothing may even TRY to consume it from
+// frontmatter). Enforced, not advisory: a page carrying any other key fails
+// the build with the move-it message. Plumbing keys (layout, permalink,
+// tags, pagination — the RESOLVED_OMIT set) are filtered before this check;
+// collections (_posts/_team/…) are content ENTRIES whose frontmatter IS the
+// document, and layouts are theme voice that never renders standalone —
+// neither passes through the guard.
+// `theme` (shell chrome config, e.g. main class) and `schema` (JSON-LD SEO)
+// are page PRESENTATION/meta machinery, not band content — legal.
+const PAGE_FRONTMATTER_ALLOW = new Set([
+  'meta', 'schema', 'theme', 'append', 'sitemap', 'templateEngineOverride', 'eleventyExcludeFromCollections',
+]);
+
 // Deep merge shared with the section tag's defaults ← data ← args chain —
 // one semantics for both override lanes (see src/merge.js).
 const { deepMerge } = require('./merge.js');
@@ -286,17 +300,18 @@ function configureOmega(eleventyConfig, options) {
 
   // ---- Frontmatter Liquid + collection tagging
   const frontmatter = createFrontmatterResolver({ site });
-  // The page's OWN frontmatter, re-parsed from the source file — no Eleventy
-  // hook sees page data apart from the cascade (preprocessors already get
-  // the merged tree), and Eleventy's cascade merge breaks the
-  // inject-properties.rb contract: it CONCATS a page array onto a
-  // layout-default array, and a layout-default object beats a page scalar
-  // (the documented `gallery: false` kill switch could never fire). The
-  // `resolved` computed re-applies these keys with OUR deepMerge. Values are
-  // raw (un-liquified) — resolved's renderData pass liquifies them with the
-  // same resolver. Virtual templates (blueprints, sample content) have no
-  // file to parse and keep pure cascade behavior; ANY read/parse failure
-  // degrades the same way.
+  // The template's OWN frontmatter, re-parsed from the source file — no
+  // Eleventy hook sees template data apart from the cascade (preprocessors
+  // already get the merged tree). Two consumers: the meta-only PAGE guard
+  // below, and the collections parity repair in `resolved` — Eleventy's
+  // cascade merge breaks the inject-properties.rb contract for content
+  // ENTRIES (it CONCATS a doc array onto a layout-default array, and a
+  // layout-default object beats a doc scalar), so `resolved` re-applies a
+  // doc's own keys with OUR deepMerge. Values are raw (un-liquified) —
+  // resolved's renderData pass liquifies them with the same resolver.
+  // Virtual templates (blueprints, sample content) have no file to parse
+  // and keep pure cascade behavior; ANY read/parse failure degrades the
+  // same way.
   const pageOwnData = new Map();
   const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
   const readOwnFrontmatter = (inputPath) => {
@@ -321,6 +336,23 @@ function configureOmega(eleventyConfig, options) {
     else if (inputPath.includes('/_alternatives/')) data.tags = ['alternatives'];
     else if (inputPath.includes('/_team/')) data.tags = ['team'];
     else if (inputPath.includes('/_updates/')) data.tags = ['updates'];
+
+    // The meta-only guard: real files under pages/ may carry ONLY meta keys
+    // in frontmatter. readOwnFrontmatter already filters the plumbing set
+    // (layout, permalink, tags, pagination…) and returns null for virtual
+    // templates (blueprints, showcase) — so anything left outside the allow
+    // set is content in frontmatter, which no longer exists as a lane.
+    if (/\/pages\//.test(inputPath)) {
+      const own = readOwnFrontmatter(inputPath);
+      const contentKeys = own ? Object.keys(own).filter((key) => !PAGE_FRONTMATTER_ALLOW.has(key)) : [];
+      if (contentKeys.length) {
+        throw new Error(
+          `[omega] ${inputPath}: frontmatter carries content keys (${contentKeys.join(', ')}) — `
+          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, sitemap, append). `
+          + `Move the content into {% section %} calls in the page body (docs/sections.md).`,
+        );
+      }
+    }
 
     frontmatter.resolveData(data);
   });
@@ -416,12 +448,13 @@ function configureOmega(eleventyConfig, options) {
         if (!RESOLVED_OMIT.has(key)) out[key] = deepMerge(out[key], data[key]);
       }
 
-      // Parity repair: Eleventy's cascade merge concats arrays and lets a
-      // layout-default object beat a page scalar — re-apply the page's OWN
-      // frontmatter (re-parsed from source) with OUR semantics, so a page
-      // always wins its own keys outright: arrays REPLACE (a page's four
-      // story items are the four, not layout's-four-plus-theirs) and
-      // `gallery: false` actually kills the layout's object default.
+      // Parity repair — collections lane: Eleventy's cascade merge concats
+      // arrays and lets a layout-default object beat a doc scalar — re-apply
+      // the template's OWN frontmatter (re-parsed from source) with OUR
+      // semantics, so a content entry (_posts/_team/_alternatives docs)
+      // always wins its own keys outright: arrays REPLACE. Pages carry
+      // meta-only frontmatter (guard above), so for them this re-applies
+      // meta/sitemap harmlessly.
       const own = readOwnFrontmatter(data.page.inputPath);
       if (own) {
         for (const key of Object.keys(own)) {

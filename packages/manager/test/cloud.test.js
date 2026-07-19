@@ -275,6 +275,13 @@ test('cloud: firebase.enabled = false skips the service', async () => {
   assert.equal(result.status, 'skipped');
 });
 
+test('cloud: demo-* project skips (emulator-only — no real cloud to reconcile)', async () => {
+  const config = brandConfig({ firebase: { projectId: 'demo-omega' } });
+  const result = await runService(config, { firebase: fakeFirebase() });
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /demo-\*/);
+});
+
 test('cloud: skips without GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET', async () => {
   const result = await runService(brandConfig());
   assert.equal(result.status, 'skipped');

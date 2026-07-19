@@ -62,12 +62,16 @@ test('theme-base bracket layout aliases into the real chain (root → classy bas
   assert.ok(html.includes('<title>MiniCo - Home of Mini</title>'), 'frontmatter {{ site.meta.title }} rendered');
 });
 
-test('frontmatter-only override page: consumer data over layout defaults (deep merge)', () => {
+test('meta-only page: layout voice renders, meta consumed, body appended (no content lane)', () => {
   const html = pages.get('/about');
-  assert.ok(html.includes('The consumer about page'), 'consumer hero.headline wins');
-  assert.ok(html.includes('success'), 'layout-only hero.headline_accent survives the deep merge');
-  assert.ok(html.includes('<title>About - MiniCo</title>'), 'frontmatter Liquid in meta.title');
-  assert.ok(html.includes('Consumer body content'), 'markdown body rendered');
+  // The 2026-07-19 rule: page frontmatter carries NO content — the layout's
+  // own composition voice renders (same hero as '/', which shares the
+  // blueprint), meta.title is the surviving frontmatter lane, and the body
+  // rides below via append: true (the guard test owns the rejection side).
+  assert.ok(html.includes('The platform for'), 'section-default hero.headline renders — no consumer override lane');
+  assert.ok(html.includes('Site-wide directory-data override'), 'directory data (the surviving site-wide lane) still feeds the band');
+  assert.ok(html.includes('<title>About - MiniCo</title>'), 'frontmatter Liquid in meta.title (the sanctioned lane)');
+  assert.ok(html.includes('Consumer body content'), 'markdown body rendered below the composition');
 });
 
 test('site-wide defaults layer: root directory data beats layout frontmatter, loses to page frontmatter', () => {

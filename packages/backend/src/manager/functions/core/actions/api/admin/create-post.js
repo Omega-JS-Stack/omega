@@ -6,6 +6,7 @@ const uuidv4 = require('uuid').v4;
 const { get, set } = require('lodash');
 const path = require('path');
 const { Octokit } = require('@octokit/rest');
+const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
 const POST_TEMPLATE = jetpack.read(`${__dirname}/templates/post.html`);
 const IMAGE_PATH_SRC = `src/assets/images/blog/post-{id}/`;
@@ -35,7 +36,7 @@ Module.prototype.main = function () {
 
       // Set now
       const now = assistant.meta.startTime.timestamp;
-      const bemRepo = assistant.parseRepo(Manager?.config?.github?.repoWebsite);
+      const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
 
       // Setup Octokit
       self.octokit = new Octokit({

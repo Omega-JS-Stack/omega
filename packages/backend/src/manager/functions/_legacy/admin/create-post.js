@@ -1,3 +1,4 @@
+const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 let fetch;
 let Poster;
 let pathApi;
@@ -38,7 +39,7 @@ let Module = {
         // label: '',
       });
 
-      let repoInfo = assistant.parseRepo(self.Manager.config?.github?.repoWebsite);
+      let repoInfo = { user: brandRepoOwner(self.Manager.config), name: brandRepoName(self.Manager.config) };
 
       if (!user.roles.admin) {
         response.status = 401;

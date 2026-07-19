@@ -2,7 +2,7 @@
  * Test: admin:edit-post
  * Tests the admin edit post command
  * Edits blog post content in a GitHub repository
- * Requires admin/blogger role, GitHub API key, and repoWebsite config
+ * Requires admin/blogger role, GitHub API key, and a resolvable github repo (github.repo slug or github.org + brand.id)
  *
  * This is a suite because we need to:
  * 1. Create a test post file via Octokit
@@ -115,19 +115,16 @@ module.exports = {
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
       async run({ assert, state, config }) {
-        if (!config.github?.repoWebsite) {
-          assert.fail('githubRepoWebsite not configured');
+        const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+        if (!brandRepoOwner(config) || !brandRepoName(config)) {
+          assert.fail('github repo not resolvable (github.repo slug or github.org + brand.id)');
           return;
         }
 
         const octokit = new Octokit({ auth: process.env.GH_TOKEN });
 
-        // Parse owner/repo from githubRepoWebsite
-        const repoMatch = config.github?.repoWebsite.match(/github\.com\/([^/]+)\/([^/]+)/);
-        if (!repoMatch) {
-          assert.fail('Could not parse githubRepoWebsite');
-          return;
-        }
+        // Owner/repo from the shared brand-repo derivation
+        const repoMatch = [null, brandRepoOwner(config), brandRepoName(config)];
 
         state.owner = repoMatch[1];
         state.repo = repoMatch[2];
