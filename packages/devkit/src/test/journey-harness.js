@@ -464,6 +464,26 @@ async function runJourney(options) {
           }
           throw new Error(`homepage never satisfied the probe (last: ${last})`);
         });
+
+        // Spec §8: dev boot materializes the sample filler under the app's
+        // gitignored .omega/sample-content with LIVE rolling dates (this env
+        // carries no OMEGA_SAMPLE_ANCHOR pin — the newest sample post is
+        // authored 10 days before the corpus epoch, so it must land ~10 days
+        // before today; ±1 day absorbs a UTC midnight between boot and now).
+        await run.step('sample content materialized (gitignored tree, rolling dates)', async () => {
+          const sampleRoot = path.join(run.brandRoot, 'apps', 'website', '.omega', 'sample-content');
+          const posts = fs.readdirSync(path.join(sampleRoot, '_posts')).sort();
+          if (posts.length !== 11) throw new Error(`expected 11 sample posts, found ${posts.length}`);
+          if (fs.readFileSync(path.join(sampleRoot, '.gitignore'), 'utf8') !== '*\n') {
+            throw new Error('self-.gitignore missing — the tree must be uncommittable');
+          }
+          const newest = posts[posts.length - 1].slice(0, 10);
+          const ageDays = Math.round((Date.now() - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000);
+          if (ageDays < 9 || ageDays > 11) {
+            throw new Error(`newest sample post is dated ${newest} (${ageDays}d ago) — rolling dates broken`);
+          }
+          return `11 posts, newest ${newest} (~10d ago), self-gitignored`;
+        });
       }
 
       await run.step('dev stack shuts down cleanly', async () => {

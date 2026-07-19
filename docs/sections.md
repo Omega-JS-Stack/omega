@@ -336,4 +336,19 @@ homepage's video-tab logic left the dying `index` page module for
 `product-demo/section.js`, so the behavior now works on EVERY page that
 composes the band — including the showcase pages, which never had it.
 
-Pending (spec §13): auto-generated sample content.
+Sample content went auto-generated (cp222, spec §8): the shared corpus (11
+posts / 4 teammates / 4 updates) carries its dates as a rhythm relative to
+the corpus epoch (2026-07-18) and re-anchors to the build day on every
+non-production build — post filenames shift (Eleventy `page.date`),
+`update.date` frontmatter lines rewrite, dateless team files pass through —
+so a virgin blog always looks alive. `omega dev` additionally materializes
+the generated set under the app's `.omega/sample-content/`
+(self-`.gitignore`d, regenerated each boot, removed per collection the
+moment the consumer owns one) for humans to read and copy. Determinism: the
+web test harness pins `OMEGA_SAMPLE_ANCHOR` to the epoch — generation
+becomes an identity transform (the cp222 goldens are byte-zero against
+cp221) — while the wizard journey proves live rolling: a wizard-born brand's
+newest sample post lands ~10 days before today, unpinned.
+
+Pending (spec §13): the extraction tail — remaining classy one-off bands
+(per-page uniques stay unless repeated).

@@ -134,16 +134,28 @@ see the harness README for the honest before/after numbers.
   construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
   renders the configured `advertising.providers.google-adsense.client` or an
   honest comment.
-- `defaults/sample-posts/**` — six starter posts injected as virtual
-  `_posts/` templates in **development builds only**, and only while the
-  brand has zero posts of its own (nested `_posts/<year>/` dirs count) — a
-  post-less brand still gets a living blog locally (index, taxonomy, prose,
-  read times). The first consumer post — or any production build — removes
-  them entirely. They carry `post.image: false` + no author, exercising the
-  designed no-media panel (serif category monogram) and the brand-byline
-  author fallback; both contracts apply to real posts too (`post.image:
-  false` → no-media panel, a path → that image, absent → the legacy
-  id-path convention).
+- `defaults/sample-posts/**`, `sample-team/**`, `sample-updates/**` — the
+  shared sample-content corpus (spec §8: 11 posts, 4 teammates, 4 updates),
+  injected as virtual collection templates in **development builds only**,
+  per collection only while the brand owns zero files there (nested
+  `_posts/<year>/` dirs count) — a content-less brand still gets a living
+  blog/team/updates locally. Dates ROLL: each file's authored date is a
+  rhythm relative to the corpus epoch (2026-07-18), re-anchored to the
+  build day (post filenames shift — Eleventy `page.date`; `update.date`
+  frontmatter lines rewrite) so a virgin blog always looks alive, never
+  "6 months stale". The anchor pins via `options.sampleAnchor` /
+  `OMEGA_SAMPLE_ANCHOR` — the test harness pins the epoch, making
+  generation an identity transform for fixtures and goldens. `omega dev`
+  also materializes the generated set under the app's
+  `.omega/sample-content/` (self-`.gitignore`d, regenerated every boot,
+  removed per collection once the consumer owns it) so the filler can be
+  read and copied — never committed, never mixed with real content. The
+  first consumer file in a collection — or any production build — removes
+  that collection's samples entirely. The two oldest posts carry
+  `post.image: false` + no author, exercising the designed no-media panel
+  (serif category monogram) and the brand-byline author fallback; both
+  contracts apply to real posts too (`post.image: false` → no-media panel,
+  a path → that image, absent → the legacy id-path convention).
 - `sw/` — the service worker: `manager.js` (the master-service-worker
   successor — FCM background messaging, notification clicks, the
   `update-cache` command, brand+build-named caches with foreign-cache

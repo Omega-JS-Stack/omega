@@ -11,11 +11,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { configureOmega } = require('../src/index.js');
-const { buildWith } = require('./lib/build.js');
+const { buildSite, buildWith, BARE } = require('./lib/build.js');
 
-const PKG = path.resolve(__dirname, '..');
-const BARE = path.join(__dirname, 'fixtures', 'bare-site');
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
 /**
@@ -24,27 +21,8 @@ const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), '
  * @param {string} name - namespace for output/farm dirs
  * @returns {Promise<Map<string, string>>}
  */
-async function buildBare(environment, name) {
-  const Eleventy = require('@11ty/eleventy').default;
-  const elev = new Eleventy(BARE, path.join(PKG, '.omega', `${name}-out`), {
-    quietMode: true,
-    configPath: false,
-    config: (eleventyConfig) => {
-      eleventyConfig.setUseTemplateCache(false);
-      return configureOmega(eleventyConfig, {
-        consumerDir: BARE,
-        siteData: bareData,
-        environment,
-        farmDir: path.join(PKG, '.omega', `${name}-farm`),
-        assetManifest: {
-          js: { main: '/assets/js/main-TEST.js', pages: {} },
-          css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
-        },
-      });
-    },
-  });
-  const results = await elev.toJSON();
-  return new Map(results.map((r) => [r.url, r.content]));
+function buildBare(environment, name) {
+  return buildSite(BARE, bareData, { environment }, name);
 }
 
 test('dev build without consumer posts injects the sample posts', async () => {

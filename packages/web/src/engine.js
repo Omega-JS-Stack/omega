@@ -21,6 +21,7 @@ const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections } = require('./collections.js');
 const { resolvePageAsset } = require('./assets.js');
+const { SAMPLE_SETS, resolveAnchor, generateSampleSet, hasOwnContent } = require('./sample-content.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -59,6 +60,7 @@ const { deepMerge } = require('./merge.js');
  * @param {string} [options.layoutMode] - 'virtual' (default) or 'farm'
  * @param {string} [options.farmDir] - symlink-farm target (farm mode)
  * @param {object} [options.assetManifest] - js/css manifest from the asset build
+ * @param {string} [options.sampleAnchor] - YYYY-MM-DD rolling-date anchor for sample content (default: OMEGA_SAMPLE_ANCHOR env, then today)
  * @returns {object} internals exposed for tests ({ site, layers, frontmatter })
  */
 function configureOmega(eleventyConfig, options) {
@@ -419,18 +421,16 @@ function configureOmega(eleventyConfig, options) {
   // ---- Sample content (development only): a content-less brand still gets
   // living pages locally. Injected as virtual templates under the matching
   // collection segment so they ride the exact same lane as real content
-  // (tags, permalinks, taxonomy). The FIRST consumer file in a collection —
-  // or a production build — removes that collection's samples entirely.
+  // (tags, permalinks, taxonomy). Dates ROLL — the corpus rhythm re-anchors
+  // to the build day (or the OMEGA_SAMPLE_ANCHOR / sampleAnchor pin), spec
+  // §8. The FIRST consumer file in a collection — or a production build —
+  // removes that collection's samples entirely.
   if (options.environment !== 'production') {
-    const sampleSets = [
-      ['_posts', 'sample-posts'], // the blog (11 posts — enough to exercise pagination at size 6)
-      ['_team', 'sample-team'], // the /team portrait grid + member pages
-      ['_updates', 'sample-updates'], // the /updates release feed
-    ];
-    for (const [collectionDir, samplesDir] of sampleSets) {
-      if (hasOwnContent(options.consumerDir, collectionDir)) continue;
-      for (const [rel, abs] of collectLayered([path.join(defaultsDir, samplesDir)])) {
-        eleventyConfig.addTemplate(`omega-defaults/${collectionDir}/${rel}`, fs.readFileSync(abs, 'utf8'));
+    const sampleAnchorMs = resolveAnchor(options.sampleAnchor);
+    for (const set of SAMPLE_SETS) {
+      if (hasOwnContent(options.consumerDir, set.collectionDir)) continue;
+      for (const { name, content } of generateSampleSet(defaultsDir, set, sampleAnchorMs)) {
+        eleventyConfig.addTemplate(`omega-defaults/${set.collectionDir}/${name}`, content);
       }
     }
 
@@ -499,29 +499,6 @@ function configureOmega(eleventyConfig, options) {
   }
 
   return { site, layers, layoutMap, frontmatter, suppressed, collectionsHolder };
-}
-
-/**
- * Does the consumer have any file of their own in a collection dir?
- * Recursive — Jekyll-style year subfolders (_posts/2024/…) count. Dotfiles
- * don't.
- * @param {string} consumerDir
- * @param {string} collectionDir - collection folder name ('_posts', '_team')
- * @returns {boolean}
- */
-function hasOwnContent(consumerDir, collectionDir) {
-  const root = path.join(consumerDir, collectionDir);
-  if (!fs.existsSync(root)) return false;
-  const stack = [root];
-  while (stack.length) {
-    const dir = stack.pop();
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith('.')) continue;
-      if (entry.isDirectory()) stack.push(path.join(dir, entry.name));
-      else if (entry.isFile()) return true;
-    }
-  }
-  return false;
 }
 
 module.exports = { configureOmega };

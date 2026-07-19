@@ -7,27 +7,35 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Determinism pin: anchor sample-content rolling dates to the corpus epoch
+// so generated dates ≡ authored dates — fixture builds and golden snapshots
+// stay stable across days. Tests that PROVE rolling pass an explicit
+// sampleAnchor option (it outranks the env pin).
+process.env.OMEGA_SAMPLE_ANCHOR = process.env.OMEGA_SAMPLE_ANCHOR || '2026-07-18';
+
 const { configureOmega } = require('../../src/index.js');
 
 const PKG = path.resolve(__dirname, '..', '..');
 const MINI = path.join(PKG, 'test', 'fixtures', 'mini-site');
+const BARE = path.join(PKG, 'test', 'fixtures', 'bare-site');
 
 /**
- * Build the mini fixture with a given siteData and index results by URL.
+ * Build a fixture site with a given siteData and index results by URL.
+ * @param {string} inputDir - fixture dir (Eleventy input / consumerDir)
  * @param {object} siteData - resolved-config-shaped site data
  * @param {object} [overrides] - configureOmega option overrides
  * @param {string} [name] - namespace for this caller's .omega output dirs
  * @returns {Promise<Map<string, string>>} url → rendered content
  */
-async function buildWith(siteData, overrides = {}, name = 'mini-build') {
+async function buildSite(inputDir, siteData, overrides = {}, name = 'site-build') {
   const Eleventy = require('@11ty/eleventy').default;
-  const elev = new Eleventy(MINI, path.join(PKG, '.omega', `${name}-out`), {
+  const elev = new Eleventy(inputDir, path.join(PKG, '.omega', `${name}-out`), {
     quietMode: true,
     configPath: false,
     config: (eleventyConfig) => {
       eleventyConfig.setUseTemplateCache(false);
       return configureOmega(eleventyConfig, {
-        consumerDir: MINI,
+        consumerDir: inputDir,
         siteData,
         farmDir: path.join(PKG, '.omega', `${name}-farm`),
         assetManifest: {
@@ -42,6 +50,17 @@ async function buildWith(siteData, overrides = {}, name = 'mini-build') {
   return new Map(results.map((r) => [r.url, r.content]));
 }
 
+/**
+ * Build the mini fixture with a given siteData and index results by URL.
+ * @param {object} siteData - resolved-config-shaped site data
+ * @param {object} [overrides] - configureOmega option overrides
+ * @param {string} [name] - namespace for this caller's .omega output dirs
+ * @returns {Promise<Map<string, string>>} url → rendered content
+ */
+function buildWith(siteData, overrides = {}, name = 'mini-build') {
+  return buildSite(MINI, siteData, overrides, name);
+}
+
 const miniData = JSON.parse(fs.readFileSync(path.join(MINI, 'site-data.json'), 'utf8'));
 
-module.exports = { buildWith, miniData, MINI, PKG };
+module.exports = { buildSite, buildWith, miniData, MINI, BARE, PKG };

@@ -34,6 +34,7 @@ const { buildServiceWorker, writeBuildMeta } = require('../service-worker.js');
 const { resolveStaticDirs, copyStaticAssets, hasFaviconSet } = require('../static-assets.js');
 const { devImageFallback } = require('../imagemin.js');
 const { configureOmega } = require('../engine.js');
+const { reconcileSampleContent } = require('../sample-content.js');
 const { resolveThemeLayers } = require('../layers.js');
 const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { PATHS, resolveClientEntry } = require('../paths.js');
@@ -76,6 +77,20 @@ module.exports = async function (options) {
   }
 
   applyDevSiteUrl(siteData, port, httpsCerts !== null);
+
+  // ---- Sample content on disk (spec §8): mirror the injected filler under
+  // the gitignored .omega/sample-content/ so it can be read and copied —
+  // machine-owned, regenerated every boot, gone per-collection once the
+  // consumer owns that collection.
+  const samples = reconcileSampleContent({
+    appRoot: paths.root,
+    consumerDir: paths.src,
+    defaultsDir: PATHS.defaults,
+  });
+  if (samples.written.length) {
+    logger.log(`Sample content: ${samples.written.length} files → ${path.relative(paths.root, samples.root)}/ (gitignored, regenerated each boot)`);
+  }
+  samples.removed.forEach((collectionDir) => logger.log(`Sample content: ${collectionDir} is yours now — materialized samples removed`));
 
   const activeTheme = (siteData.theme && siteData.theme.id) || 'classy';
   const themeLayerDirs = resolveThemeLayers({ activeTheme, consumerDir: paths.root, themesDir: PATHS.themes });
