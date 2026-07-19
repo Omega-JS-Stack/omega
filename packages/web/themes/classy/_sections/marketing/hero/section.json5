@@ -16,6 +16,7 @@
     meta: 'array',
     frame: 'object',
     demo: 'object',
+    demo_html: 'html', // finished markup for the demo position ({% slot demo_html %}) — replaces the typed demo lanes when set
   },
 
   // Every key consumer-overridable; string values liquify at the call site

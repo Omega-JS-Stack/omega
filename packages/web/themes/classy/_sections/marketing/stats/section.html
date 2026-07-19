@@ -11,7 +11,9 @@
             {% endiftruthy %}
           </div>
         {% endfor %}
-      </div>
+      </div>{% if args.after != blank %}
+
+      {{ args.after }}{% endif %}
     </div>
   </section>
 {% endif %}

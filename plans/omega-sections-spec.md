@@ -72,6 +72,7 @@ items:
 ```
 
 - Block body = YAML (same dialect as frontmatter). One tag, two forms; using both inline args and a block body on the same call is an error (simplicity first).
+- **Amendment (Ian 2026-07-18, landed cp224) — slots**: the body may also carry named markup blocks (`{% slot demo_html %}<any html>{% endslot %}`), composing with inline args OR the YAML (the both-forms error applies to the YAML remainder). Slot content renders in the caller's scope and reaches the section as a finished-HTML string arg (schema type `html`), merged outermost and never re-rendered. Full contract: docs/sections.md.
 - No args → the theme's default copy renders (defaults from `section.json5`).
 - Components: `{% component "frame/browser", url: "app.example.com" %}` — same two forms.
 - Sections must be **N-item responsive by design** (auto-fit grids etc.) — item count is data, layout self-adjusts; showcase demo data exercises 1/3/many variants.

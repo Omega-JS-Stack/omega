@@ -293,27 +293,8 @@ alternative:
 {% endif %}
 
 <!-- ═══ Stats band ═══ -->
-{% assign stats_size = alt.stats | size %}
-{% if stats_size > 0 %}
-  <section>
-    <div class="container">
-      <div class="classy-stats" data-omega-reveal-stagger="80">
-        {% for stat in alt.stats %}
-          <div class="classy-stat" data-omega-reveal>
-            <div class="classy-stat__num" data-omega-countup>{{ stat.number }}</div>
-            <div class="classy-stat__label">{{ stat.label }}</div>
-            {% iftruthy stat.sublabel %}
-              <div class="classy-stat__sub">{{ stat.sublabel }}</div>
-            {% endiftruthy %}
-          </div>
-        {% endfor %}
-      </div>
 
-      {{ section_cta_block }}
-    </div>
-  </section>
-{% endif %}
-
+{% section "marketing/stats", items: alt.stats %}{% slot after %}{{ section_cta_block }}{% endslot %}{% endsection %}
 <!-- ═══ FAQ ═══ -->
 {% assign faqs_size = alt.faqs.items | size %}
 {% if faqs_size > 0 %}

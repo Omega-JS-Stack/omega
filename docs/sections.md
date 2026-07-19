@@ -71,6 +71,40 @@ items:
 Using both forms on one call is an error. No args → the section's json5
 defaults render.
 
+### Slots — passing finished HTML (Ian 2026-07-18)
+
+When an arg needs real markup beyond strings/numbers, the block body may
+carry named slot blocks — alongside the YAML, or alongside inline args (the
+both-forms error applies to the YAML remainder only):
+
+```liquid
+{% section "marketing/hero", data: resolved.hero %}
+  {% slot demo_html %}
+    <div class="my-wild-demo">{% uj_icon "rocket" %} {{ site.brand.name }}</div>
+  {% endslot %}
+{% endsection %}
+```
+
+Slot content renders in the CALLER's scope (site vars, page captures, `uj_*`
+tags all work) and reaches the section as a finished-HTML string arg —
+schema type `html` — merged OUTERMOST (over defaults ← data ← named) and
+NEVER re-rendered: it merges after call-site liquification, so literal
+braces survive (`{% raw %}` code samples stay intact; capture-passing an
+html value as a plain named arg re-liquifies — slots are the finished-HTML
+lane). A whitespace-only slot collapses to `''` — explicit-empty, killing
+an html default the way explicit-empty kills everywhere. Duplicate slot
+names and unclosed blocks throw; slot names ride the same schema
+validation/did-you-mean lane as every arg. `{% slot %}` is body-text
+grammar, not a registered tag — stray use outside a call fails loudly.
+One limit: same-tag nesting inside a slot (a `{% section %}` block inside a
+section slot) breaks the dual-form scan — nest the other tag instead
+(components inside section slots, sections inside component slots).
+
+Shipped html args: `marketing/hero` `demo_html` (finished markup replacing
+the typed demo lanes) and `marketing/stats` `after` (markup inside the band
+container after the grid — classy AND the newsflash override serve it; the
+alternative.html stats+CTA composite now composes through it).
+
 The name is usually a quoted literal; a bare expression resolving to an id
 string is also legal (`{% section entry.id, data: variant.args %}`) — the
 showcase's mechanism, and how data-driven composition stays one tag. The
@@ -363,12 +397,25 @@ compact idiom, not newsletter-cta; the team portrait card repeats only as an
 SCSS pattern (`classy-person` — the index variant carries a links row the
 member page deliberately drops), like the rowlist/hairline idiom. The
 boundary doctrine the audit settled: **sections/components are for
-composable bands with data-only args; context-bound partials stay includes**
+composable bands with data args (+ finished-HTML slots, cp224); context-bound
+partials stay includes**
 (post-card, nav/footer, account-section-header — they need `site.*`/liquid
 tags a context-free render can't see, the same reason posts never ride
 args); **plumbing pages stay layouts** (auth flows, blog taxonomy twins,
 payment, portal — generated-page machinery brands override at the layout
 layer, not compositions brands remix).
 
-Pending (spec §13): content pass A — omega-ify the playground (Ian-gated:
-playground freeze lift).
+HTML slots (cp224, Ian's ruling 2026-07-18): the `{% slot name %}` block
+form — see "Slots" under Authoring above. Landing it: the two shipped html
+args (`hero.demo_html`, `stats.after` on classy AND the newsflash override),
+and the cp223 audit's parked composite converted — alternative.html's
+stats+CTA band now composes `marketing/stats` with its trailing CTA in the
+`after` slot. Classy goldens: every production page byte-zero (the
+conversion is motion; slot output byte-exact); the only classy diffs are the
+showcase's own arg tables documenting the new args. Newsflash: the
+per-alternative page's stats band now correctly flips to the theme's stats
+override — with the after-CTA surviving inside it — the same FLIP story as
+cp223's index page.
+
+Pending (spec §13): content pass A — omega-ify the playground (freeze
+LIFTED by Ian 2026-07-18; in flight).

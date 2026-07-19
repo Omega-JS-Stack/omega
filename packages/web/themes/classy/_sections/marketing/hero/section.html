@@ -98,9 +98,9 @@
       </div>
     {% endif %}
 
-    {% if demo.enabled %}
+    {% if demo.enabled or args.demo_html != blank %}
       <div class="mt-4" data-omega-reveal>
-        {{ hero_demo_content }}
+        {% if args.demo_html != blank %}{{ args.demo_html }}{% else %}{{ hero_demo_content }}{% endif %}
       </div>
     {% endif %}
 

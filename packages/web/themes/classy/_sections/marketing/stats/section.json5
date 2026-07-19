@@ -3,6 +3,7 @@
 
   args: {
     items: 'array',
+    after: 'html', // finished markup rendered inside the band container after the grid ({% slot after %}) — e.g. a trailing CTA button
   },
 
   defaults: {

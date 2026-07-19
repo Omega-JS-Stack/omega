@@ -4,6 +4,7 @@
   args: {
     items: 'array',
     head: 'string',
+    after: 'html', // same contract as the classy base: finished markup after the grid, inside the container
   },
 
   defaults: {

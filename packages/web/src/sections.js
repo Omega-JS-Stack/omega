@@ -15,6 +15,19 @@
  * spreads an object between defaults and named args — the bridge that keeps
  * today's frontmatter-key overrides working (layouts pass `data: resolved.X`).
  *
+ * Slots (Ian 2026-07-18): a body may carry named markup blocks —
+ * {% slot demo %}<any html>{% endslot %} — alongside the YAML (or alongside
+ * inline args: the XOR rule applies to the YAML remainder only). Slot content
+ * renders in the CALLER's scope (site.*, captures, uj_* tags all work) and
+ * reaches the section as a finished-HTML string arg (schema type 'html'),
+ * merged OUTERMOST after call-site liquification — so slot output never
+ * re-renders and literal braces (code samples via {% raw %}) survive. An
+ * empty slot passes '' — the absence spine: it kills a default the same way
+ * explicit-empty kills everywhere else. Same-tag nesting inside a slot
+ * ({% section %} in a section slot) is not supported — the dual-form scan
+ * would misread it (loud parse error); nest the OTHER tag instead
+ * (components inside section slots, sections inside component slots).
+ *
  * Resolution walks the layer chain (consumer `_sections`/`_components` →
  * active theme → classy base — first match wins), mirroring themes/layouts.
  * Each entry is a folder owning `section.html` + optional `section.json5`
@@ -136,6 +149,32 @@ function parseInlineArgs(rest) {
   return pairs;
 }
 
+// {% slot name %}…{% endslot %} regions inside a section/component block
+// body. Not a registered tag — pure body-text grammar, so a stray slot
+// outside a block call fails loudly as an unknown tag.
+const SLOT_RE = /\{%-?\s*slot\s+([A-Za-z_][\w-]*)\s*-?%\}([\s\S]*?)\{%-?\s*endslot\s*-?%\}/g;
+const SLOT_STRAY_RE = /\{%-?\s*(?:slot|endslot)\b/;
+
+/**
+ * Split a block body into its YAML remainder and its named slot blocks.
+ * @param {string} bodyText - raw captured block body
+ * @returns {{yamlText: string, slots: Array<{name: string, source: string}>}}
+ */
+function extractSlots(bodyText) {
+  const slots = [];
+  const seen = new Set();
+  const yamlText = bodyText.replace(SLOT_RE, (match, slotName, source) => {
+    if (seen.has(slotName)) throw new Error(`duplicate {% slot ${slotName} %} — one block per name`);
+    seen.add(slotName);
+    slots.push({ name: slotName, source });
+    return '';
+  });
+  if (SLOT_STRAY_RE.test(yamlText)) {
+    throw new Error('malformed slot block — every {% slot name %} needs a name and a matching {% endslot %}');
+  }
+  return { yamlText, slots };
+}
+
 /**
  * Render every Liquid-carrying string in an args tree against the caller's
  * scope — fresh containers, source never mutated.
@@ -173,6 +212,7 @@ function matchesType(value, type) {
   switch (type) {
     case 'array': return Array.isArray(value);
     case 'object': return typeof value === 'object' && !Array.isArray(value);
+    case 'html': return typeof value === 'string'; // finished markup — slot blocks or capture-passed
     case 'string': case 'number': case 'boolean': return typeof value === type;
     default: return true; // unknown schema type — never punish the caller
   }
@@ -530,10 +570,13 @@ function registerSectionTags(engine, options) {
           throw new Error(`{% ${tagName} "${name}" %}: no ${kind.dirname}/${name}/${kind.basename}.html in any layer (${roots.join(', ') || 'no roots'})`);
         }
 
-        // ---- gather passed args (inline XOR block body)
+        // ---- gather passed args (inline XOR YAML remainder; slots ride either)
         const inlinePairs = parseInlineArgs(rest);
-        if (this.bodyText !== null && this.bodyText.trim() && inlinePairs.length) {
-          throw new Error(`{% ${tagName} "${name}" %}: use inline args OR a YAML body, not both`);
+        const { yamlText, slots } = this.bodyText !== null
+          ? (this.slotSplit ||= extractSlots(this.bodyText))
+          : { yamlText: null, slots: [] };
+        if (yamlText !== null && yamlText.trim() && inlinePairs.length) {
+          throw new Error(`{% ${tagName} "${name}" %}: use inline args OR a YAML body, not both (slot blocks compose with either)`);
         }
 
         let passed = {};
@@ -543,8 +586,8 @@ function registerSectionTags(engine, options) {
           if (key === 'data') dataArg = value;
           else passed[key] = value;
         }
-        if (this.bodyText !== null && this.bodyText.trim()) {
-          const parsed = yaml.load(this.bodyText);
+        if (yamlText !== null && yamlText.trim()) {
+          const parsed = yaml.load(yamlText);
           if (parsed === null || parsed === undefined) {
             // whitespace-only body — nothing passed
           } else if (typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -558,11 +601,24 @@ function registerSectionTags(engine, options) {
           dataArg = undefined;
         }
 
+        // ---- slots render NOW, in the caller's scope (site.*, captures,
+        // uj_* tags) — finished HTML that merges outermost below, after
+        // call-site liquification, so it never re-renders.
+        const scope = typeof context.getAll === 'function' ? context.getAll() : context.environments;
+        const slotValues = {};
+        for (const slot of slots) {
+          // Untrimmed — surrounding whitespace is cosmetic in HTML but load-
+          // bearing for byte-exact conversions; whitespace-ONLY collapses to
+          // '' so an empty slot reads as explicit-empty (kills a default).
+          const rendered = yield this.liquid.parseAndRender(slot.source, scope);
+          slotValues[slot.name] = rendered.trim() === '' ? '' : rendered;
+        }
+
         // ---- schema validation (top level, warn-only)
         const schema = entry.meta.args;
         if (schema && typeof schema === 'object') {
           const known = Object.keys(schema);
-          const incoming = { ...(dataArg || {}), ...passed };
+          const incoming = { ...(dataArg || {}), ...passed, ...slotValues };
           for (const [key, value] of Object.entries(incoming)) {
             if (!known.includes(key)) {
               warn(`[sections] ${tagName} "${name}": unknown arg "${key}"${suggest(key, known)}`);
@@ -575,11 +631,12 @@ function registerSectionTags(engine, options) {
           }
         }
 
-        // ---- defaults ← data ← named args, then call-site liquification
+        // ---- defaults ← data ← named args, then call-site liquification,
+        // then slots (outermost — already rendered)
         let args = deepMerge(entry.meta.defaults || {}, dataArg || {});
         args = deepMerge(args, passed);
-        const scope = typeof context.getAll === 'function' ? context.getAll() : context.environments;
         args = yield liquifyDeep(this.liquid, scope, args);
+        Object.assign(args, slotValues);
 
         // ---- context-free render: { args } is the whole scope
         let templates = templateCache.get(entry.templatePath);
