@@ -276,6 +276,8 @@ test('wave 4: the newsletter band renders through the section (form-manager dial
   assert.ok(blog.includes('Never miss a post'), 'newsletter copy rode the data bridge');
   assert.ok(blog.includes('id="newsletter-form"') && blog.includes('data-form-state="initializing"'), 'the JS contract markup survives extraction');
   assert.ok(blog.includes('data-omega-section="marketing/newsletter-cta"'), 'the §7 presence-init attribute rides the band');
+  assert.ok(!blog.includes('newsletter-success-alert') && !blog.includes('newsletter-error-alert'),
+    'the static alert slots are culled (cp227) — FormManager presents success/error as toasts, the baked divs were never toggled');
 });
 
 test('cp209: blog posts compose the SHARED newsletter band — the dead /email-subscription form is gone', async () => {

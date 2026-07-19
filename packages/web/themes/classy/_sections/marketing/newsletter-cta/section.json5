@@ -22,11 +22,7 @@
         headline: 'Stay in the loop',
         subheadline: 'One email a month — product updates, guides, and nothing else.',
         button: { text: 'Subscribe' },
-        form: {
-          placeholder: 'you@example.com',
-          success_message: 'Thanks — check your inbox to confirm.',
-          error_message: 'Something went wrong. Please try again.',
-        },
+        form: { placeholder: 'you@example.com' },
       },
     },
   ],

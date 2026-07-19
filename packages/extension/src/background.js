@@ -10,6 +10,13 @@ import { getAuth, signInWithCustomToken, onAuthStateChanged } from 'firebase/aut
 // Variables
 const serviceWorker = self;
 
+// Cache warming is DISABLED (same call as the web SW — page speed wins,
+// nothing reads it): this cache is write-only — one caches.open, zero reads
+// anywhere in the extension, and no context even sends 'update-cache' today.
+// The machinery stays wired (updateCache + the message command) so this
+// single flag re-enables it if an offline lane ever lands.
+const CACHE_WARMING_ENABLED = false;
+
 // Import build config at the top level (synchronous)
 importScripts('/build.js');
 
@@ -292,8 +299,12 @@ class Manager {
     // this.libraries.firebase = firebase;
   }
 
-  // Update cache
+  // Update cache — disabled by CACHE_WARMING_ENABLED (see top of file)
   updateCache(pages) {
+    if (!CACHE_WARMING_ENABLED) {
+      return Promise.resolve();
+    }
+
     // Set default pages to cache
     const defaults = [
       '/',

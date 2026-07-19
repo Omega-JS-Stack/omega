@@ -130,8 +130,9 @@ see the harness README for the honest before/after numbers.
   site meta-files (sitemap.xml, `/feeds/posts.{xml,json}` RSS + JSON feeds,
   robots.txt, ads.txt, humans.txt, opensearch.xml, the pages.json search
   index, `/.well-known/security.txt`) — default pages like any other, so a
-  consumer file at the same URL overrides. JSON outputs are valid by
-  construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
+  consumer file at the same URL overrides. sitemap.xml and pages.json emit
+  entries in URL byte order (deterministic across builds). JSON outputs are
+  valid by construction (`uj_json_escape` + first-emitted-comma pattern); ads.txt
   renders the configured `advertising.providers.google-adsense.client` or an
   honest comment.
 - `defaults/sample-posts/**`, `sample-team/**`, `sample-updates/**` — the

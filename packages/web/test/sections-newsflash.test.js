@@ -92,7 +92,8 @@ test('cp217: the newsletter slab renders through the nf override — BOTH dead f
   assert.ok(!post.includes('email-subscription'), 'the dead action-form dialect died');
   assert.ok(post.includes('data-omega-section="marketing/newsletter-cta"'), 'presence-init root reaches nf posts');
   assert.ok(post.includes('data-form-state="initializing"'), 'posts speak the form-manager dialect');
-  assert.ok(post.includes('Thank you for subscribing! Check your email to confirm.'), 'post-owned alert copy rode the bridge');
+  assert.ok(!post.includes('newsletter-success-alert') && !post.includes('newsletter-error-alert'),
+    'the static alert slots are culled (cp227) — FormManager presents success/error as toasts, the baked divs were never toggled');
   assert.ok(post.includes('<div class="row justify-content-center"><div class="col-xl-8 col-lg-8 col-md-12 col-12">'), 'narrow knob wraps the card in the centered column');
 
   // Blog index: the inline slab had the managed markup but NO presence-init

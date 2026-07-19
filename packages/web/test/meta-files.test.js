@@ -111,6 +111,19 @@ test('humans.txt + opensearch.xml + security.txt: brand-derived, no empties', ()
   assert.strictEqual(Number(expires[1]), new Date().getFullYear() + 1, 'expires one year out');
 });
 
+test('sitemap.xml + pages.json: entries in URL byte order (deterministic emission, cp227)', () => {
+  // Eleventy's collections.all order varies run-to-run — the meta templates
+  // iterate the URL-sorted allByUrl collection so two builds of the same
+  // tree emit identical bytes. Sorted output is the observable proof.
+  const locs = [...pages.get('/sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.ok(locs.length > 5, 'sitemap has real entries');
+  assert.deepStrictEqual(locs, [...locs].sort(), 'sitemap locs in byte order');
+
+  const urls = JSON.parse(pages.get('/pages.json')).map((entry) => entry.url);
+  assert.ok(urls.length > 5, 'pages.json has real entries');
+  assert.deepStrictEqual(urls, [...urls].sort(), 'pages.json urls in byte order');
+});
+
 test('ads.txt without advertising config: honest comment, never a broken record', async () => {
   const bare = await buildWith(miniData, {}, 'meta-files-bare');
   assert.match(bare.get('/ads.txt'), /^# No advertising providers configured$/m);

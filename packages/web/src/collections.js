@@ -1,7 +1,8 @@
 /**
  * Content collections for the OMEGA engine: posts, alternatives, team, and
  * the blog taxonomy aggregated from posts' `post.categories`/`post.tags`
- * (jekyll-uj-powertools' blog-taxonomy generator equivalent). Every
+ * (jekyll-uj-powertools' blog-taxonomy generator equivalent), plus the
+ * URL-sorted `allByUrl` view the meta-files iterate. Every content
  * collection is mirrored into the template-kit holder so uj_* tags
  * (uj_member) can read it mid-render.
  */
@@ -53,6 +54,19 @@ function registerCollections(eleventyConfig, collectionsHolder) {
     const docs = api.getFilteredByTag('updates').sort((a, b) => b.url.localeCompare(a.url));
     collectionsHolder.set('updates', docs.map(toDoc));
     return docs;
+  });
+
+  // Deterministic meta-file emission (sitemap.xml, pages.json): Eleventy's
+  // collections.all order varies run-to-run (render/discovery concurrency),
+  // so two builds of the SAME tree listed URLs in different orders. The meta
+  // templates iterate this URL-sorted copy instead. Byte-order compare (not
+  // localeCompare) so the order can never drift across machines/ICU builds.
+  eleventyConfig.addCollection('allByUrl', (api) => {
+    return api.getAll().sort((a, b) => {
+      const au = a.url || '';
+      const bu = b.url || '';
+      return au < bu ? -1 : au > bu ? 1 : 0;
+    });
   });
 
   eleventyConfig.addCollection('postCategories', (api) => aggregateTaxonomy(api, 'categories'));

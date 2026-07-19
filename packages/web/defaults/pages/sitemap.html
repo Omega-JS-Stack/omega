@@ -10,7 +10,7 @@ sitemap:
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
   >
-  {%- for item in collections.all -%}
+  {%- for item in collections.allByUrl -%}
     {%- unless item.url -%}{%- continue -%}{%- endunless -%}
     {%- assign prefix5 = item.url | slice: 0, 5 -%}
     {%- if prefix5 == '/test' -%}{%- continue -%}{%- endif -%}
