@@ -10,6 +10,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const JSON5 = require('json5');
+const yaml = require('js-yaml');
 const markdownIt = require('markdown-it');
 const { registerLiquid } = require('@omega.js/template-kit/register-liquid');
 const { CACHE_TIMESTAMP } = require('@omega.js/template-kit/filters');
@@ -285,6 +286,35 @@ function configureOmega(eleventyConfig, options) {
 
   // ---- Frontmatter Liquid + collection tagging
   const frontmatter = createFrontmatterResolver({ site });
+  // The page's OWN frontmatter, re-parsed from the source file — no Eleventy
+  // hook sees page data apart from the cascade (preprocessors already get
+  // the merged tree), and Eleventy's cascade merge breaks the
+  // inject-properties.rb contract: it CONCATS a page array onto a
+  // layout-default array, and a layout-default object beats a page scalar
+  // (the documented `gallery: false` kill switch could never fire). The
+  // `resolved` computed re-applies these keys with OUR deepMerge. Values are
+  // raw (un-liquified) — resolved's renderData pass liquifies them with the
+  // same resolver. Virtual templates (blueprints, sample content) have no
+  // file to parse and keep pure cascade behavior; ANY read/parse failure
+  // degrades the same way.
+  const pageOwnData = new Map();
+  const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
+  const readOwnFrontmatter = (inputPath) => {
+    if (pageOwnData.has(inputPath)) return pageOwnData.get(inputPath);
+    let own = null;
+    try {
+      const match = fs.readFileSync(path.resolve(inputPath), 'utf8').match(FRONTMATTER_RE);
+      const parsed = match ? yaml.load(match[1]) : null;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        own = {};
+        for (const key of Object.keys(parsed)) {
+          if (!RESOLVED_OMIT.has(key)) own[key] = parsed[key];
+        }
+      }
+    } catch { /* virtual template or exotic frontmatter — cascade behavior stands */ }
+    pageOwnData.set(inputPath, own);
+    return own;
+  };
   eleventyConfig.addPreprocessor('omega-frontmatter', 'md,html,liquid', (data) => {
     const inputPath = data.page.inputPath;
     if (inputPath.includes('/_posts/')) data.tags = ['posts'];
@@ -371,6 +401,19 @@ function configureOmega(eleventyConfig, options) {
       }
       for (const key of Object.keys(data)) {
         if (!RESOLVED_OMIT.has(key)) out[key] = deepMerge(out[key], data[key]);
+      }
+
+      // Parity repair: Eleventy's cascade merge concats arrays and lets a
+      // layout-default object beat a page scalar — re-apply the page's OWN
+      // frontmatter (re-parsed from source) with OUR semantics, so a page
+      // always wins its own keys outright: arrays REPLACE (a page's four
+      // story items are the four, not layout's-four-plus-theirs) and
+      // `gallery: false` actually kills the layout's object default.
+      const own = readOwnFrontmatter(data.page.inputPath);
+      if (own) {
+        for (const key of Object.keys(own)) {
+          out[key] = deepMerge(out[key], own[key]);
+        }
       }
 
       // Layout-frontmatter Liquid: the preprocessor only sees PAGE frontmatter,

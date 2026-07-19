@@ -121,6 +121,19 @@ working unchanged. Bare frontmatter ARRAYS bridge as a named arg
 (`{% section "marketing/stats", items: resolved.stats %}`) — an undefined
 named arg keeps the default, so absence semantics survive.
 
+**Page-wins parity (repaired cp225)**: Eleventy's own data-cascade merge
+CONCATS a page array onto a layout-default array and lets a layout-default
+object beat a page scalar — which broke the inject-properties.rb contract
+(a page's four story items rendered as layout's-four-plus-theirs, and a
+documented kill switch like `gallery: false` could never fire). The engine
+now re-applies the page's OWN frontmatter (re-parsed from source) over the
+cascade with the shared `deepMerge` inside the `resolved` computed, so a
+page always wins its own keys outright: arrays replace, scalars beat
+objects, partial object overrides still keep layout siblings. Virtual
+templates (blueprints, sample content) have no source file and keep pure
+cascade behavior. Pinned in `test/resolved-page-wins.test.js` against the
+real about layout.
+
 ### Context-freeness (load-bearing)
 
 Section markup never reads page globals — `{ args }` is the whole render
@@ -417,5 +430,18 @@ per-alternative page's stats band now correctly flips to the theme's stats
 override — with the after-CTA surviving inside it — the same FLIP story as
 cp223's index page.
 
-Pending (spec §13): content pass A — omega-ify the playground (freeze
-LIFTED by Ian 2026-07-18; in flight).
+Content pass A (cp225, freeze lifted by Ian 2026-07-18): the playground now
+carries the real framework pitch — the homepage is a full composition
+(hero with the `demo_html` terminal slot as the product shot and the
+generic frame mock killed, six true-capability bento tiles, honest stats,
+command CTA; trusted-by/product-demo/showcase/testimonials deliberately
+absent until real ones exist) and the about page tells the real story
+(era-labeled consolidation timeline, the project's actual working
+principles as values, `gallery: false`). Landing it found and fixed the
+page-wins parity break above — the about draft was the first consumer to
+override layout arrays and caught its items concatenating. The draft is
+fork-portable: copy carries `{{ site.brand.name }}` refs, so the real
+brand's name lands at fork time.
+
+Pending (spec §13): content pass B — genericize classy (sweep omega
+dev-accents from theme defaults; in flight).
