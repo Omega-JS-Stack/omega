@@ -13,7 +13,6 @@
 # layout-composed pages; body compositions carry their YAML in the calls.
 layout: blueprint/index
 permalink: /
-composition: true
 ---
 
 <!-- ═══ Hero: the terminal IS the product shot (frame mock off — that

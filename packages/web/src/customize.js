@@ -258,10 +258,10 @@ function materialize({ url, consumerDir, siteData }) {
 
   if (plan.lane === 'composition') {
     const body = plan.inner.replace(/^\n+/, '').replace(/\n+$/, '');
-    // `composition: true` tells the {% composition %} wrap this body IS the
-    // composition (replaces the theme default, instead of the legacy
-    // append-below contract for plain body content).
-    content = `---\n${header}\n${page.frontmatterRaw}\ncomposition: true\n---\n\n${body}\n`;
+    // Body content REPLACES the {% composition %} wrap by default (Ian
+    // 2026-07-19) — no flag needed; `append: true` is the legacy
+    // add-below escape hatch.
+    content = `---\n${header}\n${page.frontmatterRaw}\n---\n\n${body}\n`;
   } else {
     content = `---\n${header}\n${page.frontmatterRaw}\n---\n${page.body}`;
   }

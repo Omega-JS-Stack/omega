@@ -69,8 +69,8 @@ module.exports = {
   // Template surface
   toSiteGlobal,
 
-  // Brand repo derivation (name: github.repo → repo_website URL → brand.id;
-  // owner: repo_website URL → github.org — legacy orgMain/orgWebsite split)
+  // Brand repo derivation (name: github.repo → repoWebsite URL → brand.id;
+  // owner: repoWebsite URL → github.org — legacy orgMain/orgWebsite split)
   parseRepoWebsite,
   brandRepoName,
   brandRepoOwner,

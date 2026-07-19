@@ -1,0 +1,35 @@
+{
+  description: 'About hero — the dotgrid statement with the facts rail: masthead heading on the left, a 2-col count-up facts grid on the right. The layout bridges the page\'s hero words via data: and the facts rail via facts:.',
+
+  args: {
+    eyebrow: 'string', // masthead eyebrow fallback; a superheadline.text arg (legacy key) wins over it
+    superheadline: 'object', // { text } — legacy hero key, kept for the resolved bridge
+    headline: 'string',
+    headline_accent: 'string',
+    description: 'string',
+    facts: 'array', // [{ label, number }] — the right-rail count-up grid; absent = statement only
+  },
+
+  defaults: {
+    eyebrow: 'About {{ site.brand.name }}',
+    superheadline: {},
+    headline: 'We make complex things <em>feel simple</em>',
+    headline_accent: '',
+    description: 'The people and stubborn opinions behind {{ site.brand.name }}.',
+  },
+
+  demo: [
+    { label: 'Statement only' },
+    {
+      label: 'With facts rail',
+      args: {
+        facts: [
+          { number: '2017', label: 'Founded' },
+          { number: '50+', label: 'Team members' },
+          { number: '1M+', label: 'Happy customers' },
+          { number: '120+', label: 'Countries' },
+        ],
+      },
+    },
+  ],
+}

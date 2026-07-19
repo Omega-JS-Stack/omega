@@ -1,0 +1,21 @@
+{
+  description: 'About photo band — life in pictures: wide tiles span the grid via @bg lazy-load, stills ride responsive @srcset. Empty items suppresses the band (the layout call also honors the page\'s gallery: false kill switch).',
+
+  args: {
+    items: 'array', // [{ src, alt, caption?, wide? }]
+    placeholder: 'string', // first-paint img src swapped by the lazy loader
+  },
+
+  defaults: {
+    placeholder: '{{ site.uj.placeholder.src }}',
+    items: [
+      { src: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80', alt: 'The team working around one table', caption: 'Shipping week, every week', wide: true },
+      { src: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80', alt: 'Two teammates pairing on a laptop', caption: 'Pairing beats meetings' },
+      { src: 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&q=80', alt: 'A notebook and coffee on a desk', caption: 'Plans in pencil' },
+    ],
+  },
+
+  demo: [
+    { label: 'Default band' },
+  ],
+}

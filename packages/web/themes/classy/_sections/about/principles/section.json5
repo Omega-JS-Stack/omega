@@ -1,0 +1,25 @@
+{
+  description: 'About principles — the numbered values list under a centered section head. Order is the statement: item 1 outranks item 2. The layout bridges the page\'s values object via data:.',
+
+  args: {
+    superheadline: 'object', // { icon, text }
+    headline: 'string',
+    subheadline: 'string',
+    items: 'array', // [{ title, description }] — icons intentionally unrendered; the index number is the mark
+  },
+
+  defaults: {
+    superheadline: { icon: 'compass', text: 'Principles' },
+    headline: 'What we <em>refuse</em> to compromise on',
+    subheadline: 'Our working principles, in order.',
+    items: [
+      { title: 'Ship it simple', description: 'The smallest thing that solves the problem wins.' },
+      { title: 'Own the outcome', description: 'Everyone ships; everyone answers for what ships.' },
+      { title: 'Say it plainly', description: 'Clear words over clever ones, in product and in person.' },
+    ],
+  },
+
+  demo: [
+    { label: 'Default principles' },
+  ],
+}

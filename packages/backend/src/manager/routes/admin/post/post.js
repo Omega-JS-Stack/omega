@@ -47,14 +47,14 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
     return assistant.respond('GitHub API key not configured.', { code: 500 });
   }
 
-  if (!Manager.config?.github?.repo_website) {
-    return assistant.respond('GitHub repo_website not configured.', { code: 500 });
+  if (!Manager.config?.github?.repoWebsite) {
+    return assistant.respond('GitHub repoWebsite not configured.', { code: 500 });
   }
 
   assistant.log('main(): settings', settings);
 
   const now = assistant.meta.startTime.timestamp;
-  const bemRepo = assistant.parseRepo(Manager.config.github.repo_website);
+  const bemRepo = assistant.parseRepo(Manager.config.github.repoWebsite);
 
   // Setup Octokit
   const octokit = new Octokit({

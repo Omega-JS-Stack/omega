@@ -3,13 +3,13 @@
  * (owner + name), shared by every surface that targets the brand repo (web
  * `omega deploy --direct`, the manager's github service setup/repo/pages).
  *
- * Name chain: explicit `github.repo` → the `repo_website` URL's repo →
- * `brand.id`. Owner chain: the `repo_website` URL's account → `github.org`.
+ * Name chain: explicit `github.repo` → the `repoWebsite` URL's repo →
+ * `brand.id`. Owner chain: the `repoWebsite` URL's account → `github.org`.
  * This mirrors the legacy omega-manager orgMain/orgWebsite split (Ian
  * 2026-07-19): most ITW brands house the WEBSITE repo under the paid
  * company org (itw-creative-works) while the brand's own org carries its
  * public profile — here `github.org` keeps naming the brand's own org for
- * org-profile reconciliation and `repo_website` fully names the site repo.
+ * org-profile reconciliation and `repoWebsite` fully names the site repo.
  * Born from the 2026-07-18 launch-night collision: the bare brand-id
  * fallback resolved brand "omega" to Omega-JS-Stack/omega — the framework
  * MONOREPO — instead of the brand repo omegajs.dev.
@@ -34,7 +34,7 @@ function parseRepoWebsite(url) {
  */
 function brandRepoName(config) {
   const github = config?.github || {};
-  return github.repo || parseRepoWebsite(github.repo_website).name || config?.brand?.id || '';
+  return github.repo || parseRepoWebsite(github.repoWebsite).name || config?.brand?.id || '';
 }
 
 /**
@@ -45,7 +45,7 @@ function brandRepoName(config) {
  */
 function brandRepoOwner(config) {
   const github = config?.github || {};
-  return parseRepoWebsite(github.repo_website).owner || github.org || '';
+  return parseRepoWebsite(github.repoWebsite).owner || github.org || '';
 }
 
 module.exports = { parseRepoWebsite, brandRepoName, brandRepoOwner };

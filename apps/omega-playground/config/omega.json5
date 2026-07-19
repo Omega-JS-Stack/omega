@@ -62,7 +62,7 @@
     // The website repo the admin/post CMS routes commit to. The repo exists
     // (gh-pages holds built output); the SOURCE lands on main at arc close
     // (Ian 2026-07-12) — until then CMS creates fail at the branch lookup.
-    repo_website: "https://github.com/Omega-JS-Stack/omega-playground",
+    repoWebsite: "https://github.com/Omega-JS-Stack/omega-playground",
   },
 
   // Download endpoints (site.download[platform][type]) — drive the /download

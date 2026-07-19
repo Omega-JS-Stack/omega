@@ -325,6 +325,19 @@ function configureOmega(eleventyConfig, options) {
     frontmatter.resolveData(data);
   });
 
+  // A body that composes sections is Liquid-HTML, not prose: rendered
+  // section markup must never pass through the markdown transform — blank
+  // lines inside emitted HTML blocks become empty <p> elements that land
+  // as REAL grid children (the 2026-07-19 live find: both brand homepages'
+  // bento/stats scattered by phantom <p>s). `omega customize` obeys the
+  // same rule by materializing .html copies; hand-authored .md
+  // compositions get it automatically here.
+  eleventyConfig.addPreprocessor('omega-composition-liquid', 'md', (data, content) => {
+    if (data.templateEngineOverride === undefined && /^\s*{%-?\s*(section|composition)\b/m.test(content)) {
+      data.templateEngineOverride = 'liquid';
+    }
+  });
+
   // ---- Jekyll conventions + page.resolved equivalent
   eleventyConfig.addGlobalData('eleventyComputed', {
     permalink: (data) => {

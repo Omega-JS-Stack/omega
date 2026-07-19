@@ -9,7 +9,7 @@
       parent: '',
       github: {
         user: 'ITW-Creative-Works',
-        repo_website: 'https://github.com/ITW-Creative-Works/omega',
+        repoWebsite: 'https://github.com/ITW-Creative-Works/omega',
       },
       marketing: {
         campaigns: {

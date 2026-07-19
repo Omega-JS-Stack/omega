@@ -113,7 +113,7 @@ test('cp220: resolver lanes — composition where the theme wraps one, shell els
   const list = listCustomizable({ consumerDir: empty, siteData: miniData });
   assert.ok(list.length >= 60, `every static default URL lists (${list.length})`);
   assert.strictEqual(list.find((entry) => entry.url === '/').lane, 'composition');
-  assert.strictEqual(list.find((entry) => entry.url === '/about').lane, 'shell');
+  assert.strictEqual(list.find((entry) => entry.url === '/about').lane, 'composition');
   assert.ok(list.every((entry) => !entry.url.includes('{')), 'generator permalinks never list');
 });
 
@@ -122,25 +122,25 @@ test('cp220: the {% composition %} guard — append without the flag (legacy), r
   fs.rmSync(consumer, { recursive: true, force: true });
   fs.mkdirSync(path.join(consumer, 'pages'), { recursive: true });
 
-  // No flag: the legacy contract — body content renders BELOW the composition
+  // Default (Ian 2026-07-19): a body REPLACES the composition — no flag
   fs.writeFileSync(
     path.join(consumer, 'pages', 'index.md'),
-    '---\nlayout: blueprint/index\npermalink: /\n---\n\n## My appended prose\n',
+    '---\nlayout: blueprint/index\npermalink: /\n---\n\n## My replacement home\n',
+  );
+  const replaced = (await buildConsumer(consumer, 'customize-replace')).get('/');
+  assert.ok(replaced.includes('My replacement home'), 'the page body renders');
+  assert.ok(replaced.includes('<h2'), 'markdown content formats (parity branch)');
+  assert.ok(!replaced.includes('classy-hero'), 'the default composition is REPLACED by default');
+
+  // append: true — the legacy escape hatch: body renders BELOW the composition
+  fs.writeFileSync(
+    path.join(consumer, 'pages', 'index.md'),
+    '---\nlayout: blueprint/index\npermalink: /\nappend: true\n---\n\n## My appended prose\n',
   );
   const appended = (await buildConsumer(consumer, 'customize-append')).get('/');
   assert.ok(appended.includes('classy-hero'), 'the default composition still renders');
   assert.ok(appended.includes('My appended prose'), 'body content appends below it');
   assert.ok(appended.indexOf('classy-hero') < appended.indexOf('My appended prose'), 'composition first, content after');
-
-  // composition: true — the body IS the composition and replaces the default
-  fs.writeFileSync(
-    path.join(consumer, 'pages', 'index.md'),
-    '---\nlayout: blueprint/index\npermalink: /\ncomposition: true\n---\n\n## My replacement home\n',
-  );
-  const replaced = (await buildConsumer(consumer, 'customize-replace')).get('/');
-  assert.ok(replaced.includes('My replacement home'), 'the page body renders');
-  assert.ok(replaced.includes('<h2'), 'markdown content formats (parity branch)');
-  assert.ok(!replaced.includes('classy-hero'), 'the default composition is REPLACED');
 });
 
 test('cp220: materialize-then-build identity, then divergence — args land, bands drop, words keep flowing', async () => {
@@ -156,7 +156,7 @@ test('cp220: materialize-then-build identity, then divergence — args land, ban
   assert.strictEqual(home.lane, 'composition');
   const homeFile = fs.readFileSync(home.target, 'utf8');
   assert.ok(!homeFile.includes('Sarah Johnson'), 'materialized file carries no theme copy');
-  assert.ok(homeFile.includes('composition: true'), 'materialized file declares composition ownership');
+  assert.ok(!homeFile.includes('composition: true'), 'no flag needed — a body replaces the composition by default');
 
   const pricing = materialize({ url: '/pricing', consumerDir: SCRATCH, siteData: miniData });
   assert.strictEqual(pricing.status, 'created');

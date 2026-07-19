@@ -38,7 +38,7 @@ let Module = {
         // label: '',
       });
 
-      let repoInfo = assistant.parseRepo(self.Manager.config?.github?.repo_website);
+      let repoInfo = assistant.parseRepo(self.Manager.config?.github?.repoWebsite);
 
       if (!user.roles.admin) {
         response.status = 401;

@@ -1,0 +1,27 @@
+{
+  description: 'About letter — mission & vision as editorial statements beside the living ops-feed aside (theme flavor markup). The layout bridges mission:/vision: objects from the page.',
+
+  args: {
+    aside_label: 'string',
+    feed_label: 'string',
+    mission: 'object', // { title, description }
+    vision: 'object', // { title, description }
+  },
+
+  defaults: {
+    aside_label: 'Why we exist',
+    feed_label: 'This week at {{ site.brand.name }}',
+    mission: {
+      title: 'Our mission',
+      description: 'To empower individuals and businesses with technology that <em>simplifies</em> complex challenges and unlocks new possibilities for growth.',
+    },
+    vision: {
+      title: 'Our vision',
+      description: 'A world where powerful tools feel effortless — where anyone can build, launch, and grow without wrestling the machinery. That\'s the product we <em>refuse to stop</em> working toward.',
+    },
+  },
+
+  demo: [
+    { label: 'Default letter' },
+  ],
+}

@@ -1,0 +1,25 @@
+{
+  description: 'About timeline — sticky section head beside the year-by-year journey. The layout bridges the page\'s story object via data:.',
+
+  args: {
+    superheadline: 'object', // { icon, text }
+    headline: 'string',
+    subheadline: 'string',
+    items: 'array', // [{ year, title, description }]
+  },
+
+  defaults: {
+    superheadline: { icon: 'clock-rotate-left', text: 'History' },
+    headline: 'Follow our <em>journey</em>',
+    subheadline: 'The moments that shaped how we work.',
+    items: [
+      { year: '2017', title: 'The beginning', description: 'Founded with a vision to revolutionize the industry' },
+      { year: '2020', title: 'Global expansion', description: 'Reached customers in over 100 countries' },
+      { year: '2024', title: 'Innovation award', description: 'Recognized as an industry leader' },
+    ],
+  },
+
+  demo: [
+    { label: 'Default journey' },
+  ],
+}

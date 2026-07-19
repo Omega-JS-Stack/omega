@@ -29,8 +29,8 @@ Module.prototype.main = function () {
         return reject(assistant.errorify(`GitHub API key not configured.`, {code: 500}));
       }
 
-      if (!Manager.config?.github?.repo_website) {
-        return reject(assistant.errorify(`GitHub repo_website not configured.`, {code: 500}));
+      if (!Manager.config?.github?.repoWebsite) {
+        return reject(assistant.errorify(`GitHub repoWebsite not configured.`, {code: 500}));
       }
 
       // Log payload
@@ -38,7 +38,7 @@ Module.prototype.main = function () {
 
       // Set now
       const now = assistant.meta.startTime.timestamp;
-      const bemRepo = assistant.parseRepo(Manager.config.github.repo_website);
+      const bemRepo = assistant.parseRepo(Manager.config.github.repoWebsite);
 
       // Setup Octokit
       self.octokit = new Octokit({

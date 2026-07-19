@@ -1,6 +1,6 @@
 /**
  * `omega deploy --direct` plan tests — the pure repo/domain derivation
- * (shared @omega.js/config brandRepoName: github.repo → repo_website →
+ * (shared @omega.js/config brandRepoName: github.repo → repoWebsite →
  * brand.id; cname from brand.url's host). The build+push path is exercised
  * live against the playground via the manager's pipeline command, not here.
  */
@@ -27,30 +27,30 @@ test('direct plan: org + explicit repo + cname from brand.url host', () => {
   assert.equal(plan.cname, 'www.example.com');
 });
 
-test('direct plan: repo_website names the repo when github.repo is unset (launch-night collision fix)', () => {
+test('direct plan: repoWebsite names the repo when github.repo is unset (launch-night collision fix)', () => {
   const plan = buildDirectPlan({
-    github: { org: 'Omega-JS-Stack', repo_website: 'https://github.com/Omega-JS-Stack/omegajs.dev' },
+    github: { org: 'Omega-JS-Stack', repoWebsite: 'https://github.com/Omega-JS-Stack/omegajs.dev' },
     brand: { id: 'omega', url: 'https://omegajs.dev' },
   });
   assert.equal(plan.repo, 'Omega-JS-Stack/omegajs.dev');
   assert.equal(plan.pushUrl, 'https://github.com/Omega-JS-Stack/omegajs.dev.git');
 });
 
-test('direct plan: owner + name both derive from repo_website (ITW-housed site repo, org still the brand org)', () => {
+test('direct plan: owner + name both derive from repoWebsite (ITW-housed site repo, org still the brand org)', () => {
   const plan = buildDirectPlan({
-    github: { org: 'Omega-JS-Stack', repo_website: 'https://github.com/ITW-Creative-Works/omegajs.dev' },
+    github: { org: 'Omega-JS-Stack', repoWebsite: 'https://github.com/ITW-Creative-Works/omegajs.dev' },
     brand: { id: 'omega', url: 'https://omegajs.dev' },
   });
   assert.equal(plan.repo, 'ITW-Creative-Works/omegajs.dev');
 });
 
-test('direct plan: repo defaults to brand.id when neither repo nor repo_website is set', () => {
+test('direct plan: repo defaults to brand.id when neither repo nor repoWebsite is set', () => {
   const plan = buildDirectPlan({ github: { org: 'Org' }, brand: { id: 'my-brand', url: 'https://my.brand' } });
   assert.equal(plan.repo, 'Org/my-brand');
 });
 
 test('direct plan: missing org / repo name / url each refuse with an instruction', () => {
   assert.throws(() => buildDirectPlan({ brand: { id: 'b', url: 'https://x.y' } }), /github\.org/);
-  assert.throws(() => buildDirectPlan({ github: { org: 'O' }, brand: { url: 'https://x.y' } }), /github\.repo, github\.repo_website, or brand\.id/);
+  assert.throws(() => buildDirectPlan({ github: { org: 'O' }, brand: { url: 'https://x.y' } }), /github\.repo, github\.repoWebsite, or brand\.id/);
   assert.throws(() => buildDirectPlan({ github: { org: 'O' }, brand: { id: 'b' } }), /brand\.url/);
 });

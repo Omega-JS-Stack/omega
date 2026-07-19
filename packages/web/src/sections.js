@@ -681,12 +681,13 @@ function registerSectionTags(engine, options) {
       const content = read('content');
       const blank = typeof content !== 'string' || content.trim() === '';
 
-      // A page declaring `composition: true` owns its body AS the composition
-      // (what `omega customize` materializes) — content REPLACES the default.
-      // Without the flag, body content keeps the legacy contract: it renders
-      // BELOW the default composition, exactly like the
-      // `{{ content | uj_content_format }}` line this wrap replaced.
-      if (!blank && read('composition')) {
+      // Ian's ruling (2026-07-19): a page that writes a body MEANS it — the
+      // body REPLACES the layout's default composition, no flag needed (the
+      // old `composition: true` key is retired). The rare page that wants
+      // the legacy add-below contract — body rendered BELOW the default
+      // composition, exactly like the `{{ content | uj_content_format }}`
+      // line this wrap replaced — declares `append: true`.
+      if (!blank && !read('append')) {
         if (!contentParity) contentParity = this.liquid.parse('{{ content | uj_content_format }}');
         emitter.write(yield this.liquid.renderer.renderTemplates(contentParity, context));
         return;

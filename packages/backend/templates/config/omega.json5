@@ -170,7 +170,7 @@
       // fires instead of aiming a real GH_TOKEN at a placeholder repo.
       github: {
         user: '',
-        repo_website: '',
+        repoWebsite: '',
       },
       marketing: {
         campaigns: {

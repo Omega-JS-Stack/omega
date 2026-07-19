@@ -2,7 +2,7 @@
  * Test: admin:edit-post
  * Tests the admin edit post command
  * Edits blog post content in a GitHub repository
- * Requires admin/blogger role, GitHub API key, and repo_website config
+ * Requires admin/blogger role, GitHub API key, and repoWebsite config
  *
  * This is a suite because we need to:
  * 1. Create a test post file via Octokit
@@ -115,7 +115,7 @@ module.exports = {
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
       async run({ assert, state, config }) {
-        if (!config.github?.repo_website) {
+        if (!config.github?.repoWebsite) {
           assert.fail('githubRepoWebsite not configured');
           return;
         }
@@ -123,7 +123,7 @@ module.exports = {
         const octokit = new Octokit({ auth: process.env.GH_TOKEN });
 
         // Parse owner/repo from githubRepoWebsite
-        const repoMatch = config.github?.repo_website.match(/github\.com\/([^/]+)\/([^/]+)/);
+        const repoMatch = config.github?.repoWebsite.match(/github\.com\/([^/]+)\/([^/]+)/);
         if (!repoMatch) {
           assert.fail('Could not parse githubRepoWebsite');
           return;

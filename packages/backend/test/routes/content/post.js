@@ -2,7 +2,7 @@
  * Test: GET /content/post
  * Tests the content fetch post endpoint
  * Fetches blog post content from GitHub
- * Requires GitHub API key and repo_website config
+ * Requires GitHub API key and repoWebsite config
  */
 module.exports = {
   description: 'General fetch post from GitHub',

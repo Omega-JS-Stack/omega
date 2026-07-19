@@ -2,7 +2,7 @@
  * Test: POST /admin/post
  * Tests the admin create post endpoint
  * Creates blog posts via GitHub with image extraction and @post/ body rewriting
- * Requires admin/blogger role, GitHub API key, and repo_website config
+ * Requires admin/blogger role, GitHub API key, and repoWebsite config
  */
 const { Octokit } = require('@octokit/rest');
 const sharp = require('sharp');
@@ -116,13 +116,13 @@ module.exports = {
           return;
         }
 
-        if (!config.github?.repo_website) {
+        if (!config.github?.repoWebsite) {
           assert.fail('githubRepoWebsite not configured');
           return;
         }
 
         // Parse owner/repo for cleanup later
-        const repoMatch = config.github?.repo_website.match(/github\.com\/([^/]+)\/([^/]+)/);
+        const repoMatch = config.github?.repoWebsite.match(/github\.com\/([^/]+)\/([^/]+)/);
         if (!repoMatch) {
           assert.fail('Could not parse githubRepoWebsite');
           return;

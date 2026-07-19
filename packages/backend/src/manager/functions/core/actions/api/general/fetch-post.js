@@ -18,8 +18,8 @@ Module.prototype.main = function () {
       return reject(assistant.errorify(`GitHub API key not configured.`, {code: 500}));
     }
 
-    if (!Manager.config?.github?.repo_website) {
-      return reject(assistant.errorify(`GitHub repo_website not configured.`, {code: 500}));
+    if (!Manager.config?.github?.repoWebsite) {
+      return reject(assistant.errorify(`GitHub repoWebsite not configured.`, {code: 500}));
     }
 
     // Setup Octokit
@@ -44,7 +44,7 @@ Module.prototype.main = function () {
 
     // Get the post
     const filename = url.pathname.replace(/blog|\//ig, '')
-    const repoInfo = assistant.parseRepo(self?.Manager?.config?.github?.repo_website);
+    const repoInfo = assistant.parseRepo(self?.Manager?.config?.github?.repoWebsite);
     const query = `title+repo:${repoInfo.user}/${repoInfo.name}+filename:${filename}`;
 
     assistant.log('Running search', query, repoInfo);

@@ -1,0 +1,20 @@
+<section class="classy-dotgrid" data-omega-dotfield>
+  <div class="container">
+    <div class="classy-hero-split">
+      <div data-omega-reveal-stagger="90">
+        {% component "heading/masthead", eyebrow: args.superheadline.text | default: args.eyebrow, headline: args.headline, headline_accent: args.headline_accent, sub: args.description %}
+      </div>
+
+      {% if args.facts %}
+        <div class="classy-facts" style="--classy-facts-cols: 2;" data-omega-reveal="left">
+          {% for stat in args.facts %}
+            <div class="classy-facts__item">
+              <span class="classy-micro classy-facts__label">{{ stat.label }}</span>
+              <span class="classy-facts__value classy-facts__value--num" data-omega-countup>{{ stat.number }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>

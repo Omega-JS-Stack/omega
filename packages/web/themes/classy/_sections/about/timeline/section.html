@@ -1,0 +1,19 @@
+<section>
+  <div class="container">
+    <div class="classy-duo">
+      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
+        {% component "heading/section-head", superheadline: args.superheadline.text, headline: args.headline, sub: args.subheadline %}
+      </div>
+
+      <div class="classy-timeline" data-omega-reveal-stagger="80">
+        {% for item in args.items %}
+          <div class="classy-timeline__item" data-omega-reveal>
+            <div class="classy-timeline__year">{{ item.year }}</div>
+            <div class="classy-timeline__title">{{ item.title }}</div>
+            <p class="classy-timeline__desc">{{ item.description }}</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>

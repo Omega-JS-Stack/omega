@@ -248,7 +248,8 @@ never render) and deleting the file returns the URL to the packaged default.
   composition in `{% composition %}…{% endcomposition %}` (classy's home
   today; more as extraction continues — the lane is detected from the tag,
   never a hardcoded list). The materialized file = the default page's thin
-  frontmatter + `composition: true` + the wrapped one-liners verbatim:
+  frontmatter + the wrapped one-liners verbatim (a body replaces the
+  composition by default — no flag):
   **no copy inlined**. The layout chain stays intact, so shared-band words
   (testimonials, cta) keep flowing from the theme's frontmatter through
   `resolved.*` — the consumer file renders "Sarah Johnson" without ever
@@ -268,8 +269,8 @@ The `{% composition %}` wrap is tri-state, byte-parity with the
 | Page state | Renders |
 |---|---|
 | No body content | The wrapped default composition |
-| Body content | Default composition, content appended BELOW (the legacy contract, preserved verbatim) |
-| Body content + `composition: true` | The body REPLACES the composition (what customize materializes) |
+| Body content | The body REPLACES the composition (Ian's 2026-07-19 ruling: writing a body means it — what customize materializes; no flag) |
+| Body content + `append: true` | Default composition, content appended BELOW (the legacy UJM contract, kept behind the explicit flag) |
 
 Materialize-then-build is identity: the only sanctioned output delta is
 blank-line runs (the materialized body passes through the blueprint's
@@ -367,11 +368,11 @@ The customize lane (cp220): `omega customize <url>` + the
 `{% composition %}` wrap — see "Customize" above. Classy's home is the
 first composition-lane page (the one pure-composition layout); every other
 URL rides the shell lane until its one-off bands extract. The wrap's
-tri-state guard preserved the legacy append contract verbatim (a consumer
-page with body content on a blueprint still renders the composition with
-its content below — the slice-suite pin caught the first over-eager
-version), and replacement is opt-in via `composition: true`, which the
-materializer writes.
+tri-state guard originally preserved the legacy append contract as the
+default (the slice-suite pin caught the first over-eager version); Ian's
+2026-07-19 ruling flipped it — a body REPLACES the composition, no flag,
+and the legacy add-below contract lives behind an explicit `append: true`.
+The `composition: true` key is retired (ignored).
 
 The wildcard lane (cp221): page assets went URL-only — `asset_path` died
 across the tree (theme post/taxonomy/legal/app layouts, the update and

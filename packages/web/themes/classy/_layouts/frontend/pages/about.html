@@ -112,144 +112,18 @@ team_cta:
     text: "Meet the team"
     href: "/team"
 ---
-
-<!-- ═══ Hero — the statement + facts rail ═══ -->
-<section class="classy-dotgrid" data-omega-dotfield>
-  <div class="container">
-    <div class="classy-hero-split">
-      <div data-omega-reveal-stagger="90">
-        {% capture _eyebrow_fallback %}About {{ site.brand.name }}{% endcapture %}
-        {% component "heading/masthead", eyebrow: resolved.hero.superheadline.text | default: _eyebrow_fallback, headline: resolved.hero.headline, headline_accent: resolved.hero.headline_accent, sub: resolved.hero.description %}
-      </div>
-
-      {% if resolved.stats.items %}
-        <div class="classy-facts" style="--classy-facts-cols: 2;" data-omega-reveal="left">
-          {% for stat in resolved.stats.items %}
-            <div class="classy-facts__item">
-              <span class="classy-micro classy-facts__label">{{ stat.label }}</span>
-              <span class="classy-facts__value classy-facts__value--num" data-omega-countup>{{ stat.number }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    </div>
-  </div>
-</section>
-
+{% composition %}
+{% section "about/hero", data: resolved.hero, facts: resolved.stats.items %}
 <!-- ═══ The letter — mission & vision as editorial statements ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-duo">
-      <div class="classy-duo__aside" data-omega-reveal>
-        <span class="classy-micro">Why we exist</span>
-
-        <!-- A living ops feed, not a paragraph -->
-        <div class="classy-object position-relative pe-4 mt-4 d-none d-lg-block">
-          <div class="classy-fragment pb-5">
-            <span class="classy-micro classy-fragment__label">This week at {{ site.brand.name }}</span>
-            <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "rocket", "fa-xs" %}</span>
-              <span><strong>v2.4</strong> shipped to production</span>
-            </div>
-            <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "user-plus", "fa-xs" %}</span>
-              <span>Two new faces on support</span>
-            </div>
-            <div class="classy-fragment__msg">
-              <span class="classy-fragment__msg-mark">{% uj_icon "quote-left", "fa-xs" %}</span>
-              <span>"Best tool we've adopted this year"</span>
-            </div>
-          </div>
-          <div class="classy-fragment-chip omega-float position-absolute bottom-0 end-0 translate-middle-y">
-            <span class="classy-dot classy-status--ok"></span>
-            All systems go
-          </div>
-        </div>
-      </div>
-      <div data-omega-reveal-stagger="120">
-        <div data-omega-reveal>
-          <span class="classy-micro d-block mb-3">{{ resolved.mission.title }}</span>
-          <p class="classy-statement">{{ resolved.mission.description }}</p>
-        </div>
-        <hr class="my-4">
-        <div data-omega-reveal>
-          <span class="classy-micro d-block mb-3">{{ resolved.vision.title }}</span>
-          <p class="classy-statement">{{ resolved.vision.description }}</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
+{% section "about/letter", mission: resolved.mission, vision: resolved.vision %}
 <!-- ═══ The journey — sticky head + timeline ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-duo">
-      <div class="classy-duo__aside classy-section-head" data-omega-reveal>
-        {% component "heading/section-head", superheadline: resolved.story.superheadline.text, headline: resolved.story.headline, sub: resolved.story.subheadline %}
-      </div>
-
-      <div class="classy-timeline" data-omega-reveal-stagger="80">
-        {% for item in resolved.story.items %}
-          <div class="classy-timeline__item" data-omega-reveal>
-            <div class="classy-timeline__year">{{ item.year }}</div>
-            <div class="classy-timeline__title">{{ item.title }}</div>
-            <p class="classy-timeline__desc">{{ item.description }}</p>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-</section>
-
+{% section "about/timeline", data: resolved.story %}
 <!-- ═══ Life in pictures — photo band (gallery: false kills it) ═══ -->
 {% unless resolved.gallery == false %}
-  {% if resolved.gallery.items and resolved.gallery.items.size > 0 %}
-    <section class="pt-0">
-      <div class="container">
-        <div class="classy-photo-band" data-omega-reveal-stagger="90">
-          {% for photo in resolved.gallery.items %}
-            {% if photo.wide %}
-              <div class="classy-photo-band__tile classy-photo-band__tile--wide lazy-loading" data-lazy="@bg {{ photo.src }}&w=1600" role="img" aria-label="{{ photo.alt }}" data-omega-reveal>
-                {% iftruthy photo.caption %}<span class="classy-photo-band__caption">{{ photo.caption }}</span>{% endiftruthy %}
-              </div>
-            {% else %}
-              <figure class="classy-photo-band__tile" data-omega-reveal>
-                <img
-                  src="{{ site.uj.placeholder.src }}"
-                  data-lazy="@srcset {{ photo.src }}&w=640 640w, {{ photo.src }}&w=1080 1080w"
-                  sizes="(min-width: 992px) 40vw, 100vw"
-                  alt="{{ photo.alt }}"/>
-                {% iftruthy photo.caption %}<figcaption class="classy-photo-band__caption">{{ photo.caption }}</figcaption>{% endiftruthy %}
-              </figure>
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
-    </section>
-  {% endif %}
+  {% section "about/photo-band", items: resolved.gallery.items %}
 {% endunless %}
-
 <!-- ═══ Principles — the numbered list ═══ -->
-<section>
-  <div class="container">
-    <div class="classy-section-head mb-5" data-omega-reveal>
-      {% component "heading/section-head", superheadline: resolved.values.superheadline.text, headline: resolved.values.headline, sub: resolved.values.subheadline %}
-    </div>
-
-    <div class="classy-numbered" data-omega-reveal-stagger="70">
-      {% for value in resolved.values.items %}
-        <div class="classy-numbered__item" data-omega-reveal>
-          <span class="classy-numbered__index">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</span>
-          <div class="classy-numbered__title">{{ value.title }}</div>
-          <p class="classy-numbered__desc">{{ value.description }}</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
+{% section "about/principles", data: resolved.values %}
 <!-- ═══ Team CTA band ═══ -->
 {% section "marketing/cta", data: resolved.team_cta %}
-
-{{ content | uj_content_format }}
+{% endcomposition %}

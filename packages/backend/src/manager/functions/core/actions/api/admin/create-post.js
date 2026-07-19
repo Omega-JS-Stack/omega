@@ -35,7 +35,7 @@ Module.prototype.main = function () {
 
       // Set now
       const now = assistant.meta.startTime.timestamp;
-      const bemRepo = assistant.parseRepo(Manager?.config?.github?.repo_website);
+      const bemRepo = assistant.parseRepo(Manager?.config?.github?.repoWebsite);
 
       // Setup Octokit
       self.octokit = new Octokit({
