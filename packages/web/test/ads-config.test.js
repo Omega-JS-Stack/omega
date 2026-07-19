@@ -31,7 +31,7 @@ test('packaged content speaks advertising.providers.* only', () => {
   const files = [
     ['core/_includes/modules/adunits/adsense.html', 'advertising.providers.google-adsense'],
     ['core/_includes/core/head.html', 'advertising.providers.google-adsense.client'],
-    ['core/js/pages/blog/post.js', "advertising?.providers?.['google-adsense']"],
+    ['core/js/pages/blog/[slug].js', "advertising?.providers?.['google-adsense']"],
   ];
 
   for (const [relative, marker] of files) {

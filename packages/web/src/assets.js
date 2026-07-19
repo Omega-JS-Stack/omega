@@ -38,16 +38,54 @@ const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
 
 // A page file is an ENTRY when it's a per-page index.js/index.scss, or a flat
-// file at most two segments below pages/ (pages/index.js, pages/blog/post.js).
-// Deeper non-index files are helpers (checkout modules/, account sections/).
+// file at most two segments below pages/ (pages/index.js, pages/blog/[slug].js).
+// Deeper non-index files are helpers (checkout modules/, account sections/),
+// and underscore basenames are shared partials in BOTH languages (sass's own
+// convention, mirrored for js: pages/legal/_document.js backs the terms/
+// cookies/privacy entries without being an entry itself).
 function isPageEntry(rel) {
   const base = path.basename(rel);
+  if (base.startsWith('_')) return false;
   if (base === 'index.js' || base === 'index.scss') return true;
   return rel.split('/').length <= 3; // 'pages' + up to 2 segments
 }
 
 function pageKey(rel) {
   return rel.replace(/^pages\//, '').replace(/\.(js|scss)$/, '');
+}
+
+// Wildcard segments use the Next.js filename convention (Windows-safe):
+// js/pages/blog/[slug].js → key blog/[slug] matches any /blog/<segment> page.
+const WILDCARD_SEGMENT = /^\[[^\]/]+\]$/;
+
+/**
+ * Resolve a page's asset entry from one manifest map (spec §7). Precedence:
+ * exact key, the per-page-dir `<key>/index` spelling, then wildcard keys —
+ * a `[name]` segment matches exactly one URL segment (a trailing `/index` on
+ * the wildcard key is the per-page-dir spelling and never consumes a URL
+ * segment). Among wildcard matches the most-literal key wins; ties break
+ * lexicographically for determinism.
+ * @param {object|undefined} map - manifest bucket (js.pages / css.pages / css.themePages)
+ * @param {string} base - the URL-derived key ('/' → 'index', /blog/hi → 'blog/hi')
+ * @returns {string|null} the hashed asset URL, or null
+ */
+function resolvePageAsset(map, base) {
+  if (!map) return null;
+  const exact = map[base] ?? map[`${base}/index`];
+  if (exact != null) return exact;
+
+  const baseSegments = base.split('/');
+  const matches = Object.keys(map).filter((key) => {
+    if (!key.includes('[')) return false;
+    const segments = key.replace(/\/index$/, '').split('/');
+    if (segments.length !== baseSegments.length) return false;
+    return segments.every((seg, i) => WILDCARD_SEGMENT.test(seg) || seg === baseSegments[i]);
+  });
+  if (!matches.length) return null;
+
+  const literals = (key) => key.split('/').filter((seg) => !WILDCARD_SEGMENT.test(seg)).length;
+  matches.sort((a, b) => literals(b) - literals(a) || a.localeCompare(b));
+  return map[matches[0]];
 }
 
 /**
@@ -249,7 +287,7 @@ async function buildAssets(options) {
   const themeCssDirs = themeRoots.map((l) => path.join(l, 'css')).filter((d) => fs.existsSync(d));
   for (const [dirs, bucket, suffix] of [[baseCssDirs, 'pages', ''], [themeCssDirs, 'themePages', '.theme']]) {
     for (const [rel, abs] of collectLayered(dirs, /^pages\/.*\.scss$/)) {
-      if (!isPageEntry(rel) || path.basename(rel).startsWith('_')) continue;
+      if (!isPageEntry(rel)) continue;
       const ownerRoot = path.dirname(abs.slice(0, abs.length - rel.length - 1));
       manifest.css[bucket][pageKey(rel)] = emitCss(compileScss(abs, ownerRoot), path.join('pages', `${pageKey(rel)}${suffix}`));
     }
@@ -354,4 +392,4 @@ function layeredFileImporter(layers) {
   };
 }
 
-module.exports = { buildAssets, purgeCss, layeredFileImporter, sectionsImporter };
+module.exports = { buildAssets, purgeCss, resolvePageAsset, layeredFileImporter, sectionsImporter };

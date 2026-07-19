@@ -20,6 +20,7 @@ const { permalinkOf, scanConsumerPermalinks } = require('./consumer-scan.js');
 const { registerVirtualLayouts, composeSymlinkFarm } = require('./layouts.js');
 const { registerSectionTags, buildSectionLibrary } = require('./sections.js');
 const { registerCollections } = require('./collections.js');
+const { resolvePageAsset } = require('./assets.js');
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
@@ -342,19 +343,19 @@ function configureOmega(eleventyConfig, options) {
         next_page_path: (p.href && p.href.next) || null,
       };
     },
-    // Per-page asset lookups against the content-hash manifest: `<key>` for
-    // flat entries (js/pages/pricing.js), `<key>/index` for per-page dirs
-    // (js/pages/pricing/index.js). `asset_path` frontmatter overrides the
-    // URL-derived key (blueprint/blog/post sets asset_path: blog/post).
+    // Per-page asset lookups against the content-hash manifest, keyed by URL
+    // alone (spec §7 — the asset_path frontmatter override is dead): `<key>`
+    // for flat entries (js/pages/pricing.js), `<key>/index` for per-page dirs
+    // (js/pages/pricing/index.js), and [name] wildcard segments for generated
+    // page families (js/pages/blog/[slug].js serves every /blog/<slug> post).
     pageAssets: (data) => {
       const manifest = data.assetManifest || {};
       const trimmed = (data.page.url || '/').replace(/^\/|\/$/g, '');
-      const base = data.asset_path || (trimmed === '' ? 'index' : trimmed);
-      const pick = (map) => (map && (map[base] ?? map[`${base}/index`])) || null;
+      const base = trimmed === '' ? 'index' : trimmed;
       return {
-        js: pick(manifest.js && manifest.js.pages),
-        css: pick(manifest.css && manifest.css.pages),
-        themeCss: pick(manifest.css && manifest.css.themePages),
+        js: resolvePageAsset(manifest.js && manifest.js.pages, base),
+        css: resolvePageAsset(manifest.css && manifest.css.pages, base),
+        themeCss: resolvePageAsset(manifest.css && manifest.css.themePages, base),
       };
     },
     resolved: (data) => {

@@ -218,7 +218,14 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   `@omega.js/client` (subpaths included) to @omega.js/client. Manifest:
   `{ js: { main, pages }, css: { main, pages, themePages } }` — base page css
   and the active theme's page css BOTH load. The engine's `pageAssets`
-  computed resolves each page's entries (`asset_path` override honored).
+  computed resolves each page's entries from the URL alone (the `asset_path`
+  frontmatter override is dead — spec §7): exact key, then the per-page-dir
+  `<key>/index` spelling, then `[name]` wildcard filenames (Next.js
+  convention — `js/pages/blog/[slug].js` serves every `/blog/<slug>` post; a
+  wildcard segment matches exactly one URL segment, exact beats wildcard,
+  most-literal wildcard wins). Underscore basenames under `pages/` are shared
+  partials in both languages, never entries (`js/pages/legal/_document.js`
+  backs the flat `terms`/`cookies`/`privacy` entries).
   Dev mode (`omega dev`): stable un-hashed names + no minify, so in-place
   asset rebuilds keep their URLs without an HTML re-render.
 - **Boot runtime (ESM + code splitting)** — all bundles come out of ONE

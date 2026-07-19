@@ -11,7 +11,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
-const { buildAssets, purgeCss } = require('../src/assets.js');
+const { buildAssets, purgeCss, resolvePageAsset } = require('../src/assets.js');
 
 const PKG = path.resolve(__dirname, '..');
 const ROOT = path.resolve(PKG, '..', '..');
@@ -45,16 +45,70 @@ test('layered page modules: site layer wins, core fills the rest, all content-ha
   fs.rmSync(OUT, { recursive: true, force: true });
   const manifest = await build(['classy']);
 
-  // Site layer's flat index.js + the real UJM core modules under dir-index keys
-  for (const key of ['index', 'pricing/index', 'signin/index', 'signup/index', 'payment/checkout/index', 'blog/post']) {
+  // Site layer's flat index.js + the real UJM core modules under dir-index
+  // keys + wildcard filenames (blog/[slug] serves every post URL — spec §7)
+  for (const key of ['index', 'pricing/index', 'signin/index', 'signup/index', 'payment/checkout/index', 'blog/[slug]']) {
     assert.ok(manifest.js.pages[key], `manifest has ${key}`);
     assert.match(manifest.js.pages[key], /^\/assets\/js\/pages\/.+-[A-Z0-9]+\.js$/, `${key} is content-hashed`);
   }
   assert.ok(!manifest.js.pages['payment/checkout/modules/api'], 'helper modules are NOT entries');
   assert.ok(!manifest.js.pages['dashboard/account/sections/billing'], 'section helpers are NOT entries');
+  assert.ok(!manifest.js.pages['legal/_document'], 'underscore partials are NOT entries');
 
-  const indexBundle = fs.readFileSync(path.join(OUT, manifest.js.pages.index.slice(1)), 'utf8');
-  assert.ok(indexBundle.includes('consumer wins'), 'SITE layer index.js beat the core layer');
+  const slugBundle = fs.readFileSync(path.join(OUT, manifest.js.pages['blog/[slug]'].slice(1)), 'utf8');
+  assert.ok(slugBundle.includes('consumer wins'), 'SITE layer blog/[slug].js beat the core layer (wildcards layer too)');
+});
+
+test('resolvePageAsset: exact beats /index spelling beats wildcard; segments match one-to-one', () => {
+  const map = {
+    'pricing/index': '/pricing-dir.js',
+    'blog/index': '/blog-list.js',
+    'blog/[slug]': '/blog-post.js',
+    'alternatives/[alternative]/index': '/alternative.js',
+    'updates/index': '/updates-list.js',
+    'updates/[update]': '/updates-detail.css',
+    'team/lead': '/team-lead.js',
+    'team/[id]': '/team-member.js',
+  };
+
+  assert.strictEqual(resolvePageAsset(map, 'pricing'), '/pricing-dir.js', 'per-page-dir /index spelling');
+  assert.strictEqual(resolvePageAsset(map, 'blog'), '/blog-list.js', 'list page hits its exact key, not the wildcard');
+  assert.strictEqual(resolvePageAsset(map, 'blog/hello-world'), '/blog-post.js', '[slug] matches any post segment');
+  assert.strictEqual(resolvePageAsset(map, 'blog/hello/world'), null, 'a wildcard segment never spans two URL segments');
+  assert.strictEqual(resolvePageAsset(map, 'team/lead'), '/team-lead.js', 'exact path beats wildcard');
+  assert.strictEqual(resolvePageAsset(map, 'team/anyone-else'), '/team-member.js', 'wildcard serves the rest of the family');
+  assert.strictEqual(resolvePageAsset(map, 'alternatives/acme'), '/alternative.js', 'trailing /index on a wildcard key is the per-page-dir spelling');
+  assert.strictEqual(resolvePageAsset(map, 'updates/v1.0.0'), '/updates-detail.css', 'dots in the URL segment are fine');
+  assert.strictEqual(resolvePageAsset(map, 'nowhere'), null, 'no match → null');
+  assert.strictEqual(resolvePageAsset(undefined, 'blog'), null, 'missing bucket → null');
+
+  // Specificity: the most-literal wildcard wins; full ties break lexicographically
+  const overlap = { '[a]/[b]': '/wide.js', 'blog/[slug]': '/narrow.js' };
+  assert.strictEqual(resolvePageAsset(overlap, 'blog/post-1'), '/narrow.js', 'most-literal wildcard wins');
+  assert.strictEqual(resolvePageAsset({ '[x]': '/x.js', '[y]': '/y.js' }, 'anything'), '/x.js', 'ties are deterministic');
+});
+
+test('the asset_path families resolve by URL alone against the real manifest', async () => {
+  const manifest = await build(['classy']);
+
+  // The dead frontmatter's old exact keys are gone…
+  for (const dead of ['blog/post', 'updates/update', 'alternatives/alternative/index', 'legal/document/index']) {
+    assert.ok(!manifest.js.pages[dead] && !manifest.css.pages[dead] && !manifest.css.themePages[dead], `no manifest bucket carries dead key ${dead}`);
+  }
+
+  // …their replacements resolve straight from page URLs
+  assert.ok(String(resolvePageAsset(manifest.css.pages, 'blog/my-first-post')).includes('/assets/css/pages/blog/[slug]'), 'post css via wildcard');
+  assert.ok(String(resolvePageAsset(manifest.css.pages, 'updates/v1.2.0')).includes('/assets/css/pages/updates/[update]'), 'update css via wildcard');
+  assert.ok(String(resolvePageAsset(manifest.js.pages, 'alternatives/acme')).includes('/assets/js/pages/alternatives/[alternative]'), 'alternative js via per-page-dir wildcard');
+  assert.strictEqual(resolvePageAsset(manifest.css.pages, 'updates'), manifest.css.pages['updates/index'], 'the /updates list page keeps its exact entry');
+
+  // The flat legal URLs each own an exact entry over the shared _document partials
+  for (const url of ['terms', 'cookies', 'privacy']) {
+    assert.ok(manifest.js.pages[url], `js.pages has ${url}`);
+    assert.ok(manifest.css.themePages[url], `classy theme css has ${url}`);
+  }
+  const termsGraph = readGraph(manifest.js.pages.terms);
+  assert.ok(termsGraph.includes('data-legal-toc'), 'terms entry reaches the shared legal-document module');
 });
 
 test('§7 asset lanes: section.scss joins the main sheet, section.js boots behind DOM presence', async () => {
@@ -71,8 +125,13 @@ test('§7 asset lanes: section.scss joins the main sheet, section.js boots behin
   assert.ok(graph.includes('data-omega-'), 'presence-init selector rides the bundle');
 
   // page bundles stay clean — sections ride the MAIN stub only
-  const pageGraph = readGraph(manifest.js.pages['blog/post']);
+  const pageGraph = readGraph(manifest.js.pages['blog/[slug]']);
   assert.ok(!pageGraph.includes('sectionProbed'), 'page stubs carry no section registry');
+
+  // classy's product-demo section.js rides the same lane (the video-tab
+  // behavior that moved out of the dead core index page module)
+  assert.ok(graph.includes('marketing/product-demo'), 'product-demo id in the section registry');
+  assert.ok(graph.includes('shown.bs.tab'), 'the tab-video behavior bundled via the section lane');
 });
 
 test('legacy module bundles emit at their fixed URLs (redirect pages script them)', async () => {
@@ -163,11 +222,11 @@ test('layered sass: main css compiles per theme through omega:theme', async () =
   assert.ok(newsflashCss.includes('--omega-ground: #F7F2E7') || newsflashCss.includes('--omega-ground: #f7f2e7'), 'newsflash re-values the omega sheet (paper ground)');
 
   // Page css namespaces: base pages from core, theme pages from the theme
-  assert.ok(classy.css.pages['blog/post'], 'core page css entry (blog/post)');
-  assert.ok(newsflash.css.themePages['blog/post'], 'newsflash theme page css for blog/post');
-  // classy ships blog/post theme css since the cp170 editorial extras
+  assert.ok(classy.css.pages['blog/[slug]'], 'core page css entry (blog/[slug])');
+  assert.ok(newsflash.css.themePages['blog/[slug]'], 'newsflash theme page css for blog/[slug]');
+  // classy ships blog/[slug] theme css since the cp170 editorial extras
   // (reading progress + article rail) — both namespaces live side by side
-  assert.ok(classy.css.themePages['blog/post'], 'classy theme page css for blog/post');
+  assert.ok(classy.css.themePages['blog/[slug]'], 'classy theme page css for blog/[slug]');
 });
 
 test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () => {
@@ -184,6 +243,7 @@ test('dev mode: stable un-hashed names so rebuilds keep their URLs', async () =>
 
   assert.strictEqual(manifest.js.main, '/assets/js/main.js', 'main js un-hashed');
   assert.strictEqual(manifest.js.pages['signin/index'], '/assets/js/pages/signin/index.js', 'page js un-hashed');
+  assert.strictEqual(manifest.js.pages['blog/[slug]'], '/assets/js/pages/blog/[slug].js', 'wildcard filenames survive esbuild verbatim');
   assert.strictEqual(manifest.css.main, '/assets/css/main.css', 'main css un-hashed');
   fs.rmSync(OUT, { recursive: true, force: true });
 });

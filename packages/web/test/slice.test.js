@@ -36,7 +36,7 @@ async function buildMini(overrides = {}) {
         siteData,
         farmDir: path.join(PKG, '.omega', 'layout-farm'),
         assetManifest: {
-          js: { main: '/assets/js/main-TEST.js', pages: { 'signin/index': '/assets/js/pages/signin/index-TEST.js' } },
+          js: { main: '/assets/js/main-TEST.js', pages: { 'signin/index': '/assets/js/pages/signin/index-TEST.js', 'blog/[slug]': '/assets/js/pages/blog/[slug]-TEST.js' } },
           css: { main: '/assets/css/main-TEST.css', pages: {}, themePages: {} },
           favicons: true,
         },
@@ -98,6 +98,18 @@ test('default pages render when the consumer has no same-URL file', () => {
   assert.ok(signin.includes('/assets/js/pages/signin/index-TEST.js'), 'pageAssets script from the manifest');
   assert.ok(pages.get('/signup').includes('id="auth-form"'), 'signup default');
   assert.ok(pages.get('/404').includes('id="page-url"'), '404 default (flat url, 404.html file)');
+});
+
+test('wildcard page modules emit for every URL in the family (spec §7, asset_path is dead)', () => {
+  // Every sample post URL rides the ONE blog/[slug] manifest entry — resolved
+  // from the URL alone at render time, emitted verbatim (brackets included).
+  const posts = [...pages.keys()].filter((url) => /^\/blog\/[^/]+$/.test(url) && !url.includes('page'));
+  assert.ok(posts.length >= 3, `sample posts rendered (${posts.length})`);
+  for (const url of posts) {
+    assert.ok(pages.get(url).includes('/assets/js/pages/blog/[slug]-TEST.js'), `${url} links the wildcard module`);
+  }
+  // …and the family boundary holds: the blog LIST page never matches [slug]
+  assert.ok(!pages.get('/blog').includes('[slug]-TEST.js'), 'the list page does not match the wildcard');
 });
 
 test('zero-page consumer still gets a homepage at / (cp194 wizard-rehearsal catch)', async () => {

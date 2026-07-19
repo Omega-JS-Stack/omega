@@ -1,30 +1,14 @@
 /**
- * Homepage JavaScript
+ * Product-demo tab behavior — Bootstrap handles the tab switching itself
+ * (data-bs-toggle="tab"); this pauses the videos of inactive tabs and
+ * restarts the active tab's video for better UX. The §7 presence init calls
+ * this once per rendered instance with the section's root element, so the
+ * behavior works on ANY page that composes the band (moved here from
+ * core/js/pages/index.js, which owned it when only the homepage — and the
+ * hero-demo test pages via the dead asset_path override — rendered it).
  */
-
-// Libraries
-import omega from '@omega.js/client';
-
-// Module
-export default () => {
-  return new Promise(async function (resolve) {
-    // Initialize when DOM is ready
-    await omega.dom().ready();
-
-    // Bootstrap tabs handle all the tab switching automatically via data-bs-toggle="tab"
-    // We just need to pause videos when switching tabs for better UX
-    setupVideoControls();
-
-    // Resolve after initialization
-    return resolve();
-  });
-};
-
-/**
- * Setup video controls to pause/play when switching tabs
- */
-function setupVideoControls() {
-  const $tabButtons = document.querySelectorAll('button[data-bs-toggle="tab"]');
+export default (el) => {
+  const $tabButtons = el.querySelectorAll('button[data-bs-toggle="tab"]');
 
   if (!$tabButtons.length) {
     return;
@@ -38,7 +22,7 @@ function setupVideoControls() {
       const $targetPane = document.querySelector(targetId);
 
       // Pause all videos first
-      const $allVideos = document.querySelectorAll('.tab-pane video');
+      const $allVideos = el.querySelectorAll('.tab-pane video');
       $allVideos.forEach(function($video) {
         $video.pause();
       });
@@ -51,10 +35,10 @@ function setupVideoControls() {
           $activeVideo.currentTime = 0;
           $activeVideo.play().catch(function(error) {
             // Autoplay might be blocked by browser, that's okay
-            console.log('[Homepage] Autoplay blocked:', error.message);
+            console.log('[Product demo] Autoplay blocked:', error.message);
           });
         }
       }
     });
   });
-}
+};

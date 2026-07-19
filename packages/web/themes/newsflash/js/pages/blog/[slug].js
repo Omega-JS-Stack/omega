@@ -1,7 +1,7 @@
 // Newsflash Theme — Blog post page JS (the #theme layer)
 // Drives the reading-progress bar: fills the fixed top rule as the reader
-// scrolls through the page. NOTE: flat file shape — the post layout sets
-// `asset_path: blog/post`, so this loads as pages/blog/post.js.
+// scrolls through the page. NOTE: [slug] wildcard filename (spec §7) — the
+// key blog/[slug] serves every /blog/<slug> post page, no frontmatter.
 export default ({ manager, options }) => {
   const $bar = document.querySelector('.reading-progress > span');
   if (!$bar) {

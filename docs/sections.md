@@ -127,6 +127,21 @@ another page's words.
 - **Dev loop**: theme-layer section edits are covered by the theme-root
   watchers; consumer `src/_sections`/`_components` have their own watch
   entries — scss changes hot-swap css, js changes rebuild + reload.
+- **Page modules (cp221)**: `asset_path` frontmatter is DEAD — page assets
+  bind to URLs alone. Exact key first (`js/pages/pricing.js` or the
+  per-page-dir `pricing/index.js`), then `[name]` wildcard filenames
+  (Next.js convention, Windows-safe): `js/pages/blog/[slug].js` /
+  `css/pages/blog/[slug].scss` serve every `/blog/<slug>` page. A wildcard
+  segment matches exactly one URL segment; exact beats wildcard; among
+  wildcards the most-literal key wins (ties break lexicographically); a
+  trailing `/index` on a wildcard key is the per-page-dir spelling and never
+  consumes a URL segment. Underscore basenames under `pages/` are shared
+  partials in BOTH languages, never entries — the flat legal URLs
+  (`/terms`, `/cookies`, `/privacy`, unreachable by wildcard) each own a
+  two-line entry over `legal/_document.js` / `legal/_document.scss`.
+  Resolver: `resolvePageAsset` (assets.js), consumed by the engine's
+  `pageAssets` computed. The `data-asset-path` html attribute died with the
+  mechanism (nothing read it).
 
 ## Update semantics
 
@@ -311,5 +326,14 @@ its content below — the slice-suite pin caught the first over-eager
 version), and replacement is opt-in via `composition: true`, which the
 materializer writes.
 
-Pending (spec §13): `[id].js` wildcard page modules, auto-generated sample
-content.
+The wildcard lane (cp221): page assets went URL-only — `asset_path` died
+across the tree (theme post/taxonomy/legal/app layouts, the update and
+alternative blueprints, the hero-demo pages, the ports fixture), the
+`blog/post` → `blog/[slug]`, `updates/[update]`, `alternatives/
+[alternative]` families renamed in place, and the legal trio split into
+flat exact entries over underscore partials. The §7 dividend: the
+homepage's video-tab logic left the dying `index` page module for
+`product-demo/section.js`, so the behavior now works on EVERY page that
+composes the band — including the showcase pages, which never had it.
+
+Pending (spec §13): auto-generated sample content.
