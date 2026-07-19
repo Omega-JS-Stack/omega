@@ -48,8 +48,14 @@
       },
     ],
     // The fake-config demo panel inside the 'code' tile (previously hardcoded
-    // {{ site.brand.* }} in markup — now args, per context-freeness).
+    // {{ site.brand.* }} in markup — now args, per context-freeness). label
+    // is the comment line above the snippet — generic by default (pass B: no
+    // framework filename in a theme's voice); a brand that wants its real
+    // config named passes its own. The 'terminal' tile's mock lines are
+    // per-ITEM args the same way: item.terminal.{command,out,ok}, defaulting
+    // to a generic npm session.
     config_demo: {
+      label: '// one config — every target',
       name: '{{ site.brand.name }}',
       color: '{{ site.brand.color | default: "#2563EB" }}',
     },

@@ -19,16 +19,16 @@
 
             {% case item.type %}
               {% when 'code' %}
-                <div class="classy-tile__code classy-ink-panel"><span class="tok-c">// omega.json5 — one file, every target</span>
+                <div class="classy-tile__code classy-ink-panel"><span class="tok-c">{{ args.config_demo.label }}</span>
 { brand: { name: <span class="tok-v">'{{ args.config_demo.name }}'</span>,
            color: <span class="tok-a">'{{ args.config_demo.color }}'</span> },
   targets: { <span class="tok-k">web</span>: {…}, <span class="tok-k">backend</span>: {…},
              <span class="tok-k">desktop</span>: {…}, <span class="tok-k">extension</span>: {…} } }</div>
               {% when 'terminal' %}
                 <div class="classy-tile__term classy-ink-panel">
-                  <div><span class="classy-term__prompt">$</span> omega deploy</div>
-                  <div class="classy-term__out">→ building 42 pages · hashing assets</div>
-                  <div class="classy-term__out"><span class="classy-term__ok">✓</span> live in 38s<span class="omega-caret"></span></div>
+                  <div><span class="classy-term__prompt">$</span> {{ item.terminal.command | default: 'npm run deploy' }}</div>
+                  <div class="classy-term__out">{{ item.terminal.out | default: '→ building 42 pages · hashing assets' }}</div>
+                  <div class="classy-term__out"><span class="classy-term__ok">✓</span> {{ item.terminal.ok | default: 'live in 38s' }}<span class="omega-caret"></span></div>
                 </div>
               {% when 'split' %}
                 <div class="classy-tile__demo">

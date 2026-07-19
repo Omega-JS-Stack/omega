@@ -443,5 +443,20 @@ override layout arrays and caught its items concatenating. The draft is
 fork-portable: copy carries `{{ site.brand.name }}` refs, so the real
 brand's name lands at fork time.
 
-Pending (spec §13): content pass B — genericize classy (sweep omega
-dev-accents from theme defaults; in flight).
+Content pass B (cp226): classy's theme layer speaks generic SaaS — the
+sweep found four literal omega accents and killed each: the hero's
+`command: npx omega setup` DEFAULT is gone (no command default at all — a
+framework command is never a theme's voice; the button renders only when a
+brand sets one), the index layout's cta command lines are gone, the bento
+code tile's comment line became `config_demo.label` (generic default
+`// one config — every target`), and the bento terminal mock's lines became
+per-item args (`item.terminal.{command,out,ok}`, defaulting to a generic
+npm session). The playground passes its own omega voice through those args
+(`omega deploy`, `// omega.json5 — one file, every target`) — proving the
+division: the THEME is generic, promoting OMEGA is the BRAND's job. The
+framework's own dev-only /test/* surfaces keep their omega references
+(they demo the framework's real machinery and are purged from production).
+
+Pending (spec §13): the arc close — THE FORK (real omegajs.dev sub-brand
+born outside the monorepo on published omega; Ian-gated on publish/launch
+decisions).

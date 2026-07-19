@@ -38,11 +38,15 @@ hero:
   frame:
     enabled: false
 
-# ─── Bento: the six real capabilities, typed tiles
+# ─── Bento: the six real capabilities, typed tiles (config_demo.label +
+# item.terminal name the REAL machinery — the theme's defaults are generic
+# since pass B; the omega voice is this brand's job)
 bento:
   superheadline: "Why {{ site.brand.name }}"
   headline: "Everything wired. <em>Nothing invented twice.</em>"
   subheadline: "One config file drives every target — change it once and every surface follows."
+  config_demo:
+    label: "// omega.json5 — one file, every target"
   items:
     - type: "code"
       span: "big"
@@ -58,6 +62,8 @@ bento:
       icon: "terminal"
       title: "Deploys are deliberate"
       description: "Nothing publishes on commit. One verb — omega deploy — builds, verifies, and ships the surface you name."
+      terminal:
+        command: "omega deploy"
     - type: "brand"
       icon: "palette"
       title: "Your color, everywhere"

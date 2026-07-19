@@ -238,7 +238,7 @@ test('frontmatter bridge: hero-demo page keeps its own keys AND the section defa
   assert.ok(demo, 'hero-demo-input built');
   assert.ok(demo.includes('Create your logo in'), 'page frontmatter headline survived the bridge');
   assert.ok(demo.includes('Introducing MiniCo'), 'unset badge fell through to the json5 default, brand-liquified');
-  assert.ok(demo.includes('npx omega setup'), 'unset command fell through to the json5 default');
+  assert.ok(!demo.includes('btn-cmd'), 'unset command renders NO command button (pass B: a framework command is never a theme default)');
 });
 
 test('wave 2: the index composition renders every extracted band from its defaults', async () => {
@@ -362,7 +362,7 @@ test('body-call lane: a consumer page composes the section with YAML args', asyn
   assert.ok(demo.includes('Composed from'), 'body-call headline rendered');
   assert.ok(demo.includes('a body call'), 'body-call rotating item rendered');
   assert.ok(!demo.includes('classy-mock'), 'frame.enabled: false suppressed the product frame');
-  assert.ok(demo.includes('npx omega setup'), 'unset command still rides the defaults');
+  assert.ok(!demo.includes('btn-cmd'), 'unset command renders no command button (pass B)');
 });
 
 // ─── cp219: expression names (the showcase's lane) ───────────────────────────

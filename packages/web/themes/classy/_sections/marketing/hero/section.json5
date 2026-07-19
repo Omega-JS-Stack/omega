@@ -37,8 +37,8 @@
       text: 'Get started free',
       href: '/signup',
     },
-    command: 'npx omega setup',
-    command_href: '/download',
+    // No command default (pass B): the mono $ button renders only when the
+    // BRAND sets one — a framework command is never a theme's voice.
     secondary_button: {
       enabled: false,
       text: 'See pricing',
