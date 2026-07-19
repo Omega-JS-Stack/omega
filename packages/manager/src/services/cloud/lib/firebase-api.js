@@ -73,6 +73,18 @@ class FirebaseAPI {
     }
   }
 
+  /**
+   * Raw project-access probe — getProject() swallows failures into null
+   * (its consumers treat "inaccessible" and "absent" alike), but the access
+   * self-heal needs the REAL failure: PERMISSION_DENIED here is the
+   * identity seam (lib/access-heal.js); anything else is a genuine fault.
+   * Resource Manager GET works for any role and for projects not yet
+   * Firebase-added.
+   */
+  probeProjectAccess(projectId) {
+    return this.request(`${RESOURCE_MANAGER_V1}/projects/${projectId}`);
+  }
+
   /** All Firebase projects visible to the authed user */
   async listProjects() {
     const response = await this.request(`${FIREBASE_API_BASE}/projects`);

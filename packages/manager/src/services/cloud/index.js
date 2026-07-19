@@ -18,6 +18,7 @@
  * rewrites a shared project's settings.
  */
 const { googleTokenStorePath } = require('../../lib/google-auth.js');
+const { ensureProjectAccess } = require('./lib/access-heal.js');
 const { isDemoProject } = require('@omega.js/config');
 const chalk = require('chalk').default;
 const { createServiceRunner } = require('../../lib/service-runner.js');
@@ -80,6 +81,20 @@ module.exports.run = createServiceRunner({
     }
 
     const firebaseApi = makeApi();
+
+    // The identity seam self-heals HERE, before any op runs (Ian
+    // 2026-07-19: wrapped in `npm start`, never a hand-run command): a
+    // manage identity with no role on the project gets granted owner via a
+    // local gcloud account that can, and the run proceeds normally.
+    // Idempotent — an accessible project is one probe and done.
+    const access = await ensureProjectAccess({
+      firebaseApi,
+      projectId,
+      ...(context.gcloudExec ? { exec: context.gcloudExec, delayMs: 0 } : {}),
+    });
+    if (access.healed) {
+      console.log(`    ${chalk.green('✓')} Access healed — ${chalk.cyan(access.grantor)} granted ${chalk.cyan(access.manageEmail)} ${chalk.cyan(access.roles.join(' + '))} on ${chalk.cyan(projectId)}`);
+    }
 
     const shared = firebase.shared === true;
     console.log(`    Project: ${chalk.cyan(projectId)}${shared ? chalk.dim(' (shared)') : ''}`);
