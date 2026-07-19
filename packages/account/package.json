@@ -1,6 +1,6 @@
 {
   "name": "@omega.js/account",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The OMEGA user/account schema engine + subscription resolution — the single source of truth shared by @omega.js/backend and @omega.js/client (private workspace package, vendored/bundled into frameworks at prepare time)",
   "private": true,
   "main": "./src/index.js",

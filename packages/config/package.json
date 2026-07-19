@@ -1,6 +1,6 @@
 {
   "name": "@omega.js/config",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "The single omega.json5 config format for every OMEGA project type — loader, schema, validator, and the SHARED_SECTIONS enumeration omega-manager disperses from (private workspace package, vendored/bundled into frameworks at prepare time)",
   "private": true,
   "main": "./src/index.js",

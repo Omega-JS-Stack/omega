@@ -1,7 +1,8 @@
 {
   "name": "@omega.js/backend",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "OMEGA backend framework — build, test, and deploy Firebase Cloud Functions backends",
+  "private": true,
   "main": "dist/manager/index.js",
   "files": [
     "bin/",
