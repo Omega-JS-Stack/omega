@@ -1,124 +1,118 @@
 ---
-# ═══ Content pass A (spec §13 step 3, Ian greenlit 2026-07-18): the real
-# OMEGA pitch as a composition — this page is the living draft of the real
-# omegajs.dev homepage (the fork copies it 1:1; {{ site.brand.name }} stays
-# a variable so the real brand's name lands at fork time). Every band below
-# is TRUE today: no invented logos, quotes, or numbers — trusted-by,
-# product-demo, showcase, and testimonials are deliberately absent until
-# real ones exist (absence is the spine).
+# ═══ Paperloom content pass (Ian 2026-07-19: the playground rebrands to its
+# OWN fictional concept — a quiet writing studio — so drift from the real
+# omegajs.dev site never reads as a broken copy). Structure is UNCHANGED:
+# the same bands the real brand exercises (hero + rotating + slot, bento,
+# stats, cta), so this brand keeps stress-testing every section shape the
+# framework ships; only the voice is fiction.
 #
-# Authoring form (Ian 2026-07-18): PURE composition — frontmatter carries
-# page meta only; every band's words live inside its own section call
-# (spec §5 block-YAML form). The data bridge (`data: resolved.*`) is for
-# layout-composed pages; body compositions carry their YAML in the calls.
+# Authoring form: PURE composition — frontmatter carries page meta only;
+# every band's words live inside its own section call (spec §5 block-YAML).
 layout: blueprint/index
 permalink: /
 ---
 
-<!-- ═══ Hero: the terminal IS the product shot (frame mock off — that
-     generic SaaS dashboard isn't this product; the demo_html slot below
-     carries a real session instead) ═══ -->
+<!-- ═══ Hero: a page-in-progress IS the product shot (frame mock off — the
+     demo_html slot carries a living draft instead; classy's ink-panel
+     classes make an editor vignette for free) ═══ -->
 {% section "marketing/hero" %}
 badge:
-  text: "The open JavaScript stack"
+  text: "A quiet place to write"
   href: null
-headline: "One brand config for"
+headline: "One home for"
 rotating:
-  - "every surface"
-  - "your website"
-  - "your backend"
-  - "your desktop app"
-  - "your extension"
-description: "{{ site.brand.name }} turns a single omega.json5 into a complete product — static website, Firebase backend, desktop app, and browser extension — with auth, payments, theming, and deploys wired from day one."
+  - "every draft"
+  - "your notes"
+  - "your journals"
+  - "your clippings"
+  - "your finished pages"
+description: "{{ site.brand.name }} keeps your writing in one calm place — capture from any tab, shape it at your desk, and publish pages you're proud of."
 primary_button:
-  text: "Get started"
-  href: "/download"
-command: "npx omega setup"
-command_href: "/download"
+  text: "Start writing"
+  href: "/signup"
 secondary_button:
-  enabled: false
+  text: "See pricing"
+  href: "/pricing"
 meta:
-  - "Web · Backend · Desktop · Extension"
-  - "Static-first websites"
-  - "Secrets never live in config"
+  - "Capture · Draft · Publish"
+  - "Synced everywhere you write"
+  - "Your words stay yours"
 frame:
   enabled: false
 {% slot demo_html %}
     <div class="classy-tile__term classy-ink-panel col-lg-7 mx-auto text-start">
-      <div><span class="classy-term__prompt">$</span> npx omega setup</div>
-      <div class="classy-term__out"><span class="classy-term__ok">✓</span> brand config → omega.json5</div>
-      <div class="classy-term__out"><span class="classy-term__ok">✓</span> targets: website · backend · desktop · extension</div>
-      <div><span class="classy-term__prompt">$</span> omega dev</div>
-      <div class="classy-term__out">● website&nbsp;&nbsp;https://localhost:4000</div>
-      <div class="classy-term__out">● backend&nbsp;&nbsp;emulators up<span class="omega-caret"></span></div>
+      <div class="classy-term__out">Tuesday, 9:12 AM — draft</div>
+      <div>The lighthouse keeper kept two logs: one for the sea,</div>
+      <div>one for everything the sea took.<span class="omega-caret"></span></div>
+      <div class="classy-term__out"><span class="classy-term__ok">✓</span> saved · waiting at your desk</div>
     </div>
 {% endslot %}
 {% endsection %}
-<!-- ═══ Bento: the six real capabilities, typed tiles (config_demo.label +
-     item.terminal name the REAL machinery — the theme's defaults are generic
-     since pass B; the omega voice is this brand's job) ═══ -->
+<!-- ═══ Bento: six product truths, one per tile type (same tile-type
+     coverage as before — code, split, terminal, brand, default ×2) ═══ -->
 {% section "marketing/bento" %}
 superheadline: "Why {{ site.brand.name }}"
-headline: "Everything wired. <em>Nothing invented twice.</em>"
-subheadline: "One config file drives every target — change it once and every surface follows."
+headline: "Everything in its place. <em>Nothing lost again.</em>"
+subheadline: "Capture anywhere, and it's waiting at your desk — organized, synced, and yours."
 config_demo:
-  label: "// omega.json5 — one file, every target"
+  label: "// tuesday.md — one page, every device"
 items:
   - type: "code"
     span: "big"
-    icon: "sliders"
-    title: "One config, every surface"
-    description: "omega.json5 names your brand, targets, and services once — pages, emails, builds, and stores all read the same truth. Secrets stay in .env; the loader refuses them anywhere else."
+    icon: "book"
+    title: "One library, every device"
+    description: "Your notes live in a single library that follows you — the web app, the writing desk, and the clipper all read the same pages. Offline first; sync catches up when you do."
   - type: "split"
     span: "tall"
     icon: "circle-half-stroke"
-    title: "Light & dark, born together"
-    description: "The design-token sheet ships both modes from day one — no bolted-on dark theme, ever."
+    title: "Paper by day, ink by night"
+    description: "A warm page in daylight, a quiet dark desk after hours — both built in from the first word."
   - type: "terminal"
-    icon: "terminal"
-    title: "Deploys are deliberate"
-    description: "Nothing publishes on commit. One verb — omega deploy — builds, verifies, and ships the surface you name."
+    icon: "feather"
+    title: "Saving is invisible"
+    description: "Every keystroke lands in your library — close the lid mid-sentence and pick the sentence back up anywhere."
     terminal:
-      command: "omega deploy"
+      command: "autosave · on"
   - type: "brand"
     icon: "palette"
-    title: "Your color, everywhere"
-    description: "One brand color becomes full light + dark accent ramps — buttons, links, focus rings, charts."
+    title: "Make it yours"
+    description: "Pick an ink and {{ site.brand.name }} re-inks itself — covers, links, highlights, focus rings."
   - type: "default"
     icon: "shield-halved"
-    title: "Auth & accounts built in"
-    description: "Sign-in, subscriptions, and billing flows arrive wired to your backend on day one."
+    title: "Private by default"
+    description: "Your library is yours alone until you say otherwise — sharing is a deliberate act, page by page."
   - type: "default"
-    icon: "puzzle-piece"
-    title: "Pages are compositions"
-    description: "Every page is section calls over your data — swap themes and the same content reskins itself."
+    icon: "book-open"
+    title: "Journals & collections"
+    description: "Group pages into journals, thread drafts into collections, and let finished work shelve itself."
 {% endsection %}
-<!-- ═══ Stats band: honest numbers only ═══ -->
+<!-- ═══ Stats band: the product's shape in four numbers ═══ -->
 {% section "marketing/stats" %}
 items:
-  - number: "4"
-    label: "Targets from one config"
-    sublabel: "Web · backend · desktop · extension"
+  - number: "3"
+    label: "Places to write"
+    sublabel: "Browser · desk · clipper"
   - number: "1"
-    label: "Config file per brand"
-    sublabel: "omega.json5 — secrets stay in .env"
+    label: "Library, synced"
+    sublabel: "Every device reads the same pages"
   - number: "2"
-    label: "First-party themes"
-    sublabel: "classy & newsflash, light + dark"
+    label: "Moods"
+    sublabel: "Paper light & ink dark"
   - number: "100%"
-    label: "Static web output"
-    sublabel: "Nothing to patch on a Sunday"
+    label: "Yours"
+    sublabel: "Export everything, anytime"
 {% endsection %}
-<!-- ═══ CTA band: the command is the call ═══ -->
+<!-- ═══ CTA band ═══ -->
 {% section "marketing/cta" %}
 superheadline:
-  icon: "rocket"
-  text: "Get started"
-headline: "Ship every surface"
-headline_accent: "from one command"
-subheadline: "{{ site.brand.name }} scaffolds the brand, wires the targets, and boots your dev stack — then gets out of your way."
-command: "npx omega setup"
-command_href: "/download"
+  icon: "feather"
+  text: "Begin"
+headline: "Start your first page"
+headline_accent: "tonight"
+subheadline: "{{ site.brand.name }} sets up your library in a minute — then gets out of the way of the words."
+primary_button:
+  text: "Start writing"
+  href: "/signup"
 secondary_button:
   text: "See pricing"
   href: "/pricing"

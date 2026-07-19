@@ -1,10 +1,14 @@
-// OMEGA Playground — brand-level omega.json5: the shared config layer every
-// app under apps/ inherits. App files override any key per-surface; key
-// presence under `targets` = this brand supports that target. Secrets NEVER
-// live here — they go in the gitignored .env (the loader hard-fails on
-// secret-shaped keys). This is the REHEARSAL brand (Ian 2026-07-11):
-// playground identity, playground subdomain — the real OMEGA brand is born
-// standalone at arc close and owns omegajs.dev.
+// Paperloom (brand id omega-playground) — brand-level omega.json5: the
+// shared config layer every app under apps/ inherits. App files override any
+// key per-surface; key presence under `targets` = this brand supports that
+// target. Secrets NEVER live here — they go in the gitignored .env (the
+// loader hard-fails on secret-shaped keys). This is the standing live TEST
+// brand wearing its OWN fictional concept — Paperloom, a quiet writing
+// studio (Ian 2026-07-19: the real omegajs.dev exists now, so the playground
+// stops posing as "here's the OMEGA framework"; drift between the two must
+// never read as a broken copy). Infrastructure identity is UNCHANGED: id
+// omega-playground, subdomain playground.omegajs.dev, Firebase project
+// omegajs-playground — only the brand VOICE is fiction.
 {
 
   // Webhook parent topology: a brand names the parent whose central backend
@@ -16,11 +20,11 @@
   parent: false,
   brand: {
     id: "omega-playground",
-    name: "OMEGA Playground",
+    name: "Paperloom",
     company: "ITW Creative Works",
-    description: "The open JavaScript stack: one brand config, every target — web, backend, desktop, and browser extension.",
-    tagline: "One config. Every target.",
-    color: "#2563eb", // draft-1 "ocean" ideation blue (Ian 2026-07-16: purple retired) — drives the --omega-accent-* ramps
+    description: "A quiet home for your writing — notes, drafts, and finished pages that follow you from browser to desk.",
+    tagline: "Where drafts become pages.",
+    color: "#166534", // "forest ink" — deliberately distinct from the real brand's ocean blue so the two sites never twin; drives the --omega-accent-* ramps
     // PLAYGROUND scope (Ian 2026-07-11): this rehearsal brand lives on a
     // SUBDOMAIN of the real domain, so every derived surface (authDomain,
     // api.playground.omegajs.dev, canonicals) stays clear of the REAL
@@ -92,7 +96,9 @@
     provider: "firebase",
     config: {
       apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
-      authDomain: "playground.omegajs.dev",
+      // firebaseapp.com serves /__/auth/handler; the site domain 404s it on
+      // Pages (found live 2026-07-19) — OAuth popup/redirect needs this host.
+      authDomain: "omegajs-playground.firebaseapp.com",
       projectId: "omegajs-playground",
       storageBucket: "omegajs-playground.firebasestorage.app",
       messagingSenderId: "644778453321",
@@ -138,32 +144,35 @@
       coinbase: { enabled: false },
     },
     products: [
+      // Paperloom-voiced catalog — ids, limits, prices, and processor ids are
+      // UNCHANGED plumbing (the Stripe test products keep their ids; display
+      // copy is the fiction layer).
       {
         id: "basic",
-        name: "Basic",
+        name: "Jotter",
         type: "subscription",
-        tagline: "best for trying OMEGA",
+        tagline: "best for trying Paperloom",
         limits: { requests: 100 },
         features: [
           // definition = the dotted-underline tooltip; author it ONCE per
           // feature id — the pricing composer backfills every other copy
-          { id: "requests", name: "Requests", icon: "wand-magic-sparkles", definition: "API requests per month." },
-          { id: "targets", name: "All four targets", icon: "layer-group", value: true, definition: "Web, backend, desktop, and browser extension from one brand config." },
+          { id: "requests", name: "Saves", icon: "feather", definition: "Notes, clips, and pages you can save per month." },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true, definition: "Web app, writing desk, and browser clipper — one library across all of them." },
         ],
       },
       {
         id: "premium",
-        name: "Premium",
+        name: "Studio",
         type: "subscription",
-        tagline: "best for shipping brands",
+        tagline: "best for daily writers",
         popular: true,
         limits: { requests: 10000 },
         trial: { days: 14 },
         prices: { monthly: 9.99, annually: 99.99 },
         features: [
-          { id: "requests", name: "Requests", icon: "wand-magic-sparkles" },
-          { id: "targets", name: "All four targets", icon: "layer-group", value: true },
-          { id: "support", name: "Priority support", icon: "headset", value: true, definition: "Your tickets jump the queue and reach a real engineer first." },
+          { id: "requests", name: "Saves", icon: "feather" },
+          { id: "targets", name: "Everywhere you write", icon: "layer-group", value: true },
+          { id: "support", name: "Priority support", icon: "headset", value: true, definition: "Your tickets jump the queue and reach a real person first." },
         ],
         stripe: { productId: "prod_UscSf6XFplJRS1" },
         paypal: { productId: null },
@@ -171,12 +180,12 @@
       },
       {
         id: "launch-kit",
-        name: "Launch Kit",
+        name: "Starter Library",
         type: "one-time",
-        tagline: "everything to launch day one",
+        tagline: "templates to begin beautifully",
         prices: { once: 49.99 },
         features: [
-          { id: "templates", name: "Brand templates", icon: "palette", value: 12, definition: "Ready-made brand starter kits included with your license." },
+          { id: "templates", name: "Page templates", icon: "palette", value: 12, definition: "Ready-made page and journal templates included with your license." },
         ],
         stripe: { productId: "prod_UscSbPkRMWy3Yr" },
         chargebee: { itemId: null },

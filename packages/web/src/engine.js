@@ -46,8 +46,10 @@ const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'u
 
 // Consumer PAGE frontmatter is meta-only (Ian's rule, 2026-07-19: content
 // lives in {% section %} calls — and nothing may even TRY to consume it from
-// frontmatter). Enforced, not advisory: a page carrying any other key fails
-// the build with the move-it message. Plumbing keys (layout, permalink,
+// frontmatter). Softened same day (Ian: no build-fail): content keys in a
+// page's own frontmatter are STRIPPED from the data cascade with a warning
+// before resolution — sections/components can never see them, and the build
+// proceeds. Plumbing keys (layout, permalink,
 // tags, pagination — the RESOLVED_OMIT set) are filtered before this check;
 // collections (_posts/_team/…) are content ENTRIES whose frontmatter IS the
 // document, and layouts are theme voice that never renders standalone —
@@ -341,15 +343,21 @@ function configureOmega(eleventyConfig, options) {
     // in frontmatter. readOwnFrontmatter already filters the plumbing set
     // (layout, permalink, tags, pagination…) and returns null for virtual
     // templates (blueprints, showcase) — so anything left outside the allow
-    // set is content in frontmatter, which no longer exists as a lane.
+    // set is content in frontmatter, a lane that doesn't exist: the keys are
+    // deleted from the cascade before resolution (sections/components never
+    // see them) and the build warns. The WHOLE key drops for this page — a
+    // directory-data value merged under the same key falls back to section
+    // defaults too; deleting the frontmatter key (what the warning says)
+    // restores it.
     if (/\/pages\//.test(inputPath)) {
       const own = readOwnFrontmatter(inputPath);
       const contentKeys = own ? Object.keys(own).filter((key) => !PAGE_FRONTMATTER_ALLOW.has(key)) : [];
       if (contentKeys.length) {
-        throw new Error(
-          `[omega] ${inputPath}: frontmatter carries content keys (${contentKeys.join(', ')}) — `
-          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, sitemap, append). `
-          + `Move the content into {% section %} calls in the page body (docs/sections.md).`,
+        for (const key of contentKeys) delete data[key];
+        console.warn(
+          `[omega] ${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
+          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, sitemap, append); `
+          + `content lives in {% section %} calls in the page body (docs/sections.md).`,
         );
       }
     }
@@ -452,12 +460,14 @@ function configureOmega(eleventyConfig, options) {
       // arrays and lets a layout-default object beat a doc scalar — re-apply
       // the template's OWN frontmatter (re-parsed from source) with OUR
       // semantics, so a content entry (_posts/_team/_alternatives docs)
-      // always wins its own keys outright: arrays REPLACE. Pages carry
-      // meta-only frontmatter (guard above), so for them this re-applies
-      // meta/sitemap harmlessly.
+      // always wins its own keys outright: arrays REPLACE. Pages are
+      // meta-only (guard above stripped content keys from the cascade) — this
+      // lane filters to the allow set so nothing stripped re-enters here.
       const own = readOwnFrontmatter(data.page.inputPath);
       if (own) {
+        const isPage = /\/pages\//.test(data.page.inputPath);
         for (const key of Object.keys(own)) {
+          if (isPage && !PAGE_FRONTMATTER_ALLOW.has(key)) continue;
           out[key] = deepMerge(out[key], own[key]);
         }
       }

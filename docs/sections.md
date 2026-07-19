@@ -121,14 +121,18 @@ the consumer's site-wide directory-data lane). Bare ARRAYS bridge as a named arg
 (`{% section "marketing/stats", items: resolved.stats %}`) — an undefined
 named arg keeps the default, so absence semantics survive.
 
-**Consumer page frontmatter is META-ONLY — enforced (Ian 2026-07-19: "not
-only no more frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter")**:
-a real file under `pages/` may carry only `layout`, `permalink`, `meta`,
-`schema`, `theme`, `sitemap`, `append` (+ engine plumbing). Any other key is
-content-in-frontmatter and FAILS the build with a move-it-into-sections
-message (`frontmatter-guard.test.js`). Content lives in the page BODY as
-`{% section %}` calls; site-wide overrides live in directory data; theme
-voice lives in layout frontmatter.
+**Consumer page frontmatter is META-ONLY (Ian 2026-07-19: "not only no more
+frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter"; softened same
+day: no build-fail)**: a real file under `pages/` may carry only `layout`,
+`permalink`, `meta`, `schema`, `theme`, `sitemap`, `append` (+ engine
+plumbing). Any other key is content-in-frontmatter — a lane that doesn't
+exist: the engine STRIPS it from the data cascade before resolution (and the
+collections parity-repair lane filters pages to the same allow set, so
+nothing stripped re-enters through `resolved`), then warns with a
+move-it-into-sections message. Sections/components can never see the values;
+the build proceeds (`frontmatter-guard.test.js`). Content lives in the page
+BODY as `{% section %}` calls; site-wide overrides live in directory data;
+theme voice lives in layout frontmatter.
 
 **Doc-wins parity — collections lane (repaired cp225, rescoped cp235)**:
 Eleventy's own data-cascade merge CONCATS a doc array onto a layout-default

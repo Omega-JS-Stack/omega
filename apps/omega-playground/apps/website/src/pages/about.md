@@ -1,56 +1,54 @@
 ---
-# ═══ Content pass A: the real OMEGA story as a PURE composition (Ian's
-# rule, 2026-07-19: consumer frontmatter carries page meta ONLY — every
-# band's words live inside its own section call). Era labels instead of
-# invented years; no photo band until real photos exist (absence is the
-# spine); the values ARE the project's actual working principles.
+# ═══ Paperloom about page (fiction voice — see index.md header for the
+# 2026-07-19 rebrand rationale). Same bands as before: hero + facts, letter,
+# timeline with era labels, principles, team CTA. Meta-only frontmatter.
 layout: blueprint/about
 permalink: /about
 ---
 
 {% section "about/hero" %}
-headline: "One config should ship <em>every surface</em>"
+headline: "Writing deserves <em>a quiet room</em>"
 headline_accent: ""
-description: "Why {{ site.brand.name }} exists, and the stubborn opinions holding it together."
+description: "Why {{ site.brand.name }} exists, and the small stubborn ideas holding it together."
 facts:
-  - number: "4"
-    label: "Targets"
+  - number: "3"
+    label: "Places to write"
   - number: "1"
-    label: "Config file"
+    label: "Library"
   - number: "2"
-    label: "First-party themes"
+    label: "Moods"
   - number: "100%"
-    label: "Static web output"
+    label: "Yours"
 {% endsection %}
 <!-- ═══ The letter — mission & vision ═══ -->
 {% section "about/letter" %}
 mission:
   title: "Our mission"
-  description: "Make one brand config the whole machine — website, backend, desktop, extension — so builders spend their time on the <em>product</em>, never the plumbing."
+  description: "Give every writer one calm, trustworthy home for their words — capture anywhere, shape it at the desk, publish with pride — so the time goes into the <em>writing</em>, never the filing."
 vision:
   title: "Our vision"
-  description: "A stack where launching your fourth surface is as boring as your first — configure it, compose it, ship it. The machinery <em>disappears</em>; the brand is all anyone sees."
+  description: "A world where no good sentence dies in a lost tab — where your library outlives your devices, your apps, and your worst backup habits. The tools <em>disappear</em>; the pages are all anyone sees."
 {% endsection %}
 <!-- ═══ The journey ═══ -->
 {% section "about/timeline" %}
 superheadline:
   icon: "clock-rotate-left"
   text: "History"
-headline: "Five frameworks became <em>one stack</em>"
-subheadline: "The consolidation that produced {{ site.brand.name }}."
+headline: "Scattered words became <em>one library</em>"
+subheadline: "The small history of {{ site.brand.name }}."
 items:
   - year: "Before"
-    title: "Five managers, one job each"
-    description: "A backend manager, a website manager, a desktop manager, an extension manager, a shared web library — each carried one surface, each solved the same problems its own way"
-  - year: "2026"
-    title: "One stack"
-    description: "The OMEGA monorepo unified them: one config format, one CLI, one section library, shared theming — with every consumer's semantics preserved"
-  - year: "2026"
-    title: "Pages became compositions"
-    description: "The section library landed: every page is composition calls over your data, themes reskin the same content, and a showcase documents every band automatically"
+    title: "Words everywhere, library nowhere"
+    description: "Notes in one app, drafts in another, clippings in bookmarks — every good idea filed somewhere it would never be found again"
+  - year: "The idea"
+    title: "One library"
+    description: "Paperloom began as a single stubborn rule: every word you write lands in the same library, no matter where you wrote it"
+  - year: "The craft"
+    title: "The desk, the page, the clipper"
+    description: "The writing desk for long mornings, the web app for anywhere, the clipper for everything worth keeping — all reading one library"
   - year: "Next"
-    title: "In the open"
-    description: "Published packages, real brands, and the same one-command birth for everyone: npx omega setup"
+    title: "Shelves for everyone"
+    description: "Shared journals, small-press publishing, and a library that grows old gracefully with you"
 {% endsection %}
 <!-- ═══ Principles ═══ -->
 {% section "about/principles" %}
@@ -60,14 +58,14 @@ superheadline:
 headline: "What we <em>refuse</em> to compromise on"
 subheadline: "Four principles, in order. When two collide, the smaller number wins."
 items:
-  - title: "Preserve semantics, replace plumbing"
-    description: "Upgrades never make you relearn your own project. The machinery changes; your contract doesn't."
-  - title: "Absence is the spine"
-    description: "Delete a key and the surface disappears. No dead switches, no zombie config."
-  - title: "Deploys are deliberate"
-    description: "Nothing publishes because you committed. Shipping is a verb you say out loud."
-  - title: "One home per fact"
-    description: "Every value lives in exactly one place — and secrets never live in config."
+  - title: "The library is sacred"
+    description: "Every word lands in one place. No second brains, no sync conflicts, no orphaned drafts."
+  - title: "Capture must be effortless"
+    description: "If saving a thought takes more than a heartbeat, the thought is gone. One keystroke, filed."
+  - title: "Publishing is deliberate"
+    description: "Nothing leaves your library because you hovered somewhere. Sharing is a verb you say out loud."
+  - title: "Your words are yours"
+    description: "Export everything, anytime, in formats that outlive us. Lock-in is a betrayal of writing."
 {% endsection %}
 <!-- ═══ Team CTA ═══ -->
 {% section "marketing/cta" %}

@@ -7,10 +7,13 @@
   github: {
     content: [
       {
+        // Repo NAME is infrastructure (an existing GitHub repo — renaming
+        // would orphan it and mint a duplicate); title/description carry the
+        // Paperloom fiction like every other brand surface.
         name: 'omega-playground-seo-demo',
         template: 'developer-tool',
-        title: 'OMEGA Playground SEO Demo',
-        description: 'Rehearsal SEO repo for the OMEGA stack playground — one brand config, every target: web, backend, desktop, and browser extension.',
+        title: 'Paperloom SEO Demo',
+        description: 'Demo SEO repo for Paperloom — the quiet writing studio: capture from any tab, shape drafts at your desk, and publish pages you are proud of.',
         features: [],
       },
     ],

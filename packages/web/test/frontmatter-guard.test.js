@@ -1,10 +1,11 @@
 /**
  * The meta-only frontmatter guard (Ian's rule, 2026-07-19: "NOTHING EVEN
- * TRIES TO CONSUME FRONTMATTER"): a consumer page carrying content keys in
- * frontmatter FAILS the build with the move-it message — the override lane
- * doesn't silently work or silently no-op, it doesn't exist. Meta keys
- * (meta, sitemap, append) and plumbing (layout, permalink) stay legal, and
- * collection docs (_posts/…) are content entries the guard never touches.
+ * TRIES TO CONSUME FRONTMATTER"; softened same day: no build-fail): content
+ * keys in a consumer page's frontmatter are STRIPPED from the cascade with a
+ * warning — the build succeeds, but sections/components can never see the
+ * values. The override lane doesn't silently work; it doesn't exist. Meta
+ * keys (meta, sitemap, append) and plumbing (layout, permalink) stay legal,
+ * and collection docs (_posts/…) are content entries the guard never touches.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -31,27 +32,28 @@ function makeConsumer(pageFrontmatter) {
   return { tmp, consumerDir };
 }
 
-test('content keys in page frontmatter fail the build with the move-it message', async () => {
+test('content keys in page frontmatter are stripped (never rendered) and warned about', async () => {
   const { tmp, consumerDir } = makeConsumer([
     'hero:',
     '  headline: "Smuggled content"',
     'mission:',
     '  title: "Also smuggled"',
   ]);
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...parts) => warnings.push(parts.join(' '));
   try {
-    await assert.rejects(
-      () => buildSite(consumerDir, bareData, { environment: 'development' }, 'fm-guard-reject'),
-      (err) => {
-        // Eleventy nests the real error: MapPagesError → BaseError → ours.
-        let message = '';
-        for (let e = err; e; e = e.originalError) message += String(e.message || '');
-        assert.ok(/content keys/.test(message), `error names the violation: ${message}`);
-        assert.ok(/hero/.test(message) && /mission/.test(message), 'error lists the offending keys');
-        assert.ok(/section/.test(message), 'error points at section calls as the home');
-        return true;
-      },
-    );
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'fm-guard-strip');
+    const html = pages.get('/');
+    assert.ok(html, 'build succeeds — content keys are inert, not fatal');
+    assert.ok(!html.includes('Smuggled content'), 'frontmatter hero value never reaches the render');
+    assert.ok(!html.includes('Also smuggled'), 'frontmatter mission value never reaches the render');
+    const warning = warnings.find((line) => line.includes('ignoring frontmatter content keys'));
+    assert.ok(warning, `build warns about the stripped keys: ${warnings.join(' | ')}`);
+    assert.ok(/hero/.test(warning) && /mission/.test(warning), 'warning lists the offending keys');
+    assert.ok(/section/.test(warning), 'warning points at section calls as the home');
   } finally {
+    console.warn = originalWarn;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

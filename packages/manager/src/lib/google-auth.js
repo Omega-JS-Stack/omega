@@ -73,8 +73,37 @@ class GoogleOAuth2Client {
 
     fs.mkdirSync(dirname(this.tokenStorePath), { recursive: true });
     // Record the granted scopes — getAccessToken() uses them to decide
-    // whether a cached token can serve a client or needs one re-consent
-    fs.writeFileSync(this.tokenStorePath, JSON.stringify({ ...tokens, scopes: this.scopes }, null, 2));
+    // whether a cached token can serve a client or needs one re-consent.
+    // MERGE over the existing store: refresh-path saves carry only the token
+    // triple and must not drop sidecar fields (account_email).
+    const existing = this.loadStoredTokens() || {};
+    fs.writeFileSync(this.tokenStorePath, JSON.stringify({ ...existing, ...tokens, scopes: this.scopes }, null, 2));
+  }
+
+  /**
+   * Best-effort: which Google account these tokens act as. Cached in the
+   * token store (account_email) after the first userinfo lookup — the
+   * userinfo.email scope is part of GOOGLE_SCOPES. Returns null when
+   * unknowable; diagnostics must never throw over the error they decorate.
+   */
+  async getAccountEmail() {
+    const stored = this.loadStoredTokens();
+    if (stored?.account_email) {
+      return stored.account_email;
+    }
+    try {
+      const token = this.accessToken || await this.getAccessToken();
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.email) {
+        this.saveTokens({ account_email: data.email });
+      }
+      return data.email || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -231,6 +260,9 @@ class GoogleOAuth2Client {
             access_token: this.accessToken,
             refresh_token: this.refreshToken,
             expiry: this.tokenExpiry,
+            // A full re-consent may be a DIFFERENT Google account — the
+            // cached identity is unknown until the next userinfo lookup
+            account_email: null,
           });
 
           res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -354,7 +386,18 @@ class GoogleOAuth2Client {
 
     if (!response.ok) {
       const errorMessage = data.error?.message || JSON.stringify(data);
-      const error = new Error(`Google API Error: ${errorMessage}`);
+      let message = `Google API Error: ${errorMessage}`;
+      // Permission failures are an IDENTITY seam, not a transient fault
+      // (found live 2026-07-19: the manage identity had no role on a
+      // hand-minted project and the raw 403 diagnosed nothing) — name the
+      // acting account and both remedies right in the error.
+      if (response.status === 403 || data.error?.status === 'PERMISSION_DENIED') {
+        const email = await this.getAccountEmail();
+        const project = url.match(/\/projects\/([a-zA-Z0-9-]+)/)?.[1];
+        message += `\n      → acting Google identity: ${email || 'unknown'}${this.tokenStorePath ? ` (token store: ${this.tokenStorePath})` : ''}`;
+        message += `\n      → grant it access${project ? ` — a project owner runs: gcloud projects add-iam-policy-binding ${project} --member=user:${email || '<email>'} --role=roles/owner` : ''} — or delete the token store and rerun interactively to consent as an owning account`;
+      }
+      const error = new Error(message);
       error.details = data.error?.details || null;
       error.status = data.error?.status || response.status;
       throw error;

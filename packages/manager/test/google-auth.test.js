@@ -105,3 +105,86 @@ test('google-auth: saveTokens records the granted scopes', () => {
   assert.deepEqual(written.scopes, GOOGLE_SCOPES);
   assert.equal(written.access_token, 'a');
 });
+
+// ═══ Permission-seam diagnostics (2026-07-19 live find: the manage identity
+// had no role on a hand-minted project and the raw 403 diagnosed nothing) ═══
+
+function stubFetch(response) {
+  const original = global.fetch;
+  global.fetch = async () => ({
+    ok: response.ok,
+    status: response.status,
+    headers: { get: () => null },
+    json: async () => response.body,
+  });
+  return () => { global.fetch = original; };
+}
+
+function cachedStore(extra = {}) {
+  return tmpStore({
+    access_token: 'cached-token',
+    refresh_token: 'r',
+    expiry: Date.now() + 3_600_000,
+    scopes: [...GOOGLE_SCOPES],
+    ...extra,
+  });
+}
+
+test('google-auth: 403s name the acting identity, grant command, and re-consent path', async () => {
+  const storePath = cachedStore({ account_email: 'itw.creative.works@gmail.com' });
+  const restore = stubFetch({
+    ok: false,
+    status: 403,
+    body: { error: { message: 'The caller does not have permission', status: 'PERMISSION_DENIED' } },
+  });
+  try {
+    await assert.rejects(
+      client(storePath).makeRequest('https://cloudbilling.googleapis.com/v1/projects/omegajs/billingInfo'),
+      (err) => {
+        assert.match(err.message, /The caller does not have permission/, 'keeps the raw API message');
+        assert.match(err.message, /acting Google identity: itw\.creative\.works@gmail\.com/, 'names the acting account');
+        assert.ok(err.message.includes(storePath), 'names the token store');
+        assert.ok(
+          err.message.includes('gcloud projects add-iam-policy-binding omegajs --member=user:itw.creative.works@gmail.com --role=roles/owner'),
+          'gives the exact grant command with the project parsed from the URL',
+        );
+        assert.match(err.message, /consent as an owning account/, 'offers the re-consent alternative');
+        assert.equal(err.status, 'PERMISSION_DENIED');
+        return true;
+      },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('google-auth: non-permission errors stay undecorated', async () => {
+  const storePath = cachedStore();
+  const restore = stubFetch({
+    ok: false,
+    status: 400,
+    body: { error: { message: 'Invalid argument', status: 'INVALID_ARGUMENT' } },
+  });
+  try {
+    await assert.rejects(
+      client(storePath).makeRequest('https://firebase.googleapis.com/v1beta1/projects/omegajs'),
+      (err) => {
+        assert.match(err.message, /Invalid argument/);
+        assert.ok(!err.message.includes('acting Google identity'), 'no identity block on non-403s');
+        return true;
+      },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('google-auth: saveTokens merges over the store — refresh saves keep account_email', () => {
+  const storePath = cachedStore({ account_email: 'itw.creative.works@gmail.com' });
+
+  client(storePath).saveTokens({ access_token: 'new-token', refresh_token: 'r', expiry: 456 });
+
+  const written = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+  assert.equal(written.access_token, 'new-token', 'new token written');
+  assert.equal(written.account_email, 'itw.creative.works@gmail.com', 'sidecar identity survives the refresh save');
+});
