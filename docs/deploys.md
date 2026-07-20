@@ -49,6 +49,19 @@ engines treat workflow files as framework-owned overwrites).
 
 Real dispatch deploys refuse `file:` deps via the shared TREE-WIDE guard (`assertNoLocalSpecs` — web additionally refuses any file: dep in the deploying app itself); dry-runs always show the plan. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
 
+## Local frameworks in production artifacts (iterate without publishing)
+
+A brand linked to the local monorepo (`file:` specs) can ship the LOCAL framework code to production — no npm publish involved. This is a supported feature (Ian 2026-07-20: iterate fast on unproven framework changes without burning registry versions). Per target:
+
+| Target | Lane | How the local framework reaches production |
+|---|---|---|
+| backend | `omega deploy` (always direct) | `stage-local-packages`: every `file:` @omega.js dep is `npm pack`ed — the package's REAL prepare runs, so vendoring makes the tarball self-contained — into `functions/omega_modules/*.tgz`; the staged manifest respells to the tarball and the lockfile regenerates, so Cloud Build installs the LOCAL framework verbatim; everything restores after the upload |
+| web | `omega deploy --direct` | the site builds HERE with the linked framework; only built output pushes to gh-pages (the CNAME + purge ride along) |
+| desktop | `npm run package` / `npm run release:local` | webpack bundles the linked framework into the artifact at build time; `release:local` signs + publishes that locally-built artifact |
+| extension | `npm run build` → `packaged/<browser>/` | same — the bundles carry the linked framework; upload the zip (or `OMEGA_IS_PUBLISH=true npm run build`) |
+
+The ONE lane that inherently needs the registry is CI-dispatch builds (web `omega deploy` without `--direct`; extension/desktop CI publish workflows): CI rebuilds from pushed source and cannot install `file:` specs — exactly what the tree-wide guard refuses, pointing back at the lanes above. cp241 made every packed tarball self-contained (vendoring in all six publishables), so the backend staging lane works for ANY linked @omega.js dep.
+
 **Every successful deploy records itself (cp196)**: `deploy.<target>` in the brand's `.omega/state.json` via `@omega.js/devkit/deploy-record` (`recordDeploy`/`readDeployRecord` — brand-root-resolved from any app dir; gitignored, per-machine). The manager's testing service reads it to split **never deployed** (live-URL checks warn with a "run `omega deploy` when ready" nudge) from **deployed but down** (an honest error), and ADOPTS a record when a record-less brand's live URL answers — so fresh clones of long-deployed brands self-heal on their first manage run. Dry-runs never record.
 
 ### Backend: local-package staging
