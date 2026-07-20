@@ -1,33 +1,43 @@
 const BaseTest = require('./base-test');
 const chalk = require('chalk').default;
-const wonderfulVersion = require('wonderful-version');
 
+/**
+ * Local Node vs the pinned Cloud Functions runtime.
+ *
+ * The runtime pin (framework `omega.functionsRuntime`) is what Firebase runs
+ * in the cloud; the laptop only has to meet the framework's dev floor
+ * (`engines.node >=22`). Local OLDER than the runtime warns — the emulator
+ * can't faithfully run runtime-era code. Local NEWER is fine (deploys are
+ * unaffected — Firebase provides the runtime) and gets a dim parity note.
+ * An app pin drifted from the framework runtime is healed by fix().
+ */
 class NodeVersionTest extends BaseTest {
   getName() {
-    return `using at least Node.js v${this.context.packageJSON.engines.node}`;
+    return `Node.js vs pinned Cloud Functions runtime (v${this.context.packageJSON.omega.functionsRuntime})`;
   }
 
   async run() {
-    const engineReqVer = this.context.packageJSON.engines.node;
-    const engineHasVer = this.context.package.engines.node;
-    const processVer = process.versions.node;
+    const runtimeMajor = parseInt(this.context.packageJSON.omega.functionsRuntime, 10);
+    const appPin = parseInt((this.context.package.engines || {}).node, 10);
+    const localVer = process.versions.node;
+    const localMajor = parseInt(localVer, 10);
 
     // #15: a wrong RUNNING Node no longer halts the whole setup — the
     // remaining checks complete and this lands in the summary as a warning
     // (manage runs spawn setup under the app's own .nvmrc Node, so this
     // fires mostly in standalone shells).
-    if (wonderfulVersion.is(processVer, '<', engineReqVer)) {
-      this._warning = `running Node ${processVer} but this project needs ${engineReqVer} — run ${chalk.bold(`nvm use ${engineReqVer}`)}`;
+    if (localMajor < runtimeMajor) {
+      this._warning = `running Node ${localVer} but the pinned Cloud Functions runtime is ${runtimeMajor} — use Node >=${runtimeMajor} (nvm users: ${chalk.bold(`nvm use ${runtimeMajor}`)})`;
       return 'warn';
     }
 
-    // Check if the engine version is less than the required version
-    if (!wonderfulVersion.is(engineHasVer, '===', engineReqVer)) {
-      console.log(chalk.yellow(`You are using Node.js version ${processVer} but this project suggests ${engineReqVer}.`));
+    if (localMajor > runtimeMajor) {
+      console.log(chalk.dim(`  local Node ${localVer} > functions runtime ${runtimeMajor} — deploys unaffected (Firebase provides the runtime); use Node ${runtimeMajor} locally for exact emulator parity`));
     }
 
-    // Return
-    return wonderfulVersion.is(engineHasVer, '>=', engineReqVer);
+    // App pin must match the framework's runtime — drift (or a missing pin)
+    // heals via fix(), keeping the staged functions manifest correct.
+    return appPin === runtimeMajor;
   }
 
   getWarning() {
@@ -35,7 +45,15 @@ class NodeVersionTest extends BaseTest {
   }
 
   async fix() {
-    throw new Error('Please manually fix your outdated Node.js version (either .nvmrc or package.json engines.node).');
+    const runtime = String(parseInt(this.context.packageJSON.omega.functionsRuntime, 10));
+
+    const app = this.readAppManifest();
+    app.engines = app.engines || {};
+    app.engines.node = runtime;
+    this.writeAppManifest();
+    this.restage();
+
+    console.log(chalk.yellow(`engines.node restamped to ${runtime} (the pinned Cloud Functions runtime)`));
   }
 }
 

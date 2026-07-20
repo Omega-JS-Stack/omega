@@ -116,7 +116,7 @@ module.exports = {
           return;
         }
 
-        const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+        const { brandRepoOwner, brandRepoName } = require('../../helpers/shared-config.js');
         if (!brandRepoOwner(config) || !brandRepoName(config)) {
           assert.fail('github repo not resolvable (github.repo slug or github.org + brand.id)');
           return;

@@ -38,14 +38,14 @@ In a brand's website app, `omega dev --local` runs the full local-mode prelude b
 
 1. **Resolve the monorepo** — `OMEGA_MONOREPO` env override → self-location (works whenever the running framework is linked from the monorepo, or the consumer lives inside it) → `~/Developer/Repositories/Omega/omega`.
 2. **Find the brand root** — walk up from cwd to the first directory with both a `package.json` and `apps/<name>/package.json` (the Omega monorepo itself never counts); standalone apps resolve to themselves.
-3. **Link brand-wide** — for every app (brand root + `apps/*`), every `@omega.js/*` dependency (including backend apps' `functions/package.json`) is `npm install <monorepo path>`-ed, flipping its spec to `file:` and symlinking it. **Idempotent**: deps already resolving to the monorepo copy are skipped (resolution walks up node_modules, so npm-workspace hoisting is handled).
+3. **Link brand-wide** — for every app (brand root + `apps/*`), every `@omega.js/*` dependency in the ONE app-root manifest (src/dist pillar — a backend's `functions/` is staged output and carries no authored manifest) is flipped to a `file:` spec and installed. **Idempotent**: deps already resolving to the monorepo copy are skipped (resolution walks up node_modules, so npm-workspace hoisting is handled), and an already-correct committed `file:` spec is never rewritten. **Transactional**: an install failure restores every flipped manifest to its pre-link spec.
 4. **Start the monorepo watch** — spawned as a session-scoped child (dies with the dev server; the lock prevents doubles). Watch output streams into the dev log under a `[watch]` prefix.
 
 Then the standard `omega dev` loop runs. Result: edit any framework's `src/` and the consumer picks it up live — no N windows, no N × `mgr i local`.
 
 ## Per-app linking: `mgr i local`
 
-Unchanged contract for consumers, now monorepo-backed: `mgr i local` (web, desktop, extension — web gained its install command in cp194) and `mgr i local` / `mgr install --local` (backend) call the same `linkLocalPackages()`. Backend links where the dep is declared (`functions/package.json`) regardless of where `mgr` was invoked. `mgr i live/prod` still installs from the registry and is untouched.
+Unchanged contract for consumers, now monorepo-backed: `mgr i local` (web, desktop, extension — web gained its install command in cp194) and `mgr i local` / `mgr install --local` (backend) call the same `linkLocalPackages()`. Backend links its app-root manifest like every other target (`functions/` is staged output; the CLI normalizes a `functions/` cwd up to the app root). `mgr i live/prod` still installs from the registry and is untouched.
 
 **Linking is brand-tree-wide by construction (cp194):** npm resolves the WHOLE workspace tree on any install anchored in a brand monorepo, so linking one app while a sibling still carries an unpublished registry spec (`@omega.js/backend: *`) 404s before anything links — only reachable in a brand OUTSIDE the omega monorepo, the real consumer topology. `linkLocalPackages()` therefore flips every app's `@omega.js/*` specs to `file:` first (dev/prod placement preserved; specs computed from REAL paths so symlinked/aliased dirs can't dangle), then runs ONE `npm install` for the tree. One call from any app links the whole brand; reruns all-skip.
 

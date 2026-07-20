@@ -50,6 +50,7 @@
     }
   },
   "omega": {
+    "nodeRuntime": "22",
     "vendorAssets": [
       {
         "package": "@omega.js/web",
@@ -72,7 +73,7 @@
     "test": "npx omega test"
   },
   "engines": {
-    "node": "22"
+    "node": ">=22"
   },
   "keywords": [
     "omega",

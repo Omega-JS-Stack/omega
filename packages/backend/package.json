@@ -8,7 +8,6 @@
     "bin/",
     "dist/",
     "docs/",
-    "src/",
     "templates/",
     "test/",
     "CLAUDE.md",
@@ -24,11 +23,13 @@
     "start": "npm run prepare:watch",
     "test": "node src/test/parse-audit.js && node bin/omega-backend test",
     "prepare": "node -e \"require('prepare-package')()\"",
-    "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "prepublishOnly": "node -e \"['src', 'dist'].forEach((d) => ['/node_modules', '/functions/node_modules'].forEach((n) => require('fs').rmSync(d + '/test/fixtures/firebase-project' + n, { recursive: true, force: true })))\""
+    "prepare:watch": "node -e \"require('prepare-package/watch')()\""
   },
   "engines": {
-    "node": "22"
+    "node": ">=22"
+  },
+  "omega": {
+    "functionsRuntime": "22"
   },
   "projectScripts": {
     "start": "npx omega setup && npx omega serve",

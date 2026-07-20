@@ -59,7 +59,7 @@ Context fields: `assistant`, `user` (resolved user), `data` (raw request data), 
 A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the declarative walk. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects — both engines run the SAME field pipeline (`src/manager/helpers/schema-engine.js`), so wire shapes are identical either way (proven by `test/helpers/schema-zod.js`). Build with the `fields` helpers for the shared semantics (coerce-never-reject, min/max clamp/truncate, `required` fires on `undefined`/`''`, unknown keys stripped):
 
 ```javascript
-const { fields: f } = require('@omega.js/backend/src/manager/helpers/schema-zod.js'); // framework schemas use a relative path
+const { fields: f } = require('@omega.js/backend/dist/manager/helpers/schema-zod.js'); // framework schemas use a relative path
 
 module.exports = ({ user }) => f.object({
   name: f.string({ default: undefined, required: true }),

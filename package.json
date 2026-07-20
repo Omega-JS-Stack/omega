@@ -5,7 +5,6 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "spikes/*",
     "apps/*"
   ],
   "engines": {
@@ -13,11 +12,12 @@
   },
   "scripts": {
     "start": "node scripts/watch-all.js",
-    "test": "node scripts/test-workspaces.js && npm run test:corpus && npm run test:e2e && node scripts/e2e-journey.js",
-    "test:packages": "node scripts/test-workspaces.js",
+    "test": "npm run test:packages && npm run test:corpus && npm run test:e2e && node scripts/e2e-journey.js",
+    "test:packages": "node --test scripts/*.test.js && node scripts/test-workspaces.js",
     "test:corpus": "node scripts/corpus-shapes.js && npm run test:backend -w sandbox-brand",
     "test:e2e": "npm run test -w sandbox-brand",
-    "test:journey": "node scripts/e2e-journey.js"
+    "test:journey": "node scripts/e2e-journey.js",
+    "release:check": "node scripts/release-check.js"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

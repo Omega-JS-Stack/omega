@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
-const { deployViaDispatch } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, assertNoLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 
 const logger = new Logger('omega:deploy');
 
@@ -149,10 +149,15 @@ module.exports = async function (options) {
   }
 
   // Check for local packages — real deploys only; a dry-run publishes
-  // nothing, so it may always show the plan
+  // nothing, so it may always show the plan. Two layers: any file: dep in
+  // THIS app (non-@omega.js included), then the tree-wide @omega.js guard —
+  // a linked SIBLING app breaks the same CI install (cp194).
   const allDeps = JSON.stringify(project.dependencies || {}) + JSON.stringify(project.devDependencies || {});
   if (!dryRun && allDeps.includes('file:')) {
     throw new Error('Please remove local packages before deploying!');
+  }
+  if (!dryRun) {
+    assertNoLocalSpecs({ dir: process.cwd() });
   }
 
   if (options.local) {
@@ -163,7 +168,7 @@ module.exports = async function (options) {
 
   if (!dryRun && options.sync !== false) {
     logger.log('Syncing (commit + push — publishes nothing by itself)...');
-    execSync(`npu sync --message='Deploy'`, { stdio: 'inherit' });
+    syncWorkingTree({ message: 'Deploy', logger });
   }
 
   const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });

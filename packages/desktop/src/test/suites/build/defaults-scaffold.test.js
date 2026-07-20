@@ -34,9 +34,9 @@ module.exports = {
         // `_`-prefixed FILENAMES are not archives — test/_init.js ships.
         ctx.expect(jetpack.exists(path.join(tmp, 'test', '_init.js'))).toBeTruthy();
 
-        // Workflow rendered with @omega.js/desktop's engines.node; GitHub's `${{ }}` tokens survive.
+        // Workflow rendered with @omega.js/desktop's pinned nodeRuntime; GitHub's `${{ }}` tokens survive.
         const workflow = jetpack.read(path.join(tmp, '.github', 'workflows', 'build.yml'));
-        ctx.expect(workflow).toContain(String(package.engines.node));
+        ctx.expect(workflow).toContain(String(package.omega.nodeRuntime));
         ctx.expect(workflow.includes('{{ versions')).toBe(false);
       },
     },

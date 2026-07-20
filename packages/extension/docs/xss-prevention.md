@@ -92,4 +92,4 @@ Safe by context (regardless of value):
 
 - [components.md](components.md) — component architecture (where these strings get rendered)
 - [common-mistakes.md](common-mistakes.md) — the local-helper violation is mistake #1
-- `@omega.js/client/src/modules/utilities.js` — the `escapeHTML` / `sanitizeURL` implementations
+- `@omega.js/client/dist/modules/utilities.js` — the `escapeHTML` / `sanitizeURL` implementations

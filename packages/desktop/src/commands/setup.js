@@ -180,8 +180,8 @@ async function updateManager() {
 }
 
 // Resolve the required Node major for the consumer's installed electron version by hitting
-// the official electron releases feed. Falls back to @omega.js/desktop's own engines.node if the network is
-// down or the electron version can't be resolved.
+// the official electron releases feed. Falls back to @omega.js/desktop's pinned runtime
+// (omega.nodeRuntime) if the network is down or the electron version can't be resolved.
 async function resolveRequiredNodeMajor() {
   // Look at the consumer's electron version FIRST (peer dep), then fall back to @omega.js/desktop's pin.
   const consumerElectron = project?.devDependencies?.electron || project?.dependencies?.electron || package?.peerDependencies?.electron;
@@ -192,8 +192,9 @@ async function resolveRequiredNodeMajor() {
       if (node) return node;
     } catch (e) { /* fall through to static value */ }
   }
-  // Fallback: @omega.js/desktop's package.json engines.node (last-known-good).
-  return version.clean(package.engines.node).split('.')[0];
+  // Fallback: @omega.js/desktop's pinned runtime (last-known-good; engines.node is
+  // the honest dev floor `>=22`, not a version).
+  return version.clean(package.omega.nodeRuntime).split('.')[0];
 }
 
 async function ensureNodeVersion(requiredMajor) {
@@ -276,10 +277,11 @@ async function copyDefaults(targetDir) {
   }
 
   // Template substitution context — `{{ versions.node }}` etc. resolved at scaffold time.
-  // Source of truth is @omega.js/desktop's own package.json `engines` block. @omega.js/desktop auto-syncs `engines.node`
-  // to whatever Electron's bundled Node version is via scripts/sync-nvmrc.js, so consumers'
-  // workflows track Electron-Node automatically without manual bumps.
-  const templateContext = { versions: package.engines || {} };
+  // Source of truth is @omega.js/desktop's pinned `omega.nodeRuntime` (the Electron-bundled
+  // Node major; consumers' .nvmrc additionally self-syncs from the live Electron feed via
+  // scripts/sync-nvmrc.js). `engines.node` is deliberately NOT used here — it's the honest
+  // dev floor (`>=22`), not a renderable version.
+  const templateContext = { versions: { ...(package.engines || {}), node: package.omega.nodeRuntime } };
 
   // Scaffolding runs through the shared devkit engine (vendored at prepare time).
   // Engine built-ins cover @omega.js/desktop's structural rules: `_.` renames (`_.env` → `.env`),

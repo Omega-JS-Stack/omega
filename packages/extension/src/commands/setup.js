@@ -137,7 +137,7 @@ async function updateManager() {
 
 async function ensureNodeVersion() {
   const installedVersion = version.clean(process.version);
-  const requiredVersion = version.clean(package.engines.node);
+  const requiredVersion = version.clean(package.omega.nodeRuntime);
   const isUpToDate = version.is(installedVersion, '>=', requiredVersion);
 
   // Log

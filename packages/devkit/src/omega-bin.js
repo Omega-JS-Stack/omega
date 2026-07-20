@@ -44,10 +44,14 @@ function readPackage(dir) {
   }
 }
 
-function frameworkOf(pkg) {
-  if (!pkg) return null;
+function frameworksOf(pkg) {
+  if (!pkg) return [];
   const declared = Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {});
-  return FRAMEWORKS.find((name) => declared[name]) || null;
+  return FRAMEWORKS.filter((name) => declared[name]);
+}
+
+function frameworkOf(pkg) {
+  return frameworksOf(pkg)[0] || null;
 }
 
 /**
@@ -82,7 +86,13 @@ function isBrandRoot(dir) {
 function findTarget(startDir) {
   let dir = path.resolve(startDir);
   while (true) {
-    const own = frameworkOf(readPackage(dir));
+    const matches = frameworksOf(readPackage(dir));
+    if (matches.length > 1) {
+      // Apps are one-framework-per-app by design — a multi-framework
+      // manifest dispatches by FRAMEWORKS order, which must never be silent.
+      console.error(`omega: ${dir} declares ${matches.length} frameworks (${matches.join(', ')}) — dispatching ${matches[0]}`);
+    }
+    const own = matches[0] || null;
     if (own) return { kind: 'framework', name: own, dir };
 
     if (isBrandRoot(dir)) {

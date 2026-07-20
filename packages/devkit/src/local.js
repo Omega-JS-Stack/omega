@@ -274,6 +274,17 @@ async function linkLocalPackages(options) {
   const installRoot = findBrandRoot(dir);
   let installNeeded = false;
 
+  // Manifest snapshots for rollback: every spec flips BEFORE the single
+  // install, so an install failure must restore the originals — a
+  // half-flipped tree is a quiet git-dirty diff someone could commit.
+  const manifestBackups = new Map();
+  const backupManifest = (appDir) => {
+    const manifestPath = path.join(appDir, 'package.json');
+    if (!manifestBackups.has(manifestPath)) {
+      manifestBackups.set(manifestPath, fs.readFileSync(manifestPath, 'utf8'));
+    }
+  };
+
   for (const appDir of discoverApps(installRoot)) {
     for (const entry of frameworkPackagesOf(appDir)) {
       const target = packageDir(monorepoRoot, entry.name);
@@ -290,17 +301,36 @@ async function linkLocalPackages(options) {
         continue;
       }
 
+      const spec = `file:${relativeSpecPath(entry.dir, target)}`;
+      if (entry.spec === spec) {
+        // Spec already correct, only the install is missing — no rewrite,
+        // so a committed relative spec is never churned to a new layout.
+        actions.push({ name: entry.name, dir: entry.dir, target, action: 'link' });
+        logger && logger.log(`${entry.name}: spec already file: — installing`);
+        installNeeded = true;
+        continue;
+      }
+
       actions.push({ name: entry.name, dir: entry.dir, target, action: 'link' });
       logger && logger.log(`${entry.name}: linking → ${target}`);
       installNeeded = true;
       if (!dryRun) {
-        setDependencySpec(entry.dir, entry.name, entry.dev, `file:${relativeSpecPath(entry.dir, target)}`);
+        backupManifest(entry.dir);
+        setDependencySpec(entry.dir, entry.name, entry.dev, spec);
       }
     }
   }
 
   if (installNeeded && !dryRun) {
-    await safeInstall('npm install', { log: true, config: { cwd: installRoot } });
+    try {
+      await safeInstall('npm install', { log: true, config: { cwd: installRoot } });
+    } catch (error) {
+      for (const [manifestPath, contents] of manifestBackups) {
+        fs.writeFileSync(manifestPath, contents);
+      }
+      logger && logger.warn(`install failed — restored ${manifestBackups.size} manifest(s) to their pre-link specs`);
+      throw error;
+    }
   }
 
   return actions;
@@ -402,18 +432,23 @@ function startMonorepoWatch(options) {
 
 /**
  * Propagate vendored shared-package edits to the frameworks that embed them:
- * watch each vendorable package's src/ and re-run `npm run prepare` in every
- * dependent when one changes. A framework's own prepare:watch only sees its
- * OWN src, while the devkit/config/account copies inside its dist/vendor/*
- * refresh only on a full prepare — without this, a shared-package edit strands
- * every dist-running framework on stale vendored code until a manual rebuild.
- * Edits inside the debounce window fold into one pass; edits landing mid-pass
- * queue exactly one follow-up pass. A dependent's prepare failing is logged
- * and never stops the rest of the pass.
+ * watch each vendorable package's src/ and re-run `npm run prepare` in the
+ * dependents that actually vendor a changed package. A framework's own
+ * prepare:watch only sees its OWN src, while the devkit/config/account copies
+ * inside its dist/vendor/* refresh only on a full prepare — without this, a
+ * shared-package edit strands every dist-running framework on stale vendored
+ * code until a manual rebuild.
+ *
+ * Each pass is SCOPED (a dependent whose dist/vendor lacks every changed
+ * package is skipped; a dependent with no vendor tree yet always runs — first
+ * build) and CONCURRENT (independent prepares, no ordering contract). Edits
+ * inside the debounce window fold into one pass; edits landing mid-pass queue
+ * exactly one follow-up pass. A dependent's prepare failing is logged and
+ * never stops the rest of the pass.
  * @param {object} options
  * @param {string} options.packagesDir - The monorepo's packages/ directory.
  * @param {string[]} options.packages - Vendorable package dir names to watch (missing src/ dirs are skipped).
- * @param {Array<{name: string, dir: string}>} options.dependents - Packages to re-prepare, in order.
+ * @param {Array<{name: string, dir: string}>} options.dependents - Packages eligible for re-prepare.
  * @param {function} [options.runPrepare] - (dependent) => Promise; defaults to spawning `npm run prepare` in dependent.dir.
  * @param {function} [options.log] - Line logger (silent when omitted).
  * @param {number} [options.debounceMs] - Quiet window before a pass (default 400).
@@ -456,19 +491,27 @@ function startVendorPropagation(options) {
     running = true;
     do {
       pending = false;
-      log(`${[...dirty].join(', ')} changed — re-preparing ${dependents.map((d) => d.name).join(', ')}`);
+      const changed = [...dirty];
       dirty.clear();
 
-      for (const dependent of dependents) {
-        if (closed) {
-          break;
-        }
-        try {
-          await runPrepare(dependent);
-        } catch (error) {
-          log(`prepare failed in ${dependent.name}: ${error.message}`);
-        }
+      // Scope: skip dependents whose dist/vendor embeds none of the changed
+      // packages (a missing vendor tree means not-yet-prepared — always run)
+      const affected = dependents.filter((dependent) => {
+        const vendorRoot = path.join(dependent.dir, 'dist', 'vendor');
+        return !fs.existsSync(vendorRoot)
+          || changed.some((name) => fs.existsSync(path.join(vendorRoot, name)));
+      });
+      const skipped = dependents.length - affected.length;
+      log(`${changed.join(', ')} changed — re-preparing ${affected.map((d) => d.name).join(', ') || '(none)'}${skipped > 0 ? ` (${skipped} unaffected)` : ''}`);
+
+      if (closed) {
+        break;
       }
+      await Promise.all(affected.map((dependent) =>
+        Promise.resolve()
+          .then(() => runPrepare(dependent))
+          .catch((error) => log(`prepare failed in ${dependent.name}: ${error.message}`))
+      ));
     } while (pending && !closed);
     running = false;
   };

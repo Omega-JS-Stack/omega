@@ -115,7 +115,7 @@ module.exports = {
       skip: !process.env.GH_TOKEN ? 'GH_TOKEN env var not set' : false,
 
       async run({ assert, state, config }) {
-        const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+        const { brandRepoOwner, brandRepoName } = require('../../helpers/shared-config.js');
         if (!brandRepoOwner(config) || !brandRepoName(config)) {
           assert.fail('github repo not resolvable (github.repo slug or github.org + brand.id)');
           return;

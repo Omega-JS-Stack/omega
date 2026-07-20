@@ -10,9 +10,11 @@ const omegaConfig = require('@omega.js/config');
 // Rules-marker regex shared with the rules setup tests (used by getRulesFile)
 const { omegaAllRulesRegex } = require('./setup-tests/helpers.js');
 
-// The framework's own manifest — its engines.node is the pinned Cloud
-// Functions runtime every consumer app inherits (SSOT with the .nvmrc
-// lockstep in setup-tests/nvmrc-version.js)
+// The framework's own manifest — its `omega.functionsRuntime` is the pinned
+// Cloud Functions runtime every consumer app inherits (SSOT with the .nvmrc
+// lockstep in setup-tests/nvmrc-version.js). Deliberately decoupled from
+// `engines.node`, which is the honest DEV floor (`>=22`): the cloud runtime
+// is Firebase's to provide, the laptop only has to meet the floor.
 const frameworkPackage = require('../../../package.json');
 
 class SetupCommand extends BaseCommand {
@@ -231,7 +233,7 @@ class SetupCommand extends BaseCommand {
     // an ambient-24 setup stamped 24 against the v22/* .nvmrc and boot died
     // on the Manager.init version mismatch)
     if (!self.package.engines || !self.package.engines.node) {
-      const nodeVer = String(parseInt(frameworkPackage.engines.node, 10));
+      const nodeVer = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
       self.package.engines = self.package.engines || {};
       self.package.engines.node = nodeVer;
       jetpack.write(`${self.firebaseProjectPath}/package.json`, JSON.stringify(self.package, null, 2));

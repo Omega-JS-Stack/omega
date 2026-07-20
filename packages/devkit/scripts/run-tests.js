@@ -19,6 +19,27 @@ const PKG = path.join(__dirname, '..');
 const TEST_DIR = path.join(PKG, 'test');
 const ISOLATED = 'e2e-harness.test.js';
 
+// Sweep dead-pid .temp dirs from prior runs (fixtures are per-pid, e.g.
+// defaults-engine-<pid>) so passing runs don't accumulate junk forever.
+// Files (flake-evidence logs) are kept — they're the point of .temp.
+const TEMP_DIR = path.join(PKG, '.temp');
+if (fs.existsSync(TEMP_DIR)) {
+  for (const entry of fs.readdirSync(TEMP_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const match = entry.name.match(/-(\d+)$/);
+    if (!match) continue;
+    let alive = true;
+    try {
+      process.kill(parseInt(match[1], 10), 0);
+    } catch (e) {
+      alive = false;
+    }
+    if (!alive) {
+      fs.rmSync(path.join(TEMP_DIR, entry.name), { recursive: true, force: true });
+    }
+  }
+}
+
 // Forward any extra args (e.g. --test-name-pattern) to every pass
 const extraArgs = process.argv.slice(2);
 

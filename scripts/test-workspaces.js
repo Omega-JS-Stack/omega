@@ -17,7 +17,11 @@ const ROOT = path.join(__dirname, '..');
 const rootPackage = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
 // Workspace globs are the simple `<dir>/*` kind — expand directly.
-const workspaceDirs = (rootPackage.workspaces || []).flatMap((pattern) => {
+// packages/* ONLY: the apps/* workspaces are covered by the root chain's own
+// dedicated stages (sandbox e2e via test:e2e, its backend corpus via
+// test:corpus) — expanding them here ran the heaviest cross-stack e2e twice
+// per root `npm test`.
+const workspaceDirs = (rootPackage.workspaces || []).filter((pattern) => pattern.startsWith('packages/')).flatMap((pattern) => {
   const base = pattern.replace(/\/\*$/, '');
   const parent = path.join(ROOT, base);
   if (!fs.existsSync(parent)) return [];

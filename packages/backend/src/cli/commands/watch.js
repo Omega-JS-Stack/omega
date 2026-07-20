@@ -41,6 +41,13 @@ class WatchCommand extends BaseCommand {
       return null;
     }
 
+    // Registry installs ship dist/ only — the framework hot-reload watch is a
+    // linked-framework dev convenience, meaningless without src/
+    if (!jetpack.exists(config.bemSrcDir)) {
+      this.log(chalk.gray('  (@omega.js/backend framework watch skipped — no src/ in a registry install)\n'));
+      return null;
+    }
+
     this.log(chalk.gray(`  @omega.js/backend watch: ${config.bemSrcDir}\n`));
 
     // Create trigger file if it doesn't exist
@@ -87,6 +94,12 @@ class WatchCommand extends BaseCommand {
     if (!nodemonPath) {
       this.logWarning('\n  Warning: nodemon is not installed globally.');
       this.log(chalk.gray('  Install it with: npm install -g nodemon\n'));
+      return;
+    }
+
+    // Same registry-install guard as the background lane
+    if (!jetpack.exists(config.bemSrcDir)) {
+      this.log(chalk.gray('\n  (@omega.js/backend framework watch skipped — no src/ in a registry install)\n'));
       return;
     }
 

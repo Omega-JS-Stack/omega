@@ -104,7 +104,7 @@ user.subscription.status === 'suspended'
 `User.resolveSubscription(account)` is a static method on the User helper that derives calculated subscription fields from raw account data. It returns only fields that require derivation logic — raw data (product.id, status, trial, cancellation) lives on the account object directly.
 
 ```javascript
-const User = require('@omega.js/backend/src/manager/helpers/user');
+const User = require('@omega.js/backend/dist/manager/helpers/user');
 
 const resolved = User.resolveSubscription(account);
 // Returns: { plan, active, trialing, cancelling }

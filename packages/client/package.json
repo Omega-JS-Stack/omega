@@ -6,7 +6,6 @@
   "main": "dist/index.js",
   "files": [
     "dist/",
-    "src/",
     "docs/",
     "CLAUDE.md"
   ],
@@ -23,7 +22,7 @@
     "prepare:watch": "node -e \"require('prepare-package/watch')()\""
   },
   "engines": {
-    "node": ">=12"
+    "node": ">=22"
   },
   "keywords": [
     "omega",

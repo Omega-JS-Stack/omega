@@ -1073,7 +1073,7 @@ user.subscription.status === 'suspended'
 Static method on the `User` helper that derives calculated subscription fields. Returns only fields that require derivation logic — raw data lives on the account object directly.
 
 ```javascript
-const User = require('@omega.js/backend/src/manager/helpers/user');
+const User = require('@omega.js/backend/dist/manager/helpers/user');
 
 const resolved = User.resolveSubscription(account);
 // Returns: { plan, active, trialing, cancelling }

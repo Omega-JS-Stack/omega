@@ -9,7 +9,10 @@
  * Cloud Functions and laptops share the code path; locally the token can
  * still come from `gh auth token`).
  */
-const { execSync } = require('node:child_process');
+const path = require('node:path');
+const { execSync, execFileSync } = require('node:child_process');
+
+const { findBrandRoot, discoverApps, frameworkPackagesOf } = require('./local.js');
 
 const API_BASE = 'https://api.github.com';
 
@@ -163,6 +166,72 @@ async function deployViaDispatch(options) {
   return { plan, dispatched: true };
 }
 
+/**
+ * Refuse a CI-dispatch deploy while ANY app in the brand tree carries a
+ * `file:` @omega.js spec. npm resolves the WHOLE workspace tree on the CI
+ * runner, so one linked sibling app breaks the install even when the
+ * deploying app is clean (the cp194 lesson — linking is tree-wide, so the
+ * guard is too). Direct/local deploy lanes never call this: they build
+ * locally and push output only, where file: packages are the whole point.
+ * @param {object} [options]
+ * @param {string} [options.dir] - Any directory inside the brand (default cwd).
+ * @throws {Error} Listing every file:-spec'd @omega.js dependency, per app.
+ */
+function assertNoLocalSpecs(options = {}) {
+  const brandRoot = findBrandRoot(options.dir || process.cwd());
+  const offenders = [];
+
+  for (const appDir of discoverApps(brandRoot)) {
+    for (const entry of frameworkPackagesOf(appDir)) {
+      if (entry.spec.startsWith('file:')) {
+        const manifest = path.relative(brandRoot, path.join(appDir, 'package.json')) || 'package.json';
+        offenders.push(`${manifest} → ${entry.name}: ${entry.spec}`);
+      }
+    }
+  }
+
+  if (offenders.length > 0) {
+    throw new Error(
+      'Local file: packages are linked somewhere in this brand — CI cannot install them.\n'
+      + `  ${offenders.join('\n  ')}\n`
+      + 'Local-era brands deploy with --direct (build here, push output); publish-era brands restore registry specs first.'
+    );
+  }
+}
+
+/**
+ * Commit + push the working tree before a dispatch deploy (D13: the push
+ * itself triggers NOTHING — scaffolded workflows carry no push triggers).
+ * Plain git via argument arrays: universal on consumer machines and
+ * injection-safe for the message.
+ * @param {object} [options]
+ * @param {string} [options.cwd] - Repo directory (default process.cwd()).
+ * @param {string} [options.message] - Commit message (default 'Deploy').
+ * @param {object} [options.logger] - Logger with log (silent when omitted).
+ */
+function syncWorkingTree(options = {}) {
+  const cwd = options.cwd || process.cwd();
+  const message = options.message || 'Deploy';
+
+  execFileSync('git', ['add', '-A'], { cwd, stdio: 'inherit' });
+
+  // `git diff --cached --quiet` exits 1 exactly when something is staged
+  let hasStaged = false;
+  try {
+    execFileSync('git', ['diff', '--cached', '--quiet'], { cwd, stdio: 'ignore' });
+  } catch (e) {
+    hasStaged = true;
+  }
+
+  if (hasStaged) {
+    execFileSync('git', ['commit', '-m', message], { cwd, stdio: 'inherit' });
+  } else if (options.logger) {
+    options.logger.log('Working tree clean — nothing to commit');
+  }
+
+  execFileSync('git', ['push'], { cwd, stdio: 'inherit' });
+}
+
 module.exports = {
   parseRemoteUrl,
   resolveRepo,
@@ -170,4 +239,6 @@ module.exports = {
   buildDispatch,
   dispatchWorkflow,
   deployViaDispatch,
+  assertNoLocalSpecs,
+  syncWorkingTree,
 };

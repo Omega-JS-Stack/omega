@@ -11,7 +11,7 @@
  * only writer is the legacy-contact import script, which hasn't ported —
  * the field rides that port.
  */
-const { FIELDS, SEGMENTS } = require('@omega.js/backend/src/manager/libraries/email/constants.js');
+const { FIELDS, SEGMENTS } = require('@omega.js/backend/dist/manager/libraries/email/constants.js');
 
 // Array shapes for handlers that iterate
 const BEM_FIELDS = Object.entries(FIELDS).map(([name, field]) => ({

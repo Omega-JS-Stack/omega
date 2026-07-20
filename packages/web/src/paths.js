@@ -26,7 +26,7 @@ function resolveClientEntry() {
   try {
     return require.resolve('@omega.js/client');
   } catch (error) {
-    throw new Error('Could not resolve the @omega.js/client client package — reinstall @omega.js/web (npu install) and retry');
+    throw new Error('Could not resolve the @omega.js/client client package — reinstall @omega.js/web (npm install) and retry');
   }
 }
 

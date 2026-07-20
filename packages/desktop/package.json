@@ -58,6 +58,7 @@
     }
   },
   "omega": {
+    "nodeRuntime": "24",
     "vendorAssets": [
       {
         "package": "@omega.js/web",
@@ -75,7 +76,6 @@
     "start": "npm run prepare:watch",
     "prepare": "node -e \"require('prepare-package')()\"",
     "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
-    "postinstall": "node scripts/sync-nvmrc.js",
     "test": "node ./bin/omega-desktop test"
   },
   "projectScripts": {
@@ -92,7 +92,7 @@
     "electron": "electron ."
   },
   "engines": {
-    "node": "24"
+    "node": ">=22"
   },
   "keywords": [
     "omega",

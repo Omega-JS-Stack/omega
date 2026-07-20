@@ -56,12 +56,6 @@ jobs:
       - name: web suite (engine core + real-layout ports + asset pipeline/ESM boot + CLI/scaffold + migrate codemod/lint + theme contract vs real Eleventy 3)
         run: npm test --workspace=packages/web
 
-      - name: bakeoff-shared suite (corpus generator)
-        run: npm test --workspace=spikes/bakeoff-shared
-
-      - name: bakeoff-astro suite (retained reference implementation vs real Astro 5)
-        run: npm test --workspace=spikes/bakeoff-astro
-
       - name: client suite
         run: npm test --workspace=packages/client
 

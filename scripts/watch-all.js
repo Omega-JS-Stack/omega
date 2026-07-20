@@ -58,10 +58,14 @@ function main() {
   console.log(`Watching ${watchable.length} packages (src→dist): ${watchable.map(({ name }) => name).join(', ')}`);
 
   let shuttingDown = false;
-  const children = [];
-  for (const { name, dir } of watchable) {
+  const children = new Set();
+  const MAX_RESPAWNS = 3;
+
+  // A watch exiting is abnormal. A silently-dead watch serves stale dist for
+  // the rest of the session, so respawn it (bounded) instead of just noting it.
+  const startWatch = ({ name, dir }, respawns = 0) => {
     const child = spawn('npm', ['run', 'prepare:watch'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
-    children.push(child);
+    children.add(child);
 
     const prefix = `[${name.padEnd(pad)}]`;
     const forward = (stream, log) => {
@@ -77,12 +81,22 @@ function main() {
     forward(child.stdout, console.log);
     forward(child.stderr, console.error);
 
-    // A watch exiting is abnormal — announce it loudly but keep the others alive
     child.on('exit', (code, signal) => {
-      if (!shuttingDown) {
-        console.error(`${prefix} watch exited (${signal || `code ${code}`}) — restart with npm start`);
+      children.delete(child);
+      if (shuttingDown) {
+        return;
+      }
+      if (respawns < MAX_RESPAWNS) {
+        console.error(`${prefix} watch exited (${signal || `code ${code}`}) — respawning (${respawns + 1}/${MAX_RESPAWNS})`);
+        startWatch({ name, dir }, respawns + 1);
+      } else {
+        console.error(`${prefix} watch exited (${signal || `code ${code}`}) and hit the respawn cap — ${name} dist is STALE until you restart npm start`);
       }
     });
+  };
+
+  for (const entry of watchable) {
+    startWatch(entry);
   }
 
   // The per-package watches above only see their OWN src — but the vendorable
@@ -107,7 +121,7 @@ function main() {
     shuttingDown = true;
     console.log('\nStopping watches...');
     propagation.close();
-    for (const child of children) {
+    for (const child of [...children]) {
       child.kill('SIGTERM');
     }
     releaseWatchLock(ROOT);

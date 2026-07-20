@@ -4,13 +4,17 @@
 
 | Tier | What | Command | When |
 |------|------|---------|------|
-| 1 — Package suites | Each package's own `node --test` (config, devkit, manager, web, client, backend boot, …) | `npm test` in the package, or `npm run test:packages` at the root | Every checkpoint |
+| 1 — Package suites | Each package's own `node --test` (config, devkit, manager, web, client, backend boot, …) plus the root `scripts/*.test.js` guards (secrets-copier etc.) | `npm test` in the package, or `npm run test:packages` at the root — **`test:packages` is also the QUICK lane** (no corpus/e2e/journey) | Every checkpoint |
 | 2 — Corpus (automated consumers) | The **brand-shape corpus** (7+ generated brand shapes: real onboard + real Eleventy builds with per-shape invariants — themes, target combos, content, font preloads; offline, no installs) then the sandbox **backend corpus** (framework routes/events/rules through a REAL consumer + real emulator) | `npm run test:corpus` at the root | Every checkpoint that touches runtime behavior |
 | 2a — Sandbox e2e | The **cross-stack e2e** (puppeteer browser → website → backend: signup/signin/subscribe/cancel/refund/data-request/delete lifecycle) | `npm run test:e2e` at the root | Every checkpoint; `OMEGA_SKIP_E2E=1` to skip |
 | 2.5 — Wizard journey (outside-monorepo consumer) | The FULL consumer story in a temp brand born OUTSIDE the monorepo: real onboard wizard (flags) → `i local` tree link → every framework setup → `omega dev` boot + branded-homepage probe → headless creds-scrubbed manage (update must build every app) | `npm run test:journey` at the root (also the tail of root `npm test`) | The full sequence, and any change to onboard/linking/setup/boot plumbing |
 | 3 — Playground (live rehearsal) | The 24-service manage pipeline against REAL cloud (Firebase, Cloudflare, SendGrid, …) | `npm run pipeline` in `apps/omega-playground` | SPARINGLY — Ian-authorized (real infra, real cost) |
 
-**Root `npm test` runs tiers 1 + 2 + 2a + 2.5 in one shot** (all workspace suites → corpus → sandbox e2e → wizard journey, sequentially — emulator runs must never overlap). The sandbox is offline-only (fake `demo-*` project); the journey brand is `demo-*`/`.invalid`-scoped and creds-scrubbed; the playground is the only tier that touches real cloud.
+**Root `npm test` runs tiers 1 + 2 + 2a + 2.5 in one shot** (package suites → corpus → sandbox e2e → wizard journey, sequentially — emulator runs must never overlap). Tier 1 expands `packages/*` only — the apps/* workspaces are covered by their own dedicated stages (the sandbox e2e used to run TWICE per root test through both lanes). The sandbox is offline-only (fake `demo-*` project); the journey brand is `demo-*`/`.invalid`-scoped and creds-scrubbed; the playground is the only tier that touches real cloud.
+
+**Skip knobs** (all documented in their script headers too): `OMEGA_SKIP_E2E=1` (sandbox e2e), `OMEGA_SKIP_JOURNEY=1` (journey), `OMEGA_JOURNEY_STRICT=1` (unmet journey preconditions fail instead of skip), `OMEGA_JOURNEY_KEEP=1` (keep the temp brand after a green run).
+
+**Publish rehearsal — `npm run release:check`** (scripts/release-check.js): packs every publishable (real prepare + vendoring), scratch-installs each tarball with local-tarball overrides for the published @omega.js runtime deps, `require.resolve`s it, and scans the installed tree for raw private @omega.js references. The laptop mirror of CI's pack-smoke; the mechanical gate for the publish-proving checkpoint. `--only=web,manager` iterates a subset; `--keep` preserves the scratch dir.
 
 ## The brand-shape corpus (cp197)
 

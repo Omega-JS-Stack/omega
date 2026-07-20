@@ -12,8 +12,10 @@ const package = Manager.getPackage('main');
 const config = Manager.getConfig('project');
 const rootPathPackage = Manager.getRootPath('main');
 
-// Get clean versions
-const cleanVersions = { versions: package.engines };
+// Get clean versions — the pinned consumer Node (omega.nodeRuntime), NOT
+// engines.node: engines is the honest dev floor (>=22), templates need a
+// concrete version to render (.nvmrc etc.)
+const cleanVersions = { versions: { ...package.engines, node: package.omega.nodeRuntime } };
 
 // File MAP — rule vocabulary is the devkit defaults engine's (minimatch patterns,
 // last-match-wins). Engine built-ins cover what used to be explicit rules here:
@@ -115,7 +117,7 @@ function siteTokenTransform(contents, item) {
   }
 
   try {
-    return template(contents, { site: config, versions: package.engines }, {
+    return template(contents, { site: config, versions: cleanVersions.versions }, {
       brackets: ['[', ']'],
     });
   } catch (error) {

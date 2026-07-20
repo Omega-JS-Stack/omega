@@ -19,7 +19,7 @@ const jetpack = require('fs-jetpack');
 
 const stageLocalPackages = require('../../dist/cli/utils/stage-local-packages.js');
 const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
-const { loadConfig } = require('@omega.js/config');
+const { loadConfig } = require('../helpers/shared-config.js');
 
 function makeTmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'bem-stage-'));

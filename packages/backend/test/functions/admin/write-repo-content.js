@@ -155,7 +155,7 @@ module.exports = {
       timeout: 60000,
 
       async run({ state, config }) {
-        const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
+        const { brandRepoOwner, brandRepoName } = require('../../helpers/shared-config.js');
         if (!process.env.GH_TOKEN || !brandRepoOwner(config) || !brandRepoName(config)) {
           return;
         }

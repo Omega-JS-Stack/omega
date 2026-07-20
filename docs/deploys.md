@@ -19,6 +19,8 @@ framework dists like every devkit module.
 | `buildDispatch({ owner, repo, workflow, ref, inputs })` | the PLAN: `{ method, url, body, runsUrl }` — dry-run output is exactly this |
 | `dispatchWorkflow(plan, { token, fetchFn })` | POST to `/repos/{o}/{r}/actions/workflows/{wf}/dispatches`; 204 = accepted, anything else throws with status + body |
 | `deployViaDispatch({ workflow, cwd, owner, repo, ref, inputs, dryRun, … })` | the one path: resolve → plan → (`dryRun` returns the plan unsent) → dispatch |
+| `assertNoLocalSpecs({ dir })` | the TREE-WIDE `file:` guard: throws (listing every offender) when any app in the brand carries a `file:` @omega.js spec — one linked sibling breaks the whole CI install (cp194) |
+| `syncWorkingTree({ cwd, message, logger })` | plain-git commit + push before a dispatch (`git add -A` → commit only when staged → push; argument arrays, no shell) — pushes trigger NOTHING (D13) |
 
 `ref` defaults to `main`; pass the real branch when it isn't (the admin post
 routes read the repo's `default_branch` first). All I/O is injectable
@@ -40,12 +42,12 @@ engines treat workflow files as framework-owned overwrites).
 
 | Target | Behavior | Flags |
 |--------|----------|-------|
-| web | sync (commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact POST, send nothing; bypasses the `file:` guard since nothing publishes), `--local` (build only), `--no-sync`, `--direct` (build + push dist to gh-pages, then Cloudflare purge) |
-| extension | sync → dispatch `publish.yml` | `--dry-run`, `--no-sync` |
+| web | guard → sync (plain git commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact POST, send nothing; bypasses the guards since nothing publishes), `--local` (build only), `--no-sync`, `--direct` (build + push dist to gh-pages, then Cloudflare purge — file: specs are FINE here, the build is local) |
+| extension | guard → sync → dispatch `publish.yml` | `--dry-run`, `--no-sync` |
 | desktop | `--dry-run` prints the dispatch; otherwise delegates to `omega release` (dispatch + live CI log streaming) | `--dry-run`, `--platforms` |
 | backend | artifact cleanup-policy pre-step → local-package staging → `firebase deploy` → public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
 
-Real deploys refuse `file:` deps (web); dry-runs always show the plan.
+Real dispatch deploys refuse `file:` deps via the shared TREE-WIDE guard (`assertNoLocalSpecs` — web additionally refuses any file: dep in the deploying app itself); dry-runs always show the plan. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
 
 **Every successful deploy records itself (cp196)**: `deploy.<target>` in the brand's `.omega/state.json` via `@omega.js/devkit/deploy-record` (`recordDeploy`/`readDeployRecord` — brand-root-resolved from any app dir; gitignored, per-machine). The manager's testing service reads it to split **never deployed** (live-URL checks warn with a "run `omega deploy` when ready" nudge) from **deployed but down** (an honest error), and ADOPTS a record when a record-less brand's live URL answers — so fresh clones of long-deployed brands self-heal on their first manage run. Dry-runs never record.
 
