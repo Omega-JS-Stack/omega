@@ -16,17 +16,20 @@ module.exports = async function (options) {
   const type = options._[1] || 'prod';
 
   try {
-    // Install production
+    // Install production — the publish-day inverse of `i local`: flip every
+    // file: spec in the brand tree to ^<linked version>, one registry install
     if (['live', 'prod', 'p', 'production'].includes(type)) {
       // Log
-      logger.log('Installing production...');
+      logger.log('Installing production (restoring registry specs tree-wide)...');
 
-      // Install
-      await install(`npm uninstall ${package.name}`);
-      await install(`npm install ${package.name}@latest --save-dev`);
+      // Restore
+      const actions = await local.restoreRegistrySpecs({ dir: process.cwd(), logger });
+      const flipped = actions.filter((action) => action.action === 'flip').length;
 
       // Return
-      return logger.log('Production installation complete.');
+      return logger.log(flipped > 0
+        ? `Production installation complete (${flipped} spec(s) restored to registry ranges).`
+        : 'Already on registry specs — nothing to flip.');
     }
 
     // Install development (link from the local Omega monorepo)

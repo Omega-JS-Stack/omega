@@ -340,3 +340,54 @@ test('a dist reference to a publishable @omega.js package (not a runtime dep) fa
 
   assert.throws(() => vendorDevkit({ cwd: root }), /not a vendorable private utility.*declare it as a runtime dependency/);
 });
+
+test('template-kit is vendorable; its @omega.js/client require stays a package require', (t) => {
+  const root = makeFixture('vendor-template-kit', {
+    packageJSON: {
+      name: 'fixture-web-host',
+      version: '1.0.0',
+      dependencies: { ...HOST_DEPS, '@omega.js/client': '^0.1.0' },
+    },
+    files: {
+      'dist/lib/render.js': [
+        `const { registerLiquid } = require('@omega.js/template-kit/register-liquid');`,
+        `const filters = require('@omega.js/template-kit/filters');`,
+        `const tags = require('@omega.js/template-kit/tags');`,
+        `module.exports = { registerLiquid, filters, tags };`,
+      ].join('\n'),
+    },
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  vendorDevkit({ cwd: root });
+
+  // Requires rewritten to the vendored copies (tags is a directory module —
+  // exports "./tags" → src/tags/index.js, the subpath→file mapping's job)
+  const rewritten = fs.readFileSync(path.join(root, 'dist', 'lib', 'render.js'), 'utf8');
+  assert.match(rewritten, /require\('\.\.\/vendor\/template-kit\/register-liquid\.js'\)/);
+  assert.match(rewritten, /require\('\.\.\/vendor\/template-kit\/filters\.js'\)/);
+  assert.ok(!rewritten.includes('@omega.js/template-kit'));
+
+  // The vendored closure is private-clean, and @omega.js/client references
+  // survive as PACKAGE requires (client is a published runtime dep of the
+  // host — never vendored, resolves from the consumer install).
+  const vendorRoot = path.join(root, 'dist', 'vendor', 'template-kit');
+  assert.ok(fs.existsSync(vendorRoot), 'missing vendored template-kit tree');
+  let clientRefs = 0;
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      const contents = fs.readFileSync(abs, 'utf8');
+      assert.ok(!/['"]@omega\.js\/(template-kit|devkit|config|account)/.test(contents), `raw private ref left in ${abs}`);
+      if (contents.includes('@omega.js/client')) clientRefs += 1;
+    }
+  };
+  walk(vendorRoot);
+  if (fs.existsSync(path.join(vendorRoot, 'tags', 'media.js'))) {
+    assert.ok(clientRefs >= 1, 'tags/media.js must keep its @omega.js/client package require');
+  }
+});

@@ -280,10 +280,14 @@ async function waitUntil(check, what, timeoutMs = 5000) {
 }
 
 /** Scratch packages/ tree with a devkit-like src dir. Caller removes scratch. */
-function vendorScratch() {
+function vendorScratch({ withSrc = true } = {}) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-vendor-prop-'));
   const packagesDir = path.join(scratch, 'packages');
-  fs.mkdirSync(path.join(packagesDir, 'devkit', 'src'), { recursive: true });
+  // withSrc: false → no real fs watcher installs, so poke()-driven tests
+  // exercise the pass machinery alone (macOS FSEvents can replay the recent
+  // mkdir as a spurious event under load — a real watcher on the scratch dir
+  // makes poke-based assertions racy)
+  fs.mkdirSync(withSrc ? path.join(packagesDir, 'devkit', 'src') : packagesDir, { recursive: true });
   return { scratch, packagesDir };
 }
 
@@ -308,7 +312,7 @@ test('startVendorPropagation watches only packages with an existing src/', () =>
 });
 
 test('a change re-prepares every dependent, in order', async () => {
-  const { scratch, packagesDir } = vendorScratch();
+  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
   const calls = [];
   const propagation = local.startVendorPropagation({
     packagesDir,
@@ -329,7 +333,7 @@ test('a change re-prepares every dependent, in order', async () => {
 });
 
 test('rapid changes inside the debounce window coalesce into one pass', async () => {
-  const { scratch, packagesDir } = vendorScratch();
+  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
   const calls = [];
   const propagation = local.startVendorPropagation({
     packagesDir,
@@ -352,7 +356,7 @@ test('rapid changes inside the debounce window coalesce into one pass', async ()
 });
 
 test('a change landing mid-pass queues exactly one follow-up pass', async () => {
-  const { scratch, packagesDir } = vendorScratch();
+  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
   const calls = [];
   const resolvers = [];
   const propagation = local.startVendorPropagation({
@@ -387,7 +391,7 @@ test('a change landing mid-pass queues exactly one follow-up pass', async () => 
 });
 
 test('a failing prepare is contained — the rest of the pass still runs', async () => {
-  const { scratch, packagesDir } = vendorScratch();
+  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
   const calls = [];
   const logs = [];
   const propagation = local.startVendorPropagation({
@@ -415,7 +419,7 @@ test('a failing prepare is contained — the rest of the pass still runs', async
 });
 
 test('close() stops the watch — later changes trigger nothing', async () => {
-  const { scratch, packagesDir } = vendorScratch();
+  const { scratch, packagesDir } = vendorScratch({ withSrc: false });
   const calls = [];
   const propagation = local.startVendorPropagation({
     packagesDir,
@@ -471,6 +475,46 @@ test('the real fs watch feeds the same pipeline (recursive, by package name)', a
     }
   } finally {
     propagation.close();
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+// ---- restoreRegistrySpecs (the publish-day inverse)
+
+test('restoreRegistrySpecs plans ^<linked version> for file: specs and skips registry specs', async () => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-restore-'));
+  try {
+    // A fake linked package whose version the flip derives
+    const pkgDir = path.join(scratch, 'monorepo', 'packages', 'client');
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({ name: '@omega.js/client', version: '0.1.0' }));
+
+    const brand = path.join(scratch, 'brand');
+    const app = path.join(brand, 'apps', 'site');
+    fs.mkdirSync(app, { recursive: true });
+    fs.writeFileSync(path.join(brand, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['apps/*'] }));
+    fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({
+      name: 'site',
+      dependencies: {
+        '@omega.js/client': `file:${path.relative(app, pkgDir).split(path.sep).join('/')}`,
+        '@omega.js/web': '^0.1.0',
+      },
+    }));
+
+    const actions = await local.restoreRegistrySpecs({ dir: app, dryRun: true });
+    assert.deepEqual(actions.map(({ name, spec, action }) => ({ name, spec, action })), [
+      { name: '@omega.js/client', spec: '^0.1.0', action: 'flip' },
+      { name: '@omega.js/web', spec: '^0.1.0', action: 'skip' },
+    ]);
+
+    // Explicit range override wins over the derived version
+    const overridden = await local.restoreRegistrySpecs({ dir: app, dryRun: true, range: '^0.2.0' });
+    assert.equal(overridden.find((action) => action.name === '@omega.js/client').spec, '^0.2.0');
+
+    // dryRun writes nothing — the file: spec survives verbatim
+    const manifest = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8'));
+    assert.ok(manifest.dependencies['@omega.js/client'].startsWith('file:'));
+  } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 });

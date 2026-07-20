@@ -1,7 +1,6 @@
 const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const local = require('@omega.js/devkit/local');
-const powertools = require('node-powertools');
 const Npm = require('npm-api');
 const jetpack = require('fs-jetpack');
 const wonderfulVersion = require('wonderful-version');
@@ -34,8 +33,16 @@ class InstallCommand extends BaseCommand {
     // Check and update peer dependencies before installing
     await this.updatePeerDependencies();
 
-    await this.uninstallPkg('@omega.js/backend');
-    await this.installPkg('@omega.js/backend');
+    // The publish-day inverse of `i local`: flip every file: spec in the
+    // brand tree to ^<linked version>, then one registry install
+    const actions = await local.restoreRegistrySpecs({
+      dir: this.firebaseProjectPath,
+      logger: { log: (m) => this.log(m), warn: (m) => this.logWarning(m) },
+    });
+    const flipped = actions.filter((action) => action.action === 'flip').length;
+    this.log(flipped > 0
+      ? `Production installation complete (${flipped} spec(s) restored to registry ranges).`
+      : 'Already on registry specs — nothing to flip.');
   }
 
   async updatePeerDependencies() {
@@ -150,15 +157,6 @@ class InstallCommand extends BaseCommand {
       });
   }
 
-  async uninstallPkg(name) {
-    const command = `npm uninstall ${name}`;
-    this.log('Running ', command);
-
-    return await powertools.execute(command, { log: true })
-      .catch((e) => {
-        throw e;
-      });
-  }
 }
 
 module.exports = InstallCommand;

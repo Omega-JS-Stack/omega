@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-require('../src/omega-bin.js');
+require('../dist/omega-bin.js');

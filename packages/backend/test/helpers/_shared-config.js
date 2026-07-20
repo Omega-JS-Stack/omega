@@ -6,7 +6,7 @@
  * carries a vendored copy (dist/vendor/config, written at prepare time) that
  * is byte-equivalent to the workspace package, and the monorepo's dist is
  * freshly prepared before any suite runs — so BOTH environments resolve the
- * same code through this one path. Test files must require config through
+ * same code through this one path (underscore-prefixed: the runner skips _ files in discovery — this is a helper, not a suite). Test files must require config through
  * this helper, never `@omega.js/config` directly (pack-smoke greps shipped
  * trees for raw private references).
  */

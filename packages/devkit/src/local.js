@@ -337,6 +337,81 @@ async function linkLocalPackages(options) {
 }
 
 /**
+ * Flip a brand tree's @omega.js `file:` specs back to registry ranges — the
+ * publish-day inverse of linkLocalPackages(). Every file:-spec'd entry in
+ * every app manifest becomes `^<version>` of the CURRENTLY LINKED copy (read
+ * from the file: target's own package.json — no monorepo lookup, no registry
+ * call, so it works on any machine), then ONE `npm install` re-resolves the
+ * tree from the registry. Idempotent: registry-spec'd entries are untouched;
+ * nothing to flip → no install. Same transactional manifest restore as the
+ * linker when the install fails.
+ * @param {object} options
+ * @param {string} options.dir - Any directory inside the brand.
+ * @param {object} [options.logger] - Logger with log/warn (silent when omitted).
+ * @param {boolean} [options.dryRun] - Plan only, write and install nothing.
+ * @param {string} [options.range] - Explicit range for every flipped entry (e.g. '^0.1.0').
+ * @returns {Promise<Array<{name: string, dir: string, spec: string, action: 'flip'|'skip'|'unresolvable'}>>}
+ */
+async function restoreRegistrySpecs(options) {
+  const { dir, logger, dryRun, range } = options;
+  const actions = [];
+
+  const installRoot = findBrandRoot(dir);
+  let installNeeded = false;
+
+  const manifestBackups = new Map();
+  const backupManifest = (appDir) => {
+    const manifestPath = path.join(appDir, 'package.json');
+    if (!manifestBackups.has(manifestPath)) {
+      manifestBackups.set(manifestPath, fs.readFileSync(manifestPath, 'utf8'));
+    }
+  };
+
+  for (const appDir of discoverApps(installRoot)) {
+    for (const entry of frameworkPackagesOf(appDir)) {
+      if (!entry.spec.startsWith('file:')) {
+        actions.push({ name: entry.name, dir: entry.dir, spec: entry.spec, action: 'skip' });
+        continue;
+      }
+
+      let spec = range;
+      if (!spec) {
+        const target = path.resolve(appDir, entry.spec.slice('file:'.length));
+        try {
+          spec = `^${JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8')).version}`;
+        } catch (e) {
+          actions.push({ name: entry.name, dir: entry.dir, spec: entry.spec, action: 'unresolvable' });
+          logger && logger.warn(`${entry.name}: cannot read ${target}/package.json — pass { range } or fix the link`);
+          continue;
+        }
+      }
+
+      actions.push({ name: entry.name, dir: entry.dir, spec, action: 'flip' });
+      logger && logger.log(`${entry.name}: ${entry.spec} → ${spec}`);
+      installNeeded = true;
+      if (!dryRun) {
+        backupManifest(entry.dir);
+        setDependencySpec(entry.dir, entry.name, entry.dev, spec);
+      }
+    }
+  }
+
+  if (installNeeded && !dryRun) {
+    try {
+      await safeInstall('npm install', { log: true, config: { cwd: installRoot } });
+    } catch (error) {
+      for (const [manifestPath, contents] of manifestBackups) {
+        fs.writeFileSync(manifestPath, contents);
+      }
+      logger && logger.warn(`install failed — restored ${manifestBackups.size} manifest(s) to their file: specs`);
+      throw error;
+    }
+  }
+
+  return actions;
+}
+
+/**
  * Read the watch lock and return the live owner pid — clearing the lock when
  * its process is gone.
  * @param {string} monorepoRoot - Monorepo root path.
@@ -494,6 +569,12 @@ function startVendorPropagation(options) {
       const changed = [...dirty];
       dirty.clear();
 
+      // A spurious trigger with nothing dirty (fs watchers can replay stale
+      // events under load) is a no-op, never a full re-prepare
+      if (changed.length === 0) {
+        continue;
+      }
+
       // Scope: skip dependents whose dist/vendor embeds none of the changed
       // packages (a missing vendor tree means not-yet-prepared — always run)
       const affected = dependents.filter((dependent) => {
@@ -570,6 +651,7 @@ module.exports = {
   discoverApps,
   frameworkPackagesOf,
   linkLocalPackages,
+  restoreRegistrySpecs,
   startMonorepoWatch,
   startVendorPropagation,
   readLiveWatchPid,

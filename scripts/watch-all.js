@@ -100,10 +100,10 @@ function main() {
   }
 
   // The per-package watches above only see their OWN src — but the vendorable
-  // shared packages (devkit, config, account) live inside every framework's
-  // dist/vendor/*, copied at prepare time. Watch their srcs too and re-prepare
-  // every watchable package when one changes, so a devkit edit can't strand
-  // dist-running frameworks on stale vendored code.
+  // shared packages (devkit, config, account, template-kit) live inside every
+  // framework's dist/vendor/*, copied at prepare time. Watch their srcs too and
+  // re-prepare the affected watchable packages when one changes, so a devkit
+  // edit can't strand dist-running frameworks on stale vendored code.
   const propagation = startVendorPropagation({
     packagesDir: PACKAGES_DIR,
     packages: VENDORABLE_PACKAGES,

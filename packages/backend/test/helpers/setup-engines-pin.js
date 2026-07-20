@@ -1,10 +1,11 @@
 /**
  * Test: cli/commands/setup.js scaffoldPackageJson
  * The engines.node stamp derives from the FRAMEWORK's pinned Cloud Functions
- * runtime — never the ambient process. Setup must produce the same app under
- * any shell Node (cp195 journey catch: an ambient-24 setup stamped 24 against
- * the v22/* .nvmrc default and `omega dev` died on the Manager.init version
- * mismatch).
+ * runtime (`omega.functionsRuntime` — engines.node is the dev floor `>=22`,
+ * not a version) — never the ambient process. Setup must produce the same app
+ * under any shell Node (cp195 journey catch: an ambient-24 setup stamped 24
+ * against the v22/* .nvmrc default and `omega dev` died on the Manager.init
+ * version mismatch).
  */
 const path = require('path');
 const os = require('os');
@@ -37,7 +38,7 @@ module.exports = {
     {
       name: 'fresh-app-gets-the-framework-pin',
       async run({ assert }) {
-        const frameworkMajor = String(parseInt(frameworkPackage.engines.node, 10));
+        const frameworkMajor = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
         const written = runScaffoldPackageJson({ name: 'pin-test-app' });
 
         assert.equal(written.engines.node, frameworkMajor,
@@ -59,7 +60,7 @@ module.exports = {
       async run({ assert }) {
         // The nvmrc setup test heals .nvmrc to `v<engines.node>/*` — with
         // engines stamped from the framework pin, both files must agree
-        const frameworkMajor = String(parseInt(frameworkPackage.engines.node, 10));
+        const frameworkMajor = String(parseInt(frameworkPackage.omega.functionsRuntime, 10));
         const written = runScaffoldPackageJson({ name: 'pin-test-app' });
 
         assert.equal(`v${written.engines.node}/*`, `v${frameworkMajor}/*`,

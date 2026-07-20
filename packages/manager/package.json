@@ -3,32 +3,48 @@
   "version": "0.1.0",
   "description": "The OMEGA orchestration engine — walks every service in dependency order and reconciles each to the brand's omega.json5, idempotently, against a brand monorepo. omega-manager's brains, ported service by service. Private until first publish.",
   "private": true,
-  "main": "./src/index.js",
+  "main": "./dist/index.js",
   "bin": {
     "omega-manager": "./bin/omega-manager"
   },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
   "exports": {
-    ".": "./src/index.js",
-    "./cli": "./src/cli-run.js",
-    "./service-runner": "./src/lib/service-runner.js",
-    "./run-summary": "./src/lib/run-summary.js",
-    "./brand": "./src/lib/brand.js",
-    "./state": "./src/lib/state.js",
-    "./manage": "./src/manage.js"
+    ".": "./dist/index.js",
+    "./cli": "./dist/cli-run.js",
+    "./service-runner": "./dist/lib/service-runner.js",
+    "./run-summary": "./dist/lib/run-summary.js",
+    "./brand": "./dist/lib/brand.js",
+    "./state": "./dist/lib/state.js",
+    "./manage": "./dist/manage.js"
   },
   "scripts": {
+    "start": "npm run prepare:watch",
+    "prepare": "node -e \"require('prepare-package')()\"",
+    "prepare:watch": "node -e \"require('prepare-package/watch')()\"",
     "test": "node --test test/*.test.js"
   },
+  "preparePackage": {
+    "input": "./src",
+    "output": "./dist",
+    "replace": {},
+    "type": "copy",
+    "hooks": {
+      "after": "node -e \"require('@omega.js/devkit/vendor')()\""
+    }
+  },
   "dependencies": {
-    "@omega.js/account": "*",
-    "@omega.js/config": "*",
-    "@omega.js/devkit": "*",
+    "@inquirer/prompts": "^8.5.2",
+    "@omega.js/backend": "^0.1.0",
     "ag-psd": "^31.0.2",
-    "@omega.js/backend": "*",
     "canvas": "^3.2.3",
     "chalk": "^5.6.2",
+    "dotenv": "^17.4.2",
     "fs-jetpack": "^5.1.0",
     "json5": "^2.2.3",
+    "node-powertools": "^3.0.0",
     "opentype.js": "^2.0.0",
     "png2icons": "^2.0.1",
     "psl": "^1.15.0",
@@ -36,6 +52,12 @@
     "stripe": "^22.3.0",
     "ws": "^8.21.0",
     "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@omega.js/account": "*",
+    "@omega.js/config": "*",
+    "@omega.js/devkit": "*",
+    "prepare-package": "^2.1.0"
   },
   "engines": {
     "node": ">=22"

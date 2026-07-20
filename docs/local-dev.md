@@ -59,10 +59,10 @@ Two different mechanisms keep consumers working:
 
 | Kind | Packages | Mechanism |
 |------|----------|-----------|
-| Private shared internals | `devkit`, `config`, `account` (devDependencies of the frameworks) | Vendored into `dist/vendor/<pkg>` at prepare time by `@omega.js/devkit/vendor`; requires rewritten to relative paths. Never published. |
-| Published runtime deps | `@omega.js/client` (dependency of desktop + extension) | Normal npm dependency — **never vendored** (a vendored copy would pin a stale snapshot and duplicate the shared client singleton). Requires stay as package requires. |
+| Private shared internals | `devkit`, `config`, `account`, `template-kit` (devDependencies of the frameworks) | Vendored into `dist/vendor/<pkg>` at prepare time by `@omega.js/devkit/vendor`; requires rewritten to relative paths. Never published. |
+| Published runtime deps | `@omega.js/client` (dependency of web + desktop + extension), `@omega.js/backend` (dependency of manager) | Normal npm dependency — **never vendored** (a vendored copy would pin a stale snapshot and duplicate the shared client singleton). Requires stay as package requires. |
 
-The vendor tool derives the split from the host's package.json: anything in `dependencies`/`peerDependencies`/`optionalDependencies` is published-runtime and skipped; devDependency workspace packages get vendored. CI's pack-smoke gate greps shipped dist for raw **private** `@omega.js/(devkit|config|account)` refs only, and maps `@omega.js/client` to its local tarball via `overrides` until it exists on npm.
+The vendor tool derives the split from the host's package.json: anything in `dependencies`/`peerDependencies`/`optionalDependencies` is published-runtime and skipped; devDependency workspace packages get vendored. ALL SIX publishables (backend, client, desktop, extension, manager, web) are dist-building with the vendor after-hook. Two mirrored gates prove self-containment: CI's pack-smoke and the local `npm run release:check` — both pack, scratch-install with tarball `overrides` for the published runtime deps, resolve, and grep the whole shipped tree for raw private `@omega.js/(devkit|config|account|template-kit)` refs. The publish runbook lives in [docs/publishing.md](publishing.md).
 
 ## API surface (`@omega.js/devkit/local`)
 
@@ -71,7 +71,8 @@ The vendor tool derives the split from the host's package.json: anything in `dep
 | `resolveMonorepoRoot()` | env → self-location walk-up → conventional path; throws with guidance if none |
 | `findBrandRoot(dir)` / `discoverApps(root)` | brand-root walk-up / brand root + `apps/*` list |
 | `frameworkPackagesOf(appDir)` | `@omega.js/*` deps incl. `functions/package.json`, with dev/prod placement + owning dir |
-| `linkLocalPackages({ dir, monorepoRoot, logger, dryRun })` | idempotent brand-tree file:-link (spec flip + one install); returns `[{ name, dir, target, action: link\|skip\|missing }]` across the tree |
+| `linkLocalPackages({ dir, monorepoRoot, logger, dryRun })` | idempotent brand-tree file:-link (spec flip + one install, transactional — a failed install restores every manifest); returns `[{ name, dir, target, action: link\|skip\|missing }]` across the tree |
+| `restoreRegistrySpecs({ dir, logger, dryRun, range })` | the publish-day INVERSE (`omega i live` in every framework): every `file:` spec flips to `^<linked version>` (read from the file: target — no monorepo needed) or the explicit `range`, then one registry install; same transactional restore on failure |
 | `startMonorepoWatch({ monorepoRoot, logger })` | lock-aware spawn of the root watch; `{ alreadyRunning, pid, child }` |
 | `startVendorPropagation({ packagesDir, packages, dependents, runPrepare?, log?, debounceMs? })` | watch vendorable srcs → re-prepare dependents (debounced, coalescing); `{ watched, poke, close }` — `poke` is the fs-free test seam |
 | `acquireWatchLock` / `releaseWatchLock` / `readLiveWatchPid` | the `.omega/dev-watch.lock` single-instance protocol (owned by watch-all) |
