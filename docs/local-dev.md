@@ -76,3 +76,7 @@ The vendor tool derives the split from the host's package.json: anything in `dep
 | `startMonorepoWatch({ monorepoRoot, logger })` | lock-aware spawn of the root watch; `{ alreadyRunning, pid, child }` |
 | `startVendorPropagation({ packagesDir, packages, dependents, runPrepare?, log?, debounceMs? })` | watch vendorable srcs → re-prepare dependents (debounced, coalescing); `{ watched, poke, close }` — `poke` is the fs-free test seam |
 | `acquireWatchLock` / `releaseWatchLock` / `readLiveWatchPid` | the `.omega/dev-watch.lock` single-instance protocol (owned by watch-all) |
+
+## Freshness guard (cp247)
+
+Every framework CLI boot (web/backend/desktop/extension/manager — `freshnessBoot` in devkit `local.js`, wired in each `cli-run`) checks whether a locally-linked framework's `dist/` is stale: newest `src/` mtime vs `dist/` (missing dist = stale), plus each embedded `dist/vendor/<name>` vs that private package's `src/`. Fresh = silent (2–16ms). Stale = loud auto `npm run prepare` in the package, then the invocation RE-EXECS once (`OMEGA_FRESH_REEXEC` loop guard) so no verb ever runs stale framework code. A live root-watch lock defers to the watch (dim note). Registry installs (realpath inside node_modules) and non-buildable dirs skip instantly. `OMEGA_SKIP_FRESHNESS` is the opt-out seam. Pinned by devkit `test/local-freshness.test.js` (14 tests incl. a linked-consumer integration proof).

@@ -6,6 +6,10 @@
  * one framework.
  */
 async function run() {
+  // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
+  // invocation re-execs once, so no command ever runs stale framework code
+  require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/manager' });
+
   // Value-less flags must be declared boolean — otherwise yargs treats the next
   // positional as the flag's VALUE (mirrors the framework bins). yargs' built-in
   // --version/--help are disabled so `-v`/`--version` route to our version

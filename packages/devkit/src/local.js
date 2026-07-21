@@ -11,6 +11,8 @@
  * - acquireWatchLock() / releaseWatchLock() — single-instance guard for the watch
  * - startVendorPropagation() — re-prepare dist-building frameworks when a
  *   vendored shared package (devkit, config, account) changes
+ * - ensureFreshLocalDist() / freshnessBoot() — rebuild a locally-linked
+ *   framework's stale dist at CLI boot (and re-exec once after a rebuild)
  *
  * Consumers: `omega dev --local` (@omega.js/web), `mgr i local`
  * (@omega.js/backend, @omega.js/desktop, @omega.js/extension), and the monorepo's
@@ -21,7 +23,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
+const { createRequire } = require('module');
 const { safeInstall } = require('./safe-install');
 
 // Constants
@@ -640,6 +643,213 @@ function startVendorPropagation(options) {
   };
 }
 
+// The vendorable private packages folded into framework dists. Hardcoded here
+// because this module must stay stdlib-only — tools/vendor.js
+// VENDORABLE_PACKAGES is the SSOT (a devkit test pins the two lists equal).
+const FRESHNESS_VENDORABLES = ['devkit', 'config', 'account', 'template-kit'];
+
+// Directory names the freshness scan never descends into.
+const FRESHNESS_SKIP_DIRS = new Set(['node_modules', '.temp', 'dist']);
+
+/**
+ * Newest mtime (ms) of any file or directory under dir, recursive — skipping
+ * node_modules/.temp/dist and never following symlinks. Directory mtimes are
+ * counted too, so a deletion (which touches only the parent dir) still reads
+ * as a change. Missing dir → 0.
+ * @param {string} dir - Directory to scan.
+ * @returns {number} Newest mtimeMs, or 0 when nothing exists.
+ */
+function newestMtimeUnder(dir) {
+  let newest = 0;
+  const queue = [dir];
+
+  while (queue.length > 0) {
+    const current = queue.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+      newest = Math.max(newest, fs.statSync(current).mtimeMs);
+    } catch (e) {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+      const abs = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (!FRESHNESS_SKIP_DIRS.has(entry.name)) {
+          queue.push(abs);
+        }
+        continue;
+      }
+      if (entry.isFile()) {
+        try {
+          newest = Math.max(newest, fs.statSync(abs).mtimeMs);
+        } catch (e) {
+          // Raced deletion — skip
+        }
+      }
+    }
+  }
+
+  return newest;
+}
+
+/**
+ * Resolve a package's REAL on-disk directory as seen from fromDir, mirroring
+ * Node resolution. require.resolve of '<name>/package.json' first (works when
+ * there is no exports map — @omega.js/backend), then a manual node_modules
+ * walk-up (exports maps rarely expose './package.json', and a missing dist
+ * makes the '.' entry unresolvable — exactly the stale case this exists for).
+ * @param {string} packageName - Package name (e.g. '@omega.js/web').
+ * @param {string} fromDir - Directory to resolve from.
+ * @returns {string|null} Real package directory, or null when unresolvable.
+ */
+function resolvePackageRealDir(packageName, fromDir) {
+  try {
+    const req = createRequire(path.join(fromDir, 'package.json'));
+    return fs.realpathSync(path.dirname(req.resolve(`${packageName}/package.json`)));
+  } catch (e) {
+    // Fall through to the manual walk
+  }
+
+  let dir = path.resolve(fromDir);
+  while (true) {
+    const candidate = path.join(dir, 'node_modules', packageName);
+    if (fs.existsSync(path.join(candidate, 'package.json'))) {
+      try {
+        return fs.realpathSync(candidate);
+      } catch (e) {
+        return null;
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return null;
+    }
+    dir = parent;
+  }
+}
+
+/**
+ * Ensure a locally-linked framework's dist is at least as new as its src —
+ * rebuilding it (`npm run prepare`) when a src edit landed without a prepare,
+ * so consumers never run stale dist code just because nobody remembered to
+ * rebuild (Ian's ask, 2026-07-20).
+ *
+ * Only acts on SOURCE CHECKOUTS: a registry install (real path still inside
+ * node_modules) is untouched. Staleness compares the newest mtime under src/
+ * against dist/ (missing dist = stale), and — for packages sitting in the
+ * monorepo — also each embedded dist/vendor/<name> copy against that
+ * vendorable package's src (vendored copies only refresh on a full prepare).
+ * When the monorepo watch holds a live lock, the rebuild is left to it.
+ * @param {object} options
+ * @param {string} options.packageName - The package to check (e.g. '@omega.js/web').
+ * @param {string} [options.fromDir] - Resolution origin (default process.cwd()).
+ * @returns {{status: 'skipped'|'reexec-guard'|'registry'|'not-buildable'|'fresh'|'watch-owned'|'rebuilt'|'rebuild-failed', packageName: string, dir?: string}}
+ */
+function ensureFreshLocalDist(options) {
+  const { packageName, fromDir = process.cwd() } = options;
+
+  // Env seams: test/CI hatch, and the loop guard freshnessBoot sets on re-exec
+  if (process.env.OMEGA_SKIP_FRESHNESS) {
+    return { status: 'skipped', packageName };
+  }
+  if (process.env.OMEGA_FRESH_REEXEC) {
+    return { status: 'reexec-guard', packageName };
+  }
+
+  const realDir = resolvePackageRealDir(packageName, fromDir);
+  if (!realDir || realDir.split(path.sep).includes('node_modules')) {
+    // Unresolvable (bootstrap dir, nothing installed) or a real registry
+    // install — either way there is no local source checkout to freshen
+    return { status: 'registry', packageName, dir: realDir || undefined };
+  }
+
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(path.join(realDir, 'package.json'), 'utf8'));
+  } catch (e) {
+    pkg = null;
+  }
+  const srcDir = path.join(realDir, 'src');
+  if (!fs.existsSync(srcDir) || !(pkg && pkg.scripts && pkg.scripts.prepare)) {
+    return { status: 'not-buildable', packageName, dir: realDir };
+  }
+
+  const distDir = path.join(realDir, 'dist');
+  let stale = !fs.existsSync(distDir) || newestMtimeUnder(srcDir) > newestMtimeUnder(distDir);
+
+  // Vendored shared-package copies: a devkit/config/account/template-kit edit
+  // only lands in dist/vendor/<name> via a full prepare — an up-to-date own-src
+  // dist can still be stale on vendored code (the cp184 class of bug)
+  const monorepoRoot = path.dirname(path.dirname(realDir));
+  const inMonorepo = isMonorepoRoot(monorepoRoot);
+  if (!stale && inMonorepo) {
+    for (const name of FRESHNESS_VENDORABLES) {
+      const vendorDir = path.join(distDir, 'vendor', name);
+      if (fs.existsSync(vendorDir)
+        && newestMtimeUnder(path.join(monorepoRoot, 'packages', name, 'src')) > newestMtimeUnder(vendorDir)) {
+        stale = true;
+        break;
+      }
+    }
+  }
+
+  if (!stale) {
+    return { status: 'fresh', packageName, dir: realDir };
+  }
+
+  if (inMonorepo && readLiveWatchPid(monorepoRoot)) {
+    console.log(`\x1b[2momega: local ${packageName} dist is stale — the monorepo watch will rebuild it\x1b[0m`);
+    return { status: 'watch-owned', packageName, dir: realDir };
+  }
+
+  console.log(`omega: local ${packageName} dist is stale — rebuilding…`);
+  const result = spawnSync('npm', ['run', 'prepare'], {
+    cwd: realDir,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+  if (result.status !== 0) {
+    console.warn(`omega: rebuild failed (npm run prepare exited ${result.status === null ? String(result.error && result.error.message || 'spawn error') : result.status} in ${realDir}) — continuing on the stale dist`);
+    return { status: 'rebuild-failed', packageName, dir: realDir };
+  }
+  return { status: 'rebuilt', packageName, dir: realDir };
+}
+
+// One freshness scan per process per module instance — a dispatcher hop that
+// re-enters the SAME framework's run() must not scan (or rebuild) twice.
+let freshnessBootRan = false;
+
+/**
+ * CLI-boot wiring for ensureFreshLocalDist: every framework run() calls this
+ * first. On a rebuild, the running process booted from the STALE dist — so the
+ * same invocation re-execs ONCE (OMEGA_FRESH_REEXEC guards the loop) and this
+ * process exits with the child's status. Every other outcome returns and the
+ * boot continues.
+ * @param {object} options - Same as ensureFreshLocalDist.
+ * @returns {{status: string, packageName: string, dir?: string}}
+ */
+function freshnessBoot(options) {
+  if (freshnessBootRan) {
+    return { status: 'already-checked', packageName: options.packageName };
+  }
+  freshnessBootRan = true;
+
+  const result = ensureFreshLocalDist(options);
+  if (result.status !== 'rebuilt') {
+    return result;
+  }
+
+  const child = spawnSync(process.execPath, process.argv.slice(1), {
+    stdio: 'inherit',
+    env: Object.assign({}, process.env, { OMEGA_FRESH_REEXEC: '1' }),
+  });
+  process.exit(child.status === null ? 1 : child.status);
+}
+
 // Exports
 module.exports = {
   DEFAULT_MONOREPO,
@@ -657,4 +867,7 @@ module.exports = {
   readLiveWatchPid,
   acquireWatchLock,
   releaseWatchLock,
+  FRESHNESS_VENDORABLES,
+  ensureFreshLocalDist,
+  freshnessBoot,
 };

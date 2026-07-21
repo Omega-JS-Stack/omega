@@ -3,6 +3,10 @@
  * dist/omega-bin.js) and cross-framework dispatch ('@omega.js/desktop/cli').
  */
 async function run() {
+  // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
+  // invocation re-execs once, so no command ever runs stale framework code
+  require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/desktop' });
+
   // Strip ELECTRON_RUN_AS_NODE — it leaks into our env from common parent processes
   // (e.g. VS Code's Claude Code extension) and makes every Electron binary we shell
   // to silently run as plain Node. Strip once at the CLI boundary.

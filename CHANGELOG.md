@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **cp247 — local-dist freshness guard (Ian 2026-07-20: catch all future prepare-forgets).** Every framework CLI boot auto-detects a stale locally-linked dist (src newer than dist, or a vendored private's src newer than its dist/vendor copy) and rebuilds it before the verb runs — loud one-liner, `npm run prepare` in the package, then a single re-exec of the same invocation so no command ever executes stale framework code. Fresh scans are silent and cost 2–16ms; a live root-watch lock defers to the watch; registry installs skip instantly; `OMEGA_SKIP_FRESHNESS`/`OMEGA_FRESH_REEXEC` are the opt-out/loop-guard seams. One shared devkit implementation (`ensureFreshLocalDist`/`freshnessBoot` in local.js, stdlib-only) wired MIRRORED at all five CLI boots; vendor-rewritten in every dist. 14 new devkit pins incl. a linked-consumer integration proof; the guard dogfooded itself during the build (detected the agent's own src edits and rebuilt all 5 dists). Suites: devkit 225+8, manager 718, desktop 773, extension 107, web 262, backend 13; root battery EXIT 0 (corpus 7/7, e2e, journey — the journey's outside-monorepo brand rode the guard clean on every spawned CLI). Contract: [docs/local-dev.md](docs/local-dev.md).
+
 ### Changed
 - **Brand AGENTS.md trimmed (Ian's inbox note, 2026-07-20).** The scaffolded file is now just the framework-guide import + a short `# <brand> — brand notes` heading — the cp244 marker comment and skeleton sentence are gone, and heals scrub any legacy copy from existing files (present now requires cruft-free). Both in-repo brands re-healed; manager 718/718.
 

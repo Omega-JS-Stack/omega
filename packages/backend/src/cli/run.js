@@ -3,6 +3,10 @@
  * dist/omega-bin.js) and cross-framework dispatch ('@omega.js/backend/cli').
  */
 async function run() {
+  // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
+  // invocation re-execs once, so no command ever runs stale framework code
+  require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/backend' });
+
   const Main = new (require('./index.js'))(process.argv);
 
   try {

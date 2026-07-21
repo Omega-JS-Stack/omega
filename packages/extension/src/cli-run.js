@@ -3,6 +3,10 @@
  * dist/omega-bin.js) and cross-framework dispatch ('@omega.js/extension/cli').
  */
 async function run() {
+  // Local-dist freshness guard: a stale locally-linked dist rebuilds and the
+  // invocation re-execs once, so no command ever runs stale framework code
+  require('@omega.js/devkit/local').freshnessBoot({ packageName: '@omega.js/extension' });
+
   // Value-less flags must be declared boolean — otherwise yargs treats the next
   // positional as the flag's VALUE. Mirrors the same fix in @omega.js/backend's CLI.
   const argv = require('yargs')(process.argv.slice(2)).boolean(['extended']).parseSync();
