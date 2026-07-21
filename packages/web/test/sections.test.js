@@ -398,7 +398,7 @@ const THEMES = path.join(__dirname, '..', 'themes');
 
 test('cp219: buildSectionLibrary — resolved entries over the real classy chain', () => {
   const { entries, groups } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'classy')] });
-  assert.equal(entries.length, 17, `classy chain: 15 sections + 2 components, got ${entries.length}`);
+  assert.equal(entries.length, 18, `classy chain: 16 sections + 2 components (ads/unit added cp246), got ${entries.length}`);
   assert.ok(entries.every((entry) => entry.source === 'classy'), 'every entry owned by the classy layer');
 
   const hero = entries.find((entry) => entry.id === 'marketing/hero' && entry.kind === 'section');
@@ -415,7 +415,7 @@ test('cp219: buildSectionLibrary — resolved entries over the real classy chain
 
 test('cp219: buildSectionLibrary — the newsflash chain resolves overrides and fallthroughs honestly', () => {
   const { entries } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'newsflash'), path.join(THEMES, 'classy')] });
-  assert.equal(entries.length, 23, `nf chain: 17 shared ids + 6 nf-only, got ${entries.length}`);
+  assert.equal(entries.length, 24, `nf chain: 18 shared ids + 6 nf-only, got ${entries.length}`);
 
   const cta = entries.find((entry) => entry.id === 'marketing/cta');
   assert.equal(cta.source, 'newsflash', 'the override wins the entry');

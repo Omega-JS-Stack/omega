@@ -86,6 +86,16 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 
 - **Exports**: `clipboardCopy()`, `escapeHTML()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`, `getContext()`
 
+## Ads (`ads.js`)
+
+- **Class**: `Ads` (+ `AdUnit` per mounted house unit)
+- **Key Methods**: `render($el, options)` (the full ladder), `renderHouse($el, options)` (fallback lane directly — the desktop/extension lane), `mount($el, options?)` (lazy IntersectionObserver arm from `data-omega-ad*` attributes, idempotent), `bind(root?)` (auto-mount every `[data-omega-ad]`), `resolveSource(source?)`
+- **The ladder** (plans/ads-system.md, monorepo): AdSense when `advertising.providers['google-adsense'].client` is configured and the type is a provider type — script-load failure of `adsbygoogle.js` IS the adblock detector (no bait divs, no poll); fill awaited via a MutationObserver on `data-ad-status` + timeout; `unfilled`/timeout/blocked → the `advertising.fallback` lane (`'inhouse'`) → no-fill collapse (`display: none` + `omega-ad:no-fill`)
+- **House lane**: sandboxed iframe → `<source>/omega/ads/serve` (`parent`, `tags`, `adId`, `height`, `theme`, cache-buster); origin-validated postMessage vocabulary `omega-ad:set-dimensions` / `omega-ad:click`; HOST-owned lifecycle — rotation timer (`rotateInterval`, off by default), staleness recovery (`visibilitychange`/`online` → reload when stale), fill timer
+- **Source resolution** (`advertising.providers.inhouse.source`): `'self'` → `getApiUrl()`, `'company'` → `config.company.url` through the api derivation, full URL → verbatim
+- **Element vocabulary**: `data-omega-ad` (type: `display`/`in-article`/`in-feed`/`multiplex`/`house`), `data-omega-ad-size` (preset or px), `data-omega-ad-id`, `data-omega-ad-tags` — the web `ads/unit` section and the phase-4 desktop/extension binding share it
+- **Events**: `omega-ad:fill` / `omega-ad:no-fill` / `omega-ad:click` / `omega-ad:reload` bubble from the host (+ `onFill`/`onNoFill`/`onClick`/`onReload` callbacks)
+
 ## Motion (`motion.js`)
 
 - **Exports**: `createMotion()`, `parseCountTarget(text)`, `formatCount(target, value)`

@@ -60,6 +60,8 @@ global.document = {
       type: '',
       setAttribute: () => {},
       getAttribute: () => null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
       remove: () => {},
       appendChild: (child) => {
         if (child.nodeValue) {

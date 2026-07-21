@@ -1,0 +1,7 @@
+<section{% if args.section_class != blank %} class="{{ args.section_class }}"{% endif %} data-omega-section="ads/unit">
+  <div class="omega-ad-unit" data-omega-ad="{{ args.type }}"
+    {%- if args.size != blank %} data-omega-ad-size="{{ args.size }}"{% endif %}
+    {%- if args.ad_id != blank %} data-omega-ad-id="{{ args.ad_id }}"{% endif %}
+    {%- if args.tags != blank %} data-omega-ad-tags="{{ args.tags | join: ',' }}"{% endif %}
+    data-wm-bind="@hide auth.resolved.active"></div>
+</section>

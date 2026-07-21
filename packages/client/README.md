@@ -233,6 +233,7 @@ Manager.serviceWorker();  // Service worker management
 Manager.sentry();         // Error tracking
 Manager.dom();            // DOM utilities
 Manager.utilities();      // Utility functions
+Manager.ads();            // Ads (provider ladder + in-house fallback units)
 
 // Helper methods
 Manager.isDevelopment();                        // Check if in development mode

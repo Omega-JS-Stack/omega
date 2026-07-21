@@ -3,12 +3,10 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-20] Ads phase 2 PAUSED mid-build (partial work in tree) → Ian says "continue phase 2" to relaunch
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- Ads phase 2: client `ads/unit` section + adblock/no-fill detection rewrite → plans/ads-system.md
 - Ads phase 3: admin dashboard ads CRUD card → plans/ads-system.md
 - Ads phase 4: desktop/extension `data-omega-ad` binding via shared client ads module → plans/ads-system.md
 - Multi-instance targets build (config normalization → manager iteration → fixture proof) → plans/multi-instance-targets.md
@@ -66,6 +64,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG
 - cp247 2026-07-20 local-dist freshness guard (auto-prepare + re-exec at every CLI boot; 14 pins; root battery EXIT 0) → CHANGELOG
 - cp246 2026-07-20 per-app docs retired in brand context (devkit `retire` rule, mirrored ×4, sweeps run; root battery EXIT 0) → CHANGELOG
 - cp245 2026-07-20 ads phase 1: backend house-ads module (53 pins; full suite 1295/0 re-verified) → CHANGELOG
@@ -75,4 +74,3 @@
 - cp241 2026-07-20 publish lanes complete — release-check 6/6 GREEN; `omega i live` restore; CI pack-smoke ×6 → CHANGELOG
 - cp240 2026-07-20 review-fixes wave 1 (release-check harness, engines pins, git-native sync, diets) → CHANGELOG
 - cp238 2026-07-19 every package 0.1.0 + mechanical publish latch → CHANGELOG
-- cp237 2026-07-19 access self-heal wrapped in npm start → CHANGELOG
