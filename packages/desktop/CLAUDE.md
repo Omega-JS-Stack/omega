@@ -244,6 +244,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/hooks.md](docs/hooks.md) — lifecycle hooks (build/pre, build/post, release/pre, release/post, notarize/post)
 - [docs/icons.md](docs/icons.md) — convention-only icon resolution (`global/` + per-platform), retina derivation, macOS Template magic
 - [docs/fontawesome.md](docs/fontawesome.md) — Font Awesome Free served from the npm dep (icon semantics shared with web via @omega.js/client's icon-core): `<i class="fa-solid fa-*">` auto-render, `manager.fontawesome.get`
+- [docs/ads.md](docs/ads.md) — `[data-omega-ad]` auto-bind to @omega.js/client's ads module (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense in desktop surfaces)
 - [docs/installer-options.md](docs/installer-options.md) — per-target installer config, defaults table
 - [docs/signing.md](docs/signing.md) — code signing for macOS + Windows
 - [docs/releasing.md](docs/releasing.md) — end-to-end release walkthrough

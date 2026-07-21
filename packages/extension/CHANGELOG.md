@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ---
 # [Unreleased]
 
+### Added
+- Ads auto-bind (ads-system phase 4): page surfaces (popup/options/sidepanel/page) bind every `[data-omega-ad]` element (present at boot or inserted later) to `@omega.js/client`'s ads module with the type pinned `'house'` — extension surfaces only ever serve the house/company inventory, never AdSense; content scripts/background/offscreen never bind. The build snapshot now carries `advertising` + `company` from omega.json5. See [docs/ads.md](docs/ads.md).
+
 ### BREAKING
 - **Config flips HARD to `config/omega.json5`** — the single OMEGA config, loaded via the vendored `@omega.js/config`. `config/browser-extension-manager.json` is no longer read anywhere. Migration (one-time, per consumer):
   1. Create `config/omega.json5` next to the old file.

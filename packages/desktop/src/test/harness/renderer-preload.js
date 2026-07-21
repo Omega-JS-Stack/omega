@@ -96,6 +96,33 @@ try {
   console.warn('[renderer-preload] Could not wire DOM enhancements:', e.message);
 }
 
+// Wire the ads auto-bind against THIS document. Production hands the client
+// singleton to _wireAds via manager.initialize(); here the preload requires
+// the REAL @omega.js/client (same resolution _wireFontAwesome uses) and seeds
+// its config directly — full initialize() is deliberately skipped (firebase,
+// heavy). AdSense is INTENTIONALLY configured and no inhouse source is: the
+// house-lane pin is exactly what must keep the provider lane (remote script)
+// from ever being attempted, and a source-less house render collapses
+// deterministically with zero network.
+(async () => {
+  try {
+    if (!testManager) return;
+    // The client is pure ESM — Electron's preload require() can't load it
+    // (unlike the CJS-compatible icon-renderer), so go through the Node ESM
+    // loader. Resolves well before suites arrive from main.
+    const wmMod = await import('@omega.js/client');
+    testManager.omega = wmMod.default || wmMod;
+    testManager.omega.config = Object.assign({}, testManager.omega.config, {
+      advertising: {
+        providers: { 'google-adsense': { client: 'ca-pub-test' } },
+      },
+    });
+    testManager._wireAds();
+  } catch (e) {
+    console.warn('[renderer-preload] Could not wire ads auto-bind:', e.message);
+  }
+})();
+
 // Tooltip instances live in the preload world (page world can't reach the
 // bootstrap namespace across the contextIsolation boundary) — expose a probe so
 // page-world suites can assert instance lifecycle by element id. `error()`

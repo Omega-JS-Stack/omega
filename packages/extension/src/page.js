@@ -4,6 +4,7 @@ import extension from './lib/extension.js';
 import LoggerLite from './lib/logger-lite.js';
 import { syncWithBackground, setupAuthBroadcastListener, setupSignOutListener, setupAuthEventListeners, openAuthPage as openAuthPageHelper } from './lib/auth-helpers.js';
 import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
+import { wireAds } from './lib/ads.js';
 
 // Import theme (exposes Bootstrap to window.bootstrap)
 import '__theme__/_theme.js';
@@ -49,6 +50,9 @@ class Manager {
 
     // Set up auth event listeners (sign in, account buttons)
     setupAuthEventListeners(this);
+
+    // Auto-bind [data-omega-ad] elements (house/company lane only — lib/ads.js)
+    wireAds();
 
     // Log
     this.logger.log('Initialized!', this);

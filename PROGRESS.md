@@ -7,7 +7,7 @@
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- Ads phase 4: desktop/extension `data-omega-ad` binding via shared client ads module → plans/ads-system.md
+- Ads step 5: retire vert.js + adunits includes; blog [slug].js flips to the section → plans/ads-system.md
 - Multi-instance targets build (config normalization → manager iteration → fixture proof) → plans/multi-instance-targets.md
 - Per-service `requires: { env, scopes }` preflight with friendly fix walkthroughs (model: cp236 google-auth 403 diagnostics)
 - `omega update` verb: installed/current/latest/breaking per dep + 7-day release-age quarantine (npu-update semantics)
@@ -65,6 +65,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
 - cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
 - cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG
 - cp247 2026-07-20 local-dist freshness guard (auto-prepare + re-exec at every CLI boot; 14 pins; root battery EXIT 0) → CHANGELOG
@@ -74,4 +75,3 @@
 - cp243 2026-07-20 sibling-theme font prune (~350KB out of newsflash artifacts) → CHANGELOG
 - cp242 2026-07-20 auto-local deploys (mirrored rule; findLocalSpecs lanes on all four targets) → CHANGELOG
 - cp241 2026-07-20 publish lanes complete — release-check 6/6 GREEN; `omega i live` restore; CI pack-smoke ×6 → CHANGELOG
-- cp240 2026-07-20 review-fixes wave 1 (release-check harness, engines pins, git-native sync, diets) → CHANGELOG

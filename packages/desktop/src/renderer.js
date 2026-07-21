@@ -62,6 +62,10 @@ Manager.prototype.initialize = async function (overrides) {
   self._wireFontAwesome();
   self._wireTooltips();
 
+  // Auto-bind [data-omega-ad] elements to the shared client ads module
+  // (house/company lane only — no AdSense in desktop surfaces).
+  self._wireAds();
+
   self.logger.log('@omega.js/desktop (renderer) initialized.');
 
   return self;
@@ -235,6 +239,63 @@ Manager.prototype._wireTooltips = function () {
       attributes: true,
       attributeFilter: ['data-bs-toggle', 'data-bs-title', 'title'],
     });
+
+    scan(document.documentElement);
+  };
+
+  if (document.documentElement && document.readyState !== 'loading') {
+    start();
+  } else {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  }
+};
+
+// Ad auto-bind (ads-system phase 4) — every `[data-omega-ad]` element,
+// present at init or inserted later (MutationObserver, same liveness as the
+// FontAwesome/tooltip wiring), is handed to @omega.js/client's ads module,
+// which owns the WHOLE lifecycle: lazy arming near the viewport, sandboxed
+// iframe to the resolved in-house source's /omega/ads/serve, origin-validated
+// postMessage, host-owned rotation + staleness recovery, no-fill collapse.
+// The type is PINNED to 'house': desktop surfaces never run the AdSense
+// provider lane (policy: no web context), so even a shared omega.json5 that
+// carries `advertising.providers['google-adsense']` can only ever take the
+// house/company inventory here. mount() merges passed options OVER the
+// element attributes, so the pin is absolute; bound hosts are marked
+// `data-omega-ad-bound="house"` for observability.
+//
+//   <div data-omega-ad data-omega-ad-size="banner"></div>
+Manager.prototype._wireAds = function () {
+  const self = this;
+
+  if (self._adsWired || typeof document === 'undefined' || typeof MutationObserver === 'undefined' || !self.omega?.ads) {
+    return;
+  }
+  self._adsWired = true;
+
+  const SELECTOR = '[data-omega-ad]';
+
+  const mount = (el) => {
+    self.omega.ads().mount(el, { type: 'house' });
+    el.setAttribute('data-omega-ad-bound', 'house');
+  };
+
+  const scan = (root) => {
+    if (root.matches?.(SELECTOR)) {
+      mount(root);
+    }
+    root.querySelectorAll?.(SELECTOR).forEach(mount);
+  };
+
+  const start = () => {
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) {
+            scan(node);
+          }
+        });
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
 
     scan(document.documentElement);
   };
