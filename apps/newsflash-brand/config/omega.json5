@@ -45,7 +45,7 @@
   // company-mode ads proof — advertising.providers.inhouse.source 'company'
   // resolves this url through the standard api derivation
   // (api.playground.omegajs.dev in production; the offline proof pairs it
-  // with the playground's local emulator — scripts/e2e-ads-company.js).
+  // with the playground's local emulator — scripts/e2e-verts-company.js).
   // Public-by-design value; this brand stays fully offline.
   company: {
     url: "https://playground.omegajs.dev",

@@ -42,7 +42,7 @@ function setupReadingProgress() {
   update();
 }
 
-// Insert ads into blog post content
+// Insert verts into blog post content
 function insertBlogPostAds() {
   // Find the article content
   const $article = document.querySelector('article .blog-post-content');
@@ -53,7 +53,7 @@ function insertBlogPostAds() {
 
   // Advertising is key-presence enabled — no config, no hosts inserted
   if (!omega.config?.advertising) {
-    console.log('[Blog Post] No advertising config — skipping ad insertion');
+    console.log('[Blog Post] No advertising config — skipping vert insertion');
     return;
   }
 
@@ -61,14 +61,14 @@ function insertBlogPostAds() {
   const $paragraphs = Array.from($article.querySelectorAll('p'))
     .filter(p => !p.closest('blockquote, details, figure'));
   if ($paragraphs.length < 3) {
-    console.log('[Blog Post] Not enough paragraphs for ad insertion');
+    console.log('[Blog Post] Not enough paragraphs for vert insertion');
     return;
   }
 
-  // Find valid positions to insert ads (every 4 paragraphs)
-  // But ensure the last ad isn't too close to the end of the article
+  // Find valid positions to insert verts (every 4 paragraphs)
+  // But ensure the last vert isn't too close to the end of the article
   const positions = [];
-  const minParagraphsAfterLastAd = 2; // Ensure at least 2 paragraphs after the last ad
+  const minParagraphsAfterLastVert = 2; // Ensure at least 2 paragraphs after the last vert
 
   for (let i = 0; i < $paragraphs.length; i++) {
     // Only consider every 4th paragraph
@@ -78,7 +78,7 @@ function insertBlogPostAds() {
 
     // Skip if this position is too close to the end of the article
     const paragraphsRemaining = $paragraphs.length - 1 - i;
-    if (paragraphsRemaining < minParagraphsAfterLastAd) {
+    if (paragraphsRemaining < minParagraphsAfterLastVert) {
       continue;
     }
 
@@ -99,24 +99,24 @@ function insertBlogPostAds() {
   }
 
   if (positions.length === 0) {
-    console.log('[Blog Post] No valid positions for ad insertion');
+    console.log('[Blog Post] No valid positions for vert insertion');
     return;
   }
 
-  // Log ad insertion
-  console.log('[Blog Post] Inserting', positions.length, 'ads');
+  // Log vert insertion
+  console.log('[Blog Post] Inserting', positions.length, 'verts');
 
-  // Insert a modern ad host at each position — the shared client ads module
+  // Insert a modern vert host at each position — the shared client verts module
   // owns the whole lifecycle (lazy arming, AdSense → house fallback ladder,
-  // no-fill collapse). Same markup vocabulary as the ads/unit section.
+  // no-fill collapse). Same markup vocabulary as the verts/unit section.
   positions.forEach((targetParagraph) => {
     const $host = document.createElement('div');
-    $host.classList.add('omega-ad-unit', 'my-4');
-    $host.setAttribute('data-omega-ad', 'in-article');
+    $host.classList.add('omega-vert-unit', 'my-4');
+    $host.setAttribute('data-omega-vert', 'in-article');
     $host.setAttribute('data-wm-bind', '@hide auth.resolved.active');
 
-    // Insert after the target paragraph, then hand it to the ads module
+    // Insert after the target paragraph, then hand it to the verts module
     targetParagraph.parentNode.insertBefore($host, targetParagraph.nextSibling);
-    omega.ads().mount($host);
+    omega.verts().mount($host);
   });
 }

@@ -239,18 +239,18 @@ test('signed-in URL scheme: user app under /dashboard, staff app rooted at /admi
   assert.ok(pages.get('/admin/dashboard').includes('data-url="/admin"'), '/admin/dashboard redirects to the root overview');
 });
 
-test('admin ads card serves at /admin/ads (plans/ads-system.md phase 3)', () => {
-  const ads = pages.get('/admin/ads');
-  assert.ok(ads, 'ads card serves at /admin/ads');
-  assert.ok(ads.includes('omega-shell'), 'ads card wears the app shell (admin/core/minimal gate)');
-  assert.ok(ads.includes('id="ads-table"'), 'inventory table present');
-  assert.ok(ads.includes('id="ad-editor-modal"'), 'create/edit modal present');
-  // The editor form covers the ads collection shape (backend docs/ads.md)
-  for (const field of ['ad.enabled', 'ad.title', 'ad.description', 'ad.button', 'ad.link', 'ad.image', 'ad.footer', 'ad.weight', 'ad.targeting.sites', 'ad.targeting.categories', 'ad.targeting.keywords', 'ad.whitelist', 'ad.blacklist']) {
-    assert.ok(ads.includes(`name="${field}"`), `editor form field ${field}`);
+test('admin verts card serves at /admin/verts (plans/ads-system.md phase 3)', () => {
+  const verts = pages.get('/admin/verts');
+  assert.ok(verts, 'verts card serves at /admin/verts');
+  assert.ok(verts.includes('omega-shell'), 'verts card wears the app shell (admin/core/minimal gate)');
+  assert.ok(verts.includes('id="verts-table"'), 'inventory table present');
+  assert.ok(verts.includes('id="vert-editor-modal"'), 'create/edit modal present');
+  // The editor form covers the verts collection shape (backend docs/verts.md)
+  for (const field of ['vert.enabled', 'vert.title', 'vert.description', 'vert.button', 'vert.link', 'vert.image', 'vert.footer', 'vert.weight', 'vert.targeting.sites', 'vert.targeting.categories', 'vert.targeting.keywords', 'vert.whitelist', 'vert.blacklist']) {
+    assert.ok(verts.includes(`name="${field}"`), `editor form field ${field}`);
   }
   // Image rides the posts-editor convention: a plain URL field, no upload lane
-  assert.ok(/<input type="url"[^>]*name="ad\.image"/.test(ads), 'image is a URL field');
+  assert.ok(/<input type="url"[^>]*name="vert\.image"/.test(verts), 'image is a URL field');
 });
 
 test('template-kit tags render inside Eleventy (uj_icon, urlmatches nav)', () => {

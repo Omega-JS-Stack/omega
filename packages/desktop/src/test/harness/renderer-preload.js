@@ -96,7 +96,7 @@ try {
   console.warn('[renderer-preload] Could not wire DOM enhancements:', e.message);
 }
 
-// Wire the ads auto-bind against THIS document. Production hands the client
+// Wire the verts auto-bind against THIS document. Production hands the client
 // singleton to _wireAds via manager.initialize(); here the preload requires
 // the REAL @omega.js/client (same resolution _wireFontAwesome uses) and seeds
 // its config directly — full initialize() is deliberately skipped (firebase,
@@ -119,7 +119,7 @@ try {
     });
     testManager._wireAds();
   } catch (e) {
-    console.warn('[renderer-preload] Could not wire ads auto-bind:', e.message);
+    console.warn('[renderer-preload] Could not wire verts auto-bind:', e.message);
   }
 })();
 

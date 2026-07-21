@@ -122,8 +122,8 @@ async function generateBuildJs(outputDir) {
         // Theme config
         theme: config.theme || {},
 
-        // Advertising (ads-system phase 4) — feeds the client ads module's
-        // house/company lane (extension surfaces never run AdSense; lib/ads.js
+        // Advertising (ads-system phase 4) — feeds the client verts module's
+        // house/company lane (extension surfaces never run AdSense; lib/verts.js
         // pins the house type). company carries the parent's url so the
         // inhouse source 'company' can resolve.
         advertising: config.advertising || {},

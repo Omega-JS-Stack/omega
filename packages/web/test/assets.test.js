@@ -141,8 +141,8 @@ test('legacy module bundles emit at their fixed URLs (redirect pages script them
   const redirect = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect.bundle.js'), 'utf8');
   assert.ok(redirect.includes('redirect-config'), 'redirect module bundled at its fixed URL');
   assert.ok(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)');
-  // The legacy ad modules are retired (ads spec step 5) — the ads/unit
-  // section + shared client ads module are the one implementation.
+  // The legacy ad modules are retired (verts spec step 5) — the verts/unit
+  // section + shared client verts module are the one implementation.
   assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'vert.bundle.js')), 'vert.bundle.js retired');
   assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'popupads.bundle.js')), 'popupads.bundle.js retired');
 });

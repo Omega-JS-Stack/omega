@@ -38,14 +38,14 @@ created: 2026-07-21
 
 23. `uj_`/`uj-` prefix retirement: rename to an omega prefix — Ian floats `omega_` or `omg_`, wants a recommendation.
 24. Ads placement: bring back auto-insertion into blog posts + dashboard sidebar slots. Note the fallback inventory question is ALREADY the ratified company model (plans/ads-system.md): the consumer's PARENT brand defines the ads.
-25. Ads visual-test page (old UJM had one): sizes/layouts side by side. (Ads in plain HTML already work: `{% section "ads/unit" %}` build-time, or any `<div data-omega-ad>` in markup — the client auto-binds.)
+25. Ads visual-test page (old UJM had one): sizes/layouts side by side. (Ads in plain HTML already work: `{% section "verts/unit" %}` build-time, or any `<div data-omega-vert>` in markup — the client auto-binds.)
 26. Download/extension pages auto-populate from config `targets` (no hand-supplied links).
 27. OS detection on download/extension pages MUST use the shared framework logic (legacy web-manager's — find where it migrated: web or client) — same for extension pages.
 28. **[PROPOSE-FIRST]** Font Awesome PRO dependency: 99% of consumers won't have Pro. Ian: "id liek to hear your solution before you implement this one because it needs to be elegant and not hacky or messy."
 
 ## Questions answered (chat 2026-07-21) — verify in docs
 
-- Q1 ads in HTML: yes — section call or `data-omega-ad` markup; no JS insertion required.
+- Q1 ads in HTML: yes — section call or `data-omega-vert` markup; no JS insertion required.
 - Q2 theme system: there is no separate shared base — resolution is consumer → active theme → classy; classy IS the base skin newsflash falls through to. Ian leans "both import a shared base" — revisit as a design question if he wants a true neutral base extracted.
 - Q3 animations: yes — one place, the shared motion engine in @omega.js/client (`data-omega-*` attributes), theme-agnostic.
 - Q4 top-level change redistribution (assets/config/.env/SHARED): needs a documented contract — what triggers redistribution + rebuild, and what the correct verb is after editing brand-level assets. Fold the answer into docs and fix the brandmark staleness (Bug #7).

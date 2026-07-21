@@ -58,8 +58,8 @@
     },
     {
       label: 'Ads',
-      href: '/admin/ads',
-      icon: 'rectangle-ad'
+      href: '/admin/verts',
+      icon: 'rectangle-list'
     },
     {
       header: true,

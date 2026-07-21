@@ -7,7 +7,6 @@
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- cp258 vert rename FULL (Ian 2026-07-21): routes/DOM/admin AND `verts` collection + omega.verts() + modules/docs; only ads.txt, Google's ad* tokens, `advertising` config key stay
 - Playground CMS creates (arc close) once the source repo's `main` exists
 ### Website polish backlog (Ian 2026-07-21, "for after the review")
 - 28 items: bugs (contact, redirect rebuild, auth kick-out), design/copy (pricing, about, checkout), features (uj_ rename, ad slots, FA-Pro PROPOSE-FIRST) → plans/website-polish-backlog.md
@@ -65,6 +64,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp258 2026-07-21 FULL vert rename: every runtime surface adblock-safe; zero-hit sweep; battery GREEN → CHANGELOG
 - cp257 2026-07-21 de-ITW recaptcha ask + company-default GA account id (manager 774/0; battery EXIT 0) → CHANGELOG
 - cp256 2026-07-21 `omega update` verb: devkit core + 5-surface wiring, 7-day quarantine, npu-routed apply (battery PASSED) → CHANGELOG
 - cp255 2026-07-21 per-service requires preflight: REQUIRES registry + consolidated walkthroughs + --strict (manager 762/0; battery EXIT 0) → CHANGELOG
@@ -74,4 +74,3 @@
 - cp251 2026-07-21 omega-manager name retired + brand-root `omega deploy` fan-out + scripts heal op (manager 737/0; battery EXIT 0) → CHANGELOG
 - cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
 - cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
-- cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG

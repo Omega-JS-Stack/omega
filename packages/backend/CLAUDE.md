@@ -168,7 +168,7 @@ Deep references live in `docs/`. **Whenever you make a behavioral change, update
 
 ### Built-in Routes
 
-- [docs/ads.md](docs/ads.md) — house ads module: `ads` collection, public `GET /omega/ads/serve` (self-contained HTML unit, 204 no-fill) + fail-closed `GET /omega/ads/redirect`, admin CRUD, in-memory inventory cache (~5 min TTL), contextual targeting × weight selection
+- [docs/verts.md](docs/verts.md) — house verts module (adblock-safe ad system): `verts` collection, public `GET /omega/verts/serve` (self-contained HTML unit, 204 no-fill) + fail-closed `GET /omega/verts/redirect`, admin CRUD, in-memory inventory cache (~5 min TTL), contextual targeting × weight selection
 - [docs/admin-post-route.md](docs/admin-post-route.md) — `POST/PUT /admin/post` blog creation via GitHub (image extraction + resize at ingest + `@post/` rewriting). Also the publish target for the Ghostii article engine (`libraries/content/ghostii.js`).
 - [docs/payment-system.md](docs/payment-system.md) — full payment pipeline: Intent → Webhook → On-Write → Transition; subscription model, statuses, `resolveSubscription()`, transition handlers, processor interface, product config, test processor
 - [docs/marketing-campaigns.md](docs/marketing-campaigns.md) — campaign CRUD routes, recurring campaigns, generator pipeline (newsletter), newsletter-driven blog article (`content.article.enabled`), template-owned schemas, asset hosting, seed campaigns

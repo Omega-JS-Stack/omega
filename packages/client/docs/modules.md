@@ -86,15 +86,15 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 
 - **Exports**: `clipboardCopy()`, `escapeHTML()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`, `getContext()`
 
-## Ads (`ads.js`)
+## Verts (`verts.js`) — adblock-safe ad engine
 
-- **Class**: `Ads` (+ `AdUnit` per mounted house unit)
-- **Key Methods**: `render($el, options)` (the full ladder), `renderHouse($el, options)` (fallback lane directly — the desktop/extension lane), `mount($el, options?)` (lazy IntersectionObserver arm from `data-omega-ad*` attributes, idempotent), `bind(root?)` (auto-mount every `[data-omega-ad]`), `resolveSource(source?)`
-- **The ladder** (plans/ads-system.md, monorepo): AdSense when `advertising.providers['google-adsense'].client` is configured and the type is a provider type — script-load failure of `adsbygoogle.js` IS the adblock detector (no bait divs, no poll); fill awaited via a MutationObserver on `data-ad-status` + timeout; `unfilled`/timeout/blocked → the `advertising.fallback` lane (`'inhouse'`) → no-fill collapse (`display: none` + `omega-ad:no-fill`)
-- **House lane**: sandboxed iframe → `<source>/omega/ads/serve` (`parent`, `tags`, `adId`, `height`, `theme`, cache-buster); origin-validated postMessage vocabulary `omega-ad:set-dimensions` / `omega-ad:click`; HOST-owned lifecycle — rotation timer (`rotateInterval`, off by default), staleness recovery (`visibilitychange`/`online` → reload when stale), fill timer
+- **Class**: `Verts` (+ `VertUnit` per mounted house unit)
+- **Key Methods**: `render($el, options)` (the full ladder), `renderHouse($el, options)` (fallback lane directly — the desktop/extension lane), `mount($el, options?)` (lazy IntersectionObserver arm from `data-omega-vert*` attributes, idempotent), `bind(root?)` (auto-mount every `[data-omega-vert]`), `resolveSource(source?)`
+- **The ladder** (plans/ads-system.md, monorepo): AdSense when `advertising.providers['google-adsense'].client` is configured and the type is a provider type — script-load failure of `adsbygoogle.js` IS the adblock detector (no bait divs, no poll); fill awaited via a MutationObserver on `data-ad-status` + timeout; `unfilled`/timeout/blocked → the `advertising.fallback` lane (`'inhouse'`) → no-fill collapse (`display: none` + `omega-vert:no-fill`)
+- **House lane**: sandboxed iframe → `<source>/omega/verts/serve` (`parent`, `tags`, `vertId`, `height`, `theme`, cache-buster); origin-validated postMessage vocabulary `omega-vert:set-dimensions` / `omega-vert:click`; HOST-owned lifecycle — rotation timer (`rotateInterval`, off by default), staleness recovery (`visibilitychange`/`online` → reload when stale), fill timer
 - **Source resolution** (`advertising.providers.inhouse.source`): `'self'` → `getApiUrl()`, `'company'` → `config.company.url` through the api derivation, full URL → verbatim
-- **Element vocabulary**: `data-omega-ad` (type: `display`/`in-article`/`in-feed`/`multiplex`/`house`), `data-omega-ad-size` (preset or px), `data-omega-ad-id`, `data-omega-ad-tags` — the web `ads/unit` section and the phase-4 desktop/extension binding share it
-- **Events**: `omega-ad:fill` / `omega-ad:no-fill` / `omega-ad:click` / `omega-ad:reload` bubble from the host (+ `onFill`/`onNoFill`/`onClick`/`onReload` callbacks)
+- **Element vocabulary**: `data-omega-vert` (type: `display`/`in-article`/`in-feed`/`multiplex`/`house`), `data-omega-vert-size` (preset or px), `data-omega-vert-id`, `data-omega-vert-tags` — the web `verts/unit` section and the phase-4 desktop/extension binding share it
+- **Events**: `omega-vert:fill` / `omega-vert:no-fill` / `omega-vert:click` / `omega-vert:reload` bubble from the host (+ `onFill`/`onNoFill`/`onClick`/`onReload` callbacks)
 
 ## Motion (`motion.js`)
 

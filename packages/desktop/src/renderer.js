@@ -62,7 +62,7 @@ Manager.prototype.initialize = async function (overrides) {
   self._wireFontAwesome();
   self._wireTooltips();
 
-  // Auto-bind [data-omega-ad] elements to the shared client ads module
+  // Auto-bind [data-omega-vert] elements to the shared client verts module
   // (house/company lane only — no AdSense in desktop surfaces).
   self._wireAds();
 
@@ -250,33 +250,33 @@ Manager.prototype._wireTooltips = function () {
   }
 };
 
-// Ad auto-bind (ads-system phase 4) — every `[data-omega-ad]` element,
+// Vert auto-bind (ads-system phase 4) — every `[data-omega-vert]` element,
 // present at init or inserted later (MutationObserver, same liveness as the
-// FontAwesome/tooltip wiring), is handed to @omega.js/client's ads module,
+// FontAwesome/tooltip wiring), is handed to @omega.js/client's verts module,
 // which owns the WHOLE lifecycle: lazy arming near the viewport, sandboxed
-// iframe to the resolved in-house source's /omega/ads/serve, origin-validated
+// iframe to the resolved in-house source's /omega/verts/serve, origin-validated
 // postMessage, host-owned rotation + staleness recovery, no-fill collapse.
 // The type is PINNED to 'house': desktop surfaces never run the AdSense
 // provider lane (policy: no web context), so even a shared omega.json5 that
 // carries `advertising.providers['google-adsense']` can only ever take the
 // house/company inventory here. mount() merges passed options OVER the
 // element attributes, so the pin is absolute; bound hosts are marked
-// `data-omega-ad-bound="house"` for observability.
+// `data-omega-vert-bound="house"` for observability.
 //
-//   <div data-omega-ad data-omega-ad-size="banner"></div>
+//   <div data-omega-vert data-omega-vert-size="banner"></div>
 Manager.prototype._wireAds = function () {
   const self = this;
 
-  if (self._adsWired || typeof document === 'undefined' || typeof MutationObserver === 'undefined' || !self.omega?.ads) {
+  if (self._adsWired || typeof document === 'undefined' || typeof MutationObserver === 'undefined' || !self.omega?.verts) {
     return;
   }
   self._adsWired = true;
 
-  const SELECTOR = '[data-omega-ad]';
+  const SELECTOR = '[data-omega-vert]';
 
   const mount = (el) => {
-    self.omega.ads().mount(el, { type: 'house' });
-    el.setAttribute('data-omega-ad-bound', 'house');
+    self.omega.verts().mount(el, { type: 'house' });
+    el.setAttribute('data-omega-vert-bound', 'house');
   };
 
   const scan = (root) => {

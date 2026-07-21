@@ -248,7 +248,7 @@ API references for each subsystem live in `docs/`:
 ### Runtime
 - [docs/extension.md](docs/extension.md) — cross-browser `chrome.*` / `browser.*` API wrapper
 - [docs/auth.md](docs/auth.md) — cross-context auth sync, sign-in / load / sign-out flows, button CSS classes
-- [docs/ads.md](docs/ads.md) — `[data-omega-ad]` auto-bind to @omega.js/client's ads module on page surfaces (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense; content scripts never bind)
+- [docs/verts.md](docs/verts.md) — `[data-omega-vert]` auto-bind to @omega.js/client's verts module on page surfaces (live via MutationObserver): house/company lane ONLY (type pinned 'house' — no AdSense; content scripts never bind)
 - [docs/offscreen.md](docs/offscreen.md) — offscreen document lifecycle, creation from background, messaging
 - [docs/xss-prevention.md](docs/xss-prevention.md) — escapeHTML/sanitizeURL canonical forms, extension attack vectors
 

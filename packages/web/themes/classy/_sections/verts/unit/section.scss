@@ -1,0 +1,22 @@
+// verts/unit — mechanical shell only (§7 omega:sections lane). Sizing comes
+// from the client verts module's ONE px table (inline max-height); this sheet
+// carries a neutral placeholder surface and the iframe reset, no visual
+// opinions.
+.omega-vert-unit {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+
+  iframe {
+    display: block;
+    width: 100%;
+    border: 0;
+  }
+}
+
+// Verts never print
+@media print {
+  .omega-vert-unit {
+    display: none !important;
+  }
+}

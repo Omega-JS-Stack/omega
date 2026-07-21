@@ -23,7 +23,7 @@
 - **Component architecture**: seven contexts (background / popup / options / sidepanel / content / pages / offscreen) each with view + styles + script
 - **One-line bootstrap per context** with cross-browser API wrapper
 - **Cross-context auth sync**: sign-in in one tab is reflected in all open contexts (no `chrome.storage` needed)
-- **Ad units with zero JS**: drop `<div data-omega-ad></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA ads module (house/company inventory only, no AdSense). See [docs/ads.md](docs/ads.md)
+- **Vert (ad) units with zero JS**: drop `<div data-omega-vert></div>` into a popup/options/sidepanel/page view — auto-bound to the shared OMEGA verts module (house/company inventory only, no AdSense). See [docs/verts.md](docs/verts.md)
 - **Auto-translation** to 16 languages via Claude CLI on every build
 - **Four-layer test framework**: build / background / view / boot — real Chromium, real MV3 service worker, real consumer extensions
 - **Multi-browser packaging + auto-publish** to Chrome / Firefox / Edge stores from one command

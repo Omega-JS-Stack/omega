@@ -22,7 +22,7 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
 
   // Classy entries + the index. A new section folder appears with zero
   // authoring — this count is the "new section → appears automatically" pin
-  // (+1 declared add: ads/unit, cp246).
+  // (+1 declared add: verts/unit, cp246).
   assert.equal(showcaseUrls(pages).length, 19, 'index + 18 entry pages');
 
   const index = pages.get('/test/sections');
@@ -53,7 +53,7 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
 test('cp219: the newsflash showcase — overrides and fallthroughs chip their owning layer', async () => {
   const pages = await buildWith(nfData);
 
-  // Shared ids + nf-only entries + the index (+1 declared add: ads/unit, cp246)
+  // Shared ids + nf-only entries + the index (+1 declared add: verts/unit, cp246)
   assert.equal(showcaseUrls(pages).length, 25, 'index + 24 entry pages under newsflash');
 
   const cta = pages.get('/test/sections/section/marketing/cta');

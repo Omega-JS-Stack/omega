@@ -1,0 +1,211 @@
+---
+layout: admin/core/minimal
+
+theme:
+  header:
+    title:
+      content: "Verts"
+      icon: "rectangle-list"
+    breadcrumbs:
+      items:
+        - label: "Admin"
+          href: "/admin"
+        - label: "Verts"
+
+meta:
+  title: "Verts - Admin"
+  description: "Manage house vert inventory"
+  breadcrumb: "All verts"
+
+prerender_icons:
+  - name: "rectangle-list"
+  - name: "pen"
+  - name: "trash"
+  - name: "ellipsis-vertical"
+  - name: "toggle-on"
+  - name: "toggle-off"
+---
+
+<!-- Page Header Actions -->
+<div class="row mb-4">
+  <div class="col">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <p class="text-muted mb-0">House vert inventory — served by the fallback ladder when providers don't fill</p>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-adaptive" id="btn-refresh-verts">
+          {% uj_icon "rotate", "fa-md me-2" %}
+          Refresh
+        </button>
+        <button class="btn btn-adaptive" id="btn-new-vert">
+          {% uj_icon "plus", "fa-md me-2" %}
+          New vert
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Merged stat card (App DNA) -->
+<div class="classy-statgrid mb-4" style="--classy-statgrid-cols: 3;">
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Total verts</span>
+      {% uj_icon "rectangle-list", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-total-verts">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+  </div>
+
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Enabled</span>
+      {% uj_icon "toggle-on", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-enabled-verts">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+  </div>
+
+  <div class="classy-statgrid__cell">
+    <div class="classy-statgrid__label">
+      <span class="classy-micro">Disabled</span>
+      {% uj_icon "toggle-off", "fa-sm" %}
+    </div>
+    <h3 class="classy-statgrid__value" id="stat-disabled-verts">
+      <span class="spinner-border spinner-border-sm fs-6"></span>
+    </h3>
+  </div>
+</div>
+
+<!-- Verts Table -->
+<div class="card">
+  <div class="card-body p-0">
+    <!-- Loading -->
+    <div id="verts-loading" class="text-center text-muted py-5">
+      <span class="spinner-border spinner-border-sm"></span>
+    </div>
+
+    <!-- Empty State -->
+    <div id="verts-empty" class="text-center text-muted py-5 d-none">
+      No verts yet
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+      <table class="table classy-table d-none" id="verts-table">
+        <thead>
+          <tr>
+            <th>Vert</th>
+            <th>Link</th>
+            <th>Targeting</th>
+            <th>Weight</th>
+            <th>Status</th>
+            <th style="width: 40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="verts-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="card-footer d-none" id="verts-footer">
+    <div class="small text-muted" id="verts-count"></div>
+  </div>
+</div>
+
+<!-- Vert Editor Modal (create + edit) -->
+<div class="modal fade" id="vert-editor-modal" tabindex="-1" aria-labelledby="vert-editor-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title" id="vert-editor-modal-label">New vert</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="vert-editor-form" data-form-state="initializing" onsubmit="return false">
+          <!-- Enabled -->
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="vert-enabled" name="vert.enabled" checked>
+            <label class="form-check-label" for="vert-enabled">Enabled</label>
+          </div>
+
+          <!-- Content -->
+          <h6 class="mb-3">Content</h6>
+          <div class="mb-3">
+            <label for="vert-title" class="form-label small">Title</label>
+            <input type="text" class="form-control form-control-sm" id="vert-title" name="vert.title" placeholder="e.g. Try Paperloom free" required>
+          </div>
+          <div class="mb-3">
+            <label for="vert-description" class="form-label small">Description</label>
+            <textarea class="form-control form-control-sm" id="vert-description" name="vert.description" rows="2" placeholder="One or two sentences of pitch"></textarea>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="vert-button" class="form-label small">Button text</label>
+              <input type="text" class="form-control form-control-sm" id="vert-button" name="vert.button" placeholder="e.g. Get started">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="vert-weight" class="form-label small">Weight</label>
+              <input type="number" class="form-control form-control-sm" id="vert-weight" name="vert.weight" min="1" step="1" value="1">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="vert-link" class="form-label small">Link URL</label>
+            <input type="url" class="form-control form-control-sm" id="vert-link" name="vert.link" placeholder="https://..." required>
+          </div>
+          <div class="mb-3">
+            <label for="vert-image" class="form-label small">Image URL</label>
+            <input type="url" class="form-control form-control-sm" id="vert-image" name="vert.image" placeholder="https://...">
+          </div>
+          <div class="mb-3">
+            <label for="vert-footer" class="form-label small">Footer text</label>
+            <input type="text" class="form-control form-control-sm" id="vert-footer" name="vert.footer" placeholder="Small print under the unit">
+          </div>
+
+          <hr>
+
+          <!-- Targeting -->
+          <h6 class="mb-3">Targeting</h6>
+          <div class="mb-3">
+            <label for="vert-targeting-sites" class="form-label small">Sites</label>
+            <input type="text" class="form-control form-control-sm" id="vert-targeting-sites" name="vert.targeting.sites" placeholder="Comma-separated, e.g. dailybuild.omegajs.dev">
+          </div>
+          <div class="mb-3">
+            <label for="vert-targeting-categories" class="form-label small">Categories</label>
+            <input type="text" class="form-control form-control-sm" id="vert-targeting-categories" name="vert.targeting.categories" placeholder="Comma-separated, e.g. writing, productivity">
+          </div>
+          <div class="mb-3">
+            <label for="vert-targeting-keywords" class="form-label small">Keywords</label>
+            <input type="text" class="form-control form-control-sm" id="vert-targeting-keywords" name="vert.targeting.keywords" placeholder="Comma-separated, e.g. notes, drafts">
+          </div>
+
+          <hr>
+
+          <!-- Placement -->
+          <h6 class="mb-3">Placement</h6>
+          <div class="mb-3">
+            <label for="vert-whitelist" class="form-label small">Whitelist</label>
+            <input type="text" class="form-control form-control-sm" id="vert-whitelist" name="vert.whitelist" placeholder="Comma-separated hosts — only these may show the vert (empty = all)">
+          </div>
+          <div class="mb-3">
+            <label for="vert-blacklist" class="form-label small">Blacklist</label>
+            <input type="text" class="form-control form-control-sm" id="vert-blacklist" name="vert.blacklist" placeholder="Comma-separated hosts that never show the vert">
+          </div>
+
+          <!-- Submit -->
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" class="btn btn-sm btn-outline-adaptive" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-sm btn-adaptive">
+              {% uj_icon "check", "fa-sm me-1" %}
+              <span class="button-text">Save vert</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

@@ -62,7 +62,7 @@
     buildTime: {{ site.uj.cache_breaker | default: 0 }},
     brand: {{ resolved.brand | jsonify }},
     advertising: {{ resolved.advertising | jsonify }},
-    // Company layer (ads source: 'company' resolves company.url → api URL)
+    // Company layer (verts source: 'company' resolves company.url → api URL)
     company: {{ resolved.company | jsonify }},
     // Canonical providers shape straight through (C4 cp106a — no flatten
     // bridge; secrets never ride: omega.json5 carries ids only)

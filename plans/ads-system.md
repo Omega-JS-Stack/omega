@@ -83,3 +83,7 @@ advertising: {
 1. Serve surface: backend routes (`/omega/ads/serve`), runtime reads — ratified (with the in-memory cache).
 2. Weight: required, default 1, composed with contextual match scoring.
 3. Legacy promo-server: site stays online untouched until the ITW brands migrate to OMEGA; inventory imports into the ITW company module at that migration.
+
+## Naming: vert (cp258, Ian's ruling 2026-07-21)
+
+Adblock-safe naming — the ad system speaks **vert** EVERYWHERE at runtime (paths `/omega/verts/*`, DOM `data-omega-vert*`/`.omega-vert-unit`, Firestore collection `verts`, postMessage `omega-vert:*`, client `omega.verts()`/`Verts`/`VertUnit`, section `verts/unit`, admin `/admin/verts`). Only ads.txt, Google's own ad* tokens (adsbygoogle, `data-ad-*`), and the `advertising` config key say "ad". This plan file keeps its historical name.

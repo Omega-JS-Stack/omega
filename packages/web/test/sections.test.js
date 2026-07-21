@@ -398,7 +398,7 @@ const THEMES = path.join(__dirname, '..', 'themes');
 
 test('cp219: buildSectionLibrary — resolved entries over the real classy chain', () => {
   const { entries, groups } = buildSectionLibrary({ baseDirs: [path.join(THEMES, 'classy')] });
-  assert.equal(entries.length, 18, `classy chain: 16 sections + 2 components (ads/unit added cp246), got ${entries.length}`);
+  assert.equal(entries.length, 18, `classy chain: 16 sections + 2 components (verts/unit added cp246), got ${entries.length}`);
   assert.ok(entries.every((entry) => entry.source === 'classy'), 'every entry owned by the classy layer');
 
   const hero = entries.find((entry) => entry.id === 'marketing/hero' && entry.kind === 'section');

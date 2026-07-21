@@ -1,0 +1,71 @@
+---
+layout: frontend/core/base
+permalink: /test/libraries/verts
+
+sitemap:
+  include: false
+meta:
+  title: "Vert unit test page"
+  description: "Test page for demonstrating verts/unit section types"
+  breadcrumb: "Vert unit test"
+  index: false
+---
+
+<section>
+<div class="container">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <h1 class="h2 mb-4">Vert unit test page</h1>
+      <p class="lead mb-5">This page demonstrates the verts/unit section types and lazy loading behavior.</p>
+
+      <!-- Display Vert -->
+      <section>
+        <h2 class="h4 mb-3">1. Display vert</h2>
+        {% section "verts/unit", type: "display" %}
+      </section>
+
+      <hr class="my-4">
+
+      <!-- In-Article Vert -->
+      <section>
+        <h2 class="h4 mb-3">2. In-article vert</h2>
+        {% section "verts/unit", type: "in-article" %}
+      </section>
+
+      <hr class="my-4">
+
+      <!-- In-Feed Vert -->
+      <section>
+        <h2 class="h4 mb-3">3. In-feed vert</h2>
+        {% section "verts/unit", type: "in-feed" %}
+      </section>
+
+      <hr class="my-4">
+
+      <!-- Multiplex Vert -->
+      <section>
+        <h2 class="h4 mb-3">4. Multiplex vert</h2>
+        {% section "verts/unit", type: "multiplex" %}
+      </section>
+
+      <hr class="my-4">
+
+      <!-- House Vert -->
+      <section>
+        <h2 class="h4 mb-3">5. House vert</h2>
+        {% section "verts/unit", type: "house", size: "rectangle" %}
+      </section>
+
+      <!-- Big spacing -->
+      <div class="vh-50"></div>
+
+      <!-- Lazy loaded display vert -->
+      <section>
+        <h2 class="h4 mb-3">6. Lazy loaded display vert (below the fold)</h2>
+        <p class="text-muted mb-3">This vert should only load when scrolled into view.</p>
+        {% section "verts/unit", type: "display" %}
+      </section>
+    </div>
+  </div>
+</div>
+</section>

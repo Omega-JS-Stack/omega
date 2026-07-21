@@ -9,7 +9,7 @@ import Notifications from './modules/notifications.js';
 import ServiceWorker from './modules/service-worker.js';
 import Sentry from './modules/sentry.js';
 import Usage from './modules/usage.js';
-import Ads from './modules/ads.js';
+import Verts from './modules/verts.js';
 
 // Classic dev ports (N7) — the browser-side fallbacks when no resolved map is
 // provided. Lockstep with @omega.js/config's CLASSIC_PORTS: browser code can't
@@ -49,7 +49,7 @@ class Manager {
     this._serviceWorker = new ServiceWorker(this);
     this._sentry = new Sentry(this);
     this._usage = new Usage(this);
-    this._ads = new Ads(this);
+    this._verts = new Verts(this);
   }
 
   // Module getters
@@ -89,8 +89,8 @@ class Manager {
     return this._analytics;
   }
 
-  ads() {
-    return this._ads;
+  verts() {
+    return this._verts;
   }
 
   // DOM utilities
