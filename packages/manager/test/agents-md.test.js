@@ -13,7 +13,7 @@ const path = require('node:path');
 
 const {
   IMPORT_LINE,
-  MARKER_LINE,
+  LEGACY_MARKER_PREFIX,
   CLAUDE_POINTER,
   ensureAgentsMd,
   ensureClaudePointer,
@@ -77,16 +77,40 @@ test('agents-md: a stale-depth import line is healed to the resolved path', () =
 
 // ─── ensureAgentsMd ──────────────────────────────────────────────────────────
 
-test('agents-md: missing AGENTS.md is created — import first, marker second, brand-notes skeleton', () => {
+test('agents-md: missing AGENTS.md is created — import first, then a short brand-notes heading (Ian: keep it short)', () => {
   const dir = tmpdir();
   assert.equal(ensureAgentsMd(dir, 'Fixture Brand'), 'created');
 
   const lines = read(dir, 'AGENTS.md').split('\n');
   assert.equal(lines[0], IMPORT_LINE);
-  assert.equal(lines[1], MARKER_LINE);
-  assert.match(read(dir, 'AGENTS.md'), /# Fixture Brand — brand notes/);
+  assert.equal(lines[1], '');
+  assert.equal(lines[2], '# Fixture Brand — brand notes');
+  assert.ok(!read(dir, 'AGENTS.md').includes('<!--'), 'no marker comment (culled 2026-07-20)');
 
   assert.equal(ensureAgentsMd(dir, 'Fixture Brand'), 'present');
+});
+
+test('agents-md: a correct import with a legacy marker below still heals (present requires cruft-free)', () => {
+  const dir = tmpdir();
+  const legacyMarker = `${LEGACY_MARKER_PREFIX} … -->`;
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `${IMPORT_LINE}\n${legacyMarker}\n\n# Notes\n`);
+
+  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
+  const content = read(dir, 'AGENTS.md');
+  assert.ok(!content.includes('<!--'));
+  assert.equal(ensureAgentsMd(dir, 'X'), 'present');
+});
+
+test('agents-md: healing scrubs the legacy cp244 marker comment', () => {
+  const dir = tmpdir();
+  const legacyMarker = `${LEGACY_MARKER_PREFIX} — maintained by \`npm start\`; keep this import first. -->`;
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@../../${IMPORT_LINE.slice(1)}\n${legacyMarker}\n\n# Notes survive\n`);
+
+  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
+  const content = read(dir, 'AGENTS.md');
+  assert.equal(content.split('\n')[0], IMPORT_LINE);
+  assert.ok(!content.includes('<!--'), 'legacy marker gone');
+  assert.match(content, /# Notes survive/);
 });
 
 test('agents-md: existing file without the import is healed in place — content preserved, import at line 1', () => {

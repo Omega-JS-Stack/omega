@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Brand AGENTS.md trimmed (Ian's inbox note, 2026-07-20).** The scaffolded file is now just the framework-guide import + a short `# <brand> — brand notes` heading — the cp244 marker comment and skeleton sentence are gone, and heals scrub any legacy copy from existing files (present now requires cruft-free). Both in-repo brands re-healed; manager 718/718.
+
 ### Added
 - **cp246 — per-app docs retired in brand context (Ian's unification ruling, 2026-07-20).** The brand root is the ONE doc home: in a brand app, `CLAUDE.md`/`CHANGELOG.md`/`docs/` NEVER scaffold anymore, and existing framework-owned-only copies are swept once (loud log, empty dirs pruned) — copies carrying real consumer content are never destroyed (kept + move-it warning). One shared mechanism: new `retire` rule in the devkit defaults engine (+ `getCustomSection` export, `isFrameworkOwned` judgment: Custom section empty/whitespace OR byte-equal to shipped boilerplate; marker-less files must equal the rendered template — conservative: ambiguity always warns, never deletes), wired MIRRORED in all four frameworks' existing brand branches (brand detection = the same `@omega.js/config` brand-root resolution the config-seed lane already used). Standalone apps unchanged (pinned). Sweeps executed on the in-repo brands (playground/newsflash/sandbox — website+desktop+extension docs gone; backend CLAUDE.mds kept+warned where legacy-migrated Custom content exists). Tests: devkit 6 retire pins + section-parse pin, backend 2 boot pins, desktop/extension/web brand-vs-standalone pins. Suites: devkit 219, web 256, desktop 773, extension 107, backend smoke 13 + FULL 1295/0; root battery EXIT 0 (corpus 7/7, cross-stack e2e, wizard journey 26 services). Contract: [docs/agent-docs.md](docs/agent-docs.md).
 

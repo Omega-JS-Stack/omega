@@ -12,7 +12,10 @@ const jetpack = require('fs-jetpack');
 
 const GUIDE_SUBPATH = 'node_modules/@omega.js/manager/AGENTS.md';
 const IMPORT_LINE = `@${GUIDE_SUBPATH}`;
-const MARKER_LINE = '<!-- ^ OMEGA framework agent guide — maintained by `npm start`; keep this import first. Non-Claude agents: read that file directly. Brand notes below are yours. -->';
+// cp244 shipped a verbose marker comment under the import; Ian culled it
+// (2026-07-20: keep it short) — heals scrub any legacy copy by prefix.
+const LEGACY_MARKER_PREFIX = '<!-- ^ OMEGA framework agent guide';
+const LEGACY_SKELETON_LINE = 'Everything below the import is yours — the framework never rewrites it.';
 const CLAUDE_POINTER = '@AGENTS.md';
 
 /**
@@ -54,11 +57,8 @@ function resolveImportLine(brandRoot) {
 function renderAgentsMd(brandName, importLine = IMPORT_LINE) {
   return [
     importLine,
-    MARKER_LINE,
     '',
     `# ${brandName} — brand notes`,
-    '',
-    'Everything below the import is yours — the framework never rewrites it.',
     '',
   ].join('\n');
 }
@@ -83,14 +83,20 @@ function ensureAgentsMd(brandRoot, brandName) {
   }
 
   const lines = existing.split('\n');
-  if (lines[0].trim() === importLine) {
+  const hasCruft = lines.some((line, i) => (i > 0 && isImportLine(line))
+    || line.trim().startsWith(LEGACY_MARKER_PREFIX)
+    || line.trim() === LEGACY_SKELETON_LINE);
+
+  if (lines[0].trim() === importLine && !hasCruft) {
     return 'present';
   }
 
-  // Heal: the resolved import (+ marker) goes to the top; drop any stray or
-  // stale-depth import copy so repeated heals never stack duplicates
-  const body = lines.filter((line) => !isImportLine(line) && line.trim() !== MARKER_LINE);
-  jetpack.write(file, [importLine, MARKER_LINE, ...(body[0]?.trim() === '' ? [] : ['']), ...body].join('\n'));
+  // Heal: the resolved import goes to the top; drop any stray/stale-depth
+  // import copy and any legacy marker comment so heals never stack cruft
+  const body = lines.filter((line) => !isImportLine(line)
+    && !line.trim().startsWith(LEGACY_MARKER_PREFIX)
+    && line.trim() !== LEGACY_SKELETON_LINE);
+  jetpack.write(file, [importLine, ...(body[0]?.trim() === '' ? [] : ['']), ...body].join('\n'));
   return 'healed';
 }
 
@@ -122,7 +128,7 @@ function ensureClaudePointer(brandRoot) {
 module.exports = {
   GUIDE_SUBPATH,
   IMPORT_LINE,
-  MARKER_LINE,
+  LEGACY_MARKER_PREFIX,
   CLAUDE_POINTER,
   isImportLine,
   resolveImportLine,

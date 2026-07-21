@@ -7,13 +7,14 @@
 ```
 brand/CLAUDE.md            @AGENTS.md                                  (one line, Claude Code's entry)
 brand/AGENTS.md   line 1:  @node_modules/@omega.js/manager/AGENTS.md  (the framework guide import)
-                  line 2:  <!-- marker comment (maintained-by note for humans + non-Claude agents) -->
-                  below:   the brand's own notes — NEVER touched by the framework
+                  below:   `# <brand> — brand notes` + the brand's own notes — NEVER touched by the framework
 ```
+
+(The cp244 marker comment under the import was culled — Ian 2026-07-20: keep it short; heals scrub any legacy copy.)
 
 - The import path is **relative** (portable to any machine). For hoisted installs (the in-repo test brands are npm workspaces of this monorepo) the ensure step walks up and writes the correct depth, e.g. `@../../node_modules/@omega.js/manager/AGENTS.md`.
 - In the local era, `node_modules/@omega.js/manager` is a `file:` symlink into this monorepo — the import resolves to the LIVE `packages/manager/AGENTS.md`, so framework edits are instantly visible to every brand session. Published installs read the shipped copy, which updates with the package.
-- Non-Claude agents read `AGENTS.md` but don't follow `@` imports — the marker comment names the target file for them.
+- Non-Claude agents read `AGENTS.md` but don't follow `@` imports — the import line itself names the target path for them.
 
 ## Maintenance
 
