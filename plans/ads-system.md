@@ -1,6 +1,8 @@
-# OMEGA Ads System — spec (DRAFT for Ian's ratification)
+# OMEGA Ads System — spec (RATIFIED with amendments, Ian 2026-07-20)
 
-> Queue item (b), Ian 2026-07-20: ads are "super important" — provider ads first (AdSense), in-house/fallback ads hostable on the parent company OR the brand itself. Grounded in the legacy survey (vert.js, promo-server-website/backend, UJM adunits, `ultimate-jekyll-manager/plans/unified-vert-ad-units.md`). Spec-first: nothing here builds until Ian ratifies.
+> Queue item (b), Ian 2026-07-20: ads are "super important" — provider ads first (AdSense), in-house/fallback ads hostable on the parent company OR the brand itself. Grounded in the legacy survey (vert.js, promo-server-website/backend, UJM adunits, `ultimate-jekyll-manager/plans/unified-vert-ad-units.md`).
+>
+> **Ian's amendments (2026-07-20)**: (1) Detection is a FULL REWRITE — don't preserve the legacy poll mechanics, just the behavior: adblock detected OR no-fill for any reason → in-house fallback. (2) Serving is RUNTIME (function/Firestore read), not build-time — cost handled by an in-memory inventory cache in the function (TTL ~5 min → one Firestore read per instance per interval, not per impression). (3) `weight` required; RELEVANCE required: contextual targeting v1 (per-ad tags × the requesting brand/page's tags, match-score × weight) — no user tracking; viewer-level targeting is a later layer on the same scoring. (4) Company model confirmed: ITW Creative Works is the company; legacy brands (soundgrail, sweet-saucy, …) eventually migrate and look to the COMPANY for ads etc. promo-server.itwcreativeworks.com stays online untouched until that migration; its inventory imports into the company module then.
 
 ## What the legacy system got right (preserved)
 
@@ -32,6 +34,7 @@ advertising: {
     },
   },
   fallback: 'inhouse',                   // provider role to fall through to; false = none
+  tags: ['music', 'audio-tools'],        // this brand's contextual tags (targeting match input)
 }
 ```
 
@@ -41,7 +44,9 @@ advertising: {
 
 ## House inventory — a backend module (modern replacement for the Jekyll-file verts)
 
-- **Firestore collection `ads`**: `{ enabled, title, description, button, link, image, footer, weight, whitelist: [], blacklist: [], metadata }` — the legacy frontmatter shape, DB-backed. Public-read via routes only (no direct Firestore reads from foreign origins).
+- **Firestore collection `ads`**: `{ enabled, title, description, button, link, image, footer, weight, targeting: { sites: [], categories: [], keywords: [] }, whitelist: [], blacklist: [], metadata }` — the legacy frontmatter shape, DB-backed + targeting. Public-read via routes only (no direct Firestore reads from foreign origins).
+- **Selection scoring**: eligibility (enabled + white/blacklist + never-advertise-self) → contextual match score (ad `targeting` tags vs the request's `tags` — brand-configured + page context) → weighted random among the top scorers (`weight`, default 1). No tags anywhere = pure weighted shuffle (legacy behavior).
+- **Inventory cache**: the serve route holds the ads collection in function memory (TTL ~5 min) — runtime serving at ~zero Firestore read cost per impression (Ian's ruling: runtime read is correct; this makes it cheap).
 - **Routes** (built-in, `/omega/ads/*`):
   - `GET /omega/ads/serve?parent=<host>&…` — selection (filter enabled + white/blacklist + never-advertise-self, weighted shuffle) → the rendered unit page (self-contained HTML: card layout, dimension reporting, click postMessage). Serves from the backend's hosting surface, so 'self' needs only the backend target.
   - `GET /omega/ads/redirect?id&url` — fail-closed allowlist validation (known ad links only) → UTM'd redirect. View/click events tracked server-side (Analytics lane) — no gtag dependency inside the frame.
@@ -53,7 +58,7 @@ advertising: {
 - `{% section "ads/unit" %}` with args: `type` (`display`/`in-article`/`in-feed`/`multiplex`/`house`), `size` preset (banner/leaderboard/rectangle/…), optional `ad_id` pin. Neutral json5 defaults; markup is context-free per §sections doctrine.
 - `section.js` (§7 presence-init, shared client singleton):
   1. Lazy: IntersectionObserver arms the unit near viewport.
-  2. Provider lane: inject `adsbygoogle.js` once, build the `<ins>`, poll `data-ad-status` (100ms/10s) — `filled` → done; `unfilled`/timeout/load-failure → fallback lane (if configured).
+  2. Provider lane (FULL REWRITE — Ian: don't trust the legacy mechanics): adblock detection first (script-load failure of `adsbygoogle.js` IS the detector — no bait divs, no separate library); blocked → straight to fallback. Otherwise build the `<ins>` and await fill via a `data-ad-status` attribute observer (MutationObserver + timeout, not a 100ms poll) — `filled` → done; `unfilled`/timeout → fallback lane (if configured).
   3. Fallback lane: sandboxed iframe → resolved inhouse source's `/omega/ads/serve`; origin-validated postMessage (set-dimensions/click); HOST-side rotation + staleness recovery.
   4. Paying users: unit hides on `auth.resolved.active` via the standard bindings (legacy behavior kept).
 - Desktop/extension: no AdSense (policy/no-web-context) — the shared client ships the same fallback-lane logic as an `omega.ads()` module binding `data-omega-ad` elements straight to the house/company inventory. Web section uses the same module under the hood (one implementation, three surfaces).
@@ -69,8 +74,8 @@ advertising: {
 6. Company-mode proof on the playground (Paperloom serves, a second in-repo brand consumes).
 - AdSense LIVE verification stays gated behind the real publish (Ian 2026-07-14: AdSense console needs the published site).
 
-## Open questions for Ian
+## Resolved questions (Ian 2026-07-20)
 
-1. Serve surface for 'self': backend hosting (`/omega/ads/serve`) is the spec'd default — OK, or would you rather the website host the frame and only fetch inventory JSON from the api?
-2. Weighted rotation (a `weight` field) vs pure shuffle — spec'd weighted-with-default-1; fine?
-3. Should the legacy promo-server (ITW) inventory migrate into the new company-mode module at ITW-rebuild time, or does promo-server.itwcreativeworks.com stay as-is until the brand rebuilds?
+1. Serve surface: backend routes (`/omega/ads/serve`), runtime reads — ratified (with the in-memory cache).
+2. Weight: required, default 1, composed with contextual match scoring.
+3. Legacy promo-server: site stays online untouched until the ITW brands migrate to OMEGA; inventory imports into the ITW company module at that migration.
