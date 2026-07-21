@@ -3,10 +3,12 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
+- [fable 2026-07-21] cp257 agent: de-ITW recaptcha ask + company-default GA account id (Ian INBOX items) → gate: suites + review → commit
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
+- cp258 vert rename (Ian GO 2026-07-21): all wire/DOM ad surfaces → vert (/omega/verts/*, data-omega-vert, .omega-vert-unit, /admin/verts); internals + `ads` collection + ads.txt stay
 - Playground CMS creates (arc close) once the source repo's `main` exists
 - De-ITW recaptcha: the ITW-owned key (GCP recaptcha console, project itw-creative-works) must be ASKED for in onboarding/manager (Ian INBOX 2026-07-21)
 - Company-default Google Analytics ACCOUNT id: definable once (company layer) so sub-brand analytics setup defaults to it, no picker (Ian INBOX 2026-07-21)
@@ -34,6 +36,7 @@
 - GO ci: all CI dispatch-only and PAUSED; even deliberate dispatches are Ian's call
 
 ## Rulings
+- Ian 2026-07-21: adblock-safe naming — nothing wire/DOM-visible ever says "ad(s)" (paths, classes, attributes, asset URLs); the codename is vert; internals/collection/docs may say ads
 - Ian 2026-07-21: "DO NOT USE EM DASHES… REWRITE EVERYTHING TO MAKE SENSE WITHUT IT" — site/brand copy never uses em dashes; manual rewrites, not deletions
 - Ian 2026-07-10: continuous mode — iterate/build/test autonomously, checkpoint after checkpoint; stop only for serious errors or genuinely-Ian decisions
 - Ian 2026-07-19: "I refuse to run a single command — wrap it in npm start, self healing idempotent" — absorb, never hand back; blocked one-offs = framework gaps; wrapped verbs only
