@@ -1,3 +1,7 @@
+---
+status: active
+created: 2026-07-11
+---
 # Dogfood arc — C1–C5 + D13 → the OMEGA brand on all four targets
 
 > Status: **ACTIVE (opened cp92, 2026-07-11)** — the execution plan for PROGRESS Next #1. Binding spec: [omega-core-changes-inbox.md](omega-core-changes-inbox.md) §C (C1–C5) + decisions D7/D8/D9/D10/D11/D13. This doc = survey findings + checkpoint slicing; per-checkpoint detail lands in CHANGELOG entries as usual. Exit criterion for the whole arc: **the OMEGA brand runs on all four targets via `omega dev --local`, built from a wizard-scaffolded brand, themed once, deployed deliberately** — then brand rebuilds (somiibo → sweet-saucy) start.

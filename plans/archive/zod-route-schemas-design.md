@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-10
+---
 # Zod route schemas — design (N4, shapes preserved)
 
 > Status: **FULLY IMPLEMENTED (cp76–78) + tightenings #2–#4 SHIPPED (cp79)** — engine (`src/manager/helpers/schema-zod.js`: `fields` builders + `resolveZodSchema` + `isZodSchema`), `Settings.resolve` zod branch, differential parity suite (`test/helpers/schema-zod.js`: 30-case battery + frozen test/schema twin + signup consent pin + enum pin, both engines through the real `Settings.resolve`), and ALL cohorts converted: test/* + general/* (cp76), user/* + brand/content/handler/special/restart (cp77), admin/* + payments/* + marketing/* (cp78). The 4 provider webhooks stay declarative-empty by design; consumer declarative schemas keep working. Deviation from the design below: the `{ schema, zod }` dual-export migration form was NOT implemented — parity diffing lived in per-cohort differential checks + the frozen twins instead, so routes converted directly to the zod export. Decision source: core-changes inbox "zod route schemas". Hard rule: **wire shapes are preserved** — zod replaces the validation ENGINE, not the observed behavior (post-parity tightenings are the deliberate, Ian-approved exceptions). Survey: cp73c route-inventory agent (full per-route detail lived in that report; this doc is the self-contained distillation).

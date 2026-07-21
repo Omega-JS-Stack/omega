@@ -1,3 +1,7 @@
+---
+status: ratified
+created: 2026-07-16
+---
 # classy v2 — Direction (LOCKED, build contract)
 
 **Status:** GO from Ian 2026-07-16 ("just go ahead and build classy"). Direction converged over two interactive comp rounds against Ian's theme notes (2026-07-15) + 14 Mobbin inspo screens + ElevenLabs/Manus references (his second-round attachments).

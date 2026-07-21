@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-13
+---
 # Backend src/dist restructure (cp122 arc)
 
 **Directive (Ian, boarded 2026-07-13, promoted same day):** @omega.js/backend consumers gain

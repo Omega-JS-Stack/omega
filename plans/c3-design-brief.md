@@ -1,3 +1,7 @@
+---
+status: draft
+created: 2026-07-11
+---
 # C3 Design Brief — flagship theme redesign
 
 **Status:** OUT FOR IAN'S REVIEW (drafted 2026-07-11, cp99). Systems work proceeds in parallel — nothing below blocks tokens/mechanics.

@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-09
+---
 # OMEGA Ecosystem Architecture & Duplication Audit
 ## For unified config format + npm @omega/* rebrand redesign
 

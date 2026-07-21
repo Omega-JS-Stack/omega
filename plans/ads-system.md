@@ -1,3 +1,7 @@
+---
+status: ratified
+created: 2026-07-20
+---
 # OMEGA Ads System — spec (RATIFIED with amendments, Ian 2026-07-20)
 
 > Queue item (b), Ian 2026-07-20: ads are "super important" — provider ads first (AdSense), in-house/fallback ads hostable on the parent company OR the brand itself. Grounded in the legacy survey (vert.js, promo-server-website/backend, UJM adunits, `ultimate-jekyll-manager/plans/unified-vert-ad-units.md`).

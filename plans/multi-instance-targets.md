@@ -1,3 +1,7 @@
+---
+status: ratified
+created: 2026-07-20
+---
 # Multi-instance targets — spec (shape RATIFIED by Ian 2026-07-20; build queued)
 
 > Queue item (c). The real need is proven by legacy `brand.subdomains` (ITW: `["admin","cdn","emails"]`; soundgrail: `["app","music","exhale"]` — each a separate website living on a subdomain of the same brand). The new system must let ONE brand run N instances of the SAME target type without inventing new target types.

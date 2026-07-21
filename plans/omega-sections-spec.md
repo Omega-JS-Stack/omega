@@ -1,3 +1,7 @@
+---
+status: ratified
+created: 2026-07-18
+---
 # OMEGA Sections & Components — Architecture Spec
 
 > **STATUS: RATIFIED (Ian, 2026-07-18 — same night as the design).** Extraction underway; durable parts migrate to `docs/sections.md` as pieces land.

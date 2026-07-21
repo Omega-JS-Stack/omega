@@ -1,3 +1,7 @@
+---
+status: active
+created: 2026-07-20
+---
 # OMEGA System Review — 2026-07-20
 
 > Comprehensive architecture, security, code quality, testing, and DX audit.

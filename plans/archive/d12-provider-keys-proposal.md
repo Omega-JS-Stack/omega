@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-10
+---
 # D12 provider-discriminated config keys — exact-shape proposal (N4)
 
 > Status: **IMPLEMENTED (checkpoint 74, 2026-07-10)** — the sweep below shipped exactly as approved; see CHANGELOG [Unreleased] "D12 shipped" for the blast-zone list + proofs (full matrix, sandbox corpus 1208/44/0, pack-smoke ×4). One survey correction found at implementation: **R3c is vacuous in the monorepo** — the `anthropic`/`openai` top-levels were legacy omega-manager keys that were never ported (zero readers in packages/manager or packages/backend; the AI library resolves keys from `.env`), so `ai.providers.*` has nothing to rename until the pinned migration tooling meets a legacy brand config that carries them.

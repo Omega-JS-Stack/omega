@@ -1,3 +1,7 @@
+---
+status: active
+created: 2026-07-11
+---
 # Dogfood friction log — omega-brand first run (cp93, 2026-07-11)
 
 > The C1 work list. Every wart from scaffolding the OMEGA brand (all four targets) via the REAL wizard + framework setups, in the order met (finding 20 added by cp94b's brand-root fan-out; ✅ = fixed, with the owning checkpoint named). Severity: 🔴 breaks the run · 🟡 wrong result, run continues · ⚪ polish. Each item names its owning slice (C1/C2/C4/N4-flavored). Positive observations at the bottom — the parts that already feel shipfa.st-grade.

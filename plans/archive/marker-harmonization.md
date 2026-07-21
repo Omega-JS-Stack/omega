@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-10
+---
 # Marker-block harmonization — ONE style family (Ian 2026-07-10)
 
 > Status: **IMPLEMENTED (checkpoint 75)** — Ian: "ensure that any marker blocks (think of the

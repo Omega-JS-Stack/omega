@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-10
+---
 # N6 — Personas + lifecycle e2e (design)
 
 > Status: **COMPLETE (cp83–cp87)** — all build items A–G shipped; N6 is closed. Spec source: core-changes inbox N6 — seeded emulator persona accounts (unauthed/free/paid/cancelled/refunded/…) usable by backend tests AND manual frontend signin; global lifecycle flows (signup, delete account, cancel, refund, data export, data deletion); boot-all-targets-and-wait harness generalized from the sandbox e2e; consumer-authorable brand tests; /account mock fixtures removed.

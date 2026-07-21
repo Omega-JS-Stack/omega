@@ -1,3 +1,7 @@
+---
+status: active
+created: 2026-07-11
+---
 # C4 — Cross-target sharing (survey + slicing)
 
 > Opened cp103+ (2026-07-11), Ian's go. Read-only survey by fan-out agent over

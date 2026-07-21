@@ -1,3 +1,7 @@
+---
+status: ratified
+created: 2026-07-10
+---
 # OMEGA Core Changes — Ideas Inbox
 
 > **Status: DECIDED 10/10 (2026-07-10) — BINDING.** All decisions resolved; graduated into [omega-redesign-master-plan.md](omega-redesign-master-plan.md) amendment (3) + the [PROGRESS.md](../PROGRESS.md) queue. This file is now the spec of record for the pre-dogfood core-changes window (Ian's raw dump preserved verbatim at the bottom).

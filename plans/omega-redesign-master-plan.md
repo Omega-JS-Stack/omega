@@ -1,3 +1,7 @@
+---
+status: ratified
+created: 2026-07-09
+---
 # OMEGA Ecosystem Redesign & Optimization Plan
 
 > **Canonical home of the master plan** (vendored 2026-07-09 from the plan-mode original at `~/.claude/plans/i-need-you-to-jiggly-salamander.md`, which now just points here).

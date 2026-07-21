@@ -1,3 +1,7 @@
+---
+status: superseded
+created: 2026-07-10
+---
 # N7 — Port auto-allocation (design)
 
 > Status: **N7 COMPLETE — cp90 SHIPPED (desktop/extension/stragglers); every fixed dev port in the stack now allocates or follows the map.** Desktop URL getters mirror the backend env channel (`OMEGA_FUNCTIONS_PORT` / `OMEGA_HTTPS_PORT`→https / `OMEGA_HOSTING_PORT`→http / `OMEGA_WEBSITE_PORT`); `getWebsiteUrl` (backend + desktop) says `http://localhost:4000` — the https form was a browsersync-era assumption `omega dev` never spoke (dev signin flows would TLS-fail). Desktop + extension serve allocate `livereload` per target (the two-targets-one-brand collision is gone; the extension's baked config now rides the resolved value — package.js used to hardcode 35729) and desktop allocates `cdp` when requested (replaces the "try +1 manually" advice). `mgr serve` allocates (`--port` pins; kill-the-incumbent pre-check DELETED) and PUBLISHES `{https, hosting}` via the ports file so `omega dev` bakes even a bumped serve into the chrome; Stripe forwarding (dormant — "coming soon" short-circuit) now takes the resolved plain-http target (it used to aim http at the TLS proxy). Manager Google-OAuth loopback = `listen(0)` (RFC 8252), no 9876 pin. Extension manifest dev-origin documented as build-time-baked (packaged artifacts can't probe — the stated non-goal). Prior slices below.
