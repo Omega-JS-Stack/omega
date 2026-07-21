@@ -331,7 +331,7 @@ const SHARED_SCHEMA = [
     path:        'targets',
     type:        'object',
     required:    false,
-    description: 'Key presence = target enabled; values = target-scoped config (any shared key inside overrides it). Unknown keys are errors.',
+    description: 'Key presence = target enabled; values = target-scoped config (any shared key inside overrides it) — an object, or an array of id\'d instances (multi-instance targets). Unknown keys are errors.',
   },
 ];
 

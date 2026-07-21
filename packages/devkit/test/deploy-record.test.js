@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { recordDeploy, readDeployRecord } = require('../src/deploy-record.js');
+const { recordDeploy, readDeployRecord, deployKey } = require('../src/deploy-record.js');
 
 function makeBrand() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deploy-record-'));
@@ -34,6 +34,26 @@ test('recordDeploy resolves to the brand root from an app dir; readDeployRecord 
 
   assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch');
   assert.equal(readDeployRecord({ dir: appDir, target: 'backend' }), null, 'target-scoped');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('instance keys (multi-instance targets): main stays the bare target, other instances key <target>:<id>', () => {
+  const root = makeBrand();
+
+  assert.equal(deployKey('web'), 'web');
+  assert.equal(deployKey('web', 'main'), 'web', 'main IS the bare key — existing records stay valid');
+  assert.equal(deployKey('web', 'admin'), 'web:admin');
+
+  recordDeploy({ dir: root, target: 'web', instance: 'main', detail: { method: 'dispatch' } });
+  recordDeploy({ dir: root, target: 'web', instance: 'admin', detail: { method: 'direct' } });
+
+  const state = JSON.parse(fs.readFileSync(path.join(root, '.omega', 'state.json'), 'utf8'));
+  assert.deepEqual(Object.keys(state.deploy).sort(), ['web', 'web:admin'], 'per-app records, distinct keys');
+
+  assert.equal(readDeployRecord({ dir: root, target: 'web' }).method, 'dispatch', 'instance-less read = the primary');
+  assert.equal(readDeployRecord({ dir: root, target: 'web', instance: 'admin' }).method, 'direct');
+  assert.equal(readDeployRecord({ dir: root, target: 'web', instance: 'cdn' }), null, 'instance-scoped');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

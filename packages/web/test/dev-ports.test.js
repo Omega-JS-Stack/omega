@@ -12,7 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 
-const { resolveWebsitePort, readSiblingPorts } = require('../src/commands/dev.js');
+const { resolveWebsitePort, websiteWantedPort, readSiblingPorts } = require('../src/commands/dev.js');
 
 function occupy(port) {
   return new Promise((resolve) => {
@@ -67,6 +67,47 @@ test('config ports.website pins', async () => {
   const { port, bumped } = await resolveWebsitePort(root, null);
   assert.equal(port, 42830);
   assert.equal(bumped, false);
+});
+
+// ---- websiteWantedPort (multi-instance offsets — deterministic, no binding)
+
+test('websiteWantedPort: each instance wants base + its array position, side-by-side capable', () => {
+  // 2-instance web brand: apps/website (main) + apps/website-admin
+  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-instances-'));
+  fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{
+    brand: { id: 'acme', name: 'Acme' },
+    targets: { web: [{ id: 'main' }, { id: 'admin', url: 'https://admin.acme.test' }] },
+  }`);
+  const website = path.join(brand, 'apps', 'website');
+  const admin = path.join(brand, 'apps', 'website-admin');
+  fs.mkdirSync(website, { recursive: true });
+  fs.mkdirSync(admin, { recursive: true });
+
+  assert.equal(websiteWantedPort(website), 4000, 'main stays on the classic base');
+  assert.equal(websiteWantedPort(admin), 4001, 'admin offsets by its instances-array position');
+
+  // Env-derived base carries the offset too
+  process.env.OMEGA_WEBSITE_PORT = '42840';
+  try {
+    assert.equal(websiteWantedPort(admin), 42841);
+  } finally {
+    delete process.env.OMEGA_WEBSITE_PORT;
+  }
+});
+
+test('websiteWantedPort: single-object brands and config-less dirs stay on the classic base (zero breaking change)', () => {
+  const brand = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-ports-single-'));
+  fs.mkdirSync(path.join(brand, 'config'), { recursive: true });
+  fs.writeFileSync(path.join(brand, 'config', 'omega.json5'), `{
+    brand: { id: 'acme', name: 'Acme' },
+    targets: { web: {} },
+  }`);
+  const website = path.join(brand, 'apps', 'website');
+  fs.mkdirSync(website, { recursive: true });
+
+  assert.equal(websiteWantedPort(website), 4000);
+  assert.equal(websiteWantedPort(os.tmpdir()), 4000, 'no config → classic base, never a dev-loop failure');
 });
 
 // ---- readSiblingPorts

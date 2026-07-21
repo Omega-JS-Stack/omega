@@ -9,8 +9,11 @@
  *      hot-swaps, js reloads — no hand refresh).
  *
  * Port (N7): the website convention is 4000, resolved through the allocator —
- * taken ports bump +1. `omega dev --port=4001` (or a config `ports.website`
- * entry) PINS the port instead: busy = hard error, never a silent bump. The
+ * taken ports bump +1. Multi-instance web brands offset deterministically:
+ * each instance wants 4000 + its position in the instances array, so
+ * apps/website and apps/website-admin dev side-by-side. `omega dev
+ * --port=4001` (or a config `ports.website` entry) PINS the port instead:
+ * busy = hard error, never a silent bump. The
  * resolved map of a live sibling backend (its `.temp/ports.json`) plus this
  * website port are injected into the page chrome as `dev.ports` so
  * @omega.js/client connects to the stack that is ACTUALLY running.
@@ -26,7 +29,7 @@ const Logger = require('@omega.js/devkit/logger');
 const {
   CLASSIC_PORTS, isPortFree, resolvePorts, envPort,
   readPortsFile, writePortsFile, clearPortsFile,
-  findBrandRoot, hasOmegaConfig, loadConfig,
+  findBrandRoot, hasOmegaConfig, loadConfig, instancePortOffset,
 } = require('@omega.js/config');
 const { emitIcons } = require('@omega.js/devkit/icons');
 const { buildAssets } = require('../assets.js');
@@ -354,9 +357,30 @@ async function resolveWebsitePort(root, flagPort) {
     }
   }
 
-  const wanted = { website: envPort('website') || CLASSIC_PORTS.website };
+  const wanted = { website: websiteWantedPort(root) };
   const { ports, bumped } = await resolvePorts({ wanted, pins });
   return { port: ports.website, bumped: bumped.length > 0 };
+}
+
+/**
+ * The wanted (pre-allocator) website port: OMEGA_WEBSITE_PORT (a parent that
+ * already allocated) or the classic 4000, plus this app's deterministic
+ * instance offset (multi-instance targets: an instance wants base + its
+ * position in the instances array, so N instances dev side-by-side off the
+ * same base). Lenient like loadPortPins — no config means no offset.
+ */
+function websiteWantedPort(root) {
+  const base = envPort('website') || CLASSIC_PORTS.website;
+
+  try {
+    if (!hasOmegaConfig(root)) {
+      return base;
+    }
+    const { config, instance } = loadConfig(root, 'web');
+    return base + instancePortOffset(config.targets?.web, instance);
+  } catch (error) {
+    return base;
+  }
 }
 
 /**
@@ -412,6 +436,7 @@ function readSiblingPorts(root) {
  */
 // Exposed for tests (the command function stays the main export)
 module.exports.resolveWebsitePort = resolveWebsitePort;
+module.exports.websiteWantedPort = websiteWantedPort;
 module.exports.readSiblingPorts = readSiblingPorts;
 module.exports.devServerOptions = devServerOptions;
 module.exports.applyDevSiteUrl = applyDevSiteUrl;

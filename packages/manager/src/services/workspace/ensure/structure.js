@@ -3,11 +3,17 @@
  * workspaces, and an app directory for every enabled target. Apps that map
  * to no target are warned (never silently skipped); enabled targets with no
  * app are errors with the exact dir to create.
+ *
+ * Multi-instance targets: an ARRAY-form target expects one app dir PER
+ * instance (`main` → the canonical dir, any other id → `<canonical>-<id>`) —
+ * an enabled instance without its dir is the same create-this-dir error. The
+ * single-object form keeps today's any-app-of-the-type check untouched.
  */
 const { join } = require('node:path');
 const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
+const { normalizeTargetInstances, instanceAppDir } = require('@omega.js/config');
 const { TARGET_APP_DIRS } = require('../../../config.js');
 
 module.exports = async ({ brandRoot, brand, apps }) => {
@@ -25,8 +31,23 @@ module.exports = async ({ brandRoot, brand, apps }) => {
     }
   }
 
-  // Every enabled target needs at least one app
+  // Every enabled target needs at least one app; the multi-instance array
+  // form needs every instance's exact dir (the config validator owns id
+  // sanity — malformed entries are its errors, never doubled here)
   for (const target of brand.targets) {
+    const entry = brand.config?.targets?.[target];
+
+    if (Array.isArray(entry)) {
+      for (const instance of normalizeTargetInstances(entry)) {
+        if (typeof instance?.id !== 'string') continue;
+        const dir = instanceAppDir(target, instance.id);
+        if (!apps.some((app) => app.name === dir)) {
+          problems.push(`enabled target "${target}" instance "${instance.id}" has no app — create apps/${dir}/`);
+        }
+      }
+      continue;
+    }
+
     if (!apps.some((app) => app.target === target)) {
       const suggested = TARGET_APP_DIRS[target] || target;
       problems.push(`enabled target "${target}" has no app — create apps/${suggested}/`);

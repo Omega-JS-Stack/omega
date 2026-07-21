@@ -51,7 +51,7 @@ targets: {
 
 ## Sequencing (when built)
 
-1. `@omega.js/config`: normalization + instance resolution + validator (ids unique, backend >1 warn) + tests.
-2. Manager workspace structure op + testing service instance iteration + tests.
-3. Web dev-port offsets + deploy-record keying proof on a fixture brand (sandbox corpus cell with a 2-instance web brand).
-4. Docs (config.md, deploys.md, local-dev.md) + this plan collapses into them.
+1. (DONE 2026-07-21) `@omega.js/config`: normalization + instance resolution + validator (ids unique, backend >1 warn) + tests — `src/instances.js` (the ONE iteration mechanism; app-dir mapping SSOT moved here from the manager), loadConfig/composeTargetConfig gained the instance dimension, `validateConfig` gained `warnings`; `test/instances.test.js`.
+2. (DONE 2026-07-21) Manager workspace structure op (per-instance dir expectations, array form only) + testing service per-instance live URLs and deploy-record keys + tests — `test/instances.test.js`.
+3. (DONE 2026-07-21) Web dev-port offsets (`websiteWantedPort` — base + array position) + deploy-record keying (`deploy.<target>:<id>`, main stays bare) proven by the `shape-web-two-instance` corpus cell (structure error/heal, per-instance compose, offsets, record keys, both instances built through the real Eleventy lane).
+4. (DONE 2026-07-21) Docs: [docs/config.md](../docs/config.md) (shape + normalization + legacy `brand.subdomains` conversion rule), [docs/deploys.md](../docs/deploys.md) (per-app = per-instance records), [docs/local-dev.md](../docs/local-dev.md) (port offsets).

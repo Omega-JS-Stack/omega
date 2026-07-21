@@ -29,6 +29,7 @@ omega dev --all                # every target with a dev leg (desktop/extension 
 
 - **Default set = `web` + `backend`** — the local web loop. GUI/watcher targets (desktop opens an Electron window; extension runs a build watcher) never boot unless named via `--only`/`--all`. The default also adapts: a web-only brand boots just web, no warning.
 - **Legs**: web → the app's `npm start` (`omega dev`, :4000); backend → `npm run emulator` (auth/firestore/functions/database/hosting + seeded personas). Backend boots first so its port map is published before web reads it (N7 makes the order optional — web falls back to the classic ports).
+- **Multi-instance web ports offset deterministically**: each instance wants the classic base + its position in the `targets.web` instances array (apps/website → :4000, apps/website-admin → :4001), so instances dev side-by-side from their own app dirs; the N7 allocator still bumps if the offset port happens to be taken, and pins (`--port` / config `ports.website`) win verbatim. Single-object brands stay on :4000 exactly as before.
 - **Per-app Node**: each leg spawns under its app's own `.nvmrc` major (web and backend pin different ones).
 - Output is line-prefixed per target (`[backend] …`, `[web] …`); one Ctrl-C stops everything; a leg dying alone is announced and its siblings stay up.
 

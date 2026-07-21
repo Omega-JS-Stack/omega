@@ -15,6 +15,12 @@
  *
  *   defaults ← brand shared ← brand targets[target] ← app shared ← app targets[target]
  *
+ * Multi-instance targets: a targets[target] value may be an ARRAY of id'd
+ * instance entries — the app dir names WHICH instance (apps/website-admin →
+ * web/admin, canonical dir → main) and that instance's entry is the target
+ * layer for this app (see instances.js; the single-object form applies to
+ * every app of the type, unchanged).
+ *
  * "shared" = the file minus its `targets` key. A target entry may override
  * ANY shared key — same agnostic deep merge at every step (see merge.js), so
  * a per-surface monitoring.dsn or analytics id is just targets.<type>.monitoring.dsn.
@@ -37,6 +43,7 @@ const { deepMerge, isPlainObject } = require('./merge.js');
 const { findSecretKeys } = require('./secrets.js');
 const { validateConfig } = require('./validate.js');
 const { TARGETS } = require('./schema.js');
+const { resolveInstanceEntry, instanceIdFromDirName, MAIN_INSTANCE } = require('./instances.js');
 
 const FILE_NAME = 'omega.json5';
 const CONFIG_LOCATIONS = [
@@ -192,10 +199,12 @@ function getEnabledTargets(config) {
  *   omega-manager's disperse want.
  * @param {object} [options]
  * @param {object} [options.defaults] - Framework defaults, the lowest merge layer.
- * @returns {{ config: object, errors: string[], enabled: boolean|null, files: { app: string, brand: string|null } }}
+ * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, instance: string, files: { app: string, brand: string|null } }}
  *   `enabled` = whether `target` is listed under `targets` (null when no target
  *   was requested); schema `errors` are returned, not thrown — only secrets and
- *   unusable files throw.
+ *   unusable files throw. `warnings` are advisory findings (e.g. >1 backend
+ *   instance); `instance` is the app-dir-resolved instance id ('main' outside
+ *   the multi-instance world).
  */
 function loadConfig(projectDir, target, options) {
   options = options || {};
@@ -233,13 +242,23 @@ function loadConfig(projectDir, target, options) {
   const hasTargets = !!((brand && brand.targets) || app.targets);
   const targets = deepMerge(brand ? brand.targets : null, app.targets);
 
+  // Instance dimension (multi-instance targets): WHICH instance this app is
+  // comes from its dir name (apps/website-admin → web/admin; the canonical
+  // dir → main). Only brand-monorepo apps resolve through the walk — a
+  // standalone project's dir name is arbitrary and always means main.
+  let appRoot = path.resolve(projectDir);
+  if (path.basename(appRoot) === 'functions') {
+    appRoot = path.dirname(appRoot);
+  }
+  const instance = target && brandPath ? instanceIdFromDirName(path.basename(appRoot), target) : MAIN_INSTANCE;
+
   const config = target
     ? deepMerge(
         options.defaults,
         stripTargets(brand),
-        brand && brand.targets ? brand.targets[target] : null,
+        brand && brand.targets ? resolveInstanceEntry(brand.targets[target], instance) : null,
         stripTargets(app),
-        app.targets ? app.targets[target] : null,
+        app.targets ? resolveInstanceEntry(app.targets[target], instance) : null,
       )
     : deepMerge(options.defaults, brand, app);
 
@@ -252,9 +271,9 @@ function loadConfig(projectDir, target, options) {
     ? hasTargets && Object.prototype.hasOwnProperty.call(targets, target)
     : null;
 
-  const { errors } = validateConfig(config, { target });
+  const { errors, warnings } = validateConfig(config, { target });
 
-  return { config, errors, enabled, files: { app: appPath, brand: brandPath } };
+  return { config, errors, warnings, enabled, instance, files: { app: appPath, brand: brandPath } };
 }
 
 /**
@@ -308,11 +327,15 @@ function composeTargetConfig(projectDir, target) {
   assertUsableRawFile(brandPath, brand);
   assertUsableRawFile(appPath, app);
 
+  // Same instance dimension as loadConfig: the app dir names the instance
+  // whose entry is this compose's target layer (main outside a brand).
+  const instance = brandPath ? instanceIdFromDirName(path.basename(appRoot), target) : MAIN_INSTANCE;
+
   const config = deepMerge(
     stripTargets(brand),
-    brand && brand.targets ? brand.targets[target] : null,
+    brand && brand.targets ? resolveInstanceEntry(brand.targets[target], instance) : null,
     stripTargets(app),
-    app.targets ? app.targets[target] : null,
+    app.targets ? resolveInstanceEntry(app.targets[target], instance) : null,
   );
 
   const hasTargets = !!((brand && brand.targets) || app.targets);

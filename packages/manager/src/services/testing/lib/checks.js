@@ -20,6 +20,7 @@ const chalk = require('chalk').default;
 const jetpack = require('fs-jetpack');
 
 const { TARGET_FRAMEWORKS } = require('../../../config.js');
+const { instanceIdFromDirName, resolveInstanceUrl } = require('@omega.js/config');
 const { recordDeploy, readDeployRecord } = require('@omega.js/devkit/deploy-record');
 
 const MAX_RETRIES = 3;
@@ -292,10 +293,14 @@ function checkWorkingTree(recorder, ctx) {
 // ── Live checks ─────────────────────────────────────────────────────────────
 
 /**
- * Homepage check — the deployed site answers on the brand URL.
+ * Homepage check — the deployed site answers on ITS instance's URL: the
+ * instance entry's url (multi-instance targets), falling back to the brand
+ * URL for the single-instance world. Deploy records key per instance too, so
+ * a never-deployed admin instance nudges without failing a live main.
  */
 async function checkHomepage(recorder, app, ctx) {
-  const url = ctx.brandConfig.brand?.url;
+  const instance = instanceIdFromDirName(app.name, app.target);
+  const url = resolveInstanceUrl(ctx.brandConfig.targets?.[app.target], instance, ctx.brandConfig);
   const name = `${app.name}: homepage`;
 
   if (!url) {
@@ -312,14 +317,14 @@ async function checkHomepage(recorder, app, ctx) {
   // (never-deployed vs deployed-but-down — Ian 2026-07-17). A live HIT on a
   // record-less brand adopts: the record is per-machine, so fresh clones of
   // deployed brands self-heal here.
-  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: app.target });
+  const deployed = readDeployRecord({ dir: ctx.brandRoot, target: app.target, instance });
   const { response, duration, error } = await fetchWithRetry(ctx, url);
   const live = !error && response.status >= 200 && response.status < 400;
 
   if (live) {
     recorder.pass(name, `${url} → ${response.status} (${duration}ms)`);
     if (!deployed) {
-      recordDeploy({ dir: ctx.brandRoot, target: app.target, detail: { adopted: true } });
+      recordDeploy({ dir: ctx.brandRoot, target: app.target, instance, detail: { adopted: true } });
     }
   } else if (!deployed) {
     recorder.warn(name, `not deployed yet — run \`omega deploy\` when ready (${url})`);

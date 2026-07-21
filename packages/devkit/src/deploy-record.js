@@ -1,6 +1,8 @@
 /**
  * The per-brand deploy record — `deploy.<target>` in `.omega/state.json`
  * (the brand's durable derived-state file; gitignored, per-machine).
+ * Multi-instance targets key per app: the primary stays `deploy.<target>`,
+ * other instances record under `deploy.<target>:<id>` (see deployKey).
  *
  * Written by every framework's deploy verb on success; read by the
  * manager's testing service to tell "never deployed" (live-URL checks skip
@@ -17,6 +19,19 @@ const { findBrandRoot } = require('./local.js');
 
 function stateFile(dir) {
   return path.join(findBrandRoot(dir), '.omega', 'state.json');
+}
+
+/**
+ * Record key for a target's instance (multi-instance targets): the primary
+ * keeps today's bare target key (zero breaking change — existing records
+ * stay valid); any other instance keys `<target>:<id>`, matching the
+ * per-app deploy model (each app deploys its own instance).
+ * @param {string} target - Target key (web/backend/desktop/extension)
+ * @param {string} [instance] - Instance id ('main' or absent = the primary)
+ * @returns {string} The deploy-record key
+ */
+function deployKey(target, instance) {
+  return instance && instance !== 'main' ? `${target}:${instance}` : target;
 }
 
 /**
@@ -69,33 +84,37 @@ function withStateLock(file, fn) {
  * @param {Object} options
  * @param {string} options.dir - Any directory inside the brand (app or root)
  * @param {string} options.target - Target key (web/backend/desktop/extension)
+ * @param {string} [options.instance] - Instance id; non-main instances record
+ *   under their own `<target>:<id>` key (per-app deploy records)
  * @param {Object} [options.detail] - Extra fields (method, adopted, …)
  * @returns {Object} The written record
  */
 function recordDeploy(options) {
   const file = stateFile(options.dir);
+  const key = deployKey(options.target, options.instance);
 
   return withStateLock(file, () => {
     const state = jetpack.read(file, 'json') || {};
 
     state.deploy = state.deploy || {};
-    state.deploy[options.target] = { at: new Date().toISOString(), ...(options.detail || {}) };
+    state.deploy[key] = { at: new Date().toISOString(), ...(options.detail || {}) };
     jetpack.write(file, state, { jsonIndent: 2 });
 
-    return state.deploy[options.target];
+    return state.deploy[key];
   });
 }
 
 /**
- * The recorded deploy for a target — null when the brand has never deployed
- * it from this machine (and no manage run has adopted a live site yet).
+ * The recorded deploy for a target's instance — null when the brand has
+ * never deployed it from this machine (and no manage run has adopted a live
+ * site yet).
  *
- * @param {Object} options - { dir, target }
+ * @param {Object} options - { dir, target, instance? }
  * @returns {Object|null}
  */
 function readDeployRecord(options) {
   const state = jetpack.read(stateFile(options.dir), 'json') || {};
-  return state.deploy?.[options.target] || null;
+  return state.deploy?.[deployKey(options.target, options.instance)] || null;
 }
 
-module.exports = { recordDeploy, readDeployRecord };
+module.exports = { recordDeploy, readDeployRecord, deployKey };

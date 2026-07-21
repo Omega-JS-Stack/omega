@@ -33,6 +33,7 @@ const { toSiteGlobal } = require('./site-global.js');
 const { parseRepoSlug, brandRepoName, brandRepoOwner } = require('./repo.js');
 const { isDemoProject } = require('./demo.js');
 const { CLASSIC_PORTS, isPortFree, resolvePorts, writePortsFile, readPortsFile, clearPortsFile, envName, portsToEnv, envPort } = require('./ports.js');
+const { APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE, INSTANCE_ID_PATTERN, normalizeTargetInstances, instanceIdFromDirName, instanceAppDir, appInstance, resolveInstanceEntry, instancePortOffset, resolveInstanceUrl } = require('./instances.js');
 
 module.exports = {
   // Loading
@@ -100,6 +101,20 @@ module.exports = {
   envName,
   portsToEnv,
   envPort,
+
+  // Multi-instance targets (plans/multi-instance-targets.md): normalization
+  // is the ONE iteration mechanism — object form = [{ id: 'main', ...entry }]
+  APP_DIR_TARGETS,
+  TARGET_APP_DIRS,
+  MAIN_INSTANCE,
+  INSTANCE_ID_PATTERN,
+  normalizeTargetInstances,
+  instanceIdFromDirName,
+  instanceAppDir,
+  appInstance,
+  resolveInstanceEntry,
+  instancePortOffset,
+  resolveInstanceUrl,
 
   // Schema (pure data)
   TARGETS,

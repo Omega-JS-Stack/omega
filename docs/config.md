@@ -34,7 +34,8 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 
   // TARGET-scoped config. KEY PRESENCE = "this brand enables this target"
   // (replaces the legacy brand-config targets ARRAY). `extension: {}` means
-  // enabled-with-defaults. Unknown keys are validation errors.
+  // enabled-with-defaults. Unknown keys are validation errors. A value may
+  // also be an ARRAY of id'd instances (see Multi-instance targets below).
   targets: {
     web:       { /* @omega.js/web settings — defined in Phase 2 */ },
     backend:   { parent, github, reviews, marketing, blog, dataRequest },
@@ -68,6 +69,49 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
   survives (`getEnabledTargets()`); the `enabled` flag on the result says whether the
   requested target is listed.
 - No target argument → whole-file merge (the shape omega-manager's disperse works with).
+
+## Multi-instance targets
+
+One brand can run N instances of the SAME target type (the legacy `brand.subdomains` need:
+admin/cdn/app sites of one brand) — `targets.<type>` takes an **object OR an array of id'd
+instances** ([plans/multi-instance-targets.md](../plans/multi-instance-targets.md), ratified
+2026-07-20):
+
+```json5
+targets: {
+  backend: { /* single instance — today's shape, unchanged */ },
+  web: [
+    { id: 'main' },                                     // the primary — apps/website
+    { id: 'admin', url: 'https://admin.acme.com',       // apps/website-admin
+      brand: { name: 'Acme Admin' } },                  // overrides brand shared for admin ONLY
+  ],
+}
+```
+
+- **Normalization is the whole mechanism** (`normalizeTargetInstances`): a single object is
+  `[{ id: 'main', ...entry }]` internally — every consumer iterates instances and the
+  single-instance world is just length 1. Zero breaking change for existing brands.
+- **App-dir mapping**: `main` → `apps/<canonical dir>` (unchanged); any other id →
+  `apps/<canonical dir>-<id>`. The inverse walk names the instance from the dir
+  (`website-admin` → web/admin), and `loadConfig`/`composeTargetConfig` slot THAT instance's
+  entry into the merge chain: `defaults ← brand shared ← instance entry ← app shared ← app
+  targets.<type>`. The instance `id` key is bookkeeping — stripped, never config. The result
+  carries `instance` (the resolved id).
+- **Validator rules**: array entries MUST carry a dir-safe `id`, unique per type; an empty
+  array is an error; **>1 backend instance is a WARNING** (`warnings` on the result) — backend
+  stays single-instance in practice (one Cloud Functions surface per brand).
+- **Scoping rules**: the single-object form applies to EVERY app of the type (today's
+  behavior, suffixed dirs included); the array form is exact-id — an app dir with no matching
+  id rides shared config alone. The workspace structure op expects every instance's exact dir
+  (missing = the same create-this-dir error as today).
+- **Per-instance surfaces**: dev ports offset by array position (docs/local-dev.md), deploy
+  records key per app (docs/deploys.md), the manager's live-URL checks use each instance's
+  `url` (instance entry `url` → instance `brand.url` → brand shared `brand.url`).
+- **Legacy `brand.subdomains` conversion rule**: each subdomain becomes a web instance —
+  `["admin", "cdn"]` → `web: [{ id: 'main' }, { id: 'admin', url: 'https://admin.<domain>' },
+  { id: 'cdn', url: 'https://cdn.<domain>' }]` (no migration tooling yet — this mapping is
+  the recorded recipe).
+- Non-goals (v1): no cross-instance shared builds, no per-instance Firebase projects.
 
 ## Hard rules
 
@@ -357,7 +401,7 @@ its Phase-3 cutover (enumerating `SHARED_SECTIONS`, per-surface values into
 
 ```js
 const {
-  loadConfig,          // (projectDir, target?, { defaults }?) → { config, errors, enabled, files }
+  loadConfig,          // (projectDir, target?, { defaults }?) → { config, errors, warnings, enabled, instance, files }
   composeTargetConfig, // (projectDir, target) → { config, files } — brand+app frozen into ONE self-contained file (deploy upload boundary, #31)
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
@@ -371,13 +415,22 @@ const {
   COMPANY_MARKER,      // '.omega/company.json'
   resolveHook,         // (startRoot, 'account/password') → hook file | null (brand → company)
   loadHook,            // (startRoot, hookPath) → { fn, file } | null — broken hooks THROW
-  validateConfig,      // (config, { target }?) → { errors }
+  validateConfig,      // (config, { target }?) → { errors, warnings }
   runSchema,           // low-level rule walker (EM's proven engine)
   formatErrors,        // errors → numbered block
   findSecretKeys,      // (object) → dot-paths of secret-shaped keys
   applyConfigEdits,    // (source, edits) → edited source — comment-preserving (see Writeback)
   writeConfigValues,   // (projectDir, edits, { dryRun }?) → { path, changed, applied }
   deepMerge,           // agnostic layer merge
+  // Multi-instance targets (instances.js — the ONE iteration mechanism)
+  normalizeTargetInstances, // (targets.<type> value) → [{ id, … }] (object form = [{ id: 'main', …entry }])
+  instanceIdFromDirName,    // ('website-admin', 'web') → 'admin'; canonical/unconventional dirs → 'main'
+  instanceAppDir,           // ('web', 'admin') → 'website-admin'; main → the canonical dir
+  appInstance,              // (projectDir, target) → this app dir's instance id (brand apps only; standalone → 'main')
+  resolveInstanceEntry,     // (entry, id) → the instance's merge layer (id stripped) | null
+  instancePortOffset,       // (entry, id) → position in the instances array (dev-port offsets)
+  resolveInstanceUrl,       // (entry, id, config) → instance url → instance brand.url → brand.url | null
+  APP_DIR_TARGETS, TARGET_APP_DIRS, MAIN_INSTANCE, // the app-dir mapping SSOT (manager re-exports)
   TARGETS, SHARED_SECTIONS, SHARED_SCHEMA, TARGET_SCHEMAS,
 } = require('@omega.js/config');
 ```

@@ -32,19 +32,11 @@
 // APP DIRECTORY CONVENTIONS
 // =============================================================================
 // apps/<dir> → target mapping when the app doesn't declare its target in its
-// own omega.json5. Exact match or `<name>-*` prefix (apps/website-docs → web).
-const APP_DIR_TARGETS = {
-  website: 'web',
-  backend: 'backend',
-  desktop: 'desktop',
-  extension: 'extension',
-  mobile: 'mobile',
-};
-
-// Inverse: canonical app dir name to suggest when an enabled target has no app
-const TARGET_APP_DIRS = Object.fromEntries(
-  Object.entries(APP_DIR_TARGETS).map(([dir, target]) => [target, dir]),
-);
+// own omega.json5. Exact match or `<name>-<id>` suffix (apps/website-admin →
+// web, instance admin). The mapping's SSOT moved to @omega.js/config with the
+// multi-instance work (the config loader walks the same dirs) — re-exported
+// here so every existing manager import keeps working.
+const { APP_DIR_TARGETS, TARGET_APP_DIRS } = require('@omega.js/config');
 
 // Framework package per target — used by the testing service to compare each
 // app's installed framework against the npm latest. Names flip to their

@@ -111,7 +111,10 @@ function deployDirect({ dryRun }) {
     fs.rmSync(path.join(dist, '.git'), { recursive: true, force: true });
   }
 
-  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', detail: { method: 'direct' } });
+  // Records key per instance (multi-instance targets): this app deploys ITS
+  // instance, so apps/website-admin lands under web:admin, main stays web
+  const { appInstance } = require('@omega.js/config');
+  require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: appInstance(process.cwd(), 'web'), detail: { method: 'direct' } });
   logger.log(`Deployed — https://${plan.cname} serves once Pages picks up the push.`);
   return purgeAfterPublish(config);
 }
@@ -173,7 +176,8 @@ module.exports = async function (options) {
   const { plan, dispatched } = await deployViaDispatch({ workflow: WORKFLOW, dryRun });
 
   if (dispatched) {
-    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', detail: { method: 'dispatch' } });
+    const { appInstance } = require('@omega.js/config');
+    require('@omega.js/devkit/deploy-record').recordDeploy({ dir: process.cwd(), target: 'web', instance: appInstance(process.cwd(), 'web'), detail: { method: 'dispatch' } });
     logger.log(`Dispatched ${WORKFLOW} — CI builds and publishes this deploy.`);
     logger.log(`Watch: ${plan.runsUrl}`);
   } else {
