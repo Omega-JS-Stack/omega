@@ -293,14 +293,42 @@ async function buildAssets(options) {
     }
   }
 
-  // ---- Fonts: every layer's fonts/ dir lands at /assets/fonts verbatim
-  // (first layer wins — a consumer's file beats the theme's vendored face).
-  // Stable names by design: @font-face src URLs are written in theme css.
+  // ---- Fonts: every layer's fonts/ dir lands at /assets/fonts (first layer
+  // wins — a consumer's file beats the theme's vendored face). Stable names
+  // by design: @font-face src URLs are written in theme css. The union is
+  // then PRUNED to faces some emitted stylesheet actually references — a
+  // sibling theme imports classy's token-pure floor but not its faces, so
+  // the base layer's woff2s were pure artifact fat (cp199 parked finding).
+  // Partial builds (options.only) skip the prune: their css set is not the
+  // full picture.
   const fontDirs = options.layers.map((layer) => path.join(layer, 'fonts')).filter((dir) => fs.existsSync(dir));
+  const copiedFonts = [];
   for (const [rel, abs] of collectLayered(fontDirs)) {
     const dest = path.join(options.outDir, 'assets', 'fonts', rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(abs, dest);
+    copiedFonts.push(rel);
+  }
+  if (!options.only && copiedFonts.length > 0) {
+    let cssText = '';
+    const readCssTree = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const abs = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          readCssTree(abs);
+        } else if (entry.name.endsWith('.css')) {
+          cssText += fs.readFileSync(abs, 'utf8');
+        }
+      }
+    };
+    readCssTree(path.join(options.outDir, 'assets', 'css'));
+    for (const rel of copiedFonts) {
+      const urlRel = rel.split(path.sep).join('/');
+      if (!cssText.includes(urlRel) && !cssText.includes(path.basename(rel))) {
+        fs.rmSync(path.join(options.outDir, 'assets', 'fonts', rel), { force: true });
+      }
+    }
   }
 
   return manifest;

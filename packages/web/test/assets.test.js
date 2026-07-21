@@ -287,3 +287,15 @@ test('only-half rebuilds (dev watcher narrowing): css writes no js, js writes no
   assert.ok(!jsOnly.css.main, 'no css in the manifest');
   assert.ok(!fs.existsSync(path.join(outDir, 'assets', 'css')), 'no css files written');
 });
+
+test('fonts: the layer union is pruned to css-referenced faces — sibling themes ship no base-layer fat (cp243)', async () => {
+  fs.rmSync(OUT, { recursive: true, force: true });
+  await build(['newsflash', 'classy']);
+  const fonts = path.join(OUT, 'assets', 'fonts');
+  assert.ok(fs.existsSync(path.join(fonts, 'fraunces-normal-latin.woff2')), 'newsflash ships its own faces');
+  assert.ok(!fs.existsSync(path.join(fonts, 'newsreader-normal-latin.woff2')), 'classy-only faces pruned from the newsflash chain');
+
+  fs.rmSync(OUT, { recursive: true, force: true });
+  await build(['classy']);
+  assert.ok(fs.existsSync(path.join(OUT, 'assets', 'fonts', 'newsreader-normal-latin.woff2')), 'the classy chain keeps its own faces');
+});
