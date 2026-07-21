@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
-const { deployViaDispatch, assertNoLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
+const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 
 const logger = new Logger('omega:deploy');
 
@@ -148,22 +148,21 @@ module.exports = async function (options) {
     return deployDirect({ dryRun });
   }
 
-  // Check for local packages — real deploys only; a dry-run publishes
-  // nothing, so it may always show the plan. Two layers: any file: dep in
-  // THIS app (non-@omega.js included), then the tree-wide @omega.js guard —
-  // a linked SIBLING app breaks the same CI install (cp194).
-  const allDeps = JSON.stringify(project.dependencies || {}) + JSON.stringify(project.devDependencies || {});
-  if (!dryRun && allDeps.includes('file:')) {
-    throw new Error('Please remove local packages before deploying!');
-  }
-  if (!dryRun) {
-    assertNoLocalSpecs({ dir: process.cwd() });
-  }
-
   if (options.local) {
     logger.log('Building (local only — no dispatch)...');
     execSync('npm run build', { stdio: 'inherit' });
     return;
+  }
+
+  // Linked local packages (tree-wide @omega.js file: specs — cp194: one
+  // linked SIBLING breaks the CI install — or any file: dep in THIS app) →
+  // the DIRECT lane automatically. Mirrored rule (Ian 2026-07-20): a linked
+  // brand ships the LOCAL framework — build here, push output; CI dispatch
+  // is only for registry-clean trees.
+  const allDeps = JSON.stringify(project.dependencies || {}) + JSON.stringify(project.devDependencies || {});
+  if (findLocalSpecs({ dir: process.cwd() }).length > 0 || allDeps.includes('file:')) {
+    logger.log('Linked local packages detected — deploying via the DIRECT lane (local build, output-only push). CI dispatch resumes after `omega i live`.');
+    return deployDirect({ dryRun });
   }
 
   if (!dryRun && options.sync !== false) {

@@ -167,17 +167,18 @@ async function deployViaDispatch(options) {
 }
 
 /**
- * Refuse a CI-dispatch deploy while ANY app in the brand tree carries a
- * `file:` @omega.js spec. npm resolves the WHOLE workspace tree on the CI
- * runner, so one linked sibling app breaks the install even when the
- * deploying app is clean (the cp194 lesson — linking is tree-wide, so the
- * guard is too). Direct/local deploy lanes never call this: they build
- * locally and push output only, where file: packages are the whole point.
+ * Find every `file:` @omega.js spec in the brand tree. npm resolves the
+ * WHOLE workspace tree on any install, so one linked sibling app breaks a
+ * CI install even when the deploying app is clean (the cp194 lesson —
+ * linking is tree-wide, so detection is too). Deploy verbs use this to
+ * AUTO-SELECT their local-artifact lane (mirrored rule, Ian 2026-07-20:
+ * a linked brand ships the LOCAL framework — build here, ship the artifact;
+ * CI dispatch is only for registry-clean trees).
  * @param {object} [options]
  * @param {string} [options.dir] - Any directory inside the brand (default cwd).
- * @throws {Error} Listing every file:-spec'd @omega.js dependency, per app.
+ * @returns {string[]} One line per offender: `<manifest> → <name>: <spec>`.
  */
-function assertNoLocalSpecs(options = {}) {
+function findLocalSpecs(options = {}) {
   const brandRoot = findBrandRoot(options.dir || process.cwd());
   const offenders = [];
 
@@ -190,11 +191,23 @@ function assertNoLocalSpecs(options = {}) {
     }
   }
 
+  return offenders;
+}
+
+/**
+ * Throw when the brand tree carries `file:` @omega.js specs — for lanes with
+ * no local-artifact fallback where dispatching would only burn a CI run.
+ * @param {object} [options]
+ * @param {string} [options.dir] - Any directory inside the brand (default cwd).
+ * @throws {Error} Listing every file:-spec'd @omega.js dependency, per app.
+ */
+function assertNoLocalSpecs(options = {}) {
+  const offenders = findLocalSpecs(options);
   if (offenders.length > 0) {
     throw new Error(
       'Local file: packages are linked somewhere in this brand — CI cannot install them.\n'
       + `  ${offenders.join('\n  ')}\n`
-      + 'Local-era brands deploy with --direct (build here, push output); publish-era brands restore registry specs first.'
+      + 'Deploy from the local-artifact lane, or restore registry specs first (omega i live).'
     );
   }
 }
@@ -239,6 +252,7 @@ module.exports = {
   buildDispatch,
   dispatchWorkflow,
   deployViaDispatch,
+  findLocalSpecs,
   assertNoLocalSpecs,
   syncWorkingTree,
 };

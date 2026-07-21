@@ -112,3 +112,38 @@ test('deployViaDispatch: explicit owner/repo skips git; live path dispatches', a
   assert.strictEqual(result.dispatched, true);
   assert.strictEqual(sent.length, 1);
 });
+
+// ---- findLocalSpecs / assertNoLocalSpecs (the auto-local-lane detector)
+
+test('findLocalSpecs lists tree-wide file: @omega.js specs; assertNoLocalSpecs throws on them', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { findLocalSpecs, assertNoLocalSpecs } = require('../src/deploy.js');
+
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-deploy-guard-'));
+  try {
+    const app = path.join(scratch, 'apps', 'site');
+    fs.mkdirSync(app, { recursive: true });
+    fs.writeFileSync(path.join(scratch, 'package.json'), JSON.stringify({ name: 'brand', private: true, workspaces: ['apps/*'] }));
+    fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({
+      name: 'site',
+      dependencies: { '@omega.js/web': 'file:../../monorepo/packages/web', '@omega.js/client': '^0.1.0' },
+    }));
+
+    const offenders = findLocalSpecs({ dir: app });
+    assert.equal(offenders.length, 1, 'exactly the file: spec is an offender');
+    assert.match(offenders[0], /@omega\.js\/web: file:/);
+    assert.throws(() => assertNoLocalSpecs({ dir: app }), /Local file: packages are linked/);
+
+    // Registry-clean tree → empty list, no throw
+    fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({
+      name: 'site',
+      dependencies: { '@omega.js/web': '^0.1.0', '@omega.js/client': '^0.1.0' },
+    }));
+    assert.deepEqual(findLocalSpecs({ dir: app }), []);
+    assertNoLocalSpecs({ dir: app });
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});

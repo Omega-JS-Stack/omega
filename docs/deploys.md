@@ -42,12 +42,12 @@ engines treat workflow files as framework-owned overwrites).
 
 | Target | Behavior | Flags |
 |--------|----------|-------|
-| web | guard → sync (plain git commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact POST, send nothing; bypasses the guards since nothing publishes), `--local` (build only), `--no-sync`, `--direct` (build + push dist to gh-pages, then Cloudflare purge — file: specs are FINE here, the build is local) |
-| extension | guard → sync → dispatch `publish.yml` | `--dry-run`, `--no-sync` |
-| desktop | `--dry-run` prints the dispatch; otherwise delegates to `omega release` (dispatch + live CI log streaming) | `--dry-run`, `--platforms` |
-| backend | artifact cleanup-policy pre-step → local-package staging → `firebase deploy` → public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
+| web | linked-local auto-detect → DIRECT lane; else sync (plain git commit + push — publishes nothing) → dispatch `build.yml` | `--dry-run` (print the exact plan, send nothing), `--local` (build only), `--no-sync`, `--direct` (force the direct lane: build + push dist to gh-pages, then Cloudflare purge) |
+| extension | linked-local auto-detect → `npm run release` (local build + store publish); else sync → dispatch `publish.yml` | `--dry-run`, `--no-sync` |
+| desktop | linked-local auto-detect → `npm run release:local` (local build + sign + publish); else `--dry-run` prints the dispatch / delegates to `omega release` (dispatch + live CI log streaming) | `--dry-run`, `--platforms` |
+| backend | artifact cleanup-policy pre-step → local-package staging (ALWAYS auto — file: deps pack into the artifact) → `firebase deploy` → public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
 
-Real dispatch deploys refuse `file:` deps via the shared TREE-WIDE guard (`assertNoLocalSpecs` — web additionally refuses any file: dep in the deploying app itself); dry-runs always show the plan. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
+**Mirrored rule (Ian 2026-07-20): every deploy verb auto-detects linked local packages (`findLocalSpecs` — tree-wide, cp194) and takes its LOCAL-ARTIFACT lane**, loudly, so a linked brand ships the local framework without flags or errors; CI dispatch is only for registry-clean trees (`omega i live` restores them). Dry-runs show whichever plan would actually run. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
 
 ## Local frameworks in production artifacts (iterate without publishing)
 
