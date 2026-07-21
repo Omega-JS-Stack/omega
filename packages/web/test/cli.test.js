@@ -137,6 +137,37 @@ test('scaffold: inside a brand monorepo the seed is targets-only and the templat
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('scaffold: inside a brand monorepo the per-app CLAUDE.md never scaffolds and framework-owned copies sweep (brand doc unification)', () => {
+  const root = tmpConsumer();
+  const appDir = path.join(root, 'brand', 'apps', 'website');
+  fs.mkdirSync(appDir, { recursive: true });
+
+  // Standalone scaffold first (no brand config yet) — the per-app CLAUDE.md lands.
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.ok(fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'standalone apps keep the per-app CLAUDE.md');
+
+  // Wrap it in a brand monorepo: the next setup sweeps the untouched copy.
+  fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  const swept = scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.deepStrictEqual(swept.removed, ['CLAUDE.md'], 'framework-owned per-app CLAUDE.md is swept');
+  assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'the brand root is the doc home');
+
+  // Rerun never resurrects it.
+  scaffoldDefaults({ outputDir: appDir, logger: quiet });
+  assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'reruns do not resurrect the per-app doc');
+
+  // Consumer content is never destroyed: real notes below the Custom marker keep the file.
+  const warnings = [];
+  fs.writeFileSync(path.join(appDir, 'CLAUDE.md'),
+    '# ========== Default Values ==========\nframework guidance\n\n# ========== Custom Values ==========\nOur deploy needs the VPN up.\n');
+  const kept = scaffoldDefaults({ outputDir: appDir, logger: { ...quiet, warn: (m) => warnings.push(m) } });
+  assert.deepStrictEqual(kept.removed, []);
+  assert.match(fs.readFileSync(path.join(appDir, 'CLAUDE.md'), 'utf8'), /VPN/, 'consumer content survives');
+  assert.ok(warnings.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('bin: `omega setup` end-to-end in a fresh consumer (real process, real bin)', () => {
   const root = tmpConsumer();
   execFileSync(process.execPath, [path.join(PKG, 'bin', 'omega'), 'setup'], { cwd: root, stdio: 'pipe' });

@@ -100,5 +100,46 @@ module.exports = {
         ctx.expect(jetpack.exists(path.join(appDir, 'config', 'omega.json5'))).toBe(false);
       },
     },
+    {
+      name: 'brand app scaffolds NO per-app docs (brand doc unification: the brand root is the doc home)',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
+        jetpack.dir(appDir);
+
+        await copyDefaults(appDir);
+        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
+        // The non-doc defaults still land.
+        ctx.expect(jetpack.exists(path.join(appDir, '.env'))).toBeTruthy();
+      },
+    },
+    {
+      name: 'brand setup sweeps framework-owned per-app docs, preserves consumer content with a warning',
+      run: async (ctx) => {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
+        jetpack.dir(appDir);
+
+        // Standalone scaffold first (no brand config yet) — per-app docs land.
+        await copyDefaults(appDir);
+        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBeTruthy();
+
+        // Wrap it in a brand monorepo: the next setup sweeps the untouched docs.
+        jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        await copyDefaults(appDir);
+        ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
+        ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
+
+        // Consumer content is never destroyed: real notes below the Custom marker keep the file.
+        jetpack.write(path.join(appDir, 'CLAUDE.md'),
+          `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
+        await copyDefaults(appDir);
+        ctx.expect(jetpack.read(path.join(appDir, 'CLAUDE.md'))).toContain('VPN');
+      },
+    },
   ],
 };

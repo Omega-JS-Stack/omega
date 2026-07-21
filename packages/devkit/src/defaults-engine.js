@@ -17,6 +17,11 @@
 //                             Actions' `${{ secrets.X }}` passes through)
 //   merge      bool           JSON5 defaults-merge with the existing file
 //   mergeLines bool           OMEGA marker-section line merge (.env/.gitignore/CLAUDE.md)
+//   retire     bool           brand-context per-app doc retirement: NEVER scaffold
+//                             the file; an existing framework-owned-only copy is
+//                             DELETED (one-time heal — the brand root is the doc
+//                             home), a copy carrying consumer content stays with a
+//                             loud move-it warning (never destroyed)
 //
 // Engine built-ins (not expressed in the file map):
 //   - `_.name` segments lose the leading `_` (dotfiles ship past npm's filter)
@@ -32,7 +37,7 @@ const path = require('path');
 const fs = require('fs');
 const jetpack = require('fs-jetpack');
 const { minimatch } = require('minimatch');
-const { mergeLineBasedFiles } = require('./merge-line-files');
+const { mergeLineBasedFiles, hasSectionMarkers, getCustomSection } = require('./merge-line-files');
 
 // Files with these extensions copy byte-for-byte and never go through
 // template/merge/transform (matches BXM's binary detection list).
@@ -46,6 +51,7 @@ const RULE_DEFAULTS = {
   template: null,
   merge: false,
   mergeLines: false,
+  retire: false,
   rule: null,
 };
 
@@ -60,7 +66,7 @@ const RULE_DEFAULTS = {
  * @param {Function} [config.transform] - `(contents, item) => contents` global hook, run on every
  *   non-binary file after per-rule processing (BXM's site-token templating pass)
  * @param {object} [config.logger] - `{ log, warn, error }` (defaults to console)
- * @returns {{ written: string[], merged: string[], skipped: string[] }} destination-relative paths per outcome
+ * @returns {{ written: string[], merged: string[], skipped: string[], removed: string[] }} destination-relative paths per outcome
  */
 function applyDefaults(config) {
   config = config || {};
@@ -79,7 +85,7 @@ function applyDefaults(config) {
     throw new Error(`[devkit defaults-engine] defaultsDir does not exist: ${defaultsDir}`);
   }
 
-  const result = { written: [], merged: [], skipped: [] };
+  const result = { written: [], merged: [], skipped: [], removed: [] };
 
   for (const source of walkFiles(defaultsDir)) {
     if (only && !only.includes(source)) {
@@ -136,6 +142,42 @@ function applyDefaults(config) {
 
     if (options.skip) {
       result.skipped.push(finalRelative);
+      continue;
+    }
+
+    // Retire: the file never scaffolds. An existing framework-owned-only copy
+    // is deleted (one-time heal); consumer content is never destroyed.
+    if (options.retire) {
+      if (!exists) {
+        result.skipped.push(finalRelative);
+        continue;
+      }
+
+      let owned;
+      if (isBinary) {
+        owned = jetpack.read(source, 'buffer').equals(jetpack.read(destination, 'buffer'));
+      } else {
+        // Render the template through the same pipeline the scaffold used, so
+        // an untouched consumer copy compares equal.
+        let rendered = jetpack.read(source);
+        if (options.template) {
+          rendered = renderTemplate(rendered, options.template);
+        }
+        if (transform) {
+          rendered = transform(rendered, item);
+        }
+        owned = isFrameworkOwned(jetpack.read(destination), rendered);
+      }
+
+      if (owned) {
+        jetpack.remove(destination);
+        pruneEmptyDirs(path.dirname(destination), outputDir);
+        result.removed.push(finalRelative);
+        logger.warn(`[defaults] Retired ${finalRelative} — framework-owned per-app doc; in a brand monorepo the BRAND ROOT (AGENTS.md / CHANGELOG.md / docs/) is the one doc home`);
+      } else {
+        result.skipped.push(finalRelative);
+        logger.warn(`[defaults] Kept ${finalRelative} — it carries consumer content. Per-app docs are retired in brand monorepos: move that content to the brand root (AGENTS.md notes / brand CHANGELOG.md / brand docs/), then delete the file`);
+      }
       continue;
     }
 
@@ -202,6 +244,30 @@ function applyDefaults(config) {
   }
 
   return result;
+}
+
+// Judge whether an existing consumer file is framework-owned-only (safe to
+// retire). Marker files are judged by their Custom section — empty,
+// whitespace-only, or exactly the template's shipped boilerplate all count as
+// untouched. Marker-less files must match the rendered template outright.
+function isFrameworkOwned(existing, rendered) {
+  if (hasSectionMarkers(existing)) {
+    const existingCustom = getCustomSection(existing).trim();
+    return existingCustom === '' || existingCustom === getCustomSection(rendered).trim();
+  }
+  return existing.trim() === rendered.trim();
+}
+
+// Remove now-empty ancestor dirs of a retired file, stopping at (and never
+// removing) rootDir — a retired docs/README.md takes its empty docs/ with it.
+function pruneEmptyDirs(dir, rootDir) {
+  const root = path.resolve(rootDir);
+  let current = path.resolve(dir);
+  while (current !== root && current.startsWith(root + path.sep)) {
+    if ((jetpack.list(current) || []).length > 0) return;
+    jetpack.remove(current);
+    current = path.dirname(current);
+  }
 }
 
 // Depth-first file walk that never follows symlinks.

@@ -107,6 +107,57 @@ module.exports = {
       },
     },
     {
+      name: 'brand-context-skips-per-app-docs',
+      async run({ assert }) {
+        // Brand doc unification: inside a brand monorepo the brand root is the
+        // one doc home — CLAUDE.md/CHANGELOG.md/docs/ never scaffold.
+        const tmp = makeTmp();
+        jetpack.write(path.join(tmp, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const appDir = path.join(tmp, 'apps', 'backend');
+        jetpack.dir(appDir);
+
+        const result = scaffoldDefaults({ outputDir: appDir, logger: quiet });
+
+        for (const file of ['CLAUDE.md', 'CHANGELOG.md', 'docs/README.md']) {
+          assert.equal(jetpack.exists(path.join(appDir, file)), false, `${file} must not scaffold in brand context`);
+        }
+        // The non-doc defaults still land.
+        for (const file of ['.env', '.gitignore', 'test/_init.js']) {
+          assert.equal(jetpack.exists(path.join(appDir, file)), 'file', `${file} should still scaffold`);
+        }
+        assert.equal(result.removed.length, 0, 'nothing to sweep on a fresh app');
+      },
+    },
+    {
+      name: 'brand-context-sweeps-framework-owned-docs-preserves-consumer-content',
+      async run({ assert }) {
+        // Seed a standalone scaffold, then wrap it in a brand monorepo — the
+        // next setup sweeps the framework-owned per-app docs (one-time heal)
+        // but never destroys a CLAUDE.md carrying consumer notes.
+        const tmp = makeTmp();
+        const appDir = path.join(tmp, 'apps', 'backend');
+        jetpack.dir(appDir);
+        scaffoldDefaults({ outputDir: appDir, logger: quiet });
+        jetpack.write(path.join(tmp, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+
+        const swept = scaffoldDefaults({ outputDir: appDir, logger: quiet });
+
+        assert.deepEqual(swept.removed.slice().sort(), ['CHANGELOG.md', 'CLAUDE.md', 'docs/README.md']);
+        assert.equal(jetpack.exists(path.join(appDir, 'docs')), false, 'emptied docs/ dir is pruned');
+
+        // Consumer content is never destroyed: a CLAUDE.md with real notes
+        // below the Custom marker stays, with a warning.
+        const warnings = [];
+        jetpack.write(path.join(appDir, 'CLAUDE.md'),
+          `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
+        const kept = scaffoldDefaults({ outputDir: appDir, logger: { log() {}, warn: (m) => warnings.push(m), error: console.error } });
+
+        assert.equal(kept.removed.length, 0);
+        assert.ok(jetpack.read(path.join(appDir, 'CLAUDE.md')).includes('VPN'), 'consumer CLAUDE.md content survives');
+        assert.ok(warnings.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints');
+      },
+    },
+    {
       name: 'rerun-is-idempotent',
       async run({ assert }) {
         const tmp = makeTmp();

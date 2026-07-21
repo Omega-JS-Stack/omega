@@ -142,6 +142,14 @@ function scaffoldDefaults(options) {
   const { resolveSeedMode } = require('@omega.js/config');
   if (!resolveSeedMode(outputDir).standalone) {
     fileMap['config/omega.json5'] = { skip: true };
+    // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
+    // BRAND ROOT is the one doc home — per-app CLAUDE.md/CHANGELOG.md/docs/
+    // never scaffold, and existing framework-owned-only copies are swept
+    // (retire rules; consumer content is never destroyed). Standalone apps
+    // keep them. Last-match-wins over the `**/*.md` preserve rule.
+    fileMap['CLAUDE.md'] = { retire: true };
+    fileMap['CHANGELOG.md'] = { retire: true };
+    fileMap['docs/**/*'] = { retire: true };
   }
 
   return applyDefaults({

@@ -235,3 +235,127 @@ test('mergeJson5Defaults and renderTemplate are exported for direct use', () => 
   assert.equal(typeof mergeJson5Defaults, 'function');
   assert.equal(renderTemplate('v{{ v.n }}', { v: { n: 1 } }), 'v1');
 });
+
+test('retire rule: never scaffolds the file when the consumer lacks it', () => {
+  const { defaultsDir, outputDir } = stage({ 'CLAUDE.md': 'framework doc' }, {});
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'CLAUDE.md': { retire: true } },
+    logger: quiet,
+  });
+
+  assert.equal(jetpack.exists(path.join(outputDir, 'CLAUDE.md')), false);
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.skipped, ['CLAUDE.md']);
+});
+
+test('retire rule: deletes a marker-less copy identical to the rendered template, pruning emptied dirs', () => {
+  const { defaultsDir, outputDir } = stage({
+    'docs/README.md': 'Docs for v{{ versions.node }}',
+  }, {
+    'docs/README.md': 'Docs for v22',
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'docs/**/*': { retire: true, template: { versions: { node: '22' } } } },
+    logger: quiet,
+  });
+
+  assert.deepEqual(result.removed, [path.join('docs', 'README.md')]);
+  assert.equal(jetpack.exists(path.join(outputDir, 'docs')), false, 'emptied docs/ dir should be pruned');
+});
+
+test('retire rule: a marker-less copy the consumer edited is kept, with a warning', () => {
+  const warnings = [];
+  const { defaultsDir, outputDir } = stage({
+    'CHANGELOG.md': '# CHANGELOG\n',
+  }, {
+    'CHANGELOG.md': '# CHANGELOG\n\n## 1.0.0\n- consumer release notes\n',
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'CHANGELOG.md': { retire: true } },
+    logger: { ...quiet, warn: (m) => warnings.push(m) },
+  });
+
+  assert.deepEqual(result.removed, []);
+  assert.match(jetpack.read(path.join(outputDir, 'CHANGELOG.md')), /consumer release notes/);
+  assert.ok(warnings.some((m) => m.includes('consumer content')), 'should warn to move consumer content to the brand root');
+});
+
+test('retire rule: marker files are judged by their Custom section (pristine boilerplate or whitespace-only = framework-owned)', () => {
+  const template = `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`;
+  const { defaultsDir, outputDir } = stage({
+    'CLAUDE.md': template,
+  }, {
+    // Pristine boilerplate custom section — even with a STALE default section.
+    'CLAUDE.md': `${DEFAULT_MARKER}\nold framework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`,
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'CLAUDE.md': { retire: true } },
+    logger: quiet,
+  });
+
+  assert.deepEqual(result.removed, ['CLAUDE.md']);
+  assert.equal(jetpack.exists(path.join(outputDir, 'CLAUDE.md')), false);
+
+  // Whitespace-only custom section is framework-owned too.
+  const ws = stage({ 'CLAUDE.md': template }, {
+    'CLAUDE.md': `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n  \n`,
+  });
+  const wsResult = applyDefaults({
+    defaultsDir: ws.defaultsDir,
+    outputDir: ws.outputDir,
+    fileMap: { 'CLAUDE.md': { retire: true } },
+    logger: quiet,
+  });
+  assert.deepEqual(wsResult.removed, ['CLAUDE.md']);
+});
+
+test('retire rule: a marker file with real consumer notes is kept, with a warning', () => {
+  const warnings = [];
+  const template = `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nAdd anything specific to THIS project here.\n`;
+  const { defaultsDir, outputDir } = stage({
+    'CLAUDE.md': template,
+  }, {
+    'CLAUDE.md': `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\n\n## Project-specific notes\n\nOur deploy needs the VPN up.\n`,
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'CLAUDE.md': { retire: true } },
+    logger: { ...quiet, warn: (m) => warnings.push(m) },
+  });
+
+  assert.deepEqual(result.removed, []);
+  assert.match(jetpack.read(path.join(outputDir, 'CLAUDE.md')), /VPN/);
+  assert.ok(warnings.some((m) => m.includes('consumer content')));
+});
+
+test('retire rule: compares through the global transform (an untouched transformed copy is framework-owned)', () => {
+  const { defaultsDir, outputDir } = stage({
+    'docs/README.md': 'Docs for [site.name]',
+  }, {
+    'docs/README.md': 'Docs for Acme',
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'docs/**/*': { retire: true } },
+    transform: (contents) => contents.replace('[site.name]', 'Acme'),
+    logger: quiet,
+  });
+
+  assert.deepEqual(result.removed, [path.join('docs', 'README.md')]);
+});

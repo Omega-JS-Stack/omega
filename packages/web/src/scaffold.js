@@ -57,6 +57,11 @@ function scaffoldDefaults(options) {
       jetpack.write(path.join(options.outputDir, 'config', 'omega.json5'), renderBrandAppSeed('web'));
     }
     fileMap['config/omega.json5'] = { overwrite: false };
+    // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
+    // BRAND ROOT is the one doc home — the per-app CLAUDE.md never scaffolds,
+    // and an existing framework-owned-only copy is swept (retire rule;
+    // consumer content is never destroyed). Standalone apps keep it.
+    fileMap['CLAUDE.md'] = { retire: true };
   }
 
   return applyDefaults({

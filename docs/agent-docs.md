@@ -33,6 +33,6 @@ Pinned by `packages/manager/test/agents-md.test.js` (guide shipped + files white
 
 The guide is `packages/manager/AGENTS.md` — framework-owned, brand-agnostic (structure, verbs, per-target required-reading pointers, hard rules). Brand-specific knowledge never goes there; it belongs below the import in that brand's `AGENTS.md`.
 
-## Per-app docs (status)
+## Per-app docs — RETIRED in brand context (cp246)
 
-Per-app `CLAUDE.md`/`CHANGELOG.md` scaffolds predate the brand-monorepo era (each app was its own repo/workspace). Claude Code walks parent directories, so the brand-root chain covers app-dir sessions. Retiring the per-app scaffolds in brand context is queued as its own change (it touches all four frameworks' mirrored consumer templates); standalone (non-brand) apps keep them.
+Per-app `CLAUDE.md`/`CHANGELOG.md`/`docs/` scaffolds predate the brand-monorepo era; Claude Code walks parent directories, so the brand-root chain covers app-dir sessions. The shared defaults engine now has a `retire` fileMap rule (devkit `defaults-engine.js`), wired mirrored in all four frameworks' brand branches (detection = the existing `@omega.js/config` brand-root resolution): in a brand app those files NEVER scaffold; an existing framework-owned-only copy (Custom section empty/whitespace or byte-equal to the shipped boilerplate; marker-less files must equal the rendered template) is deleted once, loudly; a copy carrying real consumer content is preserved with a move-it-to-the-brand-root warning. Standalone apps keep full per-app doc scaffolding (test-pinned both ways).

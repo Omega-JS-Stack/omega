@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-20] Doc-unification agent (per-app CLAUDE/CHANGELOG/docs retirement, all 4 frameworks) → full-battery gate, then review + cp246 commit
+- [fable 2026-07-20] Ads phase 2 next: client `ads/unit` section + detection rewrite → plans/ads-system.md, goldens + e2e gate
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
@@ -66,6 +66,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp246 2026-07-20 per-app docs retired in brand context (devkit `retire` rule, mirrored ×4, sweeps run; root battery EXIT 0) → CHANGELOG
 - cp245 2026-07-20 ads phase 1: backend house-ads module (53 pins; full suite 1295/0 re-verified) → CHANGELOG
 - cp244 2026-07-20 brand agent-docs chain (manager-shipped guide + hoist-aware import + heal; live-proven) → CHANGELOG
 - cp243 2026-07-20 sibling-theme font prune (~350KB out of newsflash artifacts) → CHANGELOG
@@ -75,4 +76,3 @@
 - cp238 2026-07-19 every package 0.1.0 + mechanical publish latch → CHANGELOG
 - cp237 2026-07-19 access self-heal wrapped in npm start → CHANGELOG
 - cp236 2026-07-19 guard softened + 403 diagnostics + Paperloom + omegajs flipped real → CHANGELOG
-- cp235 2026-07-19 frontmatter ENFORCED meta-only + omega-brand final names + firebase omegajs minted → CHANGELOG

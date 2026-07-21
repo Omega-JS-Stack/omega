@@ -279,4 +279,18 @@ function hasSectionMarkers(content) {
     && content.includes(CUSTOM_MARKER);
 }
 
-module.exports = { mergeLineBasedFiles, normalizeEnvLine, hasSectionMarkers, DEFAULT_MARKER, CUSTOM_MARKER };
+/**
+ * Extract the consumer-owned Custom section of a marker file (everything after
+ * the Custom marker), or '' when there is no marker. The defaults engine's
+ * `retire` rule uses this to judge whether a per-app doc carries consumer
+ * content or is framework-owned-only.
+ * @param {string} content
+ * @returns {string}
+ */
+function getCustomSection(content) {
+  if (typeof content !== 'string') return '';
+  const idx = content.indexOf(CUSTOM_MARKER);
+  return idx < 0 ? '' : content.slice(idx + CUSTOM_MARKER.length);
+}
+
+module.exports = { mergeLineBasedFiles, normalizeEnvLine, hasSectionMarkers, getCustomSection, DEFAULT_MARKER, CUSTOM_MARKER };

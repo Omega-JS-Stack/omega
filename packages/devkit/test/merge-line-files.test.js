@@ -3,7 +3,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mergeLineBasedFiles, normalizeEnvLine, hasSectionMarkers, DEFAULT_MARKER, CUSTOM_MARKER } = require('../src/merge-line-files');
+const { mergeLineBasedFiles, normalizeEnvLine, hasSectionMarkers, getCustomSection, DEFAULT_MARKER, CUSTOM_MARKER } = require('../src/merge-line-files');
 
 test('preserves user value in default section across merges (and quotes it)', () => {
   const existing = `${DEFAULT_MARKER}\nGH_TOKEN=ghp_secret123\nBACKEND_MANAGER_KEY=\n\n${CUSTOM_MARKER}\n`;
@@ -133,4 +133,11 @@ test('placeholder merge is idempotent', () => {
   const once = mergeLineBasedFiles(existing, incoming, '.env');
   const twice = mergeLineBasedFiles(once, incoming, '.env');
   assert.equal(twice, once);
+});
+
+test('getCustomSection: returns everything after the Custom marker, and "" without markers', () => {
+  const content = `${DEFAULT_MARKER}\nframework\n${CUSTOM_MARKER}\nmy notes\n`;
+  assert.equal(getCustomSection(content), '\nmy notes\n');
+  assert.equal(getCustomSection('no markers here'), '');
+  assert.equal(getCustomSection(null), '');
 });

@@ -312,6 +312,16 @@ async function copyDefaults(targetDir) {
       '_.env': { mergeLines: true, template: templateContext },
       '_.gitignore': { mergeLines: true, template: templateContext },
       'CLAUDE.md': { mergeLines: true, template: templateContext },
+      // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
+      // BRAND ROOT is the one doc home — per-app CLAUDE.md/CHANGELOG.md/docs/
+      // never scaffold, and existing framework-owned-only copies are swept
+      // (retire rules; consumer content is never destroyed). Standalone apps
+      // keep them. Last-match-wins: these override the rules above.
+      ...(isBrandApp ? {
+        'CLAUDE.md': { retire: true, template: templateContext },
+        'CHANGELOG.md': { retire: true },
+        'docs/**/*': { retire: true },
+      } : {}),
       // Workflow YAMLs are framework-owned: always re-rendered so they track changes in
       // @omega.js/desktop's defaults (e.g. engines.node bumping when Electron updates). The
       // renderer is tolerant — GitHub Actions' `${{ secrets.X }}` survives — and
