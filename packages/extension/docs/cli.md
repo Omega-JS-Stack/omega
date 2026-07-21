@@ -10,6 +10,7 @@
 | `clean` | `-c`, `--clean` | Remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | `-i`, `i`, `--install` | Install peer deps (gulp, etc.) |
 | `test` | `-t`, `--test` | Run framework + project test suites. Positional target scopes by source + path (`project:` / `mgr:` / bare path); `--filter` matches test names; `--extended` enables real-external-API tests. See [test-framework.md](test-framework.md). |
+| `update` | `-u`, `--update`, `outdated`, `out` | Dependency freshness report (installed/wanted/latest + patch/minor/major, releases < 7 days old QUARANTINED). `--apply` installs the non-breaking non-quarantined set via `npu install` (plain npm + loud note without npu); `--major` opts into breaking; `--min-age N` / `--force-fresh` tune the quarantine. `file:` specs skipped. Shared devkit implementation — see docs/updates.md in the Omega repo. |
 | `version` | `-v`, `--version` | Print @omega.js/extension, Node, peer-dep versions |
 
 ## Entry point

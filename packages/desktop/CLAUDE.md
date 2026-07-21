@@ -155,6 +155,7 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 | `install` | install peer deps |
 | `version` | print versions |
 | `test` | run framework + project test suites |
+| `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/updates.md in the Omega repo |
 | `build` | shells `gulp build` with `OMEGA_BUILD_MODE=true` |
 | `publish` | full sign + notarize + GH release upload (`OMEGA_IS_PUBLISH=true`) |
 | `validate-certs` | check cert files, env vars, profile expiration, Keychain identity. Auto-runs at end of `setup` |

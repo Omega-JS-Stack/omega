@@ -22,6 +22,7 @@ module.exports = createCliRouter({
     publish:          ['-p', '--publish'],
     release:          ['-r', '--release'],
     test:             ['-t', '--test'],
+    update:           ['-u', '--update', 'outdated', 'out'],
     logs:             ['--logs', 'log'],
     'validate-certs': ['certs', '--validate-certs'],
     'sign-windows':   ['--sign-windows'],

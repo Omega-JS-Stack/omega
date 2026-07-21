@@ -17,6 +17,7 @@ const ALIASES = {
   dev: ['serve', 'start', '--dev'],
   build: ['-b', '--build'],
   deploy: ['-d', '--deploy'],
+  update: ['-u', '--update', 'outdated', 'out'],
   migrate: ['-m', '--migrate', 'migration'],
   customize: ['-cz', '--customize'],
   translate: ['-t', '--translate', 'translation'],

@@ -33,7 +33,7 @@ test('dispatch table: every aliased command has a command file', () => {
 
   // The full B3 surface is present (+ install — the `mgr i local` parity
   // gap the wizard rehearsal caught, cp194)
-  for (const name of ['setup', 'install', 'dev', 'build', 'deploy', 'translate', 'audit', 'test', 'clean', 'version']) {
+  for (const name of ['setup', 'install', 'dev', 'build', 'deploy', 'update', 'translate', 'audit', 'test', 'clean', 'version']) {
     assert.ok(aliases[name], `${name} is routed`);
   }
 });

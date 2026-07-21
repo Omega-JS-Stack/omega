@@ -13,6 +13,8 @@ npx omega onboard              # create (or converge) a brand — wizard in a TT
                                #    company config or the support@{domain} default — or write your own)
 npx omega deploy               # DELIBERATE publish fan-out: each app's own deploy verb, backend first
                                #   (--only/--except filter apps; every other flag forwards; docs/deploys.md)
+npx omega update               # dependency-freshness fan-out: each app's own update verb (apps
+                               #   independent — one failure never blocks the rest; docs/updates.md)
 
 # From a COMPANY workspace (config/omega.json5 has a `brands` key), the same
 # command runs every managed brand:

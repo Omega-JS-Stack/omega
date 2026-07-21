@@ -38,6 +38,11 @@ npx omega test      # PROJECT scope: production build + smoke checks + consumer 
 npx omega deploy    # THE publish verb (D13): sync (push triggers nothing) → dispatch
                     #   build.yml so CI builds + publishes; --dry-run prints the exact
                     #   POST, --local builds only (docs/deploys.md in the Omega repo)
+npx omega update    # dependency freshness (npu semantics): installed/wanted/latest +
+                    #   patch/minor/major per dep; releases < 7 days old QUARANTINED
+                    #   --apply installs the non-breaking non-quarantined set via npu
+                    #   (--major explicit; --min-age N / --force-fresh tune the hold;
+                    #   file: specs skipped — docs/updates.md in the Omega repo)
 npx omega customize <url>  # materialize a default page into src/pages/ (spec §8):
                     #   composition-wrapped pages prefill the theme's section
                     #   one-liners (no copy inlined — sections keep flowing),

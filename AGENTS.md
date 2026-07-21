@@ -42,6 +42,10 @@ Every brand root carries `CLAUDE.md` = `@AGENTS.md` and an `AGENTS.md` whose fir
 
 Commits never auto-publish: scaffolded workflows carry NO push triggers (workflow_dispatch + repository_dispatch only). Publishing is the explicit `omega deploy` verb on every target — web/extension dispatch their CI workflow, desktop delegates to its release flow, backend runs `firebase deploy` directly (`--only hosting` works on Spark) — and at a BRAND ROOT the same verb fans out over the apps (manager `deploy` command, cp251): backend first, then web, then the rest; `--only`/`--except` filter apps, other flags forward, a failing app stops the run. Content-publish implies deploy (the admin post routes dispatch the website build; `deploy: false` opts out). One executor for all surfaces: `@omega.js/devkit/deploy`. Full contract: [docs/deploys.md](docs/deploys.md).
 
+## Dependency updates
+
+`omega update` on every framework + the manager (aliases `outdated`/`out`): installed/wanted/latest + patch/minor/major per dep, releases < 7 days old QUARANTINED (npu `--min-age` semantics), `--apply` installs the non-breaking non-quarantined set via `npu install` (plain npm + loud note without it), `--major` explicit. Brand root fans out over apps (deploy's shape, apps independent); `file:` specs skipped. One devkit implementation: `@omega.js/devkit/update`. Full contract: [docs/updates.md](docs/updates.md).
+
 ## Icons
 
 One Font Awesome mechanism everywhere: plain `fa-*` markup (static or set via JS — the shared `@omega.js/client` icon-renderer watches both), `uj_icon` for build-time inlining, best-first asset chain with brand-supplied Pro (never redistributed). Full contract: [docs/icons.md](docs/icons.md).

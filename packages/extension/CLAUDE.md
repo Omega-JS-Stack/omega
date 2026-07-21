@@ -189,6 +189,7 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 | `install` | install peer deps |
 | `version` | print versions |
 | `test` | run framework + project test suites |
+| `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/updates.md in the Omega repo |
 
 See [docs/cli.md](docs/cli.md).
 

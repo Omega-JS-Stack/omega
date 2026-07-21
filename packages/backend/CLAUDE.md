@@ -75,6 +75,7 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `watch` | Auto-reload functions on file change |
 | `deploy` | Deploy Cloud Functions to Firebase |
 | `test` | Run framework + project test suites against an emulator |
+| `update` | Dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/updates.md in the Omega repo |
 | `mcp` | Start the stdio MCP server (for Claude Code / Claude Desktop). Supports `--token <key>` for user-level connections |
 | `firestore:get/set/query/delete` | Direct Firestore reads/writes from the terminal |
 | `auth:get/list/delete/set-claims` | Manage Auth users from the terminal |

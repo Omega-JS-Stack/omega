@@ -36,6 +36,7 @@ const StripeCommand = require('./commands/stripe');
 const FirestoreCommand = require('./commands/firestore');
 const AuthCommand = require('./commands/auth');
 const LogsCommand = require('./commands/logs');
+const UpdateCommand = require('./commands/update');
 const McpCommand = require('./commands/mcp');
 
 function Main() {}
@@ -167,6 +168,12 @@ Main.prototype.process = async function (args) {
   // Logs utility commands (`logs` is an alias for `logs:read`)
   if (self.options['logs'] || self.options['logs:read'] || self.options['logs:tail'] || self.options['logs:stream']) {
     const cmd = new LogsCommand(self);
+    return await cmd.execute();
+  }
+
+  // Update (dependency freshness — npu-outdated semantics)
+  if (self.options['update'] || self.options['outdated'] || self.options['out']) {
+    const cmd = new UpdateCommand(self);
     return await cmd.execute();
   }
 
