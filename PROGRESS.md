@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-20] Ads phase 2 next: client `ads/unit` section + detection rewrite → plans/ads-system.md, goldens + e2e gate
+- [fable 2026-07-20] Ads phase 2 PAUSED mid-build (agent killed by process restart; partial work in tree) → Ian says "continue phase 2" to relaunch
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
