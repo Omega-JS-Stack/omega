@@ -4,8 +4,13 @@
  * interactive run, pick the GA account (create-new opens the provision
  * page), then pick or create the GA4 property via the Admin API — both land
  * in omega.json5 (comment-preserving writeback). An accountId already in
- * config (e.g. company-level) is used as-is without prompting.
+ * config is used as-is without prompting — and when it arrived through the
+ * COMPANY layer (company omega.json5 `analytics.providers.google.accountId`,
+ * merged under the brand file so an explicit brand value always wins), the
+ * flow says so with a dim note instead of silently proceeding. The
+ * interactive picker stays the fallback when nothing is configured anywhere.
  */
+const chalk = require('chalk').default;
 const { resolveConfigValue } = require('../../../lib/config-flow.js');
 
 const CREATE_ACCOUNT_URL = 'https://analytics.google.com/analytics/web/#/provision/create';
@@ -20,7 +25,17 @@ const CREATE_ACCOUNT_URL = 'https://analytics.google.com/analytics/web/#/provisi
 async function resolveGoogleProperty(context, api) {
   // When the account flow just ran (and the user said Yes), the property
   // selection rides that gate instead of asking "Set up now?" twice
-  const accountPreConfigured = Boolean(context.brandConfig.analytics?.providers?.google?.accountId);
+  const configuredAccountId = context.brandConfig.analytics?.providers?.google?.accountId;
+  const accountPreConfigured = Boolean(configuredAccountId);
+
+  // Company-default GA account (Ian 2026-07-21): a company-managed brand
+  // inherits the company's accountId through the merge chain — note the
+  // provenance instead of prompting (an explicit brand-level accountId
+  // wins in the merge before this ever runs)
+  const companyAccountId = context.companyConfig?.analytics?.providers?.google?.accountId;
+  if (configuredAccountId && companyAccountId && configuredAccountId === companyAccountId) {
+    console.log(`    ${chalk.dim(`→ Google Analytics account ${configuredAccountId} — defaulting to company account`)}`);
+  }
 
   const accountId = await resolveConfigValue(context, {
     path: 'analytics.providers.google.accountId',

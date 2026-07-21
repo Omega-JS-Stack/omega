@@ -1,5 +1,5 @@
 /**
- * Validate the shared classic reCAPTCHA keys.
+ * Validate the brand's own classic reCAPTCHA keys.
  *
  * omega-manager only printed a checkmark outside onboarding; this port
  * actually proves the secret: siteverify with a throwaway token answers
@@ -24,7 +24,7 @@ module.exports = async function ensureSiteKey(context) {
 
   const consoleUrl = buildConsoleUrl(siteKey, brandConfig.recaptcha?.project);
 
-  console.log(`      ${chalk.dim('→')} Validating shared reCAPTCHA secret key...`);
+  console.log(`      ${chalk.dim('→')} Validating reCAPTCHA secret key...`);
   const verification = await recaptchaApi.verify(PROBE_TOKEN);
   const errorCodes = verification['error-codes'] || [];
 
@@ -37,7 +37,7 @@ module.exports = async function ensureSiteKey(context) {
   const domains = [domain, `www.${domain}`];
   const output = { siteKey: { secretValid: true, domains, consoleUrl } };
 
-  console.log(`      ${chalk.green('✓')} Shared reCAPTCHA secret key is valid`);
+  console.log(`      ${chalk.green('✓')} reCAPTCHA secret key is valid`);
 
   // The domain list has no read API — a one-time interactive confirm stamps
   // state; a changed brand domain naturally re-prompts

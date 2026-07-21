@@ -41,7 +41,7 @@ const CANONICAL_ENV_GROUPS = [
   { comment: 'Cloudflare (cloudflare service + every DNS-writing flow) — API token with Zone edit', keys: ['CLOUDFLARE_TOKEN'] },
   { comment: 'Namecheap registrar (domain service)', keys: ['NAMECHEAP_USERNAME', 'NAMECHEAP_API_KEY'] },
   { comment: 'Google OAuth client (cloud, analytics, search-console, adsense services)', keys: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'] },
-  { comment: 'Classic reCAPTCHA keys, shared across brands (recaptcha service)', keys: ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY'] },
+  { comment: "Classic reCAPTCHA keys — the brand's own, from its GCP reCAPTCHA console (recaptcha service)", keys: ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY'] },
   { comment: 'Pixel access tokens (analytics service; the names @omega.js/backend reads)', keys: ['META_ACCESS_TOKEN', 'TIKTOK_ACCESS_TOKEN'] },
   { comment: 'Error monitoring (monitoring service, Sentry provider) — a personal auth token with project+team write scopes', keys: ['SENTRY_AUTH_TOKEN'] },
   { comment: 'Email marketing (campaigns + newsletter services: SendGrid + Beehiiv)', keys: ['SENDGRID_API_KEY', 'BEEHIIV_API_KEY'] },

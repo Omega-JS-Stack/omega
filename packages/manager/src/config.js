@@ -390,11 +390,11 @@ const DEFAULTS = {
     ],
   },
 
-  // Classic reCAPTCHA — keys shared across brands, read from the brand .env
-  // (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY; missing keys → the service
-  // skips). `project` = the GCP project hosting the shared key, used only for
-  // the console deep-link in guidance (omega-manager hardcoded the company
-  // project here).
+  // Classic reCAPTCHA — the brand's OWN keys (de-ITW: never a company-shared
+  // key), read from the brand .env (RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY;
+  // missing keys → the service asks interactively, else skips). `project` =
+  // the brand's GCP project hosting the key, used only for the console
+  // deep-link in guidance (omega-manager hardcoded the company project here).
   recaptcha: {
     project: null,
   },
@@ -839,11 +839,14 @@ const REQUIRES = {
   },
 
   recaptcha: {
-    why: 'proves the shared classic reCAPTCHA keys are valid (siteverify)',
+    why: "proves the brand's own classic reCAPTCHA keys are valid (siteverify)",
     when: (config) => config.recaptcha?.enabled !== false,
     env: [
-      { name: 'RECAPTCHA_SITE_KEY', label: 'reCAPTCHA site key (shared classic keys)', url: 'https://www.google.com/recaptcha/admin', prompted: true },
-      { name: 'RECAPTCHA_SECRET_KEY', label: 'reCAPTCHA secret key', prompted: true },
+      // De-ITW (Ian 2026-07-21): the key is the brand's OWN, minted in the
+      // brand's own GCP project — the walkthrough points at the GCP reCAPTCHA
+      // console, never a company-shared key
+      { name: 'RECAPTCHA_SITE_KEY', label: "reCAPTCHA site key (the brand's own key)", url: 'https://console.cloud.google.com/security/recaptcha', hint: "Create a classic key in the brand's OWN GCP project — never a shared company key", prompted: true },
+      { name: 'RECAPTCHA_SECRET_KEY', label: 'reCAPTCHA secret key', url: 'https://console.cloud.google.com/security/recaptcha', prompted: true },
     ],
     scopes: [],
   },

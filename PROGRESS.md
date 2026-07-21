@@ -3,7 +3,6 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-21] cp257 agent: de-ITW recaptcha ask + company-default GA account id BUILT (manager 774/0, battery green, CHANGELOG cut) → gate: review → commit
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
@@ -66,6 +65,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp257 2026-07-21 de-ITW recaptcha ask + company-default GA account id (manager 774/0; battery EXIT 0) → CHANGELOG
 - cp256 2026-07-21 `omega update` verb: devkit core + 5-surface wiring, 7-day quarantine, npu-routed apply (battery PASSED) → CHANGELOG
 - cp255 2026-07-21 per-service requires preflight: REQUIRES registry + consolidated walkthroughs + --strict (manager 762/0; battery EXIT 0) → CHANGELOG
 - cp254 2026-07-21 multi-instance targets: config normalization SSOT + manager/web iteration + 2-instance corpus cell (battery PASSED) → CHANGELOG
@@ -75,4 +75,3 @@
 - cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
 - cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
 - cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG
-- cp247 2026-07-20 local-dist freshness guard (auto-prepare + re-exec at every CLI boot; 14 pins; root battery EXIT 0) → CHANGELOG

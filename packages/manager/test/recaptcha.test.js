@@ -199,6 +199,49 @@ test('site-key: interactive run opens the console and stamps the confirmed domai
   }
 });
 
+// ─── De-ITW pins (cp257): the ask is the ONLY path to a key ──────────────────
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { REQUIRES } = require('../src/config.js');
+
+test("requires: RECAPTCHA_* walkthrough mints at the GCP reCAPTCHA console (the brand's own project)", () => {
+  const env = REQUIRES.recaptcha.env;
+  assert.deepEqual(env.map((e) => e.name), ['RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY']);
+  for (const entry of env) {
+    assert.equal(entry.url, 'https://console.cloud.google.com/security/recaptcha');
+    assert.equal(entry.prompted, true);
+  }
+});
+
+test('requires/defaults: no ITW or hardcoded key value anywhere in the recaptcha registry', () => {
+  // The paste flow must be the only path to a key — no default value exists
+  assert.equal(DEFAULTS.recaptcha.project, null);
+  const serialized = JSON.stringify({ defaults: DEFAULTS.recaptcha, requires: { why: REQUIRES.recaptcha.why, env: REQUIRES.recaptcha.env } });
+  assert.doesNotMatch(serialized, /itw/i);
+  assert.doesNotMatch(serialized, /6L[0-9A-Za-z_-]{38}/); // a real site-key literal
+});
+
+test('recaptcha service source carries no hardcoded key or company value', () => {
+  const serviceDir = path.join(__dirname, '../src/services/recaptcha');
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.js')) files.push(full);
+    }
+  };
+  walk(serviceDir);
+
+  assert.ok(files.length >= 3); // index + ensure + lib
+  for (const file of files) {
+    const source = fs.readFileSync(file, 'utf8');
+    assert.doesNotMatch(source, /6L[0-9A-Za-z_-]{38}/, `${file} carries a site-key literal`);
+    assert.doesNotMatch(source, /itw-creative-works/i, `${file} carries the company project`);
+  }
+});
+
 test('site-key: a stamped domain list never re-prompts, even interactively', async () => {
   const api = fakeRecaptcha();
   const opened = [];

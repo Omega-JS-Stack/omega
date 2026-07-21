@@ -648,3 +648,106 @@ test('property-flow: create-new property calls the Admin API with config time zo
     tty.close();
   }
 });
+
+// ─── Company-default GA account (cp257) ──────────────────────────────────────
+// A company-managed brand inherits `analytics.providers.google.accountId`
+// through the merge chain (company layer under the brand file). The flow says
+// so with a dim note instead of prompting; an explicit brand value wins in
+// the merge and gets no note; the picker stays the fallback.
+
+/** Capture console.log lines around a flow run (prompt I/O bypasses console). */
+function captureLog() {
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => { lines.push(args.join(' ')); };
+  return { lines, restore: () => { console.log = original; } };
+}
+
+const COMPANY_NOTE = 'defaulting to company account';
+
+test('property-flow: company-inherited account resolves with the company-default note, no prompt', async () => {
+  const api = { listAccounts: async () => { throw new Error('must not list accounts — the company default resolves it'); } };
+  const context = {
+    brandId: 'fixture-brand',
+    brandRoot: '/tmp/omega-manager-analytics-unused', // nothing lands — both values exist
+    options: {}, // non-interactive on purpose: the company default needs no prompt
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: `https://${DOMAIN}` },
+      // The merged view a company-managed brand sees: the company accountId
+      // arrived through the merge chain
+      analytics: { providers: { google: { accountId: ACCOUNT, propertyId: PROPERTY } } },
+    },
+    companyConfig: { analytics: { providers: { google: { accountId: ACCOUNT } } } },
+  };
+
+  const log = captureLog();
+  let propertyId;
+  try {
+    propertyId = await resolveGoogleProperty(context, api);
+  } finally {
+    log.restore();
+  }
+
+  assert.equal(propertyId, PROPERTY);
+  assert.ok(log.lines.some((line) => line.includes(`Google Analytics account ${ACCOUNT}`) && line.includes(COMPANY_NOTE)));
+});
+
+test('property-flow: explicit brand accountId beats the company default — no company note', async () => {
+  const api = { listAccounts: async () => { throw new Error('must not list accounts'); } };
+  const context = {
+    brandId: 'fixture-brand',
+    brandRoot: '/tmp/omega-manager-analytics-unused',
+    options: {},
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: `https://${DOMAIN}` },
+      // Brand file set its own account — the merge already made it win
+      analytics: { providers: { google: { accountId: '424242', propertyId: PROPERTY } } },
+    },
+    companyConfig: { analytics: { providers: { google: { accountId: ACCOUNT } } } },
+  };
+
+  const log = captureLog();
+  let propertyId;
+  try {
+    propertyId = await resolveGoogleProperty(context, api);
+  } finally {
+    log.restore();
+  }
+
+  assert.equal(propertyId, PROPERTY);
+  assert.ok(!log.lines.some((line) => line.includes(COMPANY_NOTE)));
+});
+
+test('property-flow: company layer without an accountId → interactive picker fallback', async () => {
+  const api = {
+    listAccounts: async () => [{ name: `accounts/${ACCOUNT}`, displayName: 'Fixture Account' }],
+    listProperties: async () => [{ name: `properties/${PROPERTY}`, displayName: 'Fixture Brand' }],
+  };
+  const brandRoot = makeBrandRoot(FLOW_WRITEBACK_CONFIG);
+  const context = {
+    brandId: 'fixture-brand',
+    brandRoot,
+    options: {},
+    brandConfig: {
+      brand: { id: 'fixture-brand', name: 'Fixture Brand', url: `https://${DOMAIN}` },
+      analytics: { providers: { google: {} } },
+    },
+    companyConfig: { brand: { name: 'Fixture Co' } }, // company exists, no GA default
+  };
+  const tty = openTtyPrompt();
+
+  try {
+    const run = resolveGoogleProperty(context, api);
+    await tty.answer('Set up now?', '\r');
+    await tty.answer('Select Google Analytics account:', '\r');
+    await tty.answer('Select GA4 property:', '\r'); // account flow's Yes gates the pair
+    const propertyId = await run;
+
+    assert.equal(propertyId, PROPERTY);
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes(`accountId: "${ACCOUNT}"`));
+    assert.ok(written.includes(`propertyId: "${PROPERTY}"`));
+  } finally {
+    tty.close();
+  }
+});

@@ -58,6 +58,9 @@ async function runService(serviceName, brand, brandState, options = {}) {
       // Company workspace root when the brand carries a valid company marker
       // — company-shared resources (Apple signing material) live there
       companyRoot: brand.companyRoot || null,
+      // The company config layer (already merged into brandConfig) for
+      // provenance checks — null for standalone brands
+      companyConfig: brand.companyConfig || null,
       brandConfig: brand.config,
       brand,
       brandState,
@@ -116,6 +119,12 @@ async function runManage(startDir, options = {}) {
   // Company-shared resources (Apple signing material) live at the company
   // workspace root — services resolve it via context.companyRoot
   brand.companyRoot = companyConfig ? marker.companyRoot : null;
+
+  // The inheritable company layer itself rides along for provenance: its
+  // values are already merged into brand.config, but flows that want to say
+  // "this came from the company" (e.g. the GA account default) compare
+  // against it via context.companyConfig
+  brand.companyConfig = companyConfig;
 
   console.log('');
   console.log(chalk.bold.cyan('🚀 Omega Manager'));
