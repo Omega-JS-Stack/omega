@@ -57,6 +57,11 @@
       icon: 'calendar-days'
     },
     {
+      label: 'Ads',
+      href: '/admin/ads',
+      icon: 'rectangle-ad'
+    },
+    {
       header: true,
       label: 'Content'
     },

@@ -119,6 +119,7 @@ test('nav + footer render their section data (JSON5 json-in-_includes)', () => {
 test('admin sidebar renders its section data too (was silently empty under JSON.parse)', () => {
   const html = fs.readFileSync(path.join(OUT, 'admin.html'), 'utf8');
   assert.ok(html.includes('Dashboard'), 'admin sidebar labels render');
+  assert.ok(html.includes('href="/admin/ads"'), 'ads card is reachable from the sidebar');
 });
 
 test('<title> falls back to the brand name — no page ever renders an empty title', () => {

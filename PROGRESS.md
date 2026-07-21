@@ -7,12 +7,13 @@
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- Ads phase 3: admin dashboard ads CRUD card → plans/ads-system.md
 - Ads phase 4: desktop/extension `data-omega-ad` binding via shared client ads module → plans/ads-system.md
 - Multi-instance targets build (config normalization → manager iteration → fixture proof) → plans/multi-instance-targets.md
 - Per-service `requires: { env, scopes }` preflight with friendly fix walkthroughs (model: cp236 google-auth 403 diagnostics)
 - `omega update` verb: installed/current/latest/breaking per dep + 7-day release-age quarantine (npu-update semantics)
 - Playground CMS creates (arc close) once the source repo's `main` exists
+- De-ITW recaptcha: the ITW-owned key (GCP recaptcha console, project itw-creative-works) must be ASKED for in onboarding/manager (Ian INBOX 2026-07-21)
+- Company-default Google Analytics ACCOUNT id: definable once (company layer) so sub-brand analytics setup defaults to it, no picker (Ian INBOX 2026-07-21)
 ### Phase B — Launch wiring (after reviews)
 - cp239: single-command launch wired INSIDE existing verbs (manage pipeline DEPLOY_LEGS + Pages/domain/cloudflare/verify; onboarding stays one-time)
 - Review waves 2–6: manager+backend → web engine/themes → config+client/account/template-kit → desktop/extension+brands → DX+security (2× Fable medium via Workflow, Ian-gated between waves)
@@ -64,6 +65,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
 - cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG
 - cp247 2026-07-20 local-dist freshness guard (auto-prepare + re-exec at every CLI boot; 14 pins; root battery EXIT 0) → CHANGELOG
 - cp246 2026-07-20 per-app docs retired in brand context (devkit `retire` rule, mirrored ×4, sweeps run; root battery EXIT 0) → CHANGELOG
@@ -73,4 +75,3 @@
 - cp242 2026-07-20 auto-local deploys (mirrored rule; findLocalSpecs lanes on all four targets) → CHANGELOG
 - cp241 2026-07-20 publish lanes complete — release-check 6/6 GREEN; `omega i live` restore; CI pack-smoke ×6 → CHANGELOG
 - cp240 2026-07-20 review-fixes wave 1 (release-check harness, engines pins, git-native sync, diets) → CHANGELOG
-- cp238 2026-07-19 every package 0.1.0 + mechanical publish latch → CHANGELOG

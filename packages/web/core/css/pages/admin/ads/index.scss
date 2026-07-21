@@ -1,0 +1,9 @@
+// Admin Ads Index
+#ads-tbody td {
+  vertical-align: middle;
+}
+
+// Prevent action dropdown from being clipped by table-responsive overflow
+.table-responsive:has(#ads-table) {
+  overflow: visible;
+}
