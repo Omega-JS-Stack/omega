@@ -8,6 +8,7 @@
     "omega-manager": "./bin/omega-manager"
   },
   "files": [
+    "AGENTS.md",
     "bin/",
     "dist/"
   ],

@@ -34,6 +34,10 @@ Root `npm start` watches every dist-building package concurrently (single-instan
 
 Every framework ships `omega` + `omg` + `mgr` — all three are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest package.json walking up from cwd (incl. a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct. No app context (fresh dir) → falls back to the HOST framework's CLI with a stderr note, which keeps `omega setup` bootstrap working. `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
 
+## Brand agent docs
+
+Every brand root carries `CLAUDE.md` = `@AGENTS.md` and an `AGENTS.md` whose first line imports the framework-owned guide shipped in `@omega.js/manager` (`packages/manager/AGENTS.md` — the SSOT; live via the local-era symlink). The manage cycle's workspace service creates/heals the chain idempotently. Contract: [docs/agent-docs.md](docs/agent-docs.md).
+
 ## Deliberate deploys (D13)
 
 Commits never auto-publish: scaffolded workflows carry NO push triggers (workflow_dispatch + repository_dispatch only). Publishing is the explicit `omega deploy` verb on every target — web/extension dispatch their CI workflow, desktop delegates to its release flow, backend runs `firebase deploy` directly (`--only hosting` works on Spark). Content-publish implies deploy (the admin post routes dispatch the website build; `deploy: false` opts out). One executor for all surfaces: `@omega.js/devkit/deploy`. Full contract: [docs/deploys.md](docs/deploys.md).

@@ -600,6 +600,7 @@ const OPERATIONS = {
     { name: 'structure', ensure: true },  // Root workspaces + an app per enabled target
     { name: 'config', ensure: true },     // omega.json5 loads + validates (brand and per-app)
     { name: 'gitignore', ensure: true },  // .omega/ is gitignored (state never gets committed)
+    { name: 'agents', ensure: true },     // AGENTS.md framework-guide import + CLAUDE.md pointer
     { name: 'env-order', ensure: true },  // Brand/company .env in the canonical group order (cp137)
   ],
 
