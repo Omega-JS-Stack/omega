@@ -12,10 +12,11 @@
   },
   "scripts": {
     "start": "node scripts/watch-all.js",
-    "test": "npm run test:packages && npm run test:corpus && npm run test:e2e && node scripts/e2e-journey.js",
+    "test": "npm run test:packages && npm run test:corpus && npm run test:e2e && npm run test:ads && node scripts/e2e-journey.js",
     "test:packages": "node --test scripts/*.test.js && node scripts/test-workspaces.js",
     "test:corpus": "node scripts/corpus-shapes.js && npm run test:backend -w sandbox-brand",
     "test:e2e": "npm run test -w sandbox-brand",
+    "test:ads": "node scripts/e2e-ads-company.js",
     "test:journey": "node scripts/e2e-journey.js",
     "release:check": "node scripts/release-check.js"
   },

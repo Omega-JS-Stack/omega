@@ -40,6 +40,38 @@ function normalizeHost(input) {
 }
 
 /**
+ * Normalize a host-ish value to the ORIGIN parent-frame messages should
+ * target — scheme + host with any explicit port PRESERVED
+ * ('localhost:4100' → 'http://localhost:4100'; 'Example.com' →
+ * 'https://example.com'). Local hosts speak http (dev servers have no TLS);
+ * everything else https. A port-stripped origin would make the browser
+ * silently drop every postMessage, collapsing dev units as no-fill.
+ * Returns '' when unparseable.
+ */
+function normalizeOrigin(input) {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+
+  const raw = input.trim().toLowerCase();
+
+  if (!raw) {
+    return '';
+  }
+
+  try {
+    const url = new URL(raw.includes('://') ? raw : `https://${raw}`);
+    const hostname = url.hostname.replace(/^www\./, '');
+    const isLocal = hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '127.0.0.1';
+    const host = url.port ? `${hostname}:${url.port}` : hostname;
+
+    return `${isLocal ? 'http' : 'https'}://${host}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
  * True when the value is a usable http(s) URL.
  */
 function isHttpUrl(input) {
@@ -314,14 +346,10 @@ function renderAdUnit(options) {
     : '';
   const width = parseInt(options.width, 10) || 0;
   const height = parseInt(options.height, 10) || 0;
-  const parentHost = options.parentHost || '';
-
-  // Origin-checked postMessage: when the parent host is known, messages only
-  // ever go to that origin (http only for local dev hosts).
-  const isLocalParent = parentHost === 'localhost' || parentHost.endsWith('.localhost') || parentHost === '127.0.0.1';
-  const targetOrigin = parentHost
-    ? `${isLocalParent ? 'http' : 'https'}://${parentHost}`
-    : '*';
+  // Origin-checked postMessage: when the parent origin is known (computed by
+  // the serve route via normalizeOrigin — port-preserving), messages only
+  // ever go to that origin.
+  const targetOrigin = options.parentOrigin || '*';
 
   const image = isHttpUrl(ad.image)
     ? `<img class="omega-ad-image" src="${escapeHtml(ad.image)}" alt="">`
@@ -452,6 +480,7 @@ function renderAdUnit(options) {
 module.exports = {
   CACHE_TTL,
   normalizeHost,
+  normalizeOrigin,
   isHttpUrl,
   escapeHtml,
   getWeight,

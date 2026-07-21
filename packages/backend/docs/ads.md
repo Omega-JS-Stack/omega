@@ -12,7 +12,7 @@ Client-inaccessible by rules (the framework's default admin-only lock — proven
 
 | Route | Auth | Behavior |
 |---|---|---|
-| `GET /omega/ads/serve` | public | `parent, tags, width, height, theme ('' \| light \| dark), adId` → a SELF-CONTAINED HTML ad unit (inline CSS/JS, light/dark theming, origin-checked postMessage `omega-ad:set-dimensions` via ResizeObserver + `omega-ad:click`, zero timers — the HOST owns rotation/staleness recovery), or **204 on no fill** (the host's fallback ladder moves on) |
+| `GET /omega/ads/serve` | public | `parent, tags, width, height, theme ('' \| light \| dark), adId` → a SELF-CONTAINED HTML ad unit (inline CSS/JS, light/dark theming, origin-checked postMessage `omega-ad:set-dimensions` via ResizeObserver + `omega-ad:click`, zero timers — the HOST owns rotation/staleness recovery), or **204 on no fill** (the host's fallback ladder moves on). The postMessage target origin PRESERVES an explicit parent port (`localhost:4100` → `http://localhost:4100` via `normalizeOrigin`) — a port-stripped origin would silently drop every report in local dev |
 | `GET /omega/ads/redirect?id&parent` | public | fail-closed click hop: 302 ONLY to the ad's STORED http(s) link + `utm_source=<parent>`/`utm_medium=ad`/`utm_campaign=<adId>`; unknown id or non-http link → 404; caller-supplied URLs are never redirected to |
 | `GET/POST/PUT/DELETE /omega/ads` | admin | schema-validated CRUD; PUT edits provided fields only (id/created immutable); writes bust the inventory cache |
 
@@ -26,4 +26,4 @@ Module-level, shared by serve + redirect: ~5 min TTL in production (one Firestor
 
 ## Tests
 
-`test/routes/ads/{selection,cache,serve,redirect,crud}.js` + `test/rules/ads.js` — 53 tests: scoring/eligibility, cache TTL, serve round-trip (200 HTML / 204 no-fill / XSS escaping), redirect fail-closed + UTM, CRUD auth gates, rules lock. Serve/redirect round-trips use raw `fetch` (HTML/302 can't ride the JSON `http` client — mcp-test precedent).
+`test/routes/ads/{selection,cache,serve,redirect,crud}.js` + `test/rules/ads.js` — 54 tests: scoring/eligibility, cache TTL, serve round-trip (200 HTML / 204 no-fill / XSS escaping / port-preserving target origin), redirect fail-closed + UTM, CRUD auth gates, rules lock. The cross-brand company-mode e2e (monorepo `scripts/e2e-ads-company.js`, root `npm run test:ads`) exercises the same routes through a real consumer resolution. Serve/redirect round-trips use raw `fetch` (HTML/302 can't ride the JSON `http` client — mcp-test precedent).

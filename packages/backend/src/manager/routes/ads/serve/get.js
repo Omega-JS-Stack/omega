@@ -15,7 +15,7 @@
  * (inline CSS/JS, postMessage reporting, no self-refresh — the host owns the
  * lifecycle), or 204 on no fill.
  */
-const { getInventory, selectAd, normalizeHost, parseTags, renderAdUnit } = require('../utils.js');
+const { getInventory, selectAd, normalizeHost, normalizeOrigin, parseTags, renderAdUnit } = require('../utils.js');
 
 module.exports = async ({ assistant, Manager, settings, analytics }) => {
 
@@ -47,7 +47,9 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   const html = renderAdUnit({
     ad,
     redirectUrl: redirectUrl.toString(),
-    parentHost,
+    // Port-preserving origin from the RAW parent param — normalizeHost strips
+    // ports (right for eligibility/UTM, wrong for postMessage targeting)
+    parentOrigin: normalizeOrigin(settings.parent),
     width: settings.width,
     height: settings.height,
     theme: settings.theme,

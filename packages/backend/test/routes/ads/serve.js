@@ -94,6 +94,24 @@ module.exports = {
     },
 
     {
+      name: 'postmessage-target-preserves-dev-port',
+      timeout: 30000,
+      async run({ assert }) {
+        // A dev site's parent host carries a port (localhost:4100). The unit's
+        // postMessage target origin must keep it — a portless 'http://localhost'
+        // origin makes the browser silently DROP every dimension report, so
+        // house ads would always collapse as no-fill in local dev (found by
+        // the ads step 6 company-mode proof).
+        const response = await fetch(`${BASE_URL}/omega/ads/serve?parent=localhost:4100&adId=serve-open`);
+        const body = await response.text();
+
+        assert.equal(response.status, 200, 'Serve should return 200');
+        assert.ok(body.includes('"http://localhost:4100"'), 'postMessage target origin should preserve the dev port');
+        assert.ok(!body.includes('"http://localhost"'), 'portless localhost origin must not appear as the target');
+      },
+    },
+
+    {
       name: 'tag-matching-serves-top-scorer',
       timeout: 30000,
       async run({ assert }) {

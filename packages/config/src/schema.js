@@ -168,10 +168,19 @@ const SHARED_SCHEMA = [
     description: 'Default AdSense slot id for multiplex units.',
   },
   {
-    path:        'advertising.providers.inhouse.serverUrl',
+    path:        'advertising.providers.inhouse.source',
     type:        'string',
     required:    false,
-    description: 'In-house ad server base URL (serves /verts/main; the AdSense-unfilled fallback and `type: custom` units). Presence-driven — unset disables in-house ads.',
+    description: "In-house ads source: 'self' (this brand's backend serves its own `ads` inventory), 'company' (the parent company's api — resolved via company.url), or a full base URL used verbatim. Presence-driven — unset disables house units.",
+  },
+
+  // ── company ──────────────────────────────────────────────────────────────
+  {
+    path:        'company.url',
+    type:        'string',
+    required:    false,
+    match:       /^https?:\/\//,
+    description: "The parent company's canonical URL. Sub-brand surfaces derive the company api from it (e.g. advertising inhouse source 'company' → api.<company host>).",
   },
 
   // ── payment ──────────────────────────────────────────────────────────────

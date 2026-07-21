@@ -250,12 +250,13 @@ test('SHARED_SECTIONS enumerates the disperse-owned sections', () => {
   );
 });
 
-test('advertising schema: role-keyed providers with the inhouse server url (C4 cp105)', () => {
+test('advertising schema: role-keyed providers with the inhouse source (ads spec)', () => {
   const { SHARED_SCHEMA } = require('../src/schema.js');
   const paths = SHARED_SCHEMA.map((entry) => entry.path);
 
   assert.ok(paths.includes('advertising.providers.google-adsense.client'));
-  assert.ok(paths.includes('advertising.providers.inhouse.serverUrl'));
+  assert.ok(paths.includes('advertising.providers.inhouse.source'));
+  assert.ok(paths.includes('company.url'));
   for (const slot of ['display-slot', 'in-article-slot', 'in-feed-slot', 'multiplex-slot']) {
     assert.ok(paths.includes(`advertising.providers.google-adsense.${slot}`), `missing ${slot}`);
   }

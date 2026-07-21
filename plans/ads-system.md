@@ -75,7 +75,7 @@ advertising: {
 3. Admin CRUD card.
 4. Desktop/extension `data-omega-ad` binding.
 5. Retire `core/js/modules/vert.js`, `adunits/*` includes, the assets.js skip-guard note; blog `[slug].js` flips to the section. (DONE)
-6. Company-mode proof on the playground (Paperloom serves, a second in-repo brand consumes).
+6. Company-mode proof on the playground (Paperloom serves, a second in-repo brand consumes). (DONE — root `npm run test:ads` / scripts/e2e-ads-company.js; The Daily Build carries the standing `source: 'company'` + `company.url` config)
 - AdSense LIVE verification stays gated behind the real publish (Ian 2026-07-14: AdSense console needs the published site).
 
 ## Resolved questions (Ian 2026-07-20)

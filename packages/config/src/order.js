@@ -26,7 +26,7 @@ const { parseRoot } = require('./edit.js');
 // `targets` goes LAST (Ian 2026-07-14) — it's the per-target override layer,
 // so it reads best after every shared section it can override.
 const CANONICAL_TOP_LEVEL_ORDER = [
-  'enabled', 'parent', 'brand', 'account', 'local', 'github', 'domain',
+  'enabled', 'parent', 'brand', 'company', 'account', 'local', 'github', 'domain',
   'cloudflare', 'cloud', 'firebase', 'gcp', 'recaptcha', 'analytics',
   'monitoring', 'advertising', 'payment', 'oauth2', 'sponsorships',
   'marketing', 'blog', 'devlog', 'reviews', 'seo', 'searchConsole',

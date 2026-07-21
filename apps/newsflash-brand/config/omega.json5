@@ -41,6 +41,16 @@
     },
   },
 
+  // COMPANY LAYER (ads step 6): The Daily Build plays the SUB-BRAND in the
+  // company-mode ads proof — advertising.providers.inhouse.source 'company'
+  // resolves this url through the standard api derivation
+  // (api.playground.omegajs.dev in production; the offline proof pairs it
+  // with the playground's local emulator — scripts/e2e-ads-company.js).
+  // Public-by-design value; this brand stays fully offline.
+  company: {
+    url: "https://playground.omegajs.dev",
+  },
+
   // Deliberately ABSENT sections (offline testbed — no real resources ever):
   // github (no repo; deploys never run here), download (no desktop/extension
   // targets — the /download page demos the notify-me flow), domain/gcp
@@ -72,6 +82,19 @@
   monitoring: {
     provider: "sentry",
     dsn: null,
+  },
+
+  // COMPANY-MODE ADS (ads step 6 proof): no AdSense (offline brand) — house
+  // units fill from the PARENT company's inventory (`company` above). tags =
+  // this brand's contextual targeting input on every serve request.
+  advertising: {
+    providers: {
+      inhouse: {
+        source: "company",
+      },
+    },
+    fallback: "inhouse",
+    tags: ["dev-news", "ci"],
   },
 
   // EDITORIAL catalog — placeholder products shaped like a news publication

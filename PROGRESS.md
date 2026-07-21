@@ -7,7 +7,6 @@
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- Ads step 6: company-mode proof on the playground (Paperloom serves, a second in-repo brand consumes) → plans/ads-system.md
 - Multi-instance targets build (config normalization → manager iteration → fixture proof) → plans/multi-instance-targets.md
 - Per-service `requires: { env, scopes }` preflight with friendly fix walkthroughs (model: cp236 google-auth 403 diagnostics)
 - `omega update` verb: installed/current/latest/breaking per dep + 7-day release-age quarantine (npu-update semantics)
@@ -59,6 +58,8 @@
 - Standing: checkpoint discipline — survey → design → implement → tests → sandbox/fixture proof → docs → commit; live checks never touch real ITW resources outside sanctioned paths
 
 ## Parked
+- Dev-mode `source: 'company'` resolves the LOCAL stack, ignoring company.url (getApiUrl dev branch) — defensible; Ian ratifies or we add a dev override (cp253 finding)
+- AdSense slot schema drift: schema documents flat '-slot' keys, client reads spec-shape `slots.*` — its own pass at the GO adsense gate (cp253 finding)
 - devkit e2e-harness ~1-in-15 flake (mechanism uncaptured; two-pass runner + retry saves failing output to .temp/) → CHANGELOG 124
 - 61 dependabot alerts on github.com/itw-creative-works/omega → wave-6 security review triages
 - web ships @anthropic-ai/claude-agent-sdk ^0.2.138 as runtime dep (backend ^0.3.153) — diet later (wave-1 finding)
@@ -67,6 +68,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp253 2026-07-21 ads step 6: company-mode proof e2e lane + 2 real bug fixes (10/10 steps; battery PASSED) → CHANGELOG
 - cp252 2026-07-21 ads step 5: vert.js/adunits lane deleted, blog+sidebar flipped to ads/unit (web 264/264; battery PASSED) → CHANGELOG
 - cp251 2026-07-21 omega-manager name retired + brand-root `omega deploy` fan-out + scripts heal op (manager 737/0; battery EXIT 0) → CHANGELOG
 - cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
@@ -76,4 +78,3 @@
 - cp246 2026-07-20 per-app docs retired in brand context (devkit `retire` rule, mirrored ×4, sweeps run; root battery EXIT 0) → CHANGELOG
 - cp245 2026-07-20 ads phase 1: backend house-ads module (53 pins; full suite 1295/0 re-verified) → CHANGELOG
 - cp244 2026-07-20 brand agent-docs chain (manager-shipped guide + hoist-aware import + heal; live-proven) → CHANGELOG
-- cp243 2026-07-20 sibling-theme font prune (~350KB out of newsflash artifacts) → CHANGELOG
