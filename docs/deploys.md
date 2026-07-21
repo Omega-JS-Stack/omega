@@ -47,6 +47,16 @@ engines treat workflow files as framework-owned overwrites).
 | desktop | linked-local auto-detect → `npm run release:local` (local build + sign + publish); else `--dry-run` prints the dispatch / delegates to `omega release` (dispatch + live CI log streaming) | `--dry-run`, `--platforms` |
 | backend | artifact cleanup-policy pre-step → local-package staging (ALWAYS auto — file: deps pack into the artifact) → `firebase deploy` → public-invoker IAM fix | `--only <targets>` pass-through (e.g. `--only hosting` deploys on Spark where functions would demand Blaze) |
 
+### The brand-root fan-out — `omega deploy` at a brand root (cp251)
+
+At a brand root the dispatcher hands `omega deploy` to `@omega.js/manager`'s deploy command (`src/commands/deploy.js`), which fans out over the brand's apps — **not a new executor**: each app's own framework `omega deploy` verb runs (the table above), spawned sequentially with streamed output, cwd = the app, under the app's own Node.
+
+- **Order: backend first, then web, then extension/desktop** — the API must be live before the surfaces that point at it.
+- **Filters (consumed here, never forwarded)**: `--only=<target|appDir>[,…]` exact set, `--except=…` subtract. A filter matching nothing is an error — never a deploy-everything fallback.
+- **Every other flag forwards verbatim** to each app's deploy (`--dry-run`, `--direct`, `--no-sync`, `--platforms`, …). Backend-target `--only` values (`--only hosting`) are app-level — run those from `apps/backend`.
+- **A failing app stops the run** (later apps depend on it); `--continue-on-error` overrides. Any failure → exit 1.
+- **Deliberate stays deliberate**: nothing invokes the brand-root verb automatically — it is only the human-typed command (scaffolded as the brand root's `deploy` npm script; the workspace service's `scripts` op heals legacy `omega-manager` script values to `omega` and guarantees the script exists).
+
 **Mirrored rule (Ian 2026-07-20): every deploy verb auto-detects linked local packages (`findLocalSpecs` — tree-wide, cp194) and takes its LOCAL-ARTIFACT lane**, loudly, so a linked brand ships the local framework without flags or errors; CI dispatch is only for registry-clean trees (`omega i live` restores them). Dry-runs show whichever plan would actually run. Sync is plain git via the shared `syncWorkingTree` (the old `npu sync` shell-out is gone — npu is a personal tool consumer machines don't have).
 
 ## Local frameworks in production artifacts (iterate without publishing)

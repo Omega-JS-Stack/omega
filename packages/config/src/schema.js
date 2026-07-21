@@ -268,7 +268,7 @@ const SHARED_SCHEMA = [
     path:        'theme.id',
     type:        'string',
     required:    false,
-    description: "Theme id (seeded 'classy' at onboarding). Project-owned — omega-manager never overwrites it.",
+    description: "Theme id (seeded 'classy' at onboarding). Project-owned — the manager never overwrites it.",
   },
   {
     path:        'theme.appearance',

@@ -175,8 +175,12 @@ function renderRootPackageJson(answers) {
     private: true,
     ...(answers.description ? { description: answers.description } : {}),
     workspaces: ['apps/*'],
+    // npm scripts put node_modules/.bin on PATH, so plain `omega` (the
+    // context-aware dispatcher) resolves — never the retired omega-manager name
     scripts: {
-      start: 'omega-manager',
+      start: 'omega',
+      dev: 'omega dev',
+      deploy: 'omega deploy',
     },
     // Brand-level verbs (`omega dev`, manage, the `start` script above) resolve
     // @omega.js/manager FROM THE BRAND ROOT (omega-bin dispatch) — without this
@@ -217,7 +221,7 @@ function renderEnvStub(answers) {
 
   return renderCanonicalEnv({
     header: [
-      `# ${answers.name} — brand secrets (gitignored; loaded before every omega-manager run).`,
+      `# ${answers.name} — brand secrets (gitignored; loaded before every omega run).`,
       '# Uncomment and fill what this brand uses. Services without their credentials',
       '# skip cleanly, so add these as the brand adopts each service.',
     ],
@@ -239,7 +243,7 @@ function renderReadme(answers) {
 ${answers.description || 'An OMEGA brand monorepo.'}
 
 One repo, every surface of the brand. \`config/omega.json5\` is the single
-source of user choices; \`omega-manager\` reconciles every external service
+source of user choices; \`omega\` reconciles every external service
 to it, idempotently.
 
 ## Structure
@@ -256,7 +260,7 @@ ${appList}
 2. Per app: \`cd apps/<dir> && npx omega setup\` — the framework scaffolds its
    consumer interior.
 3. Fill in \`.env\` as the brand adopts external services.
-4. \`npx omega-manager\` — reconcile everything; rerun any time.
+4. \`npx omega\` — reconcile everything; rerun any time.
 `;
 }
 

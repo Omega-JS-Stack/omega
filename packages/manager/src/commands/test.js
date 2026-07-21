@@ -20,13 +20,13 @@
  *
  * Apps run sequentially with streamed output; any failing app → exit 1.
  */
-const fs = require('node:fs');
 const path = require('node:path');
 const chalk = require('chalk').default;
 
 const { findTarget } = require('@omega.js/devkit/omega-bin');
 const { UNIVERSAL_FRAMEWORK_ALIASES, PROJECT_ALIASES, FULL_ALIASES, FRAMEWORK_IDS } = require('@omega.js/devkit/test/scope');
 const { resolveBrandRoot, discoverApps } = require('../lib/brand.js');
+const { resolveFrameworkBin } = require('../lib/framework-bin.js');
 const { runCommand } = require('../lib/run-command.js');
 
 // Prefixes forwarded to every app as-is (each app's own C5 parser interprets them)
@@ -71,30 +71,6 @@ function partitionTargets(rawTargets) {
   }
 
   return { shared, perFramework, invalid };
-}
-
-/**
- * Resolve a framework's `omega` bin FILE via the node_modules directory climb
- * from where the app declares it. A manual walk (not require.resolve) because
- * exports-restricted packages don't expose ./package.json.
- */
-function resolveFrameworkBin(fromDir, name) {
-  let dir = path.resolve(fromDir);
-
-  while (true) {
-    const pkgDir = path.join(dir, 'node_modules', name);
-    const pkgPath = path.join(pkgDir, 'package.json');
-
-    if (fs.existsSync(pkgPath)) {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      const bin = typeof pkg.bin === 'string' ? pkg.bin : (pkg.bin || {}).omega;
-      return bin ? path.join(pkgDir, bin) : null;
-    }
-
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
 }
 
 module.exports = async (options) => {

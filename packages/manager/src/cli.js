@@ -13,6 +13,7 @@ const ALIASES = {
   manage: ['-m', 'start', 'run'],
   onboard: ['-o', '--onboard', 'create', 'new'],
   dev: ['--dev', 'serve'], // brand-root local stack (web + backend by default)
+  deploy: ['--deploy'], // brand-root deliberate publish fan-out (backend first)
   test: ['--test'],
   version: ['-v', '--version'],
 };

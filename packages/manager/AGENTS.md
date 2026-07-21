@@ -31,6 +31,7 @@ Run from the **brand root**:
 npm start                        # manage: reconcile EVERY service to omega.json5 (idempotent)
 npm start -- --service=<name>    # reconcile one service (workspace, github, cloud, cloudflare, …)
 npm run dev                      # local dev stack (website + backend by default)
+npm run deploy                   # DELIBERATE publish fan-out: each app's own deploy, backend first
 ```
 
 Run from an **app root** (`apps/<target>/`):

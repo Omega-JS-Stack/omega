@@ -362,7 +362,7 @@ function printNextSteps(answers) {
     console.log(`  1. Install each app's framework and run its setup: ${frameworks.join(', ')}`);
   }
   console.log(`  ${frameworks.length > 0 ? 2 : 1}. Fill in .env as the brand adopts external services (the stub lists every key)`);
-  console.log(`  ${frameworks.length > 0 ? 3 : 2}. Run ${chalk.cyan('npx omega-manager')} to reconcile everything — rerun any time`);
+  console.log(`  ${frameworks.length > 0 ? 3 : 2}. Run ${chalk.cyan('npx omega')} to reconcile everything — rerun any time`);
 }
 
 /**

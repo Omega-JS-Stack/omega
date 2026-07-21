@@ -79,7 +79,7 @@ At a **brand root** (a directory carrying `config/omega.json5` with no framework
 - An id with no matching app warns and runs nothing (exit 0 — same semantics as an app-level filter matching no tests). Only-invalid targets fall back to bare-everywhere, mirroring the app-level parser.
 - Apps run **sequentially** with streamed output; any failing app makes the whole run exit 1 (per-app summary at the end).
 - **Flags are not fanned out** (`--layer`, `--extended`, …) — flagged runs are app-level invocations; run them from the app dir.
-- Other manager commands ride the same handoff: bare `omega` at a brand root now means `omega-manager manage`, `omega onboard` reaches the wizard.
+- Other manager commands ride the same handoff: bare `omega` at a brand root means the manager's manage cycle, `omega onboard` reaches the wizard, and `omega deploy` is the brand-root deliberate-deploy fan-out (docs/deploys.md).
 
 ## CI runner notes
 

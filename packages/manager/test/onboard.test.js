@@ -166,6 +166,14 @@ test('non-interactive: full flags scaffold the complete brand monorepo', async (
   // the scaffold must declare it or nothing installs it outside the monorepo
   // (cp195 journey catch)
   assert.deepEqual(pkg.devDependencies, { '@omega.js/manager': '*' });
+  // Scripts say `omega` — the ONE user-facing verb (the retired omega-manager
+  // name never scaffolds; npm scripts put node_modules/.bin on PATH, cp251)
+  assert.deepEqual(pkg.scripts, { start: 'omega', dev: 'omega dev', deploy: 'omega deploy' });
+
+  // README speaks `npx omega` too — no user-facing surface names the old bin
+  const readmeText = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  assert.ok(readmeText.includes('npx omega'));
+  assert.ok(!readmeText.includes('omega-manager'), 'README never mentions the retired bin name');
 
   const appPkg = JSON.parse(fs.readFileSync(path.join(root, 'apps', 'website', 'package.json'), 'utf8'));
   assert.equal(appPkg.name, 'acme-website');

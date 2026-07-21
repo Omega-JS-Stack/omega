@@ -152,7 +152,7 @@ module.exports = async (argv = {}) => {
 
   console.log(chalk.bold('\n🧪 Pipeline — live full-cycle test (non-interactive by construction)\n'));
   console.log(`  Brand:   ${chalk.cyan(brandRoot)}`);
-  console.log(`  Child:   omega-manager ${childArgs.join(' ')}`);
+  console.log(`  Child:   omega ${childArgs.join(' ')}`);
   console.log(`  Core:    ${[...CORE_SERVICES, ...requireExtra].join(', ')}\n`);
 
   const started = Date.now();

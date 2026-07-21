@@ -34,7 +34,7 @@ module.exports = async (context) => {
       // Only the brand file gets a default header minted (we know its name);
       // an existing header always wins
       defaultHeader: isBrand
-        ? [`# ${brandConfig.brand.name} — brand secrets (gitignored; loaded before every omega-manager run).`]
+        ? [`# ${brandConfig.brand.name} — brand secrets (gitignored; loaded before every omega run).`]
         : [],
     });
 

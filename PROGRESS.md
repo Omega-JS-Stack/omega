@@ -3,7 +3,6 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-21] cp251 agent: omega-manager name retired from user surfaces + brand-root `omega deploy` fan-out + heal op (Ian INBOX) → gate: suites + review → commit
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
@@ -27,7 +26,7 @@
 - Brand rebuilds somiibo → sweet-saucy — HARD GATE: explicitly ask Ian before starting either; password formula → company hook at migration
 
 ## Blocked
-- GO deploy: Ian runs `cd ../omega-brand/apps/backend && npm run deploy` then `cd ../omega-brand/apps/website && npm run deploy` — classifier refuses Claude-fired production deploys
+- GO deploy: Ian runs `npm run deploy` at the omega-brand ROOT (cp251 fan-out, backend first) or per-app — classifier refuses Claude-fired production deploys
 - GO wave2: resume review waves 2–6 (protocol in Phase B line)
 - GO publish: first 0.1.0 publish-proving after waves — prereq: npm org `omega.js` rights for itwcw2000 (`npm org ls` 403s; first publish is the definitive test; 2FA surfaces then)
 - GO org-move: move project `omegajs` into `itw-creative-works-org` + org-level manage grant (propose-first; project is currently org-less — why API owner grants failed)
@@ -69,6 +68,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp251 2026-07-21 omega-manager name retired + brand-root `omega deploy` fan-out + scripts heal op (manager 737/0; battery EXIT 0) → CHANGELOG
 - cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
 - cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
 - cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG
@@ -78,4 +78,3 @@
 - cp244 2026-07-20 brand agent-docs chain (manager-shipped guide + hoist-aware import + heal; live-proven) → CHANGELOG
 - cp243 2026-07-20 sibling-theme font prune (~350KB out of newsflash artifacts) → CHANGELOG
 - cp242 2026-07-20 auto-local deploys (mirrored rule; findLocalSpecs lanes on all four targets) → CHANGELOG
-- cp241 2026-07-20 publish lanes complete — release-check 6/6 GREEN; `omega i live` restore; CI pack-smoke ×6 → CHANGELOG

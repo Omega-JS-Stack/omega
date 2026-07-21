@@ -187,7 +187,7 @@ test('workspace env-order op: reorders brand AND company .env files', async () =
 
     const brandEnv = fs.readFileSync(path.join(brandRoot, '.env'), 'utf8');
     // The bare brand file gained the brand-named default header
-    assert.equal(brandEnv.split('\n')[0], '# Fixture Brand — brand secrets (gitignored; loaded before every omega-manager run).');
+    assert.equal(brandEnv.split('\n')[0], '# Fixture Brand — brand secrets (gitignored; loaded before every omega run).');
     const lines = brandEnv.split('\n');
     assert.ok(lines.findIndex((l) => l.startsWith('GH_TOKEN=')) < lines.findIndex((l) => l.startsWith('SENDGRID_API_KEY=')));
 
