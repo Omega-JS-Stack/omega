@@ -3,6 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
+- [fable 2026-07-21] cp251 agent: omega-manager name retired from user surfaces + brand-root `omega deploy` fan-out + heal op (Ian INBOX) → gate: suites + review → commit
 - [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
 
 ## Next
@@ -14,6 +15,8 @@
 - Playground CMS creates (arc close) once the source repo's `main` exists
 - De-ITW recaptcha: the ITW-owned key (GCP recaptcha console, project itw-creative-works) must be ASKED for in onboarding/manager (Ian INBOX 2026-07-21)
 - Company-default Google Analytics ACCOUNT id: definable once (company layer) so sub-brand analytics setup defaults to it, no picker (Ian INBOX 2026-07-21)
+### Website polish backlog (Ian 2026-07-21, "for after the review")
+- 28 items: bugs (contact, redirect rebuild, auth kick-out), design/copy (pricing, about, checkout), features (uj_ rename, ad slots, FA-Pro PROPOSE-FIRST) → plans/website-polish-backlog.md
 ### Phase B — Launch wiring (after reviews)
 - cp239: single-command launch wired INSIDE existing verbs (manage pipeline DEPLOY_LEGS + Pages/domain/cloudflare/verify; onboarding stays one-time)
 - Review waves 2–6: manager+backend → web engine/themes → config+client/account/template-kit → desktop/extension+brands → DX+security (2× Fable medium via Workflow, Ian-gated between waves)
@@ -36,6 +39,7 @@
 - GO ci: all CI dispatch-only and PAUSED; even deliberate dispatches are Ian's call
 
 ## Rulings
+- Ian 2026-07-21: "DO NOT USE EM DASHES… REWRITE EVERYTHING TO MAKE SENSE WITHUT IT" — site/brand copy never uses em dashes; manual rewrites, not deletions
 - Ian 2026-07-10: continuous mode — iterate/build/test autonomously, checkpoint after checkpoint; stop only for serious errors or genuinely-Ian decisions
 - Ian 2026-07-19: "I refuse to run a single command — wrap it in npm start, self healing idempotent" — absorb, never hand back; blocked one-offs = framework gaps; wrapped verbs only
 - Ian 2026-07-20: mirrored-implementation rule — same feature, same shape, every framework (cp242 deploys enforced it)
