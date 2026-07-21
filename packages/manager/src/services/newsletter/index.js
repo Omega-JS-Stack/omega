@@ -12,6 +12,7 @@
  * Auth: BEEHIIV_API_KEY in the brand .env; the webhook operation
  * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
+const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { BeehiivAPI } = require('./lib/beehiiv-api.js');
@@ -36,9 +37,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.beehiivApi) {
-      const gate = await ensureEnvSecrets(context, [
-        { name: 'BEEHIIV_API_KEY', label: 'Beehiiv API key', url: 'https://app.beehiiv.com/settings/workspace/api' },
-      ]);
+      const gate = await ensureEnvSecrets(context, REQUIRES.newsletter.env);
       if (gate) return gate;
     }
 

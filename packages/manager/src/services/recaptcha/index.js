@@ -10,6 +10,7 @@
  * Auth: RECAPTCHA_SITE_KEY + RECAPTCHA_SECRET_KEY in the brand .env.
  * Missing keys → the service skips with guidance.
  */
+const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { RecaptchaAPI } = require('./lib/recaptcha-api.js');
@@ -30,10 +31,7 @@ module.exports.run = createServiceRunner({
 
     // The site key is handler data (console link, domain guidance), not just
     // auth — both keys must come from the .env even when tests inject the api
-    const gate = await ensureEnvSecrets(context, [
-      { name: 'RECAPTCHA_SITE_KEY', label: 'reCAPTCHA site key (shared classic keys)', url: 'https://www.google.com/recaptcha/admin' },
-      { name: 'RECAPTCHA_SECRET_KEY', label: 'reCAPTCHA secret key' },
-    ]);
+    const gate = await ensureEnvSecrets(context, REQUIRES.recaptcha.env);
     if (gate) return gate;
     const siteKey = process.env.RECAPTCHA_SITE_KEY;
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;

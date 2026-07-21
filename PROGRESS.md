@@ -7,7 +7,6 @@
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- Per-service `requires: { env, scopes }` preflight with friendly fix walkthroughs (model: cp236 google-auth 403 diagnostics)
 - `omega update` verb: installed/current/latest/breaking per dep + 7-day release-age quarantine (npu-update semantics)
 - Playground CMS creates (arc close) once the source repo's `main` exists
 - De-ITW recaptcha: the ITW-owned key (GCP recaptcha console, project itw-creative-works) must be ASKED for in onboarding/manager (Ian INBOX 2026-07-21)
@@ -67,6 +66,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp255 2026-07-21 per-service requires preflight: REQUIRES registry + consolidated walkthroughs + --strict (manager 762/0; battery EXIT 0) → CHANGELOG
 - cp254 2026-07-21 multi-instance targets: config normalization SSOT + manager/web iteration + 2-instance corpus cell (battery PASSED) → CHANGELOG
 - cp253 2026-07-21 ads step 6: company-mode proof e2e lane + 2 real bug fixes (10/10 steps; battery PASSED) → CHANGELOG
 - cp252 2026-07-21 ads step 5: vert.js/adunits lane deleted, blog+sidebar flipped to ads/unit (web 264/264; battery PASSED) → CHANGELOG
@@ -76,4 +76,3 @@
 - cp248 2026-07-20 ads phase 2: shared client ads module + `ads/unit` section + detection rewrite (client 141/web 262; root battery EXIT 0) → CHANGELOG
 - cp247 2026-07-20 local-dist freshness guard (auto-prepare + re-exec at every CLI boot; 14 pins; root battery EXIT 0) → CHANGELOG
 - cp246 2026-07-20 per-app docs retired in brand context (devkit `retire` rule, mirrored ×4, sweeps run; root battery EXIT 0) → CHANGELOG
-- cp245 2026-07-20 ads phase 1: backend house-ads module (53 pins; full suite 1295/0 re-verified) → CHANGELOG

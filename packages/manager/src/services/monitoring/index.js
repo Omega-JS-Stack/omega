@@ -14,6 +14,7 @@
  * wins, else the token's lone visible org) and writes it back to
  * monitoring.org.
  */
+const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { SentryAPI } = require('./lib/sentry-api.js');
@@ -36,14 +37,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.sentryApi) {
-      const gate = await ensureEnvSecrets(context, [
-        {
-          name: 'SENTRY_AUTH_TOKEN',
-          label: 'Sentry personal auth token',
-          url: 'https://sentry.io/settings/account/api/auth-tokens/',
-          hint: 'Create a personal token with scopes: org:read, project:read, project:write, team:read, team:write — organization tokens cannot create projects',
-        },
-      ]);
+      const gate = await ensureEnvSecrets(context, REQUIRES.monitoring.env);
       if (gate) return gate;
     }
 

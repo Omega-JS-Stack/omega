@@ -29,6 +29,7 @@ module.exports = async (options) => {
       service: options.service,
       continueOnError: options.continueOnError,
       dryRun: options.dryRun,
+      strict: options.strict,
       verbose: options.verbose,
       migration: options.migration,
       limit: options.limit,

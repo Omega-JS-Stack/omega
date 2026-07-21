@@ -36,7 +36,7 @@
 // web, instance admin). The mapping's SSOT moved to @omega.js/config with the
 // multi-instance work (the config loader walks the same dirs) — re-exported
 // here so every existing manager import keeps working.
-const { APP_DIR_TARGETS, TARGET_APP_DIRS } = require('@omega.js/config');
+const { APP_DIR_TARGETS, TARGET_APP_DIRS, isDemoProject } = require('@omega.js/config');
 
 // Framework package per target — used by the testing service to compare each
 // app's installed framework against the npm latest. Names flip to their
@@ -761,6 +761,168 @@ const OPERATIONS = {
 };
 
 // =============================================================================
+// REQUIRES - Per-service preflight requirements (env var names + Google scopes)
+// =============================================================================
+// The declarative half of the cp114 secret gate: services that need env vars
+// or Google OAuth scopes declare them HERE, next to their operations — ONE
+// home. lib/preflight.js checks the whole enabled set before any service runs
+// and prints one consolidated fix walkthrough (cp236's 403-diagnostics tone)
+// instead of N mid-run skips; the services with an ensureEnvSecrets gate
+// reference these same entries so every env NAME lives once.
+//
+// Shape per service — requires: { env, scopes } plus the gates around them:
+//   why    - one line: what the requirement buys (the walkthrough's "needed")
+//   when   - (brandConfig) => bool: whether the service would run at all for
+//            this brand. Mirrors ONLY the service setup's own config gate —
+//            keep the two in lockstep. Absent = always applies.
+//   env    - [{ name, label?, url?, hint?, prompted?, when? }] — the same
+//            descriptor shape ensureEnvSecrets takes. prompted: true = an
+//            interactive run collects the value mid-run (the paste flow), so
+//            preflight lets the service run on a TTY. Entry-level `when` =
+//            the entry only applies for some configs (registrar-specific
+//            creds). Values are NEVER read here — names only.
+//   scopes - the Google OAuth scopes this service's API calls actually hit
+//            (each a member of google-auth's GOOGLE_SCOPES union — every
+//            consent grants the union, so these only ever miss against a
+//            pre-union or stale token store). Checked against the token
+//            store's granted-scopes record — what IS knowable before a
+//            call; the live grant is proven at call time (the google-auth
+//            403 diagnostics are the backstop).
+// Services NOT listed keep their own setup gates untouched (their needs are
+// conditional in ways config can't see up front — per-processor payment
+// keys, operator-only service accounts).
+
+// The shared Google OAuth app credentials — the ONE identity every Google
+// service authorizes (google-auth.js). Declared once, referenced per service.
+const GOOGLE_ENV = [
+  { name: 'GOOGLE_CLIENT_ID', label: 'Google OAuth client ID', url: 'https://console.cloud.google.com/apis/credentials', hint: 'A Desktop-app OAuth client — the one Google identity every service shares' },
+  { name: 'GOOGLE_CLIENT_SECRET', label: 'Google OAuth client secret', url: 'https://console.cloud.google.com/apis/credentials' },
+];
+
+const REQUIRES = {
+  cloudflare: {
+    why: 'reconciles the zone, DNS records, rulesets, and settings via the Cloudflare API',
+    when: (config) => config.cloudflare?.enabled !== false,
+    env: [
+      { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token', url: 'https://dash.cloudflare.com/profile/api-tokens', prompted: true },
+    ],
+    scopes: [],
+  },
+
+  domain: {
+    why: 'points the registrar nameservers at the Cloudflare zone',
+    when: (config) => config.domain?.enabled !== false && Boolean(config.domain?.provider),
+    env: [
+      { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token (reads the zone nameservers)', url: 'https://dash.cloudflare.com/profile/api-tokens', prompted: true },
+      { name: 'NAMECHEAP_USERNAME', label: 'Namecheap account username', prompted: true, when: (config) => config.domain?.provider === 'namecheap' },
+      { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: 'https://ap.www.namecheap.com/settings/tools/apiaccess/', prompted: true, when: (config) => config.domain?.provider === 'namecheap' },
+    ],
+    scopes: [],
+  },
+
+  cloud: {
+    why: 'reconciles the Firebase/GCP project (billing, APIs, hosting, auth, data stores) via Google APIs',
+    when: (config) => {
+      if (config.firebase?.enabled === false) return false;
+      // No projectId yet → the interactive selection flow is the fix, not a
+      // secret; demo-* projects have no real cloud to reconcile
+      const projectId = config.firebase?.projectId || config.cloud?.config?.projectId;
+      return Boolean(projectId) && !isDemoProject(projectId);
+    },
+    env: GOOGLE_ENV,
+    scopes: [
+      'https://www.googleapis.com/auth/firebase',
+      'https://www.googleapis.com/auth/cloud-platform',
+      'https://www.googleapis.com/auth/cloud-billing',
+      'https://www.googleapis.com/auth/userinfo.email',
+    ],
+  },
+
+  recaptcha: {
+    why: 'proves the shared classic reCAPTCHA keys are valid (siteverify)',
+    when: (config) => config.recaptcha?.enabled !== false,
+    env: [
+      { name: 'RECAPTCHA_SITE_KEY', label: 'reCAPTCHA site key (shared classic keys)', url: 'https://www.google.com/recaptcha/admin', prompted: true },
+      { name: 'RECAPTCHA_SECRET_KEY', label: 'reCAPTCHA secret key', prompted: true },
+    ],
+    scopes: [],
+  },
+
+  analytics: {
+    why: 'reconciles GA4 streams and the Firebase link via the GA Admin API',
+    when: (config) => config.analytics?.enabled !== false && Boolean(config.analytics?.providers?.google?.propertyId),
+    env: GOOGLE_ENV,
+    scopes: ['https://www.googleapis.com/auth/analytics.edit'],
+  },
+
+  'search-console': {
+    why: 'creates/verifies the sc-domain property and submits sitemaps via the Search Console API',
+    when: (config) => config.searchConsole?.enabled !== false,
+    env: GOOGLE_ENV,
+    scopes: [
+      'https://www.googleapis.com/auth/webmasters',
+      'https://www.googleapis.com/auth/siteverification',
+    ],
+  },
+
+  adsense: {
+    why: 'verifies the domain is present + approved in the AdSense account (read-only API)',
+    when: (config) => config.adsense?.enabled !== false && Boolean(config.adsense?.accountId),
+    env: GOOGLE_ENV,
+    scopes: ['https://www.googleapis.com/auth/adsense.readonly'],
+  },
+
+  monitoring: {
+    why: 'creates one Sentry project per enabled target and lands the DSNs',
+    when: (config) => Boolean(config.monitoring)
+      && config.monitoring.enabled !== false
+      && (config.monitoring.provider || 'sentry') === 'sentry',
+    env: [
+      {
+        name: 'SENTRY_AUTH_TOKEN',
+        label: 'Sentry personal auth token',
+        url: 'https://sentry.io/settings/account/api/auth-tokens/',
+        hint: 'Create a personal token with scopes: org:read, project:read, project:write, team:read, team:write — organization tokens cannot create projects',
+        prompted: true,
+      },
+    ],
+    scopes: [],
+  },
+
+  campaigns: {
+    why: 'reconciles domain auth, the sender, the list, fields, segments, and the event webhook via the SendGrid API',
+    when: (config) => config.marketing?.campaigns?.enabled !== false
+      && (config.marketing?.campaigns?.provider || 'sendgrid') === 'sendgrid',
+    env: [
+      { name: 'SENDGRID_API_KEY', label: 'SendGrid API key', url: 'https://app.sendgrid.com/settings/api_keys', prompted: true },
+    ],
+    scopes: [],
+  },
+
+  newsletter: {
+    why: 'verifies publication access, fields, segments, and the webhook via the Beehiiv API',
+    when: (config) => config.marketing?.newsletter?.enabled !== false
+      && (config.marketing?.newsletter?.provider || 'beehiiv') === 'beehiiv',
+    env: [
+      { name: 'BEEHIIV_API_KEY', label: 'Beehiiv API key', url: 'https://app.beehiiv.com/settings/workspace/api', prompted: true },
+    ],
+    scopes: [],
+  },
+
+  certificates: {
+    why: 'reconciles Apple signing certs, bundle IDs, and provisioning profiles via App Store Connect',
+    when: (config) => config.certificates?.enabled !== false
+      && Boolean(config.targets?.desktop || config.targets?.mobile),
+    env: [
+      { name: 'APPLE_API_ISSUER', label: 'App Store Connect issuer ID', url: 'https://appstoreconnect.apple.com/access/api' },
+      { name: 'APPLE_API_KEY_ID', label: 'App Store Connect API key ID', url: 'https://appstoreconnect.apple.com/access/api' },
+      { name: 'APPLE_TEAM_ID', label: 'Apple Developer team ID' },
+    ],
+    scopes: [],
+  },
+};
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
@@ -802,5 +964,6 @@ module.exports = {
   DEFAULTS,
   SERVICE_ORDER,
   OPERATIONS,
+  REQUIRES,
   templateObject,
 };

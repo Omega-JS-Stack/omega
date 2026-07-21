@@ -13,6 +13,7 @@
  * Auth: SENDGRID_API_KEY in the brand .env; the event-webhook operation
  * additionally needs OMEGA_WEBHOOK_KEY. No API key → clean skip.
  */
+const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
@@ -39,9 +40,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.sendgridApi) {
-      const gate = await ensureEnvSecrets(context, [
-        { name: 'SENDGRID_API_KEY', label: 'SendGrid API key', url: 'https://app.sendgrid.com/settings/api_keys' },
-      ]);
+      const gate = await ensureEnvSecrets(context, REQUIRES.campaigns.env);
       if (gate) return gate;
     }
 

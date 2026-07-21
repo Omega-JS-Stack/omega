@@ -15,6 +15,7 @@
  * Each handler caches its read step to .omega/cache/cloudflare/{op}.json.
  */
 const chalk = require('chalk').default;
+const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { CloudflareAPI } = require('./lib/cloudflare-api.js');
 const { getApexDomain } = require('../../lib/domain-utils.js');
@@ -33,9 +34,7 @@ module.exports.run = createServiceRunner({
     }
 
     if (!context.cloudflareApi) {
-      const gate = await ensureEnvSecrets(context, [
-        { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token', url: 'https://dash.cloudflare.com/profile/api-tokens' },
-      ]);
+      const gate = await ensureEnvSecrets(context, REQUIRES.cloudflare.env);
       if (gate) return gate;
     }
 

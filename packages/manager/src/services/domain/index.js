@@ -14,6 +14,7 @@
  * Missing credentials → the service skips with guidance.
  */
 const chalk = require('chalk').default;
+const { REQUIRES } = require('../../config.js');
 const { createServiceRunner } = require('../../lib/service-runner.js');
 const { ensureEnvSecrets } = require('../../lib/env-secrets.js');
 const { CloudflareAPI } = require('../cloudflare/lib/cloudflare-api.js');
@@ -42,18 +43,16 @@ module.exports.run = createServiceRunner({
 
     // The zone lookup needs Cloudflare even for manual registrars — the
     // required nameserver values come from the zone
+    // The env descriptors live in the REQUIRES registry (one home): the
+    // unconditional entry is the Cloudflare token; the `when`-gated entries
+    // are the namecheap credentials (registrar-specific)
     if (!context.cloudflareApi) {
-      const gate = await ensureEnvSecrets(context, [
-        { name: 'CLOUDFLARE_TOKEN', label: 'Cloudflare API token (reads the zone nameservers)', url: 'https://dash.cloudflare.com/profile/api-tokens' },
-      ]);
+      const gate = await ensureEnvSecrets(context, REQUIRES.domain.env.filter((entry) => !entry.when));
       if (gate) return gate;
     }
 
     if (provider === 'namecheap' && !context.namecheapApi) {
-      const gate = await ensureEnvSecrets(context, [
-        { name: 'NAMECHEAP_USERNAME', label: 'Namecheap account username' },
-        { name: 'NAMECHEAP_API_KEY', label: 'Namecheap API key', url: 'https://ap.www.namecheap.com/settings/tools/apiaccess/' },
-      ]);
+      const gate = await ensureEnvSecrets(context, REQUIRES.domain.env.filter((entry) => entry.when?.(context.brandConfig)));
       if (gate) return gate;
     }
 

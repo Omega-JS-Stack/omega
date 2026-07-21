@@ -20,6 +20,7 @@ const { SERVICE_ORDER, OPERATIONS } = require('./config.js');
 const { resolveBrandRoot, loadBrand } = require('./lib/brand.js');
 const { readCompanyMarker, loadCompanyConfig } = require('./lib/company.js');
 const { readState, writeState, writeRunOutput } = require('./lib/state.js');
+const { runPreflight } = require('./lib/preflight.js');
 const { RunSummary } = require('./lib/run-summary.js');
 
 // Timestamp for this process run — used in .omega/runs/{RUN_TIMESTAMP}.json
@@ -76,6 +77,7 @@ async function runService(serviceName, brand, brandState, options = {}) {
  *
  * @param {string} startDir - Any directory inside the brand monorepo
  * @param {Object} options - { service?, continueOnError?, dryRun?, verbose?,
+ *   strict? (preflight failures fail hard instead of skipping),
  *   migration? (true = all, string = one), limit?, ids? (migrations service) }
  * @returns {{ hasErrors: boolean, results: Object, brand: Object }}
  */
@@ -145,6 +147,18 @@ async function runManage(startDir, options = {}) {
   console.log(`  ${chalk.dim('Apps:')}     ${brand.apps.map((a) => `${a.name}${a.target ? chalk.dim(`→${a.target}`) : chalk.yellow('→?')}`).join(', ') || chalk.yellow('none')}`);
   console.log(`  ${chalk.dim('Services:')} ${options.service || servicesToRun.join(chalk.dim(' → '))}`);
 
+  // Preflight (the REQUIRES registry): check the enabled services' declared
+  // env vars + Google scopes up front — ONE consolidated fix walkthrough
+  // instead of N mid-run skips. Failing services skip (the cycle continues —
+  // absorb, never crash) unless the run can collect the fix itself
+  // (interactive paste/consent flows) or --strict makes them fail hard.
+  const preflight = runPreflight({
+    services: servicesToRun,
+    brandConfig: brand.config,
+    brandRoot,
+    options,
+  });
+
   // Load durable state (derived/runtime data)
   const brandState = readState(brandRoot);
   const summary = new RunSummary();
@@ -155,7 +169,28 @@ async function runManage(startDir, options = {}) {
     console.log('');
     console.log(`  ${chalk.bold.magenta(`[${serviceName.toUpperCase()}]`)}`);
 
-    const result = await runService(serviceName, brand, brandState, options);
+    // Preflight verdicts: 'skip' steps the service aside with the printed
+    // walkthrough (missingEnv rides along for the 🔑 aggregate); 'error' is
+    // the --strict hard failure; 'run' (or no gate) proceeds normally
+    const gate = preflight.gates[serviceName];
+    let result;
+    if (gate?.action === 'error') {
+      console.log(`  ${chalk.red(`✗ Preflight failed (${gate.reason})`)}`);
+      result = {
+        status: 'error',
+        error: gate.reason,
+        ...(gate.missingEnv.length > 0 ? { missingEnv: gate.missingEnv } : {}),
+      };
+    } else if (gate?.action === 'skip') {
+      console.log(`    ${chalk.dim(`⊘ Skipped (${gate.reason})`)}`);
+      result = {
+        status: 'skipped',
+        reason: gate.reason,
+        ...(gate.missingEnv.length > 0 ? { missingEnv: gate.missingEnv } : {}),
+      };
+    } else {
+      result = await runService(serviceName, brand, brandState, options);
+    }
     results[serviceName] = result;
 
     summary.add(brand.id, brand.config.brand?.name || brand.id, serviceName, result);

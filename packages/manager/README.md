@@ -7,6 +7,7 @@ npx omega                      # manage: all services against the brand containi
 npx omega --service=update     # one service
 npx omega --dry-run            # preview update's install/build work without running it
 npx omega --continue-on-error  # don't stop at the first failing service
+npx omega --strict             # preflight failures (missing env/scopes) fail hard instead of skipping
 npx omega onboard              # create (or converge) a brand — wizard in a TTY, derivation otherwise
                                #   (incl. the managed-accounts step: keep the inherited list —
                                #    company config or the support@{domain} default — or write your own)
@@ -39,6 +40,10 @@ Services declare operations in [src/config.js](src/config.js) `OPERATIONS`; hand
 **Run-mode gates are standardized** in [src/lib/run-gates.js](src/lib/run-gates.js) — never hand-compose them: `canPrompt(options)` (TTY **and** not dry-run — the only prompt gate), `dryRunPlan(message, result?)` (the canonical `⊘ Dry run — would <message>` line, optionally passing a handler return through for one-statement gates), and `needsInteractiveSkip(key, action, note?)` (the warned step-aside carrying the `needsInteractive` marker the run summary aggregates into its ⚑ section with per-service rerun hints).
 
 **Env secrets gate through `ensureEnvSecrets`** ([src/lib/env-secrets.js](src/lib/env-secrets.js), cp114) — a service setup declares the vars its APIs need (`[{ name, label, url }]`): present → proceed; missing + interactive → masked ask, persisted to the brand `.env`, exported, run continues; missing + non-interactive → skip carrying `missingEnv`, which the run summary aggregates into its 🔑 section (exact keys + the interactive rerun command). Never hand-roll `process.env.X` skip checks in setups.
+
+**Requirements are declared once, in the `REQUIRES` registry** ([src/config.js](src/config.js)) — per service, `requires`-style `{ env, scopes }` plus `why` (what the requirement buys) and `when(brandConfig)` gates (service-level and per-entry) mirroring the service's own config gate. Services with an `ensureEnvSecrets` gate reference these same entries, so every env NAME has one home; the `scopes` leg lists the Google OAuth scopes the service's API calls actually hit (each a member of google-auth's union — every consent grants the union).
+
+**Preflight runs the registry before any service** ([src/lib/preflight.js](src/lib/preflight.js), modeled on cp236's google-auth 403 diagnostics): env presence (names only — values never print) and Google scopes against the token store's granted-scopes record — what IS knowable before a call; the live grant is only proven at call time, with the 403 diagnostics as the backstop. Failures print ONE consolidated walkthrough (what's missing, which service, why, the exact fix + mint URL, then the rerun verb) instead of N mid-run skips. Verdicts per failing service: **run** (interactive and the run itself collects the fix — the paste/consent flows), **skip** (the fix needs the operator; the walkthrough prints, the cycle continues, and the skip's `missingEnv` feeds the 🔑 aggregate), or **error** with `--strict`. Services without a `REQUIRES` entry are untouched — their needs are conditional in ways config can't see up front (per-processor payment keys, operator-only service accounts).
 
 ## Services (ported so far)
 
