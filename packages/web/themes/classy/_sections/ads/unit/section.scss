@@ -13,3 +13,10 @@
     border: 0;
   }
 }
+
+// Ads never print
+@media print {
+  .omega-ad-unit {
+    display: none !important;
+  }
+}

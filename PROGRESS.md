@@ -7,7 +7,7 @@
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
-- Ads step 5: retire vert.js + adunits includes; blog [slug].js flips to the section → plans/ads-system.md
+- Ads step 6: company-mode proof on the playground (Paperloom serves, a second in-repo brand consumes) → plans/ads-system.md
 - Multi-instance targets build (config normalization → manager iteration → fixture proof) → plans/multi-instance-targets.md
 - Per-service `requires: { env, scopes }` preflight with friendly fix walkthroughs (model: cp236 google-auth 403 diagnostics)
 - `omega update` verb: installed/current/latest/breaking per dep + 7-day release-age quarantine (npu-update semantics)
@@ -59,7 +59,6 @@
 - Standing: checkpoint discipline — survey → design → implement → tests → sandbox/fixture proof → docs → commit; live checks never touch real ITW resources outside sanctioned paths
 
 ## Parked
-- vert.js sits out of the module-bundle lane (imports @omega.js/client; standalone IIFE would double the singleton) — dies at ads phase 2 by design → plans/ads-system.md
 - devkit e2e-harness ~1-in-15 flake (mechanism uncaptured; two-pass runner + retry saves failing output to .temp/) → CHANGELOG 124
 - 61 dependabot alerts on github.com/itw-creative-works/omega → wave-6 security review triages
 - web ships @anthropic-ai/claude-agent-sdk ^0.2.138 as runtime dep (backend ^0.3.153) — diet later (wave-1 finding)
@@ -68,6 +67,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp252 2026-07-21 ads step 5: vert.js/adunits lane deleted, blog+sidebar flipped to ads/unit (web 264/264; battery PASSED) → CHANGELOG
 - cp251 2026-07-21 omega-manager name retired + brand-root `omega deploy` fan-out + scripts heal op (manager 737/0; battery EXIT 0) → CHANGELOG
 - cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
 - cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
@@ -77,4 +77,3 @@
 - cp245 2026-07-20 ads phase 1: backend house-ads module (53 pins; full suite 1295/0 re-verified) → CHANGELOG
 - cp244 2026-07-20 brand agent-docs chain (manager-shipped guide + hoist-aware import + heal; live-proven) → CHANGELOG
 - cp243 2026-07-20 sibling-theme font prune (~350KB out of newsflash artifacts) → CHANGELOG
-- cp242 2026-07-20 auto-local deploys (mirrored rule; findLocalSpecs lanes on all four targets) → CHANGELOG

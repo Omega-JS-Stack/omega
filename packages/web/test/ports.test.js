@@ -1,14 +1,14 @@
 /**
  * A2 real-layout ports against the ports-site fixture — the three REAL files
  * of the migration-cost dimension (UJM classy contact 337L, sweet-saucy
- * recipe 412L + the real adsense include, somiibo index 456L + its hero-demo
+ * recipe 412L + ads/unit sections, somiibo index 456L + its hero-demo
  * include), built through the engine with ONLY the mechanical transforms the
  * B4 codemod would apply (page.resolved.→resolved., canonical/slug/content
  * forms, include leading slash, interpolated-tag-arg fix-forward, and
  * content-entry pages → collection dirs: the recipe doc lives in _recipes/
  * because page frontmatter is meta-only since 2026-07-19).
  * Assertions target REAL data: the UJM default team member via uj_member,
- * adsense slots via include params, and the full JSON-LD Recipe schema.
+ * ads/unit section placements, and the full JSON-LD Recipe schema.
  *
  * Since B2 the two ported layouts live in the fixture's own `_layouts/` —
  * CONSUMER-LOCAL layouts (the sweet-saucy pattern), resolved as the top
@@ -75,7 +75,7 @@ test('real classy contact: layout-frontmatter Liquid, fixed icon args, full sect
   assert.ok(!html.includes('text-{{'), 'no raw Liquid left in classes');
 });
 
-test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, adsense include params', () => {
+test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, ads/unit sections', () => {
   const html = pages.get('/recipes/the-best-brown-butter-chocolate-chip-cookies');
   assert.ok(html, 'recipe page rendered');
 
@@ -91,11 +91,11 @@ test('real sweet-saucy recipe: page-scoped meta, uj_member vs real team doc, ads
   assert.ok(html.includes('Alex Raeburn'), 'uj_member name resolved from team collection');
   assert.ok(html.includes('href="https://ports.example.com/team/alex-raeburn"'), 'uj_member url resolved');
 
-  // The real adsense include, 3 placements via include params
-  assert.ok(html.includes('"data-ad-client": "ca-pub-PORTSTEST"'), 'adsense client from resolved data');
-  assert.ok(html.includes('"data-ad-slot": "2222222222"'), 'in-article slot');
-  assert.ok(html.includes('"data-ad-slot": "1111111111"'), 'display slot');
-  assert.ok(html.includes('"data-ad-slot": "3333333333"'), 'multiplex slot');
+  // The modern ads/unit section, 3 placements by type (client/slot values
+  // live in config — the client ads module reads them at mount, never markup)
+  assert.ok(html.includes('data-omega-ad="in-article"'), 'in-article placement');
+  assert.ok(html.includes('data-omega-ad="display"'), 'display placement');
+  assert.ok(html.includes('data-omega-ad="multiplex"'), 'multiplex placement');
 
   // Recipe image path built from recipe.id + page slug
   assert.ok(html.includes('/assets/images/recipes/recipe-1764775196/the-best-brown-butter-chocolate-chip-cookies.jpg'),

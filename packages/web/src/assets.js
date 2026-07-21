@@ -221,15 +221,13 @@ async function buildAssets(options) {
     }
 
     // ---- Legacy module bundles: <layer>/js/modules/*.js → the FIXED URL
-    // /assets/js/modules/<name>.bundle.js. The redirect layout and the ad
-    // units script these directly (uj_cachebreak query param), so they are
-    // never content-hashed and carry no manifest key. Standalone IIFEs — no
-    // boot stub, no shared chunk — so a module importing @omega.js/client is
-    // SKIPPED: inlining a second client copy would break the cross-bundle
-    // singleton (vert.js sits out until the ads lane gets manifest URLs).
+    // /assets/js/modules/<name>.bundle.js. The redirect layout scripts these
+    // directly (uj_cachebreak query param), so they are never content-hashed
+    // and carry no manifest key. Standalone IIFEs — no boot stub, no shared
+    // chunk — so modules here must not import @omega.js/client (a second
+    // inlined client copy would break the cross-bundle singleton).
     const moduleEntries = {};
     for (const [rel, abs] of collectLayered(jsDirs, /^modules\/[^/]+\.js$/)) {
-      if (/from\s+['"]@omega\.js\/client/.test(fs.readFileSync(abs, 'utf8'))) continue;
       moduleEntries[`modules/${path.basename(rel, '.js')}.bundle`] = abs;
     }
     if (Object.keys(moduleEntries).length) {

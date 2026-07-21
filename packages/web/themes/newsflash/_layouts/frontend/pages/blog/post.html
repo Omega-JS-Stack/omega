@@ -39,7 +39,7 @@ newsletter:
   pills, a framed author card, comments, read-next tiles, and the vermilion
   newsletter slab. Preserves classy's contracts: the blog/[slug] page assets, the
   load-bearing .blog-post-content class (main-layer ad injection), the
-  data-social-share div, giscus + adsense includes, author_section /
+  data-social-share div, the giscus include + ads/unit section, author_section /
   related_posts / newsletter frontmatter.
 {% endcomment %}
 
@@ -116,7 +116,7 @@ newsletter:
     <!-- Ad -->
     <div class="row justify-content-center mb-3">
       <div class="col-xl-8 col-lg-8 col-md-12 col-12" data-lazy="@class animation-slide-up">
-        {% include modules/adunits/adsense.html type="in-article" %}
+        {% section "ads/unit", type: "in-article" %}
       </div>
     </div>
   </div>

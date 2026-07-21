@@ -51,11 +51,11 @@ function insertBlogPostAds() {
     return;
   }
 
-  // Get ad configuration from window.Configuration (set by Jekyll)
-  const adClient = window.Configuration?.advertising?.providers?.['google-adsense']?.client;
-  const adSlot = window.Configuration?.advertising?.providers?.['google-adsense']?.['in-article-slot'];
-  const adLayout = 'in-article';
-  const adFormat = 'fluid';
+  // Advertising is key-presence enabled — no config, no hosts inserted
+  if (!omega.config?.advertising) {
+    console.log('[Blog Post] No advertising config — skipping ad insertion');
+    return;
+  }
 
   // Get all top-level paragraphs (exclude those inside blockquotes, details, etc.)
   const $paragraphs = Array.from($article.querySelectorAll('p'))
@@ -103,47 +103,20 @@ function insertBlogPostAds() {
     return;
   }
 
-  // Get configuration from Manager
-  const adConfig = {
-    client: adClient,
-    type: 'in-article',
-    slot: adSlot,
-    layout: adLayout,
-    format: adFormat,
-  };
-
   // Log ad insertion
-  console.log('[Blog Post] Inserting', positions.length, 'ads', adConfig);
+  console.log('[Blog Post] Inserting', positions.length, 'ads');
 
-  // Insert ads at each position
-  positions.forEach((targetParagraph, index) => {
-    // Create div with data-lazy script configuration
-    const $adContainer = document.createElement('div');
+  // Insert a modern ad host at each position — the shared client ads module
+  // owns the whole lifecycle (lazy arming, AdSense → house fallback ladder,
+  // no-fill collapse). Same markup vocabulary as the ads/unit section.
+  positions.forEach((targetParagraph) => {
+    const $host = document.createElement('div');
+    $host.classList.add('omega-ad-unit', 'my-4');
+    $host.setAttribute('data-omega-ad', 'in-article');
+    $host.setAttribute('data-wm-bind', '@hide auth.resolved.active');
 
-    // Build data-lazy object
-    const lazyConfig = {
-      src: `${window.location.origin}/assets/js/modules/vert.bundle.js?cb=${omega.config.buildTime}`,
-      attributes: {
-        'data-ad-client': adConfig.client,
-        'data-ad-type': adConfig.type,
-        'data-ad-slot': adConfig.slot,
-        'data-ad-layout': adConfig.layout,
-        'data-ad-format': adConfig.format,
-        'async': ''
-      }
-    };
-
-    // Set data-lazy attribute
-    $adContainer.setAttribute('data-lazy', `@script ${JSON.stringify(lazyConfig)}`);
-    $adContainer.classList.add('my-4');
-
-    // Insert after the target paragraph
-    targetParagraph.parentNode.insertBefore($adContainer, targetParagraph.nextSibling);
-
-    // Log each insertion
-    console.log('[Blog Post] Inserted ad #' + (index + 1), lazyConfig);
+    // Insert after the target paragraph, then hand it to the ads module
+    targetParagraph.parentNode.insertBefore($host, targetParagraph.nextSibling);
+    omega.ads().mount($host);
   });
-
-  // Final log
-  console.log('[Blog Post] Blog post ads inserted');
 }

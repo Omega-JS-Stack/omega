@@ -4,8 +4,8 @@
  * attrs from args, the standard @hide auth binding), neutral mechanical
  * defaults, §7 asset-lane registration (section.js in the main bundle,
  * section.scss on the omega:sections sheet), library resolution, and the
- * source guards that keep the legacy vert.js lane untouched until its
- * scheduled retirement (spec sequencing step 5).
+ * source guards that pin the legacy vert.js lane RETIRED (spec sequencing
+ * step 5 — the section + shared client ads module are the one implementation).
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -86,10 +86,32 @@ test('ads/unit: section.js delegates WHOLLY to the shared client ads module (one
   assert.ok(!js.includes('createElement'), 'no DOM construction in the section — the module owns the iframe');
 });
 
-// ─── the legacy stays put until step 5 ──────────────────────────────────────
+// ─── the legacy is retired (step 5) ─────────────────────────────────────────
 
-test('spec step 5 not taken: legacy vert.js + adunits includes remain untouched', () => {
-  for (const relative of ['core/js/modules/vert.js', 'core/_includes/modules/adunits/adsense.html', 'core/_includes/modules/adunits/promo-server.html']) {
-    assert.ok(fs.existsSync(path.join(PKG, relative)), `${relative} still present`);
+test('spec step 5 taken: legacy vert.js, popupads.js + adunits includes are GONE', () => {
+  for (const relative of ['core/js/modules/vert.js', 'core/js/modules/popupads.js', 'core/_includes/modules/adunits']) {
+    assert.ok(!fs.existsSync(path.join(PKG, relative)), `${relative} deleted`);
   }
+});
+
+test('no packaged source references the retired legacy lane', () => {
+  const roots = ['core', 'defaults', 'themes'].map((dir) => path.join(PKG, dir));
+  const offenders = [];
+
+  const scan = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        scan(full);
+      } else if (/\.(js|html|scss|json5?|md)$/.test(entry.name)) {
+        const contents = fs.readFileSync(full, 'utf8');
+        if (/vert\.bundle|adunits\/|popupads/.test(contents)) {
+          offenders.push(path.relative(PKG, full));
+        }
+      }
+    }
+  };
+  roots.forEach(scan);
+
+  assert.deepEqual(offenders, [], 'no vert.bundle/adunits/popupads references remain in packaged layers');
 });

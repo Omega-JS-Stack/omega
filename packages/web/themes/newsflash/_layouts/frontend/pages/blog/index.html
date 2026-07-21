@@ -30,7 +30,7 @@ newsletter_cta:
   pagination, category/tag chips, and the vermilion newsletter slab (the
   shared marketing/newsletter-cta band — the nf override inherits classy's
   §7 FormManager section.js). Preserves classy's contracts: paginator,
-  /search/cse form, the form-manager dialect, and the adsense include.
+  /search/cse form, the form-manager dialect, and the ads/unit section.
 {% endcomment %}
 
 <!-- Page head: serif title + dek + search -->
@@ -203,7 +203,7 @@ newsletter_cta:
     <!-- In-Feed Ad -->
     <div class="row justify-content-center mb-5">
       <div class="col-12 col-lg-8" data-lazy="@class animation-slide-up">
-        {% include modules/adunits/adsense.html type="in-feed" %}
+        {% section "ads/unit", type: "in-feed" %}
       </div>
     </div>
 

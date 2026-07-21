@@ -1,10 +1,12 @@
 /**
- * C4 cp105 — advertising is role-keyed config, zero ITW hardcodes.
+ * C4 cp105 (reshaped at ads step 5) — advertising is role-keyed config,
+ * zero ITW hardcodes.
  *
  * Two halves: the packaged sources speak `advertising.providers.*` with no
- * baked-in ITW ad-server values (vert.js reads the inhouse provider from
- * config), and the engine renders ad units from the config channel — present
- * when a client id is configured, absent when not.
+ * baked-in ITW ad-server values (blog [slug].js gates on config presence and
+ * delegates to the shared client ads module), and the engine renders the
+ * ads/unit section from CONFIG-FREE markup — client ids and slots never
+ * reach the page; the client module reads them at mount.
  */
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -18,20 +20,19 @@ const buildWith = (siteData, overrides) => sharedBuildWith(siteData, overrides, 
 
 // ─── Source guards ───────────────────────────────────────────────────────────
 
-test('vert.js carries zero ITW hardcodes and reads the inhouse provider from config', () => {
-  const vert = fs.readFileSync(path.join(PKG, 'core', 'js', 'modules', 'vert.js'), 'utf8');
+test('blog [slug].js rides the modern ads lane — config-gated, module-delegated', () => {
+  const slug = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'blog', '[slug].js'), 'utf8');
 
-  assert.ok(!vert.includes('itwcreativeworks'), 'no ITW ad-server hostname baked in');
-  assert.ok(!vert.includes("brand.id === 'promo-server'"), 'no brand-id special case');
-  assert.ok(vert.includes('advertising?.providers?.inhouse?.serverUrl'), 'inhouse server comes from config');
-  assert.ok(vert.includes('allowedOrigins'), 'message origins derive from config, not a literal');
+  assert.ok(!slug.includes('itwcreativeworks'), 'no ITW ad-server hostname baked in');
+  assert.ok(!slug.includes('vert.bundle'), 'no legacy vert bundle reference');
+  assert.ok(slug.includes('omega.config?.advertising'), 'advertising key presence gates insertion');
+  assert.ok(slug.includes('data-omega-ad'), 'inserted hosts speak the modern vocabulary');
+  assert.ok(slug.includes('omega.ads().mount'), 'delegates the lifecycle to the shared client ads module');
 });
 
 test('packaged content speaks advertising.providers.* only', () => {
   const files = [
-    ['core/_includes/modules/adunits/adsense.html', 'advertising.providers.google-adsense'],
     ['core/_includes/core/head.html', 'advertising.providers.google-adsense.client'],
-    ['core/js/pages/blog/[slug].js', "advertising?.providers?.['google-adsense']"],
   ];
 
   for (const [relative, marker] of files) {
@@ -49,23 +50,26 @@ const ADVERTISING = {
       client: 'ca-pub-TEST123',
       'in-article-slot': '9990001',
     },
-    inhouse: { serverUrl: 'https://ads.example.com' },
+    inhouse: { source: 'self' },
   },
 };
 
-test('configured advertising renders the ad unit from config values', async () => {
+test('configured advertising: the ads/unit section renders its host — values stay in config', async () => {
   const pages = await buildWith({ ...miniData, advertising: ADVERTISING });
   const html = pages.get('/ad');
 
-  assert.ok(html.includes('ca-pub-TEST123'), 'client id flows from config');
-  assert.ok(html.includes('"data-ad-slot": "9990001"'), 'in-article slot flows from config');
-  assert.ok(html.includes('"data-ad-type": "in-article"'), 'ad TYPE param drives the unit');
+  assert.ok(html.includes('data-omega-ad="in-article"'), 'section host renders with the type');
+  // The id/slot reach the page ONLY through the baked window.Configuration
+  // (the channel the client ads module reads) — never as legacy unit markup
+  assert.ok(!html.includes('data-ad-client'), 'no legacy data-ad-* unit markup');
+  assert.ok(!html.includes('vert.bundle'), 'no legacy vert bundle script');
 });
 
-test('no advertising config → no ad unit markup at all', async () => {
+test('no advertising config: markup is identical — enablement is client-side key presence', async () => {
   const pages = await buildWith(miniData);
   const html = pages.get('/ad');
 
   assert.ok(html.includes('id="ad-page"'), 'page itself renders');
-  assert.ok(!html.includes('data-ad-client'), 'no ad unit without a configured client');
+  assert.ok(html.includes('data-omega-ad="in-article"'), 'the host still renders (the module no-fills without config)');
+  assert.ok(!html.includes('data-ad-client'), 'no legacy ad unit markup');
 });

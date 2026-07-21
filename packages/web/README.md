@@ -115,7 +115,7 @@ see the harness README for the honest before/after numbers.
 - `core/` — the theme-agnostic layer: `_layouts/blueprint/**` (45 page-type
   contracts), `_layouts/core/root.html` (the document shell),
   `_layouts/modules/` (redirect utility), `_includes/` (head/body/foot chrome,
-  adsense/promo adunits, price-per-unit pricing math, default
+  price-per-unit pricing math, default
   nav/footer/account + app sidebar/topbar data JSONs), `css/` (main.scss +
   the `--omega-*` token sheet, `.omega-shell` mechanics, the motion library,
   core styles, per-page css), `js/` (the UJM runtime: main module, core

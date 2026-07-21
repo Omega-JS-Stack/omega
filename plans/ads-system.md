@@ -74,7 +74,7 @@ advertising: {
 2. Client ads module in `@omega.js/client` + the web `ads/unit` section (§7 lanes, goldens, showcase entry).
 3. Admin CRUD card.
 4. Desktop/extension `data-omega-ad` binding.
-5. Retire `core/js/modules/vert.js`, `adunits/*` includes, the assets.js skip-guard note; blog `[slug].js` flips to the section.
+5. Retire `core/js/modules/vert.js`, `adunits/*` includes, the assets.js skip-guard note; blog `[slug].js` flips to the section. (DONE)
 6. Company-mode proof on the playground (Paperloom serves, a second in-repo brand consumes).
 - AdSense LIVE verification stays gated behind the real publish (Ian 2026-07-14: AdSense console needs the published site).
 

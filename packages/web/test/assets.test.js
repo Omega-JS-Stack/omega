@@ -136,15 +136,15 @@ test('§7 asset lanes: section.scss joins the main sheet, section.js boots behin
 
 test('legacy module bundles emit at their fixed URLs (redirect pages script them)', async () => {
   await build(['classy']);
-  // The redirect layout + ad units reference /assets/js/modules/<name>.bundle.js
-  // directly (uj_cachebreak query, no content hash) — the lane must emit them.
+  // The redirect layout references /assets/js/modules/<name>.bundle.js
+  // directly (uj_cachebreak query, no content hash) — the lane must emit it.
   const redirect = fs.readFileSync(path.join(OUT, 'assets', 'js', 'modules', 'redirect.bundle.js'), 'utf8');
   assert.ok(redirect.includes('redirect-config'), 'redirect module bundled at its fixed URL');
   assert.ok(redirect.includes('Forwarded fragment'), 'fragment forwarding rides along (#billing deep-links)');
-  assert.ok(fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'popupads.bundle.js')), 'popupads.bundle.js emits (import-free)');
-  // vert.js imports @omega.js/client — bundling it standalone would inline a
-  // second client copy and break the singleton; it sits out of this lane.
-  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'vert.bundle.js')), 'client-importing modules are skipped');
+  // The legacy ad modules are retired (ads spec step 5) — the ads/unit
+  // section + shared client ads module are the one implementation.
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'vert.bundle.js')), 'vert.bundle.js retired');
+  assert.ok(!fs.existsSync(path.join(OUT, 'assets', 'js', 'modules', 'popupads.bundle.js')), 'popupads.bundle.js retired');
 });
 
 // Read an entry bundle plus every chunk it transitively imports (the module
