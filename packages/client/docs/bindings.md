@@ -87,7 +87,7 @@ auth.account.roles.admin         # Boolean
 auth.account.roles.betaTester    # Boolean
 ```
 
-### Usage paths (auto-populated by @omega.js/client + authorized-fetch)
+### Usage paths (server usage — auto-populated by @omega.js/client)
 
 ```
 usage.{feature}.monthly              # Current monthly usage count
@@ -97,7 +97,19 @@ usage.{feature}.limit                # Plan limit for this feature
 
 Example: `usage.credits.monthly`, `usage.credits.limit`
 
-Seeded on auth settle from `account.usage` + the site's payment plan config. Refreshed after every `authorizedFetch` call from `omega-properties` response headers.
+Seeded on auth settle from `account.usage` + the site's payment plan config. Refreshed after every `omega.request()` call from the `omega-properties` response header — the backend attaches fresh usage counters to every response, so bound elements stay current automatically.
+
+### Device paths (local stats — auto-populated on initialize)
+
+```
+device.installed                     # First-seen timestamp (ms)
+device.session.count                 # Session count on this device
+device.version.current               # App version currently running
+device.version.isNew                 # True on the first run after an update
+device.duration.total.days           # Time since install (also: session.*, other units)
+```
+
+From the `device` module (localStorage / extension storage) — LOCAL device stats, deliberately a different key than the server-derived `usage` above.
 
 ### Custom state (set via JS)
 

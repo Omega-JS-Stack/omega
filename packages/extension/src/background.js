@@ -3,6 +3,7 @@ import extension from './lib/extension.js';
 import LoggerLite from './lib/logger-lite.js';
 import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
 import { attachTo as attachUrlHelpers } from './utils/url-helpers.js';
+import { createRequest } from '@omega.js/client/modules/request.js';
 
 // Firebase (static imports - dynamic import() doesn't work in service workers with webpack chunking)
 import { initializeApp, getApp } from 'firebase/app';
@@ -178,33 +179,17 @@ class Manager {
       // Background is signed in, context is not (or different user) → provide token
       this.logger.log('[AUTH] syncAuth: Fetching fresh custom token for context...', bgUser.email);
 
-      // Resolve the API URL (throws when cloud.config.authDomain is missing —
-      // a misconfigured brand should fail loudly, never call a foreign host)
-      const apiUrl = this.getApiUrl();
-
-      // Get fresh ID token for authorization
-      const idToken = await bgUser.getIdToken(true);
-
-      // Fetch fresh custom token from the /user/token route
-      // (uid defaults server-side to the authenticated caller)
-      const response = await fetch(`${apiUrl}/omega/user/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({}),
+      // Fetch a fresh custom token from the /user/token route via the shared
+      // request layer (uid defaults server-side to the authenticated caller).
+      // getApiUrl() throws when cloud.config.authDomain is missing — a
+      // misconfigured brand should fail loudly, never call a foreign host.
+      const request = createRequest({
+        getApiUrl: () => this.getApiUrl(),
+        getIdToken: (force) => bgUser.getIdToken(force),
       });
+      const data = await request('/omega/user/token', { method: 'POST', body: {} });
 
-      // Check response
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
-      }
-
-      // Parse response ({ token } at the top level)
-      const data = await response.json();
-
-      // Check for token in response
+      // Check for token in response ({ token } at the top level)
       if (!data.token) {
         throw new Error('No token in server response');
       }

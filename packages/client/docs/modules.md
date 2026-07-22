@@ -47,6 +47,21 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 - **Actions**: `@text`, `@value`, `@show`, `@hide`, `@attr`, `@style`
 - **Deep reference**: [bindings.md](bindings.md) — comma syntax, condition operators, state paths, skeleton loaders, root-key filtering
 
+## Request (`request.js`) — harmonized API fetch
+
+- **Singleton API**: `await omega.request('/omega/user/token', { method: 'POST', body: {} })`
+- **Options**: `method` (default GET), `headers`, `body` (objects JSON-encoded automatically), `auth: false` (skip the Bearer token for public routes), `output: 'complete'` (returns `{ status, ok, headers, data, properties }` instead of just the body)
+- **Behavior**: leading-`/` paths resolve through `getApiUrl()`; absolute URLs pass through. A fresh Firebase ID token rides as `Authorization: Bearer` when signed in. Non-ok responses THROW an `Error` carrying `.code` (HTTP status), `.data` (parsed body), and `.properties`.
+- **omega-properties**: the backend assistant attaches this header (code, tag, usage current+limits, schema, additional) to every response; `omega.request()` parses it on success AND error, and merges server usage into the `usage` bindings key — `data-wm-bind` elements refresh automatically.
+- **Standalone**: non-singleton contexts (desktop main, extension service worker) build their own via `createRequest({ getApiUrl, getIdToken, onProperties })` from `@omega.js/client/modules/request.js` — the desktop client-bridge and the extension background token sync both do.
+
+## Device (`device.js`) — local device stats
+
+- **Class**: `Device` (`omega.device()`)
+- **Key Methods**: `getUsageDuration(unit)`, `getSessionDuration(unit)`, `getInstalledDate()`, `getSessionCount()`, `getBindingData()`, `reset()`
+- **Storage**: localStorage (web) or extension storage, key `wm_usage` (historical name kept so existing installs retain their stats)
+- **Bindings**: seeds the `device` key on initialize (installed / session / version / duration) — distinct from the server-derived `usage` key (see [bindings.md](bindings.md))
+
 ## Firestore (`firestore.js`)
 
 - **Class**: `Firestore`

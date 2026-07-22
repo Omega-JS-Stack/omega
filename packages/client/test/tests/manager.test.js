@@ -116,7 +116,7 @@ describe('Module Getters', () => {
   it('should return notifications module', () => { assert(getManager().notifications()); });
   it('should return serviceWorker module', () => { assert(getManager().serviceWorker()); });
   it('should return sentry module', () => { assert(getManager().sentry()); });
-  it('should return usage module', () => { assert(getManager().usage()); });
+  it('should return device module', () => { assert(getManager().device()); });
   it('should return dom module', () => { assert(getManager().dom()); });
   it('should return utilities module', () => { assert(getManager().utilities()); });
 });

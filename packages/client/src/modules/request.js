@@ -1,0 +1,152 @@
+/**
+ * request — the harmonized API-fetch layer (successor to legacy UJM's authorizedFetch).
+ *
+ * One implementation for every surface: the browser singleton exposes it as
+ * `omega.request(url, options)`; desktop main and the extension service worker
+ * construct their own instance via `createRequest(deps)` with their framework's
+ * url/auth plumbing. Every response's `omega-properties` header (code, tag,
+ * usage current+limits, schema, additional — emitted by @omega.js/backend's
+ * assistant on every respond/errorify) is parsed automatically; contexts with
+ * bindings get server usage merged into the top-level `usage` bindings key.
+ *
+ * deps contract:
+ *   getApiUrl()          -> base API url (required for route-relative paths)
+ *   getIdToken(force)    -> fresh Firebase ID token, or null when signed out
+ *   onProperties(props)  -> optional; called with the parsed omega-properties object
+ */
+
+const PROPERTIES_HEADER = 'omega-properties';
+
+function createRequest(deps) {
+  if (typeof deps?.getApiUrl !== 'function' || typeof deps?.getIdToken !== 'function') {
+    throw new Error('createRequest requires getApiUrl and getIdToken deps');
+  }
+
+  return async function request(url, options = {}) {
+    // Route-relative paths resolve through the host's getApiUrl(); absolute urls pass through
+    const target = url.startsWith('/')
+      ? `${deps.getApiUrl()}${url}`
+      : url;
+
+    const headers = { ...(options.headers || {}) };
+
+    // Attach a fresh Bearer ID token unless the caller opted out (public routes)
+    if (options.auth !== false) {
+      const idToken = await Promise.resolve(deps.getIdToken(true)).catch(() => null);
+
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
+      } else {
+        console.warn('[Request] No authenticated user — sending without Authorization. Did auth settle yet?');
+      }
+    }
+
+    // JSON-encode object bodies (strings/FormData/URLSearchParams pass through)
+    let body = options.body;
+    if (body && typeof body === 'object' && !isRawBody(body)) {
+      body = JSON.stringify(body);
+      if (!hasHeader(headers, 'content-type')) {
+        headers['Content-Type'] = 'application/json';
+      }
+    }
+
+    const response = await fetch(target, {
+      ...options,
+      method: options.method || 'GET',
+      headers,
+      body,
+    });
+
+    // omega-properties rides EVERY assistant response (success and error)
+    const properties = parseProperties(response.headers.get(PROPERTIES_HEADER));
+    if (properties && deps.onProperties) {
+      deps.onProperties(properties);
+    }
+
+    const data = await parseBody(response);
+
+    if (!response.ok) {
+      const message = (data && typeof data === 'object' && data.message)
+        || (typeof data === 'string' && data)
+        || `Request failed with status ${response.status}`;
+      const error = new Error(message);
+      error.code = response.status;
+      error.properties = properties;
+      error.data = data;
+      throw error;
+    }
+
+    if (options.output === 'complete') {
+      return { status: response.status, ok: response.ok, headers: response.headers, data, properties };
+    }
+
+    return data;
+  };
+}
+
+// Merge server usage (current counters + plan limits) from an omega-properties
+// payload into the top-level `usage` bindings key — the same key auth settle
+// seeds, so `data-wm-bind` elements refresh automatically after every request.
+// Shape per feature: { monthly, daily, ..., limit }.
+function mergeUsageIntoBindings(bindings, properties) {
+  const current = properties?.usage?.current;
+  if (!current || !Object.keys(current).length) {
+    return;
+  }
+
+  const limits = properties.usage.limits || {};
+  const existing = bindings.getContext().usage || {};
+  const usage = { ...existing };
+
+  for (const key of Object.keys(current)) {
+    usage[key] = {
+      ...existing[key],
+      ...current[key],
+      limit: limits[key] || 0,
+    };
+  }
+
+  bindings.update({ usage });
+}
+
+function parseProperties(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn('[Request] Failed to parse omega-properties header:', e.message);
+    return null;
+  }
+}
+
+async function parseBody(response) {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    return response.json().catch(() => null);
+  }
+
+  return response.text();
+}
+
+function hasHeader(headers, name) {
+  return Object.keys(headers).some((key) => key.toLowerCase() === name);
+}
+
+function isRawBody(body) {
+  return (typeof FormData !== 'undefined' && body instanceof FormData)
+    || (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams)
+    || (typeof Blob !== 'undefined' && body instanceof Blob)
+    || (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer);
+}
+
+export { createRequest, mergeUsageIntoBindings };
+export default createRequest;
+
+// For non-ES6 environments (desktop main, extension service worker via require)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { createRequest, mergeUsageIntoBindings };
+}

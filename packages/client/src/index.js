@@ -8,8 +8,9 @@ import Firestore from './modules/firestore.js';
 import Notifications from './modules/notifications.js';
 import ServiceWorker from './modules/service-worker.js';
 import Sentry from './modules/sentry.js';
-import Usage from './modules/usage.js';
+import Device from './modules/device.js';
 import Verts from './modules/verts.js';
+import { createRequest, mergeUsageIntoBindings } from './modules/request.js';
 
 // Classic dev ports (N7) — the browser-side fallbacks when no resolved map is
 // provided. Lockstep with @omega.js/config's CLASSIC_PORTS: browser code can't
@@ -48,8 +49,25 @@ class Manager {
     this._notifications = new Notifications(this);
     this._serviceWorker = new ServiceWorker(this);
     this._sentry = new Sentry(this);
-    this._usage = new Usage(this);
+    this._device = new Device(this);
     this._verts = new Verts(this);
+
+    // Harmonized API fetch (omega.request) — fresh Bearer token when signed in,
+    // omega-properties processed on every response (server usage → bindings)
+    this._request = createRequest({
+      getApiUrl: () => this.getApiUrl(),
+      getIdToken: (force) => this._firebaseAuth?.currentUser
+        ? this._auth.getIdToken(force)
+        : null,
+      onProperties: (properties) => mergeUsageIntoBindings(this._bindings, properties),
+    });
+  }
+
+  // Make an API request: `omega.request('/omega/user/token', { method: 'POST', body: {} })`.
+  // Route-relative paths resolve through getApiUrl(); pass `auth: false` for public routes,
+  // `output: 'complete'` for { status, ok, headers, data, properties }.
+  request(url, options) {
+    return this._request(url, options);
   }
 
   // Module getters
@@ -81,8 +99,8 @@ class Manager {
     return this._sentry;
   }
 
-  usage() {
-    return this._usage;
+  device() {
+    return this._device;
   }
 
   analytics() {
@@ -178,13 +196,15 @@ class Manager {
       // Old IE force polyfill
       // await this._loadPolyfillsIfNeeded();
 
-      // Initialize usage tracking
-      await this._usage.initialize();
+      // Initialize local device-stats tracking (installed/session/version)
+      await this._device.initialize();
 
-      // Update bindings with config and usage data
+      // Update bindings with config and device data. `device` is the LOCAL
+      // stats key — the `usage` key belongs to SERVER usage (seeded on auth
+      // settle, refreshed from omega-properties by omega.request()).
       this.bindings().update({
         config: this.config,
-        usage: this._usage.getBindingData(),
+        device: this._device.getBindingData(),
       });
 
       return this;

@@ -6,7 +6,7 @@
 
 OMEGA Client is a modern JavaScript utility library for web applications with Firebase integration. It runs in the browser, in Electron's renderer process, and inside browser extensions (content scripts, popups, background pages). Provides:
 
-- A singleton `Manager` instance exposing authentication, reactive DOM data binding, Firestore, storage, push notifications, error tracking (Sentry), service-worker helpers, and DOM/utility functions
+- A singleton `Manager` instance exposing authentication, reactive DOM data binding, Firestore, storage, push notifications, error tracking (Sentry), service-worker helpers, DOM/utility functions, and `omega.request()` — the harmonized API-fetch layer (fresh Bearer token, automatic `omega-properties` processing with server usage synced into bindings)
 - Lazy Firebase imports to keep consumer bundles small
 - Reactive `data-wm-bind` DOM directives wired to auth + usage state
 - A `resolveSubscription()` helper unified with @omega.js/backend's `User.resolveSubscription()` so subscription-state logic is identical across frontend and backend
@@ -46,7 +46,7 @@ omega.firestore().doc('users/abc').get();
 
 OMEGA Client exports a singleton `Manager` instance from `src/index.js`. Every `import omega from '@omega.js/client'` returns the same already-initialized object — do NOT call `new Manager()`, and do NOT pass `omega` through function params or module-level variables.
 
-The singleton owns ten feature modules under `src/modules/`: `storage`, `auth`, `bindings`, `firestore`, `notifications`, `service-worker`, `sentry`, `dom`, `utilities`, `verts` (the fallback-ladder ad engine, adblock-safe naming — AdSense provider lane + in-house/company units, shared by web/desktop/extension). Firebase modules are dynamically imported to keep the bundle small. Alongside them live the transport-free standalone modules (`icon-core`, `icon-renderer`, `motion`) that embedding frameworks import by subpath and boot themselves — `motion` is the shared animation engine behind the `data-omega-*` attributes (classy v2). See [docs/architecture.md](docs/architecture.md) for the directory structure and module dependency graph, and [docs/modules.md](docs/modules.md) for the API reference of each module.
+The singleton owns twelve feature modules under `src/modules/`: `storage`, `auth`, `bindings`, `firestore`, `notifications`, `service-worker`, `sentry`, `dom`, `utilities`, `device` (local install/session stats — binds the `device` key), `request` (harmonized API fetch — `omega.request()`; also consumed standalone by desktop main + the extension service worker via `createRequest`), `verts` (the fallback-ladder ad engine, adblock-safe naming — AdSense provider lane + in-house/company units, shared by web/desktop/extension). Firebase modules are dynamically imported to keep the bundle small. Alongside them live the transport-free standalone modules (`icon-core`, `icon-renderer`, `motion`) that embedding frameworks import by subpath and boot themselves — `motion` is the shared animation engine behind the `data-omega-*` attributes (classy v2). See [docs/architecture.md](docs/architecture.md) for the directory structure and module dependency graph, and [docs/modules.md](docs/modules.md) for the API reference of each module.
 
 ## File Conventions
 

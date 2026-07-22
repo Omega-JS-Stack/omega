@@ -7,13 +7,13 @@ const UNITS = {
   days: 1000 * 60 * 60 * 24,
 };
 
-// Storage key
+// Storage key — keeps the historical name so existing installs retain their stats
 const STORAGE_KEY = 'wm_usage';
 
 // Session timeout (30 minutes of inactivity = new session)
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 
-class Usage {
+class Device {
   constructor(manager) {
     this.manager = manager;
     this.data = null;
@@ -111,7 +111,7 @@ class Usage {
       const result = await storage.get(STORAGE_KEY);
       return result[STORAGE_KEY] || null;
     } catch (e) {
-      console.warn('[Usage] Failed to load from extension storage:', e);
+      console.warn('[Device] Failed to load from extension storage:', e);
       return null;
     }
   }
@@ -147,7 +147,7 @@ class Usage {
     try {
       await storage.set({ [STORAGE_KEY]: this.data });
     } catch (e) {
-      console.warn('[Usage] Failed to save to extension storage:', e);
+      console.warn('[Device] Failed to save to extension storage:', e);
     }
   }
 
@@ -261,4 +261,4 @@ class Usage {
   }
 }
 
-export default Usage;
+export default Device;

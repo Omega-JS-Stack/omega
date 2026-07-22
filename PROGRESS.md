@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-22] authorizedFetch proposal written, awaiting Ian's shape ratify (name, usage bindings key, sequencing) → plans/authorized-fetch.md
+- [fable 2026-07-22] cp261 SHIPPED; next Ian input: assistant refactor GO or wave 3 → CHANGELOG
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -13,7 +13,6 @@
 ### Ian-queued (2026-07-22)
 - Assistant library review+optimization: rename, module split, signatures, sentry rework; KEEP headers/status-code semantics; propose-first → plans/assistant-refactor.md
 - Docs+skills revamp (WIDENED 07-22): rewrite all 7 omega:* skills + COMPLETE AGENTS.md rewrite — after waves → plans/agent-docs-skills-reorg.md
-- authorizedFetch: one client-side API-fetch layer + automatic omega-properties→bindings usage sync — shape awaits Ian → plans/authorized-fetch.md
 - Test harmonization + comprehensiveness pass (real-Chrome extension auth e2e, real-Electron desktop auth e2e, per-package gap table) — after the review waves → plans/test-comprehensiveness.md
 ### Phase B — Launch wiring (after reviews)
 - cp239: single-command launch wired INSIDE existing verbs (manage pipeline DEPLOY_LEGS + Pages/domain/cloudflare/verify; onboarding stays one-time)
@@ -69,6 +68,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp261 2026-07-22 omega.request() harmonized fetch layer + usage/device bindings split + desktop/extension callers (battery EXIT 0) → CHANGELOG
 - cp260 2026-07-22 legacy command lane retired + token callers fixed + test:auth e2e lane + de-ITW extension fallbacks (battery EXIT 0) → CHANGELOG
 - cp259 2026-07-21 wave-2 fix-batch + 3-pass review (email loadTemplate, errorify guard closed; backend 1332/44) → CHANGELOG
 - cp258 2026-07-21 FULL vert rename: every runtime surface adblock-safe; zero-hit sweep; battery GREEN → CHANGELOG
@@ -78,4 +78,3 @@
 - cp254 2026-07-21 multi-instance targets: config normalization SSOT + manager/web iteration + 2-instance corpus cell (battery PASSED) → CHANGELOG
 - cp253 2026-07-21 ads step 6: company-mode proof e2e lane + 2 real bug fixes (10/10 steps; battery PASSED) → CHANGELOG
 - cp252 2026-07-21 ads step 5: vert.js/adunits lane deleted, blog+sidebar flipped to ads/unit (web 264/264; battery PASSED) → CHANGELOG
-- cp251 2026-07-21 omega-manager name retired + brand-root `omega deploy` fan-out + scripts heal op (manager 737/0; battery EXIT 0) → CHANGELOG

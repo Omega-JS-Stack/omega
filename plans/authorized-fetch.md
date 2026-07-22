@@ -4,7 +4,11 @@
 > "i want our backend and frontend fetches overall to be harmonized … the backend sends things like usage
 > data as a header, we need to process that intelligently and ideally automatically by passing the usage
 > to the bindings system — that could be part of the authorized fetch addition/rework."
-> STATUS: awaiting Ian's shape ratify. Do not build until GO.
+> STATUS: BUILT (cp261, 2026-07-22) — Ian GO'd all three calls: name `omega.request()`, server usage
+> keeps the `usage` bindings key (local device stats moved to `device`), built standalone ahead of the
+> assistant refactor. Implementation: `packages/client/src/modules/request.js` (+ `device.js` rename);
+> desktop client-bridge and extension background consume `createRequest`. This file is now the record
+> of the design; behavior docs live in client docs/modules.md + docs/bindings.md.
 
 ## Prior art (the legacy one worked)
 
