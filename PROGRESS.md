@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-22] cp262 SHIPPED; next Ian input: assistant refactor GO or wave 3 → CHANGELOG
+- [fable 2026-07-22] cp263 assistant refactor: GO given, proposal written, awaiting Ian's name pick (ctx recommended) → plans/assistant-refactor.md
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
