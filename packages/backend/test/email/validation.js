@@ -195,7 +195,7 @@ module.exports = {
     },
 
     {
-      name: 'localpart-bem-suffix-allowed-on-real-names',
+      name: 'localpart-backend-suffix-allowed-on-real-names',
       timeout: 5000,
 
       async run({ assert }) {

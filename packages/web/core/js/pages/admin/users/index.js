@@ -10,7 +10,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
@@ -129,10 +128,9 @@ async function fetchPage(options) {
       url.searchParams.set('startAfter', nextCursor);
     }
 
-    const response = await authorizedFetch(url.toString(), {
+    const response = await omega.request(url.toString(), {
       method: 'GET',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
     });
@@ -390,10 +388,9 @@ async function toggleDisabled(row) {
   }
 
   try {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/admin/users/disable`, {
+    const response = await omega.request(`/omega/admin/users/disable`, {
       method: 'POST',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { uid: row.uid, disabled: disabled },
@@ -414,10 +411,9 @@ async function signInAsUser(uid, email) {
   openSignInAsModalLoading(email);
 
   try {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/token`, {
+    const response = await omega.request(`/omega/user/token`, {
       method: 'POST',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { uid: uid },
@@ -515,10 +511,9 @@ async function deleteUser(uid, email) {
   }
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/omega/user`, {
+    await omega.request(`/omega/user`, {
       method: 'DELETE',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { uid: uid },

@@ -23,23 +23,23 @@ layout: frontend/core/cover
 
       <!-- The receipt -->
       <div class="classy-receipt__panel mb-5">
-        <div class="classy-receipt__row wm-binding-skeleton" data-wm-bind="@show confirmation">
+        <div class="classy-receipt__row omega-binding-skeleton" data-omega-bind="@show confirmation">
           <span class="classy-micro">Order</span>
-          <span class="font-monospace fw-semibold" data-wm-bind="@text confirmation.order.id">Loading...</span>
+          <span class="font-monospace fw-semibold" data-omega-bind="@text confirmation.order.id">Loading...</span>
         </div>
 
-        <div class="classy-receipt__row wm-binding-skeleton" data-wm-bind="@show confirmation">
+        <div class="classy-receipt__row omega-binding-skeleton" data-omega-bind="@show confirmation">
           <span class="classy-micro">Plan</span>
-          <span class="fw-semibold" data-wm-bind="@text confirmation.order.productName">Loading...</span>
+          <span class="fw-semibold" data-omega-bind="@text confirmation.order.productName">Loading...</span>
         </div>
 
-        <div class="classy-receipt__row classy-receipt__row--total wm-binding-skeleton" data-wm-bind="@show confirmation">
+        <div class="classy-receipt__row classy-receipt__row--total omega-binding-skeleton" data-omega-bind="@show confirmation">
           <span class="classy-micro">Total paid</span>
-          <span class="classy-receipt__total" data-wm-bind="@text confirmation.order.total">$--</span>
+          <span class="classy-receipt__total" data-omega-bind="@text confirmation.order.total">$--</span>
         </div>
 
-        <div data-wm-bind="@show confirmation.subscription.show" hidden>
-          <div class="classy-receipt__note small" data-wm-bind="@text confirmation.subscription.infoText"></div>
+        <div data-omega-bind="@show confirmation.subscription.show" hidden>
+          <div class="classy-receipt__note small" data-omega-bind="@text confirmation.subscription.infoText"></div>
         </div>
       </div>
 

@@ -3,7 +3,6 @@
  */
 
 // Libraries
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
@@ -200,10 +199,9 @@ async function updateActiveSessions(account) {
   try {
     const serverApiURL = `${omega.getApiUrl()}/omega/user/sessions`;
 
-    const data = await authorizedFetch(serverApiURL, {
+    const data = await omega.request(serverApiURL, {
       method: 'GET',
       timeout: 60000,
-      response: 'json',
       tries: 2,
     });
 
@@ -450,10 +448,9 @@ function initializeSigninLinkGenerator() {
 
     try {
       const tokenURL = `${omega.getApiUrl()}/omega/user/token`;
-      const data = await authorizedFetch(tokenURL, {
+      const data = await omega.request(tokenURL, {
         method: 'POST',
         timeout: 60000,
-        response: 'json',
         tries: 2,
       });
 

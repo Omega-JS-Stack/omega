@@ -17,6 +17,9 @@
 
 const PROPERTIES_HEADER = 'omega-properties';
 
+// Delay between retry attempts (options.tries)
+const RETRY_DELAY = 500;
+
 function createRequest(deps) {
   if (typeof deps?.getApiUrl !== 'function' || typeof deps?.getIdToken !== 'function') {
     throw new Error('createRequest requires getApiUrl and getIdToken deps');
@@ -50,12 +53,33 @@ function createRequest(deps) {
       }
     }
 
-    const response = await fetch(target, {
-      ...options,
-      method: options.method || 'GET',
-      headers,
-      body,
-    });
+    // Fetch with bounded retries (network errors + 5xx) and an optional
+    // per-attempt timeout — the wonderful-fetch semantics the legacy
+    // authorizedFetch callers relied on (tries, timeout).
+    const tries = Math.max(1, options.tries || 1);
+    let response;
+
+    for (let attempt = 1; ; attempt++) {
+      try {
+        response = await fetch(target, {
+          ...options,
+          method: options.method || 'GET',
+          headers,
+          body,
+          ...(options.timeout ? { signal: AbortSignal.timeout(options.timeout) } : {}),
+        });
+
+        if (response.status < 500 || attempt >= tries) {
+          break;
+        }
+      } catch (e) {
+        if (attempt >= tries) {
+          throw e;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+    }
 
     // omega-properties rides EVERY assistant response (success and error)
     const properties = parseProperties(response.headers.get(PROPERTIES_HEADER));
@@ -86,7 +110,7 @@ function createRequest(deps) {
 
 // Merge server usage (current counters + plan limits) from an omega-properties
 // payload into the top-level `usage` bindings key — the same key auth settle
-// seeds, so `data-wm-bind` elements refresh automatically after every request.
+// seeds, so `data-omega-bind` elements refresh automatically after every request.
 // Shape per feature: { monthly, daily, ..., limit }.
 function mergeUsageIntoBindings(bindings, properties) {
   const current = properties?.usage?.current;

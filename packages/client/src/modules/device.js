@@ -7,8 +7,8 @@ const UNITS = {
   days: 1000 * 60 * 60 * 24,
 };
 
-// Storage key — keeps the historical name so existing installs retain their stats
-const STORAGE_KEY = 'wm_usage';
+// Storage key 
+const STORAGE_KEY = 'omega_device';
 
 // Session timeout (30 minutes of inactivity = new session)
 const SESSION_TIMEOUT = 30 * 60 * 1000;

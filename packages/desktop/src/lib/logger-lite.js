@@ -137,7 +137,7 @@ function ensureMainFileTransport() {
 //
 // Two paths to reach main:
 //   1. Direct ipcRenderer access (preload, or renderer with contextIsolation off).
-//   2. Via window.em.ipc.send (renderer with contextIsolation on — preload exposes
+//   2. Via window.desktop.ipc.send (renderer with contextIsolation on — preload exposes
 //      a contextBridge surface that proxies to ipcRenderer).
 // We try both; whichever works first wins.
 function tryForwardToMain(name, level, args) {
@@ -152,10 +152,10 @@ function tryForwardToMain(name, level, args) {
       // contextIsolation / sandbox can block ipcRenderer access in some configs.
     }
   }
-  // Path 2: contextBridge-exposed window.em.ipc.send (renderer in isolated context).
+  // Path 2: contextBridge-exposed window.desktop.ipc.send (renderer in isolated context).
   try {
-    if (typeof window !== 'undefined' && window.em && window.em.ipc && typeof window.em.ipc.send === 'function') {
-      window.em.ipc.send(FORWARD_CHANNEL, { name, level, args: serializeArgs(args) });
+    if (typeof window !== 'undefined' && window.desktop && window.desktop.ipc && typeof window.desktop.ipc.send === 'function') {
+      window.desktop.ipc.send(FORWARD_CHANNEL, { name, level, args: serializeArgs(args) });
       return true;
     }
   } catch (e) {

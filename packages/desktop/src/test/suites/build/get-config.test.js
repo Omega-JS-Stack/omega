@@ -7,7 +7,7 @@ const fs      = require('fs');
 const os      = require('os');
 
 function stageConsumer(jsonText) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-getconfig-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-getconfig-'));
   fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), jsonText);
   return tmp;
@@ -123,7 +123,7 @@ module.exports = {
       run: (ctx) => {
         // getConfig() always seeds brand + app blocks so downstream callers can
         // deref config.brand.X / config.app.X without optional-chaining at every site.
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-getconfig-empty-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-getconfig-empty-'));
         try {
           const cfg = loadConfigInDir(tmp);
           ctx.expect(cfg).toEqual({ brand: {}, app: {} });

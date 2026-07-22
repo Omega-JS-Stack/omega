@@ -20,7 +20,7 @@ module.exports = {
     {
       name: 'fresh scaffold: `_.` renames land, omega.json5 + CLAUDE.md ship, .nvmrc renders',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         scaffoldDefaults({ outputDir: tmp });
 
         ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBeTruthy();
@@ -37,7 +37,7 @@ module.exports = {
     {
       name: 'omega.json5 merge: consumer values and consumer-only keys survive re-scaffold',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         jetpack.write(path.join(tmp, 'config', 'omega.json5'), JSON5.stringify({
           brand: { id: 'my-brand' },
           liveReloadPort: 40000,
@@ -57,7 +57,7 @@ module.exports = {
     {
       name: 'preserve-if-exists rules: consumer config/description.md is never overwritten',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         jetpack.write(path.join(tmp, 'config', 'description.md'), 'consumer description');
 
         scaffoldDefaults({ outputDir: tmp });
@@ -71,7 +71,7 @@ module.exports = {
       // setup rerun reset the consumer's fixture hook to the stub.
       name: 'test/** is copy-once: consumer test/_init.js survives re-scaffold',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         scaffoldDefaults({ outputDir: tmp });
 
         // Seeded on first run
@@ -87,7 +87,7 @@ module.exports = {
     {
       name: 'converges: after the first re-run the tree is stable',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         // Run 1 scaffolds; run 2 is the first merge pass (JSON5 comments strip on
         // merge-stringify — pre-existing behavior). Stable from then on.
         scaffoldDefaults({ outputDir: tmp });
@@ -103,7 +103,7 @@ module.exports = {
     {
       name: 'brand app scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; app file = standalone escape hatch)',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const appDir = path.join(tmp, 'brand', 'apps', 'extension');
         jetpack.dir(appDir);
@@ -120,7 +120,7 @@ module.exports = {
     {
       name: 'brand app scaffolds NO per-app docs (brand doc unification: the brand root is the doc home)',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const appDir = path.join(tmp, 'brand', 'apps', 'extension');
         jetpack.dir(appDir);
@@ -138,7 +138,7 @@ module.exports = {
       run: (ctx) => {
         const DEFAULT_MARKER = '# ========== Default Values ==========';
         const CUSTOM_MARKER = '# ========== Custom Values ==========';
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         const appDir = path.join(tmp, 'brand', 'apps', 'extension');
         jetpack.dir(appDir);
 

@@ -327,8 +327,9 @@ const FIELDS = {
 //
 // To add a new segment:
 //   1. Add an entry here
-//   2. Add matching entry in OMEGA's src/lib/bem-segments.js
-//   3. Run OMEGA: npm start -- --service=sendgrid,beehiiv --brand=X
+//   2. Add matching entry in the manager's campaigns/newsletter segment
+//      services (packages/manager/src/services/*/ensure/segments.js)
+//   3. Run the manage cycle for the brand (services: sendgrid, beehiiv)
 //
 // Providers:
 //   skip — Array of provider names to skip segment creation for

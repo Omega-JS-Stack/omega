@@ -36,7 +36,7 @@ const UNIVERSAL_PREFIXES = new Set([
   ...FULL_ALIASES,
 ]);
 
-// id prefix → owning framework package ('em' → '@omega.js/desktop', …)
+// id prefix → owning framework package ('desktop' → '@omega.js/desktop', …)
 const ID_TO_FRAMEWORK = Object.fromEntries(
   Object.entries(FRAMEWORK_IDS).flatMap(([pkg, ids]) => ids.map((id) => [id, pkg]))
 );

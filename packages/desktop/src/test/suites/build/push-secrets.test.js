@@ -99,7 +99,7 @@ KEY2=v2
       name: 'resolveSecretValue: returns base64 when value is an existing file path',
       run: async (ctx) => {
         // Create a temp .p12-like file.
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         const filePath = path.join(tmpDir, 'cert.p12');
         const fileContent = Buffer.from('FAKE-CERT-BYTES');
         fs.writeFileSync(filePath, fileContent);
@@ -126,7 +126,7 @@ KEY2=v2
     {
       name: 'resolveSecretValue: relative path resolves against projectRoot',
       run: async (ctx) => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         const relName = 'config/certs/relative-cert.pem';
         const fullPath = path.join(tmpDir, relName);
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
@@ -143,7 +143,7 @@ KEY2=v2
     {
       name: 'resolveSecretValue: falls back to the brand root when the app-relative path is missing',
       run: async (ctx) => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         const appRoot = path.join(tmpDir, 'apps', 'desktop');
         fs.mkdirSync(appRoot, { recursive: true });
         const relName = '.omega/secrets/brand-cert.p8';
@@ -162,7 +162,7 @@ KEY2=v2
     {
       name: 'discoverRepo: parses owner/repo from package.json repository.url',
       run: async (ctx) => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         try {
           fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
             name: 'fake',
@@ -179,7 +179,7 @@ KEY2=v2
     {
       name: 'discoverRepo: handles SSH-style git URL',
       run: async (ctx) => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         try {
           fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
             name: 'fake',

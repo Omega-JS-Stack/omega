@@ -348,7 +348,7 @@ module.exports = {
     },
 
     {
-      name: 'normalize-options-structured-system-content-as-array-injects-rules',
+      name: 'normalize-options-structured-systomega-content-as-array-injects-rules',
       async run({ assert }) {
         const messages = [
           {

@@ -16,11 +16,11 @@
 globalThis.OMEGA_TEST_MODE = true;
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg && msg.type === 'bxm:test:ping') {
+  if (msg && msg.type === 'extension:test:ping') {
     sendResponse({ pong: true, ts: Date.now() });
     return false; // sync response
   }
   return false;
 });
 
-console.log('[bxm-harness] service worker ready');
+console.log('[extension-harness] service worker ready');

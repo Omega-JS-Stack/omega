@@ -1,4 +1,3 @@
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 // Enforce page-load consent guard. When true, any authenticated user whose doc has
@@ -304,16 +303,13 @@ async function sendUserSignupMetadata(account) {
       consent: consent,
     };
 
-    // Get server API URL
-    const serverApiURL = `${omega.getApiUrl()}/omega/user/signup`;
-
     // Log
     console.log('[Auth] Sending user metadata:', payload);
 
-    // Make API call to send signup metadata
-    const response = await authorizedFetch(serverApiURL, {
+    // Make API call to send signup metadata (route resolves via getApiUrl;
+    // usage from the omega-properties header syncs into bindings automatically)
+    const response = await omega.request('/omega/user/signup', {
       method: 'POST',
-      response: 'json',
       tries: 3,
       body: payload,
     });

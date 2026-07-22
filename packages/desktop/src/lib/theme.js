@@ -7,9 +7,9 @@
 //   manager.theme.onChange(fn) → fn({ source, resolved }) on every effective change; returns unsubscribe
 //
 // Renderer-side (preload contextBridge):
-//   window.em.theme.get()      → Promise<{ source, resolved }>
-//   window.em.theme.set(s)     → Promise<{ source, resolved }>
-//   window.em.theme.onChange(fn) — matchMedia-powered (see below); returns unsubscribe
+//   window.desktop.theme.get()      → Promise<{ source, resolved }>
+//   window.desktop.theme.set(s)     → Promise<{ source, resolved }>
+//   window.desktop.theme.onChange(fn) — matchMedia-powered (see below); returns unsubscribe
 //
 // How it works: everything rides on Electron's `nativeTheme.themeSource`, which accepts
 // exactly the same three values. Setting it (a) drives `shouldUseDarkColors`, (b) flips

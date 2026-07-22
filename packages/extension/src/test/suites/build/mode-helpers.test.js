@@ -119,7 +119,7 @@ module.exports = {
     {
       name: 'getVersion() reads cwd package.json#version in Node context',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-modehelpers-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-modehelpers-'));
         fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'x', version: '9.9.9' }));
         const oldCwd = process.cwd();
         try {

@@ -43,7 +43,7 @@ test('verts/unit: args flow to the data-omega-vert vocabulary on the mount host'
   assert.ok(html.includes('data-omega-vert-tags="dev,news"'), 'tags array joins');
   assert.ok(html.includes('class="my-4"'), 'section_class knob');
   assert.ok(html.includes('class="omega-vert-unit"'), 'inner mount host');
-  assert.ok(html.includes('data-wm-bind="@hide auth.resolved.active"'), 'paying users hide via the standard binding');
+  assert.ok(html.includes('data-omega-bind="@hide auth.resolved.active"'), 'paying users hide via the standard binding');
   assert.deepEqual(warnings, []);
 });
 

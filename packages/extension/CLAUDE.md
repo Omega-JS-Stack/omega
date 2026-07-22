@@ -15,7 +15,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omega.js/extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/extension.
+**@omega.js/extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/extension.
 
 **Required reading:**
 - **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
@@ -100,7 +100,7 @@ Compiled output: `dist/views/<component>/index.html`, `dist/assets/css/component
 
 Background.js is the source of truth for authentication. Other contexts compare their UID with background's on load and sync up — sign-ins / sign-outs broadcast across all open contexts via `chrome.runtime` messaging. No `chrome.storage` involved; Firebase persists per-context sessions in IndexedDB.
 
-Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.auth-signin-btn`, `.auth-signout-btn`, `.auth-account-btn`) wire UI without writing JS. Web-Manager reactive bindings (`data-wm-bind="@show auth.user"`) handle DOM state.
+Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.auth-signin-btn`, `.auth-signout-btn`, `.auth-account-btn`) wire UI without writing JS. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user"`) handle DOM state.
 
 Required setup: `cloud.config.authDomain` in config, `tabs` permission in manifest. See [docs/auth.md](docs/auth.md).
 

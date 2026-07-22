@@ -8,7 +8,7 @@ OMEGA Client is a modern JavaScript utility library for web applications with Fi
 
 - A singleton `Manager` instance exposing authentication, reactive DOM data binding, Firestore, storage, push notifications, error tracking (Sentry), service-worker helpers, DOM/utility functions, and `omega.request()` — the harmonized API-fetch layer (fresh Bearer token, automatic `omega-properties` processing with server usage synced into bindings)
 - Lazy Firebase imports to keep consumer bundles small
-- Reactive `data-wm-bind` DOM directives wired to auth + usage state
+- Reactive `data-omega-bind` DOM directives wired to auth + usage state
 - A `resolveSubscription()` helper unified with @omega.js/backend's `User.resolveSubscription()` so subscription-state logic is identical across frontend and backend
 
 ### Consumed by the frontend Manager family
@@ -78,7 +78,7 @@ Deep references live in `docs/`. Treat docs as a first-class deliverable. **When
 - [docs/architecture.md](docs/architecture.md) — singleton pattern, directory structure, module dependency graph
 - [docs/code-patterns.md](docs/code-patterns.md) — early returns, `$`-prefixed DOM vars, logical operator placement, Firestore path syntax, dynamic imports, config deep-merge, event delegation
 - [docs/modules.md](docs/modules.md) — full module quick reference (Storage, Auth + `resolveSubscription` + Settler Pattern, Bindings, Firestore, Notifications, ServiceWorker, Sentry, DOM, Utilities)
-- [docs/bindings.md](docs/bindings.md) — `data-wm-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
+- [docs/bindings.md](docs/bindings.md) — `data-omega-bind` deep reference: actions, comma syntax, condition operators, state paths, skeleton loaders, root-key update filtering
 - [docs/build-system.md](docs/build-system.md) — `prepare-package` ES5 transpile, build commands, package exports
 - [docs/testing.md](docs/testing.md) — Mocha test setup
 - [docs/cdp-debugging.md](docs/cdp-debugging.md) — driving a live browser (per-session isolated Chrome via the `chrome-devtools` MCP) to verify @omega.js/client inside a consuming site

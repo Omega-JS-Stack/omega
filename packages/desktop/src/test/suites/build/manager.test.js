@@ -149,7 +149,7 @@ module.exports = {
         // No EM_WIN_SIGN_STRATEGY env-var support anymore — config is the only source.
         // Run from a cwd with no omega.json5 to confirm the default.
         const fs = require('fs'); const os = require('os'); const path = require('path');
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-strategy-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-strategy-'));
         const orig = process.cwd();
         try {
           process.chdir(tmp);
@@ -164,7 +164,7 @@ module.exports = {
       name: 'getWindowsSignStrategy reads config platforms.win.signing.strategy',
       run: (ctx) => {
         const fs = require('fs'); const os = require('os'); const path = require('path');
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-strategy-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-strategy-'));
         fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
         fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'),
           `{ targets: { desktop: { platforms: { win: { signing: { strategy: 'cloud' } } } } } }`);

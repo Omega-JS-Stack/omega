@@ -206,25 +206,25 @@
       <div class="classy-side__ad omega-shell__label">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <span class="classy-chip">Sponsored</span>
-          <a href="/pricing" class="classy-footer__link" data-wm-bind="@show !auth.resolved.active" hidden aria-label="Remove ads with Pro">
+          <a href="/pricing" class="classy-footer__link" data-omega-bind="@show !auth.resolved.active" hidden aria-label="Remove ads with Pro">
             {% uj_icon "xmark", "fa-xs" %}
           </a>
         </div>
         {% section "verts/unit", type: "in-article", size: "rectangle" %}
-        <a href="/pricing" class="d-block text-center classy-footer__link small mt-2 text-decoration-none" data-wm-bind="@show !auth.resolved.active" hidden>
+        <a href="/pricing" class="d-block text-center classy-footer__link small mt-2 text-decoration-none" data-omega-bind="@show !auth.resolved.active" hidden>
           Remove with <span class="text-primary">Pro</span>
         </a>
       </div>
     {% endif %}
 
     <!-- User row -->
-    <div class="classy-side__user" data-wm-bind="@show auth.user" hidden>
+    <div class="classy-side__user" data-omega-bind="@show auth.user" hidden>
       <span class="avatar avatar-sm rounded-circle overflow-hidden d-inline-flex flex-shrink-0">
-        <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+        <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
       </span>
       <span class="omega-shell__label flex-grow-1 overflow-hidden">
-        <span class="classy-side__user-name d-block text-truncate" data-wm-bind="@text auth.user.displayName">User</span>
-        <span class="classy-side__user-email d-block text-truncate" data-wm-bind="@text auth.user.email">email@example.com</span>
+        <span class="classy-side__user-name d-block text-truncate" data-omega-bind="@text auth.user.displayName">User</span>
+        <span class="classy-side__user-email d-block text-truncate" data-omega-bind="@text auth.user.email">email@example.com</span>
       </span>
       <a href="/dashboard/account" class="btn-icon omega-shell__label" aria-label="Account settings">
         {% uj_icon "gear", "fa-sm" %}

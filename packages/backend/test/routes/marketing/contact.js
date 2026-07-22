@@ -47,7 +47,7 @@ module.exports = {
 
         const response = await http.post('backend-manager/marketing/contact', {
           email: testEmail,
-          source: 'bem-test',
+          source: 'backend-test',
           // skipValidation bypasses the mailbox verification check — the test email
           // doesn't have a real mailbox so the provider (correctly) marks it as not
           // deliverable. We're testing the route flow, not the deliverability check itself.
@@ -111,7 +111,7 @@ module.exports = {
       async run({ http, assert }) {
         const response = await http.post('backend-manager/marketing/contact', {
           email: 'not-a-valid-email',
-          source: 'bem-test',
+          source: 'backend-test',
         });
 
         assert.isError(response, 400, 'Invalid email format should return 400');
@@ -127,7 +127,7 @@ module.exports = {
       async run({ http, assert }) {
         const response = await http.post('backend-manager/marketing/contact', {
           firstName: 'Test',
-          source: 'bem-test',
+          source: 'backend-test',
         });
 
         assert.isError(response, 400, 'Missing email should return 400');
@@ -143,7 +143,7 @@ module.exports = {
       async run({ http, assert }) {
         const response = await http.post('backend-manager/marketing/contact', {
           email: 'test@mailinator.com',
-          source: 'bem-test',
+          source: 'backend-test',
         });
 
         assert.isError(response, 400, 'Disposable email should return 400');
@@ -164,7 +164,7 @@ module.exports = {
 
         const response = await http.post('backend-manager/marketing/contact', {
           email: testEmail,
-          source: 'bem-test',
+          source: 'backend-test',
           // No firstName/lastName - should be inferred
           // skipValidation bypasses the mailbox verification check — this test's concern
           // is AI name inference (which runs after validation); without it the mailbox
@@ -211,7 +211,7 @@ module.exports = {
 
         const response = await http.post('backend-manager/marketing/contact', {
           email: testEmail,
-          source: 'bem-test',
+          source: 'backend-test',
           skipValidation: true,
         });
 
@@ -248,7 +248,7 @@ module.exports = {
 
         const response = await http.post('backend-manager/marketing/contact', {
           email: testEmail,
-          source: 'bem-test',
+          source: 'backend-test',
         });
 
         // Outcome A: the provider rejected the fabricated mailbox → admin 400. Every
@@ -320,7 +320,7 @@ module.exports = {
 
         const response = await http.post('backend-manager/marketing/contact', {
           email: testEmail,
-          source: 'bem-test',
+          source: 'backend-test',
         });
 
         // With no ZeroBounce credits the route fails-open and returns 200; with credits
@@ -368,7 +368,7 @@ module.exports = {
         // Both are correct: the route protects itself from anonymous abuse. Accept either.
         const response = await http.post('backend-manager/marketing/contact', {
           email: TEST_EMAILS.valid(),
-          source: 'bem-test',
+          source: 'backend-test',
         });
 
         assert.ok(!response.success, 'Public request should be rejected');

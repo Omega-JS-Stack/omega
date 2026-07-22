@@ -85,10 +85,10 @@ off();                                          // unsubscribe
 Renderer:
 
 ```js
-const cfg = await window.em.remoteConfig.get();
-const v   = await window.em.remoteConfig.get('versionRequired');
-await window.em.remoteConfig.refreshNow();
-const off = window.em.remoteConfig.onUpdate((data) => {
+const cfg = await window.desktop.remoteConfig.get();
+const v   = await window.desktop.remoteConfig.get('versionRequired');
+await window.desktop.remoteConfig.refreshNow();
+const off = window.desktop.remoteConfig.onUpdate((data) => {
   // Fired on every successful fresh fetch from main.
 });
 ```

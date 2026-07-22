@@ -17,7 +17,7 @@ function freshAudit() {
 }
 
 function stageConsumer(overrides = {}, desktopOverrides = {}) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-audit-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-audit-'));
   jetpack.dir(path.join(tmp, 'config'));
   jetpack.dir(path.join(tmp, 'src'));
   jetpack.write(path.join(tmp, 'src', 'main.js'),    '// stub');

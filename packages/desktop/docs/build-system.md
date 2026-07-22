@@ -33,7 +33,7 @@ Auto-loads tasks from `<@omega.js/desktop>/dist/gulp/tasks/*.js` via `<@omega.js
 | Task | Status | Description |
 |---|---|---|
 | `defaults` | real | Copy `<@omega.js/desktop>/dist/defaults/*` into the consumer (skips existing files) |
-| `distribute` | real | Stage consumer `src/` + @omega.js/desktop `dist/` into `.em-build/` |
+| `distribute` | real | Stage consumer `src/` + @omega.js/desktop `dist/` into `.desktop-build/` |
 | `webpack` | real | Three parallel targets — main / preload / renderer |
 | `sass` | real | SCSS → `dist/assets/css/*` |
 | `html` | real | `src/views/**/index.html` → `dist/views/*` |

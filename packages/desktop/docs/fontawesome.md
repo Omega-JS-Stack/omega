@@ -40,7 +40,7 @@ drift on how an icon name resolves or what the served SVG looks like.
   throws). Lookups are slug-sanitized via icon-core (the IPC channel can
   never read outside the icon directories) and cached per app run. Serves
   renderers over `desktop:fontawesome:get`.
-- **Preload bridge** — `window.em.fontawesome.get(name, style)` →
+- **Preload bridge** — `window.desktop.fontawesome.get(name, style)` →
   `Promise<svg | null>`.
 - **Renderer auto-render** (`renderer.js _wireFontAwesome`) — a thin
   wrapper over **@omega.js/client's shared `icon-renderer`** (C4 cp112, the
@@ -81,7 +81,7 @@ own **prod dependency** so the set ships inside the asar.
 
 - **Unknown names render nothing** — the `<i>` stays empty (marked
   `data-omega-fa`). If you need a fallback, resolve through
-  `window.em.fontawesome.get()` and swap yourself.
+  `window.desktop.fontawesome.get()` and swap yourself.
 - **Free set = solid + regular + brands.** Pro styles (light/duotone/sharp)
   need a supplied Pro set (above); otherwise
   `manager.fontawesome.get(name, 'duotone')` returns `null`.

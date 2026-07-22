@@ -5,9 +5,9 @@ Persistent KV store accessible from both main and renderer. Backed by [`electron
 ## File location
 
 ```
-macOS:   ~/Library/Application Support/<productName>/em-storage.json
-Windows: %APPDATA%/<productName>/em-storage.json
-Linux:   ~/.config/<productName>/em-storage.json
+macOS:   ~/Library/Application Support/<productName>/omega-storage.json
+Windows: %APPDATA%/<productName>/omega-storage.json
+Linux:   ~/.config/<productName>/omega-storage.json
 ```
 
 ## Main-process API (sync, direct disk-backed)
@@ -19,19 +19,19 @@ manager.storage.delete(key)
 manager.storage.has(key)                 // boolean
 manager.storage.clear()
 manager.storage.onChange(key, fn)        // returns unsubscribe fn
-manager.storage.getPath()                // absolute path to em-storage.json
+manager.storage.getPath()                // absolute path to omega-storage.json
 ```
 
 ## Renderer-process API (async, proxied through preload + IPC)
 
 ```js
-await window.em.storage.get(key, defaultValue)
-await window.em.storage.set(key, value)
-await window.em.storage.delete(key)
-await window.em.storage.has(key)
-await window.em.storage.clear()
+await window.desktop.storage.get(key, defaultValue)
+await window.desktop.storage.set(key, value)
+await window.desktop.storage.delete(key)
+await window.desktop.storage.has(key)
+await window.desktop.storage.clear()
 
-const off = window.em.storage.onChange(key, ({ value, previous }) => { ... });
+const off = window.desktop.storage.onChange(key, ({ value, previous }) => { ... });
 // pass '*' as key to receive all changes
 off();
 ```
@@ -47,7 +47,7 @@ manager.storage.get('window.main.bounds.w');   // → 800
 
 ## Change broadcasts
 
-Every `set` / `delete` / `clear` in main broadcasts an `desktop:storage:change` IPC event to all renderer windows. The renderer's `window.em.storage.onChange` filters by key locally.
+Every `set` / `delete` / `clear` in main broadcasts an `desktop:storage:change` IPC event to all renderer windows. The renderer's `window.desktop.storage.onChange` filters by key locally.
 
 In main, `manager.storage.onChange(key, fn)` registers a callback fired with `(value, previous)`.
 
@@ -55,5 +55,5 @@ In main, `manager.storage.onChange(key, fn)` registers a callback fired with `(v
 
 - Storage initialization is async — `Manager.initialize()` `await`s it before any other lib boots, since features like `app-state` and `windows` rely on it.
 - IPC handlers (`desktop:storage:get` etc.) are registered on the @omega.js/desktop `ipc` bus, not directly on `ipcMain`. See [ipc.md](ipc.md).
-- The store uses `name: 'em-storage'` (filename `em-storage.json`). Don't reuse this name in a separate `electron-store` instance.
+- The store uses `name: 'omega-storage'` (filename `omega-storage.json`). Don't reuse this name in a separate `electron-store` instance.
 - `electron-store@11` is ESM-only. Webpack bundles it INTO `main.bundle.js` (static-specifier `import()` with `webpackMode: "eager"` in `lib/storage.js`) — consumers install NOTHING; packaged apps carry it inside the bundle with no runtime resolution. (It used to be a `webpackIgnore`'d runtime import, which silently no-op'd storage in packaged consumers — @omega.js/desktop is a devDependency and never ships in the asar.)

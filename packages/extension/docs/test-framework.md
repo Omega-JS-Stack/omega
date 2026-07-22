@@ -366,7 +366,7 @@ module.exports = {
   description: 'popup DOM + chrome surface',
   tests: [
     {
-      name: 'document body has data-bxm-context="popup"',
+      name: 'document body has data-omega-context="popup"',
       run: async (ctx) => {
         ctx.expect(document.body.dataset.bxmContext).toBe('popup');
       },
@@ -374,7 +374,7 @@ module.exports = {
     {
       name: 'popup ↔ background messaging round-trip',
       run: async (ctx) => {
-        const reply = await chrome.runtime.sendMessage({ type: 'bxm:test:ping' });
+        const reply = await chrome.runtime.sendMessage({ type: 'extension:test:ping' });
         ctx.expect(reply.pong).toBe(true);
       },
     },

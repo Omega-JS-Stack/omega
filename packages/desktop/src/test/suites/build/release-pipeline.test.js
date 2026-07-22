@@ -10,7 +10,7 @@ const os      = require('os');
 // platforms.win.signing.strategy (under targets.desktop in the raw file). Returns the
 // abs path to the temp dir; caller is responsible for chdir'ing into it and cleaning up.
 function stageStrategyConfig({ strategy, cloudProvider }) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-sign-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-sign-'));
   fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
   const signing = { strategy };
   if (cloudProvider) signing.cloud = { provider: cloudProvider };

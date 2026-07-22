@@ -74,7 +74,7 @@
 
   // Appearance — the app's DEFAULT theme. 'system' follows the OS preference live;
   // 'light'/'dark' are explicit overrides. A user's runtime choice (manager.theme.set
-  // or the [data-em-theme-set] controls) persists in storage and wins over this on
+  // or the [data-omega-theme-set] controls) persists in storage and wins over this on
   // every boot. See docs/themes.md.
   theme: {
     appearance: 'system',

@@ -13,7 +13,7 @@ const { Octokit } = require('@octokit/rest');
 
 // Test file paths that will be created and need cleanup
 const TEST_FILES = [
-  '_test/bem-write-test.txt',
+  '_test/backend-write-test.txt',
   '_test/type-test.txt',
 ];
 
@@ -47,7 +47,7 @@ module.exports = {
 
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/repo/content', {
-          path: '_test/bem-test-file.txt',
+          path: '_test/backend-test-file.txt',
         });
 
         assert.isError(response, 400, 'Missing content should return 400');
@@ -63,17 +63,17 @@ module.exports = {
       async run({ http, assert, state }) {
         const uniqueContent = `@omega.js/backend Test - ${new Date().toISOString()}`;
         const response = await http.post('backend-manager/admin/repo/content', {
-          path: '_test/bem-write-test.txt',
+          path: '_test/backend-write-test.txt',
           content: uniqueContent,
         });
 
         assert.isSuccess(response, 'Admin should be able to write content');
         assert.hasProperty(response, 'data.path', 'Response should contain path');
-        assert.equal(response.data.path, '_test/bem-write-test.txt', 'Path should match');
+        assert.equal(response.data.path, '_test/backend-write-test.txt', 'Path should match');
 
         // Store for cleanup
         state.filesCreated = state.filesCreated || [];
-        state.filesCreated.push('_test/bem-write-test.txt');
+        state.filesCreated.push('_test/backend-write-test.txt');
       },
     },
 
@@ -123,7 +123,7 @@ module.exports = {
 
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/repo/content', {
-          path: '_test/bem-test-file.txt',
+          path: '_test/backend-test-file.txt',
           content: 'Test content',
         });
 
@@ -138,7 +138,7 @@ module.exports = {
 
       async run({ http, assert }) {
         const response = await http.post('backend-manager/admin/repo/content', {
-          path: '_test/bem-test-file.txt',
+          path: '_test/backend-test-file.txt',
           content: 'Test content',
         });
 

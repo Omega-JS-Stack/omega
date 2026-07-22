@@ -1,11 +1,11 @@
-# Bindings (`data-wm-bind`)
+# Bindings (`data-omega-bind`)
 
-The `data-wm-bind` attribute declaratively binds DOM elements to state data (auth, plan, roles, usage, custom state) managed by `omega.bindings()`. **Always prefer wm-bindings over manual JS class toggling** for anything based on user/auth state — if an element's visibility or content depends on the user object, use `data-wm-bind` in HTML, not `classList.toggle('d-none', ...)` or `.hidden` from JS.
+The `data-omega-bind` attribute declaratively binds DOM elements to state data (auth, plan, roles, usage, custom state) managed by `omega.bindings()`. **Always prefer omega-bindings over manual JS class toggling** for anything based on user/auth state — if an element's visibility or content depends on the user object, use `data-omega-bind` in HTML, not `classList.toggle('d-none', ...)` or `.hidden` from JS.
 
 ## HTML Syntax
 
 ```html
-<element data-wm-bind="@action path.to.data"></element>
+<element data-omega-bind="@action path.to.data"></element>
 ```
 
 ### Multiple Bindings: MUST Use Commas
@@ -14,10 +14,10 @@ Multiple bindings are **comma-separated**. The parser splits by comma first, the
 
 ```html
 <!-- CORRECT: comma-separated -->
-<element data-wm-bind="@show auth.user, @attr src auth.user.photoURL"></element>
+<element data-omega-bind="@show auth.user, @attr src auth.user.photoURL"></element>
 
 <!-- WRONG: space-separated — gets parsed as ONE binding with action=@show, expression="auth.user @attr src auth.user.photoURL" -->
-<element data-wm-bind="@show auth.user @attr src auth.user.photoURL"></element>
+<element data-omega-bind="@show auth.user @attr src auth.user.photoURL"></element>
 ```
 
 **Why this matters:** The parser splits on `,` then finds the first space within each part to separate `@action` from `expression`. Without commas, everything after the first `@action` is treated as a single expression string, producing broken behavior with no error.
@@ -37,14 +37,14 @@ Multiple bindings are **comma-separated**. The parser splits by comma first, the
 
 ```html
 <!-- Truthy check -->
-<div data-wm-bind="@show auth.user">Visible when logged in</div>
+<div data-omega-bind="@show auth.user">Visible when logged in</div>
 
 <!-- Negation (!) -->
-<div data-wm-bind="@show !auth.user">Visible when NOT logged in</div>
+<div data-omega-bind="@show !auth.user">Visible when NOT logged in</div>
 
 <!-- Comparisons (===, !==, ==, !=, >, <, >=, <=) -->
-<div data-wm-bind="@show auth.account.plan.id === 'premium'">Premium only</div>
-<div data-wm-bind="@show checkout.errorCount > 0">Has errors</div>
+<div data-omega-bind="@show auth.account.plan.id === 'premium'">Premium only</div>
+<div data-omega-bind="@show checkout.errorCount > 0">Has errors</div>
 ```
 
 No logic operators (`&&`, `||`) in conditions — keep conditions simple. Right-side comparison values are auto-parsed: quoted strings, numbers, booleans, null.
@@ -53,22 +53,22 @@ No logic operators (`&&`, `||`) in conditions — keep conditions simple. Right-
 
 ```html
 <!-- Show for anonymous users -->
-<div data-wm-bind="@show !auth.user">
+<div data-omega-bind="@show !auth.user">
   <a href="/signup">Create free account</a>
 </div>
 
 <!-- Show for signed-in users -->
-<div data-wm-bind="@show auth.user">
+<div data-omega-bind="@show auth.user">
   <a href="/pricing">Upgrade your plan</a>
 </div>
 
 <!-- Admin-only elements -->
-<div data-wm-bind="@show auth.account.roles.admin">Admin panel</div>
+<div data-omega-bind="@show auth.account.roles.admin">Admin panel</div>
 
 <!-- User data binding -->
-<img data-wm-bind="@show auth.user, @attr src auth.user.photoURL, @attr alt auth.user.displayName">
-<span data-wm-bind="@text auth.user.displayName">Loading...</span>
-<input data-wm-bind="@value auth.user.email">
+<img data-omega-bind="@show auth.user, @attr src auth.user.photoURL, @attr alt auth.user.displayName">
+<span data-omega-bind="@text auth.user.displayName">Loading...</span>
+<input data-omega-bind="@value auth.user.email">
 ```
 
 ## Available State Paths
@@ -137,23 +137,23 @@ omega.bindings().clear();
 
 ### How Skeletons Work
 
-The `wm-binding-skeleton` class shows a shimmer animation until data loads. Skeletons resolve **only when at least one of the element's bindings is actually processed** — meaning the binding's root key must be in the `updatedKeys` for that `update()` call.
+The `omega-binding-skeleton` class shows a shimmer animation until data loads. Skeletons resolve **only when at least one of the element's bindings is actually processed** — meaning the binding's root key must be in the `updatedKeys` for that `update()` call.
 
 When `_updateBindings` processes an element:
 
 1. Executes each binding action (`@text`, `@show`, `@attr`, etc.)
 2. Each action returns `true` (processed) or `false` (skipped because root key wasn't updated)
-3. **Only if at least one action was processed:** adds `wm-bound` class (triggers CSS fade-out transition)
-4. After 300ms, removes `wm-binding-skeleton` class (shimmer disappears)
+3. **Only if at least one action was processed:** adds `omega-bound` class (triggers CSS fade-out transition)
+4. After 300ms, removes `omega-binding-skeleton` class (shimmer disappears)
 
 **Root key scoping matters for skeletons.** If an element is bound to `checkout.pricing.total` and `update({ auth: ... })` fires, that element's skeleton is NOT resolved — the binding is skipped entirely because `checkout` is not in `updatedKeys`.
 
 ```html
 <!-- Skeleton resolves when 'auth' key is updated -->
-<span class="wm-binding-skeleton" data-wm-bind="@text auth.user.displayName">&nbsp;</span>
+<span class="omega-binding-skeleton" data-omega-bind="@text auth.user.displayName">&nbsp;</span>
 
 <!-- Skeleton resolves when 'checkout' key is updated (NOT when 'auth' updates) -->
-<span class="wm-binding-skeleton" data-wm-bind="@text checkout.pricing.total">&nbsp;</span>
+<span class="omega-binding-skeleton" data-omega-bind="@text checkout.pricing.total">&nbsp;</span>
 ```
 
 ### Multi-phase binding example (e.g., checkout page)
@@ -178,7 +178,7 @@ This prevents checkout skeletons from disappearing prematurely when global auth 
 Use `&nbsp;` as placeholder content (prevents zero-width collapse so the shimmer is visible):
 
 ```html
-<span class="wm-binding-skeleton" data-wm-bind="@text auth.user.displayName">&nbsp;</span>
+<span class="omega-binding-skeleton" data-omega-bind="@text auth.user.displayName">&nbsp;</span>
 ```
 
 **Do NOT use text like "Loading..." as placeholder** — it flashes visible text before the shimmer kicks in. Use `&nbsp;` for a clean shimmer-only experience.
@@ -198,18 +198,18 @@ omega.bindings().update({
 
 ```html
 <!-- CORRECT: single binding for composite text -->
-<span class="wm-binding-skeleton" data-wm-bind="@text checkout.totalDueText">&nbsp;</span>
+<span class="omega-binding-skeleton" data-omega-bind="@text checkout.totalDueText">&nbsp;</span>
 
 <!-- WRONG: mixing static text with binding inside skeleton -->
-<span class="wm-binding-skeleton">
-  <span data-wm-bind="@text checkout.pricing.total"></span> due today
+<span class="omega-binding-skeleton">
+  <span data-omega-bind="@text checkout.pricing.total"></span> due today
 </span>
 ```
 
 ## Implementation Notes
 
 - Uses the `hidden` attribute for show/hide (`[hidden] { display: none !important; }`)
-- Queries `[data-wm-bind]` on each `update()` call — handles dynamic elements
+- Queries `[data-omega-bind]` on each `update()` call — handles dynamic elements
 - Auth bindings are auto-populated when `omega.auth().listen()` fires
 - When `updatedKeys` is `null` (e.g., from `clear()`), ALL bindings fire
 

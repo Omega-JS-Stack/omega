@@ -1,6 +1,6 @@
 // Preload Manager singleton.
 // Consumer entry: `new (require('@omega.js/desktop/preload'))().initialize()`.
-// Wires contextBridge so renderer code can call `window.em.ipc.invoke(...)` without nodeIntegration.
+// Wires contextBridge so renderer code can call `window.desktop.ipc.invoke(...)` without nodeIntegration.
 
 const LoggerLite = require('./lib/logger-lite.js');
 
@@ -26,7 +26,7 @@ Manager.prototype.initialize = async function () {
 
   // Expose a stable, namespaced surface to the renderer.
   // Real impl in pass 2 will type the channel list and proxy storage through here.
-  contextBridge.exposeInMainWorld('em', {
+  contextBridge.exposeInMainWorld('desktop', {
     ipc: {
       invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
       on:     (channel, handler) => ipcRenderer.on(channel, (_, payload) => handler(payload)),

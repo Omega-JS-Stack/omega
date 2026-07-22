@@ -8,10 +8,10 @@ const jetpack = require('fs-jetpack');
 const sharp   = require('sharp');
 
 function stage() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'em-icons-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-icons-'));
   const projectRoot    = path.join(root, 'project');
   const distRoot       = path.join(root, 'project', 'dist');
-  const emDefaultsRoot = path.join(root, 'em-defaults');
+  const emDefaultsRoot = path.join(root, 'desktop-defaults');
   jetpack.dir(projectRoot);
   jetpack.dir(distRoot);
   jetpack.dir(emDefaultsRoot);

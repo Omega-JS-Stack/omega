@@ -81,10 +81,10 @@ TEST_EXTENDED_MODE=true npx omega test build/config
 The target matches against the test file path. The source prefix scopes selection to framework-only or project-only tests — a prefixed target excludes the other source entirely:
 
 - `mgr:` — the **universal cross-framework alias** for "the manager's own tests" (framework-only). Works identically in @omega.js/desktop, BXM, UJM, and @omega.js/backend.
-- `em:` / `framework:` — desktop-specific aliases for framework-only tests, equivalent to `mgr:`.
+- `desktop:` / `framework:` — desktop-specific aliases for framework-only tests, equivalent to `mgr:`.
 - `project:` — consumer project tests only.
 
-A bare prefix (`mgr:` / `em:` / `project:` with no path) runs every test in that source. A bare path (no prefix) searches both sources by path.
+A bare prefix (`mgr:` / `desktop:` / `project:` with no path) runs every test in that source. A bare path (no prefix) searches both sources by path.
 
 > **Target vs `--filter`.** The positional target selects test FILES (by path + source). The `--filter=<substring>` flag is orthogonal: it matches test NAMES/descriptions within the selected files. Use them together, e.g. `npx omega test project: --filter="reorder"`.
 
@@ -92,7 +92,7 @@ A bare prefix (`mgr:` / `em:` / `project:` with no path) runs every test in that
 
 - **build** — runs in plain Node. Fast.
 - **main**  — spawns Electron and runs inside the main process. Required for anything touching `app`/`ipcMain`/`BrowserWindow`.
-- **renderer** — runs inside a hidden `BrowserWindow` spawned by the main harness. Test functions are serialized + reconstructed via `new Function('ctx', body)`, so they only have access to `ctx` and the page's globals (`window`, `document`, `window.em.*`). No closures over module scope.
+- **renderer** — runs inside a hidden `BrowserWindow` spawned by the main harness. Test functions are serialized + reconstructed via `new Function('ctx', body)`, so they only have access to `ctx` and the page's globals (`window`, `document`, `window.desktop.*`). No closures over module scope.
 - **all** (default) — build, then main, then renderer in a single Electron boot.
 
 ### Extended vs normal mode
@@ -225,7 +225,7 @@ module.exports = [
 |---|---|---|
 | `build` | Plain Node | CLI, package.json, config schema, gulp tasks |
 | `main` | Spawned Electron main process | Manager init, lib modules, IPC, windows |
-| `renderer` | Hidden BrowserWindow (not yet implemented — Pass 2.3c) | `window.em.*`, preload bridge, UI logic |
+| `renderer` | Hidden BrowserWindow (not yet implemented — Pass 2.3c) | `window.desktop.*`, preload bridge, UI logic |
 
 The runner partitions test files by layer at discovery time. The build layer runs inline; the main layer spawns Electron once with all main suites and parses JSON-line stdout.
 

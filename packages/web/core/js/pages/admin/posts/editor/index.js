@@ -11,7 +11,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 // State
@@ -105,10 +104,9 @@ async function enterEditMode() {
     const url = new URL(`${omega.getApiUrl()}/omega/content/post`);
     url.searchParams.set('url', editUrl);
 
-    const post = await authorizedFetch(url.toString(), {
+    const post = await omega.request(url.toString(), {
       method: 'GET',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       log: true,
     });
@@ -177,10 +175,9 @@ function initForm() {
     }
 
     try {
-      const response = await authorizedFetch(`${omega.getApiUrl()}/omega/admin/post`, {
+      const response = await omega.request(`/omega/admin/post`, {
         method: editUrl ? 'PUT' : 'POST',
         timeout: 190000,
-        response: 'json',
         tries: 1,
         log: true,
         body: payload,

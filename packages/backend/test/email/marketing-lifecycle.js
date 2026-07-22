@@ -36,7 +36,7 @@ module.exports = {
           email: state.testEmail,
           firstName: 'Lifecycle',
           lastName: 'Test',
-          source: 'bem-test-lifecycle',
+          source: 'backend-test-lifecycle',
           // skipValidation bypasses the mailbox verification check — the lifecycle
           // address has no real mailbox so the provider (correctly) marks it
           // undeliverable. This suite tests add → sync → remove against the real

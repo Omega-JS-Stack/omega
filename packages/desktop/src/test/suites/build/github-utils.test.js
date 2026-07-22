@@ -22,7 +22,7 @@ module.exports = {
       name: 'discoverRepo parses package.json repository.url (object form)',
       run: async (ctx) => {
         const { discoverRepo } = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-gh-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-gh-'));
         fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
           name: 'foo',
           repository: { type: 'git', url: 'https://github.com/myorg/myrepo.git' },
@@ -40,7 +40,7 @@ module.exports = {
       name: 'discoverRepo parses package.json repository.url (string form)',
       run: async (ctx) => {
         const { discoverRepo } = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-gh-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-gh-'));
         fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
           name: 'foo',
           repository: 'github.com/another/proj',
@@ -58,7 +58,7 @@ module.exports = {
       name: 'discoverRepo strips trailing .git from repo name',
       run: async (ctx) => {
         const { discoverRepo } = require(path.join(__dirname, '..', '..', '..', 'utils', 'github.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-gh-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-gh-'));
         fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({
           repository: { url: 'git+https://github.com/owner/repo.git' },
         }));

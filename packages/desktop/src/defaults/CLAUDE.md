@@ -17,7 +17,7 @@ This project consumes **OMEGA Desktop** (@omega.js/desktop) — a comprehensive 
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
+**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
 - **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
@@ -51,7 +51,7 @@ npx omega install live # restore the published @omega.js/desktop from npm
 - Packaging config — fully generated. @omega.js/desktop produces `dist/electron-builder.yml` from `config/omega.json5` (brand/app/signing) + @omega.js/desktop's opinionated defaults. Consumers never ship an `electron-builder.yml`. Override defaults via the `electronBuilder:` block in `omega.json5` if you genuinely need to.
 - `hooks/notarize/post.js` — optional post-notarize extension hook (@omega.js/desktop owns the actual `afterSign` notarize step).
 - `src/main.js` — main-process entry. One-line bootstrap of `@omega.js/desktop/main`.
-- `src/preload.js` — preload entry. Exposes `window.em` via contextBridge.
+- `src/preload.js` — preload entry. Exposes `window.desktop` via contextBridge.
 - `src/integrations/tray/index.js` — tray definition. Edit this; it's yours.
 - `src/integrations/menu/index.js` — application menu definition.
 - `src/integrations/context-menu/index.js` — right-click menu definition (called per-event with `params`).
@@ -78,7 +78,7 @@ new (require('@omega.js/desktop/renderer'))().initialize();
 
 In main: `manager.storage`, `manager.ipc`, `manager.windows`, `manager.tray`, `manager.menu`, `manager.contextMenu`, `manager.startup`, `manager.appState`, `manager.deepLink`, `manager.autoUpdater`, `manager.sentry`, `manager.omega`, `manager.context`, `manager.usage`, `manager.remoteConfig`, `manager.analytics`, `manager.restartManager`.
 
-In renderer: `window.em.storage`, `window.em.ipc`, `window.em.logger`, `OMEGA_BUILD_JSON.config`.
+In renderer: `window.desktop.storage`, `window.desktop.ipc`, `window.desktop.logger`, `OMEGA_BUILD_JSON.config`.
 
 ## Dependency resolution
 

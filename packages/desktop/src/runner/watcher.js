@@ -1,10 +1,10 @@
-// em-runner-watcher: long-running daemon installed as a Windows service by `npx omega runner install`.
+// omega-runner-watcher: long-running daemon installed as a Windows service by `npx omega runner install`.
 //
 // Responsibilities:
 //   1. Self-update: on each tick, run `npm i -g @omega.js/desktop@latest`. Always uses the freshest CLI.
 //   2. Discover orgs: query GH API for orgs the GH_TOKEN has admin on. For each new org not yet in
 //      our local registry, shell out to `mgr runner register-org <org>` to register the runner there.
-//   3. Health log: write a heartbeat line to %PROGRAMDATA%\em-runner\watcher.log every poll.
+//   3. Health log: write a heartbeat line to %PROGRAMDATA%\omega-runner\watcher.log every poll.
 //
 // The watcher is fully self-contained — it doesn't `require()` anything from the @omega.js/desktop source tree
 // because that tree might be in the middle of a `npm i -g` update. It only uses Node builtins
@@ -44,7 +44,7 @@ function ghApi(pathPart) {
       path: pathPart,
       method: 'GET',
       headers: {
-        'User-Agent':    'em-runner-watcher',
+        'User-Agent':    'omega-runner-watcher',
         'Accept':        'application/vnd.github+json',
         'Authorization': `Bearer ${token}`,
       },
@@ -123,7 +123,7 @@ async function tick() {
 }
 
 (async function main() {
-  log(`em-runner-watcher starting (poll=${POLL_INTERVAL_MS}ms, home=${RUNNER_HOME})`);
+  log(`omega-runner-watcher starting (poll=${POLL_INTERVAL_MS}ms, home=${RUNNER_HOME})`);
   while (true) {
     await tick();
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));

@@ -32,16 +32,16 @@ const { safeInstall } = require('../utils/safe-install');
 const RUNNER_LABELS = ['self-hosted', 'windows', 'ev-token'];
 
 // Per-org runner is registered as a Scheduled Task (not a Windows Service) named
-// `em-runner-<host>-<org>`. Tasks run in the user's INTERACTIVE session (Session 1)
+// `omega-runner-<host>-<org>`. Tasks run in the user's INTERACTIVE session (Session 1)
 // at logon, which is the only context that can both (a) read the user's
 // CurrentUser\My cert store where SafeNet/eToken EV certs live and (b) host the
 // SafeNet "Token Logon" PIN dialog so automately can type into it. Windows
 // services run in Session 0 (no desktop) and fail at both. Task name is the same
 // as the GH-side runner name so debugging stays sane.
 function runnerTaskName(org) {
-  return `em-runner-${os.hostname().toLowerCase()}-${org.toLowerCase()}`.slice(0, 64);
+  return `omega-runner-${os.hostname().toLowerCase()}-${org.toLowerCase()}`.slice(0, 64);
 }
-// Runner files live under %LOCALAPPDATA%\em-runner — a per-user path that
+// Runner files live under %LOCALAPPDATA%\omega-runner — a per-user path that
 // doesn't need admin to read/write. v1.2.16-v1.2.35 used C:\actions-runners
 // (root C:) which forced UAC elevation for every install/uninstall + spawned
 // the runner in a separate elevated cmd window. With per-user storage we drop
@@ -51,7 +51,7 @@ function runnerTaskName(org) {
 function defaultRunnerHome() {
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-    return path.join(localAppData, 'em-runner');
+    return path.join(localAppData, 'omega-runner');
   }
   return path.join(process.cwd(), '.gh-runners');
 }
@@ -82,14 +82,14 @@ module.exports = async function (options) {
 async function install(options) {
   ensureWindows();
   ensureGhToken();
-  // No more ensureWindowsAdmin: RUNNER_HOME is per-user (%LOCALAPPDATA%\em-runner),
+  // No more ensureWindowsAdmin: RUNNER_HOME is per-user (%LOCALAPPDATA%\omega-runner),
   // config.cmd registers without --runasservice (so no SCM access), and the
   // Startup folder shortcut goes in the user's profile. Net: install runs in
   // the calling terminal at normal user privilege.
 
   // Idempotent by replacement: always tear down any prior install before starting.
   if (jetpack.exists(RUNNER_HOME)) {
-    logger.log(`Existing em-runner installation detected — uninstalling first for a clean re-install...`);
+    logger.log(`Existing omega-runner installation detected — uninstalling first for a clean re-install...`);
     try {
       await uninstall();
     } catch (e) {
@@ -97,7 +97,7 @@ async function install(options) {
     }
   }
 
-  logger.log(`Installing em-runner under ${RUNNER_HOME}`);
+  logger.log(`Installing omega-runner under ${RUNNER_HOME}`);
   jetpack.dir(RUNNER_HOME);
 
   // 1. Download actions/runner ONCE into a template dir. Per-org dirs are cloned from this.
@@ -151,7 +151,7 @@ async function install(options) {
     }
   }
 
-  // 4. The em-runner-watcher service is intentionally NOT installed in v1.2.35+.
+  // 4. The omega-runner-watcher service is intentionally NOT installed in v1.2.35+.
   // The watcher's job was to auto-register new admin orgs by shelling
   // `mgr runner register-org <org>` on a 1-minute tick — but it runs as
   // NT AUTHORITY\NETWORK SERVICE in Session 0, which means:
@@ -255,12 +255,12 @@ async function registerOrg(options) {
   // THIS host. Without this, re-running install accumulates orphaned runners (one per
   // failed/aborted install, one per host rename, etc.) which causes actions/runner to
   // auto-suffix the new runner's name (e.g. `-2872`) and breaks our ability to predict
-  // service names. Match prefix is `em-runner-<host>-<org>` so we never touch user-
+  // service names. Match prefix is `omega-runner-<host>-<org>` so we never touch user-
   // created runners or runners from other hosts.
   //
   // We do this BEFORE fetching the registration token because the token is one-shot
   // and we want it fresh right before config.cmd uses it.
-  const hostPrefix    = `em-runner-${os.hostname().toLowerCase()}-${org.toLowerCase()}`;
+  const hostPrefix    = `omega-runner-${os.hostname().toLowerCase()}-${org.toLowerCase()}`;
   try {
     const { data: existing } = await octokit.rest.actions.listSelfHostedRunnersForOrg({ org, per_page: 100 });
     const ours = (existing.runners || []).filter((r) => (r.name || '').toLowerCase().startsWith(hostPrefix));
@@ -400,15 +400,15 @@ async function startServices() {
   ensureWindows();
   const shortcuts = listRunnerStartupShortcuts();
   if (shortcuts.length === 0) {
-    logger.warn('No em-runner-* Startup shortcuts installed. Run `npx omega runner install` first.');
+    logger.warn('No omega-runner-* Startup shortcuts installed. Run `npx omega runner install` first.');
     return;
   }
   // Map the first shortcut name back to its runner dir. The shortcut naming
-  // convention is em-runner-<host>-<org>; the org dir is actions-runner-<org>.
+  // convention is omega-runner-<host>-<org>; the org dir is actions-runner-<org>.
   // Hostname can contain dashes (e.g. desktop-ifl07vg), so we strip a known
   // host prefix rather than assume the host segment is dash-free.
   const runnerName = shortcuts[0];
-  const hostPrefix = `em-runner-${os.hostname().toLowerCase()}-`;
+  const hostPrefix = `omega-runner-${os.hostname().toLowerCase()}-`;
   let orgName = null;
   if (runnerName.toLowerCase().startsWith(hostPrefix)) {
     orgName = runnerName.slice(hostPrefix.length);
@@ -478,7 +478,7 @@ async function stopServices() {
 async function statusServices() {
   ensureWindows();
   const cfg = readConfig();
-  logger.log(`em-runner home: ${RUNNER_HOME}`);
+  logger.log(`omega-runner home: ${RUNNER_HOME}`);
   logger.log(`Installed: ${cfg.installedAt || '(not yet)'}`);
   logger.log(`Labels: ${(cfg.labels || RUNNER_LABELS).join(', ')}`);
   logger.log(`Registered orgs: ${(cfg.registeredOrgs || []).join(', ') || '(none)'}`);
@@ -487,7 +487,7 @@ async function statusServices() {
   // Per-org Startup shortcuts (auto-start at every logon).
   const shortcuts = listRunnerStartupShortcuts();
   if (shortcuts.length === 0) {
-    logger.warn('No em-runner-* Startup shortcuts installed.');
+    logger.warn('No omega-runner-* Startup shortcuts installed.');
     logger.warn('Run `npx omega runner install` to create them — registration alone is not enough.');
   } else {
     logger.log(`Runner Startup shortcuts (${shortcuts.length}):`);
@@ -540,12 +540,12 @@ async function uninstall(options) {
   // still need admin to delete fully — when not admin we attempt them anyway
   // and simply log warnings on failure rather than blocking the uninstall.
 
-  // Stop + delete em-runner-watcher service. node-windows knows its own service
+  // Stop + delete omega-runner-watcher service. node-windows knows its own service
   // metadata (script, name, etc.) — let it do the removal cleanly. This handles
   // the lock-on-files issue better than raw `sc delete`.
   await uninstallWatcherService();
 
-  // Delete each em-runner-<host>-<org>.cmd file in the user's Startup folder
+  // Delete each omega-runner-<host>-<org>.cmd file in the user's Startup folder
   // so the runner doesn't auto-spawn at next logon.
   const shortcuts = listRunnerStartupShortcuts();
   for (const runnerName of shortcuts) {
@@ -553,7 +553,7 @@ async function uninstall(options) {
     if (removed) logger.log(`  ✓ Removed Startup shortcut: ${runnerName}.cmd`);
   }
 
-  // Idempotent legacy cleanup: any em-runner-* Scheduled Tasks left over from
+  // Idempotent legacy cleanup: any omega-runner-* Scheduled Tasks left over from
   // v1.2.16–v1.2.34 (which used Logon Tasks) still need to be removed so they
   // don't keep spawning Session 0 zombies after upgrade.
   await uninstallLegacyLogonTasks();
@@ -596,7 +596,7 @@ async function uninstall(options) {
   // Now safe to remove disk state. Retry a few times if files are still locked
   // (services release file handles asynchronously after stop).
   await removeRunnerHomeWithRetry();
-  logger.log('Uninstalled em-runner.');
+  logger.log('Uninstalled omega-runner.');
 }
 
 async function uninstallWatcherService() {
@@ -692,7 +692,7 @@ async function removeRunnerHomeWithRetry() {
 // in one pass.
 //
 // Path-unavailable Runner.Listener.exe instances (NETWORK SERVICE / Local
-// System-owned, ExecutablePath comes back empty even from elevated queries)
+// Systomega-owned, ExecutablePath comes back empty even from elevated queries)
 // are killed too — they're almost always v1.2.16-v1.2.34 watcher zombies and
 // uninstall should clean them up.
 function killRunnerProcessesUnderHome() {
@@ -798,7 +798,7 @@ async function selfUpdate() {
 
 // ─── helpers ────────────────────────────────────────────────────────────────────
 
-const WATCHER_SERVICE_NAME = 'em-runner-watcher';
+const WATCHER_SERVICE_NAME = 'omega-runner-watcher';
 
 function ensureWindows() {
   if (process.platform !== 'win32' && !process.env.OMEGA_RUNNER_FORCE) {
@@ -1126,12 +1126,12 @@ function removeRunnerStartupShortcut(runnerName) {
   return false;
 }
 
-// Names of all `em-runner-*` shortcuts in the Startup folder (sans `.cmd`).
+// Names of all `omega-runner-*` shortcuts in the Startup folder (sans `.cmd`).
 function listRunnerStartupShortcuts() {
   if (process.platform !== 'win32') return [];
   if (!jetpack.exists(STARTUP_DIR)) return [];
   return (jetpack.list(STARTUP_DIR) || [])
-    .filter((name) => /^em-runner-.+\.cmd$/i.test(name))
+    .filter((name) => /^omega-runner-.+\.cmd$/i.test(name))
     .map((name) => name.replace(/\.cmd$/i, ''))
     .sort();
 }
@@ -1212,7 +1212,7 @@ function listRunnerListenerProcessesUnder(targetDir) {
   return out;
 }
 
-// Idempotent cleanup of any em-runner-* Scheduled Tasks left over from
+// Idempotent cleanup of any omega-runner-* Scheduled Tasks left over from
 // v1.2.16–v1.2.34, which registered runners as Logon Tasks. v1.2.35+ moved
 // to Startup folder shortcuts; this runs during uninstall so upgraders'
 // leftover tasks get pruned without manual schtasks juggling.
@@ -1228,7 +1228,7 @@ async function uninstallLegacyLogonTasks() {
     const m = /^"([^"]+)"/.exec(line);
     if (!m) continue;
     const tn = m[1].replace(/^\\/, '');
-    if (/^em-runner-/i.test(tn)) tasks.push(tn);
+    if (/^omega-runner-/i.test(tn)) tasks.push(tn);
   }
   if (tasks.length === 0) return;
   for (const name of tasks) {

@@ -9,7 +9,7 @@ const yaml    = require('js-yaml');
 const MOD_PATH = path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'update-info.js');
 
 function freshTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'em-update-info-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-update-info-test-'));
 }
 
 function writeBytes(filePath, bytes) {

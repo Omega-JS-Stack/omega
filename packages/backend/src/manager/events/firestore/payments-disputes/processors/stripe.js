@@ -128,7 +128,7 @@ async function processDispute(match, alert, assistant) {
         charge: match.chargeId,
         amount: amountCents,
       }, {
-        idempotencyKey: `bem-dispute-refund-${match.chargeId}`,
+        idempotencyKey: `omega-dispute-refund-${match.chargeId}`,
       });
 
       result.refundId = refund.id;

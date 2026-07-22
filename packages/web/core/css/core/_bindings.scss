@@ -6,8 +6,8 @@
 // ============================================
 
 // Loading state with shimmer animation for skeleton elements
-// This applies to elements that have the wm-binding-skeleton class
-.wm-binding-skeleton {
+// This applies to elements that have the omega-binding-skeleton class
+.omega-binding-skeleton {
   --binding-color-1: rgba(0, 0, 0, 0.03);
   --binding-color-2: rgba(0, 0, 0, 0.06);
   --binding-color-3: rgba(0, 0, 0, 0.03);
@@ -41,7 +41,7 @@
 }
 
 // Dark theme overrides
-[data-bs-theme="dark"] .wm-binding-skeleton {
+[data-bs-theme="dark"] .omega-binding-skeleton {
   --binding-color-1: rgba(255, 255, 255, 0.03);
   --binding-color-2: rgba(255, 255, 255, 0.08);
   --binding-color-3: rgba(255, 255, 255, 0.03);
@@ -52,7 +52,7 @@
 // ============================================
 
 // When bound is added while skeleton is still present, fade out the skeleton
-.wm-bound.wm-binding-skeleton {
+.omega-bound.omega-binding-skeleton {
   animation: binding-fadeout 0.25s ease-out forwards;
 }
 
@@ -85,13 +85,13 @@
 // ============================================
 
 // For block-level elements, use full width
-.wm-binding-skeleton.d-block {
+.omega-binding-skeleton.d-block {
   display: block;
   width: 100%;
 }
 
 // For images, maintain aspect ratio
-img.wm-binding-skeleton {
+img.omega-binding-skeleton {
   display: block;
   width: 100%;
   height: auto;
@@ -99,9 +99,9 @@ img.wm-binding-skeleton {
 }
 
 // For input fields, keep as inline-block with normal sizing
-input.wm-binding-skeleton,
-textarea.wm-binding-skeleton,
-select.wm-binding-skeleton {
+input.omega-binding-skeleton,
+textarea.omega-binding-skeleton,
+select.omega-binding-skeleton {
   min-width: auto;
   min-height: auto;
 }

@@ -25,7 +25,7 @@ const { convertToJpeg, applyImageCDNParams, IMAGE_MAX_DIMENSION } = post;
 
 // Generate a synthetic image of the given format and write it to a tmp path.
 async function makeImage(format, options) {
-  const filepath = path.join(os.tmpdir(), `bem-test-convert-${Date.now()}-${Math.random().toString(36).slice(2)}.${format}`);
+  const filepath = path.join(os.tmpdir(), `backend-test-convert-${Date.now()}-${Math.random().toString(36).slice(2)}.${format}`);
   const buffer = await sharp({
     create: {
       width: 640,

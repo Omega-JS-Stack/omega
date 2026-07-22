@@ -59,10 +59,10 @@ manager.analytics.setUserId('firebase-uid-abc');   // usually wired automaticall
 Same surface in renderer:
 
 ```js
-window.em.analytics.event('button_click', { button_id: 'cta' });
-window.em.analytics.pageview('/settings');
-window.em.analytics.setUserProperties({ plan: 'premium' });
-const status = await window.em.analytics.getStatus();   // { enabled, measurementId, clientId, userId, queueLength }
+window.desktop.analytics.event('button_click', { button_id: 'cta' });
+window.desktop.analytics.pageview('/settings');
+window.desktop.analytics.setUserProperties({ plan: 'premium' });
+const status = await window.desktop.analytics.getStatus();   // { enabled, measurementId, clientId, userId, queueLength }
 ```
 
 The renderer surface is fire-and-forget IPC (`ipcRenderer.send`) for events; only `getStatus` round-trips via `invoke`.

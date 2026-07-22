@@ -46,7 +46,7 @@
       class: 'btn-adaptive classy-btn-ring',
       icon: 'user-plus',
       attributes: [
-        ['data-wm-bind', '@show !auth.user']
+        ['data-omega-bind', '@show !auth.user']
       ]
     },
     // {
@@ -55,14 +55,14 @@
     //   class: 'btn-adaptive',
     //   icon: 'crown',
     //   attributes: [
-    //     ['data-wm-bind', '@show auth.account.subscription.product.id === basic'],
+    //     ['data-omega-bind', '@show auth.account.subscription.product.id === basic'],
     //     ['hidden', '']
     //   ]
     // },
     {
       type: 'account',
       attributes: [
-        ['data-wm-bind', '@show auth.user'],
+        ['data-omega-bind', '@show auth.user'],
         ['hidden', '']
       ],
     }

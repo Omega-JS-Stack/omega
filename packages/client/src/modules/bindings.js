@@ -32,8 +32,8 @@ class Bindings {
 
   // Main binding update system
   _updateBindings(context, updatedKeys = null) {
-    // Find all elements with data-wm-bind attribute
-    const bindElements = document.querySelectorAll('[data-wm-bind]');
+    // Find all elements with data-omega-bind attribute
+    const bindElements = document.querySelectorAll('[data-omega-bind]');
 
     /* @dev-only:start */
     {
@@ -42,7 +42,7 @@ class Bindings {
     /* @dev-only:end */
 
     bindElements.forEach(element => {
-      const bindValue = element.getAttribute('data-wm-bind');
+      const bindValue = element.getAttribute('data-omega-bind');
 
       // Split by comma to support multiple actions
       const bindings = this._parseBindings(bindValue);
@@ -59,11 +59,11 @@ class Bindings {
       if (!anyProcessed) return;
 
       // Add bound class to trigger fade out
-      element.classList.add('wm-bound');
+      element.classList.add('omega-bound');
 
       // Remove skeleton class after fade completes
       setTimeout(() => {
-        element.classList.remove('wm-binding-skeleton');
+        element.classList.remove('omega-binding-skeleton');
       }, 300);
     });
   }

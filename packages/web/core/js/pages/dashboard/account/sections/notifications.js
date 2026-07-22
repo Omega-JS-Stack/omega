@@ -10,7 +10,6 @@
  * error message is shown via FormManager and the toggle stays where the user
  * left it — they can try Save again without re-flipping.
  */
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
 import omega from '@omega.js/client';
 
@@ -36,10 +35,9 @@ export function init() {
   formManager.on('submit', async ({ data }) => {
     const action = data.enabled ? 'subscribe' : 'unsubscribe';
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/marketing/email-preferences`, {
+    const response = await omega.request(`/omega/marketing/email-preferences`, {
       method: 'POST',
       timeout: 60000,
-      response: 'json',
       tries: 2,
       body: { action },
     });

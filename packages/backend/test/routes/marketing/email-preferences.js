@@ -13,7 +13,7 @@
  */
 const crypto = require('crypto');
 
-const TEST_EMAIL = 'rachel.greene+bem-unsub@gmail.com';
+const TEST_EMAIL = 'rachel.greene+backend-unsub@gmail.com';
 const TEST_ASM_ID = '24077';
 
 function generateSig(email) {

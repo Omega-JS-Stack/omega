@@ -5,7 +5,6 @@
  */
 
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 import { DISPLAY_TYPES, formatDateUTC, formatTimeUTC, todayUTC } from './calendar-core.js';
@@ -118,10 +117,9 @@ export default class CalendarEvents {
         }
 
         const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
-        await authorizedFetch(url, {
+        await omega.request(url, {
           method: 'POST',
           timeout: 60000,
-          response: 'json',
           tries: 1,
           log: true,
           body: payload,
@@ -640,10 +638,9 @@ export default class CalendarEvents {
   // ============================================
   async _createCampaign(payload) {
     const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
-    const response = await authorizedFetch(url, {
+    const response = await omega.request(url, {
       method: 'POST',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       log: true,
       body: payload,
@@ -658,10 +655,9 @@ export default class CalendarEvents {
   async _updateCampaign(id, payload) {
     payload.id = id;
     const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
-    const response = await authorizedFetch(url, {
+    const response = await omega.request(url, {
       method: 'PUT',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       log: true,
       body: payload,
@@ -675,10 +671,9 @@ export default class CalendarEvents {
 
   async _deleteCampaign(id) {
     const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
-    const response = await authorizedFetch(url, {
+    const response = await omega.request(url, {
       method: 'DELETE',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { id },
@@ -693,10 +688,9 @@ export default class CalendarEvents {
    */
   async rescheduleCampaign(id, newSendAt) {
     const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
-    return authorizedFetch(url, {
+    return omega.request(url, {
       method: 'PUT',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { id, sendAt: newSendAt },
@@ -740,10 +734,9 @@ export default class CalendarEvents {
     const rollback = this.core.optimisticUpdateSendAt(templateId, newSendAtUNIX);
 
     const url = `${omega.getApiUrl()}/omega/marketing/campaign`;
-    return authorizedFetch(url, {
+    return omega.request(url, {
       method: 'PUT',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       log: true,
       body: {

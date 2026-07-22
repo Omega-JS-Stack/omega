@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 // Initialize section
@@ -167,10 +166,9 @@ function setupResetApiKeyForm() {
 
     const serverApiURL = `${omega.getApiUrl()}/omega/user/api-keys`;
 
-    const response = await authorizedFetch(serverApiURL, {
+    const response = await omega.request(serverApiURL, {
       method: 'POST',
       timeout: 30000,
-      response: 'json',
       tries: 2,
     });
 

@@ -1,4 +1,4 @@
-# Web Manager Bridge — Auth State Sync
+# Client Bridge — Auth State Sync
 
 @omega.js/desktop keeps Firebase auth state in sync across all processes (main + every renderer window). The pattern mirrors BXM's background/foreground architecture: **main is the source of truth**, renderers reflect.
 
@@ -17,7 +17,7 @@ The bridge handles all three.
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  MAIN (client-bridge.js)                               │
-│  - Owns Firebase Auth instance ("em-auth" app)              │
+│  - Owns Firebase Auth instance ("omega-auth" app)              │
 │  - Source of truth for auth state                           │
 │  - Listens for desktop:auth:* IPC from renderers                 │
 │  - Broadcasts desktop:auth:* IPC to all renderers on changes     │
@@ -108,7 +108,7 @@ The renderer's `Manager.initialize()` automatically:
 - Wires the auth bridge (`desktop:auth:sync-request` on load + listens for broadcasts).
 - Runs @omega.js/client's **full auth cycle** (`auth().listen()`): waits for auth to settle,
   fetches the Firestore account, resolves the subscription, and auto-populates the
-  **`data-wm-bind` bindings** — so @omega.js/desktop app views can use UJM/BXM-style reactive HTML
+  **`data-omega-bind` bindings** — so @omega.js/desktop app views can use UJM/BXM-style reactive HTML
   (`@show auth.user`, `@text auth.account.plan.id`, `@show auth.account.plan.id === 'premium'`,
   see @omega.js/client's docs/bindings.md). Each settle pushes `{ resolved, roles }` to main
   (`desktop:auth:account-resolved`) and re-offers it whenever main announces a state change,
@@ -125,7 +125,7 @@ Main is Node — Firebase defaults to in-memory there — so @omega.js/desktop p
 
 - **`safeStorage`** (default) — values encrypted via Electron `safeStorage` (macOS
   Keychain / Windows DPAPI / kwallet-gnome) before touching disk
-  (`{userData}/em-auth-session.json` holds base64 ciphertext only). This is the same
+  (`{userData}/omega-auth-session.json` holds base64 ciphertext only). This is the same
   os_crypt machinery Chromium uses for its cookie jar — stronger than browser
   IndexedDB/localStorage, which are plaintext LevelDB on disk.
 - **`none`** — explicit opt-out (in-memory, pre-1.12 behavior).
@@ -189,7 +189,7 @@ tray.item({
     if (manager.omega.getCurrentUser()) {
       manager.omega.signOut();
     } else {
-      require('electron').shell.openExternal(`${manager.config.brand.url}/sign-in?em=true`);
+      require('electron').shell.openExternal(`${manager.config.brand.url}/sign-in?desktop=true`);
     }
   },
 });
@@ -215,7 +215,7 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 <button id="signout">Sign out</button>
 <script>
   document.getElementById('signout').addEventListener('click', async () => {
-    await emManager.signOut();   // goes through main, propagates everywhere
+    await renderer.signOut();   // goes through main, propagates everywhere
   });
 </script>
 ```
@@ -244,7 +244,7 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 ```bash
 npm i -D firebase-admin                                   # already in @omega.js/desktop's devDeps
 export OMEGA_TEST_FIREBASE_ADMIN_KEY=/path/to/service-account.json
-export OMEGA_TEST_USER_UID=em-test-user                      # optional, defaults to em-test-user
+export OMEGA_TEST_USER_UID=desktop-test-user                      # optional, defaults to desktop-test-user
 npx omega test --extended                                   # or: TEST_EXTENDED_MODE=true npx omega test
 ```
 
@@ -252,7 +252,7 @@ Without the extended-mode opt-in the suite skips cleanly with a clear reason; sa
 
 ## Implementation notes
 
-- Firebase app name in main is `em-auth` (avoids clashes if a consumer's main code also wants its own Firebase instance).
+- Firebase app name in main is `omega-auth` (avoids clashes if a consumer's main code also wants its own Firebase instance).
 - The bridge does NOT persist user info to @omega.js/desktop storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
 - Custom tokens are NEVER stored. Renderers receive them once via broadcast, sign in, discard. Fresh tokens are minted on demand from `POST /omega/user/token` via @omega.js/client's shared request layer (`createRequest` from `@omega.js/client/modules/request.js`) — same code path as the extension background's token sync.
 - `manager.getApiUrl()` returns the dev or prod URL, so the bridge automatically hits the right backend. Available across all four Manager contexts (main / renderer / preload / build) via the shared `src/utils/url-helpers.js` module — same code path everywhere. See CLAUDE.md → "Cross-context helpers."

@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 
@@ -77,9 +76,8 @@ function setupForm() {
   formManager.on('submit', async ({ data }) => {
     trackFeedbackSubmit(data.rating);
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/feedback`, {
+    const response = await omega.request(`/omega/user/feedback`, {
       method: 'POST',
-      response: 'json',
       timeout: 30000,
       body: {
         rating: data.rating,

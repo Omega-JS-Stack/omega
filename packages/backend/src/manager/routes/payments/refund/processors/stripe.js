@@ -88,7 +88,7 @@ module.exports = {
       amount: refundAmount,
       reason: 'requested_by_customer',
     }, {
-      idempotencyKey: `bem-refund-${resourceId}`,
+      idempotencyKey: `omega-refund-${resourceId}`,
     });
 
     assistant.log(`Stripe refund created: refundId=${refund.id}, amount=${refundAmount}, full=${isFullRefund}, uid=${uid}`);

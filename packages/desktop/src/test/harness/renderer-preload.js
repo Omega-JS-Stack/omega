@@ -5,7 +5,7 @@
 //   __emTest:result  — renderer emits per-test results / suite-start / fatal
 //   __emTest:suites  — main sends serialized renderer suites for execution
 //
-// Also exposes the production-style `window.em` surface (mirrors src/preload.js so renderer
+// Also exposes the production-style `window.desktop` surface (mirrors src/preload.js so renderer
 // test suites can assert on it).
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -82,7 +82,7 @@ try {
 // Bootstrap tooltip auto-init) against THIS document. In production these run
 // in the page world (the consumer's webpack bundle); here the preload world
 // stands in — the DOM is shared, so injected SVGs / tooltip tips are visible
-// to page-world test suites. The Manager reads `window.em.ipc` which only
+// to page-world test suites. The Manager reads `window.desktop.ipc` which only
 // exists in the page world, so hand it the preload's ipcRenderer directly.
 try {
   if (testManager) {
@@ -185,7 +185,7 @@ contextBridge.exposeInMainWorld('__emTestManager', {
 });
 
 // Mirror the production preload surface so renderer test suites can assert against it.
-contextBridge.exposeInMainWorld('em', {
+contextBridge.exposeInMainWorld('desktop', {
   ipc: {
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     on:     (channel, handler) => ipcRenderer.on(channel, (_, payload) => handler(payload)),

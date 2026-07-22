@@ -16,7 +16,7 @@ Controls how the app launches: full normal launch vs completely hidden backgroun
 
 `mode` is what happens when **the user launches the app directly** (clicks the dock icon / Start menu / etc.).
 
-`openAtLogin.mode` is what happens when **the OS auto-launches the app at login**. It applies *only* when the launch is detected as a login-launch (macOS: `wasOpenedAtLogin` flag; Windows/Linux: presence of the `--em-launched-at-login` arg @omega.js/desktop passes when registering the login item).
+`openAtLogin.mode` is what happens when **the OS auto-launches the app at login**. It applies *only* when the launch is detected as a login-launch (macOS: `wasOpenedAtLogin` flag; Windows/Linux: presence of the `--omega-launched-at-login` arg @omega.js/desktop passes when registering the login item).
 
 The default behavior — `mode: 'normal'` + `openAtLogin: { enabled: true, mode: 'hidden' }` — means: the app auto-starts at login but stays out of the way until the user opens it themselves. User-direct launches show the main window like any normal app.
 
@@ -101,26 +101,26 @@ Both handlers are no-ops if `main` isn't in the registry, so consumers who genui
 
 ## Testing the login-launch path locally
 
-Pass `--em-launched-at-login` as a command-line arg when launching the .app; @omega.js/desktop treats it identically to a real OS-driven login launch (`startup.wasLaunchedAtLogin()` returns `true`, with `via:argv-flag` in the boot summary log). Useful for testing hidden-mode behavior without configuring login items + rebooting.
+Pass `--omega-launched-at-login` as a command-line arg when launching the .app; @omega.js/desktop treats it identically to a real OS-driven login launch (`startup.wasLaunchedAtLogin()` returns `true`, with `via:argv-flag` in the boot summary log). Useful for testing hidden-mode behavior without configuring login items + rebooting.
 
 The easiest way is `mgr launch`, which auto-strips `ELECTRON_RUN_AS_NODE` and uses `open -n` under the hood:
 
 ```bash
 # Auto-discover the most recent `mgr package:quick` build:
-npx omega launch --args="--em-launched-at-login"
+npx omega launch --args="--omega-launched-at-login"
 
 # Or pass an explicit path:
-npx omega launch /Applications/MyApp.app --args="--em-launched-at-login"
+npx omega launch /Applications/MyApp.app --args="--omega-launched-at-login"
 ```
 
 If you'd rather call `open` directly, remember to strip `ELECTRON_RUN_AS_NODE` first (the variable leaks into shells from common host processes like VS Code's Claude Code extension and silently breaks Electron):
 
 ```bash
 unset ELECTRON_RUN_AS_NODE
-open -n /path/to/MyApp.app --args --em-launched-at-login
+open -n /path/to/MyApp.app --args --omega-launched-at-login
 
 # Windows / Linux — direct binary launch
-"/path/to/MyApp.exe" --em-launched-at-login
+"/path/to/MyApp.exe" --omega-launched-at-login
 ```
 
 The boot summary log written by the `startup` lib distinguishes a real login launch (`via:macos-wasOpenedAtLogin`) from a flag-based simulation (`via:argv-flag`).

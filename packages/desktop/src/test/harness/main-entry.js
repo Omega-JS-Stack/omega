@@ -268,19 +268,19 @@ async function runRendererSuites(files) {
   // Register test-only IPC channels so renderer-layer tests can verify round-trip
   // behavior end-to-end (renderer.invoke → main handler → response). Idempotent:
   // unregister first in case a previous renderer suite registered the same channel.
-  try { ipcMain.removeHandler('em:__test:echo'); } catch (_) { /* ignore */ }
-  ipcMain.handle('em:__test:echo', (_evt, payload) => ({ echoed: payload, ts: Date.now() }));
+  try { ipcMain.removeHandler('desktop:__test:echo'); } catch (_) { /* ignore */ }
+  ipcMain.handle('desktop:__test:echo', (_evt, payload) => ({ echoed: payload, ts: Date.now() }));
   // Forwarded log capture — renderer logger.log(...) sends 'desktop:log:forward'; we
   // accumulate the most recent payload so the renderer test can verify it landed.
   global.__emTestLastForwardedLog = null;
-  ipcMain.removeAllListeners('em:__test:forwarded-log-tap');
+  ipcMain.removeAllListeners('desktop:__test:forwarded-log-tap');
   ipcMain.on('desktop:log:forward', (_evt, payload) => {
     global.__emTestLastForwardedLog = payload;
   });
   // Test-only handler the renderer can call to read back the most recently
   // forwarded log payload. Returns null if none yet.
-  try { ipcMain.removeHandler('em:__test:read-last-log'); } catch (_) { /* ignore */ }
-  ipcMain.handle('em:__test:read-last-log', () => global.__emTestLastForwardedLog);
+  try { ipcMain.removeHandler('desktop:__test:read-last-log'); } catch (_) { /* ignore */ }
+  ipcMain.handle('desktop:__test:read-last-log', () => global.__emTestLastForwardedLog);
   const win = new BrowserWindow({
     show:           false,
     width:          800,

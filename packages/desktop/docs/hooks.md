@@ -77,7 +77,7 @@ module.exports = async (context) => {
   const appName = packager.appInfo.productFilename;
   const appPath = path.join(appOutDir, `${appName}.app`);
   // e.g. archive a copy somewhere off the build path
-  fs.cpSync(appPath, `/tmp/em-archive/${appName}-${Date.now()}.app`, { recursive: true });
+  fs.cpSync(appPath, `/tmp/omega-archive/${appName}-${Date.now()}.app`, { recursive: true });
 };
 ```
 

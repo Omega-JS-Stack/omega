@@ -30,7 +30,7 @@ module.exports = async function (options) {
   const info = await client.evaluate(client.MAIN_VIEW, `(async () => ({
     window: { x: window.screenX, y: window.screenY, width: window.outerWidth, height: window.outerHeight },
     bsTheme: document.documentElement.getAttribute('data-bs-theme'),
-    theme: window.em?.theme ? await window.em.theme.get() : null,
+    theme: window.desktop?.theme ? await window.desktop.theme.get() : null,
   }))()`);
 
   console.log(`\nWindow: ${info.window.width}x${info.window.height} at (${info.window.x}, ${info.window.y})`);

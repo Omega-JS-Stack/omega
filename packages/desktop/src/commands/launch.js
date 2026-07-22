@@ -21,7 +21,7 @@
 //   npx omega launch /Applications/MyApp.app                        # an installed .app
 //
 // Forwarding argv to the app (for hidden-mode tests, custom flags, etc.):
-//   npx omega launch --args="--em-launched-at-login"                # single flag (quoted to keep yargs from eating it)
+//   npx omega launch --args="--omega-launched-at-login"                # single flag (quoted to keep yargs from eating it)
 //   npx omega launch --args="--foo=bar --baz"                       # multiple, space-separated inside the quotes
 //
 // Aliases: `npx omega open`, `npx omega --launch`.

@@ -67,7 +67,7 @@ manager.initialize()
     //   menu.disable();         // no application menu
     //   contextMenu.disable();  // no right-click menus
 
-    // Subscribe to auto-update status (renderer can also listen via window.em.autoUpdater):
+    // Subscribe to auto-update status (renderer can also listen via window.desktop.autoUpdater):
     //   autoUpdater.onStatus((status) => logger.log('updater:', status.code));
 
     // First-launch detection / launch counter / crash recovery:

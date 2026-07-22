@@ -62,7 +62,7 @@ const snap = manager.context.toJSON();    // structured-cloneable snapshot
 Renderer:
 
 ```js
-const snap = await window.em.context.get();
+const snap = await window.desktop.context.get();
 console.log(snap.session.deviceId);
 ```
 

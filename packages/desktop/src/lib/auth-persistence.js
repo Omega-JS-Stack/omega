@@ -19,7 +19,7 @@
 // Built-ins:
 //   'safeStorage' (DEFAULT) — Electron safeStorage (OS keychain: macOS Keychain,
 //        Windows DPAPI, kwallet/gnome-keyring). Values are encrypted BEFORE they
-//        touch disk ({userData}/em-auth-session.json holds base64 ciphertext only).
+//        touch disk ({userData}/omega-auth-session.json holds base64 ciphertext only).
 //        This is the same os_crypt machinery Chromium uses for its cookie jar —
 //        browser IndexedDB/localStorage are plaintext LevelDB, so this is STRONGER
 //        than "store it in a browser session".
@@ -37,7 +37,7 @@ const LoggerLite = require('./logger-lite.js');
 
 const logger = new LoggerLite('auth-persistence');
 
-const FILE_NAME = 'em-auth-session.json';
+const FILE_NAME = 'omega-auth-session.json';
 
 // ── safeStorage strategy ─────────────────────────────────────────────────────
 // One JSON file mapping firebase persistence keys → base64(safeStorage ciphertext).

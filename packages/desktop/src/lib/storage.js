@@ -9,8 +9,8 @@
 //   manager.storage.onChange(key, fn)  // returns unsubscribe fn
 //
 // Renderer-side (async, proxied through preload contextBridge → IPC → main):
-//   window.em.storage.get(key, default)   → Promise
-//   window.em.storage.set(key, value)     → Promise
+//   window.desktop.storage.get(key, default)   → Promise
+//   window.desktop.storage.set(key, value)     → Promise
 //   etc.
 //
 // Key paths support dot-notation (e.g. 'window.main.bounds') natively via electron-store.
@@ -54,12 +54,12 @@ const storage = {
     }
     const electron = require('electron');
 
-    // Build the store. Filename is `em-storage.json` (electron-store appends .json).
+    // Build the store. Filename is `omega-storage.json` (electron-store appends .json).
     // Production name is read from electron's app.name (set automatically from package.productName).
     const projectName = manager.config.app?.productName || electron.app.getName();
 
     storage._store = new ElectronStore({
-      name: 'em-storage',
+      name: 'omega-storage',
       // electron-store handles the cwd; no need to override unless we want a custom path.
     });
 

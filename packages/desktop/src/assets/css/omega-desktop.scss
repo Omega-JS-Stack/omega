@@ -3,7 +3,7 @@
 // ============================================
 // Consumer projects import via: `@use 'omega-desktop' as * with ($primary: #2563EB);`
 //
-// gulp/sass adds <em-package-root>/dist/assets/css and <em-package-root>/dist/assets/themes/<theme>
+// gulp/sass adds <omega-package-root>/dist/assets/css and <omega-package-root>/dist/assets/themes/<theme>
 // to the sass loadPaths so the bare 'omega-desktop' import resolves to this file.
 
 // Forward the active theme so consumers can override theme variables via @use ... with ()

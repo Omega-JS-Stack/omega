@@ -10,7 +10,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import omega from '@omega.js/client';
 
@@ -58,10 +57,9 @@ async function fetchVerts() {
     const url = new URL(`${omega.getApiUrl()}/omega/verts`);
     url.searchParams.set('limit', 100);
 
-    const response = await authorizedFetch(url.toString(), {
+    const response = await omega.request(url.toString(), {
       method: 'GET',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
     });
@@ -301,10 +299,9 @@ function initEditorForm() {
     }
 
     try {
-      await authorizedFetch(`${omega.getApiUrl()}/omega/verts`, {
+      await omega.request(`/omega/verts`, {
         method: editingId ? 'PUT' : 'POST',
         timeout: 30000,
-        response: 'json',
         tries: 1,
         log: true,
         body: payload,
@@ -334,10 +331,9 @@ async function toggleAd(vert) {
   const enabled = !(vert.enabled !== false);
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/omega/verts`, {
+    await omega.request(`/omega/verts`, {
       method: 'PUT',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { id: vert.id, enabled: enabled },
@@ -360,10 +356,9 @@ async function deleteAd(vert) {
   }
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/omega/verts`, {
+    await omega.request(`/omega/verts`, {
       method: 'DELETE',
       timeout: 30000,
-      response: 'json',
       tries: 1,
       log: true,
       body: { id: vert.id },

@@ -21,7 +21,7 @@ const { DEFAULT_MARKER, CUSTOM_MARKER } = require('../../dist/utils/merge-line-f
 const quiet = { log() {}, warn: console.warn, error: console.error };
 
 function makeTmp() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'bem-defaults-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'backend-defaults-'));
 }
 
 module.exports = {

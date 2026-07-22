@@ -10,7 +10,7 @@ Match the framework's four layers — Browser Extension Manager's test runner di
 |---|---|---|
 | `test/build/` | Plain Node | Build-time logic, manifest validation, pure utilities |
 | `test/background/` | MV3 service worker context | Background messaging, auth source-of-truth, alarms |
-| `test/view/` | Popup / options / sidepanel page | DOM, view-side controllers, `data-wm-bind` directives |
+| `test/view/` | Popup / options / sidepanel page | DOM, view-side controllers, `data-omega-bind` directives |
 | `test/boot/` | Consumer's actual built extension | End-to-end smoke tests (does the extension load, does the background register, do views render) |
 
 ## Quick example

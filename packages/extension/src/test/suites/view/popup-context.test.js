@@ -9,10 +9,10 @@ module.exports = {
   description: 'view/popup — DOM + chrome surface',
   tests: [
     {
-      name: 'document is present and body has data-bxm-context="popup"',
+      name: 'document is present and body has data-omega-context="popup"',
       run: async (ctx) => {
         ctx.expect(typeof document).toBe('object');
-        ctx.expect(document.body.dataset.bxmContext).toBe('popup');
+        ctx.expect(document.body.dataset.omegaContext).toBe('popup');
       },
     },
     {
@@ -42,7 +42,7 @@ module.exports = {
     {
       name: 'popup ↔ background messaging round-trip',
       run: async (ctx) => {
-        const reply = await chrome.runtime.sendMessage({ type: 'bxm:test:ping' });
+        const reply = await chrome.runtime.sendMessage({ type: 'extension:test:ping' });
         ctx.expect(reply.pong).toBe(true);
         ctx.expect(typeof reply.ts).toBe('number');
       },

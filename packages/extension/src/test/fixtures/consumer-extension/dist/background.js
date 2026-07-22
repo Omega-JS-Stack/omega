@@ -12,4 +12,4 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return false;
 });
 
-console.log('[bxm-fixture] background ready');
+console.log('[extension-fixture] background ready');

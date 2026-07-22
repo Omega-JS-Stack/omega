@@ -136,7 +136,7 @@ module.exports = {
 
         const response = await http.post('backend-manager/admin/post', {
           title: '@omega.js/backend Test Create Post',
-          url: 'bem-test-create-post',
+          url: 'backend-test-create-post',
           description: 'Test post created by @omega.js/backend test suite to verify @post/ body rewriting.',
           headerImageURL: headerImageURL,
           body: `# @omega.js/backend Test Create Post\n\nSome intro text.\n\n![Test inline image](${inlineImageURL})\n\nMore text after the image.`,
@@ -203,14 +203,14 @@ module.exports = {
         const octokit = new Octokit({ auth: process.env.GH_TOKEN });
         const imageDir = `src/assets/images/blog/post-${state.postId}/`;
 
-        // List committed images and pick the header (matches the slugified URL "bem-test-create-post")
+        // List committed images and pick the header (matches the slugified URL "backend-test-create-post")
         const { data: dirData } = await octokit.rest.repos.getContent({
           owner: state.owner,
           repo: state.repo,
           path: imageDir,
         });
 
-        const headerFile = dirData.find((f) => f.name === 'bem-test-create-post.jpg');
+        const headerFile = dirData.find((f) => f.name === 'backend-test-create-post.jpg');
         assert.ok(headerFile, 'Header image should be committed at expected slug');
 
         // Fetch the raw bytes and read dimensions

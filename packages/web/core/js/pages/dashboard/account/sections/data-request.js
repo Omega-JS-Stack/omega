@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 let formManager = null;
@@ -35,10 +34,9 @@ function setupDataRequestForm() {
   formManager.on('submit', async ({ data }) => {
     trackDataRequest('submit');
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/data-request`, {
+    const response = await omega.request(`/omega/user/data-request`, {
       method: 'POST',
       timeout: 30000,
-      response: 'json',
       tries: 2,
       body: {
         confirmed: true,
@@ -71,10 +69,9 @@ function setupDownloadButton() {
   });
 
   downloadFormManager.on('submit', async () => {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/data-request?action=download`, {
+    const response = await omega.request(`/omega/user/data-request?action=download`, {
       method: 'GET',
       timeout: 60000,
-      response: 'json',
     });
 
     if (response.error || !response.data) {
@@ -110,10 +107,9 @@ function setupCancelButton() {
   });
 
   cancelFormManager.on('submit', async () => {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/data-request`, {
+    const response = await omega.request(`/omega/user/data-request`, {
       method: 'DELETE',
       timeout: 30000,
-      response: 'json',
     });
 
     if (response.error) {
@@ -139,10 +135,9 @@ export async function onShow() {
 // Check request status from backend
 async function checkRequestStatus() {
   try {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user/data-request`, {
+    const response = await omega.request(`/omega/user/data-request`, {
       method: 'GET',
       timeout: 30000,
-      response: 'json',
     });
 
     if (response.request) {

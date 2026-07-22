@@ -47,7 +47,7 @@ module.exports = {
 
         const storePath = manager.storage.getPath();
         expect(Boolean(storePath)).toBe(true);
-        expect(storePath.endsWith('em-storage.json')).toBe(true);
+        expect(storePath.endsWith('omega-storage.json')).toBe(true);
         expect(fs.existsSync(storePath)).toBe(true);
 
         manager.storage.delete('desktop:boot:storageProof');

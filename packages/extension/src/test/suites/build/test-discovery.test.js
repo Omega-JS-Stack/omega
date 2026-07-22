@@ -27,7 +27,7 @@ module.exports = {
         const glob = require('glob').globSync;
         const { DISCOVERY_IGNORE } = require(path.join(__dirname, '..', '..', 'runner.js'));
 
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-discovery-test-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-discovery-test-'));
         const write = (rel) => {
           const file = path.join(tmp, rel);
           fs.mkdirSync(path.dirname(file), { recursive: true });

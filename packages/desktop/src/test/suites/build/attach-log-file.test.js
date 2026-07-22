@@ -40,7 +40,7 @@ module.exports = {
         const attach = require(path.join(__dirname, '..', '..', '..', 'utils', 'attach-log-file.js'));
         // Isolated instance — stacks under the live test.log tee, never clobbers it.
         const tee = attach.createTee();
-        const tmpPath = path.join(os.tmpdir(), `em-log-${Date.now()}.log`);
+        const tmpPath = path.join(os.tmpdir(), `desktop-log-${Date.now()}.log`);
         try {
           const stream = tee.attach(tmpPath);
           process.stdout.write('hello world\n');
@@ -66,7 +66,7 @@ module.exports = {
       run: (ctx) => {
         const attach = require(path.join(__dirname, '..', '..', '..', 'utils', 'attach-log-file.js'));
         const tee = attach.createTee();
-        const tmpPath = path.join(os.tmpdir(), `em-log-idem-${Date.now()}.log`);
+        const tmpPath = path.join(os.tmpdir(), `desktop-log-idem-${Date.now()}.log`);
         try {
           const s1 = tee.attach(tmpPath);
           const s2 = tee.attach(tmpPath);

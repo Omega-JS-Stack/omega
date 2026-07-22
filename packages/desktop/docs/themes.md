@@ -97,21 +97,21 @@ manager.theme.set('dark');    // apply + persist (throws on invalid values)
 const unsub = manager.theme.onChange(({ source, resolved }) => { ... });
 
 // Renderer (any page with the @omega.js/desktop preload)
-await window.em.theme.get();        // { source, resolved }
-await window.em.theme.set('dark');  // → { source, resolved }
-const unsub = window.em.theme.onChange(({ resolved }) => { ... }); // matchMedia-powered
+await window.desktop.theme.get();        // { source, resolved }
+await window.desktop.theme.set('dark');  // → { source, resolved }
+const unsub = window.desktop.theme.onChange(({ resolved }) => { ... }); // matchMedia-powered
 ```
 
 Main also broadcasts `desktop:theme:changed { source, resolved }` to BrowserWindows as a courtesy — but renderers should rely on `onChange`/matchMedia, which works in every context.
 
 ### Declarative controls
 
-Any element with `data-em-theme-set` becomes a theme switch (wired by the renderer Manager's initialize — event-delegated, so late-rendered controls work):
+Any element with `data-omega-theme-set` becomes a theme switch (wired by the renderer Manager's initialize — event-delegated, so late-rendered controls work):
 
 ```html
-<button data-em-theme-set="light">Day</button>
-<button data-em-theme-set="dark">Dusk</button>
-<button data-em-theme-set="system">Auto</button>
+<button data-omega-theme-set="light">Day</button>
+<button data-omega-theme-set="dark">Dusk</button>
+<button data-omega-theme-set="system">Auto</button>
 ```
 
 ### Build-time stamp
@@ -120,7 +120,7 @@ Any element with `data-em-theme-set` becomes a theme switch (wired by the render
 
 ## Where the themes live
 
-The SSOT is **`@omega.js/web/themes/`** — one theme tree for web, desktop, and extension (C4 cp109: the classy triplication is dead). @omega.js/desktop declares `omega.vendorAssets` in its package.json, and every `prepare-package` run copies the resolved web package's `themes/` into `<em>/dist/assets/themes/`. Consumers import via the sass `loadPaths` mechanism — **nothing is ever copied into the consumer's tree**. Desktop-specific theme bits (the `.em-titlebar` component, the `$min-contrast-ratio` knob) were upstreamed INTO the shared classy rather than kept as a fork.
+The SSOT is **`@omega.js/web/themes/`** — one theme tree for web, desktop, and extension (C4 cp109: the classy triplication is dead). @omega.js/desktop declares `omega.vendorAssets` in its package.json, and every `prepare-package` run copies the resolved web package's `themes/` into `<em>/dist/assets/themes/`. Consumers import via the sass `loadPaths` mechanism — **nothing is ever copied into the consumer's tree**. Desktop-specific theme bits (the `.omega-titlebar` component, the `$min-contrast-ratio` knob) were upstreamed INTO the shared classy rather than kept as a fork.
 
 ## Updating themes
 

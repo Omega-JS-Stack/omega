@@ -26,7 +26,7 @@ module.exports = {
     {
       name: 'composeMessages: cache hits land, gaps fall back to English, descriptions stay English',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-translate-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-translate-'));
 
         // Cache carries a translation for the shared "OMEGA" string only
         saveCache(tmp, 'es', 'messages', { [hashKey('OMEGA')]: 'OMEGA·es' });
@@ -47,7 +47,7 @@ module.exports = {
     {
       name: 'source edit invalidates: a changed EN message misses the old cache entry',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-translate-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-translate-'));
         saveCache(tmp, 'es', 'messages', { [hashKey('Old tooltip')]: 'Vieja' });
 
         const composed = composeMessages(
@@ -64,7 +64,7 @@ module.exports = {
     {
       name: 'readTranslatedDescription: strips the source marker, null when absent',
       run: (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-translate-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-translate-'));
 
         jetpack.write(
           path.join(tmp, 'es', 'description.md'),

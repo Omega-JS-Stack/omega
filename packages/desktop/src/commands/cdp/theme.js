@@ -16,6 +16,6 @@ module.exports = async function (options) {
     throw new Error(`Usage: npx omega cdp theme <${SOURCES.join('|')}>`);
   }
 
-  const state = await client.evaluate(client.MAIN_VIEW, `window.em.theme.set('${source}')`);
+  const state = await client.evaluate(client.MAIN_VIEW, `window.desktop.theme.set('${source}')`);
   console.log(`theme: source=${state.source} resolved=${state.resolved}`);
 };

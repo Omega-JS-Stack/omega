@@ -35,7 +35,7 @@ function directAssistant() {
     log: () => {},
     error: () => {},
     errorify: (message) => new Error(message),
-    getUser: () => ({ auth: { uid: 'bem-ai-live-test' } }),
+    getUser: () => ({ auth: { uid: 'backend-ai-live-test' } }),
     request: { geolocation: { ip: '127.0.0.1' } },
   };
 }

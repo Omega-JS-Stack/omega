@@ -1,5 +1,5 @@
 {
-  "name": "em-fixture-consumer",
+  "name": "desktop-fixture-consumer",
   "version": "1.0.0",
   "private": true,
   "description": "Minimal @omega.js/desktop consumer app — boot-layer self-test fixture (built + booted by src/test/runners/boot.js).",

@@ -4,7 +4,6 @@
 
 // Libraries
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
 import { Chart, DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
@@ -528,7 +527,7 @@ async function runCron($btn) {
   if ($text) $text.textContent = 'Running...';
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/omega/admin/cron`, {
+    await omega.request(`/omega/admin/cron`, {
       method: 'POST',
       timeout: 5 * 60 * 1000,
       response: 'text',
@@ -566,10 +565,9 @@ async function runBackup() {
   if ($text) $text.textContent = 'Running...';
 
   try {
-    await authorizedFetch(`${omega.getApiUrl()}/omega/admin/backup`, {
+    await omega.request(`/omega/admin/backup`, {
       method: 'POST',
       timeout: 5 * 60 * 1000,
-      response: 'json',
       tries: 1,
       log: true,
       body: {},

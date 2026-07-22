@@ -9,7 +9,7 @@ Wraps `electron-updater` with three triggers: startup check, periodic check, and
 | **Startup check** | `startupDelayMs` after `app.whenReady()` (default 10s) | Non-blocking. Fires once. |
 | **Periodic check** | Every `intervalMs` (default 60s) | Fires forever, also re-evaluates the 30-day gate each tick. |
 | **30-day gate** | At init + every periodic tick | If a pending update was downloaded ≥ `maxAgeMs` ago (default 30 days), force `quitAndInstall()`. |
-| **Manual check** | `manager.autoUpdater.checkNow()` (main) or `window.em.autoUpdater.checkNow()` (renderer) | Same as a periodic check but `userInitiated: true`. |
+| **Manual check** | `manager.autoUpdater.checkNow()` (main) or `window.desktop.autoUpdater.checkNow()` (renderer) | Same as a periodic check but `userInitiated: true`. |
 
 ## State machine
 
@@ -135,23 +135,23 @@ Consumers can find / move / remove the item via `manager.menu.findItem('desktop:
 
 ## Renderer surface
 
-Preload exposes `window.em.autoUpdater`:
+Preload exposes `window.desktop.autoUpdater`:
 
 ```js
 // Get current state
-const status = await window.em.autoUpdater.getStatus();
+const status = await window.desktop.autoUpdater.getStatus();
 // → { code, version, percent, error, downloadedAt, lastCheckedAt }
 
 // Subscribe to updates
-const unsubscribe = window.em.autoUpdater.onStatus((status) => {
+const unsubscribe = window.desktop.autoUpdater.onStatus((status) => {
   console.log('update status →', status.code, status.version, status.percent);
 });
 
 // User-initiated check (e.g. "Check for updates" menu item)
-await window.em.autoUpdater.checkNow();
+await window.desktop.autoUpdater.checkNow();
 
 // User-initiated install (after status === 'downloaded')
-await window.em.autoUpdater.installNow();
+await window.desktop.autoUpdater.installNow();
 ```
 
 Status is also broadcast on the IPC channel `desktop:auto-updater:status` after every state transition.

@@ -17,7 +17,7 @@ const jetpack = require('fs-jetpack');
 const ProjectIdConsistencyTest = require('../../dist/cli/commands/setup-tests/project-id-consistency.js');
 
 function stage(configProjectId, firebasercProjectId) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bem-pid-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'backend-pid-'));
 
   jetpack.write(path.join(tmp, 'config', 'omega.json5'), [
     '{',

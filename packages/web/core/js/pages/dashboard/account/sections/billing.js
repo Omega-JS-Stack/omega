@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 let paymentConfig = null;
@@ -188,10 +187,9 @@ async function openBillingPortal() {
     if ($manageBtn) $manageBtn.disabled = true;
     if ($btnText) $btnText.textContent = 'Opening...';
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/portal`, {
+    const response = await omega.request(`/omega/payments/portal`, {
       method: 'POST',
       timeout: 15000,
-      response: 'json',
       body: {
         returnUrl: window.location.href,
       },
@@ -243,10 +241,9 @@ function setupCancellationForm() {
 
     trackBilling('cancel_submit');
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/cancel`, {
+    const response = await omega.request(`/omega/payments/cancel`, {
       method: 'POST',
       timeout: 30000,
-      response: 'json',
       body: {
         reason: reason,
         feedback: data.feedback || '',

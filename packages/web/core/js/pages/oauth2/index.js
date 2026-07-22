@@ -1,5 +1,4 @@
 // Libraries
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 // Module
@@ -8,7 +7,7 @@ export default () => {
     await omega.dom().ready();
 
     // Wait for auth state before handling callback
-    // Required because authorizedFetch needs auth.currentUser
+    // Required because omega.request needs auth.currentUser
     omega.auth().listen({ once: true }, () => {
       handleOAuthCallback();
     });
@@ -49,10 +48,9 @@ async function handleOAuthCallback() {
 
     // Send tokenize request with encrypted state
     // Note: tries=1 because auth codes can only be used once
-    const response = await authorizedFetch(apiUrl, {
+    const response = await omega.request(apiUrl, {
       method: 'POST',
       timeout: 60000,
-      response: 'json',
       tries: 1,
       body: {
         action: 'tokenize',

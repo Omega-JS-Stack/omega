@@ -4,12 +4,12 @@
 
 {% capture action_attributes %}{% if include.attributes %}{% for attr in include.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
 
-<div class="dropdown animation-slide-up d-inline-flex" data-wm-bind="@show auth.user" hidden>
+<div class="dropdown animation-slide-up d-inline-flex" data-omega-bind="@show auth.user" hidden>
   <button class="p-0 border-0 bg-transparent" type="button" data-bs-toggle="dropdown" {{ action_attributes }} aria-expanded="false">
     <span class="d-flex align-items-center">
       <span class="position-relative d-inline-flex">
         <span class="avatar avatar-{{ avatar_size }} rounded-circle bg-secondary bg-opacity-10 border d-flex align-items-center justify-content-center overflow-hidden d-inline-flex">
-          <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+          <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
         </span>
         <!-- Active status indicator -->
         <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -25,7 +25,7 @@
         <div class="d-flex align-items-center">
           <div class="position-relative me-3">
             <div class="avatar avatar-md rounded-circle bg-secondary bg-opacity-10 border d-flex align-items-center justify-content-center overflow-hidden">
-              <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
+              <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" alt="{{ site.brand.name }} profile picture"/>
             </div>
             <!-- Active status indicator -->
             <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -33,8 +33,8 @@
             </span>
           </div>
           <div class="flex-grow-1 overflow-hidden">
-            <div class="fw-semibold text-truncate text-body" data-wm-bind="@text auth.user.displayName">User</div>
-            <div class="small text-muted text-truncate" data-wm-bind="@text auth.user.email">email@example.com</div>
+            <div class="fw-semibold text-truncate text-body" data-omega-bind="@text auth.user.displayName">User</div>
+            <div class="small text-muted text-truncate" data-omega-bind="@text auth.user.email">email@example.com</div>
           </div>
         </div>
       </a>

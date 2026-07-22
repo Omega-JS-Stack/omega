@@ -82,8 +82,8 @@ test('FRAMEWORK_IDS covers exactly the dispatcher\'s frameworks with the cp94a i
   const { FRAMEWORKS } = require('../src/omega-bin.js');
 
   assert.deepStrictEqual(Object.keys(FRAMEWORK_IDS).sort(), [...FRAMEWORKS].sort());
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/web'], ['web', 'ujm']);
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/web'], ['web']);
   assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/backend'], ['backend']);
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/desktop'], ['desktop', 'em']);
-  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/extension'], ['extension', 'bxm']);
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/desktop'], ['desktop']);
+  assert.deepStrictEqual(FRAMEWORK_IDS['@omega.js/extension'], ['extension']);
 });

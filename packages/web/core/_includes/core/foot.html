@@ -103,10 +103,10 @@
       }
 
       // Process binds
-      var $bindElements = document.querySelectorAll('[data-wm-bind]');
+      var $bindElements = document.querySelectorAll('[data-omega-bind]');
 
       $bindElements.forEach(function($el) {
-        var bindValue = $el.getAttribute('data-wm-bind');
+        var bindValue = $el.getAttribute('data-omega-bind');
 
         if (bindValue === '@show auth.user') {
           // Show element when user is logged in

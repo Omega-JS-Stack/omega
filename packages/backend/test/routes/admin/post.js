@@ -13,7 +13,7 @@
 const { Octokit } = require('@octokit/rest');
 
 // Test post configuration
-const TEST_POST_SLUG = 'bem-test-post';
+const TEST_POST_SLUG = 'backend-test-post';
 const TEST_POST_ID = Date.now();
 
 // Generate frontmatter for the test post

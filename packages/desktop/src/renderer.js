@@ -21,9 +21,9 @@ function Manager() {
   self.logger = new LoggerLite('renderer');
   self.omega = null;
 
-  // Bridges exposed by preload contextBridge (window.em.*)
-  self.ipc     = (typeof window !== 'undefined' && window.em?.ipc)     || null;
-  self.storage = (typeof window !== 'undefined' && window.em?.storage) || null;
+  // Bridges exposed by preload contextBridge (window.desktop.*)
+  self.ipc     = (typeof window !== 'undefined' && window.desktop?.ipc)     || null;
+  self.storage = (typeof window !== 'undefined' && window.desktop?.storage) || null;
 
   return self;
 }
@@ -53,7 +53,7 @@ Manager.prototype.initialize = async function (overrides) {
   // Wire the auth bridge: sync with main, listen for broadcasts.
   await self._wireAuthBridge();
 
-  // Wire declarative theme controls ([data-em-theme-set]).
+  // Wire declarative theme controls ([data-omega-theme-set]).
   self._wireThemeControls();
 
   // Auto-render FontAwesome icons (<i class="fa-solid fa-*">) and Bootstrap
@@ -71,30 +71,30 @@ Manager.prototype.initialize = async function (overrides) {
   return self;
 };
 
-// Declarative theme switching — any element with `data-em-theme-set="system|light|dark"`
+// Declarative theme switching — any element with `data-omega-theme-set="system|light|dark"`
 // becomes a theme control: clicking it calls main's theme setter (persisted, applied to
 // every renderer live). The `<html data-bs-theme>` attribute itself is maintained by the
 // preload's theme applier (src/preload.js) — consumers just drop plain buttons:
 //
-//   <button data-em-theme-set="light">Day</button>
-//   <button data-em-theme-set="dark">Dusk</button>
-//   <button data-em-theme-set="system">Auto</button>
+//   <button data-omega-theme-set="light">Day</button>
+//   <button data-omega-theme-set="dark">Dusk</button>
+//   <button data-omega-theme-set="system">Auto</button>
 //
 // Delegated on document so controls rendered after initialize still work.
 Manager.prototype._wireThemeControls = function () {
   const self = this;
 
-  if (typeof document === 'undefined' || !window.em?.theme) {
+  if (typeof document === 'undefined' || !window.desktop?.theme) {
     return;
   }
 
   document.addEventListener('click', (event) => {
-    const control = event.target.closest('[data-em-theme-set]');
+    const control = event.target.closest('[data-omega-theme-set]');
     if (!control) {
       return;
     }
-    const source = control.getAttribute('data-em-theme-set');
-    window.em.theme.set(source).catch((e) => {
+    const source = control.getAttribute('data-omega-theme-set');
+    window.desktop.theme.set(source).catch((e) => {
       self.logger.warn(`theme set '${source}' failed:`, e?.message);
     });
   });
@@ -108,7 +108,7 @@ Manager.prototype._wireThemeControls = function () {
 // @omega.js/client's shared icon-renderer (C4 cp112), the SAME module web
 // pages run; desktop only supplies the transport (IPC to main's icon
 // server). Unknown names leave the element empty (marked data-omega-fa) —
-// consumers that want a fallback check `window.em.fontawesome.get()`.
+// consumers that want a fallback check `window.desktop.fontawesome.get()`.
 //
 //   <i class="fa-solid fa-rocket me-2"></i>   →   <i …><svg …>…</svg></i>
 Manager.prototype._wireFontAwesome = function () {
@@ -343,7 +343,7 @@ Manager.prototype._wireAuthBridge = async function () {
 
   // Run @omega.js/client's FULL auth cycle (UJM/BXM parity): listen() waits for auth to
   // settle, fetches the Firestore account, resolves the subscription, and auto-populates
-  // the data-wm-bind bindings — so any @omega.js/desktop app can write UJM-style reactive HTML
+  // the data-omega-bind bindings — so any @omega.js/desktop app can write UJM-style reactive HTML
   // (`@show auth.user`, `@text auth.account.plan.id`, ...). Persistent listener: fires
   // again on every subsequent sign-in/out (broadcast tokens included).
   //

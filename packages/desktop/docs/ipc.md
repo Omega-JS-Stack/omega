@@ -19,21 +19,21 @@ manager.ipc.listenerCount(channel)
 ## Renderer-process API (via preload contextBridge)
 
 ```js
-await window.em.ipc.invoke(channel, payload)   // → Promise<result>
-const off = window.em.ipc.on(channel, (payload) => { ... });
-window.em.ipc.send(channel, payload);          // fire-and-forget
+await window.desktop.ipc.invoke(channel, payload)   // → Promise<result>
+const off = window.desktop.ipc.on(channel, (payload) => { ... });
+window.desktop.ipc.send(channel, payload);          // fire-and-forget
 ```
 
 ## Channel naming
 
-framework-internal channels are prefixed `em:` (e.g. `desktop:storage:get`, `desktop:storage:change`). Consumers are free to use any namespace.
+framework-internal channels are prefixed `desktop:` (e.g. `desktop:storage:get`, `desktop:storage:change`). Consumers are free to use any namespace.
 
 ## Validation
 
 - `handle()` throws if `channel` is empty/non-string or `handler` is non-function.
 - `handle()` throws on duplicate registration. Call `unhandle()` first if you need to swap.
 - `invoke()` rejects with a clear message if no handler is registered for the channel.
-- Handler errors propagate through `invoke()` (both main-local and renderer-side) — your renderer's `await window.em.ipc.invoke(...)` will reject with the original error message.
+- Handler errors propagate through `invoke()` (both main-local and renderer-side) — your renderer's `await window.desktop.ipc.invoke(...)` will reject with the original error message.
 
 ## Zero-trust payloads
 
@@ -57,5 +57,5 @@ manager.ipc.handle('user:get-token', async (payload) => {
 });
 
 // renderer
-const { token } = await window.em.ipc.invoke('user:get-token', { userId: 'abc' });
+const { token } = await window.desktop.ipc.invoke('user:get-token', { userId: 'abc' });
 ```

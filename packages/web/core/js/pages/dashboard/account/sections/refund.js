@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 // Refund reasons (will be shuffled on each render)
@@ -85,10 +84,9 @@ function setupRefundForm() {
 
     trackRefund('submit');
 
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/refund`, {
+    const response = await omega.request(`/omega/payments/refund`, {
       method: 'POST',
       timeout: 30000,
-      response: 'json',
       body: {
         confirmed: true,
         reason: reason,

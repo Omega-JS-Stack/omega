@@ -7,7 +7,7 @@ const os   = require('os');
 const MOD_PATH = path.join(__dirname, '..', '..', '..', 'commands', 'logs.js');
 
 function freshTmp() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'em-logs-cmd-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-logs-cmd-'));
 }
 
 function withCwd(dir, fn) {

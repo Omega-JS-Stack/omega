@@ -55,7 +55,7 @@ Run `npx omega setup` again to pull the latest framework defaults. Files you've 
 
 ```bash
 npx omega test                   # YOUR project's tests only (C5 scoping — docs/testing.md)
-npx omega test framework:        # the framework's own suite (aliases: omega:, mgr:, extension:, bxm:)
+npx omega test framework:        # the framework's own suite (aliases: omega:, mgr:, extension:)
 npx omega test full:             # both sources
 npx omega test --layer build     # build layer only (plain Node, fast; orthogonal to scoping)
 npx omega test --layer boot      # real-Chromium end-to-end test
@@ -164,11 +164,11 @@ Add these CSS classes to HTML elements for declarative auth UI:
 | `.auth-account-btn` | Opens `/account` page on your website |
 
 ```html
-<button class="btn auth-signin-btn" data-wm-bind="@show !auth.user">Sign In</button>
+<button class="btn auth-signin-btn" data-omega-bind="@show !auth.user">Sign In</button>
 
-<div data-wm-bind="@show auth.user" hidden>
-  <img data-wm-bind="@attr src auth.user.photoURL">
-  <span data-wm-bind="@text auth.user.displayName">User</span>
+<div data-omega-bind="@show auth.user" hidden>
+  <img data-omega-bind="@attr src auth.user.photoURL">
+  <span data-omega-bind="@text auth.user.displayName">User</span>
   <button class="auth-signout-btn">Sign Out</button>
 </div>
 ```

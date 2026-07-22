@@ -106,18 +106,18 @@ Add these classes to HTML elements to wire up auth UI without writing JS:
 
 ## Reactive bindings
 
-Web Manager exposes `data-wm-bind` attributes for show/hide/text/attr based on auth state:
+Web Manager exposes `data-omega-bind` attributes for show/hide/text/attr based on auth state:
 
 ```html
 <!-- Sign-in button shown when logged out -->
-<button class="btn auth-signin-btn" data-wm-bind="@show !auth.user">
+<button class="btn auth-signin-btn" data-omega-bind="@show !auth.user">
   Sign In
 </button>
 
 <!-- Account UI shown when logged in -->
-<div data-wm-bind="@show auth.user" hidden>
-  <img data-wm-bind="@attr src auth.user.photoURL">
-  <span data-wm-bind="@text auth.user.displayName"></span>
+<div data-omega-bind="@show auth.user" hidden>
+  <img data-omega-bind="@attr src auth.user.photoURL">
+  <span data-omega-bind="@text auth.user.displayName"></span>
   <a class="auth-account-btn" href="#">Account</a>
   <button class="auth-signout-btn">Sign Out</button>
 </div>

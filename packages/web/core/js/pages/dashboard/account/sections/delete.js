@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 let formManager = null;
@@ -41,10 +40,9 @@ function setupDeleteAccountForm() {
     }
 
     // Send delete request to server
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/user`, {
+    const response = await omega.request(`/omega/user`, {
       method: 'DELETE',
       timeout: 30000,
-      response: 'json',
       tries: 2,
       body: {
         reason: data.reason || '',

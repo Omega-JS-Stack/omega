@@ -45,7 +45,7 @@ So `hoursTotal` is intentionally a lower bound — it never over-counts crashed 
 ## Renderer
 
 ```js
-const snap = await window.em.usage.get();
+const snap = await window.desktop.usage.get();
 // { opens: 12, hoursTotal: 4.75, hoursThisSession: 0.05, installedAt: '...' }
 ```
 

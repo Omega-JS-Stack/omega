@@ -12,7 +12,7 @@
  *   npx omega test full:auth           → both sources, path-scoped
  *
  * `omega:` and `mgr:` are universal framework aliases; each framework also
- * answers to its own ids (e.g. `backend:`, `em:`, `extension:`, `web:`) via
+ * answers to its own id (`backend:`, `desktop:`, `extension:`, `web:`) via
  * `frameworkAliases`. Bare paths bind to the PROJECT source — reaching the
  * framework suite is always an explicit choice (Ian 2026-07-11: bare runs
  * from a brand must never drag the framework corpus in).
@@ -26,16 +26,16 @@ const UNIVERSAL_FRAMEWORK_ALIASES = ['framework', 'omega', 'mgr'];
 const PROJECT_ALIASES = ['project', 'brand'];
 const FULL_ALIASES = ['full'];
 
-// Per-framework id prefixes (current name + legacy short name), keyed by
-// package name. The SSOT for "which prefixes does each framework answer to":
-// framework runners pass their own entry as `frameworkAliases`, and the
-// manager's brand-root `test` fan-out routes `web:`/`em:`/… targets to the
-// app owning that framework.
+// Per-framework id prefixes, keyed by package name. The SSOT for "which
+// prefixes does each framework answer to": framework runners pass their own
+// entry as `frameworkAliases`, and the manager's brand-root `test` fan-out
+// routes `web:`/`desktop:`/… targets to the app owning that framework.
+// Legacy short ids (ujm/em/bxm) retired with cp262's legacy-name sweep.
 const FRAMEWORK_IDS = {
-  '@omega.js/web': ['web', 'ujm'],
+  '@omega.js/web': ['web'],
   '@omega.js/backend': ['backend'],
-  '@omega.js/desktop': ['desktop', 'em'],
-  '@omega.js/extension': ['extension', 'bxm'],
+  '@omega.js/desktop': ['desktop'],
+  '@omega.js/extension': ['extension'],
 };
 
 /**
@@ -44,7 +44,7 @@ const FRAMEWORK_IDS = {
  * @param {string[]} rawTargets - Positional targets (may be empty)
  * @param {Object} [options]
  * @param {string[]} [options.frameworkAliases] - Extra framework prefixes for
- *   this framework (e.g. ['backend'], ['em'], ['extension'], ['web'])
+ *   this framework (e.g. ['backend'], ['desktop'], ['extension'], ['web'])
  * @param {boolean} [options.selfTest] - True when running inside the framework
  *   package itself (no consumer project)
  * @returns {{

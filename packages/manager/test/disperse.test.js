@@ -279,7 +279,7 @@ test('env: desktop .env composes only app-owned values against the real framewor
   assert.match(env, /^# GH_TOKEN=$/m);
   assert.match(env, /^# WIN_EV_TOKEN_PATH=$/m);
   // Unmanaged template keys and the Custom section survive verbatim
-  assert.match(env, /^OMEGA_TEST_USER_UID="em-test-user"$/m);
+  assert.match(env, /^OMEGA_TEST_USER_UID="desktop-test-user"$/m);
   assert.match(env, /Custom Values/);
 });
 

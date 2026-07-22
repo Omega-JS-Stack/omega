@@ -86,7 +86,7 @@ npx omega runner install
 1. Downloads `actions/runner` (pinned version) into `<framework-clone>\.gh-runners\actions-runner-<org>\`.
 2. Discovers every GitHub org you have admin on (via `GH_TOKEN`).
 3. Registers a runner with labels `[self-hosted, windows, ev-token]` against each org.
-4. Installs the `em-runner-watcher` Windows service that:
+4. Installs the `omega-runner-watcher` Windows service that:
    - Polls GitHub every 60s for new orgs you've gained admin access to → auto-registers a runner there.
    - Self-updates @omega.js/desktop via `npm i -g @omega.js/desktop@latest` on every tick (so the runner box always has the freshest CLI).
 5. Starts the service. Auto-starts on boot.
@@ -125,7 +125,7 @@ npx omega runner monitor
 ```
 
 ```
-Watching: C:\actions-runners\em-signing.log
+Watching: C:\actions-runners\omega-signing.log
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [2026-05-06 12:34:56.789] JOB START run=12345 workflow=Build & Release
@@ -141,7 +141,7 @@ Events captured per job:
 - `✓ signed <file>` / `✗ FAILED <file>` — signtool outcome + duration; failures show the underlying error
 - `JOB END OK` / `FAILED` — overall result + total duration
 
-The event log is a JSONL file at `<runner-home>/em-signing.log` on CI (resolved from `OMEGA_RUNNER_HOME` / `RUNNER_TOOLSDIRECTORY` / `RUNNER_WORKSPACE`), or `logs/signing.log` in local dev. Override with `OMEGA_SIGN_LOG=<path>`. Monitor flags:
+The event log is a JSONL file at `<runner-home>/omega-signing.log` on CI (resolved from `OMEGA_RUNNER_HOME` / `RUNNER_TOOLSDIRECTORY` / `RUNNER_WORKSPACE`), or `logs/signing.log` in local dev. Override with `OMEGA_SIGN_LOG=<path>`. Monitor flags:
 
 ```powershell
 npx omega runner monitor --follow-only      # only show NEW events (skip replay of pre-existing log)
@@ -228,7 +228,7 @@ These are *physical* / *driver-level* prerequisites @omega.js/desktop can't auto
 │                                  │         │                                    │
 │  • detects org                   │         │  • downloads actions/runner        │
 │  • validates GH org has runner   │         │  • registers vs every admin org    │
-│  • non-fatal warning if missing  │         │  • installs em-runner-watcher svc  │
+│  • non-fatal warning if missing  │         │  • installs omega-runner-watcher svc  │
 │                                  │         │                                    │
 └──────────────┬───────────────────┘         └──────────────┬─────────────────────┘
                │                                            │

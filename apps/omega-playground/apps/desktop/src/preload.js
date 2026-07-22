@@ -1,4 +1,4 @@
-// Preload entry. Exposes window.em to the renderer via contextBridge.
+// Preload entry. Exposes window.desktop to the renderer via contextBridge.
 const Manager = require('@omega.js/desktop/preload');
 
 const manager = new Manager();

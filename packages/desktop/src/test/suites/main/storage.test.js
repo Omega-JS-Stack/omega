@@ -80,7 +80,7 @@ module.exports = {
       run: (ctx) => {
         const p = ctx.manager.storage.getPath();
         ctx.expect(typeof p).toBe('string');
-        ctx.expect(p).toMatch(/em-storage\.json$/);
+        ctx.expect(p).toMatch(/omega-storage\.json$/);
       },
     },
   ],

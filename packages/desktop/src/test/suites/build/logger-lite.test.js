@@ -136,7 +136,7 @@ module.exports = {
       run: (ctx) => {
         delete require.cache[require.resolve(MOD_PATH)];
         const Logger = require(MOD_PATH);
-        // No window.em, no electron → returns false.
+        // No window.desktop, no electron → returns false.
         const result = Logger._internals.tryForwardToMain('test', 'info', ['hi']);
         ctx.expect(result).toBe(false);
       },

@@ -29,7 +29,7 @@ curl -s http://localhost:9222/json
 
 Zero-dependency subcommands for driving the running dev app — see, act, and run the no-watch iterate loop. All read `OMEGA_CDP_PORT` (default 9222), or take `--port <n>` (which wins).
 
-**Pinning a port in an npm script? Use `--port`, never `cross-env`.** `npx cross-env OMEGA_CDP_PORT=… npx omega cdp eval … "window.em.ipc.invoke('my:channel')"` STRIPS the inner quotes from the expression before it reaches V8 (`invoke(my:channel)` → `SyntaxError: missing ) after argument list`). `npx omega cdp eval … "…" --port <n>` keeps the expression intact.
+**Pinning a port in an npm script? Use `--port`, never `cross-env`.** `npx cross-env OMEGA_CDP_PORT=… npx omega cdp eval … "window.desktop.ipc.invoke('my:channel')"` STRIPS the inner quotes from the expression before it reaches V8 (`invoke(my:channel)` → `SyntaxError: missing ) after argument list`). `npx omega cdp eval … "…" --port <n>` keeps the expression intact.
 
 ```bash
 npx omega cdp status                          # running? targets, window rect, theme
@@ -48,7 +48,7 @@ An @omega.js/desktop app is one window but potentially MANY webContents (every B
 ```bash
 npx omega cdp eval "/views/main/" 'document.title'
 npx omega cdp eval "example.com" 'getComputedStyle(document.body).backgroundColor'
-npx omega cdp eval "/views/main/" "window.em.ipc.invoke('my-app:some-channel')"   # the real IPC surface
+npx omega cdp eval "/views/main/" "window.desktop.ipc.invoke('my-app:some-channel')"   # the real IPC surface
 ```
 
 Promises are awaited, results print as JSON, and expressions run with a user gesture (focus()/clipboard-ish APIs behave like real input).

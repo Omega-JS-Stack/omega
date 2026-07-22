@@ -22,7 +22,7 @@
 // Dev simulation: set `OMEGA_DEV_UPDATE=available|unavailable|error` env var. The updater synthesizes
 // the appropriate event sequence so you can test the UI flow without a real update server.
 //
-// Renderer surface (added to preload.js as `window.em.autoUpdater`):
+// Renderer surface (added to preload.js as `window.desktop.autoUpdater`):
 //   getStatus()      → { code, version, percent, error?, downloadedAt? }
 //   onStatus(fn)     → unsubscribe fn; called on every state change.
 //   checkNow()       → user-initiated check (shows dialogs on completion).

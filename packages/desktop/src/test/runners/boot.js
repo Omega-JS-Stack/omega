@@ -94,7 +94,7 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
     })),
   };
 
-  const specFile = path.join(os.tmpdir(), `em-boot-spec-${process.pid}-${Date.now()}.json`);
+  const specFile = path.join(os.tmpdir(), `desktop-boot-spec-${process.pid}-${Date.now()}.json`);
   fs.writeFileSync(specFile, JSON.stringify(spec));
 
   const bootEntry = path.join(frameworkDistRoot, 'test', 'harness', 'boot-entry.js');

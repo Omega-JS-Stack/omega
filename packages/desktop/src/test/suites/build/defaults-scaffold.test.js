@@ -24,7 +24,7 @@ module.exports = {
     {
       name: 'fresh scaffold: `_.` renames, `_mas/` archive skipped, workflow YAML rendered',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         await copyDefaults(tmp);
 
         ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBeTruthy();
@@ -43,7 +43,7 @@ module.exports = {
     {
       name: 'preserve-if-exists: consumer files are never overwritten',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(path.join(tmp, 'src', 'main.js'), '// consumer-owned main');
         await copyDefaults(tmp);
 
@@ -53,7 +53,7 @@ module.exports = {
     {
       name: '.env re-scaffold: custom values survive, user default-section keys migrate to custom',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(
           path.join(tmp, '.env'),
           `${DEFAULT_MARKER}\nUSER_ADDED_KEY="mine"\n\n${CUSTOM_MARKER}\nCUSTOM_KEY="kept"\n`
@@ -70,7 +70,7 @@ module.exports = {
     {
       name: 'converges: after the first re-run the tree is stable',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         // Run 1 scaffolds; run 2 is the first merge pass, which normalizes marker
         // files whose template carries a preamble ABOVE the Default marker (the
         // protocol moves it below — pre-existing behavior). Stable from then on.
@@ -86,7 +86,7 @@ module.exports = {
     {
       name: 'brand app scaffolds NO config file (cp121c/cp122d: brand targets.* is the home; app file = standalone escape hatch)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
         jetpack.dir(appDir);
@@ -103,7 +103,7 @@ module.exports = {
     {
       name: 'brand app scaffolds NO per-app docs (brand doc unification: the brand root is the doc home)',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
         jetpack.dir(appDir);
@@ -119,7 +119,7 @@ module.exports = {
     {
       name: 'brand setup sweeps framework-owned per-app docs, preserves consumer content with a warning',
       run: async (ctx) => {
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-defaults-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-defaults-'));
         const appDir = path.join(tmp, 'brand', 'apps', 'desktop');
         jetpack.dir(appDir);
 

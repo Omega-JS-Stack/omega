@@ -218,7 +218,7 @@ const Stripe = {
     }
 
     const customer = await stripe.customers.create(params, {
-      idempotencyKey: `bem-customer-create-${uid}`,
+      idempotencyKey: `backend-customer-create-${uid}`,
     });
     assistant.log(`Created new Stripe customer: ${customer.id}`);
     return customer;

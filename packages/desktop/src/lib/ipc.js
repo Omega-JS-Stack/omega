@@ -9,13 +9,13 @@
 //   ipc.broadcast(channel, payload)                       // main → all renderers
 //   ipc.send(webContents, channel, payload)               // main → one renderer
 //
-// Renderer-side (via preload contextBridge as `window.em.ipc`):
-//   window.em.ipc.invoke(channel, payload)                // → Promise<result>
-//   window.em.ipc.on(channel, fn)                         // returns unsubscribe fn
-//   window.em.ipc.send(channel, payload)                  // fire-and-forget renderer → main
+// Renderer-side (via preload contextBridge as `window.desktop.ipc`):
+//   window.desktop.ipc.invoke(channel, payload)                // → Promise<result>
+//   window.desktop.ipc.on(channel, fn)                         // returns unsubscribe fn
+//   window.desktop.ipc.send(channel, payload)                  // fire-and-forget renderer → main
 //
 // All framework-internal channels are prefixed `desktop:` (e.g. `desktop:storage:get`);
-// the test harness keeps its own `em:__test:*` channels (parked internals, like EM_* env vars).
+// the test harness keeps its own `desktop:__test:*` channels (parked internals, like EM_* env vars).
 // Consumers can register their own channels under any namespace they want.
 
 const LoggerLite = require('./logger-lite.js');

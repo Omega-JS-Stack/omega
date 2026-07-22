@@ -1,4 +1,4 @@
-// Renderer-layer suite — verifies the `window.em.fontawesome` bridge and the
+// Renderer-layer suite — verifies the `window.desktop.fontawesome` bridge and the
 // REAL auto-render pipeline: an `<i class="fa-solid fa-*">` inserted into the
 // live DOM gets the bundled SVG injected by renderer.js's MutationObserver.
 //
@@ -12,10 +12,10 @@ module.exports = {
   description: 'fontawesome bridge + auto-render',
   tests: [
     {
-      name: 'window.em.fontawesome.get is exposed and resolves an SVG',
+      name: 'window.desktop.fontawesome.get is exposed and resolves an SVG',
       run: async (ctx) => {
-        ctx.expect(typeof window.em.fontawesome.get).toBe('function');
-        const svg = await window.em.fontawesome.get('play');
+        ctx.expect(typeof window.desktop.fontawesome.get).toBe('function');
+        const svg = await window.desktop.fontawesome.get('play');
         ctx.expect(typeof svg).toBe('string');
         ctx.expect(svg.startsWith('<svg ')).toBe(true);
         ctx.expect(svg.includes('fill="currentColor"')).toBe(true);
@@ -24,7 +24,7 @@ module.exports = {
     {
       name: 'unknown icons resolve to null over the bridge',
       run: async (ctx) => {
-        const svg = await window.em.fontawesome.get('definitely-not-an-icon-xyz');
+        const svg = await window.desktop.fontawesome.get('definitely-not-an-icon-xyz');
         ctx.expect(svg).toBe(null);
       },
     },
@@ -116,12 +116,12 @@ module.exports = {
 
         await until(() => el.dataset.omegaFa);
         ctx.expect(el.dataset.omegaFa).toBe('light/play'); // family/weight classes are never names
-        const lightSvg = await window.em.fontawesome.get('play', 'light');
+        const lightSvg = await window.desktop.fontawesome.get('play', 'light');
         await new Promise((r) => setTimeout(r, 150));
         ctx.expect((el.querySelector('svg') !== null)).toBe(lightSvg !== null);
 
         // sharp + weight composes: `fa-sharp fa-light` asks for sharp-light.
-        const sharpSvg = await window.em.fontawesome.get('play', 'sharp-light');
+        const sharpSvg = await window.desktop.fontawesome.get('play', 'sharp-light');
         const el2 = document.createElement('i');
         el2.className = 'fa-sharp fa-light fa-play';
         document.body.appendChild(el2);

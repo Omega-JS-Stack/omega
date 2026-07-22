@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-22] cp261 SHIPPED; next Ian input: assistant refactor GO or wave 3 → CHANGELOG
+- [fable 2026-07-22] cp262 SHIPPED; next Ian input: assistant refactor GO or wave 3 → CHANGELOG
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -68,6 +68,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp262 2026-07-22 legacy-name sweep: wm/em/bem/bxm/ujm identifiers → omega/current names on every runtime surface (battery EXIT 0) → CHANGELOG
 - cp261 2026-07-22 omega.request() harmonized fetch layer + usage/device bindings split + desktop/extension callers (battery EXIT 0) → CHANGELOG
 - cp260 2026-07-22 legacy command lane retired + token callers fixed + test:auth e2e lane + de-ITW extension fallbacks (battery EXIT 0) → CHANGELOG
 - cp259 2026-07-21 wave-2 fix-batch + 3-pass review (email loadTemplate, errorify guard closed; backend 1332/44) → CHANGELOG
@@ -77,4 +78,3 @@
 - cp255 2026-07-21 per-service requires preflight: REQUIRES registry + consolidated walkthroughs + --strict (manager 762/0; battery EXIT 0) → CHANGELOG
 - cp254 2026-07-21 multi-instance targets: config normalization SSOT + manager/web iteration + 2-instance corpus cell (battery PASSED) → CHANGELOG
 - cp253 2026-07-21 ads step 6: company-mode proof e2e lane + 2 real bug fixes (10/10 steps; battery PASSED) → CHANGELOG
-- cp252 2026-07-21 ads step 5: vert.js/adunits lane deleted, blog+sidebar flipped to ads/unit (web 264/264; battery PASSED) → CHANGELOG

@@ -211,14 +211,14 @@ faqs:
               </div>
 
               <!-- Hidden auth field (auto-populated via bindings) -->
-              <input type="hidden" aria-hidden="true" name="uid" data-wm-bind="@value auth.user.uid">
+              <input type="hidden" aria-hidden="true" name="uid" data-omega-bind="@value auth.user.uid">
 
               <div class="mb-4">
                 <label for="email" class="form-label fw-semibold">Email address <span class="text-danger">*</span></label>
                 <input type="email" class="form-control form-control-lg" id="email" name="email"
                   placeholder="Enter your email address"
                   autocomplete="email"
-                  data-wm-bind="@value auth.user.email"
+                  data-omega-bind="@value auth.user.email"
                   required>
                 <div class="invalid-feedback"></div>
               </div>

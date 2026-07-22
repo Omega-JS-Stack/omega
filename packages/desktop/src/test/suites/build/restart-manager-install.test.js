@@ -136,7 +136,7 @@ module.exports = {
     {
       name: 'install lock: wx-create, live holder blocks, dead holder is taken over',
       run: (ctx) => {
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'em-rm-lock-'));
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-rm-lock-'));
         ctx.state.lockRoot = root;
 
         // Fresh acquire succeeds; a second acquire while OUR live pid holds it fails.

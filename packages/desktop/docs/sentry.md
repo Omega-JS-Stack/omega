@@ -50,7 +50,7 @@ manager.sentry.captureMessage('explicit log', 'info' | 'warning' | 'error')
 manager.sentry.setUser({ id, email })   // or null to clear
 ```
 
-In renderer (via preload bridge): `window.em.sentry` would expose the same surface — currently not wired (preload doesn't yet bridge sentry; renderer code can call `@sentry/electron/renderer` directly if it needs to).
+In renderer (via preload bridge): `window.desktop.sentry` would expose the same surface — currently not wired (preload doesn't yet bridge sentry; renderer code can call `@sentry/electron/renderer` directly if it needs to).
 
 ## Auth attribution
 

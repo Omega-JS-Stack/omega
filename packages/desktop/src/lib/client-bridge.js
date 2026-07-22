@@ -1,4 +1,4 @@
-// Web Manager Bridge — main-process Firebase Auth, source of truth for renderers.
+// Client bridge — main-process Firebase Auth, source of truth for renderers.
 //
 // This is @omega.js/desktop's analogue of BXM's background-service-worker auth role. The pattern:
 //
@@ -21,7 +21,7 @@ const authPersistence = require('./auth-persistence.js');
 
 const logger = new LoggerLite('client-bridge');
 
-const FIREBASE_APP_NAME = 'em-auth';
+const FIREBASE_APP_NAME = 'omega-auth';
 
 const bridge = {
   _initialized:    false,

@@ -7,7 +7,7 @@ module.exports = {
   context: 'sidepanel',
   description: 'view/sidepanel — DOM + context attribute',
   run: async (ctx) => {
-    ctx.expect(document.body.dataset.bxmContext).toBe('sidepanel');
+    ctx.expect(document.body.dataset.omegaContext).toBe('sidepanel');
     ctx.expect(document.title).toContain('Side Panel');
     ctx.expect(typeof chrome.runtime.id).toBe('string');
   },

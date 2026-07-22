@@ -17,7 +17,7 @@ const jetpack = require('fs-jetpack');
 const os = require('os');
 
 // Create a minimal Manager mock with storage()
-const STORAGE_DIR = path.join(os.tmpdir(), `bem-storage-test-${Date.now()}`);
+const STORAGE_DIR = path.join(os.tmpdir(), `backend-storage-test-${Date.now()}`);
 
 function createStorage(name) {
   const _ = require('lodash');

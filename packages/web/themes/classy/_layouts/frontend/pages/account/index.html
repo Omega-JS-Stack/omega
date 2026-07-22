@@ -213,7 +213,7 @@ badges:
               <div id="avatar-container" class="me-3 position-relative d-flex align-items-center">
                 <!-- Avatar always available from getUser() -->
                 <div class="avatar avatar-lg rounded-circle overflow-hidden border">
-                  <img src="{{ site.uj.placeholder.src }}" data-wm-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ site.brand.name }} profile picture"/>
+                  <img src="{{ site.uj.placeholder.src }}" data-omega-bind="@attr src auth.user.photoURL" class="object-fit-cover w-100 h-100" alt="{{ site.brand.name }} profile picture"/>
                 </div>
                 <!-- Active status indicator -->
                 <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white avatar avatar-2xs rounded-circle mb-0">
@@ -221,7 +221,7 @@ badges:
                 </span>
               </div>
               <div>
-                <h5 class="mb-1" data-wm-bind="@text auth.user.displayName">Loading...</h5>
+                <h5 class="mb-1" data-omega-bind="@text auth.user.displayName">Loading...</h5>
                 <small class="text-muted" id="profile-join-date">Member since Loading...</small>
               </div>
             </div>
@@ -974,37 +974,37 @@ badges:
           <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h6 class="mb-0 d-inline-flex align-items-center">
               {% uj_icon "credit-card", "fa-md me-2" %}
-              <span><span data-wm-bind="@text billing.plan.name" class="wm-binding-skeleton">Current</span>&nbsp;plan</span>
+              <span><span data-omega-bind="@text billing.plan.name" class="omega-binding-skeleton">Current</span>&nbsp;plan</span>
             </h6>
-            <span class="classy-status wm-binding-skeleton" data-wm-bind="@attr class billing.status.badgeClass">
-              <span class="classy-dot classy-dot--muted" data-wm-bind="@attr class billing.status.dotClass"></span>
-              <span data-wm-bind="@text billing.status.label">&nbsp;</span>
+            <span class="classy-status omega-binding-skeleton" data-omega-bind="@attr class billing.status.badgeClass">
+              <span class="classy-dot classy-dot--muted" data-omega-bind="@attr class billing.status.dotClass"></span>
+              <span data-omega-bind="@text billing.status.label">&nbsp;</span>
             </span>
           </div>
           <div class="card-body">
             <div class="mb-2">
-              <p class="card-text mb-0" data-wm-bind="@show billing.description.free" hidden>
-                You are currently on the <strong data-wm-bind="@text billing.plan.name">Free</strong> plan. Upgrade to unlock premium features.
+              <p class="card-text mb-0" data-omega-bind="@show billing.description.free" hidden>
+                You are currently on the <strong data-omega-bind="@text billing.plan.name">Free</strong> plan. Upgrade to unlock premium features.
               </p>
-              <p class="card-text mb-0" data-wm-bind="@show billing.description.active" hidden>
-                You are currently on the <strong data-wm-bind="@text billing.plan.name">Current</strong> plan.
+              <p class="card-text mb-0" data-omega-bind="@show billing.description.active" hidden>
+                You are currently on the <strong data-omega-bind="@text billing.plan.name">Current</strong> plan.
               </p>
-              <p class="card-text mb-0" data-wm-bind="@show billing.description.suspended" hidden>
-                Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has been suspended and access has been revoked due to a payment issue. Please update your payment method to restore access.
+              <p class="card-text mb-0" data-omega-bind="@show billing.description.suspended" hidden>
+                Your <strong data-omega-bind="@text billing.plan.name">Current</strong> subscription has been suspended and access has been revoked due to a payment issue. Please update your payment method to restore access.
               </p>
-              <p class="card-text mb-0" data-wm-bind="@show billing.description.cancelled" hidden>
-                Your <strong data-wm-bind="@text billing.plan.name">Current</strong> subscription has ended. Resubscribe to regain access to premium features.
+              <p class="card-text mb-0" data-omega-bind="@show billing.description.cancelled" hidden>
+                Your <strong data-omega-bind="@text billing.plan.name">Current</strong> subscription has ended. Resubscribe to regain access to premium features.
               </p>
             </div>
 
             <!-- Billing details (next billing, amount) -->
-            <div id="billing-details" class="mb-3" data-wm-bind="@show billing.details.visible" hidden>
+            <div id="billing-details" class="mb-3" data-omega-bind="@show billing.details.visible" hidden>
               <div class="row small text-muted">
                 <div class="col-sm-6 mb-1">
-                  <strong>Next billing:&nbsp;</strong> <span data-wm-bind="@text billing.details.nextDate"></span>
+                  <strong>Next billing:&nbsp;</strong> <span data-omega-bind="@text billing.details.nextDate"></span>
                 </div>
                 <div class="col-sm-6 mb-1">
-                  <strong>Amount:&nbsp;</strong> <span data-wm-bind="@text billing.details.amount"></span>
+                  <strong>Amount:&nbsp;</strong> <span data-omega-bind="@text billing.details.amount"></span>
                 </div>
               </div>
             </div>
@@ -1012,7 +1012,7 @@ badges:
             <!-- State-specific alerts -->
             <div class="mb-3">
               <!-- Suspended (payment issue) alert -->
-              <div class="alert alert-danger d-flex align-items-start" data-wm-bind="@show billing.alerts.suspended" hidden>
+              <div class="alert alert-danger d-flex align-items-start" data-omega-bind="@show billing.alerts.suspended" hidden>
                 <span class="me-2 flex-shrink-0">{% uj_icon "triangle-exclamation", "fa-md" %}</span>
                 <div>
                   <strong>Payment failed</strong>
@@ -1021,36 +1021,36 @@ badges:
               </div>
 
               <!-- Cancellation pending alert -->
-              <div class="alert alert-warning d-flex align-items-start" data-wm-bind="@show billing.alerts.cancelling" hidden>
+              <div class="alert alert-warning d-flex align-items-start" data-omega-bind="@show billing.alerts.cancelling" hidden>
                 <span class="me-2 flex-shrink-0">{% uj_icon "clock", "fa-md" %}</span>
                 <div>
                   <strong>Cancellation scheduled</strong>
-                  <p class="mb-0 small">Your subscription will end on <strong data-wm-bind="@text billing.alerts.cancelDate"></strong>. You'll continue to have full access until then. If you change your mind, you can reactivate through billing management.</p>
+                  <p class="mb-0 small">Your subscription will end on <strong data-omega-bind="@text billing.alerts.cancelDate"></strong>. You'll continue to have full access until then. If you change your mind, you can reactivate through billing management.</p>
                 </div>
               </div>
 
               <!-- Free trial alert -->
-              <div class="alert alert-success d-flex align-items-start" data-wm-bind="@show billing.alerts.trialing" hidden>
+              <div class="alert alert-success d-flex align-items-start" data-omega-bind="@show billing.alerts.trialing" hidden>
                 <span class="me-2 flex-shrink-0">{% uj_icon "circle-check", "fa-md" %}</span>
                 <div>
                   <strong>Free trial</strong>
-                  <p class="mb-0 small" data-wm-bind="@show billing.alerts.trialHasEndDate" hidden>You're on a free trial that ends on <strong data-wm-bind="@text billing.alerts.trialEndDate"></strong>. You won't be charged until your trial ends.</p>
-                  <p class="mb-0 small" data-wm-bind="@hide billing.alerts.trialHasEndDate">You're on a free trial. You won't be charged until your trial ends.</p>
+                  <p class="mb-0 small" data-omega-bind="@show billing.alerts.trialHasEndDate" hidden>You're on a free trial that ends on <strong data-omega-bind="@text billing.alerts.trialEndDate"></strong>. You won't be charged until your trial ends.</p>
+                  <p class="mb-0 small" data-omega-bind="@hide billing.alerts.trialHasEndDate">You're on a free trial. You won't be charged until your trial ends.</p>
                 </div>
               </div>
             </div>
 
             <!-- Action Buttons -->
             <div class="d-grid d-sm-flex gap-2">
-              <button id="upgrade-plan-btn" class="btn btn-adaptive plan-action-btn" data-wm-bind="@show billing.buttons.upgrade" hidden>
+              <button id="upgrade-plan-btn" class="btn btn-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.upgrade" hidden>
                 {% uj_icon "crown", "me-2" %}
                 <span class="button-text">Upgrade plan</span>
               </button>
-              <button id="change-plan-btn" class="btn btn-outline-adaptive plan-action-btn" data-wm-bind="@show billing.buttons.change" hidden>
+              <button id="change-plan-btn" class="btn btn-outline-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.change" hidden>
                 {% uj_icon "arrow-right-arrow-left", "me-2" %}
                 <span class="button-text">Change plan</span>
               </button>
-              <button id="manage-billing-btn" class="btn btn-adaptive plan-action-btn" data-wm-bind="@show billing.buttons.manage" hidden>
+              <button id="manage-billing-btn" class="btn btn-adaptive plan-action-btn" data-omega-bind="@show billing.buttons.manage" hidden>
                 {% uj_icon "credit-card", "me-2" %}
                 <span class="button-text">Manage billing</span>
               </button>
@@ -1071,7 +1071,7 @@ badges:
         </div>
 
         <!-- Cancel Subscription (only visible for paid users) -->
-        <div id="cancel-subscription-trigger" class="text-center" data-wm-bind="@show billing.buttons.cancel" hidden>
+        <div id="cancel-subscription-trigger" class="text-center" data-omega-bind="@show billing.buttons.cancel" hidden>
           <button type="button" class="btn btn-link btn-sm text-muted text-decoration-underline opacity-50" data-bs-toggle="collapse" data-bs-target="#cancel-subscription-accordion" aria-expanded="false" aria-controls="cancel-subscription-accordion">
             {% uj_icon "xmark", "fa-xs me-1" %}
             Cancel subscription

@@ -23,7 +23,7 @@ const { resizeImage, IMAGE_MAX_DIMENSION, IMAGE_JPEG_QUALITY } = post;
 // Generate a synthetic JPEG of the given dimensions and write it to a tmp path.
 // Returns the absolute path on disk.
 async function makeJpeg(width, height) {
-  const filepath = path.join(os.tmpdir(), `bem-test-resize-${Date.now()}-${width}x${height}.jpg`);
+  const filepath = path.join(os.tmpdir(), `backend-test-resize-${Date.now()}-${width}x${height}.jpg`);
   const buffer = await sharp({
     create: {
       width: width,

@@ -36,7 +36,7 @@ module.exports = {
     {
       name: 'parseProvision extracts plist from CMS-wrapped file',
       run: (ctx) => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         const profPath = path.join(tmpDir, 'test.provisionprofile');
         fs.writeFileSync(profPath, makeMockProvision({
           appId: 'TEAMID.com.itwcw.testapp',
@@ -57,7 +57,7 @@ module.exports = {
     {
       name: 'parseProvision returns nulls for malformed file',
       run: (ctx) => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         const profPath = path.join(tmpDir, 'bad.provisionprofile');
         fs.writeFileSync(profPath, 'this is not a plist at all');
 
@@ -82,7 +82,7 @@ module.exports = {
       run: (ctx) => {
         // The validator checks `parsed.raw.includes(expectedAppId)` — confirm the raw is
         // searchable for that.
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'em-test-'));
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-test-'));
         const profPath = path.join(tmpDir, 'app.provisionprofile');
         fs.writeFileSync(profPath, makeMockProvision({
           appId: 'TEAMID.com.itwcw.somiibo',

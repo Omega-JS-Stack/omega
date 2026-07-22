@@ -4,7 +4,6 @@
 
 // Libraries
 import { FormManager } from '@omega.js/client/modules/form-manager.js';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 let oauth2Config = null;
@@ -274,10 +273,9 @@ async function handleConnect(providerId) {
   url.searchParams.set('action', 'authorize');
   url.searchParams.set('redirect', 'false');
 
-  const response = await authorizedFetch(url.toString(), {
+  const response = await omega.request(url.toString(), {
     method: 'GET',
     timeout: 30000,
-    response: 'json',
     tries: 2,
   });
 
@@ -302,10 +300,9 @@ async function handleDisconnect(providerId) {
   const url = new URL(getApiUrl());
   url.searchParams.set('provider', providerId);
 
-  const response = await authorizedFetch(url.toString(), {
+  const response = await omega.request(url.toString(), {
     method: 'DELETE',
     timeout: 30000,
-    response: 'json',
     tries: 2,
   });
 

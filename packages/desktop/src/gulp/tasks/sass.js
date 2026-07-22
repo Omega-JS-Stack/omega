@@ -4,9 +4,9 @@
 //   src/assets/scss/pages/<name>.scss  -> dist/assets/css/components/<name>.bundle.css   (per-view bundle)
 //
 // loadPaths are configured so the consumer can write `@use 'omega-desktop' as *`:
-//   - <em-package-root>/dist/assets/css      → resolves bare 'omega-desktop' to omega-desktop.scss
-//   - <em-package-root>/dist/assets/themes/<active-theme>   → resolves bare 'theme' to <theme>/_theme.scss
-//   - <em-package-root>/dist/assets/themes   → so themes can reference each other via '../<sibling>'
+//   - <omega-package-root>/dist/assets/css      → resolves bare 'omega-desktop' to omega-desktop.scss
+//   - <omega-package-root>/dist/assets/themes/<active-theme>   → resolves bare 'theme' to <theme>/_theme.scss
+//   - <omega-package-root>/dist/assets/themes   → so themes can reference each other via '../<sibling>'
 //   - <consumer>/src/assets/scss             → consumer's own modules
 
 const Manager = new (require('../../build.js'));

@@ -1,6 +1,5 @@
 // This file is required by /token page to generate custom auth tokens for extensions/apps
 // Also handles MCP OAuth flow: user signs in → Firebase ID token sent back to Claude as auth code
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import omega from '@omega.js/client';
 
 // Module
@@ -121,12 +120,9 @@ export default function () {
 
   // Generate custom token via @omega.js/backend API
   async function generateCustomToken() {
-    const serverApiURL = `${omega.getApiUrl()}/omega/user/token`;
-
-    const response = await authorizedFetch(serverApiURL, {
+    const response = await omega.request('/omega/user/token', {
       method: 'POST',
       timeout: 60000,
-      response: 'json',
       tries: 2,
     });
 

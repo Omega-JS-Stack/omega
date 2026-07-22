@@ -4,7 +4,7 @@
   // OMEGA_TEST_BOOT_PROJECT points here — auto-set when @omega.js/desktop tests itself (src/commands/test.js).
   // Not a real app; never published.
   brand: {
-    id: 'em-fixture',
+    id: 'desktop-fixture',
     name: 'Desktop Fixture Consumer',
     images: {
       // Empty → build-config falls back to @omega.js/desktop's bundled default icon (no icon file shipped).

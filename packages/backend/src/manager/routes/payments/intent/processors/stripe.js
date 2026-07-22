@@ -162,7 +162,7 @@ async function resolveStripeCoupon(stripe, discount, assistant) {
     duration: 'once',
     name: `${discount.code} (${discount.percent}% off first payment)`,
   }, {
-    idempotencyKey: `bem-coupon-${couponId}`,
+    idempotencyKey: `backend-coupon-${couponId}`,
   });
 
   assistant.log(`Stripe coupon created: ${couponId}`);

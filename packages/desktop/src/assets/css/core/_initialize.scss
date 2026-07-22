@@ -18,7 +18,7 @@ body {
 
 // Re-enable selection inside common content containers + form controls.
 main,
-.em-selectable,
+.omega-selectable,
 input,
 textarea,
 [contenteditable="true"] {
@@ -26,13 +26,13 @@ textarea,
   -webkit-user-select: text;
 }
 
-// macOS draggable title-bar surface — opt in by adding `.em-drag` (e.g. on a header bar).
-.em-drag {
+// macOS draggable title-bar surface — opt in by adding `.omega-drag` (e.g. on a header bar).
+.omega-drag {
   -webkit-app-region: drag;
 }
-.em-no-drag,
-.em-drag button,
-.em-drag input,
-.em-drag a {
+.omega-no-drag,
+.omega-drag button,
+.omega-drag input,
+.omega-drag a {
   -webkit-app-region: no-drag;
 }

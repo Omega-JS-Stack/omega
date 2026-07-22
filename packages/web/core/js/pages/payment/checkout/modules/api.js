@@ -1,15 +1,13 @@
 // API calls for checkout
 import fetch from 'wonderful-fetch';
-import authorizedFetch from '__main_assets__/js/libs/authorized-fetch.js';
 import { getRecaptchaToken } from './recaptcha.js';
 import omega from '@omega.js/client';
 
 // Check trial eligibility via backend endpoint
 export async function fetchTrialEligibility() {
   try {
-    const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/trial-eligibility`, {
+    const response = await omega.request(`/omega/payments/trial-eligibility`, {
       method: 'GET',
-      response: 'json',
     });
 
     console.log('Trial eligibility:', response);
@@ -23,7 +21,6 @@ export async function fetchTrialEligibility() {
 // Validate a discount code via backend
 export async function validateDiscountCode(code) {
   const response = await fetch(`${omega.getApiUrl()}/omega/payments/discount`, {
-    response: 'json',
     query: { code },
   });
 
@@ -75,9 +72,8 @@ export async function createPaymentIntent({ state, processor, formData }) {
   console.log('Sending payment intent:', { processor, productId: state.product.id, payload });
 
   // POST to backend (authorized — attaches Firebase ID token)
-  const response = await authorizedFetch(`${omega.getApiUrl()}/omega/payments/intent`, {
+  const response = await omega.request(`/omega/payments/intent`, {
     method: 'POST',
-    response: 'json',
     tries: 1,
     body: payload,
   });

@@ -149,7 +149,7 @@ test('mixed targets: shared paths to every app, id-scoped only to its owner', as
 
 test('id with no matching app: warns, runs nothing, exits clean (app-level filter parity)', async () => {
   const { brand } = stageBrand();
-  const code = await runTestCommand(brand, ['em:']);
+  const code = await runTestCommand(brand, ['desktop:']);
 
   assert.deepEqual(readCalls(brand), []);
   assert.equal(code, undefined);

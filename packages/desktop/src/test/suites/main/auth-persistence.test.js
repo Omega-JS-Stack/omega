@@ -54,17 +54,17 @@ module.exports = {
         const m = ctx.manager;
         ctx.expect(() => authPersistence.register('bad', {})).toThrow(/must implement/);
 
-        authPersistence.register('em-test-custom', fakeStrategy());
+        authPersistence.register('desktop-test-custom', fakeStrategy());
         m.config.omega = m.config.omega || {};
         const orig = m.config.omega.authPersistence;
         try {
-          m.config.omega.authPersistence = 'em-test-custom';
+          m.config.omega.authPersistence = 'desktop-test-custom';
           const active = await authPersistence.resolve(m);
-          ctx.expect(active.name).toBe('em-test-custom');
+          ctx.expect(active.name).toBe('desktop-test-custom');
         } finally {
           if (orig !== undefined) m.config.omega.authPersistence = orig;
           else delete m.config.omega.authPersistence;
-          delete authPersistence._strategies['em-test-custom'];
+          delete authPersistence._strategies['desktop-test-custom'];
           await authPersistence.resolve(m);
         }
       },
@@ -81,11 +81,11 @@ module.exports = {
         ctx.expect(await p._isAvailable()).toBe(true);
 
         const blob = { uid: 'u1', stsTokenManager: { refreshToken: 'rt' } };
-        await p._set('firebase:authUser:key:em-auth', blob);
-        ctx.expect(await p._get('firebase:authUser:key:em-auth')).toEqual(blob);
+        await p._set('firebase:authUser:key:omega-auth', blob);
+        ctx.expect(await p._get('firebase:authUser:key:omega-auth')).toEqual(blob);
 
-        await p._remove('firebase:authUser:key:em-auth');
-        ctx.expect(await p._get('firebase:authUser:key:em-auth')).toBeNull();
+        await p._remove('firebase:authUser:key:omega-auth');
+        ctx.expect(await p._get('firebase:authUser:key:omega-auth')).toBeNull();
         ctx.expect(await p._get('never-set')).toBeNull();
       },
     },
@@ -97,7 +97,7 @@ module.exports = {
           return; // OS vault unavailable in this environment — round-trip covered where it is
         }
         const s = authPersistence._strategies.safeStorage;
-        const KEY = 'em-test-roundtrip';
+        const KEY = 'desktop-test-roundtrip';
         try {
           await s.setItem(KEY, '{"hello":"world"}');
           ctx.expect(await s.getItem(KEY)).toBe('{"hello":"world"}');

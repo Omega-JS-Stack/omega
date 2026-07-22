@@ -1,4 +1,4 @@
-// Renderer-layer suite — verifies the `window.em.theme` surface and the REAL
+// Renderer-layer suite — verifies the `window.desktop.theme` surface and the REAL
 // propagation mechanism: main sets nativeTheme.themeSource → this renderer's
 // `prefers-color-scheme` media query flips → matchMedia listeners fire.
 //
@@ -15,17 +15,17 @@ module.exports = {
   description: 'theme surface + matchMedia propagation',
   tests: [
     {
-      name: 'window.em.theme has get / set / onChange',
+      name: 'window.desktop.theme has get / set / onChange',
       run: (ctx) => {
-        ctx.expect(typeof window.em.theme.get).toBe('function');
-        ctx.expect(typeof window.em.theme.set).toBe('function');
-        ctx.expect(typeof window.em.theme.onChange).toBe('function');
+        ctx.expect(typeof window.desktop.theme.get).toBe('function');
+        ctx.expect(typeof window.desktop.theme.set).toBe('function');
+        ctx.expect(typeof window.desktop.theme.onChange).toBe('function');
       },
     },
     {
       name: 'get() returns a { source, resolved } pair',
       run: async (ctx) => {
-        const state = await window.em.theme.get();
+        const state = await window.desktop.theme.get();
         ctx.expect(['system', 'light', 'dark'].includes(state.source)).toBe(true);
         ctx.expect(['light', 'dark'].includes(state.resolved)).toBe(true);
       },
@@ -42,7 +42,7 @@ module.exports = {
         };
         const media = window.matchMedia('(prefers-color-scheme: dark)');
 
-        const state = await window.em.theme.set('dark');
+        const state = await window.desktop.theme.set('dark');
         ctx.expect(state).toEqual({ source: 'dark', resolved: 'dark' });
         await until(() => media.matches === true);
         ctx.expect(media.matches).toBe(true);
@@ -60,7 +60,7 @@ module.exports = {
         };
         const media = window.matchMedia('(prefers-color-scheme: dark)');
 
-        const state = await window.em.theme.set('light');
+        const state = await window.desktop.theme.set('light');
         ctx.expect(state).toEqual({ source: 'light', resolved: 'light' });
         await until(() => media.matches === false);
         ctx.expect(media.matches).toBe(false);
@@ -70,11 +70,11 @@ module.exports = {
       name: 'onChange fires on a theme flip and unsubscribes cleanly',
       run: async (ctx) => {
         const events = [];
-        const unsub = window.em.theme.onChange((payload) => events.push(payload));
+        const unsub = window.desktop.theme.onChange((payload) => events.push(payload));
 
-        const current = await window.em.theme.get();
+        const current = await window.desktop.theme.get();
         const target = current.resolved === 'dark' ? 'light' : 'dark';
-        await window.em.theme.set(target);
+        await window.desktop.theme.set(target);
 
         const t0 = Date.now();
         while (events.length === 0) {
@@ -85,7 +85,7 @@ module.exports = {
 
         unsub();
         const seen = events.length;
-        await window.em.theme.set(target === 'dark' ? 'light' : 'dark');
+        await window.desktop.theme.set(target === 'dark' ? 'light' : 'dark');
         await new Promise((r) => setTimeout(r, 200));
         ctx.expect(events.length).toBe(seen);
       },
@@ -95,7 +95,7 @@ module.exports = {
       run: async (ctx) => {
         let threw = false;
         try {
-          await window.em.theme.set('midnight');
+          await window.desktop.theme.set('midnight');
         } catch (e) {
           threw = true;
         }
@@ -105,10 +105,10 @@ module.exports = {
     {
       name: 'restore: back to system + no persisted override left behind',
       run: async (ctx) => {
-        const state = await window.em.theme.set('system');
+        const state = await window.desktop.theme.set('system');
         ctx.expect(state.source).toBe('system');
-        await window.em.storage.delete('theme.appearance');
-        const has = await window.em.storage.has('theme.appearance');
+        await window.desktop.storage.delete('theme.appearance');
+        const has = await window.desktop.storage.has('theme.appearance');
         ctx.expect(has).toBe(false);
       },
     },

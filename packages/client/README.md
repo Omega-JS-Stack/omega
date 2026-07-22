@@ -91,7 +91,7 @@ Web Manager is designed to work in multiple environments:
 
 ## Features
 - **Firebase v12 Integration**: Modern Firebase Auth, Firestore, and Cloud Messaging
-- **Data Binding System**: Reactive DOM updates with `data-wm-bind` attributes
+- **Data Binding System**: Reactive DOM updates with `data-omega-bind` attributes
 - **Storage API**: Enhanced localStorage/sessionStorage with path-based access and JSON serialization
 - **Utilities**: `clipboardCopy()`, `escapeHTML()`, `getContext()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`
 - **DOM Utilities**: Dynamic script loading with retry/timeout support
@@ -412,57 +412,57 @@ auth.listen({ once: true }, async (state) => {
 
 ### Data Binding System
 
-Reactive DOM updates with `data-wm-bind` attributes:
+Reactive DOM updates with `data-omega-bind` attributes:
 
 #### Basic Text Binding
 ```html
 <!-- Display text content (default action) -->
-<span data-wm-bind="auth.user.email"></span>
-<span data-wm-bind="@text auth.user.displayName"></span>
+<span data-omega-bind="auth.user.email"></span>
+<span data-omega-bind="@text auth.user.displayName"></span>
 ```
 
 #### Input/Textarea Value Binding
 ```html
-<input data-wm-bind="@value settings.email" />
-<textarea data-wm-bind="@value user.bio"></textarea>
+<input data-omega-bind="@value settings.email" />
+<textarea data-omega-bind="@value user.bio"></textarea>
 ```
 
 #### Conditional Visibility
 ```html
 <!-- Show when truthy -->
-<div data-wm-bind="@show auth.user">Welcome back!</div>
+<div data-omega-bind="@show auth.user">Welcome back!</div>
 
 <!-- Hide when truthy -->
-<div data-wm-bind="@hide auth.user">Please log in</div>
+<div data-omega-bind="@hide auth.user">Please log in</div>
 
 <!-- Negation -->
-<div data-wm-bind="@show !auth.user">Not logged in</div>
+<div data-omega-bind="@show !auth.user">Not logged in</div>
 
 <!-- Comparisons -->
-<div data-wm-bind="@show auth.account.plan === 'premium'">Premium content</div>
-<div data-wm-bind="@hide settings.notifications === false">Notifications on</div>
+<div data-omega-bind="@show auth.account.plan === 'premium'">Premium content</div>
+<div data-omega-bind="@hide settings.notifications === false">Notifications on</div>
 ```
 
 #### Attribute Binding
 ```html
-<img data-wm-bind="@attr src auth.user.photoURL" />
-<a data-wm-bind="@attr href settings.profileUrl">Profile</a>
-<input data-wm-bind="@attr disabled auth.loading" />
+<img data-omega-bind="@attr src auth.user.photoURL" />
+<a data-omega-bind="@attr href settings.profileUrl">Profile</a>
+<input data-omega-bind="@attr disabled auth.loading" />
 ```
 
 #### Style Binding
 ```html
 <!-- CSS custom properties -->
-<div data-wm-bind="@style --rating-width ratings.percent"></div>
+<div data-omega-bind="@style --rating-width ratings.percent"></div>
 
 <!-- Inline styles -->
-<div data-wm-bind="@style background-color theme.primary"></div>
+<div data-omega-bind="@style background-color theme.primary"></div>
 ```
 
 #### Multiple Actions
 Combine actions with commas:
 ```html
-<img data-wm-bind="@show auth.user, @attr src auth.user.photoURL, @attr alt auth.user.displayName" />
+<img data-omega-bind="@show auth.user, @attr src auth.user.photoURL, @attr alt auth.user.displayName" />
 ```
 
 #### JavaScript API
@@ -485,13 +485,13 @@ bindings.clear();
 #### Skeleton Loaders
 ```html
 <!-- Shows shimmer animation until bound -->
-<span data-wm-bind="auth.user.name" class="wm-binding-skeleton"></span>
+<span data-omega-bind="auth.user.name" class="omega-binding-skeleton"></span>
 ```
 
 The skeleton automatically:
 - Displays shimmer animation while loading
 - Fades in smoothly when data arrives
-- Adds `wm-bound` class when complete
+- Adds `omega-bound` class when complete
 - Respects `prefers-reduced-motion`
 
 #### Supported Actions

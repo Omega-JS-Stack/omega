@@ -113,7 +113,7 @@ function insertBlogPostAds() {
     const $host = document.createElement('div');
     $host.classList.add('omega-vert-unit', 'my-4');
     $host.setAttribute('data-omega-vert', 'in-article');
-    $host.setAttribute('data-wm-bind', '@hide auth.resolved.active');
+    $host.setAttribute('data-omega-bind', '@hide auth.resolved.active');
 
     // Insert after the target paragraph, then hand it to the verts module
     targetParagraph.parentNode.insertBefore($host, targetParagraph.nextSibling);

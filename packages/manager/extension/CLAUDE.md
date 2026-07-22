@@ -17,7 +17,7 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`) — a comprehe
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**OMEGA Extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with the extension framework.
+**OMEGA Extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with the extension framework.
 
 **Required reading:**
 - **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
@@ -78,11 +78,11 @@ await new Manager().initialize();
 After `initialize()`, every Manager exposes:
 - `manager.extension` — cross-browser `chrome.*` / `browser.*` / `window.*` wrapper
 - `manager.logger` — timestamped per-context logger
-- `manager.omega` — Web Manager singleton (Firebase, auth, analytics, reactive `data-wm-bind` directives)
+- `manager.omega` — Web Manager singleton (Firebase, auth, analytics, reactive `data-omega-bind` directives)
 - `manager.messenger` — `chrome.runtime.onMessage` listener wired automatically
 - `manager.isDevelopment()` / `isProduction()` / `isTesting()` / `getVersion()` — cross-context helpers. `getEnvironment()` returns `'development' | 'testing' | 'production'` (mutually exclusive; testing wins). Gate side effects on the intentional check (`isProduction()` for prod-only; `isDevelopment() || isTesting()` for local-or-test) — never `!isDevelopment()`.
 
-Auth UI is declarative — add `.auth-signin-btn` / `.auth-signout-btn` / `.auth-account-btn` to buttons; the framework wires them. Show/hide based on auth state via `data-wm-bind="@show auth.user"`.
+Auth UI is declarative — add `.auth-signin-btn` / `.auth-signout-btn` / `.auth-account-btn` to buttons; the framework wires them. Show/hide based on auth state via `data-omega-bind="@show auth.user"`.
 
 ## Dependency resolution
 
@@ -98,8 +98,8 @@ Every feature ships with tests at every layer it has a surface in: **logic** (`t
 
 # ========== Custom Values ==========
 This project consumes **Browser Extension Manager** (BXM) — a comprehensive framework for building modern cross-browser extensions (Chrome, Firefox, Edge, Opera, Brave). BXM provides one-line bootstrap per extension context, a component-based architecture (view + styles + script per context), a multi-browser build/release pipeline that produces store-uploadable zips, cross-context auth synchronization, and a built-in four-layer test framework.
-**BXM ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with BXM.
+**BXM ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with BXM.
 > Editing the BXM framework source while working here? Run `npx omega install dev` so this project picks up your uncommitted framework changes (it otherwise uses its installed `node_modules/@omega.js/extension`). Run `npx omega install live` to switch back.
 - `config/@omega.js/extension.json` — JSON5 config: brand, manifest overrides, build settings, theme. `Manager.getConfig()` reads this.
 - `src/manifest.json` — extension manifest. BXM merges its defaults in at build time; you only need to declare what's specific to your extension.
-Auth UI is declarative — add `.auth-signin-btn` / `.auth-signout-btn` / `.auth-account-btn` to buttons; BXM wires them. Show/hide based on auth state via `data-wm-bind="@show auth.user"`.
+Auth UI is declarative — add `.auth-signin-btn` / `.auth-signout-btn` / `.auth-account-btn` to buttons; BXM wires them. Show/hide based on auth state via `data-omega-bind="@show auth.user"`.

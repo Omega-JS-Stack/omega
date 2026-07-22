@@ -90,7 +90,7 @@ module.exports = {
       name: 'writeMacEntitlements: writes to dist/config/entitlements.mac.plist',
       run: (ctx) => {
         const { writeMacEntitlements } = require(path.join(__dirname, '..', '..', '..', 'lib', 'sign-helpers', 'entitlements.js'));
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-entitlements-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-entitlements-'));
         try {
           const written = writeMacEntitlements(tmp, { 'com.apple.security.cs.allow-jit': false });
           ctx.expect(written).toBe(path.join(tmp, 'config', 'entitlements.mac.plist'));

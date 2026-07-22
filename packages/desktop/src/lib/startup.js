@@ -21,7 +21,7 @@
 // raw mode and let the consumer decide whether to call `manager.windows.create()`.
 //
 // Detection: macOS sets `getLoginItemSettings().wasOpenedAtLogin = true`. On Windows we
-// register the login item with `--em-launched-at-login` arg and check process.argv.
+// register the login item with `--omega-launched-at-login` arg and check process.argv.
 // On Linux there's no standard signal, so we treat all launches as user-launches.
 
 const LoggerLite = require('./logger-lite.js');
@@ -31,7 +31,7 @@ const logger = new LoggerLite('startup');
 // Valid startup modes. `tray-only` is now folded into `hidden` (they were always the
 // same idea — LSUIElement on macOS — so we collapse to a single name).
 const VALID_MODES = ['normal', 'hidden'];
-const LOGIN_ARG   = '--em-launched-at-login';   // marker for Windows + Linux login-launch detection
+const LOGIN_ARG   = '--omega-launched-at-login';   // marker for Windows + Linux login-launch detection
 
 const startup = {
   _initialized: false,
@@ -54,7 +54,7 @@ const startup = {
     // In dev, force open-at-login OFF regardless of config. And actively UNSET any prior
     // registration so a dev run that previously ran with config:enabled=true doesn't leave
     // electron.app (or worse, a stale dev binary path) trying to launch every login.
-    // Otherwise: sync the OS open-at-login flag with config. Pass --em-launched-at-login
+    // Otherwise: sync the OS open-at-login flag with config. Pass --omega-launched-at-login
     // in args so we can detect login launches reliably on Windows/Linux (macOS exposes
     // wasOpenedAtLogin natively).
     if (isDev) {
@@ -102,7 +102,7 @@ const startup = {
   },
 
   // Internal: report HOW we determined this launch was at login. Used by initialize logging
-  // to distinguish "fake login via --em-launched-at-login flag" from "real macOS at-login".
+  // to distinguish "fake login via --omega-launched-at-login flag" from "real macOS at-login".
   _launchedAtLoginVia() {
     if (process.argv.includes(LOGIN_ARG)) return 'argv-flag';
     if (process.platform === 'darwin' && startup._electron.app.getLoginItemSettings().wasOpenedAtLogin) {

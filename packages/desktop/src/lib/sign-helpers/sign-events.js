@@ -1,4 +1,4 @@
-// Structured signing event log — appends JSONL lines to `<runner-dir>/em-signing.log`
+// Structured signing event log — appends JSONL lines to `<runner-dir>/omega-signing.log`
 // (or another path via `OMEGA_SIGN_LOG`) so a separate `mgr runner monitor` process can
 // tail + pretty-print them in real time on the Windows box.
 //
@@ -7,12 +7,12 @@
 //
 // Where the file lands (resolved in this priority order):
 //   1. `OMEGA_SIGN_LOG` env var (explicit override) — wins if set
-//   2. `<OMEGA_RUNNER_HOME>/em-signing.log` — when caller has set the runner home
-//   3. `C:\actions-runners\em-signing.log` on Windows — the default OMEGA_RUNNER_HOME
+//   2. `<OMEGA_RUNNER_HOME>/omega-signing.log` — when caller has set the runner home
+//   3. `C:\actions-runners\omega-signing.log` on Windows — the default OMEGA_RUNNER_HOME
 //      (matches `defaultRunnerHome()` in src/commands/runner.js). This is the
 //      machine-wide default so EVERY signing job from every org/repo writes to
 //      the same file, and `npx omega runner monitor` with no args picks it up.
-//   4. `<RUNNER_TOOLSDIRECTORY>/em-signing.log` — legacy fallback if someone runs
+//   4. `<RUNNER_TOOLSDIRECTORY>/omega-signing.log` — legacy fallback if someone runs
 //      sign-windows outside the runner-installed path
 //   5. `<process.cwd()>/logs/signing.log` — local dev fallback (matches dev.log, build.log, etc.)
 
@@ -23,16 +23,16 @@ const path = require('path');
 function resolveLogPath() {
   if (process.env.OMEGA_SIGN_LOG) return process.env.OMEGA_SIGN_LOG;
   if (process.env.OMEGA_RUNNER_HOME) {
-    return path.join(process.env.OMEGA_RUNNER_HOME, 'em-signing.log');
+    return path.join(process.env.OMEGA_RUNNER_HOME, 'omega-signing.log');
   }
   if (process.platform === 'win32') {
-    return 'C:\\actions-runners\\em-signing.log';
+    return 'C:\\actions-runners\\omega-signing.log';
   }
   const ciRoot = process.env.RUNNER_TOOLSDIRECTORY
     || process.env.RUNNER_WORKSPACE
     || process.env.RUNNER_ROOT;
   if (ciRoot) {
-    return path.join(ciRoot, 'em-signing.log');
+    return path.join(ciRoot, 'omega-signing.log');
   }
   return path.join(process.cwd(), 'logs', 'signing.log');
 }

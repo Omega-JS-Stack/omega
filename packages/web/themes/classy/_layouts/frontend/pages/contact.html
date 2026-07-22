@@ -169,7 +169,7 @@ faqs:
           </div>
 
           <!-- Hidden auth field (auto-populated via bindings) -->
-          <input type="hidden" aria-hidden="true" name="uid" data-wm-bind="@value auth.user.uid">
+          <input type="hidden" aria-hidden="true" name="uid" data-omega-bind="@value auth.user.uid">
 
           <div class="row g-3 mb-3">
             <div class="col-md-6">
@@ -177,7 +177,7 @@ faqs:
               <input type="email" class="form-control" id="email" name="email"
                 placeholder="Enter your email address"
                 autocomplete="email"
-                data-wm-bind="@value auth.user.email"
+                data-omega-bind="@value auth.user.email"
                 required>
               <div class="invalid-feedback"></div>
             </div>

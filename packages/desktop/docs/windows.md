@@ -80,7 +80,7 @@ Per-window keys:
 | **Windows** | `titleBarStyle: 'hidden'` + `titleBarOverlay: { color, symbolColor, height: 36 }` — native min/max/close buttons drawn by the OS |
 | **Linux** | Native frame (full system title bar) |
 
-The page template (`<em>/src/config/page-template.html`, framework-internal — not consumer-overrideable) ships an `.em-titlebar` div with `-webkit-app-region: drag`. Per-platform spacing is handled by `themes/classy/css/components/_titlebar.scss`, which keys off `html[data-platform]` (set by @omega.js/client during init):
+The page template (`<em>/src/config/page-template.html`, framework-internal — not consumer-overrideable) ships an `.omega-titlebar` div with `-webkit-app-region: drag`. Per-platform spacing is handled by `themes/classy/css/components/_titlebar.scss`, which keys off `html[data-platform]` (set by @omega.js/client during init):
 
 - **mac** → `padding-left: 70px` (clear the traffic lights)
 - **windows** → `padding-right: 140px` (clear the native overlay)

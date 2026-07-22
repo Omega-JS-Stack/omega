@@ -8,7 +8,7 @@
 //   1. Install firebase-admin: `npm i -D firebase-admin` (already in @omega.js/desktop's devDeps)
 //   2. Drop a service-account JSON in a safe place
 //   3. Set OMEGA_TEST_FIREBASE_ADMIN_KEY=/path/to/file.json (or use GOOGLE_APPLICATION_CREDENTIALS)
-//   4. Optionally OMEGA_TEST_USER_UID=your-test-uid (defaults to 'em-test-user')
+//   4. Optionally OMEGA_TEST_USER_UID=your-test-uid (defaults to 'desktop-test-user')
 //   5. `npx omega test`
 
 const fs = require('fs');
@@ -16,7 +16,7 @@ const fs = require('fs');
 const ADMIN_KEY = process.env.OMEGA_TEST_FIREBASE_ADMIN_KEY
                 || process.env.GOOGLE_APPLICATION_CREDENTIALS
                 || null;
-const USER_UID = process.env.OMEGA_TEST_USER_UID || 'em-test-user';
+const USER_UID = process.env.OMEGA_TEST_USER_UID || 'desktop-test-user';
 // These hit REAL Firebase, so they're gated behind extended mode (the cross-framework
 // `TEST_EXTENDED_MODE` opt-in). `npx omega test --extended` (or TEST_EXTENDED_MODE=true) runs
 // them; default is skip so `npx omega test` stays fast + offline-safe.

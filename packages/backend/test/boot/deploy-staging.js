@@ -22,7 +22,7 @@ const { stageFunctions } = require('../../dist/cli/utils/stage-functions.js');
 const { loadConfig } = require('../helpers/_shared-config.js');
 
 function makeTmp() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'bem-stage-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'backend-stage-'));
 }
 
 module.exports = {

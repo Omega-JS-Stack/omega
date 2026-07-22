@@ -116,7 +116,7 @@ module.exports = {
         // Smoke-check the watcher's core API is referenced.
         ctx.expect(src).toContain('discoverAdminOrgs');
         ctx.expect(src).toContain('selfUpdate');
-        ctx.expect(src).toContain('em-runner-watcher');
+        ctx.expect(src).toContain('omega-runner-watcher');
       },
     },
     {
@@ -171,7 +171,7 @@ module.exports = {
         // Build a minimal zip via Node — uses the same standard zip container that
         // actions/runner ships. We're testing that tar's zip support works at all.
         // Smallest valid zip = 22-byte EOCD with no entries.
-        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-tar-test-'));
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-tar-test-'));
         const zipPath = path.join(tmp, 'empty.zip');
         // EOCD signature (PK\x05\x06) + 18 zero bytes = empty valid zip
         const eocd = Buffer.from([0x50, 0x4B, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -201,7 +201,7 @@ module.exports = {
         // Source-text guard: re-running install should never leave you in a worse state.
         const fs = require('fs');
         const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'), 'utf8');
-        ctx.expect(src).toContain('Existing em-runner installation detected');
+        ctx.expect(src).toContain('Existing omega-runner installation detected');
         ctx.expect(src).toContain('uninstalling first for a clean re-install');
       },
     },
@@ -239,13 +239,13 @@ module.exports = {
       },
     },
     {
-      name: 'RUNNER_HOME defaults to <cwd>/.gh-runners (not ~/.em-runner)',
+      name: 'RUNNER_HOME defaults to <cwd>/.gh-runners (not ~/.omega-runner)',
       run: (ctx) => {
         const fs = require('fs');
         const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'runner.js'), 'utf8');
         ctx.expect(src).toContain(".gh-runners");
         ctx.expect(src).toContain('OMEGA_RUNNER_HOME');
-        ctx.expect(src).not.toMatch(/path\.join\(os\.homedir\(\),\s*['"]\.em-runner['"]/);
+        ctx.expect(src).not.toMatch(/path\.join\(os\.homedir\(\),\s*['"]\.omega-runner['"]/);
       },
     },
     {

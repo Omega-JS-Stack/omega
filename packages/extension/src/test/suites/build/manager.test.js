@@ -7,7 +7,7 @@ const fs      = require('fs');
 const os      = require('os');
 
 function stageProject(opts = {}) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bxm-getconfig-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-getconfig-'));
   if (opts.config !== undefined) {
     fs.mkdirSync(path.join(tmp, 'config'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'config', 'omega.json5'), opts.config);

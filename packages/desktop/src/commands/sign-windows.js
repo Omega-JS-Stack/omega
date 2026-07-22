@@ -316,11 +316,11 @@ async function smokeTest() {
     throw new Error('WIN_CSC_KEY_PASSWORD not set — required when WIN_EV_TOKEN_PATH is a .pfx path.');
   }
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'em-smoke-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-smoke-'));
   // Build a minimal valid PE/COFF .exe: copy whichever tiny system .exe is around.
   // Easiest source: %WINDIR%\System32\where.exe (small, always present, copy is OK).
   const sourceExe = path.join(process.env.WINDIR || 'C:\\Windows', 'System32', 'where.exe');
-  const target    = path.join(tmp, 'em-smoke-test.exe');
+  const target    = path.join(tmp, 'desktop-smoke-test.exe');
   if (!jetpack.exists(sourceExe)) {
     throw new Error(`Could not find a sample .exe to sign at ${sourceExe}. Pass --target <path> instead.`);
   }

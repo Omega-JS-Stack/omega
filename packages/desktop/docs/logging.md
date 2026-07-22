@@ -44,9 +44,9 @@ manager.logger.log('preload ready');
 In **renderer** (use the contextBridge surface, which forwards to main → file):
 
 ```js
-window.em.logger.log('user clicked Save');
-window.em.logger.warn('IPC slow');
-window.em.logger.error(new Error('ui blew up'));
+window.desktop.logger.log('user clicked Save');
+window.desktop.logger.warn('IPC slow');
+window.desktop.logger.error(new Error('ui blew up'));
 ```
 
 All three end up in the same `runtime.log`, prefixed with their scope (`main`, `preload`, `renderer`):
@@ -99,9 +99,9 @@ Beyond what you write yourself, @omega.js/desktop emits a fixed set of high-sign
 **At boot (`manager.initialize()`):**
 
 ```
-(main)     Initializing @omega.js/desktop (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--em-launched-at-login"]
+(main)     Initializing @omega.js/desktop (main)... pid=12345 platform=darwin arch=arm64 packaged=true argv=["--omega-launched-at-login"]
 (startup)  startup boot summary — RAW inputs:
-(startup)    process.argv:            ["--em-launched-at-login"]
+(startup)    process.argv:            ["--omega-launched-at-login"]
 (startup)    process.platform:        darwin
 (startup)    process.arch:            arm64
 (startup)    app.isPackaged:          true
@@ -120,7 +120,7 @@ The boot summary has two parallel blocks: **RAW inputs** (what the OS / shell ga
 - "Why is @omega.js/desktop behaving like X?" → check resolved values
 - "Why did @omega.js/desktop decide X?" → check raw inputs
 
-The `via:` annotation on `wasLaunchedAtLogin()` distinguishes a real login launch (`via:macos-wasOpenedAtLogin`) from a flag-based simulation (`via:argv-flag` — i.e. the user passed `--em-launched-at-login`).
+The `via:` annotation on `wasLaunchedAtLogin()` distinguishes a real login launch (`via:macos-wasOpenedAtLogin`) from a flag-based simulation (`via:argv-flag` — i.e. the user passed `--omega-launched-at-login`).
 
 **App lifecycle events** (logged from `main.js`):
 
@@ -186,7 +186,7 @@ Default is `silly` (everything) on both.
 
 - **Main**: writes to `runtime.log` directly via [electron-log](https://github.com/megahertz/electron-log)'s file transport. Sets up an IPC listener on channel `desktop:log:forward` to receive forwarded calls from preload + renderer.
 - **Preload**: writes to console (DevTools) AND forwards each call via `ipcRenderer.send('desktop:log:forward', ...)` to main.
-- **Renderer**: same as preload via `window.em.logger` (contextBridge surface).
+- **Renderer**: same as preload via `window.desktop.logger` (contextBridge surface).
 - **Outside Electron** (build/CLI tools that happen to require this module): falls back to console-only.
 
 File path resolution in main:
@@ -208,7 +208,7 @@ Five separate logs in `<projectRoot>/logs/`:
 | `build.log` | Gulp pipeline output for production builds/packages (`npm run build` / `package` / `publish`, i.e. `OMEGA_BUILD_MODE=true`) | Truncated each build |
 | `test.log` | `npx omega test` runner output (suite names, pass/fail states, harness boot lines) | Truncated each test run |
 | `ci.log` | GH Actions release run output (streamed locally during `npm run release`) | Truncated each release run |
-| `signing.log` | JSONL signing events from Windows code-signing (local dev fallback; on CI this writes to the runner home as `em-signing.log` instead) | Appended (not truncated) |
+| `signing.log` | JSONL signing events from Windows code-signing (local dev fallback; on CI this writes to the runner home as `omega-signing.log` instead) | Appended (not truncated) |
 
 `dev.log` and `build.log` are the same gulp tee — which one it writes is chosen by `OMEGA_BUILD_MODE`, so they never both fill up in one run. (Disable the tee with `OMEGA_LOG_FILE=false`; override its path with `OMEGA_LOG_FILE=<path>`.)
 

@@ -16,7 +16,7 @@
 //   manager.fontawesome.has(name, style)  → boolean
 //
 // Renderer-side (preload contextBridge):
-//   window.em.fontawesome.get(name, style) → Promise<svg string | null>
+//   window.desktop.fontawesome.get(name, style) → Promise<svg string | null>
 //
 // Renderers normally never call this directly — @omega.js/desktop's renderer
 // bootstrap auto-renders any `<i class="fa-solid fa-play">` element by

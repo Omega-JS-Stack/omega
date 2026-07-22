@@ -15,7 +15,7 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 
 ## 🚨 READ WEB-MANAGER TOO
 
-**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-wm-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
+**@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
 - **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
@@ -37,7 +37,7 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
    - `npx omega test project:` — run ONLY consumer project tests (no framework suites)
    - `npx omega test project:custom-test` — run only that project test file
    - `npx omega test mgr:` — run ONLY framework tests (universal cross-framework alias for "the manager's own tests")
-   - `npx omega test desktop:build/config` — run only framework tests matching a path (`em:` aliases `framework:`, both equivalent to `mgr:`)
+   - `npx omega test desktop:build/config` — run only framework tests matching a path (`desktop:` is equivalent to `mgr:`)
    - `--filter=<substring>` matches test NAMES (orthogonal to the path target)
    - `npx omega test --extended` (or `TEST_EXTENDED_MODE=true`) opts into tests that hit real external services (Firebase, analytics, update feeds) — off by default. `TEST_EXTENDED_MODE` is the shared, unprefixed env var across @omega.js/backend, @omega.js/extension, UJM, and @omega.js/desktop; it propagates to every spawned test environment and prints a warning when on. See [docs/test-framework.md](docs/test-framework.md#extended-vs-normal-mode).
 
@@ -61,7 +61,7 @@ Each Electron process has its own one-line bootstrap:
 new (require('@omega.js/desktop/main'))().initialize();      // auto-loads JSON5 config
 
 // src/preload.js
-new (require('@omega.js/desktop/preload'))().initialize();   // exposes window.em
+new (require('@omega.js/desktop/preload'))().initialize();   // exposes window.desktop
 
 // src/assets/js/components/<view>/index.js
 new (require('@omega.js/desktop/renderer'))().initialize();
@@ -146,7 +146,7 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 
 ## CLI
 
-`npx omega <command>` (aliases `em`, `@omega.js/desktop`):
+`npx omega <command>`:
 
 | Command | Description |
 |---|---|
@@ -161,7 +161,7 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 | `validate-certs` | check cert files, env vars, profile expiration, Keychain identity. Auto-runs at end of `setup` |
 | `push-secrets` | encrypt `.env` Default section via libsodium → GH Actions secrets. Auto-runs at end of `setup` when `GH_TOKEN` is set |
 | `sign-windows` | strategy-aware EV/cloud/local signer; emits JSONL events for `runner monitor` |
-| `runner monitor` | tails `em-signing.log` and pretty-prints signing events |
+| `runner monitor` | tails `omega-signing.log` and pretty-prints signing events |
 | `launch` | launch a packaged app with clean env (strips `ELECTRON_RUN_AS_NODE`); auto-discovers `release/<platform>-<arch>/<App>.app`. Aliases: `mgr open` |
 | `finalize-release` | `--signed-dir` uploads signed installers; `--publish` flips release Draft→Published |
 | `release` | trigger consumer's GH Actions Build & Release workflow, poll-stream logs |
@@ -227,7 +227,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/startup.md](docs/startup.md) — launch modes, zero-bounce production
 - [docs/app-state.md](docs/app-state.md) — launch flags, crash sentinel
 - [docs/deep-link.md](docs/deep-link.md) — cross-platform deep links, single-instance, built-in routes
-- [docs/client-bridge.md](docs/client-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omega.js/client auth cycle (`data-wm-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
+- [docs/client-bridge.md](docs/client-bridge.md) — Firebase auth state sync across main + renderers, session persistence (safeStorage vault), the renderer @omega.js/client auth cycle (`data-omega-bind` bindings live in every renderer) + the resolved-plan push (`getResolvedPlan()`)
 - [docs/auto-updater.md](docs/auto-updater.md) — startup + periodic checks, 30-day pending-update gate, idle-aware install
 - [docs/analytics.md](docs/analytics.md) — GA4 Measurement Protocol, cross-platform `uuidv5` identity
 - [docs/context.md](docs/context.md) — runtime context block (geolocation, client, session, app)
