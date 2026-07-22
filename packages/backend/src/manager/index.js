@@ -427,22 +427,35 @@ Manager.prototype.init = function (exporter, options) {
 
   // Setup options features
   if (self.options.initialize) {
-    // Initialize Firebase
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // Initialize Firebase. On any managed runtime — explicit ADC pointer, deployed Cloud
+    // Functions/Cloud Run (K_SERVICE/FUNCTION_TARGET), or the emulator — a no-args
+    // initializeApp() authenticates with the runtime's own identity. A staged
+    // service-account.json is ONLY for local scripts hitting the real project.
+    const onCloudRuntime = !!process.env.K_SERVICE || !!process.env.FUNCTION_TARGET;
+    const onEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS || onCloudRuntime || onEmulator) {
       self.libraries.initializedAdmin = self.libraries.admin.initializeApp();
-      // self.app = self.libraries.initializedAdmin;
     } else {
       const serviceAccount = require(self.project.serviceAccountPath);
+      const loadedProjectId = serviceAccount.project_id;
+      const expectedProjectId = self.project.projectId;
+
+      // A cert for the wrong project authenticates every Firestore call with the wrong
+      // identity — gRPC UNAUTHENTICATED at request time, far from the cause. Refuse to boot.
+      // Compare project id to project id, EXACTLY: a brand id is not a project id (brand
+      // `omega-playground` runs on project `omegajs-playground`), so matching against the
+      // brand — by substring or otherwise — both false-negatives and false-positives.
+      // When the expected project is unknown (no FIREBASE_CONFIG), there is nothing to
+      // verify against, so boot proceeds rather than guessing.
+      if (expectedProjectId && loadedProjectId !== expectedProjectId) {
+        throw new Error(`Service account project mismatch: ${loadedProjectId} is not ${expectedProjectId} — fix ${self.project.serviceAccountPath}`);
+      }
+
       self.libraries.initializedAdmin = self.libraries.admin.initializeApp({
         credential: self.libraries.admin.credential.cert(serviceAccount),
         databaseURL: self.project.databaseURL || `https://${self.project.projectId}.firebaseio.com`,
       }, options.uniqueAppName);
-      // self.app = self.libraries.initializedAdmin;
-
-      const loadedProjectId = serviceAccount.project_id;
-      if (!loadedProjectId || !loadedProjectId.includes(brandId)) {
-        self.assistant.error(`Loaded app may have wrong service account: ${loadedProjectId} =/= ${brandId}`);
-      }
     }
   }
 

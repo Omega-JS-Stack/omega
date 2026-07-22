@@ -79,8 +79,8 @@ Module.prototype.main = function () {
       payload.data.payload.date = moment(payload.data.payload.date || now).subtract(1, 'days').format('YYYY-MM-DD');
       payload.data.payload.id = payload.data.payload.id || Math.round(new Date(now).getTime() / 1000);
       payload.data.payload.path = `src/_posts/${moment(now).format('YYYY')}/${payload.data.payload.path || 'guest'}`;
-      payload.data.payload.githubUser = payload.data.payload.githubUser || bemRepo.user;
-      payload.data.payload.githubRepo = payload.data.payload.githubRepo || bemRepo.name;
+      payload.data.payload.githubUser = bemRepo.user; // always brand config — never caller-supplied
+      payload.data.payload.githubRepo = bemRepo.name;
 
       // Log
       assistant.log(`main(): Creating post...`, payload.data.payload);

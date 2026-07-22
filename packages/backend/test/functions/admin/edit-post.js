@@ -99,8 +99,6 @@ module.exports = {
         const response = await http.command('admin:edit-post', {
           url: 'https://example.com/blog/test-post',
           body: 'Test content',
-          githubUser: 'nonexistent-user-12345',
-          githubRepo: 'nonexistent-repo-12345',
         });
 
         assert.isError(response, 404, 'Non-existent repo should return 404');

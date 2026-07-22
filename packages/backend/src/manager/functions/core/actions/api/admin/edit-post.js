@@ -68,8 +68,8 @@ Module.prototype.main = function () {
 
       // Fix even more values
       payload.data.payload.path = `_posts/${moment(now).format('YYYY')}/${payload.data.payload.path || 'guest'}`;
-      payload.data.payload.githubUser = payload.data.payload.githubUser || bemRepo.user;
-      payload.data.payload.githubRepo = payload.data.payload.githubRepo || bemRepo.name;
+      payload.data.payload.githubUser = bemRepo.user; // always brand config — never caller-supplied
+      payload.data.payload.githubRepo = bemRepo.name;
 
       // Log
       assistant.log(`main(): Editing post...`, payload.data.payload);

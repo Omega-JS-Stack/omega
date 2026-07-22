@@ -40,6 +40,8 @@ apps/<brand>/apps/backend/
 - `config/omega.json5` → composed via `composeTargetConfig` (brand⊕app flattened for the deploy upload boundary — the runtime cannot walk up past it)
 - `.env` / `.nvmrc` → verbatim copy from the app root
 - `service-account.json` → from the app root (standalone) or the brand's `.omega/secrets/` (brand apps — the firebase manage service mints it there)
+
+> **Credentials at runtime.** The staged key is for LOCAL scripts that talk to the real project. On any managed runtime — deployed Cloud Functions / Cloud Run (`K_SERVICE`/`FUNCTION_TARGET`), the emulator, or an explicit `GOOGLE_APPLICATION_CREDENTIALS` — `Manager.init` calls `admin.initializeApp()` with NO arguments and authenticates as the runtime's own service identity. When it does fall back to the staged cert, a `project_id` that doesn't match the resolved Firebase `projectId` **throws at boot** rather than warning: a mismatched key authenticates every Firestore call as the wrong identity and surfaces far away as gRPC `UNAUTHENTICATED (16)` on the first read.
 - `node_modules/` preserved across stages (runtime artifacts, never authored)
 - `*.log` preserved (co-located with firebase-tools logs)
 

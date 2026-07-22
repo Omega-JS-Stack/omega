@@ -23,10 +23,12 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
   assistant.log('main(): Write', settings.path, settings.document);
 
   // Write to Realtime Database
-  await admin.database().ref(settings.path).set(settings.document)
-    .catch((e) => {
-      return assistant.respond(e.message, { code: 500 });
-    });
+  const write = await admin.database().ref(settings.path).set(settings.document)
+    .catch((e) => e);
+
+  if (write instanceof Error) {
+    return assistant.respond(write.message, { code: 500 });
+  }
 
   return assistant.respond(settings.document);
 };

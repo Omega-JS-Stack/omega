@@ -41,7 +41,7 @@ const CERT_FILE_MAP = {
     },
     // Per-brand provisioning profile (only present if cert generation produced one)
     {
-      source: 'profiles/DEVELOPER_ID_APPLICATION_G2/MACOS.mobileprovision',
+      source: 'profiles/{brand.id}/DEVELOPER_ID_APPLICATION_G2/MACOS.mobileprovision',
       dest: 'config/certs/{brand.id}.provisionprofile',
       optional: true,
     },
@@ -59,7 +59,7 @@ const CERT_FILE_MAP = {
     },
     // Per-brand iOS provisioning profile
     {
-      source: 'profiles/IOS_DISTRIBUTION/IOS.mobileprovision',
+      source: 'profiles/{brand.id}/IOS_DISTRIBUTION/IOS.mobileprovision',
       dest: 'build/certs/{brand.id}.mobileprovision',
       optional: true,
     },

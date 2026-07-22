@@ -20,7 +20,7 @@ const MAX_COMMITS_PER_REPO = 30;
  * @returns {Array} Parsed results (empty array when no output)
  */
 function runPaginatedJson(api, path) {
-  const raw = api.runCommand(`api "${path}" --paginate`);
+  const raw = api.runCommand(['api', path, '--paginate']);
 
   if (!raw) {
     return [];

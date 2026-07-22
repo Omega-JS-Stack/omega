@@ -1,6 +1,10 @@
 const crypto = require('crypto');
+const path = require('path');
 const fetch = require('wonderful-fetch');
 const { arrayify } = require('node-powertools');
+const loadProcessor = require('../../../libraries/load-processor.js');
+
+const PROVIDERS_DIR = path.join(__dirname, 'providers');
 
 // Constants
 const STATE_TTL_MINUTES = 10;
@@ -68,7 +72,7 @@ async function buildContext({ assistant, user, settings, requireProvider = true 
   let oauth2Provider;
 
   try {
-    oauth2Provider = require(`./providers/${settings.provider}.js`);
+    oauth2Provider = loadProcessor(PROVIDERS_DIR, settings.provider);
   } catch (e) {
     return { error: { message: `Unknown OAuth2 provider: ${settings.provider}`, code: 400 } };
   }
@@ -99,7 +103,7 @@ function loadProvider(providerName) {
   let oauth2Provider;
 
   try {
-    oauth2Provider = require(`./providers/${providerName}.js`);
+    oauth2Provider = loadProcessor(PROVIDERS_DIR, providerName);
   } catch (e) {
     return { error: { message: `Unknown OAuth2 provider: ${providerName}`, code: 400 } };
   }

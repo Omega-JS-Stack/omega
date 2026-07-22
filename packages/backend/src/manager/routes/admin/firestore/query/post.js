@@ -89,10 +89,12 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
   };
 
   // Run all queries in parallel
-  await Promise.all(queries.map(runQuery))
-    .catch((e) => {
-      return assistant.respond(e.message, { code: 500 });
-    });
+  const ran = await Promise.all(queries.map(runQuery))
+    .catch((e) => e);
+
+  if (ran instanceof Error) {
+    return assistant.respond(ran.message, { code: 500 });
+  }
 
   return assistant.respond(docs);
 };

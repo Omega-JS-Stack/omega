@@ -28,9 +28,11 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     .orderByChild('uid')
     .equalTo(uid)
     .once('value')
-    .catch((e) => {
-      return assistant.respond(`Session query error: ${e}`, { code: 500 });
-    });
+    .catch((e) => e);
+
+  if (snapshot instanceof Error) {
+    return assistant.respond(`Session query error: ${snapshot}`, { code: 500 });
+  }
 
   const data = snapshot.val() || {};
 

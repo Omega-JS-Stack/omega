@@ -71,13 +71,17 @@ class GoogleOAuth2Client {
       return;
     }
 
-    fs.mkdirSync(dirname(this.tokenStorePath), { recursive: true });
+    // Owner-only dir + file — the store holds a cloud-platform-scoped refresh token
+    fs.mkdirSync(dirname(this.tokenStorePath), { recursive: true, mode: 0o700 });
     // Record the granted scopes — getAccessToken() uses them to decide
     // whether a cached token can serve a client or needs one re-consent.
     // MERGE over the existing store: refresh-path saves carry only the token
     // triple and must not drop sidecar fields (account_email).
     const existing = this.loadStoredTokens() || {};
-    fs.writeFileSync(this.tokenStorePath, JSON.stringify({ ...existing, ...tokens, scopes: this.scopes }, null, 2));
+    fs.writeFileSync(this.tokenStorePath, JSON.stringify({ ...existing, ...tokens, scopes: this.scopes }, null, 2), { mode: 0o600 });
+    // mode on mkdir/writeFileSync only applies at creation — tighten pre-existing paths too
+    fs.chmodSync(dirname(this.tokenStorePath), 0o700);
+    fs.chmodSync(this.tokenStorePath, 0o600);
   }
 
   /**

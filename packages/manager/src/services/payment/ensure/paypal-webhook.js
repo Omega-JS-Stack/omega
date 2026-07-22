@@ -6,7 +6,7 @@
  * backend to receive events). Requires OMEGA_WEBHOOK_KEY.
  */
 const chalk = require('chalk').default;
-const { buildWebhookUrl, diffEventSets } = require('../lib/payment-utils.js');
+const { buildWebhookUrl, diffEventSets, redactWebhookUrl } = require('../lib/payment-utils.js');
 
 // Events the backend handles for PayPal subscription/payment processing
 const ENABLED_EVENTS = [
@@ -99,13 +99,13 @@ module.exports = async function ensurePayPalWebhook(context) {
 
   if (dryRun) {
     console.log(`      ${chalk.cyan('+')} Would create webhook ${chalk.yellow('[DRY RUN]')}`);
-    console.log(`      ${chalk.dim(desiredUrl)}`);
+    console.log(`      ${chalk.dim(redactWebhookUrl(desiredUrl))}`);
     return { output: { paypalWebhook: { planned: 'create' } } };
   }
 
   const webhook = await api.createWebhook(desiredUrl, ENABLED_EVENTS);
   console.log(`      ${chalk.green('✓')} Webhook created: ${chalk.dim(webhook.id)}`);
-  console.log(`      ${chalk.dim(desiredUrl)}`);
+  console.log(`      ${chalk.dim(redactWebhookUrl(desiredUrl))}`);
 
   return { output: { paypalWebhook: { id: webhook.id, created: true } } };
 };

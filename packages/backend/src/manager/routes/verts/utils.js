@@ -268,27 +268,35 @@ async function getInventory(Manager, options) {
   const db = admin.firestore();
   const verts = [];
 
-  // Batch-read the collection (~500 cursor pagination per docs/firestore.md)
-  let lastDoc = null;
+  try {
+    // Batch-read the collection (~500 cursor pagination per docs/firestore.md)
+    let lastDoc = null;
 
-  while (true) {
-    let query = db.collection('verts').limit(BATCH_SIZE);
+    while (true) {
+      let query = db.collection('verts').limit(BATCH_SIZE);
 
-    if (lastDoc) {
-      query = query.startAfter(lastDoc);
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
+
+      const snapshot = await query.get();
+
+      if (snapshot.empty) {
+        break;
+      }
+
+      for (const doc of snapshot.docs) {
+        verts.push({ id: doc.id, ...doc.data() });
+      }
+
+      lastDoc = snapshot.docs[snapshot.docs.length - 1];
     }
-
-    const snapshot = await query.get();
-
-    if (snapshot.empty) {
-      break;
-    }
-
-    for (const doc of snapshot.docs) {
-      verts.push({ id: doc.id, ...doc.data() });
-    }
-
-    lastDoc = snapshot.docs[snapshot.docs.length - 1];
+  } catch (e) {
+    // A transient Firestore error must not 500 the public serve route — fall back
+    // to the last-good inventory (stale beats down), or [] (→ 204 no-fill). Leave
+    // cache.fetched alone so the next impression retries instead of re-caching failure.
+    console.error(`[verts] getInventory failed (${e.message}) — serving ${cache.verts ? 'last-good cache' : 'no-fill'}`);
+    return cache.verts || [];
   }
 
   cache.verts = verts.filter((vert) => vert.enabled !== false);

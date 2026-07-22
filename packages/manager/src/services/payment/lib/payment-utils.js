@@ -59,6 +59,17 @@ function buildWebhookUrl(brandConfig, processor, brandId) {
 }
 
 /**
+ * Webhook URL with the key query param redacted — the ONLY form safe to print
+ * (campaigns/newsletter build the same URL and never print it at all).
+ *
+ * @param {string} url - A buildWebhookUrl() result
+ * @returns {string} URL with key=***
+ */
+function redactWebhookUrl(url) {
+  return url.replace(/([?&]key=)[^&]*/, '$1***');
+}
+
+/**
  * Diff current webhook events against desired.
  *
  * @param {string[]} currentEvents - Events on the endpoint now
@@ -77,4 +88,4 @@ function diffEventSets(currentEvents, desiredEvents) {
     : null;
 }
 
-module.exports = { paidProducts, productDisplayName, productImage, buildWebhookUrl, diffEventSets };
+module.exports = { paidProducts, productDisplayName, productImage, buildWebhookUrl, redactWebhookUrl, diffEventSets };

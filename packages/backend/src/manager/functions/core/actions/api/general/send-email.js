@@ -1,6 +1,7 @@
 const path = require('path');
 const fetch = require('wonderful-fetch');
 const { merge } = require('lodash');
+const { loadTemplate } = require('../../../../../libraries/load-processor');
 
 function Module() {
 
@@ -37,7 +38,9 @@ Module.prototype.main = function () {
 
     let emailPayload
     try {
-      const script = require(path.join(__dirname, 'emails', `${payload.data.payload.id}.js`))
+      // Emails are stored flat with the colon-joined id as the literal filename;
+      // loadTemplate validates the id so it can never resolve outside emails/
+      const script = loadTemplate(path.join(__dirname, 'emails'), payload.data.payload.id, { flat: true })
       emailPayload = merge(
         {},
         DEFAULT,

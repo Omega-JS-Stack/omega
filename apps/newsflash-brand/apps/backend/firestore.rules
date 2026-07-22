@@ -16,11 +16,17 @@ service cloud.firestore {
       allow write: if belongsTo(uid) && !isWritingProtectedUserField();
     }
 
-    // Protect notification data
+    // Protect notification data — the doc id IS the push token, a high-entropy
+    // capability: knowing it proves possession of the device. Point reads/updates ride
+    // that capability; list is denied so tokens can never be harvested by query; owner
+    // may only be null (anonymous subscribe) or the caller's own uid.
     match /notifications/{token} {
-      allow read: if resource == null || existingData().token == token || belongsTo(existingData().owner);
-      allow update: if existingData().token == token;
-      allow create: if true;
+      allow get: if true;
+      allow list: if false;
+      allow create: if incomingData().token == token
+        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
+      allow update: if incomingData().token == existingData().token
+        && (incomingData().owner == null || (isAuthenticated() && incomingData().owner == authUid()));
     }
 
     // Protect abandoned cart data

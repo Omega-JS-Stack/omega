@@ -109,8 +109,6 @@ module.exports = {
         const response = await http.command('admin:write-repo-content', {
           path: '_test/custom-repo-test.txt',
           content: 'Test content',
-          githubUser: 'nonexistent-user-12345',
-          githubRepo: 'nonexistent-repo-12345',
         });
 
         assert.isError(response, 404, 'Non-existent repo should return 404');

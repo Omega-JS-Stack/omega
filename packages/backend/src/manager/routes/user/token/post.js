@@ -20,9 +20,11 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Create custom token
   const token = await admin.auth().createCustomToken(uid)
-    .catch((e) => {
-      return assistant.respond(`Failed to create custom token: ${e}`, { code: 500 });
-    });
+    .catch((e) => e);
+
+  if (token instanceof Error) {
+    return assistant.respond(`Failed to create custom token: ${token}`, { code: 500 });
+  }
 
   return assistant.respond({ token });
 };

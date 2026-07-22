@@ -98,8 +98,10 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   settings.date = moment(settings.date || now).subtract(1, 'days').format('YYYY-MM-DD');
   settings.id = settings.id || Math.round(new Date(now).getTime() / 1000);
   settings.directory = `src/_posts/${moment(now).format('YYYY')}/${settings.postPath}`;
-  settings.githubUser = settings.githubUser || bemRepo.user;
-  settings.githubRepo = settings.githubRepo || bemRepo.name;
+  // Always the brand's own repo — caller-supplied values would let a blogger-role
+  // user point the shared GH_TOKEN at any repo it can write
+  settings.githubUser = bemRepo.user;
+  settings.githubRepo = bemRepo.name;
 
   assistant.log('main(): Creating post...', settings);
 

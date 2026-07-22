@@ -1,5 +1,7 @@
 const path = require('path');
+const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
+const safeCompare = require('../../../helpers/safe-compare.js');
 
 /**
  * POST /payments/dispute-alert?provider=chargeblast&key=XXX
@@ -17,7 +19,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
 
   // Validate key
   const key = query.key;
-  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
+  if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 
@@ -27,7 +29,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   // Load the processor module
   let processorModule;
   try {
-    processorModule = require(path.resolve(__dirname, `processors/${provider}.js`));
+    processorModule = loadProcessor(path.join(__dirname, 'processors'), provider);
   } catch (e) {
     return assistant.respond(`Unknown alert provider: ${provider}`, { code: 400 });
   }

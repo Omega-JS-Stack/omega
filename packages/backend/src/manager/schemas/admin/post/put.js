@@ -8,8 +8,6 @@ module.exports = () => f.object({
   body: f.string({ default: undefined, required: true }),
   title: f.string({ default: undefined }),
   postPath: f.string({ default: 'guest' }),
-  githubUser: f.string({ default: undefined }),
-  githubRepo: f.string({ default: undefined }),
   // D13: content-publish implies deploy — false opts out of the build dispatch
   deploy: f.boolean({ default: true, required: false }),
 });

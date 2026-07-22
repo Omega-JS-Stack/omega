@@ -1,6 +1,8 @@
+const path = require('path');
 const powertools = require('node-powertools');
 const transitions = require('./transitions/index.js');
 const { trackPayment } = require('./analytics.js');
+const loadProcessor = require('../../../libraries/load-processor.js');
 
 /**
  * Firestore trigger: payments-webhooks/{eventId} onWrite
@@ -53,7 +55,7 @@ module.exports = async ({ assistant, change, context }) => {
     // Load the shared library for this processor
     let library;
     try {
-      library = require(`../../../libraries/payment/processors/${processor}.js`);
+      library = loadProcessor(path.join(__dirname, '../../../libraries/payment/processors'), processor);
     } catch (e) {
       throw new Error(`Unknown processor library: ${processor}`);
     }

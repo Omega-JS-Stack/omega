@@ -89,11 +89,12 @@ module.exports = {
       },
     },
 
-    // Test 4: Non-existent repo returns 404
-    // PUT first calls content/post to fetch the existing post; with a unique URL that's never been
-    // created, the fetch itself returns 404 before we ever try to push to the nonexistent repo.
+    // Test 4: Editing a never-published URL returns 404
+    // PUT first calls content/post to fetch the existing post; with a unique URL that was never
+    // created, that fetch 404s before any push. The repo itself is not caller-controllable (B4) —
+    // it always comes from brand config.
     {
-      name: 'nonexistent-repo-returns-404',
+      name: 'never-published-url-returns-404',
       auth: 'admin',
       timeout: 30000,
 
@@ -101,8 +102,6 @@ module.exports = {
         const response = await http.put('backend-manager/admin/post', {
           url: `https://example.com/blog/never-created-${Date.now()}`,
           body: 'Test content',
-          githubUser: 'nonexistent-user-12345',
-          githubRepo: 'nonexistent-repo-12345',
         });
 
         assert.isError(response, 404, 'Non-existent repo or post should return 404');

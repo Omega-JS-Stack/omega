@@ -24,9 +24,11 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Read from Firestore
   const doc = await admin.firestore().doc(settings.path).get()
-    .catch((e) => {
-      return assistant.respond(e.message, { code: 500 });
-    });
+    .catch((e) => e);
+
+  if (doc instanceof Error) {
+    return assistant.respond(doc.message, { code: 500 });
+  }
 
   // Return empty object if document doesn't exist (doc.data() returns undefined)
   return assistant.respond(doc.data() || {});

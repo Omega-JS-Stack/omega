@@ -54,7 +54,7 @@ const APPLE_FIXTURES = {
   'certificates/DEVELOPER_ID_APPLICATION_G2.p12': 'dev-id-application-p12-bytes',
   'certificates/DEVELOPER_ID_INSTALLER_G2.p12': 'dev-id-installer-p12-bytes',
   [`AuthKey_${KEY_ID}.p8`]: 'authkey-p8-bytes',
-  'profiles/DEVELOPER_ID_APPLICATION_G2/MACOS.mobileprovision': 'macos-profile-bytes',
+  [`profiles/${BRAND_ID}/DEVELOPER_ID_APPLICATION_G2/MACOS.mobileprovision`]: 'macos-profile-bytes',
 };
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ test('certs: mobile app uses build/certs/ paths', async () => {
     apple: {
       'certificates/IOS_DISTRIBUTION.p12': 'ios-distribution-p12-bytes',
       [`AuthKey_${KEY_ID}.p8`]: 'authkey-p8-bytes',
-      'profiles/IOS_DISTRIBUTION/IOS.mobileprovision': 'ios-profile-bytes',
+      [`profiles/${BRAND_ID}/IOS_DISTRIBUTION/IOS.mobileprovision`]: 'ios-profile-bytes',
     },
   });
 

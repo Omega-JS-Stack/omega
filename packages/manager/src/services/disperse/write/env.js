@@ -272,3 +272,4 @@ module.exports = async (context) => {
 
 module.exports.ENV_MAP = ENV_MAP;
 module.exports.updateEnvContent = updateEnvContent;
+module.exports.envLine = envLine;

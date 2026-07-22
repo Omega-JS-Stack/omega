@@ -1,3 +1,5 @@
+const path = require('path');
+const loadProcessor = require('../../../../libraries/load-processor.js');
 const _ = require('lodash')
 const fetch = require('wonderful-fetch');
 const { arrayify } = require('node-powertools');
@@ -72,7 +74,7 @@ Module.prototype.main = function () {
       }
 
       try {
-        self.oauth2 = new (require(`./oauth2/${payload.data.payload.provider}.js`))();
+        self.oauth2 = new (loadProcessor(path.join(__dirname, 'oauth2'), payload.data.payload.provider))();
         self.oauth2.parent = self;
         self.oauth2.Manager = self.Manager;
         self.oauth2.assistant = self.assistant;

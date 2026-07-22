@@ -2,12 +2,13 @@
  * Test: Firestore Security Rules - Notification Documents
  * Tests that security rules correctly protect notification data
  *
- * Rules being tested:
- * - Anyone can create a notification (for push subscription)
- * - User can read notification if they own it or know the token
- * - User can update notification if they know the token
- * - User cannot delete notifications
- * - Anonymous can read if document doesn't exist (for checking availability)
+ * Contract (the doc id IS the push token — a high-entropy capability):
+ * - get: anyone who knows the token (existence check before create; device re-check)
+ * - list: DENIED for non-admins — tokens can never be harvested by query
+ * - create: token field must equal the doc id; owner must be null (anonymous
+ *   subscribe) or the caller's own uid — never someone else's
+ * - update: token immutable; owner may only become null or the caller's own uid
+ * - delete: admin only
  *
  * @see templates/firestore.rules
  */
@@ -17,27 +18,26 @@ module.exports = {
   timeout: 30000,
 
   tests: [
-    // Test 1: Anyone can create a notification
+    // Test 1: Anonymous can create a notification (owner null)
     {
-      name: 'anyone-can-create-notification',
+      name: 'anonymous-can-create-notification',
       auth: 'none',
 
       async run({ rules }) {
         const db = rules.asAnonymous();
         const token = 'test-token-create-anon';
 
-        // Should succeed - anyone can create notifications
         await rules.expectSuccess(
           db.doc(`notifications/${token}`).set({
             token: token,
-            owner: 'anonymous',
+            owner: null,
             metadata: { created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } },
           })
         );
       },
     },
 
-    // Test 2: Authenticated user can create a notification
+    // Test 2: Authenticated user can create a notification they own
     {
       name: 'user-can-create-notification',
       auth: 'none',
@@ -47,7 +47,6 @@ module.exports = {
         const db = rules.asAccount('basic');
         const token = 'test-token-create-user';
 
-        // Should succeed - user can create notifications
         await rules.expectSuccess(
           db.doc(`notifications/${token}`).set({
             token: token,
@@ -58,7 +57,76 @@ module.exports = {
       },
     },
 
-    // Test 3: User can read their own notification (by owner)
+    // Test 3: Cannot create a notification owned by someone ELSE
+    {
+      name: 'user-cannot-create-notification-for-other-user',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const otherUid = accounts.admin.uid;
+        const db = rules.asAccount('basic');
+        const token = 'test-token-create-foreign-owner';
+
+        await rules.expectFailure(
+          db.doc(`notifications/${token}`).set({
+            token: token,
+            owner: otherUid,
+          })
+        );
+      },
+    },
+
+    // Test 4: Cannot create with a token field that doesn't match the doc id
+    {
+      name: 'cannot-create-with-mismatched-token-field',
+      auth: 'none',
+
+      async run({ rules }) {
+        const db = rules.asAnonymous();
+
+        await rules.expectFailure(
+          db.doc('notifications/test-token-mismatch').set({
+            token: 'some-other-token',
+            owner: null,
+          })
+        );
+      },
+    },
+
+    // Test 4b: Cannot create OMITTING the owner field (the contract requires it explicitly)
+    {
+      name: 'cannot-create-omitting-owner-field',
+      auth: 'none',
+
+      async run({ rules }) {
+        const db = rules.asAnonymous();
+        const token = 'test-token-omit-owner';
+
+        await rules.expectFailure(
+          db.doc(`notifications/${token}`).set({
+            token: token,
+          })
+        );
+      },
+    },
+
+    // Test 4c: Cannot create OMITTING the token field
+    {
+      name: 'cannot-create-omitting-token-field',
+      auth: 'none',
+
+      async run({ rules }) {
+        const db = rules.asAnonymous();
+
+        await rules.expectFailure(
+          db.doc('notifications/test-token-omit-token').set({
+            owner: null,
+          })
+        );
+      },
+    },
+
+    // Test 5: User can read their own notification (by owner)
     {
       name: 'user-can-read-own-notification',
       auth: 'none',
@@ -68,7 +136,6 @@ module.exports = {
         const db = rules.asAccount('basic');
         const token = 'test-token-read-own';
 
-        // First create the notification as admin (to set up the test)
         const adminDb = rules.asAccount('admin');
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
@@ -78,14 +145,13 @@ module.exports = {
           })
         );
 
-        // Should succeed - user can read notification they own
         await rules.expectSuccess(
           db.doc(`notifications/${token}`).get()
         );
       },
     },
 
-    // Test 4: User can read notification by token match
+    // Test 6: Point-read by token is allowed (capability: knowing the token)
     {
       name: 'user-can-read-notification-by-token',
       auth: 'none',
@@ -95,7 +161,6 @@ module.exports = {
         const db = rules.asAccount('basic');
         const token = 'test-token-read-token';
 
-        // Create notification owned by someone else
         const adminDb = rules.asAccount('admin');
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
@@ -105,14 +170,13 @@ module.exports = {
           })
         );
 
-        // Should succeed - user can read if token matches document ID
         await rules.expectSuccess(
           db.doc(`notifications/${token}`).get()
         );
       },
     },
 
-    // Test 5: Anonymous can read non-existent notification (availability check)
+    // Test 7: Anonymous can read non-existent notification (availability check)
     {
       name: 'anonymous-can-read-nonexistent-notification',
       auth: 'none',
@@ -121,35 +185,86 @@ module.exports = {
         const db = rules.asAnonymous();
         const token = 'nonexistent-token-12345';
 
-        // Should succeed - resource == null check allows this
         await rules.expectSuccess(
           db.doc(`notifications/${token}`).get()
         );
       },
     },
 
-    // Test 6: User can update notification by token match
+    // Test 8: LIST is denied — tokens can never be harvested by query
     {
-      name: 'user-can-update-notification-by-token',
+      name: 'user-cannot-list-notifications',
       auth: 'none',
 
       async run({ rules, accounts }) {
-        const otherUid = accounts.admin.uid;
-        const db = rules.asAccount('basic');
-        const token = 'test-token-update';
+        const adminDb = rules.asAccount('admin');
+        const token = 'test-token-list-harvest';
 
-        // Create notification owned by someone else
+        await rules.expectSuccess(
+          adminDb.doc(`notifications/${token}`).set({
+            token: token,
+            owner: accounts.basic.uid,
+          })
+        );
+
+        await rules.expectFailure(
+          rules.asAccount('basic').collection('notifications').get()
+        );
+        await rules.expectFailure(
+          rules.asAnonymous().collection('notifications').get()
+        );
+      },
+    },
+
+    // Test 9: Signed-in user can take over a token they possess (sign-in on device)
+    {
+      name: 'user-can-take-over-notification-by-token',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+        const token = 'test-token-take-over';
+
         const adminDb = rules.asAccount('admin');
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
-            owner: otherUid,
+            owner: accounts.admin.uid,
             metadata: { created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } },
           })
         );
 
-        // Should succeed - user can update if token matches
+        // The client's sign-in flow: same device, owner flips to the caller
         await rules.expectSuccess(
+          db.doc(`notifications/${token}`).update({
+            owner: uid,
+            'metadata.updated': { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
+          })
+        );
+      },
+    },
+
+    // Test 10: Update keeping a FOREIGN owner is denied (owner must become null or self)
+    {
+      name: 'user-cannot-update-keeping-foreign-owner',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const db = rules.asAccount('basic');
+        const token = 'test-token-foreign-owner-update';
+
+        const adminDb = rules.asAccount('admin');
+        await rules.expectSuccess(
+          adminDb.doc(`notifications/${token}`).set({
+            token: token,
+            owner: accounts.admin.uid,
+            metadata: { created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } },
+          })
+        );
+
+        // Owner stays the admin's uid — not null, not the caller → denied
+        await rules.expectFailure(
           db.doc(`notifications/${token}`).update({
             'metadata.updated': { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
           })
@@ -157,7 +272,7 @@ module.exports = {
       },
     },
 
-    // Test 7: Owner can update their notification
+    // Test 11: Owner can update their notification (owner field kept as self)
     {
       name: 'owner-can-update-notification',
       auth: 'none',
@@ -167,7 +282,6 @@ module.exports = {
         const db = rules.asAccount('basic');
         const token = 'test-token-update-owner';
 
-        // Create notification as admin but owned by basic user
         const adminDb = rules.asAccount('admin');
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
@@ -177,7 +291,6 @@ module.exports = {
           })
         );
 
-        // Should succeed - owner can update
         await rules.expectSuccess(
           db.doc(`notifications/${token}`).update({
             preferences: { sound: true },
@@ -186,44 +299,36 @@ module.exports = {
       },
     },
 
-    // Test 8: User cannot read notification without token or ownership
+    // Test 12: Anonymous can release a token to null (sign-out on device)
     {
-      name: 'user-cannot-read-others-notification-wrong-token',
+      name: 'anonymous-can-release-notification-owner',
       auth: 'none',
 
       async run({ rules, accounts }) {
-        const otherUid = accounts.admin.uid;
-        const db = rules.asAccount('basic');
-        const realToken = 'real-token-private';
-        const wrongToken = 'wrong-token-guess';
+        const db = rules.asAnonymous();
+        const token = 'test-token-anon-release';
 
-        // Create notification with a different token
         const adminDb = rules.asAccount('admin');
         await rules.expectSuccess(
-          adminDb.doc(`notifications/${realToken}`).set({
-            token: realToken,
-            owner: otherUid,
+          adminDb.doc(`notifications/${token}`).set({
+            token: token,
+            owner: accounts.basic.uid,
             metadata: { created: { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) } },
           })
         );
 
-        // Should fail - user doesn't own it and document ID doesn't match token they're querying
-        // Note: This test verifies that knowing a wrong token doesn't grant access
-        // The user is querying realToken doc but doesn't own it
-        // Actually the rule allows read if token == document ID, which it does here
-        // Let me reconsider - the token in the doc matches the doc ID, so this would succeed
-        // The rule is: existingData().token == token (where token is the doc ID)
-        // So anyone who knows the token (doc ID) can read it
-        // This is intentional for push notification validation
         await rules.expectSuccess(
-          db.doc(`notifications/${realToken}`).get()
+          db.doc(`notifications/${token}`).update({
+            owner: null,
+            'metadata.updated': { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
+          })
         );
       },
     },
 
-    // Test 9: Anonymous cannot update existing notification
+    // Test 13: Anonymous update keeping a foreign owner is denied
     {
-      name: 'anonymous-cannot-update-notification',
+      name: 'anonymous-cannot-update-keeping-foreign-owner',
       auth: 'none',
 
       async run({ rules, accounts }) {
@@ -231,7 +336,6 @@ module.exports = {
         const db = rules.asAnonymous();
         const token = 'test-token-anon-update';
 
-        // Create notification
         const adminDb = rules.asAccount('admin');
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
@@ -241,13 +345,7 @@ module.exports = {
           })
         );
 
-        // Should fail - anonymous cannot update (no token context for update)
-        // Wait, the rule says: allow update: if existingData().token == token
-        // where token is the wildcard {token} from the path
-        // So anonymous CAN update if they know the token (doc ID)
-        // Let me check the rules again...
-        // Actually for anonymous, they still get the wildcard value
-        await rules.expectSuccess(
+        await rules.expectFailure(
           db.doc(`notifications/${token}`).update({
             hacked: true,
           })
@@ -255,7 +353,34 @@ module.exports = {
       },
     },
 
-    // Test 10: Admin can create notification
+    // Test 14: Token field is immutable on update
+    {
+      name: 'cannot-change-token-field-on-update',
+      auth: 'none',
+
+      async run({ rules, accounts }) {
+        const uid = accounts.basic.uid;
+        const db = rules.asAccount('basic');
+        const token = 'test-token-immutable';
+
+        const adminDb = rules.asAccount('admin');
+        await rules.expectSuccess(
+          adminDb.doc(`notifications/${token}`).set({
+            token: token,
+            owner: uid,
+          })
+        );
+
+        await rules.expectFailure(
+          db.doc(`notifications/${token}`).update({
+            token: 'rewritten-token',
+            owner: uid,
+          })
+        );
+      },
+    },
+
+    // Test 15: Admin can create notification
     {
       name: 'admin-can-create-notification',
       auth: 'none',
@@ -264,7 +389,6 @@ module.exports = {
         const adminDb = rules.asAccount('admin');
         const token = 'test-token-admin-create';
 
-        // Should succeed - admin can create any doc
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
@@ -275,7 +399,7 @@ module.exports = {
       },
     },
 
-    // Test 11: Admin can read any notification
+    // Test 16: Admin can read any notification (and list)
     {
       name: 'admin-can-read-any-notification',
       auth: 'none',
@@ -285,7 +409,6 @@ module.exports = {
         const adminDb = rules.asAccount('admin');
         const token = 'test-token-admin-read';
 
-        // Create notification owned by basic user
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
@@ -294,14 +417,16 @@ module.exports = {
           })
         );
 
-        // Should succeed - admin can read any doc
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).get()
+        );
+        await rules.expectSuccess(
+          adminDb.collection('notifications').get()
         );
       },
     },
 
-    // Test 12: Admin can update any notification
+    // Test 17: Admin can update any notification
     {
       name: 'admin-can-update-notification',
       auth: 'none',
@@ -310,7 +435,6 @@ module.exports = {
         const adminDb = rules.asAccount('admin');
         const token = 'test-token-admin-update';
 
-        // Create notification first
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
@@ -319,7 +443,6 @@ module.exports = {
           })
         );
 
-        // Should succeed - admin can update any doc
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).update({
             'metadata.updated': { timestamp: new Date().toISOString(), timestampUNIX: Math.floor(Date.now() / 1000) },
@@ -329,7 +452,7 @@ module.exports = {
       },
     },
 
-    // Test 13: Admin can delete notification
+    // Test 18: Admin can delete notification
     {
       name: 'admin-can-delete-notification',
       auth: 'none',
@@ -338,7 +461,6 @@ module.exports = {
         const adminDb = rules.asAccount('admin');
         const token = 'test-token-admin-delete';
 
-        // Create notification
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
@@ -347,14 +469,13 @@ module.exports = {
           })
         );
 
-        // Should succeed - admin can delete via global admin rule
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).delete()
         );
       },
     },
 
-    // Test 14: Regular user cannot delete notification
+    // Test 19: Regular user cannot delete notification
     {
       name: 'user-cannot-delete-notification',
       auth: 'none',
@@ -365,7 +486,6 @@ module.exports = {
         const adminDb = rules.asAccount('admin');
         const token = 'test-token-user-delete';
 
-        // Create notification owned by the user
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
@@ -374,14 +494,13 @@ module.exports = {
           })
         );
 
-        // Should fail - no delete rule for non-admins
         await rules.expectFailure(
           db.doc(`notifications/${token}`).delete()
         );
       },
     },
 
-    // Test 15: Anonymous cannot delete notification
+    // Test 20: Anonymous cannot delete notification
     {
       name: 'anonymous-cannot-delete-notification',
       auth: 'none',
@@ -391,7 +510,6 @@ module.exports = {
         const adminDb = rules.asAccount('admin');
         const token = 'test-token-anon-delete';
 
-        // Create notification
         await rules.expectSuccess(
           adminDb.doc(`notifications/${token}`).set({
             token: token,
@@ -400,7 +518,6 @@ module.exports = {
           })
         );
 
-        // Should fail - no delete rule for anonymous
         await rules.expectFailure(
           db.doc(`notifications/${token}`).delete()
         );

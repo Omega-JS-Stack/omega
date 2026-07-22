@@ -13,6 +13,7 @@ const { join } = require('node:path');
 const jetpack = require('fs-jetpack');
 
 const { applyEnvOrder } = require('./env-order.js');
+const { envLine } = require('../services/disperse/write/env.js');
 
 /**
  * Write NAME="value" into the brand .env (replace-or-append).
@@ -23,12 +24,14 @@ const { applyEnvOrder } = require('./env-order.js');
  */
 function writeEnvValue(brandRoot, name, value) {
   const envPath = join(brandRoot, '.env');
-  const line = `${name}="${value}"`;
+  // envLine escapes \ " and newlines (the disperse .env writer's serializer — the SSOT);
+  // the replacer FUNCTION keeps $& / $1 in a secret from being expanded by String.replace
+  const line = envLine(name, value);
   const pattern = new RegExp(`^${name}\\s*=.*$`, 'm');
 
   let envContent = jetpack.exists(envPath) ? jetpack.read(envPath) : '';
   if (pattern.test(envContent)) {
-    envContent = envContent.replace(pattern, line);
+    envContent = envContent.replace(pattern, () => line);
   } else {
     // Terminate any existing content with exactly one newline, then append
     envContent = envContent === '' ? '' : envContent.replace(/\n*$/, '\n');

@@ -9,7 +9,7 @@
  * OMEGA_WEBHOOK_KEY.
  */
 const chalk = require('chalk').default;
-const { buildWebhookUrl } = require('../lib/payment-utils.js');
+const { buildWebhookUrl, redactWebhookUrl } = require('../lib/payment-utils.js');
 
 // Events the backend handles for Chargebee subscription/payment processing
 const ENABLED_EVENTS = [
@@ -74,7 +74,7 @@ module.exports = async function ensureChargebeeWebhook(context) {
       console.log(`      ${chalk.green('✓')} Webhook active ${chalk.dim(`(${existing.id})`)}`);
     }
 
-    console.log(`      ${chalk.dim(desiredUrl)}`);
+    console.log(`      ${chalk.dim(redactWebhookUrl(desiredUrl))}`);
 
     // Chargebee doesn't return enabled_events, so event drift can't be
     // checked here — events are set on create only.
@@ -83,7 +83,7 @@ module.exports = async function ensureChargebeeWebhook(context) {
 
   if (dryRun) {
     console.log(`      ${chalk.cyan('+')} Would create webhook ${chalk.yellow('[DRY RUN]')}`);
-    console.log(`      ${chalk.dim(desiredUrl)}`);
+    console.log(`      ${chalk.dim(redactWebhookUrl(desiredUrl))}`);
     console.log(`      ${chalk.dim(`Events: ${ENABLED_EVENTS.length} event types`)}`);
     return { output: { chargebeeWebhook: { planned: 'create' } } };
   }
@@ -91,7 +91,7 @@ module.exports = async function ensureChargebeeWebhook(context) {
   const webhookName = `${brandConfig.brand.name} Backend`;
   const webhook = await api.createWebhook({ url: desiredUrl, name: webhookName, eventTypes: ENABLED_EVENTS });
   console.log(`      ${chalk.green('✓')} Webhook created: ${chalk.dim(webhook.id)}`);
-  console.log(`      ${chalk.dim(desiredUrl)}`);
+  console.log(`      ${chalk.dim(redactWebhookUrl(desiredUrl))}`);
 
   return { output: { chargebeeWebhook: { id: webhook.id, created: true } } };
 };

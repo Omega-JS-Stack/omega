@@ -1,4 +1,5 @@
 const path = require('path');
+const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
 
 /**
@@ -67,7 +68,7 @@ module.exports = async ({ assistant, user, settings }) => {
   // Load the processor module
   let processorModule;
   try {
-    processorModule = require(path.resolve(__dirname, `processors/${processor}.js`));
+    processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
   } catch (e) {
     return assistant.respond(`Unknown processor: ${processor}`, { code: 400 });
   }

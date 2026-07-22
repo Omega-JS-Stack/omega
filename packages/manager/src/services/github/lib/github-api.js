@@ -7,9 +7,12 @@
  * Uses the `gh` CLI for all operations. Requires `gh` installed and
  * authenticated — `gh auth login`, or a GH_TOKEN/GITHUB_TOKEN in the brand
  * .env (loaded before services run; gh honors both env vars).
+ *
+ * Every invocation is execFileSync with an argv array — no shell, so
+ * brand-config values (descriptions, homepages) can never inject commands.
  */
 
-const { execSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 
 class GitHubAPI {
   constructor() {
@@ -21,25 +24,24 @@ class GitHubAPI {
    */
   verifyGhCli() {
     try {
-      execSync('gh --version', { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('gh', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
     } catch {
       throw new Error('GitHub CLI (gh) is not installed. Install from: https://cli.github.com/');
     }
 
     try {
-      execSync('gh auth status', { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('gh', ['auth', 'status'], { encoding: 'utf8', stdio: 'pipe' });
     } catch {
       throw new Error('GitHub CLI is not authenticated. Run: gh auth login (or set GH_TOKEN in the brand .env)');
     }
   }
 
   /**
-   * Run a gh CLI command and return trimmed stdout
+   * Run a gh CLI command (argv array, no shell) and return trimmed stdout
    */
   runCommand(args, options = {}) {
-    const cmd = `gh ${args}`;
     try {
-      const result = execSync(cmd, {
+      const result = execFileSync('gh', args, {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
         ...options,
@@ -66,7 +68,7 @@ class GitHubAPI {
    * Get authenticated user info
    */
   getAuthenticatedUser() {
-    return this.runJsonCommand('api user');
+    return this.runJsonCommand(['api', 'user']);
   }
 
   /**
@@ -74,7 +76,7 @@ class GitHubAPI {
    */
   getOrg(orgName) {
     try {
-      return this.runJsonCommand(`api orgs/${orgName}`);
+      return this.runJsonCommand(['api', `orgs/${orgName}`]);
     } catch (error) {
       if (error.message.includes('404')) {
         return null;
@@ -88,9 +90,8 @@ class GitHubAPI {
    */
   updateOrg(orgName, settings) {
     const fields = Object.entries(settings)
-      .map(([key, value]) => `-f ${key}="${String(value).replace(/"/g, '\\"')}"`)
-      .join(' ');
-    return this.runJsonCommand(`api orgs/${orgName} -X PATCH ${fields}`);
+      .flatMap(([key, value]) => ['-f', `${key}=${String(value)}`]);
+    return this.runJsonCommand(['api', `orgs/${orgName}`, '-X', 'PATCH', ...fields]);
   }
 
   /**
@@ -98,7 +99,7 @@ class GitHubAPI {
    */
   getRepo(owner, repoName) {
     try {
-      return this.runJsonCommand(`api repos/${owner}/${repoName}`);
+      return this.runJsonCommand(['api', `repos/${owner}/${repoName}`]);
     } catch (error) {
       if (error.message.includes('404')) {
         return null;
@@ -112,11 +113,16 @@ class GitHubAPI {
    * the user pushes to it; no template, no clone)
    */
   createRepo(owner, name, { isPrivate = true, description = '', homepage = '' } = {}) {
-    const visibility = isPrivate ? '--private' : '--public';
-    const descFlag = description ? ` --description "${description.replace(/"/g, '\\"')}"` : '';
-    const homepageFlag = homepage ? ` --homepage "${homepage}"` : '';
+    const args = ['repo', 'create', `${owner}/${name}`, isPrivate ? '--private' : '--public'];
 
-    this.runCommand(`repo create ${owner}/${name} ${visibility}${descFlag}${homepageFlag}`);
+    if (description) {
+      args.push('--description', description);
+    }
+    if (homepage) {
+      args.push('--homepage', homepage);
+    }
+
+    this.runCommand(args);
 
     return {
       full_name: `${owner}/${name}`,
@@ -130,14 +136,13 @@ class GitHubAPI {
    */
   updateRepo(owner, repoName, settings) {
     const fields = Object.entries(settings)
-      .map(([key, value]) => {
+      .flatMap(([key, value]) => {
         if (typeof value === 'boolean') {
-          return `-F ${key}=${value}`;
+          return ['-F', `${key}=${value}`];
         }
-        return `-f ${key}="${String(value).replace(/"/g, '\\"')}"`;
-      })
-      .join(' ');
-    return this.runJsonCommand(`api repos/${owner}/${repoName} -X PATCH ${fields}`);
+        return ['-f', `${key}=${String(value)}`];
+      });
+    return this.runJsonCommand(['api', `repos/${owner}/${repoName}`, '-X', 'PATCH', ...fields]);
   }
 
   /**
@@ -145,7 +150,7 @@ class GitHubAPI {
    */
   branchExists(owner, repo, branch) {
     try {
-      this.runJsonCommand(`api repos/${owner}/${repo}/branches/${branch}`);
+      this.runJsonCommand(['api', `repos/${owner}/${repo}/branches/${branch}`]);
       return true;
     } catch {
       return false;
@@ -157,7 +162,7 @@ class GitHubAPI {
    */
   getPages(owner, repo) {
     try {
-      return this.runJsonCommand(`api repos/${owner}/${repo}/pages`);
+      return this.runJsonCommand(['api', `repos/${owner}/${repo}/pages`]);
     } catch (error) {
       if (error.message.includes('404')) {
         return null;
@@ -170,21 +175,21 @@ class GitHubAPI {
    * Enable GitHub Pages on a repository
    */
   enablePages(owner, repo, { branch = 'gh-pages', path = '/' } = {}) {
-    return this.runJsonCommand(`api repos/${owner}/${repo}/pages -X POST -f source[branch]=${branch} -f source[path]=${path}`);
+    return this.runJsonCommand(['api', `repos/${owner}/${repo}/pages`, '-X', 'POST', '-f', `source[branch]=${branch}`, '-f', `source[path]=${path}`]);
   }
 
   /**
    * Update GitHub Pages source configuration
    */
   updatePages(owner, repo, { branch = 'gh-pages', path = '/' } = {}) {
-    return this.runJsonCommand(`api repos/${owner}/${repo}/pages -X PUT -f source[branch]=${branch} -f source[path]=${path}`);
+    return this.runJsonCommand(['api', `repos/${owner}/${repo}/pages`, '-X', 'PUT', '-f', `source[branch]=${branch}`, '-f', `source[path]=${path}`]);
   }
 
   /**
    * Set the custom domain for GitHub Pages
    */
   setPagesDomain(owner, repo, domain) {
-    return this.runJsonCommand(`api repos/${owner}/${repo}/pages -X PUT -f cname=${domain}`);
+    return this.runJsonCommand(['api', `repos/${owner}/${repo}/pages`, '-X', 'PUT', '-f', `cname=${domain}`]);
   }
 }
 

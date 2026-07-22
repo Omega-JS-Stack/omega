@@ -345,11 +345,16 @@ function _fixStatus(status) {
   }
 }
 
-function resolveBasePath(basePath, command) {
-  const sanitizedCommand = command.replace(/\.\.\//g, '').replace(/\:/, '/');
-  const resolvedPath = path.join(basePath, `${sanitizedCommand}.js`);
+// Command names are strictly colon-joined segments of [a-z0-9_-] — dots and slashes can
+// never appear, so the resolved path can only address modules inside the two api roots.
+const COMMAND_PATTERN = /^[a-z0-9_-]+(?::[a-z0-9_-]+)*$/;
 
-  return resolvedPath;
+function resolveBasePath(basePath, command) {
+  if (!COMMAND_PATTERN.test(command)) {
+    return null;
+  }
+
+  return path.join(basePath, `${command.replace(/:/g, '/')}.js`);
 };
 
 Module.prototype.resolveApiPath = function (command) {
@@ -361,6 +366,11 @@ Module.prototype.resolveApiPath = function (command) {
   const assistant = self.assistant;
   const req = self.req;
   const res = self.res;
+
+  // Reject commands that can't name a module (traversal, separators, empty)
+  if (!resolveBasePath('/', command)) {
+    return null;
+  }
 
   // Set paths
   const projectBasePath = path.join(Manager.cwd, 'routes/api');

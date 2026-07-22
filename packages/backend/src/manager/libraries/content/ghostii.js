@@ -125,7 +125,8 @@ function blocksToPost(json) {
  *
  * @param {object} assistant - @omega.js/backend assistant instance
  * @param {object} args
- * @param {object} args.brand - Public brand config ({ brand: { url, ... }, github: { user, repo } })
+ * @param {object} args.brand - Public brand config ({ brand: { url, ... } }); the target repo is
+ *   never sent — admin/post always derives it from ITS OWN brand config
  * @param {object} args.article - The article from writeArticle(). When it carries a
  *   `json` block array, the post is reconstructed via blocksToPost() (title + header
  *   image extracted, body = content only). Falls back to article.{title,body,headerImageUrl}.
@@ -157,8 +158,6 @@ async function publishArticle(assistant, { brand, article, id, author, postPath,
     tags: article.keywords,
     postPath: postPath || 'ghostii',
     source: source || null,
-    githubUser: brand.github.user,
-    githubRepo: brand.github.repo,
   };
 
   console.log(`[ghostii] publishArticle() source=${postBody.source}`);

@@ -10,7 +10,7 @@
  * rejects OpenSSL 3's default PBES2/AES-256-CBC ("MAC verification
  * failed").
  */
-const { execSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
 
@@ -64,8 +64,9 @@ function generateCSR(emailAddress, commonName, outputDir) {
   const csrPath = `${outputDir}/request.csr`;
   const subject = `/emailAddress=${emailAddress}/CN=${commonName}/C=US`;
 
-  execSync(
-    `openssl req -nodes -newkey rsa:2048 -keyout "${keyPath}" -out "${csrPath}" -subj "${subject}"`,
+  execFileSync(
+    'openssl',
+    ['req', '-nodes', '-newkey', 'rsa:2048', '-keyout', keyPath, '-out', csrPath, '-subj', subject],
     { stdio: 'pipe' },
   );
 
@@ -125,10 +126,12 @@ function exportToP12(type, appleDir, certificatePassword = '') {
   }
 
   try {
-    // -legacy: macOS `security import` requires the old PKCS12 format
-    execSync(
-      `openssl pkcs12 -export -legacy -inkey "${keyPath}" -in "${certPath}" -out "${p12Path}" -passout pass:${certificatePassword}`,
-      { stdio: 'pipe' },
+    // -legacy: macOS `security import` requires the old PKCS12 format.
+    // Password rides an env var (-passout env:) — never argv, never a shell string.
+    execFileSync(
+      'openssl',
+      ['pkcs12', '-export', '-legacy', '-inkey', keyPath, '-in', certPath, '-out', p12Path, '-passout', 'env:OMEGA_P12_PASSWORD'],
+      { stdio: 'pipe', env: { ...process.env, OMEGA_P12_PASSWORD: certificatePassword } },
     );
     console.log(`        ${chalk.green('✓')} Exported .p12 ${chalk.gray(p12Path)}`);
   } catch (error) {
@@ -169,8 +172,9 @@ function validateManualCertificate(certPath) {
   }
 
   try {
-    const endDateOutput = execSync(
-      `openssl x509 -enddate -noout -in "${certPath}"`,
+    const endDateOutput = execFileSync(
+      'openssl',
+      ['x509', '-enddate', '-noout', '-in', certPath],
       { encoding: 'utf8', stdio: 'pipe' },
     ).trim();
 
@@ -199,8 +203,9 @@ function validateManualCertificate(certPath) {
  */
 function getCertificateCommonName(certPath) {
   try {
-    const subject = execSync(
-      `openssl x509 -subject -noout -in "${certPath}"`,
+    const subject = execFileSync(
+      'openssl',
+      ['x509', '-subject', '-noout', '-in', certPath],
       { encoding: 'utf8', stdio: 'pipe' },
     );
     const match = subject.match(/CN\s*=\s*([^,]+)/);
@@ -217,12 +222,14 @@ function getCertificateCommonName(certPath) {
  */
 function certificateMatchesKey(certPath, keyPath) {
   try {
-    const certModulus = execSync(
-      `openssl x509 -modulus -noout -in "${certPath}"`,
+    const certModulus = execFileSync(
+      'openssl',
+      ['x509', '-modulus', '-noout', '-in', certPath],
       { encoding: 'utf8', stdio: 'pipe' },
     ).trim();
-    const keyModulus = execSync(
-      `openssl rsa -modulus -noout -in "${keyPath}"`,
+    const keyModulus = execFileSync(
+      'openssl',
+      ['rsa', '-modulus', '-noout', '-in', keyPath],
       { encoding: 'utf8', stdio: 'pipe' },
     ).trim();
     return certModulus.length > 0 && certModulus === keyModulus;

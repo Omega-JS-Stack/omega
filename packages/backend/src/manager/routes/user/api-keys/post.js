@@ -36,14 +36,16 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   });
 
   // Update user document
-  await admin.firestore().doc(`users/${uid}`)
+  const write = await admin.firestore().doc(`users/${uid}`)
     .set({
       api: newKeys,
       metadata: Manager.Metadata().set({ tag: 'user/api-keys' }),
     }, { merge: true })
-    .catch((e) => {
-      return assistant.respond(`Failed to generate keys: ${e}`, { code: 500, sentry: true });
-    });
+    .catch((e) => e);
+
+  if (write instanceof Error) {
+    return assistant.respond(`Failed to generate keys: ${write}`, { code: 500, sentry: true });
+  }
 
   return assistant.respond(newKeys);
 };

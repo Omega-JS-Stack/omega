@@ -305,8 +305,8 @@ test('certificates: a fully converged brand is a zero-mutation no-op across all 
     stageLocalCert(root, type);
   }
   const dir = appleDirOf(root);
-  jetpack.write(join(dir, 'profiles', 'MAC_APP_DISTRIBUTION', 'MACOS.mobileprovision'), 'staged');
-  jetpack.write(join(dir, 'profiles', 'DEVELOPER_ID_APPLICATION_G2', 'MACOS.mobileprovision'), 'staged');
+  jetpack.write(join(dir, 'profiles', BRAND_ID, 'MAC_APP_DISTRIBUTION', 'MACOS.mobileprovision'), 'staged');
+  jetpack.write(join(dir, 'profiles', BRAND_ID, 'DEVELOPER_ID_APPLICATION_G2', 'MACOS.mobileprovision'), 'staged');
 
   const client = fakeApple({
     certificates: ALL_TYPES.map((type) => certRecord(type)),
@@ -769,7 +769,7 @@ test('certificates: missing profiles are created against the bundle ID + cert an
   // Distribution profiles never fetch the device list
   assert.equal(client.calls.some((c) => c.path === 'devices'), false);
 
-  const written = jetpack.read(join(appleDirOf(root), 'profiles', 'MAC_APP_DISTRIBUTION', 'MACOS.mobileprovision'));
+  const written = jetpack.read(join(appleDirOf(root), 'profiles', BRAND_ID, 'MAC_APP_DISTRIBUTION', 'MACOS.mobileprovision'));
   assert.equal(written, 'fixture-profile');
 });
 

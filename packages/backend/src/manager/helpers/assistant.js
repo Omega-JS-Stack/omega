@@ -2,6 +2,7 @@ const os = require('os');
 const path = require('path');
 const _ = require('lodash');
 const uuid = require('uuid');
+const safeCompare = require('./safe-compare.js');
 let JSON5;
 
 const LOG_LEVELS = {
@@ -448,7 +449,8 @@ BackendAssistant.prototype.errorify = function (e, options) {
   }
 
   // Quit and respond to the request only if the assistant has a res (it sometimes does not, like in auth().onCreate() triggers)
-  if (options.send && res?.status) {
+  // and only if nothing was sent yet (double-respond guard — see respond())
+  if (options.send && res?.status && !res.headersSent) {
     let sendable = newError?.stack && options.stack
       ? newError?.stack
       : newError?.message;
@@ -503,6 +505,13 @@ BackendAssistant.prototype.respond = function(response, options) {
     return response
       .then(resolved => self.respond(resolved, options))
       .catch(error => self.respond(error, options));
+  }
+
+  // Structural double-respond guard — a second respond() (e.g. a route that keeps running
+  // after an error path already responded) would crash with ERR_HTTP_HEADERS_SENT
+  if (res?.headersSent) {
+    self.warn('respond() called after a response was already sent — ignoring');
+    return;
   }
 
   // Set options
@@ -574,6 +583,17 @@ function isBetween(value, min, max) {
   return value >= min && value <= max;
 }
 
+// Presence + last-4 only — full secrets in log lines land in Cloud Logging
+function redactSecret(value) {
+  const string = `${value || ''}`;
+
+  if (!string) {
+    return '(empty)';
+  }
+
+  return `***${string.slice(-4)} (${string.length} chars)`;
+}
+
 function stringifyNonStrings(e) {
   if (typeof e === 'string') {
     return e;
@@ -598,7 +618,8 @@ function _attachHeaderProperties(self, options, error) {
   const res = self.ref.res;
 
   // Attach properties if this assistant has a res (it sometimes does not, like in auth().onCreate() triggers)
-  if (res?.header && res?.get) {
+  // and only if nothing was sent yet — setting a header after send crashes with ERR_HTTP_HEADERS_SENT
+  if (res?.header && res?.get && !res.headersSent) {
     res.header('omega-properties', JSON.stringify(headers));
 
     // Add omega-properties to Access-Control-Expose-Headers
@@ -650,8 +671,8 @@ BackendAssistant.prototype.authenticate = async function (options) {
       ? false
       : user.authenticated;
 
-    // Validate OMEGA_ADMIN_KEY
-    if (adminKey && adminKey === OMEGA_ADMIN_KEY) {
+    // Validate OMEGA_ADMIN_KEY (constant-time — a plain === leaks match length via timing)
+    if (safeCompare(adminKey, OMEGA_ADMIN_KEY)) {
       // Update roles
       user.roles = user.roles || {};
       user.roles.admin = true;
@@ -680,8 +701,8 @@ BackendAssistant.prototype.authenticate = async function (options) {
   if (options.adminKey || req?.headers?.['omega-admin-key']) {
     adminKey = options.adminKey || req.headers['omega-admin-key'];
 
-    // Log the token
-    self.log('Found "omega-admin-key" header', adminKey);
+    // Log the token (redacted — these lines land in Cloud Logging)
+    self.log('Found "omega-admin-key" header', redactSecret(adminKey));
   }
 
   // Extract the token / API key
@@ -690,14 +711,14 @@ BackendAssistant.prototype.authenticate = async function (options) {
     // Read the ID Token from the Authorization header.
     idToken = authHeader.split('Bearer ')[1];
 
-    // Log the token
-    self.log('Found "Authorization" header', idToken);
+    // Log the token (redacted — these lines land in Cloud Logging)
+    self.log('Found "Authorization" header', redactSecret(idToken));
   } else if (req?.cookies?.__session) {
     // Read the ID Token from cookie.
     idToken = req.cookies.__session;
 
-    // Log the token
-    self.log('Found "__session" cookie', idToken);
+    // Log the token (redacted — these lines land in Cloud Logging)
+    self.log('Found "__session" cookie', redactSecret(idToken));
   } else if (
     options.authenticationToken || data.authenticationToken
     || options.apiKey || data.apiKey
@@ -706,8 +727,8 @@ BackendAssistant.prototype.authenticate = async function (options) {
     idToken = options.authenticationToken || data.authenticationToken
     || options.apiKey || data.apiKey;
 
-    // Log the token
-    self.log('Found "authenticationToken" parameter', idToken);
+    // Log the token (redacted — these lines land in Cloud Logging)
+    self.log('Found "authenticationToken" parameter', redactSecret(idToken));
   } else {
     // No token found
     return _resolve(self.request.user);

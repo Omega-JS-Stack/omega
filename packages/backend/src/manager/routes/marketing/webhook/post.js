@@ -19,6 +19,8 @@
  * end state with no extra side effects, so duplicate suppression buys nothing.
  */
 const path = require('path');
+const loadProcessor = require('../../../libraries/load-processor.js');
+const safeCompare = require('../../../helpers/safe-compare.js');
 
 module.exports = async ({ assistant, Manager }) => {
   const query = assistant.request.query;
@@ -33,7 +35,7 @@ module.exports = async ({ assistant, Manager }) => {
 
   // Validate key against OMEGA_WEBHOOK_KEY (separate from OMEGA_ADMIN_KEY
   // so it can be rotated independently and scoped narrowly)
-  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
+  if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 
@@ -50,7 +52,7 @@ module.exports = async ({ assistant, Manager }) => {
   // Load the processor module
   let processorModule;
   try {
-    processorModule = require(path.resolve(__dirname, `processors/${provider}.js`));
+    processorModule = loadProcessor(path.join(__dirname, 'processors'), provider);
   } catch (e) {
     assistant.error(`marketing webhook: failed to load processor "${provider}":`, e);
     return assistant.respond(`Unknown provider: ${provider}`, { code: 400 });

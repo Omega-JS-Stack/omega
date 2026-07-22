@@ -44,8 +44,11 @@ function fakeApi(routes) {
   return {
     calls,
     runCommand(args) {
-      calls.push(args);
-      const apiPath = (args.match(/api "([^"]+)"/) || [])[1] || args;
+      // The real client takes an argv array (execFileSync, no shell)
+      const argv = Array.isArray(args) ? args : [args];
+      const joined = argv.join(' ');
+      calls.push(joined);
+      const apiPath = argv[0] === 'api' ? argv[1] : joined;
       const route = routes.find((r) => r.match.test(apiPath));
 
       if (!route) return JSON.stringify([]);

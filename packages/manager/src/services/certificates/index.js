@@ -12,7 +12,7 @@
  *   AuthKey_*.p8                           (App Store Connect API key — the interactive rescue files it from Downloads)
  *   certificates/{TYPE}.cer + .p12         (downloaded/created + exported)
  *   csr/{TYPE}/{private.key,request.csr}   (PRESERVED — the issued cert is paired with this key)
- *   profiles/{TYPE}/{PLATFORM}.mobileprovision
+ *   profiles/{BRAND_ID}/{TYPE}/{PLATFORM}.mobileprovision  (per-brand — profiles bind one bundle ID)
  *
  * De-ITW'd from omega-manager: certs lived in the company instance's shared
  * .output/_shared/ tree (one set for all brands) and the bundle-ID prefix

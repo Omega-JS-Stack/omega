@@ -45,8 +45,10 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
 
   // Fix other values
   settings.type = settings.type;
-  settings.githubUser = settings.githubUser || bemRepo.user;
-  settings.githubRepo = settings.githubRepo || bemRepo.name;
+  // Always the brand's own repo — caller-supplied values would let a blogger-role
+  // user point the shared GH_TOKEN at any repo it can write
+  settings.githubUser = bemRepo.user;
+  settings.githubRepo = bemRepo.name;
 
   assistant.log('main(): Creating file...', settings);
 

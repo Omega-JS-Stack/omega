@@ -24,9 +24,11 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Read from Realtime Database
   const snapshot = await admin.database().ref(settings.path).once('value')
-    .catch((e) => {
-      return assistant.respond(e.message, { code: 500 });
-    });
+    .catch((e) => e);
+
+  if (snapshot instanceof Error) {
+    return assistant.respond(snapshot.message, { code: 500 });
+  }
 
   // Return empty object if path doesn't exist (snapshot.val() returns null)
   return assistant.respond(snapshot.val() || {});

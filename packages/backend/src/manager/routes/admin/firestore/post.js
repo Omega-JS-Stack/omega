@@ -45,10 +45,12 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   assistant.log('main(): Writing', path, document, options);
 
   // Write to Firestore
-  await admin.firestore().doc(path).set(document, options)
-    .catch((e) => {
-      return assistant.respond(e.message, { code: 500 });
-    });
+  const write = await admin.firestore().doc(path).set(document, options)
+    .catch((e) => e);
+
+  if (write instanceof Error) {
+    return assistant.respond(write.message, { code: 500 });
+  }
 
   return assistant.respond({ path });
 };

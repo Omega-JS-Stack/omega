@@ -1,8 +1,10 @@
 /**
  * Ensure provisioning profiles exist for the brand's bundle ID × every
  * applicable cert type/platform combo, downloading each to
- * .omega/certificates/apple/profiles/{CERT_TYPE}/{PLATFORM}.mobileprovision
- * (delete the local file to force a re-download).
+ * .omega/certificates/apple/profiles/{BRAND_ID}/{CERT_TYPE}/{PLATFORM}.mobileprovision
+ * (delete the local file to force a re-download). The brand segment matters:
+ * the signing tree is shared at companyRoot, but a profile binds ONE bundle
+ * ID — without the segment, sibling brands overwrite each other's profiles.
  *
  * Reads the bundle ID + certificateMap the previous handlers stashed in
  * state. Device lists are fetched lazily — only when a development
@@ -76,7 +78,7 @@ module.exports = catchAgreements(async (context) => {
 
       const profileName = `${brandName} - ${certType} (${platform})`;
       const profileKey = `${certType.toLowerCase()}-${platform.toLowerCase()}`;
-      const profilePath = join(profilesDir, certType, `${platform}.mobileprovision`);
+      const profilePath = join(profilesDir, brandId, certType, `${platform}.mobileprovision`);
 
       console.log(`      ${chalk.dim('•')} ${chalk.cyan(profileName)}`);
 

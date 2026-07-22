@@ -56,8 +56,8 @@ Module.prototype.main = function () {
       // Fix other values
       payload.data.payload.type = payload.data.payload.type || 'text';
       // payload.data.payload.overwrite = typeof payload.data.payload.overwrite === 'undefined' ? true : payload.data.payload.overwrite;
-      payload.data.payload.githubUser = payload.data.payload.githubUser || bemRepo.user;
-      payload.data.payload.githubRepo = payload.data.payload.githubRepo || bemRepo.name;
+      payload.data.payload.githubUser = bemRepo.user; // always brand config — never caller-supplied
+      payload.data.payload.githubRepo = bemRepo.name;
 
       // Log
       assistant.log(`main(): Creating file...`, payload.data.payload);

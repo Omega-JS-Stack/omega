@@ -16,9 +16,14 @@
  * Keychain Access — the port stays non-interactive). Non-macOS platforms
  * skip entirely.
  */
-const { execSync } = require('node:child_process');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const jetpack = require('fs-jetpack');
 const chalk = require('chalk').default;
+
+// execFileSync gets no shell, so no ~ expansion — resolve the keychain path here
+const LOGIN_KEYCHAIN = path.join(os.homedir(), 'Library/Keychains/login.keychain-db');
 
 /**
  * Import .p12 files into the macOS login keychain (best-effort).
@@ -59,8 +64,9 @@ function importP12Files({ certificatesDir, keychainPassword = null, certificateP
   // fails on a locked keychain.
   if (keychainPassword) {
     try {
-      execSync(
-        `security unlock-keychain -p "${keychainPassword}" ~/Library/Keychains/login.keychain-db`,
+      execFileSync(
+        'security',
+        ['unlock-keychain', '-p', keychainPassword, LOGIN_KEYCHAIN],
         { stdio: 'pipe' },
       );
     } catch {
@@ -76,14 +82,15 @@ function importP12Files({ certificatesDir, keychainPassword = null, certificateP
     '/usr/bin/security',
     '/usr/bin/xcodebuild',
   ];
-  const tFlags = trustedTools.map((tool) => `-T "${tool}"`).join(' ');
+  const tFlags = trustedTools.flatMap((tool) => ['-T', tool]);
 
   for (const p12Path of p12Files) {
     const certType = p12Path.split('/').pop().replace('.p12', '');
 
     try {
-      execSync(
-        `security import "${p12Path}" -k ~/Library/Keychains/login.keychain-db -P "${certificatePassword}" ${tFlags}`,
+      execFileSync(
+        'security',
+        ['import', p12Path, '-k', LOGIN_KEYCHAIN, '-P', certificatePassword, ...tFlags],
         { stdio: 'pipe' },
       );
       console.log(`      ${chalk.green('✓')} Imported ${chalk.cyan(certType)} to Keychain`);
@@ -104,8 +111,9 @@ function importP12Files({ certificatesDir, keychainPassword = null, certificateP
   // first time it uses each imported private key.
   if (imported > 0 && keychainPassword) {
     try {
-      execSync(
-        `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychainPassword}" ~/Library/Keychains/login.keychain-db`,
+      execFileSync(
+        'security',
+        ['set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:', '-s', '-k', keychainPassword, LOGIN_KEYCHAIN],
         { stdio: 'pipe' },
       );
     } catch {
@@ -117,7 +125,7 @@ function importP12Files({ certificatesDir, keychainPassword = null, certificateP
     console.log(`      ${chalk.yellow('⚠')} ${failed.length} cert(s) failed keychain import — import manually:`);
     for (const { path, type, message } of failed) {
       console.log(`      ${chalk.gray('→')} ${chalk.cyan(type)}: ${chalk.gray(message.split('\n')[0])}`);
-      console.log(`        ${chalk.gray(`double-click ${path} (password: ${certificatePassword || 'empty'})`)}`);
+      console.log(`        ${chalk.gray(`double-click ${path} (password: ${certificatePassword ? 'the CSC_KEY_PASSWORD env value' : 'empty'})`)}`);
     }
   }
 

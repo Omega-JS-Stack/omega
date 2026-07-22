@@ -31,6 +31,7 @@
  *     Children themselves track idempotency, so provider retries are safe.
  */
 const fetch = require('wonderful-fetch');
+const safeCompare = require('../../../../helpers/safe-compare.js');
 
 const CHILD_TIMEOUT_MS = 10000;
 
@@ -53,7 +54,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
 
   // Same key used for the receiver — parent validates incoming, then re-uses
   // it for outbound calls to children (all brands share this env value).
-  if (!key || key !== process.env.OMEGA_WEBHOOK_KEY) {
+  if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
     return assistant.respond('Invalid key', { code: 401 });
   }
 

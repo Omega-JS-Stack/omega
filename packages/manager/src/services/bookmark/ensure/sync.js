@@ -11,7 +11,7 @@
  * Link sources are config + state; groups with unmet inputs are simply
  * absent (a brand without analytics IDs gets no Analytics folder).
  */
-const { execSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const chalk = require('chalk').default;
 const { WebSocketServer } = require('ws');
 const { isInteractive } = require('@omega.js/devkit/prompt');
@@ -26,9 +26,10 @@ const CONNECT_TIMEOUT = 10000;
  */
 function getDeployedFunctions(projectId) {
   try {
-    const output = execSync(
-      `gcloud functions list --project=${projectId} --format="value(name)" 2>/dev/null`,
-      { encoding: 'utf-8' },
+    const output = execFileSync(
+      'gcloud',
+      ['functions', 'list', `--project=${projectId}`, '--format=value(name)'],
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] },
     );
     return output.trim().split('\n').filter(Boolean);
   } catch {
@@ -184,7 +185,9 @@ module.exports = async function ensureSync(context) {
   const connectTimeout = Number(process.env.OMEGA_EXTENSION_TIMEOUT) || CONNECT_TIMEOUT;
 
   return new Promise((resolve) => {
-    const wss = new WebSocketServer({ port });
+    // Loopback only — the extension connects from this machine; binding all
+    // interfaces would expose the sync socket to the LAN for its lifetime
+    const wss = new WebSocketServer({ host: '127.0.0.1', port });
     let resolved = false;
 
     const cleanup = (result) => {

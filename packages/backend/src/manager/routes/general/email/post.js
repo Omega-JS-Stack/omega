@@ -4,6 +4,7 @@
  */
 const path = require('path');
 const { merge } = require('lodash');
+const { loadTemplate } = require('../../../libraries/load-processor');
 module.exports = async ({ assistant, Manager, settings }) => {
   // Validate required parameters
   if (!settings.id) {
@@ -23,11 +24,11 @@ module.exports = async ({ assistant, Manager, settings }) => {
   };
 
   // Load email template — colons in id are converted to nested folders
-  // (e.g. "general:download-app-link" → templates/general/download-app-link.js)
-  const templatePath = settings.id.split(':').join('/');
+  // (e.g. "general:download-app-link" → templates/general/download-app-link.js);
+  // loadTemplate validates the id so it can never resolve outside templates/
   let emailPayload;
   try {
-    const script = require(path.join(__dirname, 'templates', `${templatePath}.js`));
+    const script = loadTemplate(path.join(__dirname, 'templates'), settings.id);
     emailPayload = merge(
       {},
       DEFAULT,

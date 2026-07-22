@@ -48,7 +48,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   assistant.log('Feedback submitted', docId, { appReviewData: reviews, settings, decision });
 
   // Save feedback to Firestore
-  await admin.firestore().doc(`feedback/${docId}`)
+  const write = await admin.firestore().doc(`feedback/${docId}`)
     .set({
       feedback: {
         rating: settings.rating,
@@ -63,9 +63,11 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
         created: assistant.meta.startTime,
       },
     }, { merge: true })
-    .catch((e) => {
-      return assistant.respond(`Failed to save feedback: ${e.message}`, { code: 500, sentry: true });
-    });
+    .catch((e) => e);
+
+  if (write instanceof Error) {
+    return assistant.respond(`Failed to save feedback: ${write.message}`, { code: 500, sentry: true });
+  }
 
   return assistant.respond({
     review: decision,
