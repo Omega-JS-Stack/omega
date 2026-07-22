@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-22] cp260 SHIPPED, awaiting nothing; propose authorizedFetch shape to Ian before building (cp260 item 4) → CHANGELOG
+- [fable 2026-07-22] authorizedFetch proposal written, awaiting Ian's shape ratify (name, usage bindings key, sequencing) → plans/authorized-fetch.md
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -13,6 +13,8 @@
 ### Ian-queued (2026-07-22)
 - Assistant library review+optimization: rename, module split, signatures, sentry rework; KEEP headers/status-code semantics; propose-first → plans/assistant-refactor.md
 - claude.md/agents.md + omega:* skills reorganization for monorepo naming — after the review waves → plans/agent-docs-skills-reorg.md
+- authorizedFetch: one client-side API-fetch layer + automatic omega-properties→bindings usage sync — shape awaits Ian → plans/authorized-fetch.md
+- Test harmonization + comprehensiveness pass (real-Chrome extension auth e2e, real-Electron desktop auth e2e, per-package gap table) — after the review waves → plans/test-comprehensiveness.md
 ### Phase B — Launch wiring (after reviews)
 - cp239: single-command launch wired INSIDE existing verbs (manage pipeline DEPLOY_LEGS + Pages/domain/cloudflare/verify; onboarding stays one-time)
 - Review waves 2–6: manager+backend → web engine/themes → config+client/account/template-kit → desktop/extension+brands → DX+security (2× Fable medium via Workflow, Ian-gated between waves)
@@ -23,7 +25,6 @@
 - Brand rebuilds somiibo → sweet-saucy — HARD GATE: explicitly ask Ian before starting either; password formula → company hook at migration
 
 ## Blocked
-- GO redeploy: B3 fix inert until Ian redeploys the brand backend (clears live UNAUTHENTICATED); omega-brand firestore.rules still pre-B7 — regenerate+deploy rules too; live verify sweep after
 - GO wave3+: Ian gates between waves (wave 2 GO given 07-21; protocol in Phase B line)
 - GO publish: first 0.1.0 publish-proving after waves — prereq: npm org `omega.js` rights for itwcw2000 (`npm org ls` 403s; first publish is the definitive test; 2FA surfaces then)
 - GO org-move: move project `omegajs` into `itw-creative-works-org` + org-level manage grant (propose-first; project is currently org-less — why API owner grants failed)
@@ -57,6 +58,7 @@
 - Standing: checkpoint discipline — survey → design → implement → tests → sandbox/fixture proof → docs → commit; live checks never touch real ITW resources outside sanctioned paths
 
 ## Parked
+- Publish-time checklist (nothing gated; Ian 2026-07-22 "stop reminding"): next backend deploy ships B3 + regenerate omega-brand firestore.rules (pre-B7); live verify sweep after
 - Dev-mode `source: 'company'` resolves the LOCAL stack, ignoring company.url (getApiUrl dev branch) — defensible; Ian ratifies or we add a dev override (cp253 finding)
 - AdSense slot schema drift: schema documents flat '-slot' keys, client reads spec-shape `slots.*` — its own pass at the GO adsense gate (cp253 finding)
 - devkit e2e-harness ~1-in-15 flake (mechanism uncaptured; two-pass runner + retry saves failing output to .temp/) → CHANGELOG 124
