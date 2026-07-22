@@ -3,13 +3,16 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-20] Deploy chain armed on healed IAM → gate: Ian's two deploy verbs (see GO deploy), then Claude runs the live verify sweep
+- [fable 2026-07-22] cp260 EXECUTING (Ian GO 07-22): migrate 2 token callers + tests FIRST, then delete legacy command lane + de-ITW extension fallbacks → battery green
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
 - Playground CMS creates (arc close) once the source repo's `main` exists
 ### Website polish backlog (Ian 2026-07-21, "for after the review")
 - 28 items: bugs (contact, redirect rebuild, auth kick-out), design/copy (pricing, about, checkout), features (uj_ rename, ad slots, FA-Pro PROPOSE-FIRST) → plans/website-polish-backlog.md
+### Ian-queued (2026-07-22)
+- Assistant library review+optimization: rename, module split, signatures, sentry rework; KEEP headers/status-code semantics; propose-first → plans/assistant-refactor.md
+- claude.md/agents.md + omega:* skills reorganization for monorepo naming — after the review waves → plans/agent-docs-skills-reorg.md
 ### Phase B — Launch wiring (after reviews)
 - cp239: single-command launch wired INSIDE existing verbs (manage pipeline DEPLOY_LEGS + Pages/domain/cloudflare/verify; onboarding stays one-time)
 - Review waves 2–6: manager+backend → web engine/themes → config+client/account/template-kit → desktop/extension+brands → DX+security (2× Fable medium via Workflow, Ian-gated between waves)
@@ -20,8 +23,8 @@
 - Brand rebuilds somiibo → sweet-saucy — HARD GATE: explicitly ask Ian before starting either; password formula → company hook at migration
 
 ## Blocked
-- GO deploy: Ian runs `npm run deploy` at the omega-brand ROOT (cp251 fan-out, backend first) or per-app — classifier refuses Claude-fired production deploys
-- GO wave2: resume review waves 2–6 (protocol in Phase B line)
+- GO redeploy: B3 fix inert until Ian redeploys the brand backend (clears live UNAUTHENTICATED); omega-brand firestore.rules still pre-B7 — regenerate+deploy rules too; live verify sweep after
+- GO wave3+: Ian gates between waves (wave 2 GO given 07-21; protocol in Phase B line)
 - GO publish: first 0.1.0 publish-proving after waves — prereq: npm org `omega.js` rights for itwcw2000 (`npm org ls` 403s; first publish is the definitive test; 2FA surfaces then)
 - GO org-move: move project `omegajs` into `itw-creative-works-org` + org-level manage grant (propose-first; project is currently org-less — why API owner grants failed)
 - GO skins: both skins await Ian's eyes — classy/Paperloom (cp147–185) + The Daily Build (cp186–193); fall-through two-lane direction stands
@@ -64,6 +67,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp259 2026-07-21 wave-2 fix-batch + 3-pass review (email loadTemplate, errorify guard closed; backend 1332/44) → CHANGELOG
 - cp258 2026-07-21 FULL vert rename: every runtime surface adblock-safe; zero-hit sweep; battery GREEN → CHANGELOG
 - cp257 2026-07-21 de-ITW recaptcha ask + company-default GA account id (manager 774/0; battery EXIT 0) → CHANGELOG
 - cp256 2026-07-21 `omega update` verb: devkit core + 5-surface wiring, 7-day quarantine, npu-routed apply (battery PASSED) → CHANGELOG
@@ -73,4 +77,3 @@
 - cp252 2026-07-21 ads step 5: vert.js/adunits lane deleted, blog+sidebar flipped to ads/unit (web 264/264; battery PASSED) → CHANGELOG
 - cp251 2026-07-21 omega-manager name retired + brand-root `omega deploy` fan-out + scripts heal op (manager 737/0; battery EXIT 0) → CHANGELOG
 - cp250 2026-07-21 ads phase 4: desktop/extension data-omega-ad auto-bind, house-lane pinned (desktop 777/ext 111; battery EXIT 0) → CHANGELOG
-- cp249 2026-07-21 ads phase 3: /admin/ads CRUD card (web 263/263; root battery EXIT 0) → CHANGELOG
