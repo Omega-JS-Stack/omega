@@ -101,7 +101,7 @@ module.exports = {
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, Manager, assistant, config }) {
+      async run({ accounts, assert, Manager, ctx, config }) {
         const granted = accounts['consent-granted'];
         const admin = Manager.libraries.admin;
 
@@ -132,7 +132,7 @@ module.exports = {
         }, { merge: true });
 
         // Trigger marketing sync via the Email() surface
-        const result = await Manager.Email(assistant).sync(granted.uid);
+        const result = await Manager.Email(ctx).sync(granted.uid);
         assert.ok(result, 'sync should return a result');
         assert.notEqual(result.blocked, 'validation', 'sync should not be blocked by validation (uses _test.allow_*)');
 
@@ -160,7 +160,7 @@ module.exports = {
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, Manager, assistant }) {
+      async run({ accounts, assert, Manager, ctx }) {
         const declined = accounts['consent-declined'];
         const admin = Manager.libraries.admin;
 
@@ -213,11 +213,11 @@ module.exports = {
       auth: 'admin',
       timeout: 180000,
 
-      async run({ accounts, assert, Manager, assistant }) {
+      async run({ accounts, assert, Manager, ctx }) {
         const granted = accounts['consent-granted'];
 
         // Trigger removal — simulates the email-preferences opt-out flow
-        const result = await Manager.Email(assistant).remove(granted.email);
+        const result = await Manager.Email(ctx).remove(granted.email);
         assert.ok(result, 'remove should return a result');
 
         // Poll for absence — SendGrid's contact delete is also an async job.
@@ -237,11 +237,11 @@ module.exports = {
       auth: 'admin',
       timeout: 30000,
 
-      async run({ assert, Manager, assistant }) {
+      async run({ assert, Manager, ctx }) {
         // _test.never-reaches-providers@... is NOT _test.allow_* → should be blocked
         const blockedEmail = '_test.never-reaches-providers@somiibo.com';
 
-        const result = await Manager.Email(assistant).add({ email: blockedEmail });
+        const result = await Manager.Email(ctx).add({ email: blockedEmail });
 
         assert.equal(result.blocked, 'validation', 'non-allow _test.* email should be blocked by validation');
 

@@ -23,42 +23,42 @@ const crypto = require('crypto');
 
 const RATE_LIMIT = 5;
 
-module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
   // --- AUTHENTICATED MODE ---
   if (user.authenticated) {
-    return handleAuthenticated({ assistant, Manager, user, settings, analytics });
+    return handleAuthenticated({ ctx, Manager, user, settings, analytics });
   }
 
   // --- ANONYMOUS HMAC MODE ---
-  return handleAnonymous({ assistant, Manager, settings, analytics });
+  return handleAnonymous({ ctx, Manager, settings, analytics });
 };
 
 /**
  * Authenticated user toggling marketing on/off from the account page.
  */
-async function handleAuthenticated({ assistant, Manager, user, settings, analytics }) {
+async function handleAuthenticated({ ctx, Manager, user, settings, analytics }) {
   const { admin } = Manager.libraries;
   const action = settings.action;
 
   if (action !== 'subscribe' && action !== 'unsubscribe') {
-    return assistant.respond('Invalid action — must be "subscribe" or "unsubscribe"', { code: 400 });
+    return ctx.respond('Invalid action — must be "subscribe" or "unsubscribe"', { code: 400 });
   }
 
   // Rate-limit per-user (defense against accidental toggling spam)
-  const usage = await Manager.Usage().init(assistant);
+  const usage = await Manager.Usage().init(ctx);
   const currentUsage = usage.getUsage('email-preferences');
   if (currentUsage >= RATE_LIMIT) {
-    return assistant.respond('Rate limit exceeded', { code: 429 });
+    return ctx.respond('Rate limit exceeded', { code: 429 });
   }
   usage.increment('email-preferences');
   await usage.update();
 
   const uid = user.auth.uid;
   const email = user.auth.email;
-  const ip = assistant.request.geolocation?.ip || null;
-  const timestamp = assistant.meta.startTime.timestamp;
-  const timestampUNIX = assistant.meta.startTime.timestampUNIX;
+  const ip = ctx.request.geolocation?.ip || null;
+  const timestamp = ctx.meta.startTime.timestamp;
+  const timestampUNIX = ctx.meta.startTime.timestampUNIX;
 
   // Build the consent.marketing mutation
   const marketingPatch = action === 'subscribe'
@@ -78,13 +78,13 @@ async function handleAuthenticated({ assistant, Manager, user, settings, analyti
     metadata: Manager.Metadata().set({ tag: 'marketing/email-preferences' }),
   }, { merge: true });
 
-  assistant.log(`email-preferences (auth): ${uid} → ${action}`);
+  ctx.log(`email-preferences (auth): ${uid} → ${action}`);
 
   // Skip provider calls in test mode unless extended mode is on
-  const shouldCallExternalAPIs = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldCallExternalAPIs = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (shouldCallExternalAPIs) {
-    const mailer = Manager.Email(assistant);
+    const mailer = Manager.Email(ctx);
 
     try {
       if (action === 'unsubscribe') {
@@ -93,22 +93,22 @@ async function handleAuthenticated({ assistant, Manager, user, settings, analyti
         await mailer.sync(uid);
       }
     } catch (e) {
-      assistant.error(`email-preferences (auth) provider sync failed:`, e);
+      ctx.error(`email-preferences (auth) provider sync failed:`, e);
       // Doc is already updated — provider sync is best-effort. Don't fail the request.
     }
   } else {
-    assistant.log('email-preferences (auth): Skipping provider calls (OMEGA_TEST_MODE=true)');
+    ctx.log('email-preferences (auth): Skipping provider calls (OMEGA_TEST_MODE=true)');
   }
 
   analytics.event('marketing/email-preferences', { action, mode: 'authenticated' });
 
-  return assistant.respond({ success: true, action });
+  return ctx.respond({ success: true, action });
 }
 
 /**
  * Anonymous HMAC unsubscribe link (preserves existing email-footer one-click flow).
  */
-async function handleAnonymous({ assistant, Manager, settings, analytics }) {
+async function handleAnonymous({ ctx, Manager, settings, analytics }) {
   const { admin } = Manager.libraries;
 
   const email = (settings.email || '').trim().toLowerCase();
@@ -117,36 +117,36 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
 
   // Validate inputs
   if (!email) {
-    return assistant.respond('Email is required', { code: 400 });
+    return ctx.respond('Email is required', { code: 400 });
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    return assistant.respond('Invalid email format', { code: 400 });
+    return ctx.respond('Invalid email format', { code: 400 });
   }
 
   if (!asmId || isNaN(asmId)) {
-    return assistant.respond('ASM group ID is required', { code: 400 });
+    return ctx.respond('ASM group ID is required', { code: 400 });
   }
 
   if (action !== 'subscribe' && action !== 'unsubscribe') {
-    return assistant.respond('Invalid action', { code: 400 });
+    return ctx.respond('Invalid action', { code: 400 });
   }
 
   // HMAC validation (proves we generated this link)
   const expectedSig = crypto.createHmac('sha256', process.env.UNSUBSCRIBE_HMAC_KEY).update(email).digest('hex');
   if (settings.sig !== expectedSig) {
-    return assistant.respond('Invalid signature', { code: 403 });
+    return ctx.respond('Invalid signature', { code: 403 });
   }
 
   // IP rate limiting (anonymous flow — unauthenticated firestore storage)
-  const usage = await Manager.Usage().init(assistant, {
+  const usage = await Manager.Usage().init(ctx, {
     unauthenticatedMode: 'firestore',
-    key: assistant.request.geolocation.ip,
+    key: ctx.request.geolocation.ip,
   });
   const currentUsage = usage.getUsage('email-preferences');
   if (currentUsage >= RATE_LIMIT) {
-    return assistant.respond('Rate limit exceeded', { code: 429 });
+    return ctx.respond('Rate limit exceeded', { code: 429 });
   }
   usage.increment('email-preferences');
   await usage.update();
@@ -154,14 +154,14 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
   // Mirror to the user doc if this email maps to a user (best-effort, silent on miss).
   // Runs BEFORE the provider calls below — on subscribe it writes consent granted first,
   // so the email library's consent gate passes when we re-sync.
-  const uid = await mirrorAnonymousToUserDoc({ assistant, Manager, email, action });
+  const uid = await mirrorAnonymousToUserDoc({ ctx, Manager, email, action });
 
   // Call SendGrid ASM (legacy behavior)
-  const shouldCallExternalAPIs = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldCallExternalAPIs = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldCallExternalAPIs) {
-    assistant.log('email-preferences (anon): Skipping SendGrid (OMEGA_TEST_MODE=true)');
-    return assistant.respond({ success: true });
+    ctx.log('email-preferences (anon): Skipping SendGrid (OMEGA_TEST_MODE=true)');
+    return ctx.respond({ success: true });
   }
 
   try {
@@ -185,8 +185,8 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
       });
     }
   } catch (e) {
-    assistant.log(`SendGrid ASM ${action} error:`, e);
-    return assistant.respond('Failed to process your request', { code: 500 });
+    ctx.log(`SendGrid ASM ${action} error:`, e);
+    return ctx.respond('Failed to process your request', { code: 500 });
   }
 
   // Cross-provider sync via the email library (best-effort — ASM suppression above
@@ -194,7 +194,7 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
   // (compliance); subscribe must actually re-add the contact: sync the matched user
   // (the mirror above already wrote consent granted, so the library consent gate
   // passes) or add a bare newsletter contact when no user matched.
-  const mailer = Manager.Email(assistant);
+  const mailer = Manager.Email(ctx);
 
   try {
     if (action === 'unsubscribe') {
@@ -205,14 +205,14 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
       await mailer.add({ email, source: 'resubscribe' });
     }
   } catch (e) {
-    assistant.error(`email-preferences (anon) provider sync failed:`, e);
+    ctx.error(`email-preferences (anon) provider sync failed:`, e);
     // Doc + ASM are already updated — provider sync is best-effort. Don't fail the request.
   }
 
-  assistant.log('email-preferences (anon) result:', { email, asmId, action });
+  ctx.log('email-preferences (anon) result:', { email, asmId, action });
   analytics.event('marketing/email-preferences', { action, mode: 'anonymous' });
 
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 }
 
 /**
@@ -222,7 +222,7 @@ async function handleAnonymous({ assistant, Manager, settings, analytics }) {
  *
  * @returns {Promise<string|null>} The matched user's uid, or null when no user matches.
  */
-async function mirrorAnonymousToUserDoc({ assistant, Manager, email, action }) {
+async function mirrorAnonymousToUserDoc({ ctx, Manager, email, action }) {
   const { admin } = Manager.libraries;
 
   const snapshot = await admin.firestore().collection('users')
@@ -230,7 +230,7 @@ async function mirrorAnonymousToUserDoc({ assistant, Manager, email, action }) {
     .limit(1)
     .get()
     .catch((e) => {
-      assistant.error('email-preferences (anon): Failed to look up user by email:', e);
+      ctx.error('email-preferences (anon): Failed to look up user by email:', e);
       return null;
     });
 
@@ -240,8 +240,8 @@ async function mirrorAnonymousToUserDoc({ assistant, Manager, email, action }) {
 
   const userDoc = snapshot.docs[0];
   const uid = userDoc.id;
-  const timestamp = assistant.meta.startTime.timestamp;
-  const timestampUNIX = assistant.meta.startTime.timestampUNIX;
+  const timestamp = ctx.meta.startTime.timestamp;
+  const timestampUNIX = ctx.meta.startTime.timestampUNIX;
 
   const marketingPatch = action === 'unsubscribe'
     ? {
@@ -258,7 +258,7 @@ async function mirrorAnonymousToUserDoc({ assistant, Manager, email, action }) {
     metadata: Manager.Metadata().set({ tag: 'marketing/email-preferences' }),
   }, { merge: true })
     .catch((e) => {
-      assistant.error(`email-preferences (anon): Failed to mirror to user doc ${uid}:`, e);
+      ctx.error(`email-preferences (anon): Failed to mirror to user doc ${uid}:`, e);
     });
 
   return uid;

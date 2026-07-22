@@ -8,16 +8,16 @@ const {
  *
  * Revokes tokens with the provider (best effort) and removes the connection.
  */
-module.exports = async ({ assistant, user, settings }) => {
-  const context = await buildContext({ assistant, user, settings });
+module.exports = async ({ ctx, user, settings }) => {
+  const context = await buildContext({ ctx, user, settings });
 
   if (context.error) {
-    return assistant.respond(context.error.message, { code: context.error.code });
+    return ctx.respond(context.error.message, { code: context.error.code });
   }
 
   const { Manager, admin, oauth2Provider, targetUid, targetUser, clientId, clientSecret } = context;
 
-  assistant.log('OAuth2 DELETE request', { provider: settings.provider });
+  ctx.log('OAuth2 DELETE request', { provider: settings.provider });
 
   // Get current access token to revoke
   const accessToken = targetUser?.oauth2?.[settings.provider]?.token?.access_token;
@@ -25,12 +25,12 @@ module.exports = async ({ assistant, user, settings }) => {
   // Attempt to revoke token with provider (best effort)
   if (accessToken && oauth2Provider.revokeToken) {
     const revokeResult = await oauth2Provider.revokeToken(accessToken, {
-      assistant,
+      ctx,
       clientId,
       clientSecret,
     }).catch(e => ({ revoked: false, reason: e.message }));
 
-    assistant.log('Token revocation result:', revokeResult);
+    ctx.log('Token revocation result:', revokeResult);
   }
 
   // Delete OAuth data from user document
@@ -39,5 +39,5 @@ module.exports = async ({ assistant, user, settings }) => {
     metadata: Manager.Metadata().set({ tag: 'user/oauth2' }),
   });
 
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 };

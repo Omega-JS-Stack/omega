@@ -331,12 +331,12 @@ const MODEL_TABLE = {
   },
 }
 
-function OpenAI(assistant, key) {
+function OpenAI(ctx, key) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant?.Manager;
-  self.user = assistant?.user;
+  self.ctx = ctx;
+  self.Manager = ctx?.Manager;
+  self.user = ctx?.user;
   self.key = key
     || self.Manager?.config?.openai?.key
     || self.Manager?.config?.openai?.global
@@ -365,7 +365,7 @@ function OpenAI(assistant, key) {
 OpenAI.prototype.request = function (options) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   return new Promise(async function(resolve, reject) {
     // Deep merge options
@@ -377,7 +377,7 @@ OpenAI.prototype.request = function (options) {
     options.timeout = typeof options.timeout === 'undefined' ? 120000 : options.timeout;
     options.moderate = typeof options.moderate === 'undefined' ? true : options.moderate;
     options.log = typeof options.log === 'undefined' ? false : options.log;
-    options.user = options.user || assistant.getUser();
+    options.user = options.user || ctx.getUser();
 
     // Format retries
     options.retries = typeof options.retries === 'undefined' ? 0 : options.retries;
@@ -443,7 +443,7 @@ OpenAI.prototype.request = function (options) {
         return;
       }
 
-      assistant.log('callOpenAI():', ...arguments);
+      ctx.log('callOpenAI():', ...arguments);
     }
 
 
@@ -452,7 +452,7 @@ OpenAI.prototype.request = function (options) {
 
 
     // Direct-messages mode: when a unified messages[] array is passed (incl.
-    // assistant toolCalls turns + role:'tool' results), it IS the full
+    // ctx toolCalls turns + role:'tool' results), it IS the full
     // conversation — prompt/message/history are ignored and the array maps
     // straight to the Responses API input (see formatMessages). The last user
     // turn's text still feeds moderation.
@@ -464,7 +464,7 @@ OpenAI.prototype.request = function (options) {
       content: loadContent(segment, _log),
     }));
     const message = useMessages ? lastUserText(options.messages) : loadContent(options.message, _log);
-    const user = options.user?.auth?.uid || assistant.request.geolocation.ip || 'unknown';
+    const user = options.user?.auth?.uid || ctx.request.geolocation.ip || 'unknown';
 
     // Log
     for (const segment of promptSegments) {
@@ -476,12 +476,12 @@ OpenAI.prototype.request = function (options) {
     // Check for errors
     for (const segment of promptSegments) {
       if (segment.content instanceof Error) {
-        return reject(assistant.errorify(`Error loading prompt[${segment.role}]: ${segment.content}`, {code: 400}));
+        return reject(ctx.report(`Error loading prompt[${segment.role}]: ${segment.content}`, {code: 400}));
       }
     }
 
     if (message instanceof Error) {
-      return reject(assistant.errorify(`Error loading message: ${message}`, {code: 400}));
+      return reject(ctx.report(`Error loading message: ${message}`, {code: 400}));
     }
 
     // Moderate if needed (skipped in direct-messages mode when the last turn
@@ -513,13 +513,13 @@ OpenAI.prototype.request = function (options) {
 
       // Check for moderation flag
       if (moderation?.flagged) {
-        return reject(assistant.errorify(`This request is inappropriate`, {code: 451}));
+        return reject(ctx.report(`This request is inappropriate`, {code: 451}));
       }
     }
 
 
     // Make attempt
-    attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log);
+    attemptRequest(options, self, promptSegments, message, user, moderation, attempt, ctx, resolve, reject, _log);
   });
 }
 
@@ -544,13 +544,13 @@ OpenAI.prototype.request = function (options) {
  */
 OpenAI.prototype.image = function (options) {
   const self = this;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   return new Promise(async function (resolve, reject) {
     options = _.merge({}, options);
 
     if (!options.prompt) {
-      return reject(assistant.errorify(`image(): {prompt} is required`, { code: 400 }));
+      return reject(ctx.report(`image(): {prompt} is required`, { code: 400 }));
     }
 
     options.model = options.model || IMAGE_DEFAULT_MODEL;
@@ -574,7 +574,7 @@ OpenAI.prototype.image = function (options) {
     }
 
     if (options.log) {
-      assistant.log(`OpenAI.image(): model=${options.model} size=${options.size} quality=${options.quality} n=${options.n}`);
+      ctx.log(`OpenAI.image(): model=${options.model} size=${options.size} quality=${options.quality} n=${options.n}`);
     }
 
     let data;
@@ -591,11 +591,11 @@ OpenAI.prototype.image = function (options) {
         body: body,
       });
     } catch (e) {
-      return reject(assistant.errorify(`OpenAI.image() request failed: ${e.message}`, { code: e.code || 500 }));
+      return reject(ctx.report(`OpenAI.image() request failed: ${e.message}`, { code: e.code || 500 }));
     }
 
     if (!data?.data?.length) {
-      return reject(assistant.errorify(`OpenAI.image() returned no image data: ${JSON.stringify(data).slice(0, 300)}`, { code: 500 }));
+      return reject(ctx.report(`OpenAI.image() returned no image data: ${JSON.stringify(data).slice(0, 300)}`, { code: 500 }));
     }
 
     const mapItem = (item) => {
@@ -626,7 +626,7 @@ function tryParse(content) {
 }
 
 // Roles permitted in the `options.prompt` array. Order is canonical per the
-// OpenAI Model Spec authority hierarchy (system > developer > user > assistant).
+// OpenAI Model Spec authority hierarchy (system > developer > user > ctx).
 const VALID_PROMPT_ROLES = new Set(['system', 'developer', 'user', 'assistant']);
 
 // Normalize the `options.prompt` input into a canonical array of segments:
@@ -1024,7 +1024,7 @@ function parseArguments(args) {
   return {};
 }
 
-function attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log) {
+function attemptRequest(options, self, promptSegments, message, user, moderation, attempt, ctx, resolve, reject, _log) {
   const retries = options.retries;
   const triggers = options.retryTriggers;
 
@@ -1144,11 +1144,11 @@ function attemptRequest(options, self, promptSegments, message, user, moderation
         stopReason: stopReason,
       })
     } catch (e) {
-      assistant.error('Error parsing response', r, e);
+      ctx.error('Error parsing response', r, e);
 
       // Retry
       if (attempt.count < retries && triggers.includes('parse')) {
-        return attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log);
+        return attemptRequest(options, self, promptSegments, message, user, moderation, attempt, ctx, resolve, reject, _log);
       }
 
       // Return
@@ -1161,16 +1161,16 @@ function attemptRequest(options, self, promptSegments, message, user, moderation
     const message = parsed?.message || e.message;
 
     // Log
-    assistant.error(`Error requesting (type=${type}, message=${message})`, e);
+    ctx.error(`Error requesting (type=${type}, message=${message})`, e);
 
     // Check for invalid request error
     if (type === 'invalid_request_error') {
-      return reject(assistant.errorify(message, {code: 400}));
+      return reject(ctx.report(message, {code: 400}));
     }
 
     // Retry
     if (attempt.count < retries && triggers.includes('network')) {
-      return attemptRequest(options, self, promptSegments, message, user, moderation, attempt, assistant, resolve, reject, _log);
+      return attemptRequest(options, self, promptSegments, message, user, moderation, attempt, ctx, resolve, reject, _log);
     }
 
     // Return

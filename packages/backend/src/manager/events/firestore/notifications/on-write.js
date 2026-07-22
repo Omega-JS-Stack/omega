@@ -6,7 +6,7 @@ const { FieldValue } = require('firebase-admin/firestore');
  * Handles create, update, and delete events for notification subscriptions.
  * Updates stats counters and sends analytics events.
  */
-module.exports = async ({ Manager, assistant, change, context, libraries }) => {
+module.exports = async ({ Manager, ctx, change, context, libraries }) => {
   const { admin } = libraries;
 
   // Shortcuts
@@ -24,7 +24,7 @@ module.exports = async ({ Manager, assistant, change, context, libraries }) => {
   }
 
   // Log
-  assistant.log('Notification subscription write:', {
+  ctx.log('Notification subscription write:', {
     after: dataAfter,
     before: dataBefore,
     eventType: eventType,
@@ -40,11 +40,11 @@ module.exports = async ({ Manager, assistant, change, context, libraries }) => {
       }, { merge: true });
 
     Manager.Analytics({
-      assistant: assistant,
+      ctx: ctx,
       uuid: dataBefore?.owner,
     }).event('notification-unsubscribe', {});
 
-    assistant.log('Notification subscription deleted:', dataBefore);
+    ctx.log('Notification subscription deleted:', dataBefore);
 
     return dataBefore;
   }
@@ -62,11 +62,11 @@ module.exports = async ({ Manager, assistant, change, context, libraries }) => {
       }, { merge: true });
 
     Manager.Analytics({
-      assistant: assistant,
+      ctx: ctx,
       uuid: dataAfter?.owner,
     }).event('notification-subscribe', {});
 
-    assistant.log('Notification subscription created:', dataAfter);
+    ctx.log('Notification subscription created:', dataAfter);
 
     return dataAfter;
   }

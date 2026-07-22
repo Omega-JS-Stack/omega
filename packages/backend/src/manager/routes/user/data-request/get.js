@@ -8,12 +8,12 @@
  *   pending   — request submitted, waiting to be processed (omega_cronDaily sets to 'completed' after 14 days)
  *   completed — data is available for download (downloads counter tracks how many times downloaded)
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   const uid = user.auth.uid;
@@ -27,7 +27,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     .get();
 
   if (requestsSnapshot.empty) {
-    return assistant.respond({ request: null });
+    return ctx.respond({ request: null });
   }
 
   const requestDoc = requestsSnapshot.docs[0];
@@ -38,14 +38,14 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   // Status check — return the doc as-is
   if (settings.action !== 'download') {
-    return assistant.respond({
+    return ctx.respond({
       request: { id: requestId, ...request },
     });
   }
 
   // Download action — only allowed when status is 'completed'
   if (status !== 'completed') {
-    return assistant.respond('Your data request is still being processed. Please check back later.', { code: 400 });
+    return ctx.respond('Your data request is still being processed. Please check back later.', { code: 400 });
   }
 
   // Build query list: @omega.js/backend defaults + project-specific queries from config
@@ -84,7 +84,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   // Compile data from results
   const authRecordResult = results.pop();
   const data = {
-    exportedAt: assistant.meta.startTime.timestamp,
+    exportedAt: ctx.meta.startTime.timestamp,
     authRecord: null,
   };
 
@@ -162,8 +162,8 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   };
 
   if (!request.metadata.completed?.timestampUNIX) {
-    updateData['metadata.completed.timestamp'] = assistant.meta.startTime.timestamp;
-    updateData['metadata.completed.timestampUNIX'] = assistant.meta.startTime.timestampUNIX;
+    updateData['metadata.completed.timestamp'] = ctx.meta.startTime.timestamp;
+    updateData['metadata.completed.timestampUNIX'] = ctx.meta.startTime.timestampUNIX;
   }
 
   await admin.firestore()
@@ -172,12 +172,12 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   const downloads = (request.downloads || 0) + 1;
 
-  assistant.log(`Data request ${requestId} downloaded by user ${uid} (download #${downloads})`);
+  ctx.log(`Data request ${requestId} downloaded by user ${uid} (download #${downloads})`);
 
   // Send download confirmation email (fire-and-forget)
-  sendDownloadEmail(assistant, user, requestId, downloads);
+  sendDownloadEmail(ctx, user, requestId, downloads);
 
-  return assistant.respond({
+  return ctx.respond({
     request: { id: requestId, ...request, downloads: downloads },
     data: data,
   });
@@ -186,13 +186,13 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 /**
  * Send data download confirmation email (fire-and-forget)
  */
-function sendDownloadEmail(assistant, user, requestId, downloads) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendDownloadEmail(ctx, user, requestId, downloads) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const uid = user.auth.uid;
   const firstName = user.personal?.name?.first;
   const greeting = firstName ? `Hey ${firstName}, your` : 'Your';
-  const downloadDate = assistant.meta.startTime.timestamp;
+  const downloadDate = ctx.meta.startTime.timestamp;
 
   mailer.send({
     to: user,
@@ -221,9 +221,9 @@ If you did not initiate this download, please secure your account immediately an
     },
   })
     .then((result) => {
-      assistant.log(`sendDownloadEmail(): Success, status=${result.status}`);
+      ctx.log(`sendDownloadEmail(): Success, status=${result.status}`);
     })
     .catch((e) => {
-      assistant.error(`sendDownloadEmail(): Failed: ${e.message}`);
+      ctx.error(`sendDownloadEmail(): Failed: ${e.message}`);
     });
 }

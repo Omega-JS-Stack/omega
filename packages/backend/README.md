@@ -44,15 +44,15 @@ Create `functions/routes/myEndpoint/index.js`:
 ```javascript
 function Route() {}
 
-Route.prototype.main = async function (assistant) {
-  const Manager = assistant.Manager;
-  const user = assistant.usage.user;
-  const settings = assistant.settings;
+Route.prototype.main = async function (ctx) {
+  const Manager = ctx.Manager;
+  const user = ctx.usage.user;
+  const settings = ctx.settings;
 
-  assistant.log('Request data:', assistant.request.data);
+  ctx.log('Request data:', ctx.request.data);
 
   // Return response
-  assistant.respond({ success: true, timestamp: new Date().toISOString() });
+  ctx.respond({ success: true, timestamp: new Date().toISOString() });
 };
 
 module.exports = Route;
@@ -61,7 +61,7 @@ module.exports = Route;
 Create `functions/schemas/myEndpoint/index.js`:
 
 ```javascript
-module.exports = function (assistant) {
+module.exports = function (ctx) {
   return {
     defaults: {
       message: {
@@ -173,31 +173,31 @@ Routes handle HTTP requests. Create files in your `routes/` directory:
 ```javascript
 function Route() {}
 
-Route.prototype.main = async function (assistant) {
+Route.prototype.main = async function (ctx) {
   // Access Manager and helpers
-  const Manager = assistant.Manager;
-  const usage = assistant.usage;
-  const user = assistant.usage.user;
-  const analytics = assistant.analytics;
-  const settings = assistant.settings;
+  const Manager = ctx.Manager;
+  const usage = ctx.usage;
+  const user = ctx.usage.user;
+  const analytics = ctx.analytics;
+  const settings = ctx.settings;
 
   // Access request data
-  const data = assistant.request.data;       // Merged body + query
-  const body = assistant.request.body;       // POST body
-  const query = assistant.request.query;     // Query params
-  const headers = assistant.request.headers;
-  const method = assistant.request.method;
-  const geolocation = assistant.request.geolocation; // { ip, country, region, city, latitude, longitude }
-  const client = assistant.request.client;   // { userAgent, language, platform, mobile }
+  const data = ctx.request.data;       // Merged body + query
+  const body = ctx.request.body;       // POST body
+  const query = ctx.request.query;     // Query params
+  const headers = ctx.request.headers;
+  const method = ctx.request.method;
+  const geolocation = ctx.request.geolocation; // { ip, country, region, city, latitude, longitude }
+  const client = ctx.request.client;   // { userAgent, language, platform, mobile }
 
   // Check authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Check admin role
   if (!user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Track analytics
@@ -209,7 +209,7 @@ Route.prototype.main = async function (assistant) {
   await usage.update();
 
   // Send response
-  assistant.respond({ success: true, data: settings });
+  ctx.respond({ success: true, data: settings });
 };
 
 module.exports = Route;
@@ -220,7 +220,7 @@ module.exports = Route;
 Schemas define and validate request parameters with defaults and plan-based limits:
 
 ```javascript
-module.exports = function (assistant, settings, options) {
+module.exports = function (ctx, settings, options) {
   const user = options.user;
 
   return {
@@ -241,7 +241,7 @@ module.exports = function (assistant, settings, options) {
         types: ['string'],
         default: 'json',
         // Dynamic required based on other settings
-        required: (assistant, settings) => settings.output === 'file',
+        required: (ctx, settings) => settings.output === 'file',
         // Clean/sanitize input
         clean: (value) => value.toLowerCase().trim(),
       },
@@ -328,10 +328,10 @@ function Job() {}
 Job.prototype.main = function () {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   return new Promise(async function(resolve, reject) {
-    assistant.log('Running my daily job...');
+    ctx.log('Running my daily job...');
 
     // Your job logic here
 
@@ -355,7 +355,7 @@ Unified MJML-based email rendering for transactional, marketing, and newsletter 
 ### Email API
 
 ```javascript
-const email = Manager.Email(assistant);
+const email = Manager.Email(ctx);
 await email.send({
   template: 'card',
   subject: 'Welcome!',
@@ -398,48 +398,48 @@ See [docs/consent.md](docs/consent.md) for the full architecture, source enum re
 
 ## Helper Classes
 
-### Assistant
+### RouteContext
 
 Handles request/response lifecycle, authentication, and logging.
 
 ```javascript
-const assistant = Manager.Assistant({ req, res });
+const ctx = Manager.RouteContext({ req, res });
 
 // Authentication
-const user = await assistant.authenticate();
+const user = await ctx.authenticate();
 // Returns: { authenticated, auth: { uid, email }, roles, plan, ... }
 
 // Request data
-assistant.request.data;        // Merged body + query
-assistant.request.body;        // POST body
-assistant.request.query;       // Query params
-assistant.request.headers;     // Request headers
-assistant.request.method;      // HTTP method
-assistant.request.geolocation; // { ip, country, region, city, latitude, longitude }
-assistant.request.client;      // { userAgent, language, platform, mobile }
+ctx.request.data;        // Merged body + query
+ctx.request.body;        // POST body
+ctx.request.query;       // Query params
+ctx.request.headers;     // Request headers
+ctx.request.method;      // HTTP method
+ctx.request.geolocation; // { ip, country, region, city, latitude, longitude }
+ctx.request.client;      // { userAgent, language, platform, mobile }
 
 // Response
-assistant.respond({ success: true });              // 200 JSON
-assistant.respond({ success: true }, { code: 201 }); // Custom status
-assistant.respond('https://example.com', { code: 302 }); // Redirect
+ctx.respond({ success: true });              // 200 JSON
+ctx.respond({ success: true }, { code: 201 }); // Custom status
+ctx.respond('https://example.com', { code: 302 }); // Redirect
 
 // Errors
-assistant.errorify('Something went wrong', { code: 500, sentry: true });
-assistant.respond(new Error('Bad request'), { code: 400 });
+ctx.report('Something went wrong', { code: 500, sentry: true });
+ctx.respond(new Error('Bad request'), { code: 400 });
 
 // Logging
-assistant.log('Info message');
-assistant.warn('Warning message');
-assistant.error('Error message');
-assistant.debug('Debug message');
+ctx.log('Info message');
+ctx.warn('Warning message');
+ctx.error('Error message');
+ctx.debug('Debug message');
 
 // Environment
-assistant.isDevelopment(); // true in emulator
-assistant.isProduction();  // true in production
-assistant.isTesting();     // true when running tests
+ctx.isDevelopment(); // true in emulator
+ctx.isProduction();  // true in production
+ctx.isTesting();     // true when running tests
 
 // File uploads
-const { fields, files } = await assistant.parseMultipartFormData();
+const { fields, files } = await ctx.parseMultipartFormData();
 ```
 
 ### User
@@ -481,7 +481,7 @@ Send events to Google Analytics 4:
 
 ```javascript
 const analytics = Manager.Analytics({
-  assistant: assistant,
+  ctx: ctx,
   uuid: user.auth.uid,
 });
 
@@ -502,7 +502,7 @@ analytics.event('purchase', {
 Track and limit API usage:
 
 ```javascript
-const usage = await Manager.Usage().init(assistant, {
+const usage = await Manager.Usage().init(ctx, {
   app: 'my-app',                    // App ID for limits
   key: 'custom-key',                // Optional custom key (default: user UID or IP)
   whitelistKeys: ['admin-key'],     // Keys that bypass limits
@@ -563,7 +563,7 @@ The middleware automatically:
 Resolve and validate request settings against a schema:
 
 ```javascript
-const settings = Manager.Settings().resolve(assistant, schema, inputSettings, {
+const settings = Manager.Settings().resolve(ctx, schema, inputSettings, {
   dir: '/schemas',
   schema: 'mySchema',
   user: user,
@@ -626,7 +626,7 @@ const { document, user } = await utilities.getDocumentWithOwnerUser('posts/abc12
   owner: 'owner',
   resolve: {
     schema: 'posts',
-    assistant: assistant,
+    ctx: ctx,
     checkRequired: false,
   },
 });
@@ -703,7 +703,7 @@ storage.set('nested.path', { data: true }).write();
 **Authenticated User Object:**
 
 ```javascript
-const user = await assistant.authenticate();
+const user = await ctx.authenticate();
 
 {
   authenticated: true,

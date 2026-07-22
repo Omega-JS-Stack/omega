@@ -8,17 +8,17 @@ const { Storage } = require('@google-cloud/storage');
 
 const storage = new Storage();
 
-module.exports = async ({ assistant, Manager, user, settings, analytics, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication (allow in dev)
-  if (!user.authenticated && assistant.isProduction()) {
-    return assistant.respond('Authentication required', { code: 401 });
+  if (!user.authenticated && ctx.isProduction()) {
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin (allow in dev)
-  if (!user.roles.admin && assistant.isProduction()) {
-    return assistant.respond('Admin required.', { code: 403 });
+  if (!user.roles.admin && ctx.isProduction()) {
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Parse deletion regex if provided
@@ -35,7 +35,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics, librari
   const bucketAddress = `gs://${bucketName}`;
 
   // Ensure bucket exists
-  await createBucket(assistant, bucketName, resourceZone);
+  await createBucket(ctx, bucketName, resourceZone);
 
   // Export documents
   const result = await client.exportDocuments({
@@ -43,29 +43,29 @@ module.exports = async ({ assistant, Manager, user, settings, analytics, librari
     outputUriPrefix: bucketAddress,
     collectionIds: [],
   }).catch(async (e) => {
-    await setMetaStats(assistant, e);
+    await setMetaStats(ctx, e);
     return e;
   });
 
   if (result instanceof Error) {
-    return assistant.respond(result.message, { code: 500 });
+    return ctx.respond(result.message, { code: 500 });
   }
 
   const response = result[0];
 
-  assistant.log('Saved backup successfully:', response.metadata.outputUriPrefix);
+  ctx.log('Saved backup successfully:', response.metadata.outputUriPrefix);
 
-  await setMetaStats(assistant, null);
+  await setMetaStats(ctx, null);
 
   // Track analytics
   analytics.event('admin/backup', { status: 'success' });
 
-  return assistant.respond({ name: response['name'] });
+  return ctx.respond({ name: response['name'] });
 };
 
 // Helper: Set meta stats
-async function setMetaStats(assistant, error) {
-  const { admin } = assistant.Manager.libraries;
+async function setMetaStats(ctx, error) {
+  const { admin } = ctx.Manager.libraries;
   const isError = error instanceof Error;
 
   await admin.firestore().doc('meta/stats')
@@ -73,8 +73,8 @@ async function setMetaStats(assistant, error) {
       backups: {
         lastBackup: {
           date: {
-            timestamp: assistant.meta.startTime.timestamp,
-            timestampUNIX: assistant.meta.startTime.timestampUNIX,
+            timestamp: ctx.meta.startTime.timestamp,
+            timestampUNIX: ctx.meta.startTime.timestampUNIX,
           },
           status: {
             success: !isError,
@@ -82,18 +82,18 @@ async function setMetaStats(assistant, error) {
           }
         }
       },
-      metadata: assistant.Manager.Metadata().set({ tag: 'admin/backup' }),
+      metadata: ctx.Manager.Metadata().set({ tag: 'admin/backup' }),
     }, { merge: true })
     .catch(e => {
-      assistant.error('Failed to update meta stats', e);
+      ctx.error('Failed to update meta stats', e);
     });
 }
 
 // Helper: Create bucket if it doesn't exist
-async function createBucket(assistant, bucketName, resourceZone) {
+async function createBucket(ctx, bucketName, resourceZone) {
   try {
     const meta = await storage.bucket(bucketName).getMetadata();
-    assistant.log(`${bucketName} metadata`, meta[0]);
+    ctx.log(`${bucketName} metadata`, meta[0]);
   } catch (e) {
     // Bucket doesn't exist, create it
     const result = await storage.createBucket(bucketName, {
@@ -101,6 +101,6 @@ async function createBucket(assistant, bucketName, resourceZone) {
       storageClass: 'COLDLINE',
     }).catch(err => err);
 
-    assistant.log('storageCreation', result);
+    ctx.log('storageCreation', result);
   }
 }

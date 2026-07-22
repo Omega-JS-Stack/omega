@@ -5,7 +5,7 @@
 
 ## Framework
 
-This project consumes **OMEGA Backend** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (Assistant, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
+This project consumes **OMEGA Backend** (@omega.js/backend) — a comprehensive framework for building modern Firebase Cloud Functions backends. @omega.js/backend provides a single `Manager.init(exports, {...})` bootstrap that wires built-in functions (`omega_api`, auth events, cron jobs), helper classes (RouteContext, User, Analytics, Usage, Middleware, Settings, Utilities, Metadata), payment processor integrations (Stripe / PayPal), Firestore-trigger pipelines, and a deploy/emulator/watch tooling pipeline.
 
 ## 🚨 READ THE FRAMEWORK DOCS FIRST
 
@@ -64,17 +64,17 @@ Manager.init(exports, {
 });
 
 // In a custom route (src/routes/get/hello.js):
-module.exports = async function(Manager, assistant) {
-  // assistant.req, assistant.res, assistant.user, etc.
+module.exports = async function(Manager, ctx) {
+  // ctx.req, ctx.res, ctx.user, etc.
 };
 ```
 
 ## Available APIs at runtime
 
 After `Manager.init()`, the Manager instance exposes factory methods:
-- `Manager.Assistant({ req, res })` — request handler with user + analytics + utility access
+- `Manager.RouteContext({ req, res })` — request handler with user + analytics + utility access
 - `Manager.User(data)` — user property structure + schema
-- `Manager.Analytics({ assistant })` — GA4 event tracking
+- `Manager.Analytics({ ctx })` — GA4 event tracking
 - `Manager.Usage()` — rate-limiting
 - `Manager.Middleware(req, res)` — request pipeline
 - `Manager.Settings()` — schema validation against `src/schemas/*`

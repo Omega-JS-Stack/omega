@@ -317,12 +317,12 @@ module.exports = {
       name: 'resolveSources-brand-pick-resolves-seed',
       async run({ assert, Manager }) {
         const { resolveSources } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
         const resolved = await resolveSources({
           sources: ['$brand'],
           count: 1,
-          assistant,
+          ctx,
         });
 
         assert.equal(resolved.length, 1, 'one source resolved');
@@ -335,12 +335,12 @@ module.exports = {
       name: 'resolveSources-text-pick-resolves-content',
       async run({ assert, Manager }) {
         const { resolveSources } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
         const resolved = await resolveSources({
           sources: ['Write about blockchain technology'],
           count: 1,
-          assistant,
+          ctx,
         });
 
         assert.equal(resolved.length, 1, 'one source resolved');
@@ -355,13 +355,13 @@ module.exports = {
       timeout: 30000,
       async run({ assert, Manager }) {
         const { createResolverState, resolvePick } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
         // $brand IS listed in the pool — the fallback chain must STILL never
         // land on it. Feed fails (nonexistent domain), no $parent listed → null.
         const state = createResolverState({
           sources: ['$feed:https://nonexistent-feed.invalid/feed.xml', '$brand'],
-          assistant,
+          ctx,
         });
 
         const result = await resolvePick(state, '$feed:https://nonexistent-feed.invalid/feed.xml');
@@ -374,7 +374,7 @@ module.exports = {
       timeout: 30000,
       async run({ assert, Manager }) {
         const { createResolverState, resolvePick } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
         // Both feeds dead, $parent listed but no Manager → parent unreachable → null.
         // Exercises the full chain (same feed → other feeds → parent) without throwing.
@@ -384,7 +384,7 @@ module.exports = {
             '$feed:https://nonexistent-b.invalid/feed.xml',
             '$parent',
           ],
-          assistant,
+          ctx,
         });
 
         const result = await resolvePick(state, '$feed:https://nonexistent-a.invalid/feed.xml');
@@ -399,13 +399,13 @@ module.exports = {
       name: 'resolvePick-parent-only-falls-back-to-parent',
       async run({ assert, Manager }) {
         const { createResolverState, resolvePick } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
         // Parent unreachable (no Manager). Feeds ARE listed — but $parent must
         // NOT fall back to them.
         const state = createResolverState({
           sources: ['$parent', '$feed:https://nonexistent.invalid/feed.xml', '$brand'],
-          assistant,
+          ctx,
         });
 
         const result = await resolvePick(state, '$parent');
@@ -418,9 +418,9 @@ module.exports = {
       name: 'resolveSources-empty-pool-returns-empty',
       async run({ assert, Manager }) {
         const { resolveSources } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
-        const resolved = await resolveSources({ sources: [], count: 3, assistant });
+        const resolved = await resolveSources({ sources: [], count: 3, ctx });
         assert.equal(resolved.length, 0, 'empty pool resolves nothing');
       },
     },
@@ -430,12 +430,12 @@ module.exports = {
       timeout: 30000,
       async run({ assert, Manager }) {
         const { resolveSources } = require(resolverPath);
-        const assistant = Manager.Assistant();
+        const ctx = Manager.RouteContext();
 
         const resolved = await resolveSources({
           sources: ['$feed:https://nonexistent.invalid/feed.xml'],
           count: 2,
-          assistant,
+          ctx,
         });
 
         assert.equal(resolved.length, 0, 'dead-feed-only pool resolves nothing (no $brand invented)');

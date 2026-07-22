@@ -6,8 +6,8 @@ const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
  * Stripe dispute processor
  *
  * Implements the dispute processor interface for Stripe:
- *   - searchAndMatch(alert, assistant) → match | null
- *   - processDispute(match, alert, assistant) → result
+ *   - searchAndMatch(alert, ctx) → match | null
+ *   - processDispute(match, alert, ctx) → result
  *
  * Match strategy: search charges by amount + date range, then confirm card last4.
  * If alert.chargeId is provided (alert.updated events), verify it directly — otherwise
@@ -26,23 +26,23 @@ const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
  * Otherwise search charges by amount + ±2 day window and match card last4.
  *
  * @param {object} alert - Normalized alert data
- * @param {object} assistant - Assistant instance
+ * @param {object} ctx - Assistant instance
  * @returns {object|null} Match details or null
  */
-async function searchAndMatch(alert, assistant) {
+async function searchAndMatch(alert, ctx) {
   const stripe = StripeLib.init();
 
   // If Chargeblast already gave us the charge ID, verify it directly
   if (alert.chargeId && alert.chargeId.startsWith('ch_')) {
-    assistant.log(`Direct charge lookup: ${alert.chargeId}`);
+    ctx.log(`Direct charge lookup: ${alert.chargeId}`);
 
     try {
       const charge = await stripe.charges.retrieve(alert.chargeId, {
         expand: ['invoice', 'invoice.subscription', 'customer'],
       });
-      return resolveMatchFromCharge({ charge, stripe, assistant });
+      return resolveMatchFromCharge({ charge, stripe, ctx });
     } catch (e) {
-      assistant.log(`Direct charge lookup failed for ${alert.chargeId}: ${e.message}`);
+      ctx.log(`Direct charge lookup failed for ${alert.chargeId}: ${e.message}`);
     }
   }
 
@@ -57,7 +57,7 @@ async function searchAndMatch(alert, assistant) {
   const start = alertDate.clone().subtract(2, 'days').unix();
   const end = alertDate.clone().add(2, 'days').unix();
 
-  assistant.log(`Searching charges: amount=${amountCents} cents, range=${moment.unix(start).format('YYYY-MM-DD')} to ${moment.unix(end).format('YYYY-MM-DD')}, last4=${alert.card.last4}`);
+  ctx.log(`Searching charges: amount=${amountCents} cents, range=${moment.unix(start).format('YYYY-MM-DD')} to ${moment.unix(end).format('YYYY-MM-DD')}, last4=${alert.card.last4}`);
 
   const charges = await stripe.charges.search({
     limit: 100,
@@ -65,15 +65,15 @@ async function searchAndMatch(alert, assistant) {
   });
 
   if (!charges.data.length) {
-    assistant.log(`No charges found for amount=${amountCents} in date range`);
+    ctx.log(`No charges found for amount=${amountCents} in date range`);
     return null;
   }
 
   if (charges.data.length >= 100) {
-    assistant.log(`Warning: 100+ charges found, results may be truncated`);
+    ctx.log(`Warning: 100+ charges found, results may be truncated`);
   }
 
-  assistant.log(`Found ${charges.data.length} charge(s), matching last4=${alert.card.last4}`);
+  ctx.log(`Found ${charges.data.length} charge(s), matching last4=${alert.card.last4}`);
 
   for (const charge of charges.data) {
     const chargeLast4 = charge.payment_method_details?.card?.last4;
@@ -87,13 +87,13 @@ async function searchAndMatch(alert, assistant) {
       const fullCharge = await stripe.charges.retrieve(charge.id, {
         expand: ['invoice', 'invoice.subscription', 'customer'],
       });
-      return resolveMatchFromCharge({ charge: fullCharge, stripe, assistant });
+      return resolveMatchFromCharge({ charge: fullCharge, stripe, ctx });
     } catch (e) {
-      assistant.log(`Failed to expand charge ${charge.id}: ${e.message}`);
+      ctx.log(`Failed to expand charge ${charge.id}: ${e.message}`);
     }
   }
 
-  assistant.log(`No charge matched last4=${alert.card.last4}`);
+  ctx.log(`No charge matched last4=${alert.card.last4}`);
   return null;
 }
 
@@ -102,10 +102,10 @@ async function searchAndMatch(alert, assistant) {
  *
  * @param {object} match - Match details from searchAndMatch
  * @param {object} alert - Normalized alert data
- * @param {object} assistant - Assistant instance
+ * @param {object} ctx - Assistant instance
  * @returns {object} Result with statuses
  */
-async function processDispute(match, alert, assistant) {
+async function processDispute(match, alert, ctx) {
   const stripe = StripeLib.init();
 
   const amountCents = Math.round(alert.amount * 100);
@@ -136,11 +136,11 @@ async function processDispute(match, alert, assistant) {
       result.currency = refund.currency;
       result.refundStatus = 'success';
 
-      assistant.log(`Refund success: refundId=${refund.id}, amount=${amountCents}, charge=${match.chargeId}`);
+      ctx.log(`Refund success: refundId=${refund.id}, amount=${amountCents}, charge=${match.chargeId}`);
     } catch (e) {
       result.refundStatus = 'failed';
       result.errors.push(`Refund failed: ${e.message}`);
-      assistant.error(`Refund failed for charge ${match.chargeId}: ${e.message}`);
+      ctx.error(`Refund failed for charge ${match.chargeId}: ${e.message}`);
     }
   }
 
@@ -151,11 +151,11 @@ async function processDispute(match, alert, assistant) {
       await stripe.subscriptions.cancel(match.subscriptionId);
       result.cancelStatus = 'success';
 
-      assistant.log(`Subscription cancelled: sub=${match.subscriptionId}`);
+      ctx.log(`Subscription cancelled: sub=${match.subscriptionId}`);
     } catch (e) {
       result.cancelStatus = 'failed';
       result.errors.push(`Cancel failed: ${e.message}`);
-      assistant.error(`Cancel failed for sub ${match.subscriptionId}: ${e.message}`);
+      ctx.error(`Cancel failed for sub ${match.subscriptionId}: ${e.message}`);
     }
   }
 
@@ -171,12 +171,12 @@ module.exports = { searchAndMatch, processDispute };
  *
  * @param {object} options.charge - Stripe charge with invoice + customer expanded
  * @param {object} options.stripe - Stripe SDK instance
- * @param {object} options.assistant - Assistant instance
+ * @param {object} options.ctx - Assistant instance
  * @returns {object|null}
  */
-async function resolveMatchFromCharge({ charge, stripe, assistant }) {
+async function resolveMatchFromCharge({ charge, stripe, ctx }) {
   if (!charge || charge.status !== 'succeeded') {
-    assistant.log(`Charge ${charge?.id} status=${charge?.status}, skipping`);
+    ctx.log(`Charge ${charge?.id} status=${charge?.status}, skipping`);
     return null;
   }
 
@@ -194,7 +194,7 @@ async function resolveMatchFromCharge({ charge, stripe, assistant }) {
       uid = customer.metadata?.uid || null;
       email = customer.email || null;
     } catch (e) {
-      assistant.error(`Failed to retrieve customer ${customerId}: ${e.message}`);
+      ctx.error(`Failed to retrieve customer ${customerId}: ${e.message}`);
     }
   }
 
@@ -205,7 +205,7 @@ async function resolveMatchFromCharge({ charge, stripe, assistant }) {
     ? (typeof invoice.subscription === 'object' ? invoice.subscription.id : invoice.subscription)
     : null;
 
-  assistant.log(`Matched charge=${charge.id}, customer=${customerId}, uid=${uid}, invoice=${invoiceId}, subscription=${subscriptionId}`);
+  ctx.log(`Matched charge=${charge.id}, customer=${customerId}, uid=${uid}, invoice=${invoiceId}, subscription=${subscriptionId}`);
 
   return {
     chargeId: charge.id,

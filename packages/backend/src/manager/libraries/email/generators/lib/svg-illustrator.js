@@ -35,10 +35,10 @@ const PNG_WIDTH = 800; // 2x display width of 400px container
  * @param {object} args.brand - { name, color: { primary, secondary, ... } }
  * @param {object} args.newsletterConfig - marketing.newsletter.content
  * @param {object} args.ai - AI instance
- * @param {object} args.assistant - @omega.js/backend assistant
+ * @param {object} args.ctx - @omega.js/backend ctx
  * @returns {Promise<{svg: string, png: Buffer, fallback: boolean}>}
  */
-async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, assistant }) {
+async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, ctx }) {
   const provider = newsletterConfig?.provider?.svg || DEFAULT_PROVIDER;
   const model = newsletterConfig?.model?.svg || DEFAULT_MODELS[provider];
   const startTime = Date.now();
@@ -75,9 +75,9 @@ async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, 
         break;
       }
 
-      assistant.log(`SVG generation attempt ${attempt + 1} returned no valid <svg>`);
+      ctx.log(`SVG generation attempt ${attempt + 1} returned no valid <svg>`);
     } catch (e) {
-      assistant.error(`SVG generation attempt ${attempt + 1} failed: ${e.message}`);
+      ctx.error(`SVG generation attempt ${attempt + 1} failed: ${e.message}`);
     }
   }
 
@@ -87,7 +87,7 @@ async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, 
     try {
       png = rasterize(svg);
     } catch (e) {
-      assistant.error(`SVG rasterization failed, using fallback: ${e.message}`);
+      ctx.error(`SVG rasterization failed, using fallback: ${e.message}`);
       svg = buildPlaceholderSvg(palette);
       png = rasterize(svg);
       fallback = true;

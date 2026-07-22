@@ -32,27 +32,27 @@ const {
 
 let postId;
 
-module.exports = async ({ Manager, assistant, context, libraries }) => {
+module.exports = async ({ Manager, ctx, context, libraries }) => {
   // External boundary (live feed fetches + AI generation + publishing) — the
   // cron entry gates itself like every other external call. Ungated, a normal
   // test run harvests real feeds from the consumer's blog config, delaying the
   // serial omega_cronDaily sequence past the usage suite's reset-usage deadline.
-  if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) {
-    assistant.log('Blog auto-publisher skipped (test mode without TEST_EXTENDED_MODE)');
+  if (ctx.isTesting() && !process.env.TEST_EXTENDED_MODE) {
+    ctx.log('Blog auto-publisher skipped (test mode without TEST_EXTENDED_MODE)');
     return;
   }
 
   if (!Manager.config.blog?.enabled) {
-    assistant.log('Blog auto-publisher disabled in config');
+    ctx.log('Blog auto-publisher disabled in config');
     return;
   }
 
-  assistant.log('Starting...');
+  ctx.log('Starting...');
 
   postId = moment().unix();
 
   const brandConfig = buildBrandConfig(Manager.config);
-  assistant.log('Brand config', brandConfig);
+  ctx.log('Brand config', brandConfig);
 
   const blog = Manager.config.blog;
   const contentArray = powertools.arrayify(blog.content);
@@ -77,32 +77,32 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
     if (entry.brand && entry.brandUrl) {
       entry.brand = await fetchRemoteBrand(entry.brandUrl).catch((e) => e);
       if (entry.brand instanceof Error) {
-        assistant.error('Error fetching remote brand data', entry.brand);
+        ctx.error('Error fetching remote brand data', entry.brand);
         continue;
       }
     } else {
       entry.brand = brandConfig;
     }
 
-    assistant.log(`Entry (brand=${entry.brand.brand.id})`, entry);
+    ctx.log(`Entry (brand=${entry.brand.brand.id})`, entry);
 
     if (!entry.quantity || !entry.sources.length) {
-      assistant.log('Quitting because quantity is 0 or no sources');
+      ctx.log('Quitting because quantity is 0 or no sources');
       continue;
     }
 
     const chance = Math.random();
     if (chance > entry.chance) {
-      assistant.log(`Quitting because the chance is not met (${chance} <= ${entry.chance})`);
+      ctx.log(`Quitting because the chance is not met (${chance} <= ${entry.chance})`);
       continue;
     }
 
-    const result = await harvest(assistant, entry, admin, provider, Manager).catch((e) => e);
+    const result = await harvest(ctx, entry, admin, provider, Manager).catch((e) => e);
     if (result instanceof Error) {
       throw result;
     }
 
-    assistant.log('Finished!', result);
+    ctx.log('Finished!', result);
   }
 };
 
@@ -120,23 +120,23 @@ function fetchRemoteBrand(brandUrl) {
   });
 }
 
-async function harvest(assistant, entry, admin, provider, Manager) {
-  assistant.log(`harvest(): Starting ${entry.brand.brand.id}...`);
+async function harvest(ctx, entry, admin, provider, Manager) {
+  ctx.log(`harvest(): Starting ${entry.brand.brand.id}...`);
 
   const recentTitles = admin
     ? await getRecentTitles(admin, entry.brand.brand.id).catch((e) => {
-        assistant.error('harvest(): Error fetching recent titles (continuing)', e);
+        ctx.error('harvest(): Error fetching recent titles (continuing)', e);
         return [];
       })
     : [];
   const runTitles = [];
 
   if (recentTitles.length) {
-    assistant.log(`harvest(): ${recentTitles.length} recent titles loaded for topic dedup`);
+    ctx.log(`harvest(): ${recentTitles.length} recent titles loaded for topic dedup`);
   }
 
   for (let index = 0; index < entry.quantity; index++) {
-    assistant.log(`harvest(): Processing ${index + 1}/${entry.quantity}`);
+    ctx.log(`harvest(): Processing ${index + 1}/${entry.quantity}`);
 
     const allKnownTitles = [...recentTitles, ...runTitles];
 
@@ -148,11 +148,11 @@ async function harvest(assistant, entry, admin, provider, Manager) {
       categories: entry.categories,
       admin,
       Manager,
-      assistant,
+      ctx,
     });
 
     if (!source) {
-      assistant.log('harvest(): No source could be resolved for this article, skipping');
+      ctx.log('harvest(): No source could be resolved for this article, skipping');
       continue;
     }
 
@@ -169,7 +169,7 @@ async function harvest(assistant, entry, admin, provider, Manager) {
         + allKnownTitles.slice(0, 25).map((t) => `- ${t}`).join('\n');
     }
 
-    assistant.log('harvest(): Resolved source', { type: source.type, title: source.title, url: source.url });
+    ctx.log('harvest(): Resolved source', { type: source.type, title: source.title, url: source.url });
 
     const overrides = { ...entry.overrides };
     if (!overrides.keywords && entry.keywords.length) {
@@ -184,11 +184,11 @@ async function harvest(assistant, entry, admin, provider, Manager) {
       overrides: overrides,
     }).catch((e) => e);
     if (article instanceof Error) {
-      assistant.error('harvest(): Error requesting article from provider', article);
+      ctx.error('harvest(): Error requesting article from provider', article);
       break;
     }
 
-    assistant.log('harvest(): Article', article);
+    ctx.log('harvest(): Article', article);
 
     const post = provider.blocksToPost?.(article.json);
     const generatedTitle = post?.title || article.title || '';
@@ -201,15 +201,15 @@ async function harvest(assistant, entry, admin, provider, Manager) {
       postPath: entry.postPath,
       source: source.trackingData?.url || null,
     };
-    assistant.log('harvest(): publishArgs', publishArgs);
+    ctx.log('harvest(): publishArgs', publishArgs);
 
-    const uploadedPost = await provider.publishArticle(assistant, publishArgs).catch((e) => e);
+    const uploadedPost = await provider.publishArticle(ctx, publishArgs).catch((e) => e);
     if (uploadedPost instanceof Error) {
-      assistant.error('harvest(): Error uploading post to blog', uploadedPost);
+      ctx.error('harvest(): Error uploading post to blog', uploadedPost);
       break;
     }
 
-    assistant.log('harvest(): Uploaded post', uploadedPost);
+    ctx.log('harvest(): Uploaded post', uploadedPost);
 
     if (generatedTitle) {
       runTitles.push(generatedTitle);
@@ -235,7 +235,7 @@ async function harvest(assistant, entry, admin, provider, Manager) {
         postSlug: uploadedPost.slug,
         postTitle: generatedTitle || null,
       }).catch((e) => {
-        assistant.error('harvest(): Error tracking content source (non-fatal)', e);
+        ctx.error('harvest(): Error tracking content source (non-fatal)', e);
       });
     }
   }

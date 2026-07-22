@@ -9,12 +9,12 @@ const powertools = require('node-powertools');
  * Only available in non-production environments.
  */
 module.exports = {
-  async processRefund({ resourceId, uid, subscription, assistant }) {
-    if (assistant.isProduction()) {
+  async processRefund({ resourceId, uid, subscription, ctx }) {
+    if (ctx.isProduction()) {
       throw new Error('Test processor is not available in production');
     }
 
-    const admin = assistant.Manager.libraries.admin;
+    const admin = ctx.Manager.libraries.admin;
 
     const timestamp = Date.now();
     const eventId = `_test-evt-refund-${timestamp}`;
@@ -30,7 +30,7 @@ module.exports = {
       if (orderDoc.exists) {
         const orderData = orderDoc.data();
         const productId = orderData.unified?.product?.id;
-        const products = assistant.Manager.config.payment?.products || [];
+        const products = ctx.Manager.config.payment?.products || [];
         const product = products.find(p => p.id === productId);
         if (product) {
           stripeProductId = product.stripe?.productId || `_test_${product.id}`;
@@ -89,7 +89,7 @@ module.exports = {
       },
     });
 
-    assistant.log(`Test refund processor: wrote payments-webhooks/${eventId} for sub=${resourceId}, uid=${uid}`);
+    ctx.log(`Test refund processor: wrote payments-webhooks/${eventId} for sub=${resourceId}, uid=${uid}`);
 
     // Return mock refund result
     return {

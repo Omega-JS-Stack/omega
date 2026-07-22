@@ -9,31 +9,31 @@ const { Octokit } = require('@octokit/rest');
 const dispatchDeploy = require('./dispatch-deploy');
 const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
-module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   const fetch = Manager.require('wonderful-fetch');
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin or blogger
   if (!user.roles.admin && !user.roles.blogger) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Check for GitHub configuration
   if (!process.env.GH_TOKEN) {
-    return assistant.respond('GitHub API key not configured.', { code: 500 });
+    return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
   if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return assistant.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
+    return ctx.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
   }
 
-  assistant.log('main(): settings', settings);
+  ctx.log('main(): settings', settings);
 
-  const now = assistant.meta.startTime.timestamp;
+  const now = ctx.meta.startTime.timestamp;
   const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
 
   // Setup Octokit
@@ -43,10 +43,10 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
 
   // Check for required values
   if (!settings.url) {
-    return assistant.respond('Missing required parameter: url', { code: 400 });
+    return ctx.respond('Missing required parameter: url', { code: 400 });
   }
   if (!settings.body) {
-    return assistant.respond('Missing required parameter: body', { code: 400 });
+    return ctx.respond('Missing required parameter: body', { code: 400 });
   }
 
   // Fix URL
@@ -68,34 +68,34 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   settings.githubUser = bemRepo.user;
   settings.githubRepo = bemRepo.name;
 
-  assistant.log('main(): Editing post...', settings);
+  ctx.log('main(): Editing post...', settings);
 
   // Fetch existing post using NEW API format
-  const fetchedPost = await fetchPost(assistant, settings.url).catch(e => e);
+  const fetchedPost = await fetchPost(ctx, settings.url).catch(e => e);
   if (fetchedPost instanceof Error) {
-    return assistant.respond(fetchedPost.message, { code: fetchedPost.status || 404 });
+    return ctx.respond(fetchedPost.message, { code: fetchedPost.status || 404 });
   }
 
   // Upload post
-  const uploadResult = await uploadPost(assistant, octokit, settings, fetchedPost).catch(e => e);
+  const uploadResult = await uploadPost(ctx, octokit, settings, fetchedPost).catch(e => e);
   if (uploadResult instanceof Error) {
-    return assistant.respond(uploadResult.message, { code: uploadResult.status || 500 });
+    return ctx.respond(uploadResult.message, { code: uploadResult.status || 500 });
   }
 
-  assistant.log('main(): uploadPost', uploadResult);
+  ctx.log('main(): uploadPost', uploadResult);
 
   // D13: content-publish implies deploy (deploy: false opts out)
-  await dispatchDeploy(assistant, octokit, settings);
+  await dispatchDeploy(ctx, octokit, settings);
 
   // Track analytics
   analytics.event('admin/post', { action: 'edit' });
 
-  return assistant.respond(settings);
+  return ctx.respond(settings);
 };
 
 // Helper: Fetch existing post
-async function fetchPost(assistant, url) {
-  const Manager = assistant.Manager;
+async function fetchPost(ctx, url) {
+  const Manager = ctx.Manager;
   const fetch = Manager.require('wonderful-fetch');
 
   // Use NEW API format
@@ -109,13 +109,13 @@ async function fetchPost(assistant, url) {
     },
   });
 
-  assistant.log('fetchPost(): Result', result);
+  ctx.log('fetchPost(): Result', result);
 
   return result;
 }
 
 // Helper: Upload post to GitHub
-async function uploadPost(assistant, octokit, settings, fetchedPost) {
+async function uploadPost(ctx, octokit, settings, fetchedPost) {
   const filename = fetchedPost.path;
   const sha = fetchedPost.sha;
   const frontmatter = fetchedPost.frontmatter;
@@ -139,7 +139,7 @@ async function uploadPost(assistant, octokit, settings, fetchedPost) {
     content: Buffer.from(fullContent).toString('base64'),
   });
 
-  assistant.log('uploadPost(): Result', result);
+  ctx.log('uploadPost(): Result', result);
 
   return result;
 }

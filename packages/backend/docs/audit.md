@@ -41,14 +41,14 @@ Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / EM) �
 
 | ID | Sev | Scope | Check |
 |----|-----|-------|-------|
-| BKD-01 | HIGH | B | Every custom route has a name-matched schema; handlers are context-object exports (`async ({ Manager, assistant, … }) => {}`) — no legacy constructor routes ([routes.md](routes.md), [schemas.md](schemas.md)) |
+| BKD-01 | HIGH | B | Every custom route has a name-matched schema; handlers are context-object exports (`async ({ Manager, ctx, … }) => {}`) — no legacy constructor routes ([routes.md](routes.md), [schemas.md](schemas.md)) |
 | BKD-02 | HIGH | B | Schema field rules — never `required: true` + `default` together (required is checked BEFORE defaults; use `min: 1` for path-extracted IDs); flat schema with in-function plan branching, no tier arrays ([schemas.md](schemas.md)) |
-| BKD-03 | HIGH | B | Route handlers — ownership checks on PUT/DELETE; plural-noun route names; `assistant.respond()` only (never `res.send()`) ([routes.md](routes.md), [common-operations.md](common-operations.md)) |
+| BKD-03 | HIGH | B | Route handlers — ownership checks on PUT/DELETE; plural-noun route names; `ctx.respond()` only (never `res.send()`) ([routes.md](routes.md), [common-operations.md](common-operations.md)) |
 | BKD-04 | HIGH | C | Wiring — every route exported in `functions/index.js`; `firebase.json` rewrites use bracket syntax, ordered most-specific-first ([routes.md](routes.md)) |
 | BKD-05 | HIGH | B | Firestore canon — NO subcollections; path-string `.doc('users/abc')`; batched collection reads (~500, cursor pagination); timestamps under `metadata.{created,updated}`; mirror-the-doc responses; delete-don't-redact ([firestore.md](firestore.md)) |
 | BKD-06 | HIGH | B | Usage — never read/write `{doc}.usage.*` manually, always the `usage` helper; expensive/abusable routes carry usage validation or rate limiting ([usage-rate-limiting.md](usage-rate-limiting.md)) |
 | BKD-07 | MED | B | Composite indexes — every compound query (`where` + `orderBy`, multiple `where`s) is registered in the required-indexes SSOT ([CLAUDE.md](../CLAUDE.md) §File Conventions) |
-| BKD-08 | HIGH | B | Auth gates — routes resolve the caller via `assistant`/`user` before acting; admin-only routes verify admin status ([common-operations.md](common-operations.md), [routes.md](routes.md)) |
+| BKD-08 | HIGH | B | Auth gates — routes resolve the caller via `ctx`/`user` before acting; admin-only routes verify admin status ([common-operations.md](common-operations.md), [routes.md](routes.md)) |
 | BKD-09 | HIGH | B | Rules coverage — `firestore.rules` changes ship a rules suite (`rules.asAccount` / `expectSuccess` / `expectFailure`) ([test-framework.md](test-framework.md)) |
 
 ## Framework-repo checks (F-xx)

@@ -122,7 +122,7 @@ module.exports = {
         assert.equal(first.toolCalls[0].name, 'check_order', 'tool name');
         assert.deepEqual(first.toolCalls[0].arguments, { orderNumber: '42' }, 'tool args');
 
-        // Turn 2: caller appended the assistant turn + tool result — provider
+        // Turn 2: caller appended the ctx turn + tool result — provider
         // moves to the next step (the reply)
         const second = await provider.request({
           response: 'json',

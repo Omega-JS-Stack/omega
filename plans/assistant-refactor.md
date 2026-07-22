@@ -1,9 +1,8 @@
 ---
-status: draft
+status: active
 created: 2026-07-22
 ---
-> GO given (Ian 2026-07-22, "assistant refactor is fine"); status flips to active once Ian
-> ratifies the name pick below.
+> Ian 2026-07-22: GO + name RATIFIED — ctx / RouteContext.
 
 # Assistant library review + optimization (backend `helpers/assistant.js`)
 

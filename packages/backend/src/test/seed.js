@@ -82,11 +82,11 @@ function loadInit(testDir, label, ctx) {
  * @param {object} options.config      - Resolved brand config
  * @param {string} options.projectDir  - Firebase project directory (for _init.js discovery)
  * @param {object} [options.Manager]   - Backend Manager instance (passed to _init hooks)
- * @param {object} [options.assistant] - Backend assistant instance (passed to _init hooks)
+ * @param {object} [options.ctx] - Backend ctx instance (passed to _init hooks)
  * @param {boolean} [options.quiet]    - Suppress progress output
  * @returns {Promise<{ accounts: object, created: number }>}
  */
-async function seed({ admin, domain, config, projectDir, Manager, assistant, quiet }) {
+async function seed({ admin, domain, config, projectDir, Manager, ctx, quiet }) {
   const log = quiet ? () => {} : (msg) => process.stdout.write(msg);
   const logLn = quiet ? () => {} : (msg) => console.log(msg);
 
@@ -138,7 +138,7 @@ async function seed({ admin, domain, config, projectDir, Manager, assistant, qui
   for (const setup of initHooks.setups) {
     log(chalk.gray('  Running test/_init.js setup... '));
     try {
-      await setup({ admin, config, accounts, Manager, assistant });
+      await setup({ admin, config, accounts, Manager, ctx });
       logLn(chalk.green('✓'));
     } catch (e) {
       logLn(chalk.red(`✗ (${e.message})`));

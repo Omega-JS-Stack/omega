@@ -85,16 +85,16 @@ const PROMPT = `
  * @param {string[]} [args.categories] - Categories for $parent fetches
  * @param {object} [args.admin] - firebase-admin (used-source checks; omit to skip)
  * @param {object} [args.Manager] - Manager instance (parent URL resolution)
- * @param {object} args.assistant - logger
+ * @param {object} args.ctx - logger
  * @returns {object} state
  */
-function createResolverState({ sources, categories, admin, Manager, assistant }) {
+function createResolverState({ sources, categories, admin, Manager, ctx }) {
   return {
     pool: [...(sources || [])],
     categories: categories || [],
     admin,
     Manager,
-    assistant,
+    ctx,
     sessionUsed: new Set(),   // item url/id already returned this call
     feedCache: new Map(),     // feedUrl → { items: [...], dead: bool }
     parentPool: null,         // null = not fetched yet; [] = fetched (possibly exhausted)
@@ -119,26 +119,26 @@ async function loadFeed(state, feedUrl) {
   }).catch((e) => e);
 
   if (feedText instanceof Error) {
-    state.assistant.error(`loadFeed(): Failed to fetch feed: ${feedUrl}`, feedText);
+    state.ctx.error(`loadFeed(): Failed to fetch feed: ${feedUrl}`, feedText);
     entry.dead = true;
     return entry;
   }
 
   const { items } = parseFeed(feedText);
   if (!items.length) {
-    state.assistant.log(`loadFeed(): No items in feed: ${feedUrl}`);
+    state.ctx.log(`loadFeed(): No items in feed: ${feedUrl}`);
     entry.dead = true;
     return entry;
   }
 
   const processedIds = await getProcessedItemIds(state.admin, feedUrl).catch((e) => {
-    state.assistant.error('loadFeed(): Error querying tracked items (continuing)', e);
+    state.ctx.error('loadFeed(): Error querying tracked items (continuing)', e);
     return new Set();
   });
 
   entry.items = items.filter((item) => !processedIds.has(item.id) && !processedIds.has(item.url));
 
-  state.assistant.log(`loadFeed(): ${entry.items.length}/${items.length} unprocessed items in ${feedUrl}`);
+  state.ctx.log(`loadFeed(): ${entry.items.length}/${items.length} unprocessed items in ${feedUrl}`);
 
   return entry;
 }
@@ -153,7 +153,7 @@ async function resolveFeedItem(state, feedUrl) {
   // Newest-first among items not yet used this session
   const item = feed.items.find((i) => !state.sessionUsed.has(i.id) && !state.sessionUsed.has(i.url));
   if (!item) {
-    state.assistant.log(`resolveFeedItem(): Feed exhausted for this session: ${feedUrl}`);
+    state.ctx.log(`resolveFeedItem(): Feed exhausted for this session: ${feedUrl}`);
     return null;
   }
 
@@ -165,7 +165,7 @@ async function resolveFeedItem(state, feedUrl) {
   let content = '';
   if (item.url) {
     content = await extractArticleContent(item.url).catch((e) => {
-      state.assistant.error(`resolveFeedItem(): Failed to extract content from ${item.url} (using summary)`, e);
+      state.ctx.error(`resolveFeedItem(): Failed to extract content from ${item.url} (using summary)`, e);
       return '';
     });
   }
@@ -203,7 +203,7 @@ async function loadParentPool(state) {
 
   const parentUrl = state.Manager?.getParentApiUrl?.();
   if (!parentUrl) {
-    state.assistant.log('loadParentPool(): No parent URL configured');
+    state.ctx.log('loadParentPool(): No parent URL configured');
     return state.parentPool;
   }
 
@@ -234,7 +234,7 @@ async function loadParentPool(state) {
       },
       query: query,
     }).catch((e) => {
-      state.assistant.error(`loadParentPool(): Failed to fetch sources for category=${category}: ${e.message}`);
+      state.ctx.error(`loadParentPool(): Failed to fetch sources for category=${category}: ${e.message}`);
       return null;
     });
 
@@ -264,7 +264,7 @@ async function loadParentPool(state) {
       .select('url')
       .get()
       .catch((e) => {
-        state.assistant.error('loadParentPool(): Error querying tracked sources (continuing)', e);
+        state.ctx.error('loadParentPool(): Error querying tracked sources (continuing)', e);
         return { docs: [] };
       });
 
@@ -278,7 +278,7 @@ async function loadParentPool(state) {
     available = deduped.filter((s) => !usedUrls.has(s.url || s.id));
   }
 
-  state.assistant.log(`loadParentPool(): ${available.length}/${fetched.length} parent sources available`);
+  state.ctx.log(`loadParentPool(): ${available.length}/${fetched.length} parent sources available`);
 
   state.parentPool = available;
   return state.parentPool;
@@ -293,7 +293,7 @@ async function resolveParentItem(state) {
   });
 
   if (!candidates.length) {
-    state.assistant.log('resolveParentItem(): Parent pool exhausted for this session');
+    state.ctx.log('resolveParentItem(): Parent pool exhausted for this session');
     return null;
   }
 
@@ -345,7 +345,7 @@ async function resolvePick(state, source) {
     }
 
     if (state.pool.includes('$parent')) {
-      state.assistant.log('resolvePick(): All feeds exhausted, falling back to $parent');
+      state.ctx.log('resolvePick(): All feeds exhausted, falling back to $parent');
       return resolveParentItem(state);
     }
 
@@ -373,7 +373,7 @@ async function resolvePick(state, source) {
   // --- URL → fetch content, no fallback ---
   if (isURL(source)) {
     const content = await getURLContent(source).catch((e) => {
-      state.assistant.error(`resolvePick(): Error fetching URL ${source}`, e);
+      state.ctx.error(`resolvePick(): Error fetching URL ${source}`, e);
       return null;
     });
 
@@ -423,16 +423,16 @@ async function resolvePick(state, source) {
  * @param {string[]} [args.categories] - Categories for $parent fetches
  * @param {object} [args.admin] - firebase-admin
  * @param {object} [args.Manager]
- * @param {object} args.assistant
+ * @param {object} args.ctx
  * @returns {Promise<object[]>} resolved sources ({ type, id, title, url, content, feedUrl?, raw?, trackingData })
  */
-async function resolveSources({ sources, count, categories, admin, Manager, assistant }) {
+async function resolveSources({ sources, count, categories, admin, Manager, ctx }) {
   count = count || 1;
 
-  const state = createResolverState({ sources, categories, admin, Manager, assistant });
+  const state = createResolverState({ sources, categories, admin, Manager, ctx });
 
   if (!state.pool.length) {
-    assistant.log('resolveSources(): Empty source pool');
+    ctx.log('resolveSources(): Empty source pool');
     return [];
   }
 
@@ -441,21 +441,21 @@ async function resolveSources({ sources, count, categories, admin, Manager, assi
   for (let i = 0; i < count; i++) {
     const pick = state.pool[Math.floor(Math.random() * state.pool.length)];
 
-    assistant.log(`resolveSources(): Pick ${i + 1}/${count} → ${typeof pick === 'string' ? pick.slice(0, 80) : pick}`);
+    ctx.log(`resolveSources(): Pick ${i + 1}/${count} → ${typeof pick === 'string' ? pick.slice(0, 80) : pick}`);
 
     const result = await resolvePick(state, pick).catch((e) => {
-      assistant.error('resolveSources(): Error resolving pick', e);
+      ctx.error('resolveSources(): Error resolving pick', e);
       return null;
     });
 
     if (result) {
       resolved.push(result);
     } else {
-      assistant.log(`resolveSources(): Pick ${i + 1}/${count} exhausted its fallback chain`);
+      ctx.log(`resolveSources(): Pick ${i + 1}/${count} exhausted its fallback chain`);
     }
   }
 
-  assistant.log(`resolveSources(): Resolved ${resolved.length}/${count} sources`);
+  ctx.log(`resolveSources(): Resolved ${resolved.length}/${count} sources`);
 
   return resolved;
 }

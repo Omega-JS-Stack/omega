@@ -12,7 +12,7 @@ Auth hooks let consumer projects inject custom logic into @omega.js/backend's au
 Hook signature (same as @omega.js/backend's internal handlers):
 
 ```javascript
-module.exports = async ({ Manager, assistant, user, context, libraries }) => {
+module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   // user: AuthUserRecord (uid, email, providerData, etc.)
   // context: AuthEventContext for blocking functions (ipAddress, userAgent, additionalUserInfo)
   //          EventContext for triggers (eventId, eventType, timestamp — no IP/userAgent)
@@ -28,14 +28,14 @@ const ENFORCE = true;
 
 const ALLOWED_PROVIDERS = ['google.com'];
 
-module.exports = async ({ assistant, user, context, libraries }) => {
+module.exports = async ({ ctx, user, context, libraries }) => {
   if (!ENFORCE) { return; }
 
   const { functions } = libraries;
   const provider = context.additionalUserInfo?.providerId;
 
   if (!ALLOWED_PROVIDERS.includes(provider)) {
-    assistant.error(`hook/before-create: Blocked provider '${provider}' for ${user.email}`);
+    ctx.error(`hook/before-create: Blocked provider '${provider}' for ${user.email}`);
     throw new functions.auth.HttpsError('permission-denied', 'Please sign up with Google.');
   }
 };
@@ -50,7 +50,7 @@ const powertools = require('node-powertools');
 const ENFORCE = true;
 const BLOCKED_AFFILIATE_CODES = ['iLvQjmvm'];
 
-module.exports = async ({ Manager, assistant, user, context, libraries }) => {
+module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   if (!ENFORCE) { return; }
 
   const { admin } = libraries;
@@ -69,6 +69,6 @@ module.exports = async ({ Manager, assistant, user, context, libraries }) => {
   if (!referredBy || !BLOCKED_AFFILIATE_CODES.includes(referredBy)) { return; }
 
   // Delete spam account (triggers on-delete for cleanup)
-  await admin.auth().deleteUser(uid).catch(e => assistant.error('Delete failed:', e));
+  await admin.auth().deleteUser(uid).catch(e => ctx.error('Delete failed:', e));
 };
 ```

@@ -7,14 +7,14 @@
  *
  * Scans the entire collection (no index required) since data-requests is small.
  */
-module.exports = async ({ Manager, assistant, context, libraries }) => {
+module.exports = async ({ Manager, ctx, context, libraries }) => {
   const { admin } = libraries;
   const nowUNIX = Math.round(Date.now() / 1000);
 
   const FOURTEEN_DAYS = 14 * 24 * 60 * 60;
   const FORTY_FOUR_DAYS = 44 * 24 * 60 * 60;
 
-  assistant.log('Starting...');
+  ctx.log('Starting...');
 
   // Only fetch requests created within the last 45 days (single-field filter, no composite index needed)
   const snapshot = await admin.firestore()
@@ -22,7 +22,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
     .where('metadata.created.timestampUNIX', '>', nowUNIX - FORTY_FOUR_DAYS - 86400)
     .get();
 
-  assistant.log(`Found ${snapshot.size} total data requests`);
+  ctx.log(`Found ${snapshot.size} total data requests`);
 
   let completed = 0;
   let expired = 0;
@@ -36,22 +36,22 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
       await doc.ref.update({ status: 'completed' })
         .then(() => {
           completed++;
-          assistant.log(`Completed request ${doc.id} (age: ${Math.round(age / 86400)}d)`);
+          ctx.log(`Completed request ${doc.id} (age: ${Math.round(age / 86400)}d)`);
         })
         .catch((e) => {
-          assistant.error(`Failed to complete request ${doc.id}: ${e.message}`);
+          ctx.error(`Failed to complete request ${doc.id}: ${e.message}`);
         });
     } else if (data.status === 'completed' && age >= FORTY_FOUR_DAYS) {
       await doc.ref.update({ status: 'expired' })
         .then(() => {
           expired++;
-          assistant.log(`Expired request ${doc.id} (age: ${Math.round(age / 86400)}d)`);
+          ctx.log(`Expired request ${doc.id} (age: ${Math.round(age / 86400)}d)`);
         })
         .catch((e) => {
-          assistant.error(`Failed to expire request ${doc.id}: ${e.message}`);
+          ctx.error(`Failed to expire request ${doc.id}: ${e.message}`);
         });
     }
   }
 
-  assistant.log(`Completed! (${completed} completed, ${expired} expired)`);
+  ctx.log(`Completed! (${completed} completed, ${expired} expired)`);
 };

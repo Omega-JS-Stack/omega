@@ -35,38 +35,38 @@ const safeCompare = require('../../../../helpers/safe-compare.js');
 
 const CHILD_TIMEOUT_MS = 10000;
 
-module.exports = async ({ assistant, Manager, libraries }) => {
+module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
-  const query = assistant.request.query;
+  const query = ctx.request.query;
 
   // Gate: only the parent @omega.js/backend exposes this route. Any brand whose config.parent
   // points to a URL (the normal case) returns 404 — pretend the route doesn't exist.
   if (!Manager.isParent()) {
-    return assistant.respond('Not found', { code: 404 });
+    return ctx.respond('Not found', { code: 404 });
   }
 
   const provider = query.provider;
   const key = query.key;
 
   if (!provider) {
-    return assistant.respond('Missing provider parameter', { code: 400 });
+    return ctx.respond('Missing provider parameter', { code: 400 });
   }
 
   // Same key used for the receiver — parent validates incoming, then re-uses
   // it for outbound calls to children (all brands share this env value).
   if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
-    return assistant.respond('Invalid key', { code: 401 });
+    return ctx.respond('Invalid key', { code: 401 });
   }
 
   // Read the brands collection. This lives in the PARENT's Firestore.
   const snapshot = await admin.firestore().collection('brands').get()
     .catch((e) => {
-      assistant.error('marketing webhook forward: failed to read brands collection:', e);
+      ctx.error('marketing webhook forward: failed to read brands collection:', e);
       return null;
     });
 
   if (!snapshot) {
-    return assistant.respond('Failed to load brands', { code: 500 });
+    return ctx.respond('Failed to load brands', { code: 500 });
   }
 
   // Collect brand URLs from the docs
@@ -77,7 +77,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
     const brandId = data.brand?.id || doc.id;
 
     if (!brandUrl) {
-      assistant.log(`marketing webhook forward: brand ${brandId} has no brand.url, skipping`);
+      ctx.log(`marketing webhook forward: brand ${brandId} has no brand.url, skipping`);
       return;
     }
 
@@ -85,19 +85,19 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   });
 
   if (brands.length === 0) {
-    assistant.log('marketing webhook forward: no brands to forward to');
-    return assistant.respond({ received: true, forwarded: 0 });
+    ctx.log('marketing webhook forward: no brands to forward to');
+    return ctx.respond({ received: true, forwarded: 0 });
   }
 
-  assistant.log(`marketing webhook forward: fanning out ${provider} event to ${brands.length} brand(s)`);
+  ctx.log(`marketing webhook forward: fanning out ${provider} event to ${brands.length} brand(s)`);
 
-  // Forward the raw body to every child. assistant.ref.req.body holds the body
+  // Forward the raw body to every child. ctx.ref.req.body holds the body
   // as we received it from the provider. We re-POST it without modification.
-  const rawBody = assistant.ref.req?.body;
+  const rawBody = ctx.ref.req?.body;
 
   const results = await Promise.allSettled(
     brands.map(({ brandId, brandUrl }) => forwardToChild({
-      assistant,
+      ctx,
       brandId,
       brandUrl,
       provider,
@@ -118,15 +118,15 @@ module.exports = async ({ assistant, Manager, libraries }) => {
       failed += 1;
       const reason = r.status === 'rejected' ? r.reason?.message : (r.value?.error || 'unknown');
       failures.push({ brandId: brand.brandId, reason });
-      assistant.error(`marketing webhook forward: ${brand.brandId} failed:`, reason);
+      ctx.error(`marketing webhook forward: ${brand.brandId} failed:`, reason);
     }
   }
 
-  assistant.log(`marketing webhook forward: ${provider} complete — succeeded=${succeeded}, failed=${failed}`);
+  ctx.log(`marketing webhook forward: ${provider} complete — succeeded=${succeeded}, failed=${failed}`);
 
   // Always return 200 — child failures shouldn't make the provider retry the
   // parent. Each child tracks its own idempotency so safe to re-fan on retry.
-  return assistant.respond({
+  return ctx.respond({
     received: true,
     forwarded: brands.length,
     succeeded,
@@ -139,7 +139,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
  * POST the raw body to one child @omega.js/backend's /marketing/webhook receiver.
  * Returns { ok: true } on success, { ok: false, error } on failure.
  */
-async function forwardToChild({ assistant, brandId, brandUrl, provider, key, body }) {
+async function forwardToChild({ ctx, brandId, brandUrl, provider, key, body }) {
   // Derive API URL: brandUrl 'https://somiibo.com' → 'https://api.somiibo.com'.
   // Use URL parsing so we tolerate trailing slashes and unusual hosts.
   let apiUrl;
@@ -161,7 +161,7 @@ async function forwardToChild({ assistant, brandId, brandUrl, provider, key, bod
       headers: { 'Content-Type': 'application/json' },
       body,
     });
-    assistant.log(`marketing webhook forward: ${brandId} OK — ${JSON.stringify(result)}`);
+    ctx.log(`marketing webhook forward: ${brandId} OK — ${JSON.stringify(result)}`);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e?.message || String(e) };

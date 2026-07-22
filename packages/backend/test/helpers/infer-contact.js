@@ -99,8 +99,8 @@ module.exports = {
           return skip('OMEGA_OPENAI_API_KEY not set');
         }
 
-        const assistant = Manager.Assistant();
-        const result = await inferContact('john.smith@microsoft.com', assistant);
+        const ctx = Manager.RouteContext();
+        const result = await inferContact('john.smith@microsoft.com', ctx);
 
         assert.ok(result, 'Should return a result');
         assert.equal(result.method, 'ai', 'Should use AI method');

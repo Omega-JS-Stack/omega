@@ -7,20 +7,20 @@
  */
 const { buildCampaignDoc } = require('./utils');
 
-module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, user, Manager, settings, analytics }) => {
 
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
   if (!user.roles.admin) {
-    return assistant.respond('Admin access required', { code: 403 });
+    return ctx.respond('Admin access required', { code: 403 });
   }
 
   const { admin } = Manager.libraries;
   const campaignId = (settings.id || '').trim();
 
   if (!campaignId) {
-    return assistant.respond('Campaign ID is required', { code: 400 });
+    return ctx.respond('Campaign ID is required', { code: 400 });
   }
 
   // Fetch existing
@@ -28,14 +28,14 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
   const doc = await docRef.get();
 
   if (!doc.exists) {
-    return assistant.respond('Campaign not found', { code: 404 });
+    return ctx.respond('Campaign not found', { code: 404 });
   }
 
   const existing = doc.data();
 
   // Can only edit pending campaigns
   if (existing.status !== 'pending') {
-    return assistant.respond(`Cannot edit campaign with status "${existing.status}"`, { code: 400 });
+    return ctx.respond(`Cannot edit campaign with status "${existing.status}"`, { code: 400 });
   }
 
   // Build update from provided fields using shared utility
@@ -58,14 +58,14 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
 
   await docRef.set(update, { merge: true });
 
-  assistant.log('marketing/campaign updated:', { campaignId, update });
+  ctx.log('marketing/campaign updated:', { campaignId, update });
 
   analytics.event('marketing/campaign', { action: 'update' });
 
   // Fetch updated doc
   const updated = await docRef.get();
 
-  return assistant.respond({
+  return ctx.respond({
     success: true,
     campaign: { id: campaignId, ...updated.data() },
   });

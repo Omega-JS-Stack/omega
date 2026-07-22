@@ -3,7 +3,7 @@
  *
  * Usage:
  *   const notification = require('./libraries/notification.js');
- *   await notification.send(assistant, { title, body, icon, clickAction, filters });
+ *   await notification.send(ctx, { title, body, icon, clickAction, filters });
  *
  * Used by:
  * - POST /admin/notification route
@@ -19,7 +19,7 @@ const BATCH_SIZE = 500;
 /**
  * Send push notification to FCM subscribers.
  *
- * @param {object} assistant - @omega.js/backend assistant instance
+ * @param {object} ctx - @omega.js/backend ctx instance
  * @param {object} options
  * @param {string} options.title - Notification title
  * @param {string} options.body - Notification body
@@ -32,7 +32,7 @@ const BATCH_SIZE = 500;
  * @param {number} [options.filters.limit] - Max tokens to send to
  * @returns {{ subscribers: number, batches: number, sent: number, deleted: number }}
  */
-async function send(assistant, options) {
+async function send(ctx, options) {
   const { title, body, icon, clickAction, filters } = options;
 
   if (!title || !body) {
@@ -40,7 +40,7 @@ async function send(assistant, options) {
   }
 
   // Build notification payload
-  const brand = assistant.Manager.config?.brand;
+  const brand = ctx.Manager.config?.brand;
   const notification = {
     title,
     body,
@@ -59,7 +59,7 @@ async function send(assistant, options) {
     throw new Error(`Invalid click_action URL: ${e.message}`);
   }
 
-  assistant.log('notification.send():', notification);
+  ctx.log('notification.send():', notification);
 
   const response = { subscribers: 0, batches: 0, sent: 0, deleted: 0 };
   const filterOptions = {
@@ -69,22 +69,22 @@ async function send(assistant, options) {
     limit: filters?.limit || null,
   };
 
-  await processTokens(assistant, notification, filterOptions, response);
+  await processTokens(ctx, notification, filterOptions, response);
 
   return response;
 }
 
-async function processTokens(assistant, notification, options, response) {
-  const Manager = assistant.Manager;
+async function processTokens(ctx, notification, options, response) {
+  const Manager = ctx.Manager;
 
   // Specific token — send directly
   if (options.token) {
-    assistant.log(`Sending to specific token: ${options.token}`);
+    ctx.log(`Sending to specific token: ${options.token}`);
 
     try {
-      await sendBatch(assistant, [options.token], 0, notification, response);
+      await sendBatch(ctx, [options.token], 0, notification, response);
     } catch (e) {
-      assistant.error('Error sending to specific token', e);
+      ctx.error('Error sending to specific token', e);
     }
 
     return;
@@ -104,7 +104,7 @@ async function processTokens(assistant, notification, options, response) {
     ? Math.ceil(options.limit / BATCH_SIZE)
     : Infinity;
 
-  assistant.log('Processing tokens with filters:', {
+  ctx.log('Processing tokens with filters:', {
     tags: options.tags,
     owner: options.owner,
     limit: options.limit,
@@ -132,10 +132,10 @@ async function processTokens(assistant, notification, options, response) {
       }
 
       try {
-        assistant.log(`Sending batch ${index} with ${batchTokens.length} tokens.`);
-        await sendBatch(assistant, batchTokens, index, notification, response);
+        ctx.log(`Sending batch ${index} with ${batchTokens.length} tokens.`);
+        await sendBatch(ctx, batchTokens, index, notification, response);
       } catch (e) {
-        assistant.error(`Error sending batch ${index}`, e);
+        ctx.error(`Error sending batch ${index}`, e);
       }
     },
     {
@@ -146,14 +146,14 @@ async function processTokens(assistant, notification, options, response) {
       log: true,
     }
   ).catch(e => {
-    assistant.error(`Error during token processing: ${e}`);
+    ctx.error(`Error during token processing: ${e}`);
   });
 }
 
-async function sendBatch(assistant, batch, id, notification, response) {
-  const { admin } = assistant.Manager.libraries;
+async function sendBatch(ctx, batch, id, notification, response) {
+  const { admin } = ctx.Manager.libraries;
 
-  assistant.log(`Sending batch #${id}: tokens=${batch.length}...`);
+  ctx.log(`Sending batch #${id}: tokens=${batch.length}...`);
 
   const messages = batch.map(token => ({
     token,
@@ -183,7 +183,7 @@ async function sendBatch(assistant, batch, id, notification, response) {
 
   const result = await admin.messaging().sendEach(messages);
 
-  assistant.log(`Sent batch #${id}: success=${result.successCount}, failures=${result.failureCount}`);
+  ctx.log(`Sent batch #${id}: success=${result.successCount}, failures=${result.failureCount}`);
 
   result.responses = result.responses.map((item, index) => {
     item.token = batch[index];
@@ -192,15 +192,15 @@ async function sendBatch(assistant, batch, id, notification, response) {
 
   // Clean bad tokens
   if (result.failureCount > 0) {
-    await cleanTokens(assistant, batch, result.responses, id, response);
+    await cleanTokens(ctx, batch, result.responses, id, response);
   }
 
   response.sent += (batch.length - result.failureCount);
   response.batches++;
 }
 
-async function cleanTokens(assistant, batch, results, id, response) {
-  const { admin } = assistant.Manager.libraries;
+async function cleanTokens(ctx, batch, results, id, response) {
+  const { admin } = ctx.Manager.libraries;
 
   const cleanPromises = results
     .map((item) => {
@@ -210,11 +210,11 @@ async function cleanTokens(assistant, batch, results, id, response) {
 
       return admin.firestore().doc(`${PATH_NOTIFICATIONS}/${item.token}`).delete()
         .then(() => {
-          assistant.log(`Deleted bad token: ${item.token} (${item.error.code})`);
+          ctx.log(`Deleted bad token: ${item.token} (${item.error.code})`);
           response.deleted++;
         })
         .catch((e) => {
-          assistant.error(`Failed to delete bad token: ${item.token}`, e);
+          ctx.error(`Failed to delete bad token: ${item.token}`, e);
         });
     })
     .filter(Boolean);

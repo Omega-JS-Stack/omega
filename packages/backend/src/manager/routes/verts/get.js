@@ -6,13 +6,13 @@
  *   id    — Get a single vert by ID
  *   limit — Max results (default 100)
  */
-module.exports = async ({ assistant, user, Manager, settings }) => {
+module.exports = async ({ ctx, user, Manager, settings }) => {
 
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
   if (!user.roles.admin) {
-    return assistant.respond('Admin access required', { code: 403 });
+    return ctx.respond('Admin access required', { code: 403 });
   }
 
   const { admin } = Manager.libraries;
@@ -22,10 +22,10 @@ module.exports = async ({ assistant, user, Manager, settings }) => {
     const doc = await admin.firestore().doc(`verts/${settings.id}`).get();
 
     if (!doc.exists) {
-      return assistant.respond('Vert not found', { code: 404 });
+      return ctx.respond('Vert not found', { code: 404 });
     }
 
-    return assistant.respond({
+    return ctx.respond({
       success: true,
       vert: { id: doc.id, ...doc.data() },
     });
@@ -41,7 +41,7 @@ module.exports = async ({ assistant, user, Manager, settings }) => {
     ...doc.data(),
   }));
 
-  return assistant.respond({
+  return ctx.respond({
     success: true,
     verts,
     count: verts.length,

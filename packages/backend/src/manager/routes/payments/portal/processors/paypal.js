@@ -11,14 +11,14 @@ module.exports = {
    * @param {string} options.uid - User's UID
    * @param {string} options.email - User's email (not used for PayPal)
    * @param {string|null} options.returnUrl - Not used for PayPal
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {object} { url }
    */
-  async createPortalSession({ uid, email, returnUrl, assistant }) {
+  async createPortalSession({ uid, email, returnUrl, ctx }) {
     // PayPal subscribers manage their subscription directly at PayPal
     const url = 'https://www.paypal.com/myaccount/autopay/';
 
-    assistant.log(`PayPal portal redirect: uid=${uid}, url=${url}`);
+    ctx.log(`PayPal portal redirect: uid=${uid}, url=${url}`);
 
     return { url };
   },

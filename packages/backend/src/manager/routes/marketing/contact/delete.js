@@ -7,17 +7,17 @@
  * would re-add the contact the admin just removed.
  */
 
-module.exports = async ({ assistant, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   // Initialize Usage to check auth level
-  const usage = await Manager.Usage().init(assistant, {
+  const usage = await Manager.Usage().init(ctx, {
     unauthenticatedMode: 'firestore',
   });
   const isAdmin = usage.user.roles?.admin;
 
   // Admin only endpoint
   if (!isAdmin) {
-    return assistant.respond('Admin access required', { code: 403 });
+    return ctx.respond('Admin access required', { code: 403 });
   }
 
   // Extract parameters
@@ -25,20 +25,20 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
 
   // Validate email is provided
   if (!email) {
-    return assistant.respond('Email is required', { code: 400 });
+    return ctx.respond('Email is required', { code: 400 });
   }
 
   // Remove from providers
-  const mailer = Manager.Email(assistant);
+  const mailer = Manager.Email(ctx);
   const providerResults = await mailer.remove(email);
 
   // Mirror the removal to the user doc's consent so future syncs hit the email
   // library's consent gate instead of silently re-adding the contact
   // (best-effort, silent when the email maps to no user)
-  await mirrorRevokedConsent({ assistant, Manager, email });
+  await mirrorRevokedConsent({ ctx, Manager, email });
 
   // Log result
-  assistant.log('marketing/contact delete result:', {
+  ctx.log('marketing/contact delete result:', {
     email,
     providers: providerResults,
   });
@@ -46,7 +46,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   // Track analytics
   analytics.event('marketing/contact', { action: 'delete' });
 
-  return assistant.respond({
+  return ctx.respond({
     success: true,
     providers: providerResults,
   });
@@ -57,7 +57,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
  * matches the removed email. Same lookup + write shape as the marketing webhook
  * processors' revoke write. Silent when no user matches.
  */
-async function mirrorRevokedConsent({ assistant, Manager, email }) {
+async function mirrorRevokedConsent({ ctx, Manager, email }) {
   const { admin } = Manager.libraries;
 
   const snapshot = await admin.firestore().collection('users')
@@ -65,7 +65,7 @@ async function mirrorRevokedConsent({ assistant, Manager, email }) {
     .limit(1)
     .get()
     .catch((e) => {
-      assistant.error('marketing/contact delete: Failed to look up user by email:', e);
+      ctx.error('marketing/contact delete: Failed to look up user by email:', e);
       return null;
     });
 
@@ -74,8 +74,8 @@ async function mirrorRevokedConsent({ assistant, Manager, email }) {
   }
 
   const uid = snapshot.docs[0].id;
-  const timestamp = assistant.meta.startTime.timestamp;
-  const timestampUNIX = assistant.meta.startTime.timestampUNIX;
+  const timestamp = ctx.meta.startTime.timestamp;
+  const timestampUNIX = ctx.meta.startTime.timestampUNIX;
 
   // Write consent.marketing.status = 'revoked' (preserve grantedAt — informational audit trail)
   await admin.firestore().doc(`users/${uid}`).set({
@@ -94,9 +94,9 @@ async function mirrorRevokedConsent({ assistant, Manager, email }) {
     metadata: Manager.Metadata().set({ tag: 'marketing/contact:delete' }),
   }, { merge: true })
     .then(() => {
-      assistant.log(`marketing/contact delete: Mirrored revoked consent to user ${uid} (${email})`);
+      ctx.log(`marketing/contact delete: Mirrored revoked consent to user ${uid} (${email})`);
     })
     .catch((e) => {
-      assistant.error(`marketing/contact delete: Failed to mirror revoked consent to ${uid}:`, e);
+      ctx.error(`marketing/contact delete: Failed to mirror revoked consent to ${uid}:`, e);
     });
 }

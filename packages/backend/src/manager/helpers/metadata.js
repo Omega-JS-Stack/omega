@@ -24,7 +24,7 @@ Metadata.prototype.set = function (metadata) {
   self.document.metadata.updated.timestampUNIX = now.unix();
   self.document.metadata.tag = metadata.tag || uuidv4();
 
-  self.Manager.assistant.log(`Metadata: #${self.document.metadata.tag}`);
+  self.Manager.ctx.log(`Metadata: #${self.document.metadata.tag}`);
 
   return self.document.metadata;
 };

@@ -9,7 +9,7 @@
  *   - ai/index.js normalizeOptions — structured conversations are NOT
  *     string-flattened; system injections still apply
  *
- * All pure helpers — no network, no assistant.
+ * All pure helpers — no network, no ctx.
  */
 const format = require('../../src/manager/libraries/ai/providers/anthropic-format.js');
 const OpenAI = require('../../src/manager/libraries/ai/providers/openai.js');
@@ -92,7 +92,7 @@ module.exports = {
     // ─── anthropic-format: message building ───
 
     {
-      name: 'anthropic-messages-assistant-toolcalls-become-tool-use-blocks',
+      name: 'anthropic-messages-ctx-toolcalls-become-tool-use-blocks',
       async run({ assert }) {
         const { system, messages } = format.buildMessages({
           messages: [
@@ -103,10 +103,10 @@ module.exports = {
         });
 
         assert.equal(system, 'sys', 'system extracted');
-        assert.equal(messages.length, 2, 'user + assistant');
+        assert.equal(messages.length, 2, 'user + ctx');
 
         const assistantTurn = messages[1];
-        assert.equal(assistantTurn.role, 'assistant', 'assistant role');
+        assert.equal(assistantTurn.role, 'assistant', 'ctx role');
         assert.equal(assistantTurn.content[0].type, 'text', 'text block first');
         assert.equal(assistantTurn.content[0].text, 'Let me check.', 'text content');
         assert.equal(assistantTurn.content[1].type, 'tool_use', 'tool_use block');
@@ -130,7 +130,7 @@ module.exports = {
           ],
         });
 
-        assert.equal(messages.length, 3, 'user + assistant + ONE merged tool-result user turn');
+        assert.equal(messages.length, 3, 'user + ctx + ONE merged tool-result user turn');
 
         const resultTurn = messages[2];
         assert.equal(resultTurn.role, 'user', 'tool results ride a user turn');
@@ -217,11 +217,11 @@ module.exports = {
           { role: 'tool', toolCallId: 'call_1', content: '{"status":"shipped"}' },
         ], noopLog);
 
-        assert.equal(input.length, 5, 'system + user + assistant text + function_call + function_call_output');
+        assert.equal(input.length, 5, 'system + user + ctx text + function_call + function_call_output');
         assert.equal(input[0].role, 'system', 'system turn');
         assert.equal(input[1].role, 'user', 'user turn');
-        assert.equal(input[2].role, 'assistant', 'assistant text turn');
-        assert.equal(input[2].content[0].type, 'output_text', 'assistant uses output_text');
+        assert.equal(input[2].role, 'assistant', 'ctx text turn');
+        assert.equal(input[2].content[0].type, 'output_text', 'ctx uses output_text');
 
         const callItem = input[3];
         assert.equal(callItem.type, 'function_call', 'function_call item');
@@ -245,7 +245,7 @@ module.exports = {
         ], noopLog);
 
         assert.equal(input.length, 2, 'user + function_call only');
-        assert.equal(input[1].type, 'function_call', 'no empty assistant message item');
+        assert.equal(input[1].type, 'function_call', 'no empty ctx message item');
       },
     },
 

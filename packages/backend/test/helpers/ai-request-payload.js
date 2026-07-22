@@ -6,7 +6,7 @@
  * into the eventual OpenAI HTTP payload (the `input: [...]` array).
  *
  * These tests exercise the pure helpers `normalizePrompt` and `formatHistory`
- * directly — no network, no assistant required.
+ * directly — no network, no ctx required.
  */
 const OpenAI = require('../../src/manager/libraries/ai/providers/openai.js');
 const { normalizePrompt, formatHistory, VALID_PROMPT_ROLES } = OpenAI._internals;
@@ -152,13 +152,13 @@ module.exports = {
     {
       name: 'format-single-system-prompt-emits-system-then-user',
       async run({ assert }) {
-        const promptSegments = normalizePrompt({ content: 'You are a helpful assistant.' });
+        const promptSegments = normalizePrompt({ content: 'You are a helpful ctx.' });
         const formatted = formatHistory(baseOptions(), promptSegments, 'Hello!', noopLog);
 
         assert.equal(formatted.length, 2, 'two messages: system + user');
         assert.equal(formatted[0].role, 'system', 'first message is system');
         assert.equal(formatted[0].content[0].type, 'input_text', 'system uses input_text');
-        assert.equal(formatted[0].content[0].text, 'You are a helpful assistant.', 'system text');
+        assert.equal(formatted[0].content[0].text, 'You are a helpful ctx.', 'system text');
         assert.equal(formatted[1].role, 'user', 'second message is user');
         assert.equal(formatted[1].content[0].text, 'Hello!', 'user text');
       },
@@ -222,7 +222,7 @@ module.exports = {
     },
 
     {
-      name: 'format-assistant-history-uses-output_text-type',
+      name: 'format-ctx-history-uses-output_text-type',
       async run({ assert }) {
         const options = baseOptions({
           history: {
@@ -233,7 +233,7 @@ module.exports = {
         const formatted = formatHistory(options, [], 'new message', noopLog);
 
         const assistantMsg = formatted.find((m) => m.role === 'assistant');
-        assert.equal(assistantMsg.content[0].type, 'output_text', 'assistant uses output_text');
+        assert.equal(assistantMsg.content[0].type, 'output_text', 'ctx uses output_text');
       },
     },
 
@@ -279,8 +279,8 @@ module.exports = {
         const formatted = formatHistory(options, [], 'real new message', noopLog);
 
         // history's trailing 'user' is dropped, then the real new message is appended
-        assert.equal(formatted.length, 2, 'assistant + new user only');
-        assert.equal(formatted[0].role, 'assistant', 'kept assistant');
+        assert.equal(formatted.length, 2, 'ctx + new user only');
+        assert.equal(formatted[0].role, 'assistant', 'kept ctx');
         assert.equal(formatted[1].role, 'user', 'new user');
         assert.equal(formatted[1].content[0].text, 'real new message', 'new user content');
       },

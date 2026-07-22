@@ -83,13 +83,13 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 **Route:** constructor pattern → context-object export ([routes.md](routes.md)):
 
 - `routes/example/index.js` → `routes/example/post.js` (or the appropriate method file)
-- Remove the constructor; use `module.exports = async ({ Manager, assistant, analytics, usage, user, settings, libraries, utilities }) => {}`
+- Remove the constructor; use `module.exports = async ({ Manager, ctx, analytics, usage, user, settings, libraries, utilities }) => {}`
 
 **Schema:** wrapped tiers → flat ([schemas.md](schemas.md)):
 
 - `schemas/example/index.js` → `schemas/example/post.js`
 - Remove the `['defaults']:` wrapper; flatten the structure (plan adjustments move INSIDE the function, branching on `user`)
-- Change the signature to the context object: `({ assistant, user, data, method, headers, geolocation, client })`
+- Change the signature to the context object: `({ ctx, user, data, method, headers, geolocation, client })`
 - Remove `value: undefined` noise
 
 | Aspect | Old Format | New Format |
@@ -98,7 +98,9 @@ Search all `.js` files under `functions/` for legacy config reads and convert to
 | Self reference | `const self = this;` | Not needed |
 | File naming | `index.js` | `get.js`, `post.js`, `put.js`, `delete.js` |
 | Schema wrapper | `['defaults']: { ... }` | Flat structure (no wrapper) |
-| Schema params | `(assistant)` | `({ assistant, user, data, ... })` context object |
+| Schema params | `(ctx)` | `({ ctx, user, data, ... })` context object |
+| Context key | `{ assistant }` / `Manager.Assistant()` / `BackendAssistant` | `{ ctx }` / `Manager.RouteContext()` / `RouteContext` (cp263) |
+| Error factory | `assistant.errorify(e, { code, sentry, log })` | `ctx.report(e, { code })` — 5xx captures to Sentry automatically, 4xx never; sending stays `ctx.respond()` |
 
 ## See also
 

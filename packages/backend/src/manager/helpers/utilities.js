@@ -280,7 +280,7 @@ Utilities.prototype.getDocumentWithOwnerUser = function (path, options) {
     options.resolve = options.resolve || {};
     options.resolve.schema = options.resolve.schema || '';
     options.resolve.checkRequired = options.resolve.checkRequired;
-    options.resolve.assistant = options.resolve.assistant;
+    options.resolve.ctx = options.resolve.ctx;
 
     // If no doc is provided, throw an error
     if (!path) {
@@ -348,7 +348,7 @@ Utilities.prototype.getDocumentWithOwnerUser = function (path, options) {
 
     // Resolve with schema
     if (options.resolve.schema) {
-      const documentResolved = Manager.Settings().resolve(options.resolve.assistant, undefined, document, {
+      const documentResolved = Manager.Settings().resolve(options.resolve.ctx, undefined, document, {
         schema: options.resolve.schema,
         user: userResolved,
         checkRequired: options.resolve.checkRequired,

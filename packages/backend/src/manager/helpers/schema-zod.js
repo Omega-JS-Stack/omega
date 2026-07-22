@@ -53,28 +53,28 @@ function isZodSchema(x) {
  * opt-out) and enum enforcement (sent values checked post-coercion; absent fields
  * pass) run from the ._omegaMeta registry that fields.object() builds; the error
  * messages and codes match the declarative engine exactly.
- * @param {object} assistant - Assistant (errorify)
+ * @param {object} ctx - RouteContext (report)
  * @param {import('zod').ZodType} schema - Zod schema (usually from fields.object())
  * @param {object} settings - Raw request data
  * @param {object} options - Resolve options (checkRequired, user, ...)
  * @returns {object} Resolved settings
  */
-function resolveZodSchema(assistant, schema, settings, options) {
+function resolveZodSchema(ctx, schema, settings, options) {
   const meta = schema._omegaMeta;
 
   // Required check — same rule as the declarative engine: fires when the raw value
   // is undefined or '' (null, 0, false pass), honoring checkRequired and
-  // function-valued required(assistant, settings, options).
+  // function-valued required(ctx, settings, options).
   if (options.checkRequired && meta) {
     for (const [path, node] of Object.entries(meta.paths)) {
       const isRequired = typeof node.required === 'function'
-        ? node.required(assistant, settings, options)
+        ? node.required(ctx, settings, options)
         : node.required === true;
 
       const raw = _.get(settings, path);
 
       if (isRequired && (typeof raw === 'undefined' || raw === '')) {
-        throw assistant.errorify(`Required key {${path}} is missing in settings`, {code: 400});
+        throw ctx.report(`Required key {${path}} is missing in settings`, {code: 400});
       }
     }
   }
@@ -85,7 +85,7 @@ function resolveZodSchema(assistant, schema, settings, options) {
     const first = result.error.issues[0];
     const where = first && first.path.length ? ` {${first.path.join('.')}}` : '';
 
-    throw assistant.errorify(`Invalid settings${where}: ${first ? first.message : 'validation failed'}`, {code: 400});
+    throw ctx.report(`Invalid settings${where}: ${first ? first.message : 'validation failed'}`, {code: 400});
   }
 
   // Enum enforcement — post-resolution, same layer as the declarative engine
@@ -94,7 +94,7 @@ function resolveZodSchema(assistant, schema, settings, options) {
       .filter(([, node]) => Array.isArray(node.enum))
       .map(([path, node]) => ({ path: path, allowed: node.enum }));
 
-    enforceEnums(assistant, settings, result.data, enumPaths);
+    enforceEnums(ctx, settings, result.data, enumPaths);
   }
 
   return result.data;

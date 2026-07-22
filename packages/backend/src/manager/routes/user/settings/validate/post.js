@@ -8,12 +8,12 @@ const { resolveSchema } = require('../../../../helpers/schema-engine.js');
  * POST /user/settings/validate - Validate user settings against defaults
  * Merges user settings with subscription-specific defaults from defaults.js
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID
@@ -21,7 +21,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   // Require admin to validate other users' settings
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Get user data for subscription
@@ -31,7 +31,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     const doc = await admin.firestore().doc(`users/${uid}`).get();
 
     if (!doc.exists) {
-      return assistant.respond('User not found', { code: 404 });
+      return ctx.respond('User not found', { code: 404 });
     }
 
     userData = doc.data();
@@ -45,7 +45,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   // Check if file exists
   if (!jetpack.exists(resolvedPath)) {
-    return assistant.respond(`Defaults file at ${resolvedPath} does not exist, please add it manually.`, { code: 500, sentry: true });
+    return ctx.respond(`Defaults file at ${resolvedPath} does not exist, please add it manually.`, { code: 500 });
   }
 
   // Load and process defaults
@@ -53,11 +53,11 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     const defaults = _.get(require(resolvedPath)(), settings.defaultsPath);
     const combined = combineDefaults(defaults.all, defaults[userData.subscription?.product?.id] || {});
 
-    assistant.log('Combined settings', combined);
+    ctx.log('Combined settings', combined);
 
-    return assistant.respond(resolveSchema(mergedSettings, combined));
+    return ctx.respond(resolveSchema(mergedSettings, combined));
   } catch (e) {
-    return assistant.respond(`Unable to load file at ${resolvedPath}: ${e}`, { code: 500, sentry: true });
+    return ctx.respond(`Unable to load file at ${resolvedPath}: ${e}`, { code: 500 });
   }
 };
 

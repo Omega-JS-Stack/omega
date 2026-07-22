@@ -16,8 +16,8 @@ const loadProcessor = require('../../../libraries/load-processor.js');
  * 4. Detects state transitions and dispatches handler files (non-blocking)
  * 5. Marks the webhook as completed
  */
-module.exports = async ({ assistant, change, context }) => {
-  const Manager = assistant.Manager;
+module.exports = async ({ ctx, change, context }) => {
+  const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
 
   const dataAfter = change.after.data();
@@ -45,7 +45,7 @@ module.exports = async ({ assistant, change, context }) => {
     const resourceType = dataAfter.event?.resourceType;
     const resourceId = dataAfter.event?.resourceId;
 
-    assistant.log(`Processing webhook ${eventId}: processor=${processor}, eventType=${eventType}, category=${category}, resourceType=${resourceType}, resourceId=${resourceId}, uid=${uid || 'null'}`);
+    ctx.log(`Processing webhook ${eventId}: processor=${processor}, eventType=${eventType}, category=${category}, resourceType=${resourceType}, resourceId=${resourceId}, uid=${uid || 'null'}`);
 
     // Validate category
     if (!category) {
@@ -65,14 +65,14 @@ module.exports = async ({ assistant, change, context }) => {
     const rawFallback = raw.data?.object || {};
     const resource = await library.fetchResource(resourceType, resourceId, rawFallback, { admin, eventType, config: Manager.config });
 
-    assistant.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resource.status || 'unknown'}`);
+    ctx.log(`Fetched resource: type=${resourceType}, id=${resourceId}, status=${resource.status || 'unknown'}`);
 
     // Resolve UID from the fetched resource if not available from webhook parse
     // This handles events like PAYMENT.SALE where the Sale object doesn't carry custom_id
     // but the parent subscription (fetched via fetchResource) does
     if (!uid && library.getUid) {
       uid = library.getUid(resource);
-      assistant.log(`UID resolved from fetched resource: uid=${uid || 'null'}, processor=${processor}, resourceType=${resourceType}`);
+      ctx.log(`UID resolved from fetched resource: uid=${uid || 'null'}, processor=${processor}, resourceType=${resourceType}`);
 
       // Update the webhook doc with the resolved UID so it's persisted for debugging
       if (uid) {
@@ -86,12 +86,12 @@ module.exports = async ({ assistant, change, context }) => {
     let resolvedFromPassThru = false;
     let passThruOrderId = null;
     if (!uid && library.resolveUidFromHostedPage) {
-      const passThruResult = await library.resolveUidFromHostedPage(resourceId, assistant);
+      const passThruResult = await library.resolveUidFromHostedPage(resourceId, ctx);
       if (passThruResult) {
         uid = passThruResult.uid;
         passThruOrderId = passThruResult.orderId || null;
         resolvedFromPassThru = true;
-        assistant.log(`UID resolved from hosted page pass_thru_content: uid=${uid}, orderId=${passThruOrderId}, resourceId=${resourceId}`);
+        ctx.log(`UID resolved from hosted page pass_thru_content: uid=${uid}, orderId=${passThruOrderId}, resourceId=${resourceId}`);
 
         await webhookRef.set({ owner: uid }, { merge: true });
       }
@@ -106,8 +106,8 @@ module.exports = async ({ assistant, change, context }) => {
     // so future webhooks (renewals, cancellations) can resolve the UID directly
     if (resolvedFromPassThru && resourceType === 'subscription' && library.setMetaData) {
       library.setMetaData(resource, { uid, orderId: passThruOrderId })
-        .then(() => assistant.log(`Backfilled meta_data on subscription ${resourceId} + customer: uid=${uid}, orderId=${passThruOrderId}`))
-        .catch((e) => assistant.error(`Failed to backfill meta_data on ${resourceType} ${resourceId}: ${e.message}`));
+        .then(() => ctx.log(`Backfilled meta_data on subscription ${resourceId} + customer: uid=${uid}, orderId=${passThruOrderId}`))
+        .catch((e) => ctx.error(`Failed to backfill meta_data on ${resourceType} ${resourceId}: ${e.message}`));
     }
 
     // Build timestamps
@@ -124,7 +124,7 @@ module.exports = async ({ assistant, change, context }) => {
       throw new Error(`Unknown event category: ${category}`);
     }
 
-    const transitionName = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, assistant, raw });
+    const transitionName = await processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, ctx, raw });
 
     // Mark webhook as completed (include transition name for auditing/testing)
     await webhookRef.set({
@@ -140,9 +140,9 @@ module.exports = async ({ assistant, change, context }) => {
       },
     }, { merge: true });
 
-    assistant.log(`Webhook ${eventId} completed`);
+    ctx.log(`Webhook ${eventId} completed`);
   } catch (e) {
-    assistant.error(`Webhook ${eventId} failed: ${e.message}`, e);
+    ctx.error(`Webhook ${eventId} failed: ${e.message}`, e);
 
     const now = powertools.timestamp(new Date(), { output: 'string' });
     const nowUNIX = powertools.timestamp(now, { output: 'unix' });
@@ -179,8 +179,8 @@ module.exports = async ({ assistant, change, context }) => {
  * 6. Track analytics (non-blocking)
  * 7. Write to Firestore (user doc for subscriptions + payments-orders)
  */
-async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, assistant, raw }) {
-  const Manager = assistant.Manager;
+async function processPaymentEvent({ category, library, resource, resourceType, uid, processor, eventType, eventId, resourceId, orderId, now, nowUNIX, webhookReceivedUNIX, ctx, raw }) {
+  const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
   const isSubscription = category === 'subscription';
 
@@ -190,7 +190,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     if (existingDoc.exists) {
       const existingUpdatedUNIX = existingDoc.data()?.metadata?.updated?.timestampUNIX || 0;
       if (webhookReceivedUNIX < existingUpdatedUNIX) {
-        assistant.log(`Stale webhook ${eventId}: received=${webhookReceivedUNIX}, existing updated=${existingUpdatedUNIX}, skipping`);
+        ctx.log(`Stale webhook ${eventId}: received=${webhookReceivedUNIX}, existing updated=${existingUpdatedUNIX}, skipping`);
         return null;
       }
     }
@@ -201,7 +201,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   const userData = userDoc.exists ? userDoc.data() : {};
   const before = isSubscription ? (userData.subscription || null) : null;
 
-  assistant.log(`User doc for ${uid}: exists=${userDoc.exists}, email=${userData?.auth?.email || 'null'}, name=${userData?.personal?.name?.first || 'null'}, subscription=${userData?.subscription?.product?.id || 'null'}`);
+  ctx.log(`User doc for ${uid}: exists=${userDoc.exists}, email=${userData?.auth?.email || 'null'}, name=${userData?.personal?.name?.first || 'null'}, subscription=${userData?.subscription?.product?.id || 'null'}`);
 
   // Auto-fill user name from payment processor if not already set
   if (!userData?.personal?.name?.first) {
@@ -210,7 +210,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
       await admin.firestore().doc(`users/${uid}`).set({
         personal: { name: customerName },
       }, { merge: true });
-      assistant.log(`Auto-filled user name from ${resourceType}: ${customerName.first} ${customerName.last || ''}`);
+      ctx.log(`Auto-filled user name from ${resourceType}: ${customerName.first} ${customerName.last || ''}`);
     }
   }
 
@@ -226,11 +226,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   // PayPal: PAYMENT.SALE.DENIED, Stripe: invoice.payment_failed, Chargebee: payment_failed
   const PAYMENT_DENIED_EVENTS = ['PAYMENT.SALE.DENIED', 'invoice.payment_failed', 'payment_failed'];
   if (isSubscription && PAYMENT_DENIED_EVENTS.includes(eventType) && unified.status === 'active') {
-    assistant.log(`Overriding status to suspended: ${eventType} received but provider still says active`);
+    ctx.log(`Overriding status to suspended: ${eventType} received but provider still says active`);
     unified.status = 'suspended';
   }
 
-  assistant.log(`Unified ${category}: product=${unified.product.id}, status=${unified.status}`, unified);
+  ctx.log(`Unified ${category}: product=${unified.product.id}, status=${unified.status}`, unified);
 
   // Read checkout context from payments-intents (attribution, discount, supplemental)
   let intentData = {};
@@ -270,11 +270,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
   };
 
   // Detect and dispatch transition (non-blocking)
-  const shouldRunHandlers = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldRunHandlers = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
   const transitionName = transitions.detectTransition(category, before, unified, eventType);
 
   if (transitionName) {
-    assistant.log(`Transition detected: ${category}/${transitionName} (before.status=${before?.status || 'null'}, after.status=${unified.status})`);
+    ctx.log(`Transition detected: ${category}/${transitionName} (before.status=${before?.status || 'null'}, after.status=${unified.status})`);
 
     if (shouldRunHandlers) {
       // Extract unified refund details from the processor library (keeps handlers processor-agnostic)
@@ -283,31 +283,31 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
         : null;
 
       transitions.dispatch(transitionName, category, {
-        before, after: unified, order, uid, userDoc: userData, assistant, refundDetails,
+        before, after: unified, order, uid, userDoc: userData, ctx, refundDetails,
       });
     } else {
-      assistant.log(`Transition handler skipped (testing mode): ${category}/${transitionName}`);
+      ctx.log(`Transition handler skipped (testing mode): ${category}/${transitionName}`);
     }
   }
 
   // Track payment analytics (non-blocking)
   // Fires independently of transitions — renewals have no transition but still need tracking
   if (shouldRunHandlers) {
-    trackPayment({ category, transitionName, eventType, unified, order, uid, processor, assistant });
+    trackPayment({ category, transitionName, eventType, unified, order, uid, processor, ctx });
   }
 
   // Write unified subscription to user doc (subscriptions only)
   if (isSubscription) {
     await admin.firestore().doc(`users/${uid}`).set({ subscription: unified }, { merge: true });
-    assistant.log(`Updated users/${uid}.subscription: status=${unified.status}, product=${unified.product.id}`);
+    ctx.log(`Updated users/${uid}.subscription: status=${unified.status}, product=${unified.product.id}`);
 
     // Sync marketing contact with updated subscription data (non-blocking)
     if (shouldRunHandlers) {
-      const email = Manager.Email(assistant);
+      const email = Manager.Email(ctx);
       const updatedUserDoc = { ...userData, subscription: unified };
       email.sync(updatedUserDoc)
-        .then((r) => assistant.log('Marketing sync after payment:', r))
-        .catch((e) => assistant.error('Marketing sync after payment failed:', e));
+        .then((r) => ctx.log('Marketing sync after payment:', r))
+        .catch((e) => ctx.error('Marketing sync after payment failed:', e));
     }
   }
 
@@ -328,7 +328,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
     }
 
     await orderRef.set(order, { merge: true });
-    assistant.log(`Updated payments-orders/${orderId}: type=${category}, uid=${uid}, eventType=${eventType}`);
+    ctx.log(`Updated payments-orders/${orderId}: type=${category}, uid=${uid}, eventType=${eventType}`);
   }
 
   // Update payments-intents/{orderId} status to match webhook outcome
@@ -342,7 +342,7 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
         },
       },
     }, { merge: true });
-    assistant.log(`Updated payments-intents/${orderId}: status=completed`);
+    ctx.log(`Updated payments-intents/${orderId}: status=completed`);
   }
 
   // Mark abandoned cart as completed (non-blocking, fire-and-forget)
@@ -356,11 +356,11 @@ async function processPaymentEvent({ category, library, resource, resourceType, 
       },
     },
   }, { merge: true })
-    .then(() => assistant.log(`Updated ${COLLECTION}/${uid}: status=completed`))
+    .then(() => ctx.log(`Updated ${COLLECTION}/${uid}: status=completed`))
     .catch((e) => {
       // Ignore not-found — cart may not exist for this user
       if (e.code !== 5) {
-        assistant.error(`Failed to update ${COLLECTION}/${uid}: ${e.message}`);
+        ctx.error(`Failed to update ${COLLECTION}/${uid}: ${e.message}`);
       }
     });
 

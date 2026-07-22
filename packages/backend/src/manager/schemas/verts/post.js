@@ -3,8 +3,8 @@
  */
 const { fields: f } = require('../../helpers/schema-zod.js');
 
-module.exports = ({ assistant }) => f.object({
-  id: f.string({ value: () => assistant.Manager.Utilities().randomId() }),
+module.exports = ({ ctx }) => f.object({
+  id: f.string({ value: () => ctx.Manager.Utilities().randomId() }),
   enabled: f.boolean({ default: true }),
   title: f.string({ default: undefined, required: true }),
   description: f.string({ default: '' }),

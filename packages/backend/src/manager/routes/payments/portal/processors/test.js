@@ -4,14 +4,14 @@
  * Only available in non-production environments.
  */
 module.exports = {
-  async createPortalSession({ uid, returnUrl, assistant }) {
-    if (assistant.isProduction()) {
+  async createPortalSession({ uid, returnUrl, ctx }) {
+    if (ctx.isProduction()) {
       throw new Error('Test processor is not available in production');
     }
 
     const url = returnUrl || 'https://example.com/account';
 
-    assistant.log(`Test portal session: uid=${uid}, url=${url}`);
+    ctx.log(`Test portal session: uid=${uid}, url=${url}`);
 
     return { url };
   },

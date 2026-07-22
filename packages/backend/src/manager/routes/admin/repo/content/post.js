@@ -5,28 +5,28 @@
 const { Octokit } = require('@octokit/rest');
 const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
-module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin or blogger
   if (!user.roles.admin && !user.roles.blogger) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Check for GitHub configuration
   if (!process.env.GH_TOKEN) {
-    return assistant.respond('GitHub API key not configured.', { code: 500 });
+    return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
   if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return assistant.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
+    return ctx.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
   }
 
-  assistant.log('main(): settings', settings);
+  ctx.log('main(): settings', settings);
 
   const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
 
@@ -37,10 +37,10 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
 
   // Check for required values
   if (!settings.path) {
-    return assistant.respond('Missing required parameter: path', { code: 400 });
+    return ctx.respond('Missing required parameter: path', { code: 400 });
   }
   if (!settings.content) {
-    return assistant.respond('Missing required parameter: content', { code: 400 });
+    return ctx.respond('Missing required parameter: content', { code: 400 });
   }
 
   // Fix other values
@@ -50,30 +50,30 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   settings.githubUser = bemRepo.user;
   settings.githubRepo = bemRepo.name;
 
-  assistant.log('main(): Creating file...', settings);
+  ctx.log('main(): Creating file...', settings);
 
   // Upload content
-  const uploadResult = await uploadContent(assistant, octokit, settings).catch(e => e);
+  const uploadResult = await uploadContent(ctx, octokit, settings).catch(e => e);
   if (uploadResult instanceof Error) {
-    return assistant.respond(uploadResult.message, { code: uploadResult.status || 500 });
+    return ctx.respond(uploadResult.message, { code: uploadResult.status || 500 });
   }
 
-  assistant.log('main(): uploadContent', uploadResult);
+  ctx.log('main(): uploadContent', uploadResult);
 
   // Track analytics
   analytics.event('admin/repo/content', { action: 'write' });
 
-  return assistant.respond(settings);
+  return ctx.respond(settings);
 };
 
 // Helper: Upload content to GitHub
-async function uploadContent(assistant, octokit, settings) {
+async function uploadContent(ctx, octokit, settings) {
   const owner = settings.githubUser;
   const repo = settings.githubRepo;
   const filename = settings.path;
   const content = settings.content;
 
-  assistant.log('uploadContent(): filename', filename);
+  ctx.log('uploadContent(): filename', filename);
 
   // Get existing file
   const existing = await octokit.rest.repos.getContent({
@@ -82,7 +82,7 @@ async function uploadContent(assistant, octokit, settings) {
     path: filename,
   }).catch(e => e);
 
-  assistant.log('uploadContent(): Existing', existing);
+  ctx.log('uploadContent(): Existing', existing);
 
   // Quit if error and it's DIFFERENT than 404
   if (existing instanceof Error && existing?.status !== 404) {
@@ -99,7 +99,7 @@ async function uploadContent(assistant, octokit, settings) {
     content: Buffer.from(content).toString('base64'),
   });
 
-  assistant.log('uploadContent(): Result', result);
+  ctx.log('uploadContent(): Result', result);
 
   return result;
 }

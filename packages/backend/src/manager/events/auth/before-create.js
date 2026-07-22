@@ -31,39 +31,39 @@ const MAX_SIGNUPS_PER_DAY = 2;
  * Note: recaptchaScore requires reCAPTCHA Enterprise (Google Cloud level), NOT the Firebase SMS fraud toggle.
  * Note: credential tokens (idToken, accessToken, refreshToken) require opt-in via BlockingOptions.
  */
-module.exports = async ({ Manager, assistant, user, context, libraries }) => {
+module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { functions } = libraries;
   const ipAddress = context.ipAddress || '';
 
-  assistant.log(`beforeCreate: ${user.uid} (${user.email})`, user, context);
+  ctx.log(`beforeCreate: ${user.uid} (${user.email})`, user, context);
 
   // Block disposable email domains
   if (isDisposable(user.email)) {
-    assistant.error(`beforeCreate: Blocked disposable email ${user.email}`);
+    ctx.error(`beforeCreate: Blocked disposable email ${user.email}`);
 
     throw new functions.auth.HttpsError('invalid-argument', ERROR_DISPOSABLE_EMAIL);
   }
 
   // Skip rate limiting if no IP (shouldn't happen in production)
   if (!ipAddress) {
-    assistant.log(`beforeCreate: No IP address, skipping rate limit check (${Date.now() - startTime}ms)`);
+    ctx.log(`beforeCreate: No IP address, skipping rate limit check (${Date.now() - startTime}ms)`);
     return;
   }
 
   // IP Rate Limiting using Usage system
-  const usage = await Manager.Usage().init(assistant, {
+  const usage = await Manager.Usage().init(ctx, {
     key: ipAddress,
     log: true,
   });
 
   const signups = usage.getUsage('signups');
 
-  assistant.log(`beforeCreate: Rate limit check for ${ipAddress}: ${signups}/${MAX_SIGNUPS_PER_DAY}`);
+  ctx.log(`beforeCreate: Rate limit check for ${ipAddress}: ${signups}/${MAX_SIGNUPS_PER_DAY}`);
 
   // Block if too many signups from this IP
   if (signups >= MAX_SIGNUPS_PER_DAY) {
-    assistant.error(`beforeCreate: Too many signups from ${ipAddress} (${signups}/${MAX_SIGNUPS_PER_DAY})`);
+    ctx.error(`beforeCreate: Too many signups from ${ipAddress} (${signups}/${MAX_SIGNUPS_PER_DAY})`);
 
     throw new functions.auth.HttpsError('resource-exhausted', ERROR_TOO_MANY_ATTEMPTS);
   }
@@ -73,7 +73,7 @@ module.exports = async ({ Manager, assistant, user, context, libraries }) => {
   await usage.update();
 
   // Run consumer hook (can throw HttpsError to block signup)
-  await runAuthHook('before-create', { Manager, assistant, user, context, libraries });
+  await runAuthHook('before-create', { Manager, ctx, user, context, libraries });
 
-  assistant.log(`beforeCreate: Completed for ${user.uid} (${Date.now() - startTime}ms)`);
+  ctx.log(`beforeCreate: Completed for ${user.uid} (${Date.now() - startTime}ms)`);
 };

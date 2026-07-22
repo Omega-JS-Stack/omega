@@ -5,22 +5,22 @@ const powertools = require('node-powertools');
  * POST /admin/firestore/query - Query Firestore collections
  * Admin-only endpoint to run complex queries
  */
-module.exports = async ({ assistant, user, settings, libraries }) => {
+module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   const queries = powertools.arrayify(settings.queries);
 
-  assistant.log('main(): Queries', queries);
+  ctx.log('main(): Queries', queries);
 
   // Run all queries
   const docs = [];
@@ -93,10 +93,10 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     .catch((e) => e);
 
   if (ran instanceof Error) {
-    return assistant.respond(ran.message, { code: 500 });
+    return ctx.respond(ran.message, { code: 500 });
   }
 
-  return assistant.respond(docs);
+  return ctx.respond(docs);
 };
 
 function checkFilter(data, filters) {

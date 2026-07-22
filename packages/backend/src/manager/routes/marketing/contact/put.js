@@ -3,36 +3,36 @@
  * Admin-only endpoint to re-sync a user's data to marketing providers
  */
 
-module.exports = async ({ assistant, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   // Initialize Usage to check auth level
-  const usage = await Manager.Usage().init(assistant, {
+  const usage = await Manager.Usage().init(ctx, {
     unauthenticatedMode: 'firestore',
   });
   const isAdmin = usage.user.roles?.admin;
 
   // Admin only endpoint
   if (!isAdmin) {
-    return assistant.respond('Admin access required', { code: 403 });
+    return ctx.respond('Admin access required', { code: 403 });
   }
 
   const uid = (settings.uid || '').trim();
 
   if (!uid) {
-    return assistant.respond('UID is required', { code: 400 });
+    return ctx.respond('UID is required', { code: 400 });
   }
 
   // Sync via email library (accepts UID string, resolves user doc internally)
-  const mailer = Manager.Email(assistant);
+  const mailer = Manager.Email(ctx);
   const result = await mailer.sync(uid);
 
   // Log result
-  assistant.log('marketing/contact sync result:', { uid, providers: result });
+  ctx.log('marketing/contact sync result:', { uid, providers: result });
 
   // Track analytics
   analytics.event('marketing/contact', { action: 'sync' });
 
-  return assistant.respond({
+  return ctx.respond({
     success: true,
     providers: result,
   });

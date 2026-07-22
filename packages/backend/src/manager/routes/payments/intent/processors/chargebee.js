@@ -15,10 +15,10 @@ module.exports = {
    * @param {boolean} options.trial - Whether to include a trial period
    * @param {string} options.confirmationUrl - Success redirect URL
    * @param {string} options.cancelUrl - Cancel redirect URL
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {object} { id, url, raw }
    */
-  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, assistant }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, ctx }) {
     const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');
     ChargebeeLib.init();
 
@@ -28,18 +28,18 @@ module.exports = {
     // Resolve Chargebee coupon if discount is present
     let chargebeeCouponId = null;
     if (discount) {
-      chargebeeCouponId = await resolveChargebeeCoupon(ChargebeeLib, discount, assistant);
+      chargebeeCouponId = await resolveChargebeeCoupon(ChargebeeLib, discount, ctx);
     }
 
     let hostedPage;
 
     if (productType === 'subscription') {
-      hostedPage = await createSubscriptionCheckout({ ChargebeeLib, uid, orderId, product, productId, frequency, trial, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, assistant });
+      hostedPage = await createSubscriptionCheckout({ ChargebeeLib, uid, orderId, product, productId, frequency, trial, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, ctx });
     } else {
-      hostedPage = await createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, productId, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, assistant });
+      hostedPage = await createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, productId, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, ctx });
     }
 
-    assistant.log(`Chargebee hosted page created: id=${hostedPage.id}, type=${productType}, url=${hostedPage.url}`);
+    ctx.log(`Chargebee hosted page created: id=${hostedPage.id}, type=${productType}, url=${hostedPage.url}`);
 
     return {
       id: hostedPage.id,
@@ -52,7 +52,7 @@ module.exports = {
 /**
  * Create a Chargebee Hosted Page for a new subscription
  */
-async function createSubscriptionCheckout({ ChargebeeLib, uid, orderId, product, productId, frequency, trial, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, assistant }) {
+async function createSubscriptionCheckout({ ChargebeeLib, uid, orderId, product, productId, frequency, trial, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, ctx }) {
   const chargebeeItemId = product.chargebee?.itemId;
 
   if (!chargebeeItemId) {
@@ -87,7 +87,7 @@ async function createSubscriptionCheckout({ ChargebeeLib, uid, orderId, product,
     params.coupon_ids = [chargebeeCouponId];
   }
 
-  assistant.log(`Chargebee subscription checkout: itemPriceId=${itemPriceId}, uid=${uid}, trial=${trial}, coupon=${chargebeeCouponId || 'none'}`);
+  ctx.log(`Chargebee subscription checkout: itemPriceId=${itemPriceId}, uid=${uid}, trial=${trial}, coupon=${chargebeeCouponId || 'none'}`);
 
   const result = await ChargebeeLib.request('/hosted_pages/checkout_new_for_items', {
     method: 'POST',
@@ -100,7 +100,7 @@ async function createSubscriptionCheckout({ ChargebeeLib, uid, orderId, product,
 /**
  * Create a Chargebee Hosted Page for a one-time charge
  */
-async function createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, productId, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, assistant }) {
+async function createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, productId, metaData, chargebeeCouponId, confirmationUrl, cancelUrl, ctx }) {
   const price = product.prices?.once;
 
   if (!price) {
@@ -125,7 +125,7 @@ async function createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, prod
     params.coupon_ids = [chargebeeCouponId];
   }
 
-  assistant.log(`Chargebee one-time checkout: amount=${amountCents}, productId=${productId}, uid=${uid}, coupon=${chargebeeCouponId || 'none'}`);
+  ctx.log(`Chargebee one-time checkout: amount=${amountCents}, productId=${productId}, uid=${uid}, coupon=${chargebeeCouponId || 'none'}`);
 
   const result = await ChargebeeLib.request('/hosted_pages/checkout_one_time_for_items', {
     method: 'POST',
@@ -139,13 +139,13 @@ async function createOneTimeCheckout({ ChargebeeLib, uid, orderId, product, prod
  * Resolve or create a Chargebee coupon for a discount code
  * Uses a deterministic ID so the same code always maps to the same coupon
  */
-async function resolveChargebeeCoupon(ChargebeeLib, discount, assistant) {
+async function resolveChargebeeCoupon(ChargebeeLib, discount, ctx) {
   const couponId = `BEM_${discount.code}_${discount.percent}OFF_ONCE`;
 
   try {
     // Check if coupon already exists
     await ChargebeeLib.request(`/coupons/${couponId}`, { method: 'GET' });
-    assistant.log(`Chargebee coupon exists: ${couponId}`);
+    ctx.log(`Chargebee coupon exists: ${couponId}`);
     return couponId;
   } catch (e) {
     // Chargebee returns 404 for missing resources
@@ -167,6 +167,6 @@ async function resolveChargebeeCoupon(ChargebeeLib, discount, assistant) {
     },
   });
 
-  assistant.log(`Chargebee coupon created: ${couponId}`);
+  ctx.log(`Chargebee coupon created: ${couponId}`);
   return couponId;
 }

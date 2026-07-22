@@ -18,7 +18,7 @@ const MAX_RETRIES = 5;
  * Emails land in this queue when their `sendAt` exceeds the 71-hour limit
  * at the time of the original send() call (see email.js → saveToEmailQueue).
  */
-module.exports = async ({ Manager, assistant, context, libraries }) => {
+module.exports = async ({ Manager, ctx, context, libraries }) => {
   const { admin } = libraries;
   const cutoff = moment().add(SEND_AT_LIMIT, 'hours').unix();
 
@@ -30,13 +30,13 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
     .get();
 
   if (snapshot.empty) {
-    assistant.log('No queued emails ready to send');
+    ctx.log('No queued emails ready to send');
     return;
   }
 
-  assistant.log(`Processing ${snapshot.size} queued email(s)...`);
+  ctx.log(`Processing ${snapshot.size} queued email(s)...`);
 
-  const email = Manager.Email(assistant);
+  const email = Manager.Email(ctx);
   let sent = 0;
   let dropped = 0;
   let retried = 0;
@@ -49,23 +49,23 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
 
     try {
       const result = await email.send(settings);
-      assistant.log(`Queued email ${emailId} ${result.status}`);
+      ctx.log(`Queued email ${emailId} ${result.status}`);
       await doc.ref.delete();
       sent++;
     } catch (e) {
       const isPermanent = e.code >= 400 && e.code < 500;
 
       if (isPermanent || retries >= MAX_RETRIES) {
-        assistant.error(`Dropping queued email ${emailId} after ${retries} retries: ${e.message}`);
+        ctx.error(`Dropping queued email ${emailId} after ${retries} retries: ${e.message}`);
         await doc.ref.delete();
         dropped++;
       } else {
-        assistant.warn(`Queued email ${emailId} failed (retry ${retries + 1}/${MAX_RETRIES}): ${e.message}`);
+        ctx.warn(`Queued email ${emailId} failed (retry ${retries + 1}/${MAX_RETRIES}): ${e.message}`);
         await doc.ref.set({ retries: retries + 1, lastError: e.message }, { merge: true });
         retried++;
       }
     }
   }));
 
-  assistant.log(`Completed! (${sent} sent, ${dropped} dropped, ${retried} retried)`);
+  ctx.log(`Completed! (${sent} sent, ${dropped} dropped, ${retried} retried)`);
 };

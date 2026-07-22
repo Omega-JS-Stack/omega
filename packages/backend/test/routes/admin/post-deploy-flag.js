@@ -20,7 +20,7 @@ const editSchema = require('../../../src/manager/schemas/admin/post/put.js');
 const makeAssistant = () => ({
   log() {},
   warn() {},
-  errorify: (msg, opts) => Object.assign(new Error(msg), { code: (opts || {}).code }),
+  report: (msg, opts) => Object.assign(new Error(msg), { code: (opts || {}).code }),
   request: { method: 'POST', user: { auth: { uid: 'u1', email: 'u1@test.com' } } },
 });
 const Manager = { cwd: '/tmp' };

@@ -153,12 +153,12 @@ function enforceMinMax(value, min, max) {
  * does not imply required, and schema-author defaults are presumed valid.
  * Runs at the route boundary (Settings.resolve / resolveZodSchema), not inside
  * resolveSchema(), so bare resolution stays a pure defaults/coercion pass.
- * @param {object} assistant - Assistant (errorify)
+ * @param {object} ctx - RouteContext (report)
  * @param {object} raw - The ORIGINAL request settings (absence check)
  * @param {object} resolved - The resolved settings (value check)
  * @param {Array<{path: string, allowed: Array}>} enumPaths - Fields carrying enum lists
  */
-function enforceEnums(assistant, raw, resolved, enumPaths) {
+function enforceEnums(ctx, raw, resolved, enumPaths) {
   for (const { path, allowed } of enumPaths) {
     if (typeof _.get(raw, path) === 'undefined') {
       continue;
@@ -167,7 +167,7 @@ function enforceEnums(assistant, raw, resolved, enumPaths) {
     const value = _.get(resolved, path);
 
     if (!allowed.includes(value)) {
-      throw assistant.errorify(`Invalid settings {${path}}: must be one of [${allowed.join(', ')}]`, {code: 400});
+      throw ctx.report(`Invalid settings {${path}}: must be one of [${allowed.join(', ')}]`, {code: 400});
     }
   }
 }

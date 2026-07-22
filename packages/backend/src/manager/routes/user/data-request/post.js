@@ -4,17 +4,17 @@
  */
 const uuidv4 = require('uuid').v4;
 
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require confirmation
   if (!settings.confirmed) {
-    return assistant.respond('You must confirm the data request acknowledgments.', { code: 400 });
+    return ctx.respond('You must confirm the data request acknowledgments.', { code: 400 });
   }
 
   const uid = user.auth.uid;
@@ -35,7 +35,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
     // Reject if there's already a pending request
     if (mostRecent.status === 'pending') {
-      return assistant.respond('You already have a pending data request. Please wait for it to be processed.', { code: 409 });
+      return ctx.respond('You already have a pending data request. Please wait for it to be processed.', { code: 409 });
     }
 
     // Reject if last request was created within 30 days (cooldown)
@@ -43,14 +43,14 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     const elapsedSeconds = Math.round(Date.now() / 1000) - mostRecent.metadata.created.timestampUNIX;
 
     if (elapsedSeconds < THIRTY_DAYS) {
-      return assistant.respond('You have already received a data export within the last 30 days. Please try again later.', { code: 429 });
+      return ctx.respond('You have already received a data export within the last 30 days. Please try again later.', { code: 429 });
     }
   }
 
   // Create the request document
   const requestId = uuidv4();
-  const now = assistant.meta.startTime.timestamp;
-  const nowUNIX = assistant.meta.startTime.timestampUNIX;
+  const now = ctx.meta.startTime.timestamp;
+  const nowUNIX = ctx.meta.startTime.timestampUNIX;
 
   const docData = {
     status: 'pending',
@@ -74,12 +74,12 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     .doc(`data-requests/${requestId}`)
     .set(docData, { merge: true });
 
-  assistant.log(`Data request created: ${requestId} for user ${uid}`);
+  ctx.log(`Data request created: ${requestId} for user ${uid}`);
 
   // Send confirmation email (fire-and-forget)
-  sendConfirmationEmail(assistant, user, requestId, reason);
+  sendConfirmationEmail(ctx, user, requestId, reason);
 
-  return assistant.respond({
+  return ctx.respond({
     request: { id: requestId, ...docData },
   });
 };
@@ -87,9 +87,9 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 /**
  * Send data request confirmation email (fire-and-forget)
  */
-function sendConfirmationEmail(assistant, user, requestId, reason) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendConfirmationEmail(ctx, user, requestId, reason) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const uid = user.auth.uid;
   const firstName = user.personal?.name?.first;
   const greeting = firstName ? `Hey ${firstName}, we've` : `We've`;
@@ -128,9 +128,9 @@ If you did not make this request, please contact us immediately by replying to t
     },
   })
     .then((result) => {
-      assistant.log(`sendConfirmationEmail(): Success, status=${result.status}`);
+      ctx.log(`sendConfirmationEmail(): Success, status=${result.status}`);
     })
     .catch((e) => {
-      assistant.error(`sendConfirmationEmail(): Failed: ${e.message}`);
+      ctx.error(`sendConfirmationEmail(): Failed: ${e.message}`);
     });
 }

@@ -1,22 +1,22 @@
 const jetpack = require('fs-jetpack');
 
-module.exports = async ({ assistant, user, analytics }) => {
+module.exports = async ({ ctx, user, analytics }) => {
 
   // Send analytics event
   analytics.event('restart', {});
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Log
-  assistant.log('Restarting...');
+  ctx.log('Restarting...');
 
   // Remove node_modules
   jetpack.remove('node_modules');
@@ -33,5 +33,5 @@ module.exports = async ({ assistant, user, analytics }) => {
   }, 1000);
 
   // Return success
-  return assistant.respond({success: true});
+  return ctx.respond({success: true});
 };

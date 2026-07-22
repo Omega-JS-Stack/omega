@@ -424,7 +424,7 @@ async function handleMcpProtocol(req, res, options) {
       if (tool.handler && tool._consumer) {
         const result = await tool.handler({
           Manager,
-          assistant: Manager.assistant,
+          ctx: Manager.ctx,
           user: null,
           params: args || {},
           libraries: Manager.libraries,

@@ -1,8 +1,8 @@
-module.exports = async ({ assistant, user }) => {
+module.exports = async ({ ctx, user }) => {
 
   // Log user info
-  assistant.log('User:', user);
+  ctx.log('User:', user);
 
   // Return user info
-  return assistant.respond({ user });
+  return ctx.respond({ user });
 };

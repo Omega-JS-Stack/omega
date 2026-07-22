@@ -42,7 +42,7 @@ async function makeImage(format, options) {
   return filepath;
 }
 
-// Minimal assistant stub — convertToJpeg only uses Manager.require + log.
+// Minimal ctx stub — convertToJpeg only uses Manager.require + log.
 function makeAssistant() {
   return {
     log: () => {},

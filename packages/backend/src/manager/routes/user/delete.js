@@ -4,12 +4,12 @@ const fetch = require('wonderful-fetch');
  * DELETE /user - Delete user account
  * Requires admin auth or self-deletion with admin override
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID and reason
@@ -18,14 +18,14 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   // Require admin to delete other users
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Fetch user to check subscription status
   const userDoc = await admin.firestore().doc(`users/${uid}`).get();
 
   if (!userDoc.exists) {
-    return assistant.respond('User not found', { code: 404 });
+    return ctx.respond('User not found', { code: 404 });
   }
 
   const userData = userDoc.data();
@@ -37,14 +37,14 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     (subStatus === 'active' || subStatus === 'suspended')
     && subId !== 'basic'
   ) {
-    return assistant.respond(
+    return ctx.respond(
       'This account cannot be deleted because it has a paid subscription attached to it. In order to delete the account, you must first cancel the paid subscription.',
       { code: 400 }
     );
   }
 
   // Sign out of all sessions first
-  assistant.log(`Signing out of all sessions for ${uid}...`);
+  ctx.log(`Signing out of all sessions for ${uid}...`);
 
   await fetch(`${Manager.getApiUrl()}/omega/user/sessions`, {
     method: 'delete',
@@ -60,10 +60,10 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     },
   })
     .then((json) => {
-      assistant.log(`Sign out of all sessions success`, json);
+      ctx.log(`Sign out of all sessions success`, json);
     })
     .catch((e) => {
-      assistant.error(`Sign out of all sessions failed`, e);
+      ctx.error(`Sign out of all sessions failed`, e);
     });
 
   // Get the user's email before deleting (for confirmation email)
@@ -75,27 +75,27 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   try {
     await admin.auth().deleteUser(uid);
   } catch (e) {
-    return assistant.respond(`Failed to delete user: ${e}`, { code: 500 });
+    return ctx.respond(`Failed to delete user: ${e}`, { code: 500 });
   }
 
-  assistant.log(`Account deleted: ${uid}${reason ? `, reason: ${reason}` : ''}`);
+  ctx.log(`Account deleted: ${uid}${reason ? `, reason: ${reason}` : ''}`);
 
   // Send confirmation email (fire-and-forget)
-  const shouldSend = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldSend = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
   if (email && shouldSend) {
-    sendConfirmationEmail(assistant, email, uid, reason, userData?.personal?.name?.first);
+    sendConfirmationEmail(ctx, email, uid, reason, userData?.personal?.name?.first);
   }
 
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 };
 
 /**
  * Send account deletion confirmation email (fire-and-forget)
  */
-function sendConfirmationEmail(assistant, email, uid, reason, firstName) {
-  const Manager = assistant.Manager;
+function sendConfirmationEmail(ctx, email, uid, reason, firstName) {
+  const Manager = ctx.Manager;
   const brandName = Manager.config.brand.name;
-  const mailer = Manager.Email(assistant);
+  const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}, your` : 'Your';
   const reasonLine = reason
     ? `\n\n**Reason provided:** ${reason}`
@@ -137,9 +137,9 @@ If you wish to use ${brandName} again in the future, you are welcome to create a
     },
   })
     .then((result) => {
-      assistant.log(`sendConfirmationEmail(): Success, status=${result.status}`);
+      ctx.log(`sendConfirmationEmail(): Success, status=${result.status}`);
     })
     .catch((e) => {
-      assistant.error(`sendConfirmationEmail(): Failed: ${e.message}`);
+      ctx.error(`sendConfirmationEmail(): Failed: ${e.message}`);
     });
 }

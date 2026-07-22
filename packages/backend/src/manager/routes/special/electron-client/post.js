@@ -5,7 +5,7 @@
 const path = require('path');
 const { buildPublicConfig } = require(path.join(__dirname, '..', '..', 'brand', 'get.js'));
 
-module.exports = async ({ assistant, Manager, settings, analytics, libraries }) => {
+module.exports = async ({ ctx, Manager, settings, analytics, libraries }) => {
   const { admin } = libraries;
 
   // brandId/brand fallback to Manager.config
@@ -16,7 +16,7 @@ module.exports = async ({ assistant, Manager, settings, analytics, libraries }) 
   let signInToken = null;
 
   // If authenticated, get user and create custom token
-  const user = assistant.getUser();
+  const user = ctx.getUser();
   if (user.authenticated && user.roles?.admin) {
     uid = user.auth?.uid ?? null;
 
@@ -24,7 +24,7 @@ module.exports = async ({ assistant, Manager, settings, analytics, libraries }) 
       try {
         signInToken = await admin.auth().createCustomToken(uid);
       } catch (e) {
-        return assistant.respond(`Failed to create custom token: ${e}`, { code: 500 });
+        return ctx.respond(`Failed to create custom token: ${e}`, { code: 500 });
       }
     }
   }
@@ -39,7 +39,7 @@ module.exports = async ({ assistant, Manager, settings, analytics, libraries }) 
   // Validate config — kept only when the REQUEST is admin-authenticated (the
   // omega-admin-key header); the config payload itself never carries a secret
   if (user.roles?.admin) {
-    assistant.log('Validated config', config);
+    ctx.log('Validated config', config);
   } else {
     config = {};
   }
@@ -47,12 +47,12 @@ module.exports = async ({ assistant, Manager, settings, analytics, libraries }) 
   // Track analytics
   analytics.event('special/electron-client', { action: 'setup' });
 
-  return assistant.respond({
+  return ctx.respond({
     uuid: uuid,
     signInToken: signInToken,
     timestamp: new Date().toISOString(),
-    ip: assistant.request.geolocation.ip,
-    country: assistant.request.geolocation.country,
+    ip: ctx.request.geolocation.ip,
+    country: ctx.request.geolocation.country,
     brand: buildPublicConfig(Manager.config),
     config: config,
   });

@@ -7,12 +7,12 @@ const uidgen = new UIDGenerator(256);
  * POST /user/api-keys - Regenerate API keys
  * Regenerates clientId and/or privateKey for the user
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID
@@ -20,7 +20,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   // Require admin to regenerate other users' keys
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Determine which keys to regenerate
@@ -44,8 +44,8 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     .catch((e) => e);
 
   if (write instanceof Error) {
-    return assistant.respond(`Failed to generate keys: ${write}`, { code: 500, sentry: true });
+    return ctx.respond(`Failed to generate keys: ${write}`, { code: 500 });
   }
 
-  return assistant.respond(newKeys);
+  return ctx.respond(newKeys);
 };

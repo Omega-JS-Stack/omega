@@ -84,11 +84,11 @@ Manager.prototype.init = function (exporter, options) {
     : options.fetchStats;
   options.checkNodeVersion = typeof options.checkNodeVersion === 'undefined' ? true : options.checkNodeVersion;
   options.uniqueAppName = options.uniqueAppName || undefined;
-  options.assistant = options.assistant || {};
+  options.ctx = options.ctx || {};
   options.cwd = typeof options.cwd === 'undefined' ? process.cwd() : options.cwd;
   options.projectPackageDirectory = typeof options.projectPackageDirectory === 'undefined' ? undefined : options.projectPackageDirectory;
   options.logSavePath = typeof options.logSavePath === 'undefined' ? false : options.logSavePath;
-  // options.assistant.optionsLogString = options.assistant.optionsLogString || undefined;
+  // options.ctx.optionsLogString = options.ctx.optionsLogString || undefined;
 
   // Express options
   options.express = options.express || {};
@@ -107,7 +107,7 @@ Manager.prototype.init = function (exporter, options) {
     sentry: null,
 
     // First-party
-    Assistant: require('./helpers/assistant.js'),
+    RouteContext: require('./helpers/context/index.js'),
     localDatabase: null,
     User: null,
     Analytics: null,
@@ -132,7 +132,7 @@ Manager.prototype.init = function (exporter, options) {
   try {
     loadEnv(self.cwd);
   } catch (e) {
-    self.assistant.error(new Error(`Failed to set up environment variables from .env file: ${e.message}`));
+    self.ctx.error(new Error(`Failed to set up environment variables from .env file: ${e.message}`));
   }
 
   // Load config — the consumer's config/omega.json5 resolved through
@@ -189,9 +189,9 @@ Manager.prototype.init = function (exporter, options) {
   // env vars (OMEGA_TEST_MODE / ENVIRONMENT / FUNCTIONS_EMULATOR / TERM_PROGRAM); the three
   // is*() checks derive from it live on every call. They return exactly ONE of three
   // mutually-exclusive values — testing wins, then production, else development.
-  // The assistant exposes the same methods but FORWARDS to these (assistant.isTesting()
-  // → Manager.isTesting()), so request handlers can keep calling `assistant.*`.
-  // Defined BEFORE the assistant is constructed so the assistant's own init() can call back.
+  // The ctx exposes the same methods but FORWARDS to these (ctx.isTesting()
+  // → Manager.isTesting()), so request handlers can keep calling `ctx.*`.
+  // Defined BEFORE the ctx is constructed so the ctx's own init() can call back.
   self.getEnvironment = function() {
     // Testing takes precedence — set by the test runner / emulator (OMEGA_TEST_MODE=true).
     if (process.env.OMEGA_TEST_MODE === 'true') {
@@ -232,14 +232,14 @@ Manager.prototype.init = function (exporter, options) {
     return self.getEnvironment() === 'testing';
   };
 
-  // Init assistant
-  self.assistant = self.Assistant().init({
+  // Init ctx
+  self.ctx = self.RouteContext().init({
     req: null,
     res: null,
     admin: self.libraries.admin,
     functions: self.libraries.functions,
     Manager: self,
-  }, options.assistant);
+  }, options.ctx);
 
   // Helper functions for URLs based on environment
   self.getFunctionsUrl = function(env) {
@@ -316,7 +316,7 @@ Manager.prototype.init = function (exporter, options) {
     return self.config.parent === 'self';
   };
 
-  // Set more properties (need to wait for assistant to determine if DEV)
+  // Set more properties (need to wait for ctx to determine if DEV)
   self.project.functionsUrl = self.getFunctionsUrl();
 
   // Set API URL (like @omega.js/client's getApiUrl)
@@ -351,7 +351,7 @@ Manager.prototype.init = function (exporter, options) {
 
   // Handle test environment
   if (self.isTesting()) {
-    self.assistant.log('⚠️⚠️⚠️ Running in TEST environment, some features may be disabled ⚠️⚠️⚠️');
+    self.ctx.log('⚠️⚠️⚠️ Running in TEST environment, some features may be disabled ⚠️⚠️⚠️');
 
     // Install the test-mode-file watcher exactly once. Lets the test command
     // flip env vars (currently just TEST_EXTENDED_MODE) on the running emulator
@@ -380,28 +380,28 @@ Manager.prototype.init = function (exporter, options) {
     if (version.is(nodeUsing, '<', nodeRequired)) {
       const msg = `Node.js version mismatch: using ${nodeUsing} but asked for ${nodeRequired}`;
       if (options.checkNodeVersion) {
-        self.assistant.error(new Error(msg));
+        self.ctx.error(new Error(msg));
         return process.exit(1);
       } else {
-        self.assistant.log(msg);
+        self.ctx.log(msg);
       }
     }
   }
 
   if (options.log) {
-    // self.assistant.log('process.env', process.env)
-    self.assistant.log('Resolved serviceAccountPath', self.project.serviceAccountPath);
+    // self.ctx.log('process.env', process.env)
+    self.ctx.log('Resolved serviceAccountPath', self.project.serviceAccountPath);
   }
 
   if (!brandId) {
-    self.assistant.warn('⚠️ Missing config.brand.id');
+    self.ctx.warn('⚠️ Missing config.brand.id');
   }
 
   // Setup sentry
   if (self.options.sentry) {
     const sentryRelease = `${brandId || self.project.projectId}@${self.package.version}`;
     const sentryDSN = self.config?.monitoring?.dsn || '';
-    // self.assistant.log('Sentry', sentryRelease, sentryDSN);
+    // self.ctx.log('Sentry', sentryRelease, sentryDSN);
 
     self.libraries.sentry = require('@sentry/node');
     self.libraries.sentry.init({
@@ -412,12 +412,12 @@ Manager.prototype.init = function (exporter, options) {
         // explicitly opted in. Intentional positive check — we never want test-run errors
         // polluting production Sentry.
         if (!self.isProduction() && !self.options.reportErrorsInDev) {
-          self.assistant.error(new Error('[Sentry] Skipping Sentry because we\'re not in production'), hint)
+          self.ctx.error(new Error('[Sentry] Skipping Sentry because we\'re not in production'), hint)
           return null;
         }
         event.tags = event.tags || {};
-        event.tags['function.name'] = self.assistant.meta.name;
-        event.tags['function.type'] = self.assistant.meta.type;
+        event.tags['function.name'] = self.ctx.meta.name;
+        event.tags['function.type'] = self.ctx.meta.type;
         event.tags['environment'] = self.getEnvironment();
         return event;
       },
@@ -476,19 +476,19 @@ Manager.prototype.init = function (exporter, options) {
   // Fetch stats
   if (self.isDevelopment() && options.fetchStats) {
     setTimeout(function () {
-      self.assistant.log('Fetching meta/stats...');
+      self.ctx.log('Fetching meta/stats...');
       self.libraries.admin
       .firestore().doc('meta/stats')
       .get()
       .then(doc => {
-        self.assistant.log('meta/stats', doc.data());
+        self.ctx.log('meta/stats', doc.data());
       })
     }, 100);
   }
 
   // Send analytics
   self.Analytics({
-    assistant: self.assistant,
+    ctx: self.ctx,
     uuid: self.SERVER_UUID,
   })
   .event('admin/initialized', {});
@@ -500,14 +500,14 @@ Manager.prototype.init = function (exporter, options) {
 // HELPERS
 Manager.prototype._preProcess = function (mod) {
   const self = this;
-  const name = mod.assistant.meta.name;
+  const name = mod.ctx.meta.name;
   return new Promise(async function(resolve, reject) {
     if (self.handlers && self.handlers[name]) {
       let result;
       try {
         result = self.handlers[name](mod)
       } catch (e) {
-        mod.assistant.error(e);
+        mod.ctx.error(e);
         return reject(e);
       }
       if (Promise.resolve(result) == result) {
@@ -516,7 +516,7 @@ Manager.prototype._preProcess = function (mod) {
           return resolve(r);
         })
         .catch(e => {
-          mod.assistant.error(e);
+          mod.ctx.error(e);
           return reject(e);
         })
       } else {
@@ -563,29 +563,15 @@ Manager.prototype._processMiddleware = function (req, res, routePath) {
   });
 };
 
-// Manager.prototype.Assistant = function(ref, options) {
-//   const self = this;
-//   ref = ref || {};
-//   options = options || {};
-//   return (new self.libraries.Assistant()).init({
-//     req: ref.req,
-//     res: ref.res,
-//     admin: self.libraries.admin,
-//     functions: self.libraries.functions,
-//   }, {
-//     accept: options.accept,
-//   })
-// };
-
-Manager.prototype.Assistant = function(ref, options) {
+Manager.prototype.RouteContext = function(ref, options) {
   const self = this;
 
   // Set options defaults
   ref = ref || {};
   options = options || {};
 
-  // Create assistant instance
-  return (new self.libraries.Assistant()).init({
+  // Create ctx instance
+  return (new self.libraries.RouteContext()).init({
     req: ref.req,
     res: ref.res,
     admin: self.libraries.admin,
@@ -654,16 +640,16 @@ Manager.prototype.Metadata = function () {
   return new self.libraries.Metadata(self, ...arguments);
 };
 
-Manager.prototype.Email = function (assistant) {
+Manager.prototype.Email = function (ctx) {
   const self = this;
   self.libraries.Email = self.libraries.Email || require('./libraries/email/index.js');
-  return new self.libraries.Email(assistant);
+  return new self.libraries.Email(ctx);
 };
 
-Manager.prototype.AI = function (assistant, key) {
+Manager.prototype.AI = function (ctx, key) {
   const self = this;
   self.libraries.AI = self.libraries.AI || require('./libraries/ai/index.js');
-  return new self.libraries.AI(assistant, key);
+  return new self.libraries.AI(ctx, key);
 };
 
 // Manager.prototype.Utilities = function () {
@@ -705,7 +691,7 @@ Manager.prototype.storage = function (options) {
 
     // Log
     if (options.log) {
-      self.assistant.log('storage(): Location', location);
+      self.ctx.log('storage(): Location', location);
     }
 
     // Clear temporary storage
@@ -714,7 +700,7 @@ Manager.prototype.storage = function (options) {
       && self.isDevelopment()
       && options.clear
     ) {
-      self.assistant.log('Removed temporary file @', location);
+      self.ctx.log('Removed temporary file @', location);
       jetpack.remove(location);
     }
 
@@ -748,16 +734,16 @@ Manager.prototype.storage = function (options) {
     try {
       _setup()
     } catch (e) {
-      self.assistant.error(`Could not setup storage: ${location}`, e);
+      self.ctx.error(`Could not setup storage: ${location}`, e);
 
       try {
         if (options.clearInvalid) {
-          self.assistant.log(`Clearing invalid storage: ${location}`);
+          self.ctx.log(`Clearing invalid storage: ${location}`);
           jetpack.write(location, {});
         }
         _setup()
       } catch (e) {
-        self.assistant.error(`Failed to clear invalid storage: ${location}`, e);
+        self.ctx.error(`Failed to clear invalid storage: ${location}`, e);
       }
     }
   }
@@ -794,7 +780,7 @@ Manager.prototype.install = function (controller, options) {
   const isDirectory = jetpack.exists(options.dir) === 'dir';
 
   if (options.log) {
-    self.assistant.log(`Installing from ${options.dir}, prefix=${options.prefix}, isDirectory=${isDirectory}...`);
+    self.ctx.log(`Installing from ${options.dir}, prefix=${options.prefix}, isDirectory=${isDirectory}...`);
   }
 
   // function _install(prefix, file) {
@@ -805,7 +791,7 @@ Manager.prototype.install = function (controller, options) {
   //   const fullPath = path.resolve(options.dir, file);
 
   //   if (options.log) {
-  //     self.assistant.log(`Installing ${_prefix} from ${fullPath}...`);
+  //     self.ctx.log(`Installing ${_prefix} from ${fullPath}...`);
   //   }
 
   //   controller[`${_prefix}`] = require(fullPath);
@@ -819,7 +805,7 @@ Manager.prototype.install = function (controller, options) {
     const fullPath = path.resolve(options.dir, file);
 
     if (options.log) {
-      self.assistant.log(`Installing ${_prefix} from ${fullPath}...`);
+      self.ctx.log(`Installing ${_prefix} from ${fullPath}...`);
     }
 
     const mod = require(fullPath);
@@ -873,7 +859,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
 
   // Log
   if (options.log) {
-    self.assistant.log('Setting up Firebase functions...');
+    self.ctx.log('Setting up Firebase functions...');
   }
 
   // Setup functions
@@ -903,7 +889,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -918,7 +904,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -932,7 +918,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -946,7 +932,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -960,7 +946,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -974,7 +960,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -988,7 +974,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -1002,7 +988,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -1017,7 +1003,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -1031,7 +1017,7 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._preProcess(Module)
       .then(r => Module.main())
       .catch(e => {
-        self.assistant.error(e);
+        self.ctx.error(e);
         return res.status(500).send(e.message);
       });
     });
@@ -1101,7 +1087,7 @@ Manager.prototype.setupCustomServer = function (_library, options) {
 
   // Log
   if (options.log) {
-    self.assistant.log('Setting up custom server...');
+    self.ctx.log('Setting up custom server...');
   }
 
   // Setup express
@@ -1115,12 +1101,12 @@ Manager.prototype.setupCustomServer = function (_library, options) {
 
   // Handle errors with custom error handler
   app.use((err, req, res, next) => {
-    // Create a new assistant because our custom Middleware has not been run yet
-    const assistant = self.Assistant({ req: req, res: res, }, {});
+    // Create a new ctx because our custom Middleware has not been run yet
+    const ctx = self.RouteContext({ req: req, res: res, }, {});
 
     // Handle PayloadTooLargeError from body-parser
     if (err.type === 'entity.too.large') {
-      return assistant.respond('Request payload too large.', { code: 413 });
+      return ctx.respond('Request payload too large.', { code: 413 });
     }
 
     // Catch-all for other body-parser and middleware errors
@@ -1130,7 +1116,7 @@ Manager.prototype.setupCustomServer = function (_library, options) {
       console.log('@TODO: Custom Error Handler:', err);
 
       // Return
-      return assistant.respond(err.message || 'Bad request', { code: err.status || err.code || err.statusCode || 400 });
+      return ctx.respond(err.message || 'Bad request', { code: err.status || err.code || err.statusCode || 400 });
     }
 
     // If no error, continue
@@ -1200,18 +1186,18 @@ Manager.prototype.setupCustomServer = function (_library, options) {
 
   // Log routes
   // if (options.log) {
-  //   self.assistant.log('Routes:', routes);
+  //   self.ctx.log('Routes:', routes);
   // }
 
   // Install process
   routes.forEach((file) => {
-    // self.assistant.log('---file', file);
+    // self.ctx.log('---file', file);
     // Require the file
     const cors = self.libraries.cors;
 
     // Log
     // if (options.log) {
-      self.assistant.log(`Initializing route: ${file.method.toUpperCase()} /${file.name} @ ${file.path}`);
+      self.ctx.log(`Initializing route: ${file.method.toUpperCase()} /${file.name} @ ${file.path}`);
     // }
 
     // Register the route with the appropriate HTTP method
@@ -1238,7 +1224,7 @@ Manager.prototype.setupCustomServer = function (_library, options) {
   // Run the server!
   const server = app.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' }, (error) => {
     if (error) {
-      self.assistant.error(error);
+      self.ctx.error(error);
       process.exit(1);
     }
 
@@ -1246,7 +1232,7 @@ Manager.prototype.setupCustomServer = function (_library, options) {
 
     // Log
     if (options.log) {
-      self.assistant.log(`Server listening on ${address.address}:${address.port}`);
+      self.ctx.log(`Server listening on ${address.address}:${address.port}`);
     }
 
     // Set server and app to internal
@@ -1337,9 +1323,9 @@ function setupTestModeWatcher(manager) {
   const initial = readTestMode(projectDir);
   const changed = applyEnvFromFile(initial);
   for (const c of changed) {
-    manager.assistant.log(`[test-mode] sync ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
+    manager.ctx.log(`[test-mode] sync ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
   }
-  manager.assistant.log(`[test-mode] resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
+  manager.ctx.log(`[test-mode] resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
 
   // Ensure .temp/ exists so we can watch the directory (fs.watch on a missing
   // path throws synchronously). Watching the directory rather than the file
@@ -1356,11 +1342,11 @@ function setupTestModeWatcher(manager) {
       const next = readTestMode(projectDir);
       const flipped = applyEnvFromFile(next);
       for (const c of flipped) {
-        manager.assistant.log(`[test-mode] flip ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
+        manager.ctx.log(`[test-mode] flip ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
       }
     });
   } catch (e) {
-    manager.assistant.log(`[test-mode] watcher failed to install (${e.message}), live sync disabled`);
+    manager.ctx.log(`[test-mode] watcher failed to install (${e.message}), live sync disabled`);
   }
 }
 

@@ -40,7 +40,7 @@ module.exports = {
   description: 'Generate a blog article (config check by default, full AI pipeline with TEST_EXTENDED_MODE)',
   auth: 'none',
   timeout: 300000,
-  async run({ assert, config, Manager, assistant, skip }) {
+  async run({ assert, config, Manager, ctx, skip }) {
     const env = process.env;
     const blogConfig = Manager.config.blog;
 
@@ -134,7 +134,7 @@ module.exports = {
     // Run the publisher
     await publisher({
       Manager,
-      assistant,
+      ctx,
       context: {},
       libraries: Manager.libraries,
     });

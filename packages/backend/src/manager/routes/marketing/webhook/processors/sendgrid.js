@@ -114,18 +114,18 @@ function isSupported(parsed) {
  *
  * Returns a result object summarizing what happened (for logging/response).
  */
-async function handleEvent({ Manager, assistant, parsed }) {
+async function handleEvent({ Manager, ctx, parsed }) {
   const { admin } = Manager.libraries;
   const { eventId, eventType, email, timestamp } = parsed;
 
   if (!email) {
-    assistant.log(`sendgrid webhook: event ${eventId} (${eventType}) missing email, skipping`);
+    ctx.log(`sendgrid webhook: event ${eventId} (${eventType}) missing email, skipping`);
     return { handled: false, reason: 'missing-email' };
   }
 
   // Convert SendGrid's UNIX timestamp to our canonical { timestamp, timestampUNIX } shape.
   // Fall back to server time if missing.
-  const startTime = assistant.meta.startTime;
+  const startTime = ctx.meta.startTime;
   const eventUNIX = typeof timestamp === 'number' ? timestamp : startTime.timestampUNIX;
   const eventISO = new Date(eventUNIX * 1000).toISOString();
 
@@ -135,13 +135,13 @@ async function handleEvent({ Manager, assistant, parsed }) {
     .limit(1)
     .get()
     .catch((e) => {
-      assistant.error(`sendgrid webhook: user lookup failed for ${email}:`, e);
+      ctx.error(`sendgrid webhook: user lookup failed for ${email}:`, e);
       return null;
     });
 
   if (!snapshot || snapshot.empty) {
     // Silent skip — this email may not map to a customer of THIS brand (shared SendGrid account).
-    assistant.log(`sendgrid webhook: no user found for ${email}, skipping doc update`);
+    ctx.log(`sendgrid webhook: no user found for ${email}, skipping doc update`);
     return { handled: false, reason: 'user-not-found', email };
   }
 
@@ -165,22 +165,22 @@ async function handleEvent({ Manager, assistant, parsed }) {
     metadata: Manager.Metadata().set({ tag: 'marketing/webhook:sendgrid' }),
   }, { merge: true });
 
-  assistant.log(`sendgrid webhook: revoked consent.marketing for ${uid} (${email}) — eventType=${eventType}`);
+  ctx.log(`sendgrid webhook: revoked consent.marketing for ${uid} (${email}) — eventType=${eventType}`);
 
   // Cross-provider sync: also remove from Beehiiv (best-effort, idempotent on 404)
-  const shouldCallExternalAPIs = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldCallExternalAPIs = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (shouldCallExternalAPIs) {
     try {
-      const mailer = Manager.Email(assistant);
+      const mailer = Manager.Email(ctx);
       await mailer.remove(email);
-      assistant.log(`sendgrid webhook: cross-provider sync complete for ${email}`);
+      ctx.log(`sendgrid webhook: cross-provider sync complete for ${email}`);
     } catch (e) {
       // Best-effort — user doc is already updated. Log + continue.
-      assistant.error(`sendgrid webhook: cross-provider sync failed for ${email}:`, e);
+      ctx.error(`sendgrid webhook: cross-provider sync failed for ${email}:`, e);
     }
   } else {
-    assistant.log('sendgrid webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
+    ctx.log('sendgrid webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
   }
 
   return { handled: true, uid, email, eventType };

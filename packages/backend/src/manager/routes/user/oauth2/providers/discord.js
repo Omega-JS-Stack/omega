@@ -18,7 +18,7 @@ module.exports = {
 
   // Revoke a token with Discord
   async revokeToken(token, context) {
-    const { assistant, clientId, clientSecret } = context;
+    const { ctx, clientId, clientSecret } = context;
 
     const response = await fetch(this.urls.revoke, {
       method: 'POST',
@@ -32,15 +32,15 @@ module.exports = {
     }).catch(e => e);
 
     if (response instanceof Error) {
-      assistant.log('Discord revokeToken error:', response.message);
+      ctx.log('Discord revokeToken error:', response.message);
       return { revoked: false, reason: response.message };
     }
 
     return { revoked: true };
   },
 
-  async verifyIdentity(tokenizeResult, Manager, assistant) {
-    assistant.log('verifyIdentity(): tokenizeResult', tokenizeResult);
+  async verifyIdentity(tokenizeResult, Manager, ctx) {
+    ctx.log('verifyIdentity(): tokenizeResult', tokenizeResult);
 
     // Get identity from Discord API
     const identityResponse = await fetch('https://discord.com/api/users/@me', {
@@ -54,7 +54,7 @@ module.exports = {
       },
     });
 
-    assistant.log('verifyIdentity(): identityResponse', identityResponse);
+    ctx.log('verifyIdentity(): identityResponse', identityResponse);
 
     // Check if exists
     const snap = await Manager.libraries.admin.firestore().collection('users')

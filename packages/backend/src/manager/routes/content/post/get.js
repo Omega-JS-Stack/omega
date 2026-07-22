@@ -6,15 +6,15 @@ const { Octokit } = require('@octokit/rest');
 const { parse } = require('yaml');
 const { brandRepoOwner, brandRepoName } = require('@omega.js/config');
 
-module.exports = async ({ assistant, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   // Check for GitHub configuration
   if (!process.env.GH_TOKEN) {
-    return assistant.respond('GitHub API key not configured.', { code: 500 });
+    return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
   if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return assistant.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
+    return ctx.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
   }
 
   // Setup Octokit
@@ -24,14 +24,14 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
 
   // Check for required parameters
   if (!settings.url) {
-    return assistant.respond('Missing required parameter: url', { code: 400 });
+    return ctx.respond('Missing required parameter: url', { code: 400 });
   }
 
   let url;
   try {
     url = new URL(settings.url);
   } catch (e) {
-    return assistant.respond('Invalid URL', { code: 400 });
+    return ctx.respond('Invalid URL', { code: 400 });
   }
 
   // Get the post
@@ -39,21 +39,21 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   const repoInfo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
   const query = `title+repo:${repoInfo.user}/${repoInfo.name}+filename:${filename}`;
 
-  assistant.log('Running search', query, repoInfo);
+  ctx.log('Running search', query, repoInfo);
 
   // Search the repo for the file matching the url
   const results = await octokit.rest.search.code({
     q: query,
   }).catch(e => e);
 
-  assistant.log('Results', results);
+  ctx.log('Results', results);
 
   // Check for errors
   if (results instanceof Error) {
-    return assistant.respond(`Error searching for post: ${results}`, { code: 500 });
+    return ctx.respond(`Error searching for post: ${results}`, { code: 500 });
   }
   if (results?.data?.total_count === 0) {
-    return assistant.respond('Post not found', { code: 404 });
+    return ctx.respond('Post not found', { code: 404 });
   }
 
   // Get the first result
@@ -66,11 +66,11 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
     path: firstResult.path,
   }).catch(e => e);
 
-  assistant.log('Post', post);
+  ctx.log('Post', post);
 
   // Check for errors
   if (post instanceof Error) {
-    return assistant.respond(`Error fetching post: ${post}`, { code: 500 });
+    return ctx.respond(`Error fetching post: ${post}`, { code: 500 });
   }
 
   // Decode the content
@@ -83,7 +83,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   // Track analytics
   analytics.event('content/post', { action: 'get' });
 
-  return assistant.respond({
+  return ctx.respond({
     // Meta
     name: post.data.name,
     path: post.data.path,

@@ -2,10 +2,10 @@
  * GET /brand - Public brand configuration
  * Returns a safe subset of the project's config (no secrets)
  */
-module.exports = async ({ assistant, Manager }) => {
+module.exports = async ({ ctx, Manager }) => {
   const config = Manager.config;
 
-  return assistant.respond(buildPublicConfig(config));
+  return ctx.respond(buildPublicConfig(config));
 };
 
 /**

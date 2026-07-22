@@ -4,16 +4,16 @@
  */
 const { inferContact } = require('../../../libraries/infer-contact.js');
 
-module.exports = async ({ assistant, user, settings }) => {
+module.exports = async ({ ctx, user, settings }) => {
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Accept single email or array of emails. Schema defaults `emails` to [], so check length:
@@ -26,10 +26,10 @@ module.exports = async ({ assistant, user, settings }) => {
     emails
       .filter(Boolean)
       .map(async (email) => {
-        const result = await inferContact(email, assistant);
+        const result = await inferContact(email, ctx);
         return { email, ...result };
       })
   );
 
-  return assistant.respond({ results });
+  return ctx.respond({ results });
 };

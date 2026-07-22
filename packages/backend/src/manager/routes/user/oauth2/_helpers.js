@@ -18,8 +18,8 @@ const STATE_KEY = process.env.OMEGA_ADMIN_KEY
  * Build context object with common OAuth2 data
  * Used by GET, POST, DELETE handlers
  */
-async function buildContext({ assistant, user, settings, requireProvider = true }) {
-  const Manager = assistant.Manager;
+async function buildContext({ ctx, user, settings, requireProvider = true }) {
+  const Manager = ctx.Manager;
   const { admin } = Manager.libraries;
 
   // Require authentication
@@ -53,7 +53,7 @@ async function buildContext({ assistant, user, settings, requireProvider = true 
   // If provider not required (e.g., tokenize gets it from encrypted state), skip loading
   if (!requireProvider) {
     return {
-      assistant,
+      ctx,
       Manager,
       admin,
       settings,
@@ -83,7 +83,7 @@ async function buildContext({ assistant, user, settings, requireProvider = true 
   const clientSecret = process.env[`OAUTH2_${providerEnvKey}_CLIENT_SECRET`];
 
   return {
-    assistant,
+    ctx,
     Manager,
     admin,
     oauth2Provider,

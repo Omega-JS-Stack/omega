@@ -2,7 +2,7 @@
  * Test: environment detection + URL helpers
  * Covers the Manager's getEnvironment() SSOT, the derived is*() checks, the URL
  * builders (getApiUrl / getFunctionsUrl / getWebsiteUrl + parent variants), and the
- * assistant→Manager forwarding.
+ * ctx→Manager forwarding.
  *
  * Run: npx omega test backend:helpers/environment
  *
@@ -14,7 +14,7 @@
  *     never read raw signals, so they can NEVER disagree with it. Exactly one is true.
  *   - getApiUrl/getFunctionsUrl/getWebsiteUrl resolve LOCAL in dev OR testing, prod
  *     otherwise. The parent helpers ALWAYS return the live URL (no localhost).
- *   - The assistant forwards each method to its Manager (identical results).
+ *   - The ctx forwards each method to its Manager (identical results).
  */
 
 // Run a thunk with the env-detection vars cleared, restoring them afterward. These are
@@ -137,11 +137,11 @@ module.exports = {
       },
     },
 
-    // ─── assistant forwards to the Manager (identical results) ───
+    // ─── ctx forwards to the Manager (identical results) ───
 
     {
-      name: 'assistant forwards getEnvironment()/is*() to the Manager (identical)',
-      async run({ Manager, assistant, assert }) {
+      name: 'ctx forwards getEnvironment()/is*() to the Manager (identical)',
+      async run({ Manager, ctx, assert }) {
         const cases = [
           { OMEGA_TEST_MODE: 'true' },
           { ENVIRONMENT: 'production' },
@@ -149,10 +149,10 @@ module.exports = {
         ];
         for (const env of cases) {
           withEnv(env, () => {
-            assert.equal(assistant.getEnvironment(), Manager.getEnvironment(), 'getEnvironment forward');
-            assert.equal(assistant.isDevelopment(), Manager.isDevelopment(), 'isDevelopment forward');
-            assert.equal(assistant.isTesting(),     Manager.isTesting(),     'isTesting forward');
-            assert.equal(assistant.isProduction(),  Manager.isProduction(),  'isProduction forward');
+            assert.equal(ctx.getEnvironment(), Manager.getEnvironment(), 'getEnvironment forward');
+            assert.equal(ctx.isDevelopment(), Manager.isDevelopment(), 'isDevelopment forward');
+            assert.equal(ctx.isTesting(),     Manager.isTesting(),     'isTesting forward');
+            assert.equal(ctx.isProduction(),  Manager.isProduction(),  'isProduction forward');
           });
         }
       },

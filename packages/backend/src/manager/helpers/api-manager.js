@@ -135,11 +135,11 @@ ApiManager.prototype._createNewUser = function (authenticatedUser, planId, persi
   return newUser;
 }
 
-ApiManager.prototype.getUser = async function (assistant) {
+ApiManager.prototype.getUser = async function (ctx) {
   const self = this;
 
   let newUser;
-  let apiKey = assistant.request.data.apiKey;
+  let apiKey = ctx.request.data.apiKey;
   let authenticatedUser;
   let persistentData = {set: false};
   // console.log('---getuser for', apiKey);
@@ -166,14 +166,14 @@ ApiManager.prototype.getUser = async function (assistant) {
 
   if (!newUser) {
     // console.log('---doesnt exist so reauthing');
-    authenticatedUser = await assistant.authenticate({apiKey: apiKey});
+    authenticatedUser = await ctx.authenticate({apiKey: apiKey});
     // console.log('---authenticatedUser', authenticatedUser);
     const planId = authenticatedUser?.subscription?.product?.id || 'basic';
     let workingUID = !authenticatedUser.authenticated
-      ? uuidv5(assistant.request.geolocation.ip || 'unknown', '1b671a64-40d5-491e-99b0-da01ff1f3341')
+      ? uuidv5(ctx.request.geolocation.ip || 'unknown', '1b671a64-40d5-491e-99b0-da01ff1f3341')
       : authenticatedUser.auth.uid
-    authenticatedUser.ip = assistant.request.geolocation.ip;
-    authenticatedUser.country = assistant.request.geolocation.country;
+    authenticatedUser.ip = ctx.request.geolocation.ip;
+    authenticatedUser.country = ctx.request.geolocation.country;
     // console.log('---workingUID', workingUID);
     // console.log('----self.userList', self.userList);
     let existingUser = self.userList.find(user => user.auth.uid === workingUID);
@@ -257,19 +257,19 @@ ApiManager.prototype.incrementUserStat = function (user, stat, amount) {
 }
 
 
-ApiManager.prototype.validateOfficialRequest = async function (assistant, apiUser) {
+ApiManager.prototype.validateOfficialRequest = async function (ctx, apiUser) {
   const self = this
-  let data = assistant.request.data;
+  let data = ctx.request.data;
   let multipartData;
-  assistant.ref.Manager.libraries.hcaptcha = assistant.ref.Manager.libraries.hcaptcha || assistant.ref.Manager.require('hcaptcha');
-  const hcaptcha = assistant.ref.Manager.libraries.hcaptcha;
+  ctx.ref.Manager.libraries.hcaptcha = ctx.ref.Manager.libraries.hcaptcha || ctx.ref.Manager.require('hcaptcha');
+  const hcaptcha = ctx.ref.Manager.libraries.hcaptcha;
 
-  const contentType = assistant.ref.req.headers?.['content-type'] || '';
+  const contentType = ctx.ref.req.headers?.['content-type'] || '';
   const requestType = !contentType || contentType.includes('application/json') ? 'json' : 'form';
 
   // console.log('----requestType', requestType);
   if (requestType !== 'json') {
-    multipartData = await assistant.parseMultipartFormData();
+    multipartData = await ctx.parseMultipartFormData();
     data = multipartData.fields;
     // console.log('----multipartData', multipartData);
   }
@@ -280,7 +280,7 @@ ApiManager.prototype.validateOfficialRequest = async function (assistant, apiUse
         .catch((e) => e);
       if (!captchaResult || captchaResult instanceof Error || !captchaResult.success) {
         // console.log(`Cap`);
-        assistant.ref.res.status(400).send(new Error(`Captcha verification failed.`).message);
+        ctx.ref.res.status(400).send(new Error(`Captcha verification failed.`).message);
         return {
           ok: false,
           official: true,

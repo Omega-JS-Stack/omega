@@ -8,18 +8,18 @@ Use early returns instead of nested conditionals:
 // CORRECT
 function handler(data) {
   if (!data) {
-    return assistant.errorify('Missing data', { code: 400 });
+    return ctx.report('Missing data', { code: 400 });
   }
 
   // Main logic here
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 }
 
 // INCORRECT
 function handler(data) {
   if (data) {
     // Main logic here
-    return assistant.respond({ success: true });
+    return ctx.respond({ success: true });
   }
 }
 ```

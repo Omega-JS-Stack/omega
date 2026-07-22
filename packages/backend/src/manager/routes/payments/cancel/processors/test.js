@@ -12,12 +12,12 @@ const powertools = require('node-powertools');
  * Only available in non-production environments.
  */
 module.exports = {
-  async cancelAtPeriodEnd({ resourceId, uid, subscription, assistant }) {
-    if (assistant.isProduction()) {
+  async cancelAtPeriodEnd({ resourceId, uid, subscription, ctx }) {
+    if (ctx.isProduction()) {
       throw new Error('Test processor is not available in production');
     }
 
-    const admin = assistant.Manager.libraries.admin;
+    const admin = ctx.Manager.libraries.admin;
 
     const timestamp = Date.now();
     const now = Math.floor(timestamp / 1000);
@@ -33,7 +33,7 @@ module.exports = {
       if (orderDoc.exists) {
         const orderData = orderDoc.data();
         const productId = orderData.unified?.product?.id;
-        const products = assistant.Manager.config.payment?.products || [];
+        const products = ctx.Manager.config.payment?.products || [];
         const product = products.find(p => p.id === productId);
         if (product) {
           stripeProductId = product.stripe?.productId || `_test_${product.id}`;
@@ -102,6 +102,6 @@ module.exports = {
       },
     });
 
-    assistant.log(`Test cancel processor: wrote payments-webhooks/${eventId} (${eventType}) for sub=${resourceId}, uid=${uid}, trialing=${isTrialing}`);
+    ctx.log(`Test cancel processor: wrote payments-webhooks/${eventId} (${eventType}) for sub=${resourceId}, uid=${uid}, trialing=${isTrialing}`);
   },
 };

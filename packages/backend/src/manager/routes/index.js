@@ -1,11 +1,11 @@
-module.exports = async ({ assistant, Manager }) => {
+module.exports = async ({ ctx, Manager }) => {
 
   // Get url
   const url = Manager.config?.brand?.url;
 
   // Log
-  assistant.log('Route.main(): Executing route logic', url);
+  ctx.log('Route.main(): Executing route logic', url);
 
   // Redirect to brand URL
-  return assistant.redirect(url);
+  return ctx.redirect(url);
 };

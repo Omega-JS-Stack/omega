@@ -26,11 +26,11 @@
  */
 const { runAuthHook } = require('./utils.js');
 
-module.exports = async ({ Manager, assistant, user, context, libraries }) => {
+module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  assistant.log(`beforeSignIn: ${user.uid} (${user.email})`, user, context);
+  ctx.log(`beforeSignIn: ${user.uid} (${user.email})`, user, context);
 
   const now = new Date();
 
@@ -56,14 +56,14 @@ module.exports = async ({ Manager, assistant, user, context, libraries }) => {
     .catch(e => e);
 
   if (update instanceof Error) {
-    assistant.error(`beforeSignIn: Failed to update user ${user.uid}:`, update);
+    ctx.error(`beforeSignIn: Failed to update user ${user.uid}:`, update);
     // Don't block sign-in for activity update failure
   } else {
-    assistant.log(`beforeSignIn: Updated user activity`);
+    ctx.log(`beforeSignIn: Updated user activity`);
   }
 
   // Run consumer hook (can throw HttpsError to block sign-in)
-  await runAuthHook('before-signin', { Manager, assistant, user, context, libraries });
+  await runAuthHook('before-signin', { Manager, ctx, user, context, libraries });
 
-  assistant.log(`beforeSignIn: Completed for ${user.uid} (${Date.now() - startTime}ms)`);
+  ctx.log(`beforeSignIn: Completed for ${user.uid} (${Date.now() - startTime}ms)`);
 };

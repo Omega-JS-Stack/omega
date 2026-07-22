@@ -17,12 +17,12 @@ const POLL_INTERVAL_MS = 500;
  * 5. Process affiliate referral (writes to referrer's doc)
  * 6. Send welcome emails + add to marketing lists (non-blocking)
  */
-module.exports = async ({ assistant, user, settings, libraries }) => {
+module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID
@@ -30,23 +30,23 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Require admin to signup other users
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
-  assistant.log(`signup(): Starting for ${uid}`, settings);
+  ctx.log(`signup(): Starting for ${uid}`, settings);
 
   // 1. Poll for user doc to exist (wait for onCreate to complete)
-  const userDoc = await pollForUserDoc(assistant, uid);
+  const userDoc = await pollForUserDoc(ctx, uid);
 
   if (!userDoc) {
-    return assistant.respond('User document not found after waiting. Please try again.', { code: 500 });
+    return ctx.respond('User document not found after waiting. Please try again.', { code: 500 });
   }
 
-  assistant.log(`signup(): User doc found for ${uid}`);
+  ctx.log(`signup(): User doc found for ${uid}`);
 
   // 2. Check if signup has already been processed
   if (userDoc.flags?.signupProcessed) {
-    return assistant.respond('Signup has already been processed', { code: 400 });
+    return ctx.respond('Signup has already been processed', { code: 400 });
   }
 
   // 3. Fetch the Auth user — needed for the canonical creationTime used to stamp
@@ -56,14 +56,14 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
   const authUser = await admin.auth().getUser(uid).catch((e) => e);
 
   if (authUser instanceof Error) {
-    return assistant.respond(`Failed to get auth user: ${authUser.message}`, { code: 500 });
+    return ctx.respond(`Failed to get auth user: ${authUser.message}`, { code: 500 });
   }
 
   // 4. Gather all data, then write once
   const email = user.auth.email;
-  const inferred = await inferUserContact(assistant, email);
-  assistant.log(`signup(): inferUserContact returned for ${email}:`, inferred);
-  const userRecord = buildUserRecord(assistant, {
+  const inferred = await inferUserContact(ctx, email);
+  ctx.log(`signup(): inferUserContact returned for ${email}:`, inferred);
+  const userRecord = buildUserRecord(ctx, {
     settings,
     inferred,
     uid,
@@ -72,38 +72,38 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     existingDoc: userDoc,
   });
 
-  assistant.log(`signup(): Writing user record for ${uid}`, userRecord);
+  ctx.log(`signup(): Writing user record for ${uid}`, userRecord);
 
   await admin.firestore().doc(`users/${uid}`)
     .set(userRecord, { merge: true });
 
   // 5. Process affiliate referral (writes to referrer's doc, not this user's)
-  await processAffiliate(assistant, uid, email, settings);
+  await processAffiliate(ctx, uid, email, settings);
 
   // 6. Send emails + marketing (awaited so the function stays alive)
   // Gate marketing sync on explicit consent — never add a user to marketing lists without it
   if (userRecord.consent?.marketing?.status === 'granted') {
-    await syncMarketingContact(assistant, uid, email);
+    await syncMarketingContact(ctx, uid, email);
   } else {
-    assistant.log(`signup(): Skipping marketing sync — consent.marketing.status is "${userRecord.consent?.marketing?.status}"`);
+    ctx.log(`signup(): Skipping marketing sync — consent.marketing.status is "${userRecord.consent?.marketing?.status}"`);
   }
-  await sendWelcomeEmails(assistant, uid, inferred?.firstName);
+  await sendWelcomeEmails(ctx, uid, inferred?.firstName);
 
-  return assistant.respond({ signedUp: true });
+  return ctx.respond({ signedUp: true });
 };
 
 /**
  * Poll for user doc to exist (wait for onCreate to complete)
  */
-async function pollForUserDoc(assistant, uid) {
-  const { admin } = assistant.Manager.libraries;
+async function pollForUserDoc(ctx, uid) {
+  const { admin } = ctx.Manager.libraries;
   const startTime = Date.now();
 
   while (Date.now() - startTime < MAX_POLL_TIME_MS) {
     const doc = await admin.firestore().doc(`users/${uid}`)
       .get()
       .catch((e) => {
-        assistant.error(`pollForUserDoc(): Error fetching doc:`, e);
+        ctx.error(`pollForUserDoc(): Error fetching doc:`, e);
         return null;
       });
 
@@ -111,11 +111,11 @@ async function pollForUserDoc(assistant, uid) {
       return doc.data();
     }
 
-    assistant.log(`pollForUserDoc(): Waiting for user doc ${uid}...`);
+    ctx.log(`pollForUserDoc(): Waiting for user doc ${uid}...`);
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  assistant.error(`pollForUserDoc(): Timeout waiting for user doc ${uid}`);
+  ctx.error(`pollForUserDoc(): Timeout waiting for user doc ${uid}`);
   return null;
 }
 
@@ -135,8 +135,8 @@ async function pollForUserDoc(assistant, uid) {
  * full attribution object and the OMEGA migration had to re-add every leaf on every signup.
  * Deep-merging in JS and writing the whole doc avoids that entirely.
  */
-function buildUserRecord(assistant, { settings, inferred, uid, email, creationTime, existingDoc }) {
-  const Manager = assistant.Manager;
+function buildUserRecord(ctx, { settings, inferred, uid, email, creationTime, existingDoc }) {
+  const Manager = ctx.Manager;
 
   // Inferred name/company (from AI/regex on the email) — only set when present.
   const personal = {};
@@ -161,15 +161,15 @@ function buildUserRecord(assistant, { settings, inferred, uid, email, creationTi
       ...settings.context,
       geolocation: {
         ...(settings.context?.geolocation || {}),
-        ...assistant.request.geolocation,
+        ...ctx.request.geolocation,
       },
       client: {
-        ...assistant.request.client,
+        ...ctx.request.client,
         ...(settings.context?.client || {}),
       },
     },
     attribution: settings.attribution || {},
-    consent: buildConsentRecord(assistant, settings.consent, creationTime, existingDoc?.consent),
+    consent: buildConsentRecord(ctx, settings.consent, creationTime, existingDoc?.consent),
     metadata: Manager.Metadata().set({ tag: 'user/signup' }),
     ...(Object.keys(personal).length ? { personal } : {}),
   };
@@ -202,16 +202,16 @@ function buildUserRecord(assistant, { settings, inferred, uid, email, creationTi
  * record what the client sent, but the route will not have reached this point in practice
  * (the signup-form HTML5-requires the legal checkbox).
  */
-function buildConsentRecord(assistant, clientConsent, creationTime, existingConsent) {
+function buildConsentRecord(ctx, clientConsent, creationTime, existingConsent) {
   const consent = clientConsent || {};
-  const ip = assistant.request.geolocation?.ip || null;
+  const ip = ctx.request.geolocation?.ip || null;
 
   // Stamp grantedAt/revokedAt from Auth's creationTime so consent timestamps match
   // metadata.created (the OMEGA migration treats metadata.created as the SSOT and reconciles
   // consent.grantedAt against it). Fall back to request start time if creationTime is absent.
   const createdDate = creationTime ? new Date(creationTime) : null;
-  const timestamp = createdDate ? createdDate.toISOString() : assistant.meta.startTime.timestamp;
-  const timestampUNIX = createdDate ? Math.round(createdDate.getTime() / 1000) : assistant.meta.startTime.timestampUNIX;
+  const timestamp = createdDate ? createdDate.toISOString() : ctx.meta.startTime.timestamp;
+  const timestampUNIX = createdDate ? Math.round(createdDate.getTime() / 1000) : ctx.meta.startTime.timestampUNIX;
 
   // Build empty leaf shape — used wherever grantedAt or revokedAt is "not set"
   const emptyMeta = { timestamp: null, timestampUNIX: null, source: null, ip: null, text: null };
@@ -260,7 +260,7 @@ function buildConsentRecord(assistant, clientConsent, creationTime, existingCons
     marketing = existingConsent.marketing;
   }
 
-  assistant.log(`buildConsentRecord: legal=${legal.status}, marketing=${marketing.status} (raw input legal.granted=${consent.legal?.granted}, marketing.granted=${consent.marketing?.granted})`);
+  ctx.log(`buildConsentRecord: legal=${legal.status}, marketing=${marketing.status} (raw input legal.granted=${consent.legal?.granted}, marketing.granted=${consent.marketing?.granted})`);
 
   return { legal, marketing };
 }
@@ -269,20 +269,20 @@ function buildConsentRecord(assistant, clientConsent, creationTime, existingCons
  * Infer name/company from email using AI (or regex fallback)
  * Returns the inferred contact info, or null on failure
  */
-async function inferUserContact(assistant, email) {
+async function inferUserContact(ctx, email) {
   try {
-    const inferred = await inferContact(email, assistant);
+    const inferred = await inferContact(email, ctx);
 
     if (!inferred?.firstName && !inferred?.lastName && !inferred?.company) {
-      assistant.log(`signup(): inferUserContact returned empty result for ${email} (method=${inferred?.method || 'unknown'})`);
+      ctx.log(`signup(): inferUserContact returned empty result for ${email} (method=${inferred?.method || 'unknown'})`);
       return null;
     }
 
-    assistant.log(`signup(): Inferred contact: ${inferred.firstName || ''} ${inferred.lastName || ''}, company=${inferred.company || ''} (method=${inferred.method})`);
+    ctx.log(`signup(): Inferred contact: ${inferred.firstName || ''} ${inferred.lastName || ''}, company=${inferred.company || ''} (method=${inferred.method})`);
 
     return inferred;
   } catch (e) {
-    assistant.error('signup(): Name inference failed:', e);
+    ctx.error('signup(): Name inference failed:', e);
     return null;
   }
 }
@@ -291,8 +291,8 @@ async function inferUserContact(assistant, email) {
  * Process affiliate referral if affiliate code provided
  * Writes to the referrer's doc (not the current user's)
  */
-async function processAffiliate(assistant, uid, email, settings) {
-  const { admin } = assistant.Manager.libraries;
+async function processAffiliate(ctx, uid, email, settings) {
+  const { admin } = ctx.Manager.libraries;
   const affiliateCode = settings.attribution?.affiliate?.code || null;
 
   if (!affiliateCode) {
@@ -301,22 +301,22 @@ async function processAffiliate(assistant, uid, email, settings) {
 
   // Skip referral credit for disposable email signups (affiliate fraud prevention)
   if (isDisposable(email)) {
-    assistant.log(`processAffiliate(): Skipping referral — disposable email ${email}`);
+    ctx.log(`processAffiliate(): Skipping referral — disposable email ${email}`);
     return;
   }
 
-  assistant.log(`processAffiliate(): Looking for referrer with code ${affiliateCode}`);
+  ctx.log(`processAffiliate(): Looking for referrer with code ${affiliateCode}`);
 
   const snapshot = await admin.firestore().collection('users')
     .where('affiliate.code', '==', affiliateCode)
     .get()
     .catch((e) => {
-      assistant.error(`processAffiliate(): Failed to find referrer:`, e);
+      ctx.error(`processAffiliate(): Failed to find referrer:`, e);
       throw e;
     });
 
   if (snapshot.empty) {
-    assistant.log(`processAffiliate(): No referrer found with code ${affiliateCode}`);
+    ctx.log(`processAffiliate(): No referrer found with code ${affiliateCode}`);
     return;
   }
 
@@ -329,10 +329,10 @@ async function processAffiliate(assistant, uid, email, settings) {
 
   referrals.push({
     uid: uid,
-    timestamp: assistant.meta.startTime.timestamp,
+    timestamp: ctx.meta.startTime.timestamp,
   });
 
-  assistant.log(`processAffiliate(): Appending referral to ${referrerDoc.id}`, referrals);
+  ctx.log(`processAffiliate(): Appending referral to ${referrerDoc.id}`, referrals);
 
   await admin.firestore().doc(`users/${referrerDoc.id}`)
     .set({
@@ -341,22 +341,22 @@ async function processAffiliate(assistant, uid, email, settings) {
       },
     }, { merge: true })
     .then(() => {
-      assistant.log(`processAffiliate(): Success`);
+      ctx.log(`processAffiliate(): Success`);
     })
     .catch((e) => {
-      assistant.error(`processAffiliate(): Failed to update referrer:`, e);
+      ctx.error(`processAffiliate(): Failed to update referrer:`, e);
     });
 }
 
 /**
  * Sync marketing contact — validates email (including mailbox verification) before syncing to providers
  */
-async function syncMarketingContact(assistant, uid, email) {
-  const Manager = assistant.Manager;
-  const shouldSend = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+async function syncMarketingContact(ctx, uid, email) {
+  const Manager = ctx.Manager;
+  const shouldSend = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldSend) {
-    assistant.log(`signup(): Skipping marketing sync (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
+    ctx.log(`signup(): Skipping marketing sync (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
     return;
   }
 
@@ -364,45 +364,45 @@ async function syncMarketingContact(assistant, uid, email) {
   const validation = await validateEmail(email, { checks: ALL_CHECKS });
 
   if (!validation.valid) {
-    assistant.log(`signup(): Skipping marketing sync — email validation failed:`, validation.checks);
+    ctx.log(`signup(): Skipping marketing sync — email validation failed:`, validation.checks);
     return;
   }
 
-  const mailer = Manager.Email(assistant);
+  const mailer = Manager.Email(ctx);
 
   try {
     const result = await mailer.sync(uid);
-    assistant.log('signup(): Marketing sync:', result);
+    ctx.log('signup(): Marketing sync:', result);
   } catch (e) {
-    assistant.error('signup(): Marketing sync failed:', e);
+    ctx.error('signup(): Marketing sync failed:', e);
   }
 }
 
 /**
  * Send welcome, checkup, and feedback emails
  */
-async function sendWelcomeEmails(assistant, uid, firstName) {
-  const shouldSend = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+async function sendWelcomeEmails(ctx, uid, firstName) {
+  const shouldSend = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (!shouldSend) {
-    assistant.log(`signup(): Skipping welcome emails (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
+    ctx.log(`signup(): Skipping welcome emails (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)`);
     return;
   }
 
   await Promise.all([
-    sendWelcomeEmail(assistant, uid, firstName).catch(e => assistant.error('signup(): sendWelcomeEmail failed:', e)),
-    sendDiscountNudgeEmail(assistant, uid, firstName).catch(e => assistant.error('signup(): sendDiscountNudgeEmail failed:', e)),
-    sendCheckupEmail(assistant, uid, firstName).catch(e => assistant.error('signup(): sendCheckupEmail failed:', e)),
-    sendFeedbackEmail(assistant, uid, firstName).catch(e => assistant.error('signup(): sendFeedbackEmail failed:', e)),
+    sendWelcomeEmail(ctx, uid, firstName).catch(e => ctx.error('signup(): sendWelcomeEmail failed:', e)),
+    sendDiscountNudgeEmail(ctx, uid, firstName).catch(e => ctx.error('signup(): sendDiscountNudgeEmail failed:', e)),
+    sendCheckupEmail(ctx, uid, firstName).catch(e => ctx.error('signup(): sendCheckupEmail failed:', e)),
+    sendFeedbackEmail(ctx, uid, firstName).catch(e => ctx.error('signup(): sendFeedbackEmail failed:', e)),
   ]);
 }
 
 /**
  * Send welcome email (immediate)
  */
-function sendWelcomeEmail(assistant, uid, firstName) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendWelcomeEmail(ctx, uid, firstName) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}, welcome` : 'Welcome';
 
   return mailer.send({
@@ -435,7 +435,7 @@ Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginning
     },
   })
     .then((result) => {
-      assistant.log('sendWelcomeEmail(): Success', result.status);
+      ctx.log('sendWelcomeEmail(): Success', result.status);
       return result;
     });
 }
@@ -458,9 +458,9 @@ Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginning
  * intrigue framing ("something for you 🎁") rather than spam-trigger words ("free",
  * "claim", "bonus") to protect deliverability.
  */
-function sendDiscountNudgeEmail(assistant, uid, firstName) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendDiscountNudgeEmail(ctx, uid, firstName) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}` : 'Hey there';
   const subject = firstName
     ? `${firstName}, I've got something for you 🎁`
@@ -499,7 +499,7 @@ I read every reply and I'm looking forward to hearing from you!`,
     },
   })
     .then((result) => {
-      assistant.log('sendDiscountNudgeEmail(): Success', result.status);
+      ctx.log('sendDiscountNudgeEmail(): Success', result.status);
       return result;
     });
 }
@@ -507,9 +507,9 @@ I read every reply and I'm looking forward to hearing from you!`,
 /**
  * Send checkup email (7 days after signup)
  */
-function sendCheckupEmail(assistant, uid, firstName) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendCheckupEmail(ctx, uid, firstName) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}` : 'Hi there';
 
   return mailer.send({
@@ -545,7 +545,7 @@ Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginning
     },
   })
     .then((result) => {
-      assistant.log('sendCheckupEmail(): Success', result.status);
+      ctx.log('sendCheckupEmail(): Success', result.status);
       return result;
     });
 }
@@ -553,9 +553,9 @@ Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginning
 /**
  * Send feedback email (10 days after signup)
  */
-function sendFeedbackEmail(assistant, uid, firstName) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendFeedbackEmail(ctx, uid, firstName) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const first = firstName || 'You';
 
   return mailer.send({
@@ -568,7 +568,7 @@ function sendFeedbackEmail(assistant, uid, firstName) {
     sendAt: moment().add(10, 'days').unix(),
   })
     .then((result) => {
-      assistant.log('sendFeedbackEmail(): Success', result.status);
+      ctx.log('sendFeedbackEmail(): Success', result.status);
       return result;
     });
 }

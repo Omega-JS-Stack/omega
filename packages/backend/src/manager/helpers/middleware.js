@@ -1,6 +1,6 @@
 /**
  * Middleware
- * Used to handle middleware for the assistant
+ * Used to handle middleware for the ctx
  */
 
 const path = require('path');
@@ -28,7 +28,7 @@ Middleware.prototype.run = function (libPath, options) {
   const { cors } = Manager.libraries;
 
   return cors(req, res, async () => {
-    const assistant = Manager.Assistant({req: req, res: res});
+    const ctx = Manager.RouteContext({req: req, res: res});
 
     // Set options
     options = options || {};
@@ -48,40 +48,40 @@ Middleware.prototype.run = function (libPath, options) {
     // Parse multipart/form-data if needed
     if (options.parseMultipartFormData && req.headers['content-type']?.includes('multipart/form-data')) {
       try {
-        const parsed = await assistant.parseMultipartFormData();
+        const parsed = await ctx.parseMultipartFormData();
 
         // Add each field to the body either as a whole json object or each field
         // Parsed JSON
         if (parsed.fields.json) {
-          assistant.request.body = JSON5.parse(parsed.fields.json || '{}');
+          ctx.request.body = JSON5.parse(parsed.fields.json || '{}');
         } else {
-          assistant.request.body = parsed.fields;
+          ctx.request.body = parsed.fields;
         }
 
-        // Re-assign data how assistant normally does it
-        assistant.request.data = merge({}, assistant.request.body, assistant.request.query);
+        // Re-assign data how ctx normally does it
+        ctx.request.data = merge({}, ctx.request.body, ctx.request.query);
 
         // Log that it was parsed successfully
-        assistant.log(`Middleware.run(): Parsed multipart form data successfully`);
+        ctx.log(`Middleware.run(): Parsed multipart form data successfully`);
       } catch (e) {
-        return assistant.respond(new Error(`Failed to parse multipart form data: ${e.message}`), {code: 400, sentry: true});
+        return ctx.respond(new Error(`Failed to parse multipart form data: ${e.message}`), {code: 400});
       }
     }
 
     // Set properties
-    const data = assistant.request.data;
-    const headers = assistant.request.headers;
-    const method = assistant.request.method.toLowerCase();
-    const url = assistant.request.url;
-    const geolocation = assistant.request.geolocation;
-    const client = assistant.request.client;
+    const data = ctx.request.data;
+    const headers = ctx.request.headers;
+    const method = ctx.request.method.toLowerCase();
+    const url = ctx.request.url;
+    const geolocation = ctx.request.geolocation;
+    const client = ctx.request.client;
 
     // Strip URL
     const strippedUrl = stripUrl(url);
 
     // Log
-    assistant.log(`Middleware.process(): Request (${geolocation.ip || 'unknown'} @ ${geolocation.country || '?'}, ${geolocation.region || '?'}, ${geolocation.city || '?'}) [${method} > ${strippedUrl}]`, safeStringify(data));
-    assistant.log(`Middleware.process(): Headers`, safeStringify(headers));
+    ctx.log(`Middleware.process(): Request (${geolocation.ip || 'unknown'} @ ${geolocation.country || '?'}, ${geolocation.region || '?'}, ${geolocation.city || '?'}) [${method} > ${strippedUrl}]`, safeStringify(data));
+    ctx.log(`Middleware.process(): Headers`, safeStringify(headers));
 
     // Set paths
     const routesDir = path.resolve(options.routesDir, libPath.replace('.js', ''));
@@ -89,9 +89,9 @@ Middleware.prototype.run = function (libPath, options) {
 
     // Wakeup trigger (quit immediately if wakeup is true to avoid cold start on a future request)
     if (data.wakeup) {
-      assistant.log(`Middleware.process(): Wakeup activated at ${new Date().toISOString()}`);
+      ctx.log(`Middleware.process(): Wakeup activated at ${new Date().toISOString()}`);
 
-      return assistant.respond({wakeup: true});
+      return ctx.respond({wakeup: true});
     }
 
     // Load route handler
@@ -109,44 +109,44 @@ Middleware.prototype.run = function (libPath, options) {
 
       if (fs.existsSync(methodFilePath)) {
         routeHandler = require(methodFilePath);
-        assistant.log(`Middleware.process(): Loaded route: ${methodFile}`);
+        ctx.log(`Middleware.process(): Loaded route: ${methodFile}`);
       } else if (fs.existsSync(indexPath)) {
         routeHandler = require(indexPath);
-        assistant.log(`Middleware.process(): Method-specific file (${methodFile}) not found, using index.js`);
+        ctx.log(`Middleware.process(): Method-specific file (${methodFile}) not found, using index.js`);
       } else if (fs.existsSync(routesDir)) {
-        return assistant.respond(new Error(`Method not allowed: ${method.toUpperCase()} is not supported by ${libPath}`), {code: 405, sentry: false});
+        return ctx.respond(new Error(`Method not allowed: ${method.toUpperCase()} is not supported by ${libPath}`), {code: 405});
       } else {
-        return assistant.respond(new Error(`Unable to load route @ (${libPath}): route does not exist`), {code: 500, sentry: true});
+        return ctx.respond(new Error(`Unable to load route @ (${libPath}): route does not exist`), {code: 500});
       }
     } catch (e) {
-      return assistant.respond(new Error(`Unable to load route @ (${libPath}): ${e.message}`), {code: 500, sentry: true});
+      return ctx.respond(new Error(`Unable to load route @ (${libPath}): ${e.message}`), {code: 500});
     }
 
     // Setup user
     if (!options.setupUsage && options.authenticate) {
-      await assistant.authenticate();
+      await ctx.authenticate();
     }
 
     // Setup usage
     if (options.setupUsage) {
-      // assistant.usage = await Manager.Usage().init(assistant, {log: assistant.isProduction()});
-      assistant.usage = await Manager.Usage().init(assistant, {log: false});
+      // ctx.usage = await Manager.Usage().init(ctx, {log: ctx.isProduction()});
+      ctx.usage = await Manager.Usage().init(ctx, {log: false});
     }
 
     // Log working user
-    const workingUser = assistant.getUser();
+    const workingUser = ctx.getUser();
     const resolvedSub = User.resolveSubscription(workingUser);
-    assistant.log(`Middleware.process(): User (${workingUser.auth.uid}, ${workingUser.auth.email}, ${workingUser.subscription.product.id}=${workingUser.subscription.status} (resolved: ${resolvedSub.plan})):`, safeStringify(workingUser));
+    ctx.log(`Middleware.process(): User (${workingUser.auth.uid}, ${workingUser.auth.email}, ${workingUser.subscription.product.id}=${workingUser.subscription.status} (resolved: ${resolvedSub.plan})):`, safeStringify(workingUser));
 
     // Setup analytics
     if (options.setupAnalytics) {
-      const uuid = assistant?.usage?.user?.auth?.uid
-        || assistant.request.user.auth.uid
-        || assistant.request.geolocation.ip
+      const uuid = ctx?.usage?.user?.auth?.uid
+        || ctx.request.user.auth.uid
+        || ctx.request.geolocation.ip
         || 'unknown'
 
-      assistant.analytics = Manager.Analytics({
-        assistant: assistant,
+      ctx.analytics = Manager.Analytics({
+        ctx: ctx,
         uuid: uuid,
       });
     }
@@ -158,37 +158,37 @@ Middleware.prototype.run = function (libPath, options) {
     if (options.setupSettings) {
       // Resolve settings
       try {
-        // Attach schema to assistant
-        // assistant.schema.dir = schemasDir;
-        // assistant.schema.name = options.schema;
+        // Attach schema to ctx
+        // ctx.schema.dir = schemasDir;
+        // ctx.schema.name = options.schema;
         settingsLib = Manager.Settings();
-        assistant.settings = settingsLib.resolve(assistant, undefined, data, {dir: schemasDir, schema: options.schema});
+        ctx.settings = settingsLib.resolve(ctx, undefined, data, {dir: schemasDir, schema: options.schema});
       } catch (e) {
-        return assistant.respond(new Error(`Unable to resolve schema ${options.schema}: ${e.message}`), {code: e.code || 500, sentry: true});
+        return ctx.respond(new Error(`Unable to resolve schema ${options.schema}: ${e.message}`), {code: e.code || 500});
       }
 
       // // Here we need to include IF it exists the apiKey (admin rides the
       // // omega-admin-key header — never settings)
       // if (data.apiKey) {
-      //   assistant.settings.apiKey = data.apiKey;
+      //   ctx.settings.apiKey = data.apiKey;
       // }
 
       // Merge settings with data
       if (options.includeNonSchemaSettings) {
-        assistant.settings = merge(data, assistant.settings)
+        ctx.settings = merge(data, ctx.settings)
       }
 
       // Log multipart files if they exist
-      const files = assistant.request.multipartData.files || {};
+      const files = ctx.request.multipartData.files || {};
       if (files) {
-        assistant.log(`Middleware.process(): Multipart files`, safeStringify(files));
+        ctx.log(`Middleware.process(): Multipart files`, safeStringify(files));
       }
     } else {
-      assistant.settings = data;
+      ctx.settings = data;
     }
 
     // Trim whitespace on all string settings (always on — harmless and useful).
-    assistant.settings = Manager.Utilities().trim(assistant.settings);
+    ctx.settings = Manager.Utilities().trim(ctx.settings);
 
     // Optional HTML strip (off by default — opt in with `{ sanitize: true }`).
     // Sanitize at the HTML-insertion site instead unless you need a belt-and-suspenders pass here.
@@ -197,20 +197,20 @@ Middleware.prototype.run = function (libPath, options) {
       const schema = settingsLib ? settingsLib.schema : null;
       const utilities = Manager.Utilities();
 
-      assistant.settings = sanitizeWithSchema(utilities, assistant.settings, schema);
+      ctx.settings = sanitizeWithSchema(utilities, ctx.settings, schema);
     }
 
     // Log
-    assistant.log(`Middleware.process(): Resolved settings with schema=${options.schema}`, safeStringify(assistant.settings));
+    ctx.log(`Middleware.process(): Resolved settings with schema=${options.schema}`, safeStringify(ctx.settings));
 
     // Build context object for route handler
     const context = {
       Manager: Manager,
-      assistant: assistant,
-      user: assistant.getUser(),
-      usage: assistant.usage,
-      settings: assistant.settings,
-      analytics: assistant.analytics,
+      ctx: ctx,
+      user: ctx.getUser(),
+      usage: ctx.usage,
+      settings: ctx.settings,
+      analytics: ctx.analytics,
       libraries: Manager.libraries,
       utilities: Manager.Utilities(),
     };
@@ -219,10 +219,10 @@ Middleware.prototype.run = function (libPath, options) {
     try {
       routeHandler(context)
         .catch(e => {
-          return assistant.respond(e, {code: e.code, sentry: true});
+          return ctx.respond(e, {code: e.code});
         });
     } catch (e) {
-      return assistant.respond(e, {code: e.code, sentry: true});
+      return ctx.respond(e, {code: e.code});
     }
   });
 };

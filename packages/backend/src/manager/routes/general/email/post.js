@@ -5,13 +5,13 @@
 const path = require('path');
 const { merge } = require('lodash');
 const { loadTemplate } = require('../../../libraries/load-processor');
-module.exports = async ({ assistant, Manager, settings }) => {
+module.exports = async ({ ctx, Manager, settings }) => {
   // Validate required parameters
   if (!settings.id) {
-    return assistant.respond('Parameter {id} is required.', { code: 400 });
+    return ctx.respond('Parameter {id} is required.', { code: 400 });
   }
   if (!settings.email) {
-    return assistant.respond('Parameter {email} is required.', { code: 400 });
+    return ctx.respond('Parameter {email} is required.', { code: 400 });
   }
 
   const DEFAULT = {
@@ -35,12 +35,12 @@ module.exports = async ({ assistant, Manager, settings }) => {
       script(settings, Manager.config),
     );
   } catch (e) {
-    return assistant.respond(`${settings.id} is not a valid email ID.`, { code: 400 });
+    return ctx.respond(`${settings.id} is not a valid email ID.`, { code: 400 });
   }
 
   // Check spam filter using local storage
   const storage = Manager.storage({ temporary: true });
-  const ipPath = ['api:general:email', 'ips', assistant.request.geolocation.ip || 'unknown'];
+  const ipPath = ['api:general:email', 'ips', ctx.request.geolocation.ip || 'unknown'];
   const emailPath = ['api:general:email', 'emails', settings.email];
 
   const ipData = storage.get(ipPath).value() || {};
@@ -57,12 +57,12 @@ module.exports = async ({ assistant, Manager, settings }) => {
   storage.set(ipPath, ipData).write();
   storage.set(emailPath, emailData).write();
 
-  assistant.log('Storage:', storage.getState()['api:general:email']);
+  ctx.log('Storage:', storage.getState()['api:general:email']);
 
   // Check spam thresholds
   if (ipData.count >= emailPayload.spamFilter.ip || emailData.count >= emailPayload.spamFilter.email) {
-    assistant.error(`Spam filter triggered ip=${ipData.count}, email=${emailData.count}`);
-    return assistant.respond({ success: true });
+    ctx.error(`Spam filter triggered ip=${ipData.count}, email=${emailData.count}`);
+    return ctx.respond({ success: true });
   }
 
   // Add delay if specified
@@ -70,20 +70,20 @@ module.exports = async ({ assistant, Manager, settings }) => {
     emailPayload.payload.sendAt = Math.round((new Date().getTime() + emailPayload.delay) / 1000);
   }
 
-  assistant.log('Email payload:', emailPayload);
+  ctx.log('Email payload:', emailPayload);
 
   // Send email directly via library
-  const email = Manager.Email(assistant);
+  const email = Manager.Email(ctx);
   const result = await email.send(emailPayload.payload).catch(e => e);
 
   if (result instanceof Error) {
-    return assistant.respond(result.message, { code: result.code || 500, sentry: result.code !== 400 });
+    return ctx.respond(result.message, { code: result.code || 500 });
   }
 
-  assistant.log('Response:', result.status);
+  ctx.log('Response:', result.status);
 
   // Track analytics
-  assistant.analytics.event('general/email', { id: settings.id });
+  ctx.analytics.event('general/email', { id: settings.id });
 
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 };

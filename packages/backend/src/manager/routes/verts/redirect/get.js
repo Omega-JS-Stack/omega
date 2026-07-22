@@ -12,13 +12,13 @@
  */
 const { getVertById, normalizeHost, isHttpUrl } = require('../utils.js');
 
-module.exports = async ({ assistant, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   const vert = await getVertById(Manager, settings.id);
 
   // Fail closed — only a known vert's own stored link ever redirects
   if (!vert || !isHttpUrl(vert.link)) {
-    return assistant.respond('Vert not found', { code: 404 });
+    return ctx.respond('Vert not found', { code: 404 });
   }
 
   const parentHost = normalizeHost(settings.parent);
@@ -34,7 +34,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   // Track the click server-side (Analytics lane — no gtag inside the frame)
   analytics.event('verts/redirect', { action: 'click', vertId: vert.id, parent: parentHost });
 
-  assistant.log('verts/redirect: Redirecting', { vertId: vert.id, url: url.toString() });
+  ctx.log('verts/redirect: Redirecting', { vertId: vert.id, url: url.toString() });
 
-  return assistant.redirect(url.toString());
+  return ctx.redirect(url.toString());
 };

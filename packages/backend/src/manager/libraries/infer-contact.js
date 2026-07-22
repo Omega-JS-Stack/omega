@@ -6,7 +6,7 @@
  *
  * Usage:
  *   const { inferContact } = require('./libraries/infer-contact.js');
- *   const result = await inferContact(email, assistant);
+ *   const result = await inferContact(email, ctx);
  *   // { firstName, lastName, company, confidence, method }
  */
 const path = require('path');
@@ -17,18 +17,18 @@ const PROMPT_PATH = path.join(__dirname, 'prompts', 'infer-contact.md');
  * Infer contact info from email address using AI
  *
  * @param {string} email - Email address
- * @param {object} assistant - Assistant instance (for AI access)
+ * @param {object} ctx - Assistant instance (for AI access)
  * @returns {{ firstName: string, lastName: string, company: string, confidence: number, method: string }}
  */
-async function inferContact(email, assistant) {
+async function inferContact(email, ctx) {
   if (process.env.OMEGA_OPENAI_API_KEY) {
-    const aiResult = await inferContactWithAI(email, assistant);
+    const aiResult = await inferContactWithAI(email, ctx);
     if (aiResult) {
       return aiResult;
     }
-    assistant?.log(`inferContact: AI returned null for ${email} — falling back to empty result`);
+    ctx?.log(`inferContact: AI returned null for ${email} — falling back to empty result`);
   } else {
-    assistant?.log(`inferContact: OMEGA_OPENAI_API_KEY not set — skipping AI inference for ${email}`);
+    ctx?.log(`inferContact: OMEGA_OPENAI_API_KEY not set — skipping AI inference for ${email}`);
   }
 
   return { firstName: '', lastName: '', company: '', confidence: 0, method: 'none' };
@@ -38,12 +38,12 @@ async function inferContact(email, assistant) {
  * Use AI to infer contact info from email
  *
  * @param {string} email - Email address
- * @param {object} assistant - Assistant instance
+ * @param {object} ctx - Assistant instance
  * @returns {object|null} Inferred contact or null on failure
  */
-async function inferContactWithAI(email, assistant) {
+async function inferContactWithAI(email, ctx) {
   try {
-    const ai = assistant.Manager.AI(assistant, process.env.OMEGA_OPENAI_API_KEY);
+    const ai = ctx.Manager.AI(ctx, process.env.OMEGA_OPENAI_API_KEY);
     const result = await ai.request({
       model: 'gpt-5.4-mini',
       timeout: 60000,
@@ -68,14 +68,14 @@ async function inferContactWithAI(email, assistant) {
         method: 'ai',
       };
       if (!inferred.firstName && !inferred.lastName && !inferred.company) {
-        assistant?.log(`inferContactWithAI: AI parsed response had ALL fields empty for ${email}. Raw:`, parsed);
+        ctx?.log(`inferContactWithAI: AI parsed response had ALL fields empty for ${email}. Raw:`, parsed);
       }
       return inferred;
     }
 
-    assistant?.log(`inferContactWithAI: AI response missing firstName for ${email}. Raw result:`, result);
+    ctx?.log(`inferContactWithAI: AI response missing firstName for ${email}. Raw result:`, result);
   } catch (e) {
-    assistant?.error('inferContactWithAI: Failed:', e);
+    ctx?.error('inferContactWithAI: Failed:', e);
   }
 
   return null;

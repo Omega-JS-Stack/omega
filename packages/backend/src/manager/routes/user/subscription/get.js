@@ -4,12 +4,12 @@ const powertools = require('node-powertools');
  * GET /user/subscription - Get user subscription info
  * Returns subscription, expiry, trial, and payment status
  */
-module.exports = async ({ assistant, user, settings, libraries }) => {
+module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID
@@ -17,7 +17,7 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Require admin to view other users' subscriptions
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Get user data
@@ -27,7 +27,7 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     const doc = await admin.firestore().doc(`users/${uid}`).get();
 
     if (!doc.exists) {
-      return assistant.respond('User not found', { code: 404 });
+      return ctx.respond('User not found', { code: 404 });
     }
 
     userData = doc.data();
@@ -73,5 +73,5 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     },
   };
 
-  return assistant.respond(result);
+  return ctx.respond(result);
 };

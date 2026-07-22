@@ -22,21 +22,21 @@ const path = require('path');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const safeCompare = require('../../../helpers/safe-compare.js');
 
-module.exports = async ({ assistant, Manager }) => {
-  const query = assistant.request.query;
+module.exports = async ({ ctx, Manager }) => {
+  const query = ctx.request.query;
 
   const provider = query.provider;
   const key = query.key;
 
   // Validate provider
   if (!provider) {
-    return assistant.respond('Missing provider parameter', { code: 400 });
+    return ctx.respond('Missing provider parameter', { code: 400 });
   }
 
   // Validate key against OMEGA_WEBHOOK_KEY (separate from OMEGA_ADMIN_KEY
   // so it can be rotated independently and scoped narrowly)
   if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
-    return assistant.respond('Invalid key', { code: 401 });
+    return ctx.respond('Invalid key', { code: 401 });
   }
 
   // Brand filter (defensive — mirror payments webhook pattern). If a brand is
@@ -45,8 +45,8 @@ module.exports = async ({ assistant, Manager }) => {
   const brand = query.brand;
   const ourBrand = Manager.config.brand?.id;
   if (brand && ourBrand && brand !== ourBrand) {
-    assistant.log(`marketing webhook: brand mismatch (received=${brand}, expected=${ourBrand}), ignoring`);
-    return assistant.respond({ received: true, ignored: true });
+    ctx.log(`marketing webhook: brand mismatch (received=${brand}, expected=${ourBrand}), ignoring`);
+    return ctx.respond({ received: true, ignored: true });
   }
 
   // Load the processor module
@@ -54,31 +54,31 @@ module.exports = async ({ assistant, Manager }) => {
   try {
     processorModule = loadProcessor(path.join(__dirname, 'processors'), provider);
   } catch (e) {
-    assistant.error(`marketing webhook: failed to load processor "${provider}":`, e);
-    return assistant.respond(`Unknown provider: ${provider}`, { code: 400 });
+    ctx.error(`marketing webhook: failed to load processor "${provider}":`, e);
+    return ctx.respond(`Unknown provider: ${provider}`, { code: 400 });
   }
 
   // Parse the webhook body into events
   let events;
   try {
-    events = processorModule.parseWebhook(assistant.ref.req);
+    events = processorModule.parseWebhook(ctx.ref.req);
   } catch (e) {
-    assistant.error(`marketing webhook: parse failed for ${provider}:`, e);
-    return assistant.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
+    ctx.error(`marketing webhook: parse failed for ${provider}:`, e);
+    return ctx.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
   }
 
   if (!Array.isArray(events) || events.length === 0) {
-    assistant.log(`marketing webhook: ${provider} returned no events`);
-    return assistant.respond({ received: true, processed: 0 });
+    ctx.log(`marketing webhook: ${provider} returned no events`);
+    return ctx.respond({ received: true, processed: 0 });
   }
 
-  assistant.log(`marketing webhook: ${provider} delivered ${events.length} event(s)`);
+  ctx.log(`marketing webhook: ${provider} delivered ${events.length} event(s)`);
 
   // Process each event independently — one failure shouldn't block the others.
   // Use Promise.allSettled so we return success only after all events have been
   // attempted.
   const results = await Promise.allSettled(
-    events.map((event) => processOneEvent({ Manager, assistant, provider, event, processorModule }))
+    events.map((event) => processOneEvent({ Manager, ctx, provider, event, processorModule }))
   );
 
   let processed = 0;
@@ -90,13 +90,13 @@ module.exports = async ({ assistant, Manager }) => {
       else skipped++;
     } else {
       failed++;
-      assistant.error('marketing webhook: event processing rejected:', r.reason);
+      ctx.error('marketing webhook: event processing rejected:', r.reason);
     }
   }
 
-  assistant.log(`marketing webhook: ${provider} complete — processed=${processed}, skipped=${skipped}, failed=${failed}`);
+  ctx.log(`marketing webhook: ${provider} complete — processed=${processed}, skipped=${skipped}, failed=${failed}`);
 
-  return assistant.respond({ received: true, processed, skipped, failed });
+  return ctx.respond({ received: true, processed, skipped, failed });
 };
 
 /**
@@ -104,7 +104,7 @@ module.exports = async ({ assistant, Manager }) => {
  * Handlers are idempotent, so provider retries re-run safely with no dedup ledger.
  * Returns { processed: bool, skipped?: string, error?: any }.
  */
-async function processOneEvent({ Manager, assistant, provider, event, processorModule }) {
+async function processOneEvent({ Manager, ctx, provider, event, processorModule }) {
   const { eventType } = event;
 
   // Filter by supported event types
@@ -113,10 +113,10 @@ async function processOneEvent({ Manager, assistant, provider, event, processorM
   }
 
   try {
-    await processorModule.handleEvent({ Manager, assistant, parsed: event });
+    await processorModule.handleEvent({ Manager, ctx, parsed: event });
     return { processed: true };
   } catch (e) {
-    assistant.error(`marketing webhook: handler failed for ${provider} event ${event.eventId} (${eventType}):`, e);
+    ctx.error(`marketing webhook: handler failed for ${provider} event ${event.eventId} (${eventType}):`, e);
     return { processed: false, error: e };
   }
 }

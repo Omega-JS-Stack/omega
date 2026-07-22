@@ -12,13 +12,13 @@
 const pushid = require('pushid');
 const { buildCampaignDoc } = require('./utils');
 
-module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, user, Manager, settings, analytics }) => {
 
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
   if (!user.roles.admin) {
-    return assistant.respond('Admin access required', { code: 403 });
+    return ctx.respond('Admin access required', { code: 403 });
   }
 
   const { admin } = Manager.libraries;
@@ -50,14 +50,14 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
   // Save to Firestore
   await admin.firestore().doc(`marketing-campaigns/${campaignId}`).set(doc);
 
-  assistant.log('marketing/campaign created:', { campaignId, sendAt: docFields.sendAt, isFuture, type: docFields.type });
+  ctx.log('marketing/campaign created:', { campaignId, sendAt: docFields.sendAt, isFuture, type: docFields.type });
 
   // If sendAt is now/past, fire immediately
   let results = null;
 
   if (!isFuture) {
     if (docFields.type === 'email') {
-      const mailer = Manager.Email(assistant);
+      const mailer = Manager.Email(ctx);
       results = await mailer.sendCampaign({ ...campaignSettings, sendAt: 'now' });
     } else if (docFields.type === 'push') {
       const notification = require('../../../libraries/notification.js');
@@ -66,7 +66,7 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
         : (campaignSettings.filters || {});
 
       results = {
-        push: await notification.send(assistant, {
+        push: await notification.send(ctx, {
           title: campaignSettings.name,
           body: campaignSettings.subject,
           icon: campaignSettings.icon || Manager.config.brand?.images?.brandmark,
@@ -90,7 +90,7 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
         },
       }, { merge: true });
 
-      assistant.log('marketing/campaign sent:', { campaignId, status, results });
+      ctx.log('marketing/campaign sent:', { campaignId, status, results });
     }
   }
 
@@ -100,7 +100,7 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
     type: docFields.type,
   });
 
-  return assistant.respond({
+  return ctx.respond({
     success: true,
     id: campaignId,
     status: isFuture ? 'pending' : (results ? 'sent' : 'pending'),

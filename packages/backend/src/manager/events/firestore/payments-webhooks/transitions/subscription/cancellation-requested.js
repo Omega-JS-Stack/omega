@@ -4,15 +4,15 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant }) {
-  assistant.log(`Transition [subscription/cancellation-requested]: uid=${uid}, product=${after.product?.id}, cancelDate=${after.cancellation?.date?.timestamp}`);
+module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
+  ctx.log(`Transition [subscription/cancellation-requested]: uid=${uid}, product=${after.product?.id}, cancelDate=${after.cancellation?.date?.timestamp}`);
 
   sendOrderEmail({
     template: 'order',
     subject: `Your cancellation is confirmed #${order?.id || ''}`,
     categories: ['order/cancellation-requested'],
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'cancellation-requested',
         ...order,

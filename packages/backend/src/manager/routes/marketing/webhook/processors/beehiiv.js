@@ -89,12 +89,12 @@ function isSupported(parsed) {
  * Process a single parsed event. Called by the dispatcher for each supported event.
  * Returns a result object summarizing what happened.
  */
-async function handleEvent({ Manager, assistant, parsed }) {
+async function handleEvent({ Manager, ctx, parsed }) {
   const { admin } = Manager.libraries;
   const { eventId, eventType, email, timestamp, publicationId } = parsed;
 
   if (!email) {
-    assistant.log(`beehiiv webhook: event ${eventId} (${eventType}) missing email, skipping`);
+    ctx.log(`beehiiv webhook: event ${eventId} (${eventType}) missing email, skipping`);
     return { handled: false, reason: 'missing-email' };
   }
 
@@ -111,23 +111,23 @@ async function handleEvent({ Manager, assistant, parsed }) {
         ourPublicationId = await beehiivProvider.getPublicationId();
       }
     } catch (e) {
-      assistant.error('beehiiv webhook: failed to resolve our publication ID:', e);
+      ctx.error('beehiiv webhook: failed to resolve our publication ID:', e);
       return { handled: false, reason: 'publication-resolve-failed' };
     }
 
     if (!ourPublicationId) {
-      assistant.log(`beehiiv webhook: no publication configured for this brand, skipping event ${eventId}`);
+      ctx.log(`beehiiv webhook: no publication configured for this brand, skipping event ${eventId}`);
       return { handled: false, reason: 'no-local-publication' };
     }
 
     if (ourPublicationId !== publicationId) {
-      assistant.log(`beehiiv webhook: publication mismatch (event=${publicationId}, ours=${ourPublicationId}), skipping`);
+      ctx.log(`beehiiv webhook: publication mismatch (event=${publicationId}, ours=${ourPublicationId}), skipping`);
       return { handled: false, reason: 'publication-mismatch' };
     }
   }
 
   // Build the canonical revokedAt timestamp from the event (or server time if missing)
-  const startTime = assistant.meta.startTime;
+  const startTime = ctx.meta.startTime;
   const eventUNIX = typeof timestamp === 'number' ? timestamp : startTime.timestampUNIX;
   const eventISO = new Date(eventUNIX * 1000).toISOString();
 
@@ -137,7 +137,7 @@ async function handleEvent({ Manager, assistant, parsed }) {
     .limit(1)
     .get()
     .catch((e) => {
-      assistant.error(`beehiiv webhook: user lookup failed for ${email}:`, e);
+      ctx.error(`beehiiv webhook: user lookup failed for ${email}:`, e);
       return null;
     });
 
@@ -145,7 +145,7 @@ async function handleEvent({ Manager, assistant, parsed }) {
     // Silent skip — this email may not map to a customer of THIS brand even if
     // the publication matched (legitimate for shared-devbeans where 6 brands
     // process every event but only one has the user).
-    assistant.log(`beehiiv webhook: no user found for ${email}, skipping doc update`);
+    ctx.log(`beehiiv webhook: no user found for ${email}, skipping doc update`);
     return { handled: false, reason: 'user-not-found', email };
   }
 
@@ -169,22 +169,22 @@ async function handleEvent({ Manager, assistant, parsed }) {
     metadata: Manager.Metadata().set({ tag: 'marketing/webhook:beehiiv' }),
   }, { merge: true });
 
-  assistant.log(`beehiiv webhook: revoked consent.marketing for ${uid} (${email}) — eventType=${eventType}`);
+  ctx.log(`beehiiv webhook: revoked consent.marketing for ${uid} (${email}) — eventType=${eventType}`);
 
   // Cross-provider sync: also remove from SendGrid (best-effort, idempotent on 404)
-  const shouldCallExternalAPIs = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldCallExternalAPIs = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   if (shouldCallExternalAPIs) {
     try {
-      const mailer = Manager.Email(assistant);
+      const mailer = Manager.Email(ctx);
       await mailer.remove(email);
-      assistant.log(`beehiiv webhook: cross-provider sync complete for ${email}`);
+      ctx.log(`beehiiv webhook: cross-provider sync complete for ${email}`);
     } catch (e) {
       // Best-effort — user doc is already updated. Log + continue.
-      assistant.error(`beehiiv webhook: cross-provider sync failed for ${email}:`, e);
+      ctx.error(`beehiiv webhook: cross-provider sync failed for ${email}:`, e);
     }
   } else {
-    assistant.log('beehiiv webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
+    ctx.log('beehiiv webhook: skipping cross-provider sync (OMEGA_TEST_MODE=true)');
   }
 
   return { handled: true, uid, email, eventType };

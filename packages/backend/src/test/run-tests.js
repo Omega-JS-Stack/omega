@@ -9,7 +9,7 @@
 // Mark this process as the test runner BEFORE loading any @omega.js/backend code. Manager.init()
 // auto-detects this and skips Firebase Functions / server / Sentry wiring (which
 // can't run outside a real Functions runtime). This is what lets tests receive a
-// fully-wired Manager + assistant in their context — no per-test stub.
+// fully-wired Manager + ctx in their context — no per-test stub.
 process.env.OMEGA_TEST_RUNNER = '1';
 
 const path = require('path');
@@ -43,11 +43,11 @@ async function main() {
   // Boot a real Manager. With OMEGA_TEST_RUNNER set, init() loads libraries +
   // resolves project config but skips the parts that need a Functions runtime
   // (handler wiring, server boot, Sentry, admin.initializeApp re-init).
-  // The resulting Manager + assistant are passed into every test context, so
+  // The resulting Manager + ctx are passed into every test context, so
   // tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
   // like production code does — no hand-rolled stubs.
   let Manager = null;
-  let assistant = null;
+  let ctx = null;
   try {
     const projectDir = testConfig.projectDir || process.cwd();
     const BackendManager = require('../manager/index.js');
@@ -58,7 +58,7 @@ async function main() {
       cwd: path.join(projectDir, 'dist'),
       log: false,
     });
-    assistant = Manager.Assistant({}, { functionName: 'backend-test-runner', accept: 'json' });
+    ctx = Manager.RouteContext({}, { functionName: 'backend-test-runner', accept: 'json' });
   } catch (error) {
     console.error('Warning: Could not initialize @omega.js/backend Manager for tests:', error.message);
   }
@@ -68,7 +68,7 @@ async function main() {
     ...testConfig,
     admin,
     Manager,
-    assistant,
+    ctx,
   });
 
   const results = await runner.run();

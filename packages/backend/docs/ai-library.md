@@ -1,6 +1,6 @@
 # AI Library
 
-`Manager.AI(assistant).request({ provider, model, messages, ... })` is the unified entry for all AI calls. Provider-agnostic surface — same options shape, same return shape.
+`Manager.AI(ctx).request({ provider, model, messages, ... })` is the unified entry for all AI calls. Provider-agnostic surface — same options shape, same return shape.
 
 | Provider | Default model | Notes |
 |---|---|---|
@@ -16,10 +16,10 @@ API keys: `OMEGA_OPENAI_API_KEY`, `OMEGA_ANTHROPIC_API_KEY` (process.env or conf
 
 ## Image generation (OpenAI)
 
-`Manager.AI(assistant).image({ prompt, ... })` generates an image via OpenAI's image model (`gpt-image-2` by default). Separate from `request()` because the return type is bytes, not text — it bypasses moderation, token accounting, schema, and prompt-normalization (none apply to image gen).
+`Manager.AI(ctx).image({ prompt, ... })` generates an image via OpenAI's image model (`gpt-image-2` by default). Separate from `request()` because the return type is bytes, not text — it bypasses moderation, token accounting, schema, and prompt-normalization (none apply to image gen).
 
 ```js
-const ai = Manager.AI(assistant);
+const ai = Manager.AI(ctx);
 const { buffer, b64, mime, revisedPrompt } = await ai.image({
   prompt: 'Minimal flat vector illustration of a rocket, undraw.co style, blue + white, no text.',
   size: '1024x1024',   // 1024x1024 | 1536x1024 | 1024x1536 | auto (default 1024x1024)
@@ -54,11 +54,11 @@ A tool-call turn legitimately has `content: ''` — `response: 'json'` parsing i
 
 Structured conversations pass the full turn history through `options.messages` with two cross-provider conventions:
 
-- Assistant tool-call turn: `{ role: 'assistant', content?, toolCalls: [{ id, name, arguments }] }` — or replay the provider's raw blocks (`{ role: 'assistant', content: r.raw.content }`) on Anthropic.
+- Assistant tool-call turn: `{ role: 'ctx', content?, toolCalls: [{ id, name, arguments }] }` — or replay the provider's raw blocks (`{ role: 'ctx', content: r.raw.content }`) on Anthropic.
 - Tool result turn: `{ role: 'tool', toolCallId, content }` — consecutive tool results merge into one Anthropic user turn of `tool_result` blocks; OpenAI gets `function_call_output` items.
 
 ```js
-const ai = Manager.AI(assistant);
+const ai = Manager.AI(ctx);
 const messages = [
   { role: 'system', content: 'Use tools to answer.' },
   { role: 'user', content: 'What is the weather in Paris?' },
@@ -68,7 +68,7 @@ const tools = { list: [{ name: 'get_weather', description: '...', parameters: { 
 const first = await ai.request({ provider: 'anthropic', messages, tools });
 // first.stopReason === 'tool_use'; first.toolCalls = [{ id, name: 'get_weather', arguments: { city: 'Paris' } }]
 
-messages.push({ role: 'assistant', content: first.raw.content });          // or { role: 'assistant', toolCalls: first.toolCalls }
+messages.push({ role: 'ctx', content: first.raw.content });          // or { role: 'ctx', toolCalls: first.toolCalls }
 messages.push({ role: 'tool', toolCallId: first.toolCalls[0].id, content: '{"temp":"21C"}' });
 
 const second = await ai.request({ provider: 'anthropic', messages, tools });
@@ -96,7 +96,7 @@ URL citations live in the returned `output` (message content) as `annotations` o
 
 `provider: 'test'` is the AI analog of the `test` payment processor: a first-class provider that suites drive with directives in the LAST user message, so consumer routes exercise their full loop (Firestore writes, usage, locks, tool execution) against the real emulator with zero paid API calls. It **refuses to run outside development/testing**.
 
-Directives form a sequence consumed across loop turns (call N executes directive N-1, indexed by assistant turns after the last user turn). Directive values must not contain `]]` internally (a trailing JSON `]` is fine).
+Directives form a sequence consumed across loop turns (call N executes directive N-1, indexed by ctx turns after the last user turn). Directive values must not contain `]]` internally (a trailing JSON `]` is fine).
 
 The directive source is resolved in order: the last `messages[]` user turn → `message.content` → **`message.settings` values** (flattened raw). That last fallback makes path-based routes (`message: { path, settings }` — the idiomatic @omega.js/backend prompt-template style) scriptable as-is: embed the directive in whatever request field gets interpolated into the template (e.g. a chat's `message`, a quiz's `topic`).
 
@@ -121,7 +121,7 @@ Mint the token with `claude setup-token` (valid ~1 year). When it expires, reque
 
 > **Caveats:** the Bearer/beta subscription path is undocumented and may change. Usage is subject to the subscription's rate limits (not API-tier limits). For high-volume production traffic, prefer `anthropic` + `OMEGA_ANTHROPIC_API_KEY`.
 
-The legacy `src/manager/libraries/openai.js` is a thin compatibility shim that re-exports the OpenAI provider class — existing callers using `new OpenAI(assistant, key)` still work unchanged.
+The legacy `src/manager/libraries/openai.js` is a thin compatibility shim that re-exports the OpenAI provider class — existing callers using `new OpenAI(ctx, key)` still work unchanged.
 
 | File | Purpose |
 |---|---|

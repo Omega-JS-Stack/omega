@@ -124,7 +124,7 @@ function detectOneTimeTransition(eventType) {
  * @param {object} context - Full context passed to the handler
  */
 function dispatch(transitionName, category, context) {
-  const { assistant } = context;
+  const { ctx } = context;
 
   try {
     const handlerPath = path.join(__dirname, category, `${transitionName}.js`);
@@ -132,11 +132,11 @@ function dispatch(transitionName, category, context) {
 
     // Fire-and-forget — don't block the main webhook processing
     Promise.resolve(handler(context)).catch((e) => {
-      assistant.error(`Transition handler [${category}/${transitionName}] failed: ${e.message}`, e);
+      ctx.error(`Transition handler [${category}/${transitionName}] failed: ${e.message}`, e);
     });
   } catch (e) {
     // Handler file doesn't exist or can't be loaded — log but don't fail
-    assistant.error(`Transition handler [${category}/${transitionName}] not found: ${e.message}`);
+    ctx.error(`Transition handler [${category}/${transitionName}] not found: ${e.message}`);
   }
 }
 

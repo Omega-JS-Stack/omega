@@ -75,10 +75,10 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
  *                                  When provided and USE_CDN_URLS is true, asset URLs use this
  *                                  instead of raw.githubusercontent.com.
  * @param {string} [args.token] - GitHub token (defaults to process.env.GH_TOKEN)
- * @param {object} [args.assistant] - logger
+ * @param {object} [args.ctx] - logger
  * @returns {Promise<{ urls: string[], paths: string[], htmlUrl?: string, htmlPath?: string, previewUrl?: string, folderUrl: string, commitSha: string }>}
  */
-async function uploadAssets({ images, html, markdown, summary, brandId, campaignId, subject, commitMessage, cdnBase, token, assistant }) {
+async function uploadAssets({ images, html, markdown, summary, brandId, campaignId, subject, commitMessage, cdnBase, token, ctx }) {
   const hasImages = Array.isArray(images) && images.length > 0;
   const hasHtml = typeof html === 'string' && html.length > 0;
   const hasMarkdown = typeof markdown === 'string' && markdown.length > 0;
@@ -97,7 +97,7 @@ async function uploadAssets({ images, html, markdown, summary, brandId, campaign
     throw new Error('image-host: GH_TOKEN env var (or token arg) is required');
   }
 
-  const log = (msg) => assistant?.log ? assistant.log(`[image-host] ${msg}`) : null;
+  const log = (msg) => ctx?.log ? ctx.log(`[image-host] ${msg}`) : null;
 
   // Brand branch — each brand gets its own branch, zero cross-brand contention
   const branch = brandId;

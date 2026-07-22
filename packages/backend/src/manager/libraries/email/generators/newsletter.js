@@ -48,7 +48,7 @@ const { trackContentSource, contentSourceHash, resolveSources } = require('../..
  * Generate newsletter content from parent server sources.
  *
  * @param {object} Manager - @omega.js/backend Manager instance
- * @param {object} assistant - @omega.js/backend assistant instance
+ * @param {object} ctx - @omega.js/backend ctx instance
  * @param {object} settings - Campaign settings from the recurring template
  * @param {object} [opts] - Optional overrides used by the iteration test
  * @param {function} [opts.persistImage] - async (image, idx) => imagePath (URL or relative path).
@@ -68,13 +68,13 @@ const { trackContentSource, contentSourceHash, resolveSources } = require('../..
  *                                          Production cron passes true; the iteration test leaves it false.
  * @returns {object|null} Updated settings with content filled in, or null if unavailable
  */
-async function generate(Manager, assistant, settings, opts = {}) {
+async function generate(Manager, ctx, settings, opts = {}) {
   // Same convention as the marketing providers (email/marketing/index.js):
   // default test runs never hit the real pipeline (AI calls + GitHub commit +
   // Beehiiv post + report email). TEST_EXTENDED_MODE opts into
   // production-equivalent side effects.
-  if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) {
-    assistant.log('Newsletter generator: skipped in test mode (set TEST_EXTENDED_MODE to run the real pipeline)');
+  if (ctx.isTesting() && !process.env.TEST_EXTENDED_MODE) {
+    ctx.log('Newsletter generator: skipped in test mode (set TEST_EXTENDED_MODE to run the real pipeline)');
     return null;
   }
 
@@ -82,12 +82,12 @@ async function generate(Manager, assistant, settings, opts = {}) {
   const rawContent = newsletterRoleConfig?.content;
 
   if (!newsletterRoleConfig?.enabled) {
-    assistant.log('Newsletter generator: newsletter disabled in config');
+    ctx.log('Newsletter generator: newsletter disabled in config');
     return null;
   }
 
   if (!rawContent) {
-    assistant.log('Newsletter generator: no marketing.newsletter.content config block');
+    ctx.log('Newsletter generator: no marketing.newsletter.content config block');
     return null;
   }
 
@@ -96,7 +96,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
   const config = contentArray[0];
 
   if (!config) {
-    assistant.log('Newsletter generator: empty content array');
+    ctx.log('Newsletter generator: empty content array');
     return null;
   }
 
@@ -110,7 +110,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
     const categories = config.categories || [];
 
     if (!categories.length) {
-      assistant.log('Newsletter generator: no categories configured');
+      ctx.log('Newsletter generator: no categories configured');
       return null;
     }
 
@@ -124,7 +124,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
       categories,
       admin,
       Manager,
-      assistant,
+      ctx,
     });
 
     sources = resolved
@@ -133,12 +133,12 @@ async function generate(Manager, assistant, settings, opts = {}) {
   }
 
   if (!sources?.length) {
-    assistant.log('Newsletter generator: no sources available');
+    ctx.log('Newsletter generator: no sources available');
     return null;
   }
 
   const brand = Manager.config?.brand;
-  const ai = Manager.AI(assistant);
+  const ai = Manager.AI(ctx);
   const pipelineStart = Date.now();
 
   // 1. Filter — drop sources that don't fit the brand
@@ -147,16 +147,16 @@ async function generate(Manager, assistant, settings, opts = {}) {
     brand,
     newsletterConfig: config,
     ai,
-    assistant,
+    ctx,
     threshold: opts.fitThreshold,
   });
 
   if (!filteredSources.length) {
-    assistant.log('Newsletter generator: no sources passed brand-fit filter, skipping');
+    ctx.log('Newsletter generator: no sources passed brand-fit filter, skipping');
     return null;
   }
 
-  assistant.log(`Newsletter generator: assembling from ${filteredSources.length} brand-fit sources (out of ${sources.length})`);
+  ctx.log(`Newsletter generator: assembling from ${filteredSources.length} brand-fit sources (out of ${sources.length})`);
 
   // 2. Structure
   const structure = await generateStructure({
@@ -164,10 +164,10 @@ async function generate(Manager, assistant, settings, opts = {}) {
     brand,
     newsletterConfig: config,
     ai,
-    assistant,
+    ctx,
   });
 
-  assistant.log(`Newsletter generator: structure ready (${structure.sections.length} sections)`);
+  ctx.log(`Newsletter generator: structure ready (${structure.sections.length} sections)`);
 
   // Asset hosting target — controls what URLs end up in <img src=...> AND
   // whether the rendered HTML gets uploaded too. Two values:
@@ -227,7 +227,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
         brand,
         newsletterConfig: config,
         ai,
-        assistant,
+        ctx,
       }))
     );
 
@@ -246,7 +246,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
       imagePaths = persistedPaths || generatedImages.map((_, i) => `about:blank#section-${i + 1}`);
     }
 
-    assistant.log(`Newsletter generator: ${generatedImages.length} images rendered`);
+    ctx.log(`Newsletter generator: ${generatedImages.length} images rendered`);
     opts._lastImages = generatedImages;
   };
 
@@ -275,14 +275,14 @@ async function generate(Manager, assistant, settings, opts = {}) {
 
     return buildLinkedArticle({
       Manager,
-      assistant,
+      ctx,
       brand,
       config,
       structure,
       sources: filteredSources,
       publish: !!opts.publishArticle,
     }).catch((e) => {
-      assistant.error(`Newsletter generator: linked article failed — ${e.message}`);
+      ctx.error(`Newsletter generator: linked article failed — ${e.message}`);
       return null;
     });
   };
@@ -294,9 +294,9 @@ async function generate(Manager, assistant, settings, opts = {}) {
   // non-existent post is worse than no CTA at all.
   if (articleResult?.url && articleResult.published) {
     structure.sections[0].cta = { label: 'Read the full article', url: articleResult.url };
-    assistant.log(`Newsletter generator: linked article published — ${articleResult.url}`);
+    ctx.log(`Newsletter generator: linked article published — ${articleResult.url}`);
   } else if (articleResult?.url) {
-    assistant.log(`Newsletter generator: linked article generated (not published, CTA omitted) — ${articleResult.url}`);
+    ctx.log(`Newsletter generator: linked article generated (not published, CTA omitted) — ${articleResult.url}`);
   }
 
   // 3. MJML → HTML
@@ -349,7 +349,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
         campaignId,
         subject: structure.subject,
         cdnBase,
-        assistant,
+        ctx,
       });
       assetsFolderUrl = upload.folderUrl;
       htmlUrl = upload.htmlUrl;
@@ -357,7 +357,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
       markdownUrl = upload.markdownUrl || null;
       summaryUrl = upload.summaryUrl || null;
     } catch (e) {
-      assistant.error(`Newsletter generator: asset upload failed — ${e.message}`);
+      ctx.error(`Newsletter generator: asset upload failed — ${e.message}`);
     }
   }
 
@@ -378,26 +378,26 @@ async function generate(Manager, assistant, settings, opts = {}) {
         preheader:     structure.preheader,
         content:       html,
         contentTags:   Array.isArray(structure.tags) ? structure.tags : [],
-        status:        assistant.isTesting() ? 'draft' : 'confirmed',
+        status:        ctx.isTesting() ? 'draft' : 'confirmed',
       });
 
       if (result?.success && result.id) {
         beehiivPostId = result.id;
-        assistant.log(`Newsletter generator: Beehiiv ${assistant.isTesting() ? 'draft' : 'post'} created — ${beehiivPostId}`);
+        ctx.log(`Newsletter generator: Beehiiv ${ctx.isTesting() ? 'draft' : 'post'} created — ${beehiivPostId}`);
       } else {
         beehiivFailureReason = result?.error || 'unknown error';
-        assistant.log(`Newsletter generator: Beehiiv upload failed — ${beehiivFailureReason}`);
+        ctx.log(`Newsletter generator: Beehiiv upload failed — ${beehiivFailureReason}`);
       }
     } catch (e) {
       beehiivFailureReason = e.message;
-      assistant.error(`Newsletter generator: Beehiiv draft upload threw — ${e.message}`);
+      ctx.error(`Newsletter generator: Beehiiv draft upload threw — ${e.message}`);
     }
   }
 
   // 3d. Newsletter report email — always sent to the brand's internal alerts
   //     inbox after generation completes. Contains everything needed for
   //     review and manual Beehiiv upload if needed.
-  await sendNewsletterReportEmail(Manager, assistant, {
+  await sendNewsletterReportEmail(Manager, ctx, {
     brand,
     subject: structure.subject,
     preheader: structure.preheader,
@@ -436,7 +436,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
         usedBy: 'newsletter',
         brandId: brand?.id || '',
       }).catch((e) => {
-        assistant.error(`Newsletter generator: Error tracking content source (non-fatal): ${e.message}`);
+        ctx.error(`Newsletter generator: Error tracking content source (non-fatal): ${e.message}`);
       });
     }
   }
@@ -529,7 +529,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
  *
  * @param {object} args
  * @param {object} args.Manager
- * @param {object} args.assistant
+ * @param {object} args.ctx
  * @param {object} args.brand - { id, name, url, ... }
  * @param {object} args.config - marketing.newsletter.content (tone, instructions, article.author)
  * @param {object} args.structure - newsletter structure (sections[0] is the lead)
@@ -538,7 +538,7 @@ async function generate(Manager, assistant, settings, opts = {}) {
  * @param {boolean} [args.publish] - Commit the post to GitHub via admin/post. Default false.
  * @returns {Promise<{url, slug, path, published}|null>}
  */
-async function buildLinkedArticle({ Manager, assistant, brand, config, structure, sources, publish }) {
+async function buildLinkedArticle({ Manager, ctx, brand, config, structure, sources, publish }) {
   const lead = structure.sections[0] || {};
   const publicConfig = buildPublicConfig(Manager.config);
 
@@ -555,7 +555,7 @@ async function buildLinkedArticle({ Manager, assistant, brand, config, structure
     `Summary: ${lead.body || ''}`,
   ].filter(Boolean).join('\n');
 
-  assistant.log(`Newsletter generator: building linked article for "${lead.title}"`);
+  ctx.log(`Newsletter generator: building linked article for "${lead.title}"`);
 
   // Phase 1 — GENERATE (always)
   const article = await writeArticle({
@@ -573,13 +573,13 @@ async function buildLinkedArticle({ Manager, assistant, brand, config, structure
 
   // Phase 2 — PUBLISH (gated). Commit to the website repo only when asked.
   if (!publish) {
-    assistant.log(`Newsletter generator: article generated but NOT published (publish=false) — would live at ${url}`);
+    ctx.log(`Newsletter generator: article generated but NOT published (publish=false) — would live at ${url}`);
     return { url, slug, path: null, published: false, article };
   }
 
   try {
     const sourceUrls = (sources || []).map(s => s.url || s.id).filter(Boolean);
-    const result = await publishArticle(assistant, {
+    const result = await publishArticle(ctx, {
       brand: publicConfig,
       article,
       id: Math.round(Date.now() / 1000),
@@ -592,10 +592,10 @@ async function buildLinkedArticle({ Manager, assistant, brand, config, structure
       return { url: result.url || url, slug: result.slug || slug, path: result.path, published: true, article };
     }
 
-    assistant.log(`Newsletter generator: publishArticle returned no path — treating as unpublished`);
+    ctx.log(`Newsletter generator: publishArticle returned no path — treating as unpublished`);
     return { url, slug, path: null, published: false, article };
   } catch (e) {
-    assistant.error(`Newsletter generator: publishArticle failed — ${e.message}`);
+    ctx.error(`Newsletter generator: publishArticle failed — ${e.message}`);
     return { url, slug, path: null, published: false, article };
   }
 }
@@ -612,7 +612,7 @@ async function buildLinkedArticle({ Manager, assistant, brand, config, structure
  * brand.url is unset, the email is skipped entirely.
  *
  * @param {object} Manager
- * @param {object} assistant
+ * @param {object} ctx
  * @param {object} args
  * @param {object} args.brand
  * @param {string} args.subject
@@ -628,11 +628,11 @@ async function buildLinkedArticle({ Manager, assistant, brand, config, structure
  * @param {object[]} [args.articles] - Published linked articles
  * @param {object[]} [args.sources] - Content sources used for generation
  */
-async function sendNewsletterReportEmail(Manager, assistant, args) {
+async function sendNewsletterReportEmail(Manager, ctx, args) {
   const brandDomain = Manager.config?.brand?.contact?.email?.split('@')[1];
 
   if (!brandDomain) {
-    assistant.log('Newsletter generator: report email skipped — no brand.contact.email');
+    ctx.log('Newsletter generator: report email skipped — no brand.contact.email');
     return;
   }
 
@@ -640,7 +640,7 @@ async function sendNewsletterReportEmail(Manager, assistant, args) {
   const beehiivOk = !!args.beehiivPostId;
 
   try {
-    const email = Manager.Email(assistant);
+    const email = Manager.Email(ctx);
     const messageLines = [];
 
     // --- Status ---
@@ -763,9 +763,9 @@ async function sendNewsletterReportEmail(Manager, assistant, args) {
       },
     });
 
-    assistant.log(`Newsletter generator: report email sent to ${alertsEmail}`);
+    ctx.log(`Newsletter generator: report email sent to ${alertsEmail}`);
   } catch (e) {
-    assistant.error(`Newsletter generator: report email failed — ${e.message}`);
+    ctx.error(`Newsletter generator: report email failed — ${e.message}`);
   }
 }
 

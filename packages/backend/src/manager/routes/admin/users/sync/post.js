@@ -4,31 +4,31 @@
  */
 const { merge } = require('lodash');
 
-module.exports = async ({ assistant, Manager, user, settings, analytics, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication (allow in dev)
-  if (!user.authenticated && assistant.isProduction()) {
-    return assistant.respond('Authentication required', { code: 401 });
+  if (!user.authenticated && ctx.isProduction()) {
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin (allow in dev)
-  if (!user.roles.admin && assistant.isProduction()) {
-    return assistant.respond('Admin required.', { code: 403 });
+  if (!user.roles.admin && ctx.isProduction()) {
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Get lastPageToken from meta/stats
   const metaDoc = await admin.firestore().doc('meta/stats').get().catch(e => e);
 
   if (metaDoc instanceof Error) {
-    return assistant.respond(metaDoc.message, { code: 500 });
+    return ctx.respond(metaDoc.message, { code: 500 });
   }
 
   const metaData = metaDoc.data() || {};
   const lastPageToken = metaData?.syncUsers?.lastPageToken;
   let processedUsers = 0;
 
-  assistant.log(`Running sync-users based on lastPageToken: ${lastPageToken}`);
+  ctx.log(`Running sync-users based on lastPageToken: ${lastPageToken}`);
 
   // List firebase auth users
   await Manager.Utilities().iterateUsers(
@@ -78,11 +78,11 @@ module.exports = async ({ assistant, Manager, user, settings, analytics, librari
         await admin.firestore().doc(`users/${uid}`)
           .set(finalData, { merge: true })
           .then(() => {
-            assistant.log(`Synched user: ${uid}`);
+            ctx.log(`Synched user: ${uid}`);
             processedUsers++;
           })
           .catch(e => {
-            assistant.error(`Failed to sync user: ${uid}`, e);
+            ctx.error(`Failed to sync user: ${uid}`, e);
           });
       }
 
@@ -100,20 +100,20 @@ module.exports = async ({ assistant, Manager, user, settings, analytics, librari
             }
           }, { merge: true })
           .then(() => {
-            assistant.log(`Saved lastPageToken: ${batch.pageToken}`);
+            ctx.log(`Saved lastPageToken: ${batch.pageToken}`);
           })
           .catch(e => {
-            assistant.error('Failed to update lastPageToken', e);
+            ctx.error('Failed to update lastPageToken', e);
           });
       }
     },
     { batchSize: 10, log: true, pageToken: lastPageToken }
   );
 
-  assistant.log(`Processed ${processedUsers} users.`);
+  ctx.log(`Processed ${processedUsers} users.`);
 
   // Track analytics
   analytics.event('admin/users/sync', { processed: processedUsers });
 
-  return assistant.respond({ processed: processedUsers });
+  return ctx.respond({ processed: processedUsers });
 };

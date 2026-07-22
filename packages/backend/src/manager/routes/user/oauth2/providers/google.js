@@ -23,7 +23,7 @@ module.exports = {
 
   // Revoke a token with Google
   async revokeToken(token, context) {
-    const { assistant } = context;
+    const { ctx } = context;
 
     const response = await fetch(this.urls.revoke, {
       method: 'POST',
@@ -33,19 +33,19 @@ module.exports = {
     }).catch(e => e);
 
     if (response instanceof Error) {
-      assistant.log('Google revokeToken error:', response.message);
+      ctx.log('Google revokeToken error:', response.message);
       return { revoked: false, reason: response.message };
     }
 
     return { revoked: true };
   },
 
-  async verifyIdentity(tokenizeResult, Manager, assistant) {
-    assistant.log('verifyIdentity(): tokenizeResult', tokenizeResult);
+  async verifyIdentity(tokenizeResult, Manager, ctx) {
+    ctx.log('verifyIdentity(): tokenizeResult', tokenizeResult);
 
     // Decode token
     const decoded = jwtDecode(tokenizeResult.id_token);
-    assistant.log('verifyIdentity(): decoded', decoded);
+    ctx.log('verifyIdentity(): decoded', decoded);
 
     // Require email scope for proper identity verification
     if (!decoded.email) {

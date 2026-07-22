@@ -18,22 +18,22 @@ module.exports = {
    * @param {boolean} options.trial - Whether to include a trial period (subscriptions only)
    * @param {string} options.confirmationUrl - Success redirect URL
    * @param {string} options.cancelUrl - Cancel redirect URL
-   * @param {object} options.assistant - Assistant instance
+   * @param {object} options.ctx - Assistant instance
    * @returns {object} { id, url, raw }
    */
-  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, assistant }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, ctx }) {
     // Guard: test processor is not available in production
-    if (assistant.isProduction()) {
+    if (ctx.isProduction()) {
       throw new Error('Test processor is not available in production');
     }
 
     const productType = product.type || 'subscription';
 
     if (productType === 'subscription') {
-      return createSubscriptionIntent({ uid, orderId, product, frequency, trial, confirmationUrl, assistant });
+      return createSubscriptionIntent({ uid, orderId, product, frequency, trial, confirmationUrl, ctx });
     }
 
-    return createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, assistant });
+    return createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, ctx });
   },
 };
 
@@ -41,7 +41,7 @@ module.exports = {
  * Create a test subscription intent
  * Generates Stripe-shaped subscription + customer.subscription.created event
  */
-async function createSubscriptionIntent({ uid, orderId, product, frequency, trial, confirmationUrl, assistant }) {
+async function createSubscriptionIntent({ uid, orderId, product, frequency, trial, confirmationUrl, ctx }) {
   // Generate IDs
   const timestamp = Date.now();
   const sessionId = `_test-cs-${timestamp}`;
@@ -93,10 +93,10 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
     data: { object: subscription },
   };
 
-  assistant.log(`Test subscription intent: sessionId=${sessionId}, subscriptionId=${subscriptionId}, eventId=${eventId}, trial=${!!subscription.trial_start}`);
+  ctx.log(`Test subscription intent: sessionId=${sessionId}, subscriptionId=${subscriptionId}, eventId=${eventId}, trial=${!!subscription.trial_start}`);
 
   // Auto-fire webhook
-  fireWebhook({ event, assistant });
+  fireWebhook({ event, ctx });
 
   return {
     id: sessionId,
@@ -109,7 +109,7 @@ async function createSubscriptionIntent({ uid, orderId, product, frequency, tria
  * Create a test one-time payment intent
  * Generates Stripe-shaped checkout session + checkout.session.completed event
  */
-async function createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, assistant }) {
+async function createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, ctx }) {
   // Validate that a price exists
   if (!product.prices?.once) {
     throw new Error(`No one-time price configured for ${product.id}`);
@@ -139,10 +139,10 @@ async function createOneTimeIntent({ uid, orderId, product, productId, confirmat
     data: { object: session },
   };
 
-  assistant.log(`Test one-time intent: sessionId=${sessionId}, eventId=${eventId}, productId=${productId}`);
+  ctx.log(`Test one-time intent: sessionId=${sessionId}, eventId=${eventId}, productId=${productId}`);
 
   // Auto-fire webhook
-  fireWebhook({ event, assistant });
+  fireWebhook({ event, ctx });
 
   return {
     id: sessionId,
@@ -154,14 +154,14 @@ async function createOneTimeIntent({ uid, orderId, product, productId, confirmat
 /**
  * Fire-and-forget webhook to trigger the full pipeline
  */
-function fireWebhook({ event, assistant }) {
-  const webhookUrl = `${assistant.Manager.getApiUrl()}/omega/payments/webhook?processor=test&key=${process.env.OMEGA_WEBHOOK_KEY}`;
+function fireWebhook({ event, ctx }) {
+  const webhookUrl = `${ctx.Manager.getApiUrl()}/omega/payments/webhook?processor=test&key=${process.env.OMEGA_WEBHOOK_KEY}`;
   fetch(webhookUrl, {
     method: 'POST',
     response: 'json',
     body: event,
     timeout: 60000,
   }).catch((e) => {
-    assistant.log(`Test processor auto-webhook failed: ${e.message}`);
+    ctx.log(`Test processor auto-webhook failed: ${e.message}`);
   });
 }

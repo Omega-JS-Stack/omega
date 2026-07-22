@@ -1,7 +1,7 @@
 const path = require('path');
 const { readTestMode, applyEnvFromFile } = require('../../../../test/utils/test-mode-file.js');
 
-module.exports = async ({ assistant, Manager }) => {
+module.exports = async ({ ctx, Manager }) => {
 
   // Belt-and-suspenders freshness check: re-read the test-mode file before
   // reporting `testExtendedMode`. fs.watch installed in Manager.init usually
@@ -20,14 +20,14 @@ module.exports = async ({ assistant, Manager }) => {
   const response = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    environment: assistant.meta?.environment || 'unknown',
+    environment: ctx.meta?.environment || 'unknown',
     projectId: Manager.config?.cloud?.config?.projectId || process.env.GCLOUD_PROJECT || 'unknown',
     version: Manager.package?.version || 'unknown',
     backendVersion: Manager.version || 'unknown',
     testExtendedMode: !!process.env.TEST_EXTENDED_MODE,
   };
 
-  assistant.log('Health check', response);
+  ctx.log('Health check', response);
 
-  return assistant.respond(response);
+  return ctx.respond(response);
 };

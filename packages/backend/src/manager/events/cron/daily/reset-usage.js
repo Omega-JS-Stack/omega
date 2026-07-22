@@ -7,42 +7,42 @@
  * - Authenticated user daily counters: reset every day
  * - Authenticated user monthly counters: reset on the 1st of each month
  */
-module.exports = async ({ Manager, assistant, context, libraries }) => {
+module.exports = async ({ Manager, ctx, context, libraries }) => {
   const storage = Manager.storage({ name: 'usage', temporary: true, clear: false, log: false });
 
-  assistant.log('Starting...');
+  ctx.log('Starting...');
 
   // Clear local storage (daily)
-  clearLocal(assistant, storage);
+  clearLocal(ctx, storage);
 
   // Clear unauthenticated usage collection (daily)
-  await clearUnauthenticatedUsage(assistant, libraries);
+  await clearUnauthenticatedUsage(ctx, libraries);
 
   // Reset authenticated user counters (daily + monthly on 1st)
-  await resetAuthenticated(Manager, assistant);
+  await resetAuthenticated(Manager, ctx);
 };
 
-function clearLocal(assistant, storage) {
-  assistant.log('[local]: Clearing...');
+function clearLocal(ctx, storage) {
+  ctx.log('[local]: Clearing...');
   storage.setState({}).write();
-  assistant.log('[local]: Completed!');
+  ctx.log('[local]: Completed!');
 }
 
-async function clearUnauthenticatedUsage(assistant, libraries) {
+async function clearUnauthenticatedUsage(ctx, libraries) {
   const { admin } = libraries;
 
-  assistant.log('[unauthenticated]: Deleting usage collection...');
+  ctx.log('[unauthenticated]: Deleting usage collection...');
 
   await admin.firestore().recursiveDelete(admin.firestore().collection('usage'))
   .then(() => {
-    assistant.log('[unauthenticated]: Completed!');
+    ctx.log('[unauthenticated]: Completed!');
   })
   .catch((e) => {
-    assistant.errorify(`Error deleting usage collection: ${e}`, { code: 500, log: true });
+    ctx.report(`Error deleting usage collection: ${e}`, { code: 500 });
   });
 }
 
-async function resetAuthenticated(Manager, assistant) {
+async function resetAuthenticated(Manager, ctx) {
   const isFirstOfMonth = new Date().getDate() === 1;
   const products = Manager.config.payment?.products || [];
 
@@ -55,7 +55,7 @@ async function resetAuthenticated(Manager, assistant) {
   }
   const metricNames = Object.keys(metricSet);
 
-  assistant.log(`[authenticated]: Resetting ${isFirstOfMonth ? 'daily + monthly' : 'daily'} for metrics`, metricNames);
+  ctx.log(`[authenticated]: Resetting ${isFirstOfMonth ? 'daily + monthly' : 'daily'} for metrics`, metricNames);
 
   // Collect all user IDs that need resetting (deduplicated across metrics)
   // Each entry maps uid -> { ref, usage } so we only write once per user
@@ -81,7 +81,7 @@ async function resetAuthenticated(Manager, assistant) {
       log: false,
     })
     .catch(e => {
-      assistant.errorify(`Error querying ${metric}.daily: ${e}`, { code: 500, log: true });
+      ctx.report(`Error querying ${metric}.daily: ${e}`, { code: 500 });
     });
 
     // On the 1st, also query users with monthly > 0
@@ -104,13 +104,13 @@ async function resetAuthenticated(Manager, assistant) {
         log: false,
       })
       .catch(e => {
-        assistant.errorify(`Error querying ${metric}.monthly: ${e}`, { code: 500, log: true });
+        ctx.report(`Error querying ${metric}.monthly: ${e}`, { code: 500 });
       });
     }
   }
 
   const userIds = Object.keys(usersToReset);
-  assistant.log(`[authenticated]: Found ${userIds.length} users to reset`);
+  ctx.log(`[authenticated]: Found ${userIds.length} users to reset`);
 
   // Single write per user: reset daily (always) + monthly (on 1st) for all metrics
   for (const uid of userIds) {
@@ -130,12 +130,12 @@ async function resetAuthenticated(Manager, assistant) {
 
     await ref.update({ usage })
     .then(() => {
-      assistant.log(`[authenticated]: Reset ${uid}`);
+      ctx.log(`[authenticated]: Reset ${uid}`);
     })
     .catch(e => {
-      assistant.errorify(`Error resetting ${uid}: ${e}`, { code: 500, log: true });
+      ctx.report(`Error resetting ${uid}: ${e}`, { code: 500 });
     });
   }
 
-  assistant.log(`[authenticated]: Completed!`);
+  ctx.log(`[authenticated]: Completed!`);
 }

@@ -2,7 +2,7 @@
  * Unified email library — transactional + marketing
  *
  * Usage:
- *   const email = Manager.Email(assistant);
+ *   const email = Manager.Email(ctx);
  *
  *   // Transactional (default)
  *   await email.send({ to, subject, template, ... });
@@ -28,15 +28,15 @@
 const Transactional = require('./transactional/index.js');
 const Marketing = require('./marketing/index.js');
 
-function Email(assistant) {
+function Email(ctx) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant.Manager;
+  self.ctx = ctx;
+  self.Manager = ctx.Manager;
 
   // Compose internal modules
-  self._transactional = new Transactional(assistant);
-  self._marketing = new Marketing(assistant);
+  self._transactional = new Transactional(ctx);
+  self._marketing = new Marketing(ctx);
 
   return self;
 }

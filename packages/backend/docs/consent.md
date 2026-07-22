@@ -67,7 +67,7 @@ There are five places where consent gets recorded or updated. All five converge 
 }
 ```
 
-`buildConsentRecord(assistant, settings.consent, creationTime, existingConsent)` translates this into the canonical user-doc shape:
+`buildConsentRecord(ctx, settings.consent, creationTime, existingConsent)` translates this into the canonical user-doc shape:
 
 - `legal.granted: true` → `legal.status = 'granted'`, `grantedAt` populated with `source: 'signup'` + **timestamp from Auth `creationTime`** + server-detected IP + exact label text.
 - `marketing.granted: false` → `marketing.status = 'revoked'`, `grantedAt` all-null, `revokedAt` populated with `source: 'signup'`. (Records the explicit decline.)
@@ -92,7 +92,7 @@ Body: { action: 'subscribe' | 'unsubscribe' }
 ```
 
 - Requires authentication (uses the calling user's auth UID and email).
-- Rate-limited per-user via `Manager.Usage().init(assistant)` (5/day).
+- Rate-limited per-user via `Manager.Usage().init(ctx)` (5/day).
 - Writes `consent.marketing.{status, grantedAt|revokedAt}` to the user doc with `source: 'account'` + server time + server IP.
 - Calls `mailer.sync(uid)` on subscribe, `mailer.remove(email)` on unsubscribe — hits both SendGrid + Beehiiv via the email library.
 
@@ -126,7 +126,7 @@ POST /omega/marketing/webhook?provider=beehiiv&key=<OMEGA_WEBHOOK_KEY>
 The dispatcher loads `processors/{provider}.js`, parses the event(s), and for each event:
 
 1. Checks `isSupported(eventType)` — filters out non-revoke events like `delivered` / `open`.
-2. Calls `handleEvent({ Manager, assistant, parsed })` on the processor.
+2. Calls `handleEvent({ Manager, ctx, parsed })` on the processor.
 
 There is **no idempotency ledger**. Both handler side effects — writing `consent.marketing.status = 'revoked'` and calling `mailer.remove()` — are idempotent, so a provider retry (or a duplicate fan-out from the parent) re-runs to the same end state with no extra side effects. This is the key difference from `payments-webhooks`, where dedup is load-bearing because payment side effects are not idempotent.
 

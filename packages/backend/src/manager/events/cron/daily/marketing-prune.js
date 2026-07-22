@@ -21,31 +21,31 @@
  */
 const sendgridProvider = require('../../../libraries/email/providers/sendgrid.js');
 
-module.exports = async ({ Manager, assistant, libraries }) => {
+module.exports = async ({ Manager, ctx, libraries }) => {
   if (new Date().getDate() !== 1) {
     return;
   }
 
   if (Manager.config?.marketing?.prune?.enabled === false) {
-    assistant.log('Marketing prune: disabled');
+    ctx.log('Marketing prune: disabled');
     return;
   }
 
   const brand = Manager.config?.brand;
 
-  assistant.log(`Marketing prune: Starting monthly prune cycle for ${brand?.id || 'unknown'}`);
+  ctx.log(`Marketing prune: Starting monthly prune cycle for ${brand?.id || 'unknown'}`);
 
   // --- Stage 1: Re-engagement email ---
   try {
-    await stageReengage(Manager, assistant);
+    await stageReengage(Manager, ctx);
   } catch (e) {
-    assistant.error('Marketing prune: Stage 1 (re-engagement) failed:', e.message);
+    ctx.error('Marketing prune: Stage 1 (re-engagement) failed:', e.message);
   }
 
   // --- Stage 2: Delete inactive contacts ---
-  await stagePrune(Manager, assistant, libraries);
+  await stagePrune(Manager, ctx, libraries);
 
-  assistant.log(`Marketing prune: Completed for ${brand?.id || 'unknown'}`);
+  ctx.log(`Marketing prune: Completed for ${brand?.id || 'unknown'}`);
 };
 
 /**
@@ -55,10 +55,10 @@ module.exports = async ({ Manager, assistant, libraries }) => {
  * sendCampaign handles brand-scoping internally via _resolveAudience →
  * createBrandScopedSegment, so this stage is already brand-safe.
  */
-async function stageReengage(Manager, assistant) {
-  assistant.log('Marketing prune: Stage 1 — Re-engagement');
+async function stageReengage(Manager, ctx) {
+  ctx.log('Marketing prune: Stage 1 — Re-engagement');
 
-  const mailer = Manager.Email(assistant);
+  const mailer = Manager.Email(ctx);
   const brand = Manager.config?.brand;
 
   const result = await mailer.sendCampaign({
@@ -82,7 +82,7 @@ async function stageReengage(Manager, assistant) {
     sendAt: 'now',
   });
 
-  assistant.log('Marketing prune: Re-engagement result:', result);
+  ctx.log('Marketing prune: Re-engagement result:', result);
 }
 
 /**
@@ -93,20 +93,20 @@ async function stageReengage(Manager, assistant) {
  * Excludes paying customers (subscription_paid segment).
  * Logs deleted emails to Firestore for recoverability.
  */
-async function stagePrune(Manager, assistant, libraries) {
-  assistant.log('Marketing prune: Stage 2 — Prune');
+async function stagePrune(Manager, ctx, libraries) {
+  ctx.log('Marketing prune: Stage 2 — Prune');
 
   const marketing = Manager.config?.marketing || {};
   const brand = Manager.config?.brand;
   const { admin } = libraries;
 
   if (!brand?.id) {
-    assistant.error('Marketing prune: brand.id is missing — aborting to prevent account-global deletion');
+    ctx.error('Marketing prune: brand.id is missing — aborting to prevent account-global deletion');
     return;
   }
 
   if (marketing.campaigns?.enabled === false || !process.env.SENDGRID_API_KEY) {
-    assistant.log('Marketing prune: SendGrid not configured, skipping');
+    ctx.log('Marketing prune: SendGrid not configured, skipping');
     return;
   }
 
@@ -114,7 +114,7 @@ async function stagePrune(Manager, assistant, libraries) {
   const pruneSegmentId = segmentIdMap['engagement_inactive_6m'];
 
   if (!pruneSegmentId) {
-    assistant.error('Marketing prune: engagement_inactive_6m segment not found in SendGrid');
+    ctx.error('Marketing prune: engagement_inactive_6m segment not found in SendGrid');
     return;
   }
 
@@ -125,7 +125,7 @@ async function stagePrune(Manager, assistant, libraries) {
   );
 
   if (!tempPrune) {
-    assistant.error('Marketing prune: Failed to create brand-scoped prune segment');
+    ctx.error('Marketing prune: Failed to create brand-scoped prune segment');
     return;
   }
 
@@ -133,12 +133,12 @@ async function stagePrune(Manager, assistant, libraries) {
     const exportResult = await sendgridProvider.getSegmentContacts(tempPrune.segmentId, 180000);
 
     if (!exportResult.success) {
-      assistant.error('Marketing prune: Failed to export segment:', exportResult.error);
+      ctx.error('Marketing prune: Failed to export segment:', exportResult.error);
       return;
     }
 
     if (exportResult.contacts.length === 0) {
-      assistant.log('Marketing prune: No contacts to prune');
+      ctx.log('Marketing prune: No contacts to prune');
       return;
     }
 
@@ -162,7 +162,7 @@ async function stagePrune(Manager, assistant, libraries) {
             const paidEmails = new Set(paidExport.contacts.map(c => c.email));
             contactsToPrune = contactsToPrune.filter(c => !paidEmails.has(c.email));
             skippedPaid = exportResult.contacts.length - contactsToPrune.length;
-            assistant.log(`Marketing prune: Excluded ${skippedPaid} paying customers`);
+            ctx.log(`Marketing prune: Excluded ${skippedPaid} paying customers`);
           }
         } finally {
           await tempPaid.cleanup();
@@ -171,13 +171,13 @@ async function stagePrune(Manager, assistant, libraries) {
     }
 
     if (contactsToPrune.length === 0) {
-      assistant.log('Marketing prune: No contacts to prune after paid exclusion');
+      ctx.log('Marketing prune: No contacts to prune after paid exclusion');
       return;
     }
 
     const emails = contactsToPrune.map(c => c.email).filter(Boolean);
 
-    assistant.log(`Marketing prune: Deleting ${contactsToPrune.length} contacts for ${brand.id}`);
+    ctx.log(`Marketing prune: Deleting ${contactsToPrune.length} contacts for ${brand.id}`);
 
     // Delete from SendGrid
     const ids = contactsToPrune.map(c => c.id).filter(Boolean);
@@ -190,17 +190,17 @@ async function stagePrune(Manager, assistant, libraries) {
       if (deleteResult.success) {
         totalDeleted += batch.length;
       } else {
-        assistant.error('Marketing prune: Batch delete failed:', deleteResult.error);
+        ctx.error('Marketing prune: Batch delete failed:', deleteResult.error);
       }
     }
 
-    assistant.log(`Marketing prune: Deleted ${totalDeleted} SendGrid contacts for ${brand.id}`);
+    ctx.log(`Marketing prune: Deleted ${totalDeleted} SendGrid contacts for ${brand.id}`);
 
     // Remove from Beehiiv (before Firestore log — a failed log shouldn't skip BH cleanup)
     if (marketing.newsletter?.enabled !== false && process.env.BEEHIIV_API_KEY) {
       const beehiivProvider = require('../../../libraries/email/providers/beehiiv.js');
 
-      assistant.log(`Marketing prune: Removing ${emails.length} contacts from Beehiiv for ${brand.id}`);
+      ctx.log(`Marketing prune: Removing ${emails.length} contacts from Beehiiv for ${brand.id}`);
 
       await Promise.allSettled(
         emails.map(email => beehiivProvider.removeContact(email))
@@ -222,9 +222,9 @@ async function stagePrune(Manager, assistant, libraries) {
           skippedPaid,
         });
 
-      assistant.log(`Marketing prune: Logged ${emails.length} pruned emails to Firestore (${logKey})`);
+      ctx.log(`Marketing prune: Logged ${emails.length} pruned emails to Firestore (${logKey})`);
     } catch (e) {
-      assistant.error('Marketing prune: Failed to write Firestore log:', e.message);
+      ctx.error('Marketing prune: Failed to write Firestore log:', e.message);
     }
   } finally {
     await tempPrune.cleanup();

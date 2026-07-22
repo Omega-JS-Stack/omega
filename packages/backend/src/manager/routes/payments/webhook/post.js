@@ -12,10 +12,10 @@ const safeCompare = require('../../../helpers/safe-compare.js');
  *   - parseWebhook(req) — extracts { eventId, eventType, category, resourceType, resourceId, raw, uid }
  *   - isSupported(eventType) — returns true for events we should process
  */
-module.exports = async ({ assistant, Manager, libraries }) => {
+module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
-  const data = assistant.request.data;
-  const query = assistant.request.query;
+  const data = ctx.request.data;
+  const query = ctx.request.query;
 
   // Get processor and key from query params
   const processor = query.processor;
@@ -23,20 +23,20 @@ module.exports = async ({ assistant, Manager, libraries }) => {
 
   // Validate processor
   if (!processor) {
-    return assistant.respond('Missing processor parameter', { code: 400 });
+    return ctx.respond('Missing processor parameter', { code: 400 });
   }
 
   // Validate key
   if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
-    return assistant.respond('Invalid key', { code: 401 });
+    return ctx.respond('Invalid key', { code: 401 });
   }
 
   // Validate brand — quit if a brand is specified and doesn't match ours
   const brand = query.brand;
   const ourBrand = Manager.config.brand?.id;
   if (brand && ourBrand && brand !== ourBrand) {
-    assistant.log(`Ignoring webhook: explicit brand mismatch (received=${brand}, expected=${ourBrand})`);
-    return assistant.respond({ received: true, ignored: true });
+    ctx.log(`Ignoring webhook: explicit brand mismatch (received=${brand}, expected=${ourBrand})`);
+    return ctx.respond({ received: true, ignored: true });
   }
 
   // Load the processor module
@@ -44,31 +44,31 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   try {
     processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
   } catch (e) {
-    return assistant.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
   }
 
   // Parse the webhook using the processor
   let parsed;
   try {
-    parsed = processorModule.parseWebhook(assistant.ref.req);
+    parsed = processorModule.parseWebhook(ctx.ref.req);
   } catch (e) {
-    return assistant.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
+    return ctx.respond(`Failed to parse webhook: ${e.message}`, { code: 400 });
   }
 
   const { eventId, eventType, category, resourceType, resourceId, raw, uid } = parsed;
 
-  assistant.log(`Parsed webhook: eventId=${eventId}, eventType=${eventType}, category=${category || 'null'}, resourceType=${resourceType || 'null'}, uid=${uid || 'null'}, api_version=${raw?.api_version || 'unknown'}`);
+  ctx.log(`Parsed webhook: eventId=${eventId}, eventType=${eventType}, category=${category || 'null'}, resourceType=${resourceType || 'null'}, uid=${uid || 'null'}, api_version=${raw?.api_version || 'unknown'}`);
 
   // Let the processor decide if this event type is relevant
   if (processorModule.isSupported && !processorModule.isSupported(eventType)) {
-    assistant.log(`Ignoring unsupported event type: ${eventType}`);
-    return assistant.respond({ received: true, ignored: true });
+    ctx.log(`Ignoring unsupported event type: ${eventType}`);
+    return ctx.respond({ received: true, ignored: true });
   }
 
   // Skip events with no category (e.g., checkout.session.completed for subscription mode)
   if (!category) {
-    assistant.log(`Ignoring event with no category: ${eventType}`);
-    return assistant.respond({ received: true, ignored: true });
+    ctx.log(`Ignoring event with no category: ${eventType}`);
+    return ctx.respond({ received: true, ignored: true });
   }
 
   // Check for duplicate (skip if already processing/completed)
@@ -76,10 +76,10 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   if (existingDoc.exists) {
     const existingStatus = existingDoc.data()?.status;
     if (existingStatus !== 'failed') {
-      assistant.log(`Duplicate webhook ${eventId}, existing status=${existingStatus}, skipping`);
-      return assistant.respond({ received: true, duplicate: true });
+      ctx.log(`Duplicate webhook ${eventId}, existing status=${existingStatus}, skipping`);
+      return ctx.respond({ received: true, duplicate: true });
     }
-    assistant.log(`Retrying previously failed webhook ${eventId}`);
+    ctx.log(`Retrying previously failed webhook ${eventId}`);
   }
 
   // Build timestamps
@@ -112,8 +112,8 @@ module.exports = async ({ assistant, Manager, libraries }) => {
     },
   });
 
-  assistant.log(`Saved payments-webhooks/${eventId}: eventType=${eventType}, category=${category}, processor=${processor}, uid=${uid}`);
+  ctx.log(`Saved payments-webhooks/${eventId}: eventType=${eventType}, category=${category}, processor=${processor}, uid=${uid}`);
 
   // Return 200 immediately
-  return assistant.respond({ received: true });
+  return ctx.respond({ received: true });
 };

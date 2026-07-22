@@ -2,17 +2,17 @@
  * POST /handler/post - Create post handler (with invoice and notification)
  * Admin-only endpoint that creates invoices and sends notifications for guest posts
  */
-module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
   const fetch = Manager.require('wonderful-fetch');
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   const response = {
@@ -74,7 +74,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
     }).catch(e => e);
 
     if (createdInvoice instanceof Error) {
-      return assistant.respond(createdInvoice.message, { code: 500 });
+      return ctx.respond(createdInvoice.message, { code: 500 });
     }
 
     // Send invoice
@@ -93,7 +93,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
     }).catch(e => e);
 
     if (sentInvoice instanceof Error) {
-      return assistant.respond(sentInvoice.message, { code: 500 });
+      return ctx.respond(sentInvoice.message, { code: 500 });
     }
 
     response.invoice = {
@@ -124,7 +124,7 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
         }
       },
     }).catch(e => {
-      assistant.error('Failed to send notification:', e);
+      ctx.error('Failed to send notification:', e);
     });
 
     response.notification = {
@@ -136,5 +136,5 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   // Track analytics
   analytics.event('handler/post', { action: 'create' });
 
-  return assistant.respond(response);
+  return ctx.respond(response);
 };

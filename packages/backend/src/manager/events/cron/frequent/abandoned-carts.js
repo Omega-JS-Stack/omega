@@ -8,7 +8,7 @@ const User = require('../../../helpers/user.js');
  * Queries payments-carts where status is pending and nextReminderAt has passed,
  * sends escalating email reminders, and advances or completes the tracker.
  */
-module.exports = async ({ Manager, assistant, context, libraries }) => {
+module.exports = async ({ Manager, ctx, context, libraries }) => {
   const { admin } = libraries;
   const nowUNIX = Math.floor(Date.now() / 1000);
 
@@ -20,13 +20,13 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
     .get();
 
   if (snapshot.empty) {
-    assistant.log('No abandoned carts due for reminders');
+    ctx.log('No abandoned carts due for reminders');
     return;
   }
 
-  assistant.log(`Processing ${snapshot.size} abandoned cart reminder(s)...`);
+  ctx.log(`Processing ${snapshot.size} abandoned cart reminder(s)...`);
 
-  const email = Manager.Email(assistant);
+  const email = Manager.Email(ctx);
   let sent = 0;
   let completed = 0;
   let skipped = 0;
@@ -41,7 +41,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
       const userSnap = await admin.firestore().doc(`users/${uid}`).get();
 
       if (!userSnap.exists) {
-        assistant.log(`User ${uid} not found, marking cart completed`);
+        ctx.log(`User ${uid} not found, marking cart completed`);
         await markCompleted(doc, admin, nowUNIX);
         skipped++;
         continue;
@@ -51,7 +51,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
 
       // Belt-and-suspenders: skip if user already has active paid subscription
       if (User.resolveSubscription(userDoc).active) {
-        assistant.log(`User ${uid} now has active subscription, marking cart completed`);
+        ctx.log(`User ${uid} now has active subscription, marking cart completed`);
         await markCompleted(doc, admin, nowUNIX);
         skipped++;
         continue;
@@ -66,7 +66,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
       const brandName = Manager.config.brand?.name || '';
 
       // Send reminder email
-      assistant.log(`Sending abandoned cart reminder #${reminderIndex + 1} to uid=${uid}, product=${data.productId}`);
+      ctx.log(`Sending abandoned cart reminder #${reminderIndex + 1} to uid=${uid}, product=${data.productId}`);
 
       email.send({
         sender: 'marketing',
@@ -89,8 +89,8 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
           },
         },
       })
-        .then(() => assistant.log(`Abandoned cart email sent for uid=${uid}`))
-        .catch((e) => assistant.error(`Abandoned cart email failed for uid=${uid}: ${e.message}`));
+        .then(() => ctx.log(`Abandoned cart email sent for uid=${uid}`))
+        .catch((e) => ctx.error(`Abandoned cart email failed for uid=${uid}: ${e.message}`));
 
       sent++;
 
@@ -98,7 +98,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
       const nextIndex = reminderIndex + 1;
 
       if (nextIndex >= REMINDER_DELAYS.length) {
-        assistant.log(`Last reminder sent for uid=${uid}, marking cart completed`);
+        ctx.log(`Last reminder sent for uid=${uid}, marking cart completed`);
         await markCompleted(doc, admin, nowUNIX);
         completed++;
       } else {
@@ -116,15 +116,15 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
           },
         }, { merge: true });
 
-        assistant.log(`Advanced uid=${uid} to reminder index ${nextIndex}, next at ${updatedNowUNIX + REMINDER_DELAYS[nextIndex]}`);
+        ctx.log(`Advanced uid=${uid} to reminder index ${nextIndex}, next at ${updatedNowUNIX + REMINDER_DELAYS[nextIndex]}`);
       }
     } catch (e) {
-      assistant.error(`Error processing abandoned cart for uid=${uid}: ${e.message}`, e);
+      ctx.error(`Error processing abandoned cart for uid=${uid}: ${e.message}`, e);
       // Continue to next document
     }
   }
 
-  assistant.log(`Completed! (${sent} sent, ${completed} completed, ${skipped} skipped)`);
+  ctx.log(`Completed! (${sent} sent, ${completed} completed, ${skipped} skipped)`);
 };
 
 /**

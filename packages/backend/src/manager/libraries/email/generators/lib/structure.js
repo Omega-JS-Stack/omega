@@ -130,11 +130,11 @@ function defaultBuildPrompt({ brand, newsletterConfig, sources }) {
  * @param {Array<object>} args.sources - Newsletter source records (id, subject, ai: { headline, summary, takeaways })
  * @param {object} args.brand - { name, url, id, description? }
  * @param {object} args.newsletterConfig - marketing.newsletter.content from @omega.js/backend config
- * @param {object} args.ai - AI instance from Manager.AI(assistant)
- * @param {object} args.assistant - @omega.js/backend assistant
+ * @param {object} args.ai - AI instance from Manager.AI(ctx)
+ * @param {object} args.ctx - @omega.js/backend ctx
  * @returns {Promise<object>} Structured newsletter object
  */
-async function generateStructure({ sources, brand, newsletterConfig, ai, assistant }) {
+async function generateStructure({ sources, brand, newsletterConfig, ai, ctx }) {
   if (!sources?.length) {
     throw new Error('generateStructure requires at least one source');
   }
@@ -153,7 +153,7 @@ async function generateStructure({ sources, brand, newsletterConfig, ai, assista
   const buildPrompt = template.buildPrompt || defaultBuildPrompt;
   const { system, user } = buildPrompt({ brand, newsletterConfig, sources });
 
-  assistant.log(`Newsletter structure: template=${templateName} provider=${provider} model=${model} sources=${sources.length}`);
+  ctx.log(`Newsletter structure: template=${templateName} provider=${provider} model=${model} sources=${sources.length}`);
 
   const result = await ai.request({
     provider,

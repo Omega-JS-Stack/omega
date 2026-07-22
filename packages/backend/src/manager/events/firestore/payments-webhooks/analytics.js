@@ -19,8 +19,8 @@ const fetch = require('wonderful-fetch');
  * Track payment events across analytics platforms (non-blocking)
  * Fires GA4, Meta, and TikTok independently with per-platform payloads
  */
-function trackPayment({ category, transitionName, eventType, unified, order, uid, processor, assistant }) {
-  const Manager = assistant.Manager;
+function trackPayment({ category, transitionName, eventType, unified, order, uid, processor, ctx }) {
+  const Manager = ctx.Manager;
   const config = Manager.config;
 
   try {
@@ -28,20 +28,20 @@ function trackPayment({ category, transitionName, eventType, unified, order, uid
     const resolved = resolvePaymentEvent(category, transitionName, eventType, unified, order);
 
     if (!resolved) {
-      assistant.log(`trackPayment: skipped — no trackable event (category=${category}, transition=${transitionName || 'null'}, eventType=${eventType})`);
+      ctx.log(`trackPayment: skipped — no trackable event (category=${category}, transition=${transitionName || 'null'}, eventType=${eventType})`);
       return;
     }
 
     const currency = config.payment?.currency || 'USD';
 
-    assistant.log(`trackPayment: reason=${resolved.reason}, value=${resolved.value}, currency=${currency}, product=${resolved.productId}, uid=${uid}, processor=${processor}`);
+    ctx.log(`trackPayment: reason=${resolved.reason}, value=${resolved.value}, currency=${currency}, product=${resolved.productId}, uid=${uid}, processor=${processor}`);
 
     // Fire each platform independently (non-blocking, errors isolated)
-    fireGA4({ resolved, currency, uid, processor, assistant, Manager });
-    fireMeta({ resolved, currency, uid, processor, assistant, config });
-    fireTikTok({ resolved, currency, uid, processor, assistant, config });
+    fireGA4({ resolved, currency, uid, processor, ctx, Manager });
+    fireMeta({ resolved, currency, uid, processor, ctx, config });
+    fireTikTok({ resolved, currency, uid, processor, ctx, config });
   } catch (e) {
-    assistant.error(`trackPayment failed: ${e.message}`, e);
+    ctx.error(`trackPayment failed: ${e.message}`, e);
   }
 }
 
@@ -142,12 +142,12 @@ function isPaymentEvent(eventType) {
  * Fire GA4 event via Manager.Analytics (Measurement Protocol)
  * https://developers.google.com/analytics/devguides/collection/protocol/ga4
  */
-function fireGA4({ resolved, currency, uid, processor, assistant, Manager }) {
+function fireGA4({ resolved, currency, uid, processor, ctx, Manager }) {
   try {
     // Map reason → GA4 event name
     const eventName = resolved.reason === 'trial-started' ? 'start_trial' : 'purchase';
 
-    Manager.Analytics({ assistant, uuid: uid }).event(eventName, {
+    Manager.Analytics({ ctx, uuid: uid }).event(eventName, {
       transaction_id: resolved.resourceId,
       value: resolved.value,
       currency: currency,
@@ -163,9 +163,9 @@ function fireGA4({ resolved, currency, uid, processor, assistant, Manager }) {
       is_recurring: resolved.isRecurring,
     });
 
-    assistant.log(`trackPayment [GA4]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
+    ctx.log(`trackPayment [GA4]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
   } catch (e) {
-    assistant.error(`trackPayment [GA4] failed: ${e.message}`, e);
+    ctx.error(`trackPayment [GA4] failed: ${e.message}`, e);
   }
 }
 
@@ -186,7 +186,7 @@ const META_EVENTS = {
  * Fire Meta Conversions API event
  * https://developers.facebook.com/docs/marketing-api/conversions-api
  */
-function fireMeta({ resolved, currency, uid, processor, assistant, config }) {
+function fireMeta({ resolved, currency, uid, processor, ctx, config }) {
   try {
     const pixelId = config.analytics?.providers?.meta?.id;
     const accessToken = process.env.META_ACCESS_TOKEN;
@@ -229,13 +229,13 @@ function fireMeta({ resolved, currency, uid, processor, assistant, config }) {
       tries: 2,
     })
     .then(() => {
-      assistant.log(`trackPayment [Meta]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
+      ctx.log(`trackPayment [Meta]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
     })
     .catch((e) => {
-      assistant.error(`trackPayment [Meta] failed: ${e.message}`, e);
+      ctx.error(`trackPayment [Meta] failed: ${e.message}`, e);
     });
   } catch (e) {
-    assistant.error(`trackPayment [Meta] failed: ${e.message}`, e);
+    ctx.error(`trackPayment [Meta] failed: ${e.message}`, e);
   }
 }
 
@@ -256,7 +256,7 @@ const TIKTOK_EVENTS = {
  * Fire TikTok Events API event
  * https://business-api.tiktok.com/portal/docs?id=1771100865818625
  */
-function fireTikTok({ resolved, currency, uid, processor, assistant, config }) {
+function fireTikTok({ resolved, currency, uid, processor, ctx, config }) {
   try {
     const pixelCode = config.analytics?.providers?.tiktok?.id;
     const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
@@ -302,13 +302,13 @@ function fireTikTok({ resolved, currency, uid, processor, assistant, config }) {
       tries: 2,
     })
     .then(() => {
-      assistant.log(`trackPayment [TikTok]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
+      ctx.log(`trackPayment [TikTok]: event=${eventName}, value=${resolved.value}, product=${resolved.productId}, uid=${uid}`);
     })
     .catch((e) => {
-      assistant.error(`trackPayment [TikTok] failed: ${e.message}`, e);
+      ctx.error(`trackPayment [TikTok] failed: ${e.message}`, e);
     });
   } catch (e) {
-    assistant.error(`trackPayment [TikTok] failed: ${e.message}`, e);
+    ctx.error(`trackPayment [TikTok] failed: ${e.message}`, e);
   }
 }
 

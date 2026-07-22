@@ -19,9 +19,9 @@ The core `Manager` class (in `src/manager/index.js`) extends EventEmitter and or
 All helpers are accessed via factory methods on the Manager instance:
 
 ```javascript
-Manager.Assistant({ req, res })  // Request handler
+Manager.RouteContext({ req, res })  // Request handler
 Manager.User(data)               // User properties
-Manager.Analytics({ assistant }) // GA4 events
+Manager.Analytics({ ctx }) // GA4 events
 Manager.Usage()                  // Rate limiting
 Manager.Middleware(req, res)     // Request pipeline
 Manager.Settings()               // Schema validation

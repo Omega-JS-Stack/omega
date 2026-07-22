@@ -7,7 +7,7 @@ let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
     this.libraries = Manager.libraries;
-    this.assistant = Manager.Assistant({req: data.req, res: data.res});
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res});
     this.req = data.req;
     this.res = data.res;
 
@@ -16,7 +16,7 @@ let Module = {
   main: async function() {
     let self = this;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
     let req = self.req;
     let res = self.res;
 
@@ -26,11 +26,11 @@ let Module = {
 
     return libraries.cors(req, res, async () => {
       // authenticate admin!
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       // Analytics
       let analytics = self.Manager.Analytics({
-        assistant: assistant,
+        ctx: ctx,
         uuid: user.auth.uid,
       })
       .event({
@@ -44,7 +44,7 @@ let Module = {
       if (!user.roles.admin) {
         response.status = 401;
         response.error = new Error('Unauthenticated, admin required.');
-        assistant.error(response.error)
+        ctx.error(response.error)
       } else {
         // Poster = Poster || require('/Users/ianwiedenman/Documents/GitHub/ITW-Creative-Works/ultimate-jekyll-poster');
         Poster = Poster || require('ultimate-jekyll-poster');
@@ -64,18 +64,18 @@ let Module = {
           });
         }
 
-        let finalPost = await poster.create(assistant.request.data);
+        let finalPost = await poster.create(ctx.request.data);
 
         // Save post OR commit
         await createFile(self.Manager.config?.github?.user, repoInfo.user, repoInfo.name, process.env.GH_TOKEN, poster.removeDirDot(finalPost.path), finalPost.content)
         .catch((e) => {
           response.status = 400;
           response.error = new Error('Failed to post: ' + e);
-          assistant.error(response.error)
+          ctx.error(response.error)
         })
       }
 
-      assistant.log('Post', assistant.request.data, response);
+      ctx.log('Post', ctx.request.data, response);
 
       if (response.status === 200) {
         return res.status(response.status).json(response.data);

@@ -12,16 +12,16 @@ const {
  *   - authorize (default): Get authorization URL
  *   - status: Check connection status
  */
-module.exports = async ({ assistant, user, settings }) => {
-  const context = await buildContext({ assistant, user, settings });
+module.exports = async ({ ctx, user, settings }) => {
+  const context = await buildContext({ ctx, user, settings });
 
   if (context.error) {
-    return assistant.respond(context.error.message, { code: context.error.code });
+    return ctx.respond(context.error.message, { code: context.error.code });
   }
 
   const { admin, oauth2Provider, targetUid, targetUser, clientId, clientSecret, redirectUri } = context;
 
-  assistant.log('OAuth2 GET request', { action: settings.action, provider: settings.provider });
+  ctx.log('OAuth2 GET request', { action: settings.action, provider: settings.provider });
 
   switch (settings.action) {
     case 'status':
@@ -38,10 +38,10 @@ module.exports = async ({ assistant, user, settings }) => {
 // ============================================================================
 
 async function processAuthorize(context) {
-  const { assistant, Manager, admin, oauth2Provider, settings, targetUid, clientId, redirectUri } = context;
+  const { ctx, Manager, admin, oauth2Provider, settings, targetUid, clientId, redirectUri } = context;
 
   if (!clientId) {
-    return assistant.respond(`Missing client_id for ${settings.provider} provider`, { code: 500 });
+    return ctx.respond(`Missing client_id for ${settings.provider} provider`, { code: 500 });
   }
 
   // Generate CSRF token
@@ -71,7 +71,7 @@ async function processAuthorize(context) {
   try {
     encryptedState = encryptState(stateData);
   } catch (e) {
-    return assistant.respond(e.message, { code: 500 });
+    return ctx.respond(e.message, { code: 500 });
   }
 
   // Build authorization URL
@@ -95,27 +95,27 @@ async function processAuthorize(context) {
 
   const urlString = url.toString();
 
-  assistant.log('OAuth2 authorize URL generated');
+  ctx.log('OAuth2 authorize URL generated');
 
   if (settings.redirect) {
-    return assistant.redirect(urlString);
+    return ctx.redirect(urlString);
   }
 
-  return assistant.respond({ url: urlString });
+  return ctx.respond({ url: urlString });
 }
 
 async function processStatus(context) {
-  const { assistant, Manager, admin, oauth2Provider, settings, targetUid, targetUser, clientId, clientSecret } = context;
+  const { ctx, Manager, admin, oauth2Provider, settings, targetUid, targetUser, clientId, clientSecret } = context;
 
   const token = targetUser?.oauth2?.[settings.provider]?.token?.refresh_token;
 
   if (!token) {
-    return assistant.respond({ status: 'disconnected' });
+    return ctx.respond({ status: 'disconnected' });
   }
 
   // Verify connection if provider supports it
   if (oauth2Provider.verifyConnection) {
-    const status = await oauth2Provider.verifyConnection(token, { Manager, assistant, clientId, clientSecret })
+    const status = await oauth2Provider.verifyConnection(token, { Manager, ctx, clientId, clientSecret })
       .catch(() => 'error');
 
     if ((status === 'disconnected' || status === 'error') && settings.removeInvalidTokens) {
@@ -123,11 +123,11 @@ async function processStatus(context) {
         [`oauth2.${settings.provider}`]: FieldValue.delete(),
         metadata: Manager.Metadata().set({ tag: 'user/oauth2' }),
       });
-      assistant.log(`Removed invalid token for user: ${targetUid}`);
+      ctx.log(`Removed invalid token for user: ${targetUid}`);
     }
 
-    return assistant.respond({ status });
+    return ctx.respond({ status });
   }
 
-  return assistant.respond({ status: 'connected' });
+  return ctx.respond({ status: 'connected' });
 }

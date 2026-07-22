@@ -5,7 +5,7 @@ let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
     this.libraries = Manager.libraries;
-    this.assistant = Manager.Assistant({req: data.req, res: data.res})
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res})
     this.req = data.req;
     this.res = data.res;
 
@@ -14,7 +14,7 @@ let Module = {
   main: async function() {
     let self = this;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
     let req = self.req;
     let res = self.res;
 
@@ -26,11 +26,11 @@ let Module = {
 
     return libraries.cors(req, res, async () => {
       // authenticate admin!
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       // Analytics
       let analytics = self.Manager.Analytics({
-        assistant: assistant,
+        ctx: ctx,
         uuid: user.auth.uid,
       })
       .event({
@@ -42,11 +42,11 @@ let Module = {
       if (!user.roles.admin) {
         response.status = 401;
         response.error = new Error('Unauthenticated, admin required.');
-        assistant.error(response.error)
+        ctx.error(response.error)
       } else {
         self.docs = [];
-        // assistant.log('Queries', assistant.request.data.queries);
-        let queries = powertools.arrayify(assistant.request.data.queries || []);
+        // ctx.log('Queries', ctx.request.data.queries);
+        let queries = powertools.arrayify(ctx.request.data.queries || []);
 
         let promises = [];
         for (var i = 0; i < queries.length; i++) {
@@ -57,16 +57,16 @@ let Module = {
         await Promise.all(promises)
           .then((r) => {
             response.data = self.docs;
-            // assistant.log('Query result:', );
+            // ctx.log('Query result:', );
           })
           .catch((e) => {
             response.error = e;
             response.status = 400;
-            assistant.error(response.error)
+            ctx.error(response.error)
           })
       }
 
-      assistant.log('Query', assistant.request.data, response);
+      ctx.log('Query', ctx.request.data, response);
 
       if (response.status === 200) {
         return res.status(response.status).json(response.data);
@@ -88,7 +88,7 @@ async function runQuery(payload) {
   payload.filter = powertools.arrayify(payload.filter || []);
   payload.orderBy = powertools.arrayify(payload.orderBy || []);
 
-  // self.assistant.log('Query', payload);
+  // self.ctx.log('Query', payload);
 
   return new Promise(function(resolve, reject) {
     let collection;
@@ -152,7 +152,7 @@ async function runQuery(payload) {
       return resolve(self.docs);
     })
     .catch(function (error) {
-      self.assistant.error(error)
+      self.ctx.error(error)
       return reject(error);
     });
   });

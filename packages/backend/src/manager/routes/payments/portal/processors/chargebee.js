@@ -13,17 +13,17 @@ module.exports = {
    * @param {string} options.uid - User's UID
    * @param {string} options.email - User's email
    * @param {string|null} options.returnUrl - URL to redirect after logout
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {object} { url }
    */
-  async createPortalSession({ uid, email, returnUrl, assistant }) {
+  async createPortalSession({ uid, email, returnUrl, ctx }) {
     const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');
     ChargebeeLib.init();
 
     // Chargebee portal sessions require a customer ID.
     // The customer_id in Chargebee is set during subscription checkout.
     // We look up the subscription to find the Chargebee customer_id.
-    const admin = assistant.Manager.libraries.admin;
+    const admin = ctx.Manager.libraries.admin;
     const userDoc = await admin.firestore().doc(`users/${uid}`).get();
     const subscription = userDoc.data()?.subscription;
 
@@ -55,7 +55,7 @@ module.exports = {
 
     const portalSession = result.portal_session;
 
-    assistant.log(`Chargebee portal session created: uid=${uid}, customerId=${customerId}, url=${portalSession.access_url}`);
+    ctx.log(`Chargebee portal session created: uid=${uid}, customerId=${customerId}, url=${portalSession.access_url}`);
 
     return { url: portalSession.access_url };
   },

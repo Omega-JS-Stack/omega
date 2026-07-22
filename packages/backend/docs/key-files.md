@@ -3,7 +3,7 @@
 | Purpose | File |
 |---------|------|
 | Main Manager class | `src/manager/index.js` |
-| Request/response handling | `src/manager/helpers/assistant.js` |
+| Request/response handling | `src/manager/helpers/context/` |
 | Middleware pipeline | `src/manager/helpers/middleware.js` |
 | Schema validation | `src/manager/helpers/settings.js` |
 | Rate limiting | `src/manager/helpers/usage.js` |

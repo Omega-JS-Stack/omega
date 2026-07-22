@@ -14,7 +14,7 @@ const powertools = require('node-powertools');
  * 3. Update status to 'cancelled' and cancellation.pending to false
  * 4. Dispatch 'subscription-cancelled' transition (sends email)
  */
-module.exports = async ({ Manager, assistant, context, libraries }) => {
+module.exports = async ({ Manager, ctx, context, libraries }) => {
   const { admin } = libraries;
   const transitions = require('../../firestore/payments-webhooks/transitions/index.js');
 
@@ -22,7 +22,7 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
   const nowStr = powertools.timestamp(now, { output: 'string' });
   const nowUNIX = powertools.timestamp(nowStr, { output: 'unix' });
 
-  assistant.log('Checking for expired PayPal pending cancellations...');
+  ctx.log('Checking for expired PayPal pending cancellations...');
 
   let processed = 0;
   let skipped = 0;
@@ -35,12 +35,12 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
 
       // Double-check: skip if expires is in the future
       if (!sub?.expires?.timestampUNIX || sub.expires.timestampUNIX > nowUNIX) {
-        assistant.log(`[skip] ${uid}: expires=${sub?.expires?.timestamp || 'null'} is still in the future (now=${nowStr})`);
+        ctx.log(`[skip] ${uid}: expires=${sub?.expires?.timestamp || 'null'} is still in the future (now=${nowStr})`);
         skipped++;
         continue;
       }
 
-      assistant.log(`[expire] ${uid}: expires=${sub.expires.timestamp}, product=${sub.product?.id}, processor=${sub.payment?.processor}, orderId=${sub.payment?.orderId || 'null'}`);
+      ctx.log(`[expire] ${uid}: expires=${sub.expires.timestamp}, product=${sub.product?.id}, processor=${sub.payment?.processor}, orderId=${sub.payment?.orderId || 'null'}`);
 
       // Snapshot the before state for transition detection
       const before = { ...sub };
@@ -58,13 +58,13 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
       // Write to Firestore
       await doc.ref.set({ subscription: after }, { merge: true });
 
-      assistant.log(`[expire] ${uid}: Updated status=cancelled, cancellation.pending=false`);
+      ctx.log(`[expire] ${uid}: Updated status=cancelled, cancellation.pending=false`);
 
       // Detect and dispatch transition (should fire 'subscription-cancelled')
       const transitionName = transitions.detectTransition('subscription', before, after, null);
 
       if (transitionName) {
-        assistant.log(`[expire] ${uid}: Transition detected: subscription/${transitionName}`);
+        ctx.log(`[expire] ${uid}: Transition detected: subscription/${transitionName}`);
 
         // Build minimal order context for the handler
         const order = {
@@ -82,10 +82,10 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
           order,
           uid,
           userDoc: data,
-          assistant,
+          ctx,
         });
       } else {
-        assistant.log(`[expire] ${uid}: No transition detected (before.status=${before.status}, after.status=${after.status})`);
+        ctx.log(`[expire] ${uid}: No transition detected (before.status=${before.status}, after.status=${after.status})`);
       }
 
       processed++;
@@ -100,5 +100,5 @@ module.exports = async ({ Manager, assistant, context, libraries }) => {
     log: true,
   });
 
-  assistant.log(`Completed! Processed=${processed}, Skipped=${skipped}`);
+  ctx.log(`Completed! Processed=${processed}, Skipped=${skipped}`);
 };

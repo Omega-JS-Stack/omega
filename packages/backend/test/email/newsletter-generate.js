@@ -92,7 +92,7 @@ module.exports = {
   // CI). Set TEST_EXTENDED_MODE=1 to switch to the full AI pipeline that fetches
   // real sources, calls the structure + SVG providers, and writes a preview.
   // Other modes (FIXTURE, THEME_ONLY, RELEASE, PEEK) are also opt-in via env.
-  async run({ assert, config, Manager, assistant, skip }) {
+  async run({ assert, config, Manager, ctx, skip }) {
     const env = process.env;
 
     // --- Apply env overrides into newsletterConfig ---
@@ -311,7 +311,7 @@ module.exports = {
           html,
           structure,
           config,
-          assistant: console,
+          ctx: console,
           runDir,
         });
       }
@@ -451,7 +451,7 @@ module.exports = {
 
     const result = await generator.generate(
       Manager,
-      assistant,
+      ctx,
       { name: `${config.brand?.name || 'Brand'} Newsletter — Iteration ${stamp}` },
       {
         sources: useResolverSources ? undefined : sources,

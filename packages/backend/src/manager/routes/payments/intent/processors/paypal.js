@@ -15,30 +15,30 @@ module.exports = {
    * @param {boolean} options.trial - Whether to include a trial period
    * @param {string} options.confirmationUrl - Success redirect URL
    * @param {string} options.cancelUrl - Cancel redirect URL
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {object} { id, url, raw }
    */
-  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, assistant }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, ctx }) {
     const PayPalLib = require('../../../../libraries/payment/processors/paypal.js');
 
     const productType = product.type || 'subscription';
 
     if (productType === 'subscription') {
-      return createSubscriptionIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, assistant, PayPalLib });
+      return createSubscriptionIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, ctx, PayPalLib });
     }
 
-    return createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, cancelUrl, assistant, PayPalLib });
+    return createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, cancelUrl, ctx, PayPalLib });
   },
 };
 
 /**
  * Create a PayPal subscription via the Billing Subscriptions API
  */
-async function createSubscriptionIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, assistant, PayPalLib }) {
+async function createSubscriptionIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, ctx, PayPalLib }) {
   // Resolve the PayPal plan ID at runtime (fetches plans from product, matches by interval + amount)
   const planId = await PayPalLib.resolvePlanId(product, frequency);
 
-  assistant.log(`PayPal subscription: planId=${planId}, uid=${uid}, trial=${trial}, trialDays=${product.trial?.days || 'none'}`);
+  ctx.log(`PayPal subscription: planId=${planId}, uid=${uid}, trial=${trial}, trialDays=${product.trial?.days || 'none'}`);
 
   // Build subscription request
   const subscriptionParams = {
@@ -59,7 +59,7 @@ async function createSubscriptionIntent({ uid, orderId, product, productId, freq
   if (trial && product.trial?.days) {
     // Let the plan's trial cycle handle it (if configured)
     // PayPal trials are configured on the plan, not at subscription creation
-    assistant.log('PayPal trial: using plan trial cycle');
+    ctx.log('PayPal trial: using plan trial cycle');
   } else if (!trial) {
     // Skip trial by starting billing immediately
     const now = new Date();
@@ -80,7 +80,7 @@ async function createSubscriptionIntent({ uid, orderId, product, productId, freq
     throw new Error('PayPal subscription created but no approval URL returned');
   }
 
-  assistant.log(`PayPal subscription created: id=${subscription.id}, url=${approvalLink.href}`);
+  ctx.log(`PayPal subscription created: id=${subscription.id}, url=${approvalLink.href}`);
 
   return {
     id: subscription.id,
@@ -92,7 +92,7 @@ async function createSubscriptionIntent({ uid, orderId, product, productId, freq
 /**
  * Create a PayPal one-time order via the Orders API v2
  */
-async function createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, cancelUrl, assistant, PayPalLib }) {
+async function createOneTimeIntent({ uid, orderId, product, productId, confirmationUrl, cancelUrl, ctx, PayPalLib }) {
   if (product.archived) {
     throw new Error(`Product ${product.id} is archived`);
   }
@@ -103,7 +103,7 @@ async function createOneTimeIntent({ uid, orderId, product, productId, confirmat
     throw new Error(`No one-time price configured for ${product.id}`);
   }
 
-  const brandName = assistant.Manager?.config?.brand?.name || product.name || productId;
+  const brandName = ctx.Manager?.config?.brand?.name || product.name || productId;
 
   const orderParams = {
     intent: 'CAPTURE',
@@ -140,7 +140,7 @@ async function createOneTimeIntent({ uid, orderId, product, productId, confirmat
     throw new Error('PayPal order created but no approval URL returned');
   }
 
-  assistant.log(`PayPal order created: id=${order.id}, url=${approvalLink.href}`);
+  ctx.log(`PayPal order created: id=${order.id}, url=${approvalLink.href}`);
 
   return {
     id: order.id,

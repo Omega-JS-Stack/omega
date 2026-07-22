@@ -2,7 +2,7 @@ let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
     this.libraries = Manager.libraries;
-    this.assistant = Manager.Assistant({req: data.req, res: data.res})
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res})
     this.req = data.req;
     this.res = data.res;
 
@@ -11,7 +11,7 @@ let Module = {
   main: async function() {
     let self = this;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
     let req = self.req;
     let res = self.res;
 
@@ -23,11 +23,11 @@ let Module = {
 
     return libraries.cors(req, res, async () => {
       // authenticate admin!
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       // Analytics
       let analytics = self.Manager.Analytics({
-        assistant: assistant,
+        ctx: ctx,
         uuid: user.auth.uid,
       })
       .event({
@@ -39,7 +39,7 @@ let Module = {
       if (!user.roles.admin) {
         response.status = 401;
         response.error = new Error('Unauthenticated, admin required.');
-        assistant.error(response.error)
+        ctx.error(response.error)
       } else {
         let stats = libraries.admin.firestore().doc(`meta/stats`)
 
@@ -51,14 +51,14 @@ let Module = {
               .catch(e => {
                 response.status = 500;
                 response.error = new Error(`Failed fixing stats: ${e.message}`);
-                assistant.error(response.error)
+                ctx.error(response.error)
               })
 
             await self.updateStats()
               .catch(e => {
                 response.status = 500;
                 response.error = new Error(`Failed updating stats: ${e.message}`);
-                assistant.error(response.error)
+                ctx.error(response.error)
               })
 
             await stats
@@ -69,19 +69,19 @@ let Module = {
               .catch(function (e) {
                 response.status = 500;
                 response.error = e;
-                assistant.error(response.error)
+                ctx.error(response.error)
               })
           })
           .catch(function (e) {
             response.status = 500;
             response.error = e;
-            assistant.error(response.error)
+            ctx.error(response.error)
           })
       }
 
       // response.data = data;
 
-      assistant.log('Stats', assistant.request.data, response);
+      ctx.log('Stats', ctx.request.data, response);
 
       if (response.status === 200) {
         return res.status(response.status).json(response.data);
@@ -105,7 +105,7 @@ let Module = {
           .catch(e => {
             response.status = 500;
             response.error = new Error(`Failed fixing stats: ${e.message}`);
-            self.assistant.error(response.error);
+            self.ctx.error(response.error);
           })
         await self.getAllSubscriptions()
           .then(r => {
@@ -114,7 +114,7 @@ let Module = {
           .catch(e => {
             response.status = 500;
             response.error = new Error(`Failed fixing stats: ${e.message}`);
-            self.assistant.error(response.error);
+            self.ctx.error(response.error);
           })
         await stats
           .set({

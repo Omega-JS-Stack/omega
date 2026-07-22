@@ -53,7 +53,7 @@ const PROCESSING_LEASE_SECONDS = 30 * 60;
 // cron cadence this is ~6 hours of retries.
 const GENERATOR_MAX_ATTEMPTS = 36;
 
-module.exports = async ({ Manager, assistant, libraries }) => {
+module.exports = async ({ Manager, ctx, libraries }) => {
   const { admin } = libraries;
   const now = Math.round(Date.now() / 1000);
   const collection = admin.firestore().collection('marketing-campaigns');
@@ -77,7 +77,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
       metadata: { updated: stamp() },
     }, { merge: true });
 
-    assistant.log(`Reclaimed stale processing lease on ${doc.id} (started ${moment.unix(startedAt).toISOString()})`);
+    ctx.log(`Reclaimed stale processing lease on ${doc.id} (started ${moment.unix(startedAt).toISOString()})`);
   }
 
   // --- Query campaigns that are ready to send ---
@@ -88,13 +88,13 @@ module.exports = async ({ Manager, assistant, libraries }) => {
     .get();
 
   if (snapshot.empty) {
-    assistant.log('No pending campaigns ready to send');
+    ctx.log('No pending campaigns ready to send');
     return;
   }
 
-  assistant.log(`Processing ${snapshot.size} campaign(s)...`);
+  ctx.log(`Processing ${snapshot.size} campaign(s)...`);
 
-  const email = Manager.Email(assistant);
+  const email = Manager.Email(ctx);
 
   const results = await Promise.allSettled(snapshot.docs.map(async (doc) => {
     const data = doc.data();
@@ -106,11 +106,11 @@ module.exports = async ({ Manager, assistant, libraries }) => {
     const claimed = await claimCampaign(admin, doc, now);
 
     if (!claimed) {
-      assistant.log(`Campaign ${campaignId} already claimed by another run, skipping`);
+      ctx.log(`Campaign ${campaignId} already claimed by another run, skipping`);
       return;
     }
 
-    assistant.log(`Processing campaign ${campaignId} (${type}): ${settings.name}`);
+    ctx.log(`Processing campaign ${campaignId} (${type}): ${settings.name}`);
 
     // --- Generator campaigns: generate content + send in one shot ---
     if (generator) {
@@ -125,14 +125,14 @@ module.exports = async ({ Manager, assistant, libraries }) => {
           metadata: { updated: stamp() },
         }, { merge: true });
 
-        assistant.log(`Unknown generator "${generator}" on ${campaignId} — marked failed`);
+        ctx.log(`Unknown generator "${generator}" on ${campaignId} — marked failed`);
         return;
       }
 
-      assistant.log(`Running generator "${generator}" for ${campaignId}...`);
+      ctx.log(`Running generator "${generator}" for ${campaignId}...`);
 
       const generatedId = pushid();
-      const generated = await generators[generator].generate(Manager, assistant, settings, {
+      const generated = await generators[generator].generate(Manager, ctx, settings, {
         campaignId: generatedId,
         imageHost: 'github',
         publishArticle: Manager.isProduction(),
@@ -154,7 +154,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
               metadata: { updated: stamp() },
             }, { merge: true });
 
-            assistant.log(`Generator "${generator}" yielded nothing ${attempts}x on ${campaignId} — skipping to next occurrence: ${moment.unix(nextSendAt).toISOString()}`);
+            ctx.log(`Generator "${generator}" yielded nothing ${attempts}x on ${campaignId} — skipping to next occurrence: ${moment.unix(nextSendAt).toISOString()}`);
           } else {
             await doc.ref.set({
               status: 'failed',
@@ -162,7 +162,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
               metadata: { updated: stamp() },
             }, { merge: true });
 
-            assistant.log(`Generator "${generator}" yielded nothing ${attempts}x on one-off ${campaignId} — marked failed`);
+            ctx.log(`Generator "${generator}" yielded nothing ${attempts}x on one-off ${campaignId} — marked failed`);
           }
 
           return;
@@ -174,7 +174,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
           metadata: { updated: stamp() },
         }, { merge: true });
 
-        assistant.log(`Generator "${generator}" returned no content for ${campaignId}, will retry next run (attempt ${attempts}/${GENERATOR_MAX_ATTEMPTS})`);
+        ctx.log(`Generator "${generator}" returned no content for ${campaignId}, will retry next run (attempt ${attempts}/${GENERATOR_MAX_ATTEMPTS})`);
         return;
       }
 
@@ -192,7 +192,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
         ...generatedSettings
       } = generated;
 
-      assistant.log(`Generated content for ${campaignId}: "${generated.subject}"`);
+      ctx.log(`Generated content for ${campaignId}: "${generated.subject}"`);
 
       // Send immediately
       const campaignResults = await email.sendCampaign({ ...generatedSettings, sendAt: 'now' });
@@ -223,7 +223,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
           metadata: { updated: stamp() },
         }, { merge: true });
 
-        assistant.log(`${success ? 'Sent' : 'Failed'} generator campaign ${campaignId}, next: ${moment.unix(nextSendAt).toISOString()}`);
+        ctx.log(`${success ? 'Sent' : 'Failed'} generator campaign ${campaignId}, next: ${moment.unix(nextSendAt).toISOString()}`);
       } else {
         // One-off: finalize so it is never picked up again
         await doc.ref.set({
@@ -233,7 +233,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
           metadata: { updated: stamp() },
         }, { merge: true });
 
-        assistant.log(`${success ? 'Sent' : 'Failed'} generator campaign ${campaignId} (one-off)`);
+        ctx.log(`${success ? 'Sent' : 'Failed'} generator campaign ${campaignId} (one-off)`);
       }
 
       return;
@@ -250,7 +250,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
         : (settings.filters || {});
 
       campaignResults = {
-        push: await notification.send(assistant, {
+        push: await notification.send(ctx, {
           title: settings.name,
           body: settings.subject || settings.body,
           icon: settings.icon || Manager.config.brand?.images?.brandmark,
@@ -265,7 +265,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
         metadata: { updated: stamp() },
       }, { merge: true });
 
-      assistant.log(`Unknown campaign type "${type}" on ${campaignId} — marked failed`);
+      ctx.log(`Unknown campaign type "${type}" on ${campaignId} — marked failed`);
       return;
     }
 
@@ -295,7 +295,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
         metadata: { updated: stamp() },
       }, { merge: true });
 
-      assistant.log(`Recurring campaign ${campaignId} ${success ? 'sent' : 'failed'}, next: ${moment.unix(nextSendAt).toISOString()}`);
+      ctx.log(`Recurring campaign ${campaignId} ${success ? 'sent' : 'failed'}, next: ${moment.unix(nextSendAt).toISOString()}`);
     } else {
       // One-off: update status directly
       await doc.ref.set({
@@ -304,7 +304,7 @@ module.exports = async ({ Manager, assistant, libraries }) => {
         metadata: { updated: stamp() },
       }, { merge: true });
 
-      assistant.log(`Campaign ${campaignId} ${success ? 'sent' : 'failed'}`);
+      ctx.log(`Campaign ${campaignId} ${success ? 'sent' : 'failed'}`);
     }
   }));
 
@@ -315,11 +315,11 @@ module.exports = async ({ Manager, assistant, libraries }) => {
     if (r.status === 'rejected') {
       // The campaign doc stays 'processing' — the stale-lease reclaim retries
       // it after PROCESSING_LEASE_SECONDS instead of every 10 minutes.
-      assistant.error(`Failed to process campaign: ${r.reason?.message}`, r.reason);
+      ctx.error(`Failed to process campaign: ${r.reason?.message}`, r.reason);
     }
   }
 
-  assistant.log(`Completed! (${sent} processed, ${failed} failed)`);
+  ctx.log(`Completed! (${sent} processed, ${failed} failed)`);
 };
 
 /**

@@ -22,34 +22,34 @@ const { retryWrite, runAuthHook, MAX_RETRIES } = require('./utils.js');
  * context (EventContext — NOT AuthEventContext, no ipAddress/userAgent/locale):
  *   eventId, eventType, timestamp, resource: { service, name }, params
  */
-module.exports = async ({ Manager, assistant, user, context, libraries }) => {
+module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  assistant.log(`onDelete: ${user.uid} (${user.email})`, user, context);
+  ctx.log(`onDelete: ${user.uid} (${user.email})`, user, context);
 
   // Check if user doc exists before attempting delete
   const existingDoc = await admin.firestore().doc(`users/${user.uid}`)
     .get()
     .catch(e => {
-      assistant.error(`onDelete: Failed to check existing doc for ${user.uid}:`, e);
+      ctx.error(`onDelete: Failed to check existing doc for ${user.uid}:`, e);
       return null;
     });
 
   if (!existingDoc || !existingDoc.exists) {
-    assistant.log(`onDelete: User doc does not exist for ${user.uid}, skipping (${Date.now() - startTime}ms)`);
+    ctx.log(`onDelete: User doc does not exist for ${user.uid}, skipping (${Date.now() - startTime}ms)`);
     return;
   }
 
   // Delete user doc with retry
   try {
-    await retryWrite(assistant, 'onDelete', async () => {
+    await retryWrite(ctx, 'onDelete', async () => {
       await admin.firestore().doc(`users/${user.uid}`).delete();
     });
 
-    assistant.log(`onDelete: Successfully deleted user doc for ${user.uid}`);
+    ctx.log(`onDelete: Successfully deleted user doc for ${user.uid}`);
   } catch (error) {
-    assistant.error(`onDelete: Failed to delete user doc after ${MAX_RETRIES} retries:`, error);
+    ctx.error(`onDelete: Failed to delete user doc after ${MAX_RETRIES} retries:`, error);
 
     // Don't reject - the user was already deleted from Auth
     // Just log the error and continue
@@ -58,22 +58,22 @@ module.exports = async ({ Manager, assistant, user, context, libraries }) => {
 
   // Remove marketing contact from all providers (non-blocking)
   if (user.email) {
-    const email = Manager.Email(assistant);
+    const email = Manager.Email(ctx);
     email.remove(user.email)
-      .then((r) => assistant.log('onDelete: Marketing remove:', r))
-      .catch((e) => assistant.error('onDelete: Marketing remove failed:', e));
+      .then((r) => ctx.log('onDelete: Marketing remove:', r))
+      .catch((e) => ctx.error('onDelete: Marketing remove failed:', e));
   }
 
   // Send delete analytics (server-side only event)
   Manager.Analytics({
-    assistant: assistant,
+    ctx: ctx,
     uuid: user.uid,
   }).event('user_delete', {});
 
   // Run consumer hook (non-blocking — errors logged but don't fail)
-  await runAuthHook('on-delete', { Manager, assistant, user, context, libraries }).catch(e => {
-    assistant.error('onDelete: Consumer hook error:', e);
+  await runAuthHook('on-delete', { Manager, ctx, user, context, libraries }).catch(e => {
+    ctx.error('onDelete: Consumer hook error:', e);
   });
 
-  assistant.log(`onDelete: Completed for ${user.uid} (${Date.now() - startTime}ms)`);
+  ctx.log(`onDelete: Completed for ${user.uid} (${Date.now() - startTime}ms)`);
 };

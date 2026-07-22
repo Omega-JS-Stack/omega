@@ -15,15 +15,15 @@ module.exports = {
    * @param {string} options.uid - User's UID
    * @param {string} options.email - User's email (for customer resolution)
    * @param {string|null} options.returnUrl - URL to return to after portal session
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {object} { url }
    */
-  async createPortalSession({ uid, email, returnUrl, assistant }) {
+  async createPortalSession({ uid, email, returnUrl, ctx }) {
     const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
     const stripe = StripeLib.init();
 
     // Resolve the Stripe customer for this user
-    const customer = await StripeLib.resolveCustomer(uid, email, assistant);
+    const customer = await StripeLib.resolveCustomer(uid, email, ctx);
 
     // Lazily create and cache a portal configuration with cancellation disabled
     if (!portalConfigId) {
@@ -40,7 +40,7 @@ module.exports = {
       });
 
       portalConfigId = config.id;
-      assistant.log(`Created Stripe portal config: ${portalConfigId}`);
+      ctx.log(`Created Stripe portal config: ${portalConfigId}`);
     }
 
     // Build session params
@@ -55,7 +55,7 @@ module.exports = {
 
     const session = await stripe.billingPortal.sessions.create(sessionParams);
 
-    assistant.log(`Stripe portal session created: uid=${uid}, customerId=${customer.id}, url=${session.url}`);
+    ctx.log(`Stripe portal session created: uid=${uid}, customerId=${customer.id}, url=${session.url}`);
 
     return { url: session.url };
   },

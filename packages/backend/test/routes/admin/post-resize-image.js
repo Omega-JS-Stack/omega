@@ -39,7 +39,7 @@ async function makeJpeg(width, height) {
   return filepath;
 }
 
-// Minimal assistant stub — resizeImage only uses Manager.require + log.
+// Minimal ctx stub — resizeImage only uses Manager.require + log.
 function makeAssistant() {
   return {
     log: () => {},

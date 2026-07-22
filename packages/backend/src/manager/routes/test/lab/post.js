@@ -1,8 +1,8 @@
-module.exports = async ({ assistant, user, settings }) => {
+module.exports = async ({ ctx, user, settings }) => {
 
   // Check admin
   if (!user.roles.admin) {
-    assistant.log('User is not admin');
+    ctx.log('User is not admin');
   }
 
   // Example: Send notification (demonstrates calling another @omega.js/backend endpoint)
@@ -11,7 +11,7 @@ module.exports = async ({ assistant, user, settings }) => {
   const icon = 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/socials/itw-creative-works-brandmark-square-black-1024x1024.png?cb=1651834176';
 
   // For now, just return success - the lab is a testing sandbox
-  assistant.log('Lab test executed', { url, title, icon });
+  ctx.log('Lab test executed', { url, title, icon });
 
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 };

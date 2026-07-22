@@ -20,10 +20,10 @@ module.exports = {
    * @param {string} options.resourceId - Stripe subscription ID (e.g., 'sub_xxx')
    * @param {string} options.uid - User's UID (for logging)
    * @param {object} options.subscription - User's subscription object from Firestore
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {{ amount: number, currency: string, full: boolean }}
    */
-  async processRefund({ resourceId, uid, assistant }) {
+  async processRefund({ resourceId, uid, ctx }) {
     const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
     const stripe = StripeLib.init();
 
@@ -91,13 +91,13 @@ module.exports = {
       idempotencyKey: `omega-refund-${resourceId}`,
     });
 
-    assistant.log(`Stripe refund created: refundId=${refund.id}, amount=${refundAmount}, full=${isFullRefund}, uid=${uid}`);
+    ctx.log(`Stripe refund created: refundId=${refund.id}, amount=${refundAmount}, full=${isFullRefund}, uid=${uid}`);
 
     // 5. Cancel subscription immediately (if not already canceled)
     //    This triggers customer.subscription.deleted webhook → existing pipeline
     if (sub.status !== 'canceled') {
       await stripe.subscriptions.cancel(resourceId);
-      assistant.log(`Stripe subscription cancelled immediately: sub=${resourceId}, uid=${uid}`);
+      ctx.log(`Stripe subscription cancelled immediately: sub=${resourceId}, uid=${uid}`);
     }
 
     return {

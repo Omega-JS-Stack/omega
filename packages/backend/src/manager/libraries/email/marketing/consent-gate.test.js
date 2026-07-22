@@ -6,7 +6,7 @@
  * - isMarketingRevoked() — the pure gate semantic (revoked-only skip).
  * - sync() — gate fires after doc resolution, BEFORE validation/providers, so a
  *   revoked doc returns { blocked: 'consent', email } with zero I/O. Proceed cases
- *   stop at the testing-mode provider guard (assistant.isTesting() → true here).
+ *   stop at the testing-mode provider guard (ctx.isTesting() → true here).
  * - add() — by-email lookup runs through a minimal in-memory firestore stand-in to
  *   exercise add()'s wiring (block on revoked, proceed on no-user, fail open on
  *   lookup error). The emulator suites (test/routes/marketing/*) remain the
@@ -39,13 +39,13 @@ const GATE_CASES = [
 ];
 
 /**
- * Minimal assistant — just what the Marketing constructor + gate paths read.
+ * Minimal ctx — just what the Marketing constructor + gate paths read.
  * isTesting() → true so proceed cases stop at the provider guard (no network).
  */
 function buildAssistant(admin) {
   const calls = { logs: [], warns: [], errors: [] };
 
-  const assistant = {
+  const ctx = {
     Manager: {
       libraries: { admin },
       config: {},
@@ -56,7 +56,7 @@ function buildAssistant(admin) {
     error: (...args) => calls.errors.push(args),
   };
 
-  return { assistant, calls };
+  return { ctx, calls };
 }
 
 /**
@@ -141,8 +141,8 @@ async function run() {
 
   // ─── 2. sync() blocks a revoked doc (gate fires before validation/providers) ───
   {
-    const { assistant, calls } = buildAssistant(null);
-    const result = await new Marketing(assistant).sync(REVOKED_DOC);
+    const { ctx, calls } = buildAssistant(null);
+    const result = await new Marketing(ctx).sync(REVOKED_DOC);
 
     check(result.blocked === 'consent', 'sync(): blocks revoked doc', `Expected blocked='consent', got ${JSON.stringify(result)}`);
     check(result.email === 'revoked.user@gmail.com', 'sync(): blocked result includes email', `Got ${JSON.stringify(result)}`);
@@ -151,16 +151,16 @@ async function run() {
 
   // ─── 3. sync() proceeds on missing consent (legacy user) ───
   {
-    const { assistant } = buildAssistant(null);
-    const result = await new Marketing(assistant).sync(LEGACY_DOC);
+    const { ctx } = buildAssistant(null);
+    const result = await new Marketing(ctx).sync(LEGACY_DOC);
 
     check(result.blocked === undefined, 'sync(): proceeds on missing consent', `Expected no block, got ${JSON.stringify(result)}`);
   }
 
   // ─── 4. sync() proceeds on granted consent ───
   {
-    const { assistant } = buildAssistant(null);
-    const result = await new Marketing(assistant).sync(GRANTED_DOC);
+    const { ctx } = buildAssistant(null);
+    const result = await new Marketing(ctx).sync(GRANTED_DOC);
 
     check(result.blocked === undefined, 'sync(): proceeds on granted consent', `Expected no block, got ${JSON.stringify(result)}`);
   }
@@ -168,8 +168,8 @@ async function run() {
   // ─── 5. sync() by uid blocks when the fetched doc is revoked ───
   {
     const { admin, captured } = buildAdmin({ userDoc: REVOKED_DOC });
-    const { assistant } = buildAssistant(admin);
-    const result = await new Marketing(assistant).sync('revoked-uid');
+    const { ctx } = buildAssistant(admin);
+    const result = await new Marketing(ctx).sync('revoked-uid');
 
     check(result.blocked === 'consent', 'sync(uid): blocks revoked fetched doc', `Expected blocked='consent', got ${JSON.stringify(result)}`);
     check(captured.docPaths[0] === 'users/revoked-uid', 'sync(uid): fetches users/{uid}', `Got ${JSON.stringify(captured.docPaths)}`);
@@ -178,8 +178,8 @@ async function run() {
   // ─── 6. add() blocks when the email maps to a revoked user ───
   {
     const { admin, captured } = buildAdmin({ userDoc: REVOKED_DOC });
-    const { assistant, calls } = buildAssistant(admin);
-    const result = await new Marketing(assistant).add({ email: 'revoked.user@gmail.com' });
+    const { ctx, calls } = buildAssistant(admin);
+    const result = await new Marketing(ctx).add({ email: 'revoked.user@gmail.com' });
 
     check(result.blocked === 'consent', 'add(): blocks revoked user by email', `Expected blocked='consent', got ${JSON.stringify(result)}`);
     check(result.email === 'revoked.user@gmail.com', 'add(): blocked result includes email', `Got ${JSON.stringify(result)}`);
@@ -200,8 +200,8 @@ async function run() {
   // ─── 7. add() normalizes the email for the lookup ───
   {
     const { admin, captured } = buildAdmin({ userDoc: null });
-    const { assistant } = buildAssistant(admin);
-    await new Marketing(assistant).add({ email: '  Revoked.User@GMAIL.com  ' });
+    const { ctx } = buildAssistant(admin);
+    await new Marketing(ctx).add({ email: '  Revoked.User@GMAIL.com  ' });
 
     check(
       captured.queries[0]?.value === 'revoked.user@gmail.com',
@@ -213,8 +213,8 @@ async function run() {
   // ─── 8. add() proceeds when no user doc exists (pure newsletter contact) ───
   {
     const { admin } = buildAdmin({ userDoc: null });
-    const { assistant } = buildAssistant(admin);
-    const result = await new Marketing(assistant).add({ email: 'newsletter.reader@gmail.com' });
+    const { ctx } = buildAssistant(admin);
+    const result = await new Marketing(ctx).add({ email: 'newsletter.reader@gmail.com' });
 
     check(result.blocked === undefined, 'add(): proceeds when no user doc exists', `Expected no block, got ${JSON.stringify(result)}`);
   }
@@ -222,8 +222,8 @@ async function run() {
   // ─── 9. add() proceeds when the matched user has no consent field (legacy) ───
   {
     const { admin } = buildAdmin({ userDoc: LEGACY_DOC });
-    const { assistant } = buildAssistant(admin);
-    const result = await new Marketing(assistant).add({ email: 'legacy.user@gmail.com' });
+    const { ctx } = buildAssistant(admin);
+    const result = await new Marketing(ctx).add({ email: 'legacy.user@gmail.com' });
 
     check(result.blocked === undefined, 'add(): proceeds on legacy user (no consent field)', `Expected no block, got ${JSON.stringify(result)}`);
   }
@@ -231,8 +231,8 @@ async function run() {
   // ─── 10. add() fails open when the lookup errors ───
   {
     const { admin } = buildAdmin({ failLookup: true });
-    const { assistant, calls } = buildAssistant(admin);
-    const result = await new Marketing(assistant).add({ email: 'someone@gmail.com' });
+    const { ctx, calls } = buildAssistant(admin);
+    const result = await new Marketing(ctx).add({ email: 'someone@gmail.com' });
 
     check(result.blocked === undefined, 'add(): fails open on lookup error', `Expected no block, got ${JSON.stringify(result)}`);
     check(calls.errors.length === 1, 'add(): lookup error is logged', `Got ${calls.errors.length} errors`);

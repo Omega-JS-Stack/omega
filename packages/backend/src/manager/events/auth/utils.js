@@ -6,7 +6,7 @@ const RETRY_DELAY_MS = 1000;
 /**
  * Retry a function up to maxRetries times with exponential backoff
  */
-async function retryWrite(assistant, tag, fn) {
+async function retryWrite(ctx, tag, fn) {
   let lastError;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -15,11 +15,11 @@ async function retryWrite(assistant, tag, fn) {
       return; // Success
     } catch (error) {
       lastError = error;
-      assistant.error(`${tag}: Write attempt ${attempt}/${MAX_RETRIES} failed:`, error);
+      ctx.error(`${tag}: Write attempt ${attempt}/${MAX_RETRIES} failed:`, error);
 
       if (attempt < MAX_RETRIES) {
         const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1); // Exponential backoff: 1s, 2s, 4s
-        assistant.log(`${tag}: Retrying in ${delay}ms...`);
+        ctx.log(`${tag}: Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -42,7 +42,7 @@ async function retryWrite(assistant, tag, fn) {
  *   - Hook errors are logged but don't block the operation
  *
  * Hook signature:
- *   module.exports = async ({ Manager, assistant, user, context, libraries }) => { ... }
+ *   module.exports = async ({ Manager, ctx, user, context, libraries }) => { ... }
  *
  * Consumer project structure:
  *   functions/
@@ -54,7 +54,7 @@ async function retryWrite(assistant, tag, fn) {
  *         on-delete.js       — runs after @omega.js/backend deletes user doc
  */
 async function runAuthHook(eventName, args) {
-  const { Manager, assistant } = args;
+  const { Manager, ctx } = args;
   const hookPath = `${Manager.cwd}/hooks/auth/${eventName}.js`;
 
   // Check if hook file exists
@@ -62,13 +62,13 @@ async function runAuthHook(eventName, args) {
     return;
   }
 
-  assistant.log(`${eventName}: Running consumer hook @ ${hookPath}`);
+  ctx.log(`${eventName}: Running consumer hook @ ${hookPath}`);
 
   // Load and execute — passes the same args object the @omega.js/backend handler received
   const hook = require(hookPath);
   await hook(args);
 
-  assistant.log(`${eventName}: Consumer hook completed`);
+  ctx.log(`${eventName}: Consumer hook completed`);
 }
 
 module.exports = { retryWrite, runAuthHook, MAX_RETRIES };

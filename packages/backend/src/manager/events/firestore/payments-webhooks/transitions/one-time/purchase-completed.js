@@ -4,8 +4,8 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant }) {
-  const brandName = assistant.Manager.config.brand?.name || '';
+module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
+  const brandName = ctx.Manager.config.brand?.name || '';
   const productName = after.product?.name || '';
 
   // Pre-compute discount values for the email template
@@ -13,14 +13,14 @@ module.exports = async function ({ before, after, order, uid, userDoc, assistant
   const discount = order.discount;
   const hasPromoDiscount = discount?.valid === true && discount?.percent > 0;
 
-  assistant.log(`Transition [one-time/purchase-completed]: uid=${uid}, resourceId=${after.payment?.resourceId}, discount=${hasPromoDiscount ? discount.code : 'none'}`);
+  ctx.log(`Transition [one-time/purchase-completed]: uid=${uid}, resourceId=${after.payment?.resourceId}, discount=${hasPromoDiscount ? discount.code : 'none'}`);
 
   sendOrderEmail({
     template: 'order',
     subject: `Your ${brandName} ${productName} order #${order?.id || ''}`,
     categories: ['order/confirmation'],
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'confirmation',
         ...order,

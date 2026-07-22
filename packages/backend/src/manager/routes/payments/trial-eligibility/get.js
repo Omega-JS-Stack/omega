@@ -3,12 +3,12 @@
  * Returns whether the authenticated user is eligible for a free trial
  * Eligible = no previous subscription orders in payments-orders
  */
-module.exports = async ({ assistant, user, libraries }) => {
+module.exports = async ({ ctx, user, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   const uid = user.auth.uid;
@@ -23,7 +23,7 @@ module.exports = async ({ assistant, user, libraries }) => {
 
   const eligible = historySnapshot.empty;
 
-  assistant.log(`Trial eligibility for ${uid}: ${eligible}`);
+  ctx.log(`Trial eligibility for ${uid}: ${eligible}`);
 
-  return assistant.respond({ eligible });
+  return ctx.respond({ eligible });
 };

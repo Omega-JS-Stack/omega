@@ -2,9 +2,9 @@
 
 ## 🚫 NEVER mock — test against the real emulator (HARD RULE)
 
-Tests run against a **real Firebase emulator** (real Firestore/Auth). **Do NOT hand-roll fake/stub/mock objects** — no `mockManager`, `mockAdmin`, `makeManager()`, fake `firestore()`/`admin`, stubbed `assistant`, or fake HTTP. Every test `run()` receives the **real** booted `Manager`, `assistant`, `firestore`, `http`, and `accounts` (see [the test context](#test-context)). Use them.
+Tests run against a **real Firebase emulator** (real Firestore/Auth). **Do NOT hand-roll fake/stub/mock objects** — no `mockManager`, `mockAdmin`, `makeManager()`, fake `firestore()`/`admin`, stubbed `ctx`, or fake HTTP. Every test `run()` receives the **real** booted `Manager`, `ctx`, `firestore`, `http`, and `accounts` (see [the test context](#test-context)). Use them.
 
-- Call routes over `http.as(...)`; call handlers/helpers with the real `Manager`/`assistant` from context; read/write/verify with the real `firestore` helper.
+- Call routes over `http.as(...)`; call handlers/helpers with the real `Manager`/`ctx` from context; read/write/verify with the real `firestore` helper.
 - **Pure functions are the only exception** — a function with zero I/O can be `require()`d and called with plain inputs (nothing to mock). The instant it touches Firestore or any external system, it must run for real against the emulator.
 - **Real external APIs (OpenAI, PayPal, GitHub, SendGrid, Beehiiv, Stripe) are gated behind `TEST_EXTENDED_MODE` in the source, NOT mocked** — see [Extended Mode](#extended-mode-test_extended_mode). Normal mode skips them; extended mode runs them for real.
 - **Anything an extended test creates in an external system must be cleaned up by the test** (delete the GitHub file, cancel the PayPal invoice, etc.) — the runner's pre-test wipe only covers local Firestore/Auth.
@@ -13,7 +13,7 @@ If you're writing `const mockX = {...}` to satisfy a function under test, STOP a
 
 ### The ONLY two exceptions where a stub is allowed
 
-Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment — and even then, stub the *smallest possible seam*, never a whole `Manager`/`assistant`:
+Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment — and even then, stub the *smallest possible seam*, never a whole `Manager`/`ctx`:
 
 1. **A side effect that would destroy the test run itself.** If invoking the real method would kill or corrupt the harness — e.g. a process-exit, an `app.quit()`, a destructive filesystem wipe, a recursive re-invocation of the test/build command — you may stub *that one call* to a no-op, assert the surrounding logic, then restore it. You are not faking behavior; you are preventing the harness from terminating mid-assertion.
 2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omega.js/backend backends (parent → child brand servers). Only **one** @omega.js/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.js`.)
@@ -26,7 +26,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 
 | Coverage | Where | Proves |
 |---|---|---|
-| **Logic** | `test/routes/` / `test/events/` | The handler does the right thing — exercised against the real emulator (real Manager, `assistant`, Firestore) |
+| **Logic** | `test/routes/` / `test/events/` | The handler does the right thing — exercised against the real emulator (real Manager, `ctx`, Firestore) |
 | **Wiring** | Route round-trips over `http.as(...)` | The route is registered, auth-gated, schema-validated, and answers correctly over the real HTTP surface — this IS @omega.js/backend's end-to-end |
 | **Rules** | `test/rules/` suites | Firestore security rules permit/deny exactly as intended (required whenever rules change) |
 
@@ -94,7 +94,7 @@ Some routes fan out to **other @omega.js/backend backends** — e.g. a sponsorsh
 
 This means:
 - The target backend must be **deployed** with up-to-date code for extended tests to pass.
-- Normal (non-extended) test mode **gates these calls** via `assistant.isTesting() && !process.env.TEST_EXTENDED_MODE` checks, returning synthetic results. Extended mode makes the real call.
+- Normal (non-extended) test mode **gates these calls** via `ctx.isTesting() && !process.env.TEST_EXTENDED_MODE` checks, returning synthetic results. Extended mode makes the real call.
 - You **cannot** test cross-project API calls against a local emulator. If the live target is down or has a bug, extended tests that depend on it will fail.
 
 ## Test Data Cleanup — at the START of every run
@@ -139,7 +139,7 @@ The runner loads an optional `test/_init.js` from **both** test roots — @omega
 The module **must export a function** — `module.exports = (ctx) => ({ ... })` — called with `{ config, Manager }` and returning the hook object. (The function form lets a project compute its accounts/fixtures from config.) It may declare:
 
 - `accounts` — array of extra test accounts to create alongside the built-in ones (admin/basic/premium-*/journey-*), so this project has a user for each lifecycle it exercises. Each entry is `{ id, uid, email, properties }` (email may use the `{domain}` placeholder, `properties` is merged into the user doc after `auth:on-create`). These accounts are created, fetched (privateKeys), and deleted on the same path as the built-ins, and show up in the `accounts` map that tests and `setup()` receive. A project account may override a built-in one by reusing its `id`.
-- `async setup({ admin, config, accounts, Manager, assistant })` — seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed — the whole DB is wiped each run).
+- `async setup({ admin, config, accounts, Manager, ctx })` — seed fixtures (e.g. a brand doc) into the freshly-flushed DB, AFTER the clean slate + account creation. `accounts` is available so fixtures can reference a test uid. Use real ids that mirror production shape (no `_test-` prefix needed — the whole DB is wiped each run).
 
 There is **no `cleanup` hook**: the entire emulator Firestore is flushed before every run and each test cleans up after itself, so there is nothing project-level to tear down.
 
@@ -171,7 +171,7 @@ Several routes/handlers skip external API calls (SendGrid, Beehiiv, Stripe webho
 
 **@omega.js/backend propagates the mode to BOTH spawned environments — the distinctive @omega.js/backend detail.** The mode reaches (1) the **test-runner subprocess** (spawned with `{ ...process.env }`, so `TEST_EXTENDED_MODE` carries through) AND (2) the **running emulator's function workers** (via the `.temp/test-mode.json` shared state file written pre-flight by `src/test/utils/test-mode-file.js`, allowlisted in `SYNCED_ENV_KEYS`). That's why a single `--extended` on the test command flips both the runner's in-source gates and the live emulator without restarting it.
 
-The marketing library gates at the SSOT level: `Marketing.add()`, `Marketing.sync()`, and `Marketing.remove()` each short-circuit with `if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) return {}` before touching any provider. Callers (auth `onDelete`, webhook processors, contact-delete route) inherit the gate for free — do NOT rely on a per-caller guard for provider safety; add the gate to the library method itself when introducing a new provider-touching method.
+The marketing library gates at the SSOT level: `Marketing.add()`, `Marketing.sync()`, and `Marketing.remove()` each short-circuit with `if (ctx.isTesting() && !process.env.TEST_EXTENDED_MODE) return {}` before touching any provider. Callers (auth `onDelete`, webhook processors, contact-delete route) inherit the gate for free — do NOT rely on a per-caller guard for provider safety; add the gate to the library method itself when introducing a new provider-touching method.
 
 **Live sync — no env coordination across terminals.** The flag flows automatically from the test command to the running emulator via a small shared state file at `<projectRoot>/.temp/test-mode.json`. The test command writes the file pre-flight; the emulator's function workers watch it via `fs.watch` and mutate their own `process.env.TEST_EXTENDED_MODE` in place. Effect: you only need to set the flag on **the test command**. The emulator follows.
 
@@ -299,7 +299,7 @@ module.exports = {
 | `state` | Shared state (suites only) |
 | `waitFor` | Polling helper `waitFor(condition, timeout, interval)` |
 | `config` | Test configuration |
-| `Manager` | Real booted @omega.js/backend Manager (+ `Manager.Assistant()` etc.) |
+| `Manager` | Real booted @omega.js/backend Manager (+ `Manager.RouteContext()` etc.) |
 
 ## HTTP Routing
 

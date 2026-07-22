@@ -2,34 +2,34 @@
  * GET /admin/database - Read Realtime Database
  * Admin-only endpoint to read any path
  */
-module.exports = async ({ assistant, user, settings, libraries }) => {
+module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Require path
   if (!settings.path) {
-    return assistant.respond('Path parameter required.', { code: 400 });
+    return ctx.respond('Path parameter required.', { code: 400 });
   }
 
-  assistant.log('main(): Read', settings.path);
+  ctx.log('main(): Read', settings.path);
 
   // Read from Realtime Database
   const snapshot = await admin.database().ref(settings.path).once('value')
     .catch((e) => e);
 
   if (snapshot instanceof Error) {
-    return assistant.respond(snapshot.message, { code: 500 });
+    return ctx.respond(snapshot.message, { code: 500 });
   }
 
   // Return empty object if path doesn't exist (snapshot.val() returns null)
-  return assistant.respond(snapshot.val() || {});
+  return ctx.respond(snapshot.val() || {});
 };

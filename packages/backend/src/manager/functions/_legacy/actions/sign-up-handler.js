@@ -5,7 +5,7 @@ let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
     this.libraries = Manager.libraries;
-    this.assistant = Manager.Assistant({req: data.req, res: data.res})
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res})
     this.req = data.req;
     this.res = data.res;
 
@@ -14,7 +14,7 @@ let Module = {
   main: async function() {
     let self = this;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
     let req = self.req;
     let res = self.res;
 
@@ -25,7 +25,7 @@ let Module = {
 
 
     return libraries.cors(req, res, async () => {
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       if (!user.authenticated) {
         response.status = 401;
@@ -37,38 +37,38 @@ let Module = {
             email: user.auth.email,
           },
           affiliate: {
-            referredBy: assistant.request.data.affiliateCode
+            referredBy: ctx.request.data.affiliateCode
           },
         })
         .then(async function (result) {
           response.data = result;
-          if (assistant.request.data.newsletterSignUp) {
+          if (ctx.request.data.newsletterSignUp) {
             await addToMCList(
               self.Manager.config?.mailchimp?.key,
               self.Manager.config?.mailchimp?.list_id,
               user.auth.email,
             )
             .then(function (res) {
-              assistant.log('Sucessfully added user to MC list.')
+              ctx.log('Sucessfully added user to MC list.')
             })
             .catch(function (error) {
-              assistant.log('Failed to add user to MC list.', error)
+              ctx.log('Failed to add user to MC list.', error)
             })
           }
         })
         .catch(function (e) {
           response.status = 400;
           response.error = e;
-          assistant.error('Failed to signup:', response.error);
+          ctx.error('Failed to signup:', response.error);
         })
       }
 
-      assistant.log('Signup handler:', assistant.request.data, response);
+      ctx.log('Signup handler:', ctx.request.data, response);
 
       if (response.status === 200) {
         return res.status(response.status).json(response.data);
       } else {
-        assistant.error('Failed to signup:', assistant.request.data, user);
+        ctx.error('Failed to signup:', ctx.request.data, user);
         return res.status(response.status).send(response.error.message);
       }
     });
@@ -109,7 +109,7 @@ let Module = {
         uid: payload.auth.uid,
       })
       .catch(function (e) {
-        assistant.log('Failed to update affiliate code')
+        ctx.log('Failed to update affiliate code')
       })
 
       self.libraries.admin.firestore().doc(`users/${payload.auth.uid}`)
@@ -149,7 +149,7 @@ let Module = {
           count = referrals.length;
           referrals = referrals.concat({
             uid: payload.uid,
-            timestamp: self.assistant.meta.startTime.timestamp,
+            timestamp: self.ctx.meta.startTime.timestamp,
           })
 
           self.libraries.admin.firestore().doc(`users/${doc.id}`)

@@ -4,7 +4,7 @@
  * Pipeline: prepare (shared) → recipients (transactional-only) → render → deliver
  *
  * Usage:
- *   const email = Manager.Email(assistant);
+ *   const email = Manager.Email(ctx);
  *   const result = await email.send(settings);
  *
  * Used by:
@@ -21,11 +21,11 @@ const { SEND_AT_LIMIT, errorWithCode } = require('../constants.js');
 const { tagLinks } = require('../utm.js');
 const prepare = require('../prepare.js');
 
-function Transactional(assistant) {
+function Transactional(ctx) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant.Manager;
+  self.ctx = ctx;
+  self.Manager = ctx.Manager;
   self.admin = self.Manager.libraries.admin;
 
   return self;
@@ -48,7 +48,7 @@ Transactional.prototype.build = async function (settings) {
   const self = this;
   const Manager = self.Manager;
   const admin = self.admin;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   // --- 1. Brand + sender ---
   const { brand, brandDomain } = prepare.resolveBrand(Manager);
@@ -66,9 +66,9 @@ Transactional.prototype.build = async function (settings) {
   let bcc = normalizeRecipients(settings.bcc);
 
   [to, cc, bcc] = await Promise.all([
-    resolveRecipients(to, admin, assistant),
-    resolveRecipients(cc, admin, assistant),
-    resolveRecipients(bcc, admin, assistant),
+    resolveRecipients(to, admin, ctx),
+    resolveRecipients(cc, admin, ctx),
+    resolveRecipients(bcc, admin, ctx),
   ]);
 
   // Extract user properties from primary recipient for template data
@@ -215,9 +215,9 @@ Transactional.prototype.send = async function (settings) {
   const self = this;
   const Manager = self.Manager;
   const admin = self.admin;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
-  assistant.log(`Email.send(): to=${JSON.stringify(settings.to)}, subject=${settings.subject}, template=${settings.template}`);
+  ctx.log(`Email.send(): to=${JSON.stringify(settings.to)}, subject=${settings.subject}, template=${settings.template}`);
 
   const email = await self.build(settings);
 
@@ -227,7 +227,7 @@ Transactional.prototype.send = async function (settings) {
 
   // If scheduled beyond the limit, queue for later
   if (email.sendAt && email.sendAt >= moment().add(SEND_AT_LIMIT, 'hours').unix()) {
-    await saveToEmailQueue(settings, email.sendAt, admin, assistant);
+    await saveToEmailQueue(settings, email.sendAt, admin, ctx);
 
     return { status: 'queued', options: email, response: null };
   }
@@ -237,17 +237,17 @@ Transactional.prototype.send = async function (settings) {
 
   if (send instanceof Error) {
     const details = send?.response?.body?.errors || send;
-    assistant.error('Email send failed:', details);
+    ctx.error('Email send failed:', details);
     throw errorWithCode(`Failed to send email: ${JSON.stringify(details)}`, 500);
   }
 
   const messageId = send[0].headers['x-message-id'];
-  assistant.log('Email send succeeded:', messageId, send);
+  ctx.log('Email send succeeded:', messageId, send);
 
-  saveAuditTrail(email, messageId, admin, assistant);
+  saveAuditTrail(email, messageId, admin, ctx);
 
-  if (assistant.analytics) {
-    assistant.analytics.event('admin/email', { status: 'sent' });
+  if (ctx.analytics) {
+    ctx.analytics.event('admin/email', { status: 'sent' });
   }
 
   return { status: 'sent', options: email, response: send };
@@ -288,7 +288,7 @@ function normalizeRecipients(input) {
   return result;
 }
 
-async function resolveRecipients(recipients, admin, assistant) {
+async function resolveRecipients(recipients, admin, ctx) {
   const uidEntries = recipients.filter(r => r._uid);
   const nonUidEntries = recipients.filter(r => !r._uid);
 
@@ -300,7 +300,7 @@ async function resolveRecipients(recipients, admin, assistant) {
     uidEntries.map(entry =>
       admin.firestore().doc(`users/${entry._uid}`).get()
         .catch(e => {
-          assistant.error(`resolveRecipients(): Failed to fetch user ${entry._uid}`, e);
+          ctx.error(`resolveRecipients(): Failed to fetch user ${entry._uid}`, e);
           return null;
         })
     )
@@ -312,7 +312,7 @@ async function resolveRecipients(recipients, admin, assistant) {
     const snap = snapshots[i];
 
     if (!snap || !snap.exists) {
-      assistant.warn(`resolveRecipients(): User ${uidEntries[i]._uid} not found, skipping`);
+      ctx.warn(`resolveRecipients(): User ${uidEntries[i]._uid} not found, skipping`);
       continue;
     }
 
@@ -320,7 +320,7 @@ async function resolveRecipients(recipients, admin, assistant) {
     const email = data?.auth?.email;
 
     if (!email) {
-      assistant.warn(`resolveRecipients(): User ${uidEntries[i]._uid} has no email, skipping`);
+      ctx.warn(`resolveRecipients(): User ${uidEntries[i]._uid} has no email, skipping`);
       continue;
     }
 
@@ -390,7 +390,7 @@ function normalizeSendAt(sendAt) {
   return null;
 }
 
-async function saveToEmailQueue(settings, sendAt, admin, assistant) {
+async function saveToEmailQueue(settings, sendAt, admin, ctx) {
   const emailId = pushid();
 
   const settingsCloned = _.cloneDeepWith(settings, (value) => {
@@ -399,15 +399,15 @@ async function saveToEmailQueue(settings, sendAt, admin, assistant) {
     }
   });
 
-  assistant.log(`saveToEmailQueue(): Saving ${emailId}, sendAt=${sendAt}`);
+  ctx.log(`saveToEmailQueue(): Saving ${emailId}, sendAt=${sendAt}`);
 
   await admin.firestore().doc(`emails-queue/${emailId}`)
     .set({ settings: settingsCloned, sendAt })
-    .then(() => assistant.log(`saveToEmailQueue(): Success ${emailId}`))
-    .catch(e => assistant.error(`saveToEmailQueue(): Failed ${emailId}`, e));
+    .then(() => ctx.log(`saveToEmailQueue(): Success ${emailId}`))
+    .catch(e => ctx.error(`saveToEmailQueue(): Failed ${emailId}`, e));
 }
 
-function saveAuditTrail(email, messageId, admin, assistant) {
+function saveAuditTrail(email, messageId, admin, ctx) {
   const emailCloned = _.cloneDeepWith(email, (value) => {
     if (typeof value === 'undefined') {
       return null;
@@ -419,10 +419,10 @@ function saveAuditTrail(email, messageId, admin, assistant) {
       id: messageId,
       request: emailCloned,
       body: { html: '', text: '' },
-      created: assistant.meta.startTime,
+      created: ctx.meta.startTime,
     })
-    .then(() => assistant.log(`Audit trail saved: ${messageId}`))
-    .catch(e => assistant.error(`Audit trail failed: ${messageId}`, e));
+    .then(() => ctx.log(`Audit trail saved: ${messageId}`))
+    .catch(e => ctx.error(`Audit trail failed: ${messageId}`, e));
 }
 
 module.exports = Transactional;

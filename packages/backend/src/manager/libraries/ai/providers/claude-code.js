@@ -37,12 +37,12 @@ const MODEL_TABLE = {
   'claude-haiku-4-5':  { input: 1.00,  output: 5.00  },
 };
 
-function ClaudeCode(assistant, key) {
+function ClaudeCode(ctx, key) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant?.Manager;
-  self.user = assistant?.user;
+  self.ctx = ctx;
+  self.Manager = ctx?.Manager;
+  self.user = ctx?.user;
   self.token = key
     || self.Manager?.config?.claude_code?.oauth_token
     || process.env.CLAUDE_CODE_OAUTH_TOKEN;
@@ -58,7 +58,7 @@ function ClaudeCode(assistant, key) {
 
 ClaudeCode.prototype.request = async function (options) {
   const self = this;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   options = _.merge({}, options);
   options.model = options.model || DEFAULT_MODEL;
@@ -121,7 +121,7 @@ ClaudeCode.prototype.request = async function (options) {
   try {
     raw = await client.messages.create(requestBody);
   } catch (e) {
-    assistant?.error?.(`claude-code request failed: ${e.message}`, e);
+    ctx?.error?.(`claude-code request failed: ${e.message}`, e);
     throw e;
   }
 

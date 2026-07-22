@@ -275,7 +275,7 @@ class TestRunner {
       config: this.config,
       projectDir: this.options.projectDir,
       Manager: this.config.Manager,
-      assistant: this.config.assistant,
+      ctx: this.config.ctx,
     });
 
     if (!result.accounts) {
@@ -749,11 +749,11 @@ class TestRunner {
       pubsub,
       skip,
       admin: this.config.admin,
-      // Real @omega.js/backend Manager + assistant, booted by run-tests.js with OMEGA_TEST_RUNNER=1.
+      // Real @omega.js/backend Manager + ctx, booted by run-tests.js with OMEGA_TEST_RUNNER=1.
       // Tests can call Manager.AI(), Manager.Email(), Manager.User(), etc. exactly
       // like production code — no stubs.
       Manager: this.config.Manager,
-      assistant: this.config.assistant,
+      ctx: this.config.ctx,
       rules: this.rulesContext,
       config: this.config,
       payments: { stripeProductIds, products: productMeta },

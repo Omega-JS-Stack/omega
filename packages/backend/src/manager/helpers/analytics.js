@@ -19,20 +19,20 @@ function Analytics(Manager, options) {
 
   // Set properties
   self.Manager = Manager;
-  self.assistant = options?.assistant || Manager.Assistant();
+  self.ctx = options?.ctx || Manager.RouteContext();
 
   // Set request properties
   self.request = {
-    ip: self.assistant?.request?.geolocation?.ip || null,
-    country: self.assistant?.request?.geolocation?.country || null,
-    city: self.assistant?.request?.geolocation?.city || null,
-    region: self.assistant?.request?.geolocation?.region || null,
-    referrer: self.assistant?.request?.referrer || null,
-    userAgent: self.assistant?.request?.client?.userAgent || null,
-    language: (self.assistant?.request?.client?.language || '').split(',')[0] || null,
-    mobile: self.assistant?.request?.client?.mobile || false,
-    platform: self.assistant?.request?.client?.platform || null,
-    name: self.assistant?.meta?.name || '',
+    ip: self.ctx?.request?.geolocation?.ip || null,
+    country: self.ctx?.request?.geolocation?.country || null,
+    city: self.ctx?.request?.geolocation?.city || null,
+    region: self.ctx?.request?.geolocation?.region || null,
+    referrer: self.ctx?.request?.referrer || null,
+    userAgent: self.ctx?.request?.client?.userAgent || null,
+    language: (self.ctx?.request?.client?.language || '').split(',')[0] || null,
+    mobile: self.ctx?.request?.client?.mobile || false,
+    platform: self.ctx?.request?.client?.platform || null,
+    name: self.ctx?.meta?.name || '',
   }
 
   // Remove blacklisted user agents
@@ -45,7 +45,7 @@ function Analytics(Manager, options) {
   options.uuid = options.uuid || self.request.ip || Manager.SERVER_UUID;
   // Skip real analytics in ANY non-production environment (development OR testing) so
   // test/dev runs never pollute GA4. Intentional `!isProduction()` check.
-  options.isDevelopment = typeof options.isDevelopment === 'undefined' ? !self.assistant.isProduction() : options.isDevelopment;
+  options.isDevelopment = typeof options.isDevelopment === 'undefined' ? !self.ctx.isProduction() : options.isDevelopment;
   options.pageview = typeof options.pageview === 'undefined' ? true : options.pageview;
   options.version = options.version || Manager.package.version;
   options.userProperties = options.userProperties || {};
@@ -55,7 +55,7 @@ function Analytics(Manager, options) {
   // https://www.optimizesmart.com/how-to-create-and-use-user-properties-in-ga4/
   // https://developers.google.com/analytics/devguides/collection/protocol/ga4/user-properties?client_type=gtag
   // https://support.google.com/analytics/answer/12980150?hl=en&co=GENIE.Platform%3DAndroid
-  const authUser = self.assistant?.usage?.user;
+  const authUser = self.ctx?.usage?.user;
   self.userProperties = {
     app_version: {
       value: options.version,
@@ -108,7 +108,7 @@ function Analytics(Manager, options) {
     },
 
     // TODO
-    // Add custom events for user properties, like plan ID, etc, draw from self.assistant.usage, etc
+    // Add custom events for user properties, like plan ID, etc, draw from self.ctx.usage, etc
     authenticated: {
       value: authUser?.auth?.uid ? true : false,
     },
@@ -121,7 +121,7 @@ function Analytics(Manager, options) {
     activity_created: {
       value: moment(authUser?.metadata?.created?.timestampUNIX
         ? authUser?.metadata?.created?.timestamp
-        : self.assistant.meta.startTime.timestamp).format('YYYY-MM-DD'),
+        : self.ctx.meta.startTime.timestamp).format('YYYY-MM-DD'),
     },
 
     // ds? 'app
@@ -168,10 +168,10 @@ function Analytics(Manager, options) {
 
   // Check if we have the required properties
   if (!self.analyticsId) {
-    self.assistant.log('analytics(): Not initializing because missing analyticsId', self.analyticsId);
+    self.ctx.log('analytics(): Not initializing because missing analyticsId', self.analyticsId);
     return self;
   } else if (!self.analyticsSecret) {
-    self.assistant.log('analytics(): Not initializing because missing analyticsSecret', self.analyticsSecret);
+    self.ctx.log('analytics(): Not initializing because missing analyticsSecret', self.analyticsSecret);
     return self;
   }
 
@@ -196,7 +196,7 @@ function Analytics(Manager, options) {
 Analytics.prototype.generateId = function (id) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
   const options = self.options;
   const request = self.request;
   const userProperties = self.userProperties;
@@ -217,7 +217,7 @@ Analytics.prototype.generateId = function (id) {
 Analytics.prototype.event = function (payload, params) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
   const options = self.options;
   const request = self.request;
   const userProperties = self.userProperties;
@@ -249,7 +249,7 @@ Analytics.prototype.event = function (payload, params) {
   if (!self.initialized) {
     return self;
   } else if (options.isDevelopment) {
-    assistant.log('analytics().event(): Skipping because in development', options.uuid, JSON.stringify(payload));
+    ctx.log('analytics().event(): Skipping because in development', options.uuid, JSON.stringify(payload));
     return self;
   }
 
@@ -270,10 +270,10 @@ Analytics.prototype.event = function (payload, params) {
   payload.params.user_agent = request.userAgent;
   payload.params.page_referrer = request.referrer;
   // https://stackoverflow.com/questions/70708893/google-analytics-4-measurement-protocol-shows-events-but-no-users/71811327#71811327
-  payload.params.engagement_time_msec = new Date().getTime() - new Date(assistant.meta.startTime.timestamp).getTime();
+  payload.params.engagement_time_msec = new Date().getTime() - new Date(ctx.meta.startTime.timestamp).getTime();
   // payload.params.engagement_time_msec = 1;
   payload.params.debug_mode = false;
-  payload.params.session_id = assistant.id;
+  payload.params.session_id = ctx.id;
   // payload.params.campaign = 'your_campaign';
   // payload.params.source = 'your_source';
   // payload.params.medium = 'your_medium';
@@ -321,8 +321,8 @@ Analytics.prototype.event = function (payload, params) {
   }
 
   // Log full payload
-  if (assistant.isDevelopment()) {
-    assistant.log('analytics().event(): Sending...', url, JSON.stringify(body));
+  if (ctx.isDevelopment()) {
+    ctx.log('analytics().event(): Sending...', url, JSON.stringify(body));
   }
 
   // Send event
@@ -337,12 +337,12 @@ Analytics.prototype.event = function (payload, params) {
     body: body,
   })
   .then((r) => {
-    if (assistant.isDevelopment()) {
-      assistant.log('analytics().event(): Success', r);
+    if (ctx.isDevelopment()) {
+      ctx.log('analytics().event(): Success', r);
     }
   })
   .catch((e) => {
-    assistant.error('analytics().event(): Failed', e);
+    ctx.error('analytics().event(): Failed', e);
   });
 
   // Return
@@ -359,7 +359,7 @@ Analytics.prototype.event = function (payload, params) {
 //   if (!self.initialized) {
 //     return self;
 //   } else if (self.options.isDevelopment) {
-//     assistant.log('analytics(): Skipping Analytics.event() because in development', self.options.uuid, event);
+//     ctx.log('analytics(): Skipping Analytics.event() because in development', self.options.uuid, event);
 //     return self;
 //   }
 
@@ -387,7 +387,7 @@ Analytics.prototype.event = function (payload, params) {
 //   // event = event || {};
 //   // event.name = event.name || '';
 //   // event.params = event.params || {};
-//   // event.params.engagement_time_msec = `${new Date().getTime() - new Date(self.assistant.meta.startTime.timestamp).getTime()}`;
+//   // event.params.engagement_time_msec = `${new Date().getTime() - new Date(self.ctx.meta.startTime.timestamp).getTime()}`;
 //   // event.params.event_source = self.options.dataSource;
 //   // event.params.ip_override = self.request.ip;
 //   // event.params.user_agent = self.request.userAgent;
@@ -398,8 +398,8 @@ Analytics.prototype.event = function (payload, params) {
 //   event = event || {};
 //   event.name = event.name || '';
 //   event.params = event.params || {};
-//   // event.params.session_id = self.assistant.id;
-//   // event.params.engagement_time_msec = `${new Date().getTime() - new Date(self.assistant.meta.startTime.timestamp).getTime()}`;
+//   // event.params.session_id = self.ctx.id;
+//   // event.params.engagement_time_msec = `${new Date().getTime() - new Date(self.ctx.meta.startTime.timestamp).getTime()}`;
 //   // event.params.event_source = self.options.dataSource;
 //   // event.params.ip_override = self.request.ip;
 //   // event.params.user_agent = self.request.userAgent;
@@ -430,8 +430,8 @@ Analytics.prototype.event = function (payload, params) {
 //   }
 
 //   // Log
-//   if (self.assistant.isDevelopment()) {
-//     assistant.log('analytics().send(): Sending...', url, JSON.stringify(body));
+//   if (self.ctx.isDevelopment()) {
+//     ctx.log('analytics().send(): Sending...', url, JSON.stringify(body));
 //   }
 
 //   // Send event
@@ -447,12 +447,12 @@ Analytics.prototype.event = function (payload, params) {
 //     body: body,
 //   })
 //   .then((r) => {
-//     if (self.assistant.isDevelopment()) {
-//       assistant.log('analytics().send(): Success', r);
+//     if (self.ctx.isDevelopment()) {
+//       ctx.log('analytics().send(): Success', r);
 //     }
 //   })
 //   .catch((e) => {
-//     self.assistant.error('analytics().send(): Failed', e);
+//     self.ctx.error('analytics().send(): Failed', e);
 //   });
 
 //   return self;

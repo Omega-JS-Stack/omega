@@ -70,7 +70,7 @@ Campaigns with a `generator` field (e.g. `generator: 'newsletter'`) are handled 
 
 **Empty-run retry cap:** when the generator yields nothing (no sources, filter dropped everything), the campaign returns to `pending` with `generatorAttempts` incremented and retries next run. After `GENERATOR_MAX_ATTEMPTS` (36 ≈ 6h at the 10-minute cadence) a recurring campaign skips to its next occurrence (counter reset); a one-off is marked `failed`.
 
-**Test gating:** `generate()` short-circuits to `null` under `assistant.isTesting()` without `TEST_EXTENDED_MODE` — same convention as the marketing providers and the blog cron. A normal consumer test run never spends AI tokens or touches GitHub/Beehiiv; extended runs are production-equivalent.
+**Test gating:** `generate()` short-circuits to `null` under `ctx.isTesting()` without `TEST_EXTENDED_MODE` — same convention as the marketing providers and the blog cron. A normal consumer test run never spends AI tokens or touches GitHub/Beehiiv; extended runs are production-equivalent.
 
 In production, Beehiiv posts are published (`status: 'confirmed'`). In testing, they're forced to draft (`status: 'draft'`). The report email always goes to `alerts@{brandDomain}` with all asset links; its subject adapts to whether Beehiiv upload succeeded.
 
@@ -176,7 +176,7 @@ Per-brand subusers provide full contact/segment/field isolation under one billin
 Pipeline:
 1. Resolve sources: `resolveSources({ sources, count: sourceCount || 6, categories })` — the unified blog/newsletter resolver (source-resolver.js). Each pick is a RANDOM source from the entry's `sources` array; failures follow the type hierarchy ($feed → other feeds → $parent; $parent → other parent items; nothing falls to $brand). Firestore-checked so used items never repeat, session-checked so one issue never gets duplicates. See [docs/ghostii.md](ghostii.md#source-picking--fallback-hierarchy) for the full hierarchy.
 2. **structure.js** — Generic dispatcher. Resolves the active template, merges `BASE_SCHEMA` (universal fields: subject, preheader, signoff, citations) with the template's own `schema` fragment, calls the template's `buildPrompt({brand, newsletterConfig, sources})` to get the AI brief, runs the AI call, and normalizes the result via the template's optional `normalize()`. Default provider: `openai` (override per-run only via `NEWSLETTER_PROVIDER_STRUCTURE` env).
-3. **image-illustrator.js** (default) — One flat-vector PNG per section in parallel (`Promise.all`), generated directly via `Manager.AI(assistant).image()` → `gpt-image-2`. Iterates `structure.sections` — templates whose content shape isn't section-based (e.g. field-report uses `dispatches`) populate `sections` in their `normalize()` step so this loop keeps working unchanged. The prompt enforces a clean flat 2D vector style (Stripe / Linear / undraw.co aesthetic) built from the brand palette (`content.theme.{primary,secondary,accent}Color`), on a white background, no text. **Legacy method:** set `marketing.newsletter.content.method.image = 'svg'` to use the older `svg-illustrator.js` (AI authors an `<svg>`, rasterized via `@resvg/resvg-js`). Both methods return the same `{ png: Buffer, fallback, meta }` contract.
+3. **image-illustrator.js** (default) — One flat-vector PNG per section in parallel (`Promise.all`), generated directly via `Manager.AI(ctx).image()` → `gpt-image-2`. Iterates `structure.sections` — templates whose content shape isn't section-based (e.g. field-report uses `dispatches`) populate `sections` in their `normalize()` step so this loop keeps working unchanged. The prompt enforces a clean flat 2D vector style (Stripe / Linear / undraw.co aesthetic) built from the brand palette (`content.theme.{primary,secondary,accent}Color`), on a white background, no text. **Legacy method:** set `marketing.newsletter.content.method.image = 'svg'` to use the older `svg-illustrator.js` (AI authors an `<svg>`, rasterized via `@resvg/resvg-js`). Both methods return the same `{ png: Buffer, fallback, meta }` contract.
 4. **mjml-template.js** — Resolves the template by name from `templates/index.js`, calls `template.build({structure, imagePaths, theme, ...})` for the MJML, compiles to email-safe HTML via the `mjml` package. Brand-domain links get UTM-tagged via the existing `tagLinks()` utility.
 5. Mark used: `trackContentSource()` per source into the local `content-sources` collection — ONLY after generation succeeds. No PUT to the parent; the child tracks its own usage.
 
@@ -388,7 +388,7 @@ marketing: {
 | Newsletter markdown renderer (programmatic, no AI) | `src/manager/libraries/email/generators/lib/markdown-renderer.js` |
 | Ghostii article engine (writeArticle + publishArticle) | `src/manager/libraries/content/ghostii.js` |
 | Standalone blog article cron (off by default) | `src/manager/events/cron/daily/blog-auto-publisher.js` |
-| Unified AI library | `src/manager/libraries/ai/index.js` (OpenAI + Anthropic via `Manager.AI(assistant).request({ provider, ... })`) |
+| Unified AI library | `src/manager/libraries/ai/index.js` (OpenAI + Anthropic via `Manager.AI(ctx).request({ provider, ... })`) |
 | Notification library | `src/manager/libraries/notification.js` |
 | SendGrid provider | `src/manager/libraries/email/providers/sendgrid.js` |
 | Beehiiv provider | `src/manager/libraries/email/providers/beehiiv.js` |

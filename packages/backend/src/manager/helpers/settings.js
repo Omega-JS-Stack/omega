@@ -18,7 +18,7 @@ function Settings(m) {
   self.settings = null;
 }
 
-Settings.prototype.resolve = function (assistant, schema, settings, options) {
+Settings.prototype.resolve = function (ctx, schema, settings, options) {
   const self = this;
 
   // Shortcuts
@@ -32,7 +32,7 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
   options = options || {};
   options.dir = typeof options.dir === 'undefined' ? `${Manager.cwd}/schemas` : options.dir;
   options.schema = typeof options.schema === 'undefined' ? undefined : options.schema;
-  options.user = options.user || assistant.request.user;
+  options.user = options.user || ctx.request.user;
   options.checkRequired = typeof options.checkRequired === 'undefined' ? true : options.checkRequired;
 
   // Load schema if not provided and schema is defined in options
@@ -45,7 +45,7 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
     && typeof options.schema !== 'undefined'
   ) {
     // Try to load method-specific schema first, then fallback to main schema
-    const method = (assistant?.request?.method || '').toLowerCase();
+    const method = (ctx?.request?.method || '').toLowerCase();
     const methodFile = `${method}.js`;
     const schemaFile = options.schema.replace('.js', '');
 
@@ -61,21 +61,21 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
       && err.message.includes(expectedPath);
 
     try {
-      schema = loadSchema(assistant, methodSchemaPath);
-      assistant.log(`Settings.resolve(): Loaded method-specific schema: ${schemaFile}/${methodFile}`);
+      schema = loadSchema(ctx, methodSchemaPath);
+      ctx.log(`Settings.resolve(): Loaded method-specific schema: ${schemaFile}/${methodFile}`);
     } catch (methodErr) {
       if (!isMissingModule(methodErr, methodSchemaPath)) {
         throw methodErr;
       }
 
       try {
-        schema = loadSchema(assistant, indexSchemaPath);
-        assistant.log(`Settings.resolve(): Method-specific schema not found, using main schema fallback`);
+        schema = loadSchema(ctx, indexSchemaPath);
+        ctx.log(`Settings.resolve(): Method-specific schema not found, using main schema fallback`);
       } catch (indexErr) {
         if (!isMissingModule(indexErr, indexSchemaPath)) {
           throw indexErr;
         }
-        throw assistant.errorify(
+        throw ctx.report(
           `No schema for ${method.toUpperCase()} request: expected ${schemaFile}/${methodFile} or ${schemaFile}/index.js`,
           {code: 500},
         );
@@ -85,13 +85,13 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
 
   // If schema is not an object, throw an error
   if (!schema || typeof schema !== 'object') {
-    throw assistant.errorify(`Invalid schema provided`, {code: 400});
+    throw ctx.report(`Invalid schema provided`, {code: 400});
   }
 
   // Zod branch: a schema module may export a zod schema (fields builders for
   // powertools-parity semantics, raw zod for zod-native) — see helpers/schema-zod.js
   if (isZodSchema(schema)) {
-    self.settings = resolveZodSchema(assistant, schema, settings, options);
+    self.settings = resolveZodSchema(ctx, schema, settings, options);
     self.schema = buildSchemaMap(schema);
 
     return self.settings;
@@ -111,14 +111,14 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
     // Check if this node is marked as required
     let isRequired = false;
     if (typeof schemaNode.required === 'function') {
-      isRequired = schemaNode.required(assistant, settings, options);
+      isRequired = schemaNode.required(ctx, settings, options);
     } else if (typeof schemaNode.required === 'boolean') {
       isRequired = schemaNode.required;
     }
 
     // If the key is required and the original value is missing, throw an error
     if (options.checkRequired && isRequired && (typeof originalValue === 'undefined' || originalValue === '')) {
-      throw assistant.errorify(`Required key {${path}} is missing in settings`, {code: 400});
+      throw ctx.report(`Required key {${path}} is missing in settings`, {code: 400});
     }
 
     const resolvedNode = {
@@ -143,7 +143,7 @@ Settings.prototype.resolve = function (assistant, schema, settings, options) {
   self.settings = resolveSchema(settings, schema);
 
   // Enforce enums (sent values checked post-coercion; absent fields pass)
-  enforceEnums(assistant, settings, self.settings, enumPaths);
+  enforceEnums(ctx, settings, self.settings, enumPaths);
 
   // Set schema
   self.schema = resolvedSchema;
@@ -179,16 +179,16 @@ Settings.prototype.constant = function (name, options) {
   }
 };
 
-function loadSchema(assistant, schemaPath) {
+function loadSchema(ctx, schemaPath) {
   // Build context object with everything the schema might need
   const context = {
-    assistant: assistant,
-    user: assistant.getUser(),
-    data: assistant.request.data,
-    method: assistant.request.method,
-    headers: assistant.request.headers,
-    geolocation: assistant.request.geolocation,
-    client: assistant.request.client,
+    ctx: ctx,
+    user: ctx.getUser(),
+    data: ctx.request.data,
+    method: ctx.request.method,
+    headers: ctx.request.headers,
+    geolocation: ctx.request.geolocation,
+    client: ctx.request.client,
   };
 
   // Load schema - the schema function returns a flat object directly

@@ -12,8 +12,8 @@ const powertools = require('node-powertools');
  * 4. Sends email alert to brand contact
  * 5. Updates dispute document with results
  */
-module.exports = async ({ assistant, change, context }) => {
-  const Manager = assistant.Manager;
+module.exports = async ({ ctx, change, context }) => {
+  const Manager = ctx.Manager;
   const admin = Manager.libraries.admin;
 
   const dataAfter = change.after.data();
@@ -33,7 +33,7 @@ module.exports = async ({ assistant, change, context }) => {
     const alert = dataAfter.alert;
     const processor = alert.processor || 'stripe';
 
-    assistant.log(`Processing dispute ${alertId}: processor=${processor}, amount=${alert.amount}, card=****${alert.card.last4}, date=${alert.transactionDate}, chargeId=${alert.chargeId || 'none'}, paymentIntentId=${alert.paymentIntentId || 'none'}`);
+    ctx.log(`Processing dispute ${alertId}: processor=${processor}, amount=${alert.amount}, card=****${alert.card.last4}, date=${alert.transactionDate}, chargeId=${alert.chargeId || 'none'}, paymentIntentId=${alert.paymentIntentId || 'none'}`);
 
     // Load the processor module
     let processorModule;
@@ -44,7 +44,7 @@ module.exports = async ({ assistant, change, context }) => {
     }
 
     // Search for the matching charge
-    const match = await processorModule.searchAndMatch(alert, assistant);
+    const match = await processorModule.searchAndMatch(alert, ctx);
 
     // Build timestamps
     const now = powertools.timestamp(new Date(), { output: 'string' });
@@ -68,14 +68,14 @@ module.exports = async ({ assistant, change, context }) => {
         },
       }, { merge: true });
 
-      assistant.log(`Dispute ${alertId}: no matching charge found`);
+      ctx.log(`Dispute ${alertId}: no matching charge found`);
 
       // Still send email to alert brand about unmatched dispute
-      if (!assistant.isTesting() || process.env.TEST_EXTENDED_MODE) {
-        sendDisputeEmail({ alert, match: null, result: null, alertId, assistant });
+      if (!ctx.isTesting() || process.env.TEST_EXTENDED_MODE) {
+        sendDisputeEmail({ alert, match: null, result: null, alertId, ctx });
         await disputeRef.set({ actions: { email: 'success' } }, { merge: true });
       } else {
-        assistant.log(`Dispute ${alertId}: skipping email (testing mode)`);
+        ctx.log(`Dispute ${alertId}: skipping email (testing mode)`);
         await disputeRef.set({ actions: { email: 'skipped-testing' } }, { merge: true });
       }
 
@@ -83,7 +83,7 @@ module.exports = async ({ assistant, change, context }) => {
     }
 
     // Process refund and cancel
-    const result = await processorModule.processDispute(match, alert, assistant);
+    const result = await processorModule.processDispute(match, alert, ctx);
 
     // Update dispute document with results
     await disputeRef.set({
@@ -114,17 +114,17 @@ module.exports = async ({ assistant, change, context }) => {
     }, { merge: true });
 
     // Send email alert (fire-and-forget)
-    if (!assistant.isTesting() || process.env.TEST_EXTENDED_MODE) {
-      sendDisputeEmail({ alert, match, result, alertId, assistant });
+    if (!ctx.isTesting() || process.env.TEST_EXTENDED_MODE) {
+      sendDisputeEmail({ alert, match, result, alertId, ctx });
       await disputeRef.set({ actions: { email: 'success' } }, { merge: true });
     } else {
-      assistant.log(`Dispute ${alertId}: skipping email (testing mode)`);
+      ctx.log(`Dispute ${alertId}: skipping email (testing mode)`);
       await disputeRef.set({ actions: { email: 'skipped-testing' } }, { merge: true });
     }
 
-    assistant.log(`Dispute ${alertId} resolved: refund=${result.refundStatus}, cancel=${result.cancelStatus}`);
+    ctx.log(`Dispute ${alertId} resolved: refund=${result.refundStatus}, cancel=${result.cancelStatus}`);
   } catch (e) {
-    assistant.error(`Dispute ${alertId} failed: ${e.message}`, e);
+    ctx.error(`Dispute ${alertId} failed: ${e.message}`, e);
 
     await disputeRef.set({
       status: 'failed',
@@ -141,15 +141,15 @@ module.exports = async ({ assistant, change, context }) => {
  * @param {object|null} options.match - Match details (null if no match)
  * @param {object} [options.result] - Processing result (refund/cancel statuses)
  * @param {string} options.alertId - Dispute alert ID
- * @param {object} options.assistant - Assistant instance
+ * @param {object} options.ctx - Assistant instance
  */
-function sendDisputeEmail({ alert, match, result, alertId, assistant }) {
-  const Manager = assistant.Manager;
-  const email = Manager.Email(assistant);
+function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
+  const Manager = ctx.Manager;
+  const email = Manager.Email(ctx);
   const brandEmail = Manager.config.brand?.contact?.email;
 
   if (!brandEmail) {
-    assistant.error(`sendDisputeEmail(): No brand.contact.email configured, skipping`);
+    ctx.error(`sendDisputeEmail(): No brand.contact.email configured, skipping`);
     return;
   }
 
@@ -240,9 +240,9 @@ function sendDisputeEmail({ alert, match, result, alertId, assistant }) {
     },
   })
     .then((r) => {
-      assistant.log(`sendDisputeEmail(): Success alertId=${alertId}`);
+      ctx.log(`sendDisputeEmail(): Success alertId=${alertId}`);
     })
     .catch((e) => {
-      assistant.error(`sendDisputeEmail(): Failed alertId=${alertId}: ${e.message}`);
+      ctx.error(`sendDisputeEmail(): Failed alertId=${alertId}: ${e.message}`);
     });
 }

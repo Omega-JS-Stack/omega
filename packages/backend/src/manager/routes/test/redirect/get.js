@@ -1,9 +1,9 @@
-module.exports = async ({ assistant, settings }) => {
+module.exports = async ({ ctx, settings }) => {
 
   // Get URL from settings (defaults to itwcreativeworks.com)
   const url = settings.url;
 
-  assistant.log('Redirecting', url);
+  ctx.log('Redirecting', url);
 
-  return assistant.redirect(url);
+  return ctx.redirect(url);
 };

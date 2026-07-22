@@ -25,10 +25,10 @@ const DEFAULT_QUALITY = 'medium';     // medium is plenty for flat vector; ~40-5
  * @param {object} args.brand - { name, tagline, color: { primary, secondary, ... } }
  * @param {object} args.newsletterConfig - marketing.newsletter.content
  * @param {object} args.ai - Manager.AI() instance
- * @param {object} args.assistant - @omega.js/backend assistant
+ * @param {object} args.ctx - @omega.js/backend ctx
  * @returns {Promise<{png: Buffer, fallback: boolean, meta: object}>}
  */
-async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, assistant }) {
+async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, ctx }) {
   const startTime = Date.now();
   const model = newsletterConfig?.model?.image || DEFAULT_MODEL;
   const size = newsletterConfig?.image?.size || DEFAULT_SIZE;
@@ -61,9 +61,9 @@ async function generateSectionImage({ imagePrompt, brand, newsletterConfig, ai, 
         break;
       }
 
-      assistant.log(`Image generation attempt ${attempt + 1} returned no buffer`);
+      ctx.log(`Image generation attempt ${attempt + 1} returned no buffer`);
     } catch (e) {
-      assistant.error(`Image generation attempt ${attempt + 1} failed: ${e.message}`);
+      ctx.error(`Image generation attempt ${attempt + 1} failed: ${e.message}`);
     }
   }
 

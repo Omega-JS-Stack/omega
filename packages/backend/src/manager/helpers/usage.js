@@ -17,7 +17,7 @@ function Usage(m) {
 
   self.user = null;
   self.options = null;
-  self.assistant = null;
+  self.ctx = null;
   self.storage = null;
 
   self.paths = {
@@ -29,7 +29,7 @@ function Usage(m) {
   self.initialized = false;
 }
 
-Usage.prototype.init = function (assistant, options) {
+Usage.prototype.init = function (ctx, options) {
   const self = this;
 
   return new Promise(async function(resolve, reject) {
@@ -42,11 +42,11 @@ Usage.prototype.init = function (assistant, options) {
     options.key = typeof options.key === 'undefined' ? undefined : options.key;
     options.unauthenticatedMode = typeof options.unauthenticatedMode === 'undefined' ? 'firestore' : options.unauthenticatedMode;
     options.whitelistKeys = options.whitelistKeys || [];
-    options.log = typeof options.log === 'undefined' ? assistant.isDevelopment() : options.log;
+    options.log = typeof options.log === 'undefined' ? ctx.isDevelopment() : options.log;
 
     // Check for required options
-    if (!assistant) {
-      return reject(new Error('Missing required {assistant} parameter'));
+    if (!ctx) {
+      return reject(new Error('Missing required {ctx} parameter'));
     }
 
     // Add @omega.js/backend to whitelist keys
@@ -55,21 +55,21 @@ Usage.prototype.init = function (assistant, options) {
     // Set options
     self.options = options;
 
-    // Set assistant
-    self.assistant = assistant;
+    // Set ctx
+    self.ctx = ctx;
 
     // Setup storage (used for unauthenticated local-mode usage tracking)
     self.storage = Manager.storage({name: 'usage', temporary: true, clear: options.clear, log: options.log});
 
     // Set local key
-    self.key = (options.key || self.assistant.request.geolocation.ip || 'unknown')
+    self.key = (options.key || self.ctx.request.geolocation.ip || 'unknown')
       // .replace(/[\.:]/g, '_');
 
     // Set paths
     self.paths.user = `users.${self.key}`;
 
     // Authenticate user (user will be resolved as well)
-    self.user = await assistant.authenticate();
+    self.user = await ctx.authenticate();
 
     self.useUnauthenticatedStorage = !self.user.auth.uid || self.options.key;
 
@@ -83,7 +83,7 @@ Usage.prototype.init = function (assistant, options) {
           .get()
           .then((r) => r.data())
           .catch((e) => {
-            assistant.errorify(`Usage.init(): Error fetching usage data: ${e}`, {code: 500, sentry: true});
+            ctx.report(`Usage.init(): Error fetching usage data: ${e}`, {code: 500});
           });
       } else {
         foundUsage = self.storage.get(`${self.paths.user}.usage`, {}).value();
@@ -141,7 +141,7 @@ Usage.prototype.validate = function (name, options) {
 
   return new Promise(async function(resolve, reject) {
     const Manager = self.Manager;
-    const assistant = self.assistant;
+    const ctx = self.ctx;
 
     // Set options
     options = options || {};
@@ -155,13 +155,13 @@ Usage.prototype.validate = function (name, options) {
 
     // Log (independent of options.log because this is important)
     if (options.log) {
-      assistant.log(`Usage.validate(): Checking ${monthly}/${allowed} for ${name} (${self.key})...`);
+      ctx.log(`Usage.validate(): Checking ${monthly}/${allowed} for ${name} (${self.key})...`);
     }
 
     // Reject function
     function _reject() {
       reject(
-        assistant.errorify(`You have exceeded your ${name} usage limit of ${monthly}/${allowed}.`, {code: 429})
+        ctx.report(`You have exceeded your ${name} usage limit of ${monthly}/${allowed}.`, {code: 429})
       );
     }
 
@@ -197,20 +197,20 @@ Usage.prototype.validate = function (name, options) {
       const daily = _.get(self.user, `usage.${name}.daily`, 0);
 
       if (options.log) {
-        assistant.log(`Usage.validate(): Daily cap check: ${daily}/${flatDailyCap} today, ${monthly}/${dailyAllowance} proportional (monthly: ${allowed}) for ${name} (${self.key})`);
+        ctx.log(`Usage.validate(): Daily cap check: ${daily}/${flatDailyCap} today, ${monthly}/${dailyAllowance} proportional (monthly: ${allowed}) for ${name} (${self.key})`);
       }
 
       // Check flat daily cap (can't exceed ceil(limit/daysInMonth) in a single day)
       if (daily >= flatDailyCap) {
         return reject(
-          assistant.errorify(`You have reached your daily usage limit for ${name} (${daily}/${flatDailyCap}). Your monthly limit is ${allowed}.`, {code: 429})
+          ctx.report(`You have reached your daily usage limit for ${name} (${daily}/${flatDailyCap}). Your monthly limit is ${allowed}.`, {code: 429})
         );
       }
 
       // Check proportional monthly cap (can't accumulate too fast)
       if (monthly >= dailyAllowance) {
         return reject(
-          assistant.errorify(`You have reached your usage limit for ${name} (${monthly}/${dailyAllowance}). Your monthly limit is ${allowed}.`, {code: 429})
+          ctx.report(`You have reached your usage limit for ${name} (${monthly}/${dailyAllowance}). Your monthly limit is ${allowed}.`, {code: 429})
         );
       }
     }
@@ -223,7 +223,7 @@ Usage.prototype.validate = function (name, options) {
     }
 
     // If they are using captcha, attempt to resolve
-    const captchaResponse = assistant.request.data['h-captcha-response'];
+    const captchaResponse = ctx.request.data['h-captcha-response'];
     if (captchaResponse && options.useCaptchaResponse) {
       self.log(`Usage.validate(): Checking captcha response`, captchaResponse);
 
@@ -234,7 +234,7 @@ Usage.prototype.validate = function (name, options) {
       // If the captcha is valid, resolve
       if (!captchaResult || captchaResult instanceof Error || !captchaResult.success) {
         return reject(
-          assistant.errorify(`Captcha verification failed.`, {code: 400})
+          ctx.report(`Captcha verification failed.`, {code: 400})
         );
       }
     }
@@ -247,7 +247,7 @@ Usage.prototype.validate = function (name, options) {
 Usage.prototype.increment = function (name, value, options) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   // Set name
   name = name || 'requests';
@@ -288,7 +288,7 @@ Usage.prototype.increment = function (name, value, options) {
 Usage.prototype.set = function (name, value) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   // Set name
   name = name || 'requests';
@@ -311,7 +311,7 @@ Usage.prototype.set = function (name, value) {
 Usage.prototype.getUsage = function (name) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   // Get usage
   if (name) {
@@ -395,7 +395,7 @@ Usage.prototype.update = function () {
 
   // Shortcuts
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   return new Promise(async function(resolve, reject) {
     const { admin } = Manager.libraries;
@@ -436,7 +436,7 @@ Usage.prototype.update = function () {
         return resolve(self.user.usage);
       })
       .catch(e => {
-        return reject(assistant.errorify(e, {code: 500, sentry: true}));
+        return reject(ctx.report(e, {code: 500}));
       });
   });
 };
@@ -461,7 +461,7 @@ Usage.prototype.log = function () {
 
   // Log
   if (self.options.log) {
-    self.assistant.log(...arguments);
+    self.ctx.log(...arguments);
   }
 };
 

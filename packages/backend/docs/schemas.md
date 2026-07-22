@@ -7,7 +7,7 @@ Schemas define and validate the payload your routes accept. They live at `functi
 A schema exports a function that receives a **context object** and returns a **flat schema object**. Plan-based adjustments happen INSIDE the function (there is no tier system):
 
 ```javascript
-module.exports = ({ assistant, user, data, method, headers, geolocation, client }) => {
+module.exports = ({ ctx, user, data, method, headers, geolocation, client }) => {
   const planId = user?.subscription?.product?.id || 'basic';
   const isPremium = planId !== 'basic';
 
@@ -37,14 +37,14 @@ module.exports = ({ assistant, user, data, method, headers, geolocation, client 
 };
 ```
 
-Context fields: `assistant`, `user` (resolved user), `data` (raw request data), `method`, `headers`, `geolocation`, `client`.
+Context fields: `ctx`, `user` (resolved user), `data` (raw request data), `method`, `headers`, `geolocation`, `client`.
 
 ## Field Properties
 
 - `types` — array of allowed types: `['string']`, `['number']`, `['boolean']`, `['object']`, `['array']`, `['any']`, or multiple (`['string', 'number']`)
 - `default` — default value if not provided; may be a function (`default: () => ...`)
 - `value` — force-set value (ignores user input — e.g. auto-generated IDs)
-- `required` — `true`/`false` or a function `(assistant, settings, options) => bool`. A key counts as missing when it's `undefined` **or `''`** (null/0/false pass). **NEVER combine with `default`** — see the footgun below
+- `required` — `true`/`false` or a function `(ctx, settings, options) => bool`. A key counts as missing when it's `undefined` **or `''`** (null/0/false pass). **NEVER combine with `default`** — see the footgun below
 - `min` / `max` — validation bounds (string length, number range, array length); numbers clamp, strings/arrays truncate at `max`. Enforced **only when declared** — no `min` means negatives pass through, and a declared `0` is a real bound
 - `enum` — array of allowed values. Enforced for values the caller sends (checked post-coercion): out-of-list → `400 Invalid settings {field}: must be one of [...]`. Absent fields pass — combine with `required` if the field must also be present
 - `clean` — a RegExp (matched chars removed) or function `(value) => cleaned`
@@ -86,7 +86,7 @@ IDs are auto-generated in the **schema**, NOT in the route. Use `value` to force
 ```javascript
 id: {
   types: ['string'],
-  value: () => assistant.Manager.Utilities().randomId(),
+  value: () => ctx.Manager.Utilities().randomId(),
 },
 ```
 
@@ -100,7 +100,7 @@ For single-item operations, extract the ID from the URL path in the **schema**:
 // /items/{id} → split('/') = ['', 'items', '{id}'] → index 2
 id: {
   types: ['string'],
-  default: (assistant.request.path || '').split('/')[2] || '',
+  default: (ctx.request.path || '').split('/')[2] || '',
   min: 1,     // enforce non-empty (NOT required: true — see footgun above)
   max: 128,
 },
@@ -111,7 +111,7 @@ For GET list endpoints, omit `min` so an empty ID means "list":
 ```javascript
 id: {
   types: ['string'],
-  default: (assistant.request.path || '').split('/')[2] || '',
+  default: (ctx.request.path || '').split('/')[2] || '',
 },
 limit: { types: ['number'], default: 20, min: 1, max: 100 },
 startAfter: { types: ['string'], default: '' },
@@ -122,7 +122,7 @@ startAfter: { types: ['string'], default: '' },
 Schemas can branch on request data (e.g. different fields per type):
 
 ```javascript
-module.exports = ({ assistant, data }) => {
+module.exports = ({ ctx, data }) => {
   const type = data?.type || '';
 
   const schema = {

@@ -27,7 +27,7 @@ EventMiddleware.prototype.run = function (handlerName, options) {
   const payload = self.payload;
 
   return new Promise(async function(resolve, reject) {
-    const assistant = Manager.Assistant();
+    const ctx = Manager.RouteContext();
     options = options || {};
 
     // Resolve handler path
@@ -43,7 +43,7 @@ EventMiddleware.prototype.run = function (handlerName, options) {
     // Build context based on event type
     const context = {
       Manager,
-      assistant,
+      ctx,
       libraries: Manager.libraries,
       // Event-specific properties (some may be undefined depending on event type)
       user: payload.user,
@@ -57,12 +57,12 @@ EventMiddleware.prototype.run = function (handlerName, options) {
     try {
       handler = require(handlerPath);
     } catch (e) {
-      assistant.error(`EventMiddleware: Failed to load handler @ ${handlerPath}:`, e);
+      ctx.error(`EventMiddleware: Failed to load handler @ ${handlerPath}:`, e);
       return reject(e);
     }
 
     // Execute with hooks support
-    const name = assistant.meta.name;
+    const name = ctx.meta.name;
     const hook = Manager.handlers && Manager.handlers[name];
 
     try {
@@ -85,7 +85,7 @@ EventMiddleware.prototype.run = function (handlerName, options) {
       if (e.code || e.httpErrorCode) {
         return reject(e);
       }
-      assistant.error(`EventMiddleware: Handler error:`, e);
+      ctx.error(`EventMiddleware: Handler error:`, e);
       return reject(e);
     }
   });

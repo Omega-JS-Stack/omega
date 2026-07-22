@@ -23,12 +23,12 @@ const { z, fields: f, isZodSchema } = require('../../src/manager/helpers/schema-
 const { resolveSchema } = require('../../src/manager/helpers/schema-engine.js');
 const zodTestSchemaModule = require('../../src/manager/schemas/test/schema/post.js');
 
-// Mock assistant/manager — Settings.resolve only touches these surfaces when the
+// Mock ctx/manager — Settings.resolve only touches these surfaces when the
 // schema is passed directly (no file loading)
 const makeAssistant = () => ({
   log() {},
   warn() {},
-  errorify: (msg, opts) => Object.assign(new Error(msg), { code: (opts || {}).code }),
+  report: (msg, opts) => Object.assign(new Error(msg), { code: (opts || {}).code }),
   request: { method: 'POST', user: { auth: { uid: 'u1', email: 'u1@test.com' } } },
 });
 const Manager = { cwd: '/tmp' };
@@ -206,10 +206,10 @@ module.exports = {
     {
       name: 'required-function-receives-resolve-args',
       async run({ assert }) {
-        // Same contract as declarative required(assistant, settings, options)
+        // Same contract as declarative required(ctx, settings, options)
         const zod = f.object({
           other: f.string({ default: '' }),
-          dependent: f.string({ default: undefined, required: (assistant, settings) => settings.other === 'trigger' }),
+          dependent: f.string({ default: undefined, required: (ctx, settings) => settings.other === 'trigger' }),
         });
 
         assert.ok(resolve(zod, { other: 'calm' }), 'Not required when condition false');

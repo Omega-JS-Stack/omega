@@ -3,8 +3,8 @@
  * Increments the 'requests' usage metric and returns the updated usage data
  * Supports both authenticated (user doc) and unauthenticated (usage collection by IP) modes
  */
-module.exports = async ({ assistant, user, settings }) => {
-  const usage = assistant.usage;
+module.exports = async ({ ctx, user, settings }) => {
+  const usage = ctx.usage;
   const amount = settings.amount;
 
   // Get usage before increment
@@ -24,14 +24,14 @@ module.exports = async ({ assistant, user, settings }) => {
   const afterDaily = user.usage?.requests?.daily || 0;
 
   // Log
-  assistant.log(`test/usage: Incremented requests by ${amount}`, {
+  ctx.log(`test/usage: Incremented requests by ${amount}`, {
     authenticated: user.authenticated,
     key: usage.key,
     before: { monthly: beforeMonthly, daily: beforeDaily, total: beforeTotal },
     after: { monthly: afterMonthly, daily: afterDaily, total: afterTotal },
   });
 
-  return assistant.respond({
+  return ctx.respond({
     metric: 'requests',
     amount,
     authenticated: user.authenticated,

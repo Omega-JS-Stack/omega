@@ -137,10 +137,10 @@ const Chargebee = {
    * Searches recent hosted pages for one whose subscription matches the given resourceId
    *
    * @param {string} resourceId - Chargebee subscription ID to match
-   * @param {object} assistant - Assistant instance for logging
+   * @param {object} ctx - Assistant instance for logging
    * @returns {Promise<{ uid: string, orderId: string }|null>}
    */
-  async resolveUidFromHostedPage(resourceId, assistant) {
+  async resolveUidFromHostedPage(resourceId, ctx) {
     try {
       this.init();
       const result = await this.request('/hosted_pages?limit=25&sort_by[desc]=created_at');
@@ -173,7 +173,7 @@ const Chargebee = {
 
       return null;
     } catch (e) {
-      assistant.log(`resolveUidFromHostedPage failed: ${e.message}`);
+      ctx.log(`resolveUidFromHostedPage failed: ${e.message}`);
       return null;
     }
   },

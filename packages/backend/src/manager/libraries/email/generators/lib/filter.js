@@ -46,11 +46,11 @@ const FILTER_SCHEMA = {
  * @param {object} args.brand - { name, description }
  * @param {object} args.newsletterConfig
  * @param {object} args.ai
- * @param {object} args.assistant
+ * @param {object} args.ctx
  * @param {number} [args.threshold] - override fit threshold (default 6)
  * @returns {Promise<{kept: object[], scores: object[]}>}
  */
-async function filterSources({ sources, brand, newsletterConfig, ai, assistant, threshold }) {
+async function filterSources({ sources, brand, newsletterConfig, ai, ctx, threshold }) {
   if (!sources?.length) {
     return { kept: [], scores: [] };
   }
@@ -60,7 +60,7 @@ async function filterSources({ sources, brand, newsletterConfig, ai, assistant, 
   const model = newsletterConfig?.model?.filter || DEFAULT_MODELS[provider];
   const startTime = Date.now();
 
-  assistant.log(`Newsletter filter: scoring ${sources.length} sources (provider=${provider} threshold=${t})`);
+  ctx.log(`Newsletter filter: scoring ${sources.length} sources (provider=${provider} threshold=${t})`);
 
   const systemPrompt = buildSystemPrompt(brand, newsletterConfig);
   const userPrompt = buildUserPrompt(sources);
@@ -86,10 +86,10 @@ async function filterSources({ sources, brand, newsletterConfig, ai, assistant, 
     scores = aiResult.content?.scores || [];
 
     if (!scores.length) {
-      assistant.log(`Newsletter filter: AI returned no scores. Raw content: ${JSON.stringify(aiResult.content)?.slice(0, 500)}`);
+      ctx.log(`Newsletter filter: AI returned no scores. Raw content: ${JSON.stringify(aiResult.content)?.slice(0, 500)}`);
     }
   } catch (e) {
-    assistant.error(`Filter failed: ${e.message}. Falling back to no filtering.`);
+    ctx.error(`Filter failed: ${e.message}. Falling back to no filtering.`);
     return {
       kept: sources,
       scores: [],
@@ -103,7 +103,7 @@ async function filterSources({ sources, brand, newsletterConfig, ai, assistant, 
   // Log all scores up front for visibility (sorted highest fit first)
   const sortedScores = [...scores].sort((a, b) => b.fit - a.fit);
   for (const s of sortedScores) {
-    assistant.log(`  fit=${s.fit} ${s.id} — ${s.reason}`);
+    ctx.log(`  fit=${s.fit} ${s.id} — ${s.reason}`);
   }
 
   // Keep sources scoring >= threshold; preserve original order
@@ -112,7 +112,7 @@ async function filterSources({ sources, brand, newsletterConfig, ai, assistant, 
     return score && score.fit >= t;
   });
 
-  assistant.log(`Newsletter filter: kept ${kept.length}/${sources.length} sources (threshold=${t})`);
+  ctx.log(`Newsletter filter: kept ${kept.length}/${sources.length} sources (threshold=${t})`);
 
   return {
     kept,

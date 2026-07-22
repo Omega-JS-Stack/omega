@@ -4,7 +4,7 @@ let Module = {
     this.libraries = Manager.libraries;
     this.req = data.req;
     this.res = data.res
-    this.assistant = Manager.Assistant({req: data.req, res: data.res});
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res});
 
     return this;
   },
@@ -13,14 +13,14 @@ let Module = {
     let req = self.req;
     let res = self.res;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
 
     return libraries.cors(req, res, async () => {
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       // Analytics
       let analytics = self.Manager.Analytics({
-        assistant: assistant,
+        ctx: ctx,
         uuid: user.auth.uid,
       })
       .event({
@@ -28,8 +28,8 @@ let Module = {
         params: {},
       });
 
-      assistant.log(assistant.request);
-      return res.status(200).json({status: 200, request: assistant.request.data});
+      ctx.log(ctx.request);
+      return res.status(200).json({status: 200, request: ctx.request.data});
     });
   }
 }

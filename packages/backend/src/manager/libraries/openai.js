@@ -7,7 +7,7 @@
  * OpenAI provider class with the same constructor + prototype as before. New
  * code should use the unified surface:
  *
- *   const ai = Manager.AI(assistant);
+ *   const ai = Manager.AI(ctx);
  *   await ai.request({ provider: 'openai' | 'anthropic', ... });
  */
 module.exports = require('./ai/providers/openai.js');

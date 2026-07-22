@@ -5,12 +5,12 @@ const powertools = require('node-powertools');
  * POST /user/feedback - Submit user feedback
  * Saves feedback to Firestore and optionally prompts for review
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   const docId = pushid();
@@ -45,7 +45,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     decision.promptReview = false;
   }
 
-  assistant.log('Feedback submitted', docId, { appReviewData: reviews, settings, decision });
+  ctx.log('Feedback submitted', docId, { appReviewData: reviews, settings, decision });
 
   // Save feedback to Firestore
   const write = await admin.firestore().doc(`feedback/${docId}`)
@@ -60,16 +60,16 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
       owner: user?.auth?.uid ?? null,
       metadata: {
         ...Manager.Metadata().set({ tag: 'user/feedback' }),
-        created: assistant.meta.startTime,
+        created: ctx.meta.startTime,
       },
     }, { merge: true })
     .catch((e) => e);
 
   if (write instanceof Error) {
-    return assistant.respond(`Failed to save feedback: ${write.message}`, { code: 500, sentry: true });
+    return ctx.respond(`Failed to save feedback: ${write.message}`, { code: 500 });
   }
 
-  return assistant.respond({
+  return ctx.respond({
     review: decision,
     originalRequest: {
       rating: settings.rating,

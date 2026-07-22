@@ -8,44 +8,44 @@ const { isHttpUrl, resetInventoryCache } = require('./utils.js');
 // Fields a PUT may update (id + metadata are immutable)
 const EDITABLE_FIELDS = ['enabled', 'title', 'description', 'button', 'link', 'image', 'footer', 'weight', 'targeting', 'whitelist', 'blacklist'];
 
-module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, user, Manager, settings, analytics }) => {
 
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
   if (!user.roles.admin) {
-    return assistant.respond('Admin access required', { code: 403 });
+    return ctx.respond('Admin access required', { code: 403 });
   }
 
   const { admin } = Manager.libraries;
   const vertId = (settings.id || '').trim();
 
   if (!vertId) {
-    return assistant.respond('Vert ID is required', { code: 400 });
+    return ctx.respond('Vert ID is required', { code: 400 });
   }
 
   // Presence comes from the RAW request data (the schema engine coerces
   // absent fields to type-empty values, so settings alone can't distinguish
   // "absent" from "cleared")
-  const provided = Object.keys(assistant.request.data || {});
+  const provided = Object.keys(ctx.request.data || {});
 
   if (provided.includes('link') && !isHttpUrl(settings.link)) {
-    return assistant.respond('link must be a valid http(s) URL', { code: 400 });
+    return ctx.respond('link must be a valid http(s) URL', { code: 400 });
   }
 
   const docRef = admin.firestore().doc(`verts/${vertId}`);
   const doc = await docRef.get();
 
   if (!doc.exists) {
-    return assistant.respond('Vert not found', { code: 404 });
+    return ctx.respond('Vert not found', { code: 404 });
   }
 
   // Build update from provided fields only
   const update = {
     metadata: {
       updated: {
-        timestamp: assistant.meta.startTime.timestamp,
-        timestampUNIX: assistant.meta.startTime.timestampUNIX,
+        timestamp: ctx.meta.startTime.timestamp,
+        timestampUNIX: ctx.meta.startTime.timestampUNIX,
       },
     },
   };
@@ -61,14 +61,14 @@ module.exports = async ({ assistant, user, Manager, settings, analytics }) => {
   // Same-instance inventory freshness
   resetInventoryCache();
 
-  assistant.log('verts updated:', { vertId, update });
+  ctx.log('verts updated:', { vertId, update });
 
   analytics.event('verts', { action: 'update' });
 
   // Fetch updated doc
   const updated = await docRef.get();
 
-  return assistant.respond({
+  return ctx.respond({
     success: true,
     vert: { id: vertId, ...updated.data() },
   });

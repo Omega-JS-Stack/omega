@@ -4,22 +4,22 @@ const pushid = require('pushid');
  * POST /admin/firestore - Write Firestore document
  * Admin-only endpoint to write any document
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Require path
   if (!settings.path) {
-    return assistant.respond('Path parameter required.', { code: 400 });
+    return ctx.respond('Path parameter required.', { code: 400 });
   }
 
   // Process path placeholders
@@ -42,15 +42,15 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     merge: settings.merge,
   };
 
-  assistant.log('main(): Writing', path, document, options);
+  ctx.log('main(): Writing', path, document, options);
 
   // Write to Firestore
   const write = await admin.firestore().doc(path).set(document, options)
     .catch((e) => e);
 
   if (write instanceof Error) {
-    return assistant.respond(write.message, { code: 500 });
+    return ctx.respond(write.message, { code: 500 });
   }
 
-  return assistant.respond({ path });
+  return ctx.respond({ path });
 };

@@ -14,7 +14,7 @@ Match the framework's layout — OMEGA Backend's test runner discovers files by 
 | `test/fixtures/` | Static test data (JSON, sample docs) |
 | `test/_init/` | Per-suite setup (Firestore seed data, user accounts) |
 
-Tests run inside the Firebase emulator. Use the @omega.js/backend helpers (`assistant`, admin SDK, fixture loaders) instead of mocking — `npx omega emulator` boots the same environment the tests run against.
+Tests run inside the Firebase emulator. Use the @omega.js/backend helpers (`ctx`, admin SDK, fixture loaders) instead of mocking — `npx omega emulator` boots the same environment the tests run against.
 
 ## Extended mode (real external APIs)
 

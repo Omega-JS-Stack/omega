@@ -4,17 +4,17 @@ const _ = require('lodash');
  * GET /admin/stats - Get application stats
  * Admin-only endpoint to retrieve and optionally update app statistics
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin
   if (!user.roles.admin) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   const stats = admin.firestore().doc('meta/stats');
@@ -23,7 +23,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   let doc = await stats.get().catch((e) => e);
 
   if (doc instanceof Error) {
-    return assistant.respond(`Failed to get stats: ${doc.message}`, { code: 500 });
+    return ctx.respond(`Failed to get stats: ${doc.message}`, { code: 500 });
   }
 
   let data = doc.data() || {};
@@ -39,40 +39,40 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
 
   // Update stats if requested
   if (settings.update) {
-    const error = await updateStats(assistant, data, settings.update);
+    const error = await updateStats(ctx, data, settings.update);
 
     if (error) {
-      return assistant.respond(error.message, { code: 500 });
+      return ctx.respond(error.message, { code: 500 });
     }
 
     // Retrieve stats again after updating
     doc = await stats.get().catch((e) => e);
 
     if (doc instanceof Error) {
-      return assistant.respond(`Failed to get stats: ${doc.message}`, { code: 500 });
+      return ctx.respond(`Failed to get stats: ${doc.message}`, { code: 500 });
     }
 
     data = doc.data() || {};
   }
 
-  return assistant.respond(data);
+  return ctx.respond(data);
 };
 
-async function updateStats(assistant, existingData, update) {
-  const Manager = assistant.Manager;
+async function updateStats(ctx, existingData, update) {
+  const Manager = ctx.Manager;
   const { admin } = Manager.libraries;
   const stats = admin.firestore().doc('meta/stats');
   const newData = {
     brand: Manager.config?.brand?.id || null,
   };
 
-  assistant.log('updateStats(): Starting...');
+  ctx.log('updateStats(): Starting...');
 
   let error = null;
 
   // Update notification stats
   if (update === true || update?.notifications) {
-    const count = await getAllNotifications(assistant).catch((e) => e);
+    const count = await getAllNotifications(ctx).catch((e) => e);
 
     if (count instanceof Error) {
       error = new Error(`Failed getting notifications: ${count.message}`);
@@ -83,7 +83,7 @@ async function updateStats(assistant, existingData, update) {
 
   // Update subscription stats
   if (!error && (update === true || update?.subscriptions)) {
-    const subscriptions = await getAllSubscriptions(assistant).catch((e) => e);
+    const subscriptions = await getAllSubscriptions(ctx).catch((e) => e);
 
     if (subscriptions instanceof Error) {
       error = new Error(`Failed getting subscriptions: ${subscriptions.message}`);
@@ -94,7 +94,7 @@ async function updateStats(assistant, existingData, update) {
 
   // Update user stats
   if (!error && (!existingData?.users?.total || update === true || update?.users)) {
-    const users = await getAllUsers(assistant).catch((e) => e);
+    const users = await getAllUsers(ctx).catch((e) => e);
 
     if (users instanceof Error) {
       error = new Error(`Failed getting users: ${users.message}`);
@@ -105,7 +105,7 @@ async function updateStats(assistant, existingData, update) {
 
   // Update online users
   if (!error && (update === true || update?.online)) {
-    const online = await countOnlineUsers(assistant);
+    const online = await countOnlineUsers(ctx);
 
     _.set(newData, 'users.online', online);
   }
@@ -117,7 +117,7 @@ async function updateStats(assistant, existingData, update) {
   // Set metadata
   newData.metadata = Manager.Metadata().set({ tag: 'admin/stats' });
 
-  assistant.log('updateStats(): newData', newData);
+  ctx.log('updateStats(): newData', newData);
 
   // Save stats
   await stats.set(newData, { merge: true }).catch((e) => {
@@ -127,10 +127,10 @@ async function updateStats(assistant, existingData, update) {
   return error;
 }
 
-async function getAllUsers(assistant) {
-  const { admin } = assistant.Manager.libraries;
+async function getAllUsers(ctx) {
+  const { admin } = ctx.Manager.libraries;
 
-  assistant.log('getAllUsers(): Starting...');
+  ctx.log('getAllUsers(): Starting...');
 
   const users = [];
   let nextPageToken;
@@ -141,28 +141,28 @@ async function getAllUsers(assistant) {
     nextPageToken = result.pageToken;
   } while (nextPageToken);
 
-  assistant.log(`getAllUsers(): Completed with ${users.length} users`);
+  ctx.log(`getAllUsers(): Completed with ${users.length} users`);
 
   return users;
 }
 
-async function getAllNotifications(assistant) {
-  const { admin } = assistant.Manager.libraries;
+async function getAllNotifications(ctx) {
+  const { admin } = ctx.Manager.libraries;
 
-  assistant.log('getAllNotifications(): Starting...');
+  ctx.log('getAllNotifications(): Starting...');
 
   const snap = await admin.firestore().collection('notifications').count().get();
   const count = snap.data().count;
 
-  assistant.log(`getAllNotifications(): Completed with ${count} notifications`);
+  ctx.log(`getAllNotifications(): Completed with ${count} notifications`);
 
   return count;
 }
 
-async function getAllSubscriptions(assistant) {
-  const { admin } = assistant.Manager.libraries;
+async function getAllSubscriptions(ctx) {
+  const { admin } = ctx.Manager.libraries;
 
-  assistant.log('getAllSubscriptions(): Starting...');
+  ctx.log('getAllSubscriptions(): Starting...');
 
   const snapshot = await admin.firestore().collection('users')
     .where('subscription.expires.timestampUNIX', '>=', Date.now() / 1000)
@@ -198,13 +198,13 @@ async function getAllSubscriptions(assistant) {
     stats.plans[planId][frequency] = (stats.plans[planId][frequency] || 0) + 1;
   });
 
-  assistant.log(`getAllSubscriptions(): Completed with ${stats.totals.total} subscriptions`, stats);
+  ctx.log(`getAllSubscriptions(): Completed with ${stats.totals.total} subscriptions`, stats);
 
   return stats;
 }
 
-async function countOnlineUsers(assistant) {
-  const { admin } = assistant.Manager.libraries;
+async function countOnlineUsers(ctx) {
+  const { admin } = ctx.Manager.libraries;
   let online = 0;
 
   const paths = ['gatherings/online', 'sessions/app', 'sessions/online'];

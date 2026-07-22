@@ -16,7 +16,7 @@ module.exports = {
    * @param {string} options.cancelUrl - Cancel redirect URL
    * @returns {object} { id, url, raw }
    */
-  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, assistant }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, discount, confirmationUrl, cancelUrl, ctx }) {
     // Initialize Stripe SDK
     const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
     const stripe = StripeLib.init();
@@ -27,16 +27,16 @@ module.exports = {
     const priceId = await StripeLib.resolvePriceId(product, productType, frequency);
 
     // Resolve or create Stripe customer (keyed by uid in metadata)
-    const email = assistant?.getUser()?.auth?.email || null;
-    const customer = await StripeLib.resolveCustomer(uid, email, assistant);
+    const email = ctx?.getUser()?.auth?.email || null;
+    const customer = await StripeLib.resolveCustomer(uid, email, ctx);
 
     // Resolve Stripe coupon if discount is present
     let stripeCouponId = null;
     if (discount) {
-      stripeCouponId = await resolveStripeCoupon(stripe, discount, assistant);
+      stripeCouponId = await resolveStripeCoupon(stripe, discount, ctx);
     }
 
-    assistant.log(`Stripe checkout: type=${productType}, priceId=${priceId}, uid=${uid}, customerId=${customer.id}, trial=${trial}, trialDays=${product.trial?.days || 'none'}, discount=${discount?.code || 'none'}`);
+    ctx.log(`Stripe checkout: type=${productType}, priceId=${priceId}, uid=${uid}, customerId=${customer.id}, trial=${trial}, trialDays=${product.trial?.days || 'none'}, discount=${discount?.code || 'none'}`);
 
     // Build session params based on product type
     let sessionParams;
@@ -50,7 +50,7 @@ module.exports = {
     // Create the checkout session
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    assistant.log(`Stripe session created: sessionId=${session.id}, mode=${sessionParams.mode}, url=${session.url}`);
+    ctx.log(`Stripe session created: sessionId=${session.id}, mode=${sessionParams.mode}, url=${session.url}`);
 
     return {
       id: session.id,
@@ -138,13 +138,13 @@ function buildOneTimeSession({ priceId, customer, uid, orderId, productId, strip
  * Resolve or create a Stripe coupon for a discount code
  * Uses a deterministic ID so the same code always maps to the same coupon
  */
-async function resolveStripeCoupon(stripe, discount, assistant) {
+async function resolveStripeCoupon(stripe, discount, ctx) {
   const couponId = `BEM_${discount.code}_${discount.percent}OFF_ONCE`;
 
   try {
     // Check if coupon already exists
     await stripe.coupons.retrieve(couponId);
-    assistant.log(`Stripe coupon exists: ${couponId}`);
+    ctx.log(`Stripe coupon exists: ${couponId}`);
     return couponId;
   } catch (e) {
     if (e.code !== 'resource_missing') {
@@ -165,7 +165,7 @@ async function resolveStripeCoupon(stripe, discount, assistant) {
     idempotencyKey: `backend-coupon-${couponId}`,
   });
 
-  assistant.log(`Stripe coupon created: ${couponId}`);
+  ctx.log(`Stripe coupon created: ${couponId}`);
   return couponId;
 }
 

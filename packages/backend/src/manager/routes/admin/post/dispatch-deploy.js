@@ -9,7 +9,7 @@ const { buildDispatch, dispatchWorkflow } = require('@omega.js/devkit/deploy');
 
 const WORKFLOW = 'build.yml';
 
-module.exports = async function dispatchDeploy(assistant, octokit, settings) {
+module.exports = async function dispatchDeploy(ctx, octokit, settings) {
   settings.deploy = settings.deploy !== false;
   if (!settings.deploy) {
     return settings;
@@ -25,10 +25,10 @@ module.exports = async function dispatchDeploy(assistant, octokit, settings) {
 
     await dispatchWorkflow(plan, { token: process.env.GH_TOKEN });
     settings.deployDispatched = true;
-    assistant.log(`dispatchDeploy(): dispatched ${WORKFLOW} on ${owner}/${repo}@${data.default_branch}`);
+    ctx.log(`dispatchDeploy(): dispatched ${WORKFLOW} on ${owner}/${repo}@${data.default_branch}`);
   } catch (e) {
     settings.deployDispatched = false;
-    assistant.warn(`dispatchDeploy(): deploy dispatch failed (post still committed): ${e.message}`);
+    ctx.warn(`dispatchDeploy(): deploy dispatch failed (post still committed): ${e.message}`);
   }
 
   return settings;

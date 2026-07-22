@@ -2,12 +2,12 @@
  * DELETE /user/data-request - Cancel a pending data request
  * Deletes the most recent pending data request for the authenticated user.
  */
-module.exports = async ({ assistant, user, libraries }) => {
+module.exports = async ({ ctx, user, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   const uid = user.auth.uid;
@@ -21,7 +21,7 @@ module.exports = async ({ assistant, user, libraries }) => {
     .get();
 
   if (mostRecentSnapshot.empty || mostRecentSnapshot.docs[0].data().status !== 'pending') {
-    return assistant.respond('No pending data request found.', { code: 404 });
+    return ctx.respond('No pending data request found.', { code: 404 });
   }
 
   const requestDoc = mostRecentSnapshot.docs[0];
@@ -30,12 +30,12 @@ module.exports = async ({ assistant, user, libraries }) => {
   // Delete the request document
   await admin.firestore().doc(`data-requests/${requestDoc.id}`).delete();
 
-  assistant.log(`Data request cancelled: ${requestDoc.id} for user ${uid}`);
+  ctx.log(`Data request cancelled: ${requestDoc.id} for user ${uid}`);
 
   // Send cancellation email (fire-and-forget)
-  sendCancellationEmail(assistant, user, requestDoc.id);
+  sendCancellationEmail(ctx, user, requestDoc.id);
 
-  return assistant.respond({
+  return ctx.respond({
     message: 'Your data request has been cancelled.',
     request: { id: requestDoc.id, ...request },
   });
@@ -44,9 +44,9 @@ module.exports = async ({ assistant, user, libraries }) => {
 /**
  * Send data request cancellation email (fire-and-forget)
  */
-function sendCancellationEmail(assistant, user, requestId) {
-  const Manager = assistant.Manager;
-  const mailer = Manager.Email(assistant);
+function sendCancellationEmail(ctx, user, requestId) {
+  const Manager = ctx.Manager;
+  const mailer = Manager.Email(ctx);
   const uid = user.auth.uid;
   const firstName = user.personal?.name?.first;
   const greeting = firstName ? `Hey ${firstName}, your` : 'Your';
@@ -76,9 +76,9 @@ If you did not cancel this request, please contact us immediately by replying to
     },
   })
     .then((result) => {
-      assistant.log(`sendCancellationEmail(): Success, status=${result.status}`);
+      ctx.log(`sendCancellationEmail(): Success, status=${result.status}`);
     })
     .catch((e) => {
-      assistant.error(`sendCancellationEmail(): Failed: ${e.message}`);
+      ctx.error(`sendCancellationEmail(): Failed: ${e.message}`);
     });
 }

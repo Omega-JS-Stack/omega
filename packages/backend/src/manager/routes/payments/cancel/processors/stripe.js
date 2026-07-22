@@ -14,9 +14,9 @@ module.exports = {
    * @param {string} options.resourceId - Stripe subscription ID (e.g., 'sub_xxx')
    * @param {string} options.uid - User's UID (for logging)
    * @param {object} options.subscription - User's current subscription object
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    */
-  async cancelAtPeriodEnd({ resourceId, uid, subscription, assistant }) {
+  async cancelAtPeriodEnd({ resourceId, uid, subscription, ctx }) {
     const StripeLib = require('../../../../libraries/payment/processors/stripe.js');
     const stripe = StripeLib.init();
 
@@ -26,10 +26,10 @@ module.exports = {
 
     if (isTrialing) {
       await stripe.subscriptions.cancel(resourceId);
-      assistant.log(`Stripe cancel immediate (trialing): sub=${resourceId}, uid=${uid}`);
+      ctx.log(`Stripe cancel immediate (trialing): sub=${resourceId}, uid=${uid}`);
     } else {
       await stripe.subscriptions.update(resourceId, { cancel_at_period_end: true });
-      assistant.log(`Stripe cancel at period end: sub=${resourceId}, uid=${uid}`);
+      ctx.log(`Stripe cancel at period end: sub=${resourceId}, uid=${uid}`);
     }
   },
 };

@@ -39,7 +39,7 @@ module.exports = {
       name: 'negative-limit-has-no-daily-allowance',
       async run({ Manager, state, assert }) {
         const usage = Manager.Usage();
-        await usage.init(Manager.Assistant(), { log: false });
+        await usage.init(Manager.RouteContext(), { log: false });
         await usage.setUser(TEST_UID);
 
         state.usage = usage;
@@ -66,7 +66,7 @@ module.exports = {
         });
 
         const usage = Manager.Usage();
-        await usage.init(Manager.Assistant(), { log: false });
+        await usage.init(Manager.RouteContext(), { log: false });
         await usage.setUser(`${TEST_UID}-zero`);
 
         const result = await usage.validate('unknownmetric').catch((e) => e);

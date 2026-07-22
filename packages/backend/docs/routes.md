@@ -12,9 +12,9 @@ A route exports an **async function receiving a context object** (built by the m
 /**
  * POST /items - Create a new item
  */
-module.exports = async ({ Manager, assistant, analytics, usage, user, settings, libraries, utilities }) => {
+module.exports = async ({ Manager, ctx, analytics, usage, user, settings, libraries, utilities }) => {
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   const { admin } = libraries;
@@ -32,11 +32,11 @@ module.exports = async ({ Manager, assistant, analytics, usage, user, settings, 
 
   await firestore.doc(`items/${id}`).set({ id, owner: user.auth.uid, ...settings });
 
-  return assistant.respond({ id });
+  return ctx.respond({ id });
 };
 ```
 
-Context object fields: `Manager`, `assistant`, `user` (from `assistant.getUser()`), `usage`, `settings` (schema-resolved), `analytics`, `libraries`, `utilities`.
+Context object fields: `Manager`, `ctx`, `user` (from `ctx.getUser()`), `usage`, `settings` (schema-resolved), `analytics`, `libraries`, `utilities`.
 
 ### CRUD method files
 
@@ -57,7 +57,7 @@ Every resource endpoint follows proper CRUD with **method-specific files** (plur
 const existing = docSnap.data();
 
 if (existing.owner !== user.auth.uid) {
-  return assistant.respond('Not authorized', { code: 403 });
+  return ctx.respond('Not authorized', { code: 403 });
 }
 ```
 
@@ -67,7 +67,7 @@ Immutable fields (`id`, `owner`, `stats`, `metadata.created`) should NOT be edit
 
 - Short-circuit returns for auth/validation checks
 - `settings` contains the parsed + validated request data (from schemas)
-- `assistant.respond()` for ALL responses (success and error)
+- `ctx.respond()` for ALL responses (success and error)
 - `admin.firestore().doc('collection/id')` shorthand for Firestore access ([firestore.md](firestore.md))
 - Timestamps under `metadata.{created,updated}` ([firestore.md](firestore.md#document-metadata))
 
@@ -139,7 +139,7 @@ function Module() {}
 Module.prototype.init = function (Manager, payload) {
   const self = this;
   self.Manager = Manager;
-  self.assistant = Manager.Assistant();
+  self.ctx = Manager.RouteContext();
   self.libraries = Manager.libraries;
   self.user = payload.user;
   self.context = payload.context;
@@ -149,12 +149,12 @@ Module.prototype.init = function (Manager, payload) {
 Module.prototype.main = function () {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   return new Promise(async function(resolve, reject) {
     const { admin } = self.libraries;
 
-    assistant.log('Event triggered', self.user);
+    ctx.log('Event triggered', self.user);
 
     // Event logic here
 
@@ -175,10 +175,10 @@ function Job() {}
 Job.prototype.main = function () {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   return new Promise(async function(resolve, reject) {
-    assistant.log('Running daily job...');
+    ctx.log('Running daily job...');
 
     // Job logic here
 

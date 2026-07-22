@@ -66,12 +66,12 @@ const itemData = {
   owner: user.auth.uid,
   metadata: {
     created: {
-      timestamp: assistant.meta.startTime.timestamp,
-      timestampUNIX: assistant.meta.startTime.timestampUNIX,
+      timestamp: ctx.meta.startTime.timestamp,
+      timestampUNIX: ctx.meta.startTime.timestampUNIX,
     },
     updated: {
-      timestamp: assistant.meta.startTime.timestamp,
-      timestampUNIX: assistant.meta.startTime.timestampUNIX,
+      timestamp: ctx.meta.startTime.timestamp,
+      timestampUNIX: ctx.meta.startTime.timestampUNIX,
     },
   },
 };
@@ -81,8 +81,8 @@ const updated = _.merge({}, existing, settings, {
   metadata: {
     created: existing.metadata.created,
     updated: {
-      timestamp: assistant.meta.startTime.timestamp,
-      timestampUNIX: assistant.meta.startTime.timestampUNIX,
+      timestamp: ctx.meta.startTime.timestamp,
+      timestampUNIX: ctx.meta.startTime.timestampUNIX,
     },
   },
 });
@@ -94,12 +94,12 @@ const itemData = {
 };
 ```
 
-In schemas, use `assistant.Manager.Settings().constant('timestampFULL')`:
+In schemas, use `ctx.Manager.Settings().constant('timestampFULL')`:
 
 ```javascript
 metadata: {
-  created: assistant.Manager.Settings().constant('timestampFULL', { date: undefined }),
-  updated: assistant.Manager.Settings().constant('timestampFULL', { date: undefined }),
+  created: ctx.Manager.Settings().constant('timestampFULL', { date: undefined }),
+  updated: ctx.Manager.Settings().constant('timestampFULL', { date: undefined }),
 },
 ```
 
@@ -113,15 +113,15 @@ metadata: {
 ```javascript
 // ✅ CORRECT — mirror the Firestore doc
 const doc = await admin.firestore().doc(`items/${id}`).get();
-return assistant.respond({ item: { id: doc.id, ...doc.data() } });
+return ctx.respond({ item: { id: doc.id, ...doc.data() } });
 
 // ❌ WRONG — reshaping into a different structure
-return assistant.respond({ item: { id, name: doc.data().name, createdAt: doc.data().metadata.created.timestamp } });
+return ctx.respond({ item: { id, name: doc.data().name, createdAt: doc.data().metadata.created.timestamp } });
 
 // ✅ CORRECT — redact by deleting
 const data = doc.data();
 delete data.api?.privateKey;
-return assistant.respond({ item: { id: doc.id, ...data } });
+return ctx.respond({ item: { id: doc.id, ...data } });
 
 // ❌ WRONG — redact by replacing
 data.api.privateKey = '[REDACTED]';

@@ -133,7 +133,7 @@ module.exports = [
         days: { type: 'number', description: 'Days to look back', default: 30 },
       },
     },
-    handler: async ({ Manager, assistant, user, params, libraries }) => {
+    handler: async ({ Manager, ctx, user, params, libraries }) => {
       const cutoff = Date.now() - (params.days || 30) * 86400000;
       const snapshot = await libraries.admin.firestore()
         .collection('newsletters')

@@ -64,7 +64,7 @@ Stored XSS comes from rendering, not from receiving. Sanitize at the render site
 ## Route Handler Context
 
 ```javascript
-module.exports = async ({ Manager, assistant, analytics, usage, user, settings, libraries, utilities }) => {
+module.exports = async ({ Manager, ctx, analytics, usage, user, settings, libraries, utilities }) => {
   // settings    — whitespace-trimmed by middleware; HTML preserved unless route opts in via { sanitize: true }
   // utilities   — Manager.Utilities() instance for manual sanitize()/trim()
 };

@@ -187,10 +187,10 @@ const Stripe = {
    *
    * @param {string} uid - User's UID
    * @param {string|null} email - User's email (used when creating a new customer)
-   * @param {object} assistant - Assistant instance for logging
+   * @param {object} ctx - Assistant instance for logging
    * @returns {object} Stripe customer object
    */
-  async resolveCustomer(uid, email, assistant) {
+  async resolveCustomer(uid, email, ctx) {
     const stripe = this.init();
 
     // Search for existing customer with this uid
@@ -201,7 +201,7 @@ const Stripe = {
 
     if (search.data.length > 0) {
       const existing = search.data[0];
-      assistant.log(`Found existing Stripe customer: ${existing.id}`);
+      ctx.log(`Found existing Stripe customer: ${existing.id}`);
       return existing;
     }
 
@@ -220,7 +220,7 @@ const Stripe = {
     const customer = await stripe.customers.create(params, {
       idempotencyKey: `backend-customer-create-${uid}`,
     });
-    assistant.log(`Created new Stripe customer: ${customer.id}`);
+    ctx.log(`Created new Stripe customer: ${customer.id}`);
     return customer;
   },
 

@@ -4,16 +4,16 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant }) {
+module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
   const direction = (after.product?.id || '') > (before.product?.id || '') ? 'upgrade' : 'downgrade';
-  assistant.log(`Transition [subscription/plan-changed]: uid=${uid}, ${before.product?.id} → ${after.product?.id} (${direction})`);
+  ctx.log(`Transition [subscription/plan-changed]: uid=${uid}, ${before.product?.id} → ${after.product?.id} (${direction})`);
 
   sendOrderEmail({
     template: 'order',
     subject: `Your plan has been updated #${order?.id || ''}`,
     categories: ['order/plan-changed'],
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'plan-changed',
         ...order,

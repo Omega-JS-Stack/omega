@@ -19,10 +19,10 @@ module.exports = {
    * @param {string} options.resourceId - Chargebee subscription ID
    * @param {string} options.uid - User's UID (for logging)
    * @param {object} options.subscription - User's subscription object from Firestore
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {{ amount: number, currency: string, full: boolean }}
    */
-  async processRefund({ resourceId, uid, assistant }) {
+  async processRefund({ resourceId, uid, ctx }) {
     const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');
     ChargebeeLib.init();
 
@@ -81,7 +81,7 @@ module.exports = {
 
     const currency = invoice.currency_code || 'USD';
 
-    assistant.log(`Chargebee refund issued: invoiceId=${invoice.id}, amount=${refundAmountCents}, full=${isFullRefund}, uid=${uid}`);
+    ctx.log(`Chargebee refund issued: invoiceId=${invoice.id}, amount=${refundAmountCents}, full=${isFullRefund}, uid=${uid}`);
 
     // 5. Cancel subscription immediately (if not already cancelled)
     if (sub.status !== 'cancelled') {
@@ -89,7 +89,7 @@ module.exports = {
         method: 'POST',
         body: { cancel_option: 'immediately' },
       });
-      assistant.log(`Chargebee subscription cancelled immediately: sub=${resourceId}, uid=${uid}`);
+      ctx.log(`Chargebee subscription cancelled immediately: sub=${resourceId}, uid=${uid}`);
     }
 
     return {

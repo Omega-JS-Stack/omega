@@ -6,10 +6,10 @@ const recaptcha = require('../../../libraries/recaptcha.js');
 const { validate: validateEmail, ALL_CHECKS } = require('../../../libraries/email/validation.js');
 const { inferContact } = require('../../../libraries/infer-contact.js');
 
-module.exports = async ({ assistant, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   // Initialize Usage to check auth level
-  const usage = await Manager.Usage().init(assistant, {
+  const usage = await Manager.Usage().init(ctx, {
     unauthenticatedMode: 'firestore',
   });
   const isAdmin = usage.user.roles?.admin;
@@ -25,7 +25,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   const skipValidation = isAdmin ? settings.skipValidation : false;
 
   // Email validation — run free checks before reCAPTCHA/rate limit
-  const shouldCallExternalAPIs = !assistant.isTesting() || process.env.TEST_EXTENDED_MODE;
+  const shouldCallExternalAPIs = !ctx.isTesting() || process.env.TEST_EXTENDED_MODE;
 
   // skipValidation (admin-only) reduces to just format + disposable
   // Admin gets full checks including mailbox verification when external APIs are enabled
@@ -38,45 +38,45 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   if (!validation.valid) {
     // For public requests, return generic success to prevent email enumeration
     if (!isAdmin) {
-      return assistant.respond({ success: true });
+      return ctx.respond({ success: true });
     }
 
     const { format, localPart, disposable, corporate } = validation.checks;
 
     if (format && !format.valid) {
-      return assistant.respond('Invalid email format', { code: 400 });
+      return ctx.respond('Invalid email format', { code: 400 });
     }
 
     if (localPart && !localPart.valid) {
-      return assistant.respond(`Blocked email local part: ${localPart.localPart}`, { code: 400 });
+      return ctx.respond(`Blocked email local part: ${localPart.localPart}`, { code: 400 });
     }
 
     if (disposable && !disposable.valid) {
-      return assistant.respond(`Disposable email domain not allowed: ${disposable.domain}`, { code: 400 });
+      return ctx.respond(`Disposable email domain not allowed: ${disposable.domain}`, { code: 400 });
     }
 
     if (corporate && !corporate.valid) {
-      return assistant.respond(`Corporate/social-media domain not allowed: ${corporate.domain}`, { code: 400 });
+      return ctx.respond(`Corporate/social-media domain not allowed: ${corporate.domain}`, { code: 400 });
     }
 
     // Name the failing check (admin-only branch — public callers already got a
     // generic success above, so email-enumeration protection is untouched)
     const failedCheck = Object.keys(validation.checks).find((name) => validation.checks[name]?.valid === false);
-    return assistant.respond(`Email validation failed (${failedCheck})`, { code: 400 });
+    return ctx.respond(`Email validation failed (${failedCheck})`, { code: 400 });
   }
 
   // Public access protection (after validation so we don't waste reCAPTCHA on garbage)
   if (!isAdmin) {
     // Verify reCAPTCHA (skip during automated tests)
-    if (!assistant.isTesting()) {
+    if (!ctx.isTesting()) {
       const recaptchaToken = settings['g-recaptcha-response'];
       if (!recaptchaToken) {
-        return assistant.respond('Request could not be verified', { code: 403 });
+        return ctx.respond('Request could not be verified', { code: 403 });
       }
 
       const recaptchaValid = await recaptcha.verify(recaptchaToken);
       if (!recaptchaValid) {
-        return assistant.respond('Request could not be verified', { code: 403 });
+        return ctx.respond('Request could not be verified', { code: 403 });
       }
     }
 
@@ -86,7 +86,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
       usage.increment('marketing-subscribe');
       await usage.update();
     } catch (e) {
-      return assistant.respond('Rate limit exceeded', { code: 429 });
+      return ctx.respond('Rate limit exceeded', { code: 429 });
     }
   }
 
@@ -94,7 +94,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   let nameInferred = null;
   let company = '';
   if (!firstName && !lastName) {
-    nameInferred = await inferContact(email, assistant);
+    nameInferred = await inferContact(email, ctx);
     firstName = nameInferred.firstName;
     lastName = nameInferred.lastName;
     company = nameInferred.company;
@@ -104,9 +104,9 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   let providerResults = {};
 
   if (!shouldCallExternalAPIs) {
-    assistant.log('marketing/contact: Skipping providers (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)');
+    ctx.log('marketing/contact: Skipping providers (OMEGA_TEST_MODE=true, TEST_EXTENDED_MODE not set)');
   } else {
-    const mailer = Manager.Email(assistant);
+    const mailer = Manager.Email(ctx);
     providerResults = await mailer.add({
       email,
       firstName,
@@ -117,7 +117,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   }
 
   // Log result
-  assistant.log('marketing/contact result:', {
+  ctx.log('marketing/contact result:', {
     email,
     providers: providerResults,
     validation,
@@ -129,7 +129,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
 
   // Return response based on auth level
   if (isAdmin) {
-    return assistant.respond({
+    return ctx.respond({
       success: true,
       providers: providerResults,
       validation,
@@ -138,5 +138,5 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   }
 
   // Public: generic response
-  return assistant.respond({ success: true });
+  return ctx.respond({ success: true });
 };

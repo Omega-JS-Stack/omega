@@ -5,9 +5,9 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant }) {
+module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
   const isTrial = after.trial?.claimed === true;
-  const brandName = assistant.Manager.config.brand?.name || '';
+  const brandName = ctx.Manager.config.brand?.name || '';
   const planName = after.product?.name || '';
 
   // Pre-compute discount values for the email template
@@ -15,14 +15,14 @@ module.exports = async function ({ before, after, order, uid, userDoc, assistant
   const discount = order.discount;
   const hasPromoDiscount = discount?.valid === true && discount?.percent > 0;
 
-  assistant.log(`Transition [subscription/new-subscription]: uid=${uid}, product=${after.product?.id}, frequency=${after.payment?.frequency}, trial=${isTrial}, discount=${hasPromoDiscount ? discount.code : 'none'}`);
+  ctx.log(`Transition [subscription/new-subscription]: uid=${uid}, product=${after.product?.id}, frequency=${after.payment?.frequency}, trial=${isTrial}, discount=${hasPromoDiscount ? discount.code : 'none'}`);
 
   sendOrderEmail({
     template: 'order',
     subject: `Your ${brandName} ${planName} order #${order?.id || ''}`,
     categories: ['order/confirmation'],
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'confirmation',
         ...order,

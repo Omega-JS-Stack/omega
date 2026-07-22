@@ -4,16 +4,16 @@
  */
 const discountCodes = require('../../../libraries/payment/discount-codes.js');
 
-module.exports = async ({ assistant, user, settings }) => {
+module.exports = async ({ ctx, user, settings }) => {
   const result = discountCodes.validate(settings.code, user.authenticated ? user : undefined);
 
-  assistant.log(`Discount validation: code=${result.code}, valid=${result.valid}`);
+  ctx.log(`Discount validation: code=${result.code}, valid=${result.valid}`);
 
   if (!result.valid) {
-    return assistant.respond({ valid: false }, { code: 200 });
+    return ctx.respond({ valid: false }, { code: 200 });
   }
 
-  return assistant.respond({
+  return ctx.respond({
     valid: true,
     code: result.code,
     percent: result.percent,

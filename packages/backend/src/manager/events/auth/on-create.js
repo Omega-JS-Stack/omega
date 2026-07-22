@@ -27,15 +27,15 @@ const { retryWrite, runAuthHook, MAX_RETRIES } = require('./utils.js');
  * context (EventContext — NOT AuthEventContext, no ipAddress/userAgent/locale):
  *   eventId, eventType, timestamp, resource: { service, name }, params
  */
-module.exports = async ({ Manager, assistant, user, context, libraries }) => {
+module.exports = async ({ Manager, ctx, user, context, libraries }) => {
   const startTime = Date.now();
   const { admin } = libraries;
 
-  assistant.log(`onCreate: ${user.uid} (${user.email})`, user, context);
+  ctx.log(`onCreate: ${user.uid} (${user.email})`, user, context);
 
   // Skip anonymous users
   if (user.providerData?.every(p => p.providerId === 'anonymous')) {
-    assistant.log(`onCreate: Skipping anonymous user ${user.uid} (${Date.now() - startTime}ms)`);
+    ctx.log(`onCreate: Skipping anonymous user ${user.uid} (${Date.now() - startTime}ms)`);
     return;
   }
 
@@ -43,19 +43,19 @@ module.exports = async ({ Manager, assistant, user, context, libraries }) => {
   const existingDoc = await admin.firestore().doc(`users/${user.uid}`)
     .get()
     .catch(e => {
-      assistant.error(`onCreate: Failed to check existing doc for ${user.uid}:`, e);
+      ctx.error(`onCreate: Failed to check existing doc for ${user.uid}:`, e);
       return null;
     });
 
   if (existingDoc?.exists && existingDoc.data()?.auth?.uid) {
-    assistant.log(`onCreate: User doc already exists for ${user.uid}, skipping creation (${Date.now() - startTime}ms)`);
+    ctx.log(`onCreate: User doc already exists for ${user.uid}, skipping creation (${Date.now() - startTime}ms)`);
     return;
   }
 
   // Extract name from provider data (e.g., Google, Facebook, GitHub)
   const providerName = extractProviderName(user);
 
-  assistant.log(`onCreate: Inferred name from provider:`, providerName);
+  ctx.log(`onCreate: Inferred name from provider:`, providerName);
 
   // Create user record using Manager.User() helper
   const userRecord = Manager.User({
@@ -84,25 +84,25 @@ module.exports = async ({ Manager, assistant, user, context, libraries }) => {
     };
   }
 
-  assistant.log(`onCreate: Creating user doc for ${user.uid}`, userRecord);
+  ctx.log(`onCreate: Creating user doc for ${user.uid}`, userRecord);
 
   // Write user doc with retry
   try {
-    await retryWrite(assistant, 'onCreate', async () => {
+    await retryWrite(ctx, 'onCreate', async () => {
       await admin.firestore().doc(`users/${user.uid}`).set(userRecord);
     });
 
-    assistant.log(`onCreate: Successfully created user doc for ${user.uid} (${Date.now() - startTime}ms)`);
+    ctx.log(`onCreate: Successfully created user doc for ${user.uid} (${Date.now() - startTime}ms)`);
   } catch (error) {
-    assistant.error(`onCreate: Failed to create user doc after ${MAX_RETRIES} retries:`, error);
+    ctx.error(`onCreate: Failed to create user doc after ${MAX_RETRIES} retries:`, error);
 
     // Don't reject - the user was already created in Auth
     // The user/signup endpoint will handle creating the doc if it's missing
   }
 
   // Run consumer hook (non-blocking — errors logged but don't fail)
-  await runAuthHook('on-create', { Manager, assistant, user, context, libraries }).catch(e => {
-    assistant.error('onCreate: Consumer hook error:', e);
+  await runAuthHook('on-create', { Manager, ctx, user, context, libraries }).catch(e => {
+    ctx.error('onCreate: Consumer hook error:', e);
   });
 };
 

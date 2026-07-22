@@ -5,9 +5,9 @@ Inside-the-handler patterns for the most frequent operations. See [docs/routes.m
 ## Authenticate User
 
 ```javascript
-const user = await assistant.authenticate();
+const user = await ctx.authenticate();
 if (!user.authenticated) {
-  return assistant.errorify('Authentication required', { code: 401 });
+  return ctx.report('Authentication required', { code: 401 });
 }
 ```
 
@@ -28,21 +28,21 @@ await admin.firestore().doc('users/abc123').set({ field: 'value' }, { merge: tru
 
 ```javascript
 // Send error response
-assistant.errorify('Something went wrong', { code: 500, sentry: true });
+ctx.report('Something went wrong', { code: 500, sentry: true });
 
 // Or throw to reject
-return reject(assistant.errorify('Bad request', { code: 400 }));
+return reject(ctx.report('Bad request', { code: 400 }));
 ```
 
 ## Send Response
 
 ```javascript
 // Success
-assistant.respond({ success: true, data: result });
+ctx.respond({ success: true, data: result });
 
 // With custom status
-assistant.respond({ created: true }, { code: 201 });
+ctx.respond({ created: true }, { code: 201 });
 
 // Redirect
-assistant.respond('https://example.com', { code: 302 });
+ctx.respond('https://example.com', { code: 302 });
 ```

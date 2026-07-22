@@ -1,16 +1,16 @@
-module.exports = async ({ assistant, analytics }) => {
+module.exports = async ({ ctx, analytics }) => {
 
   // Send analytics event
   analytics.event('test', {});
 
   // Log
-  assistant.log('Running test');
-  assistant.log('assistant.request.body', assistant.request.body);
-  assistant.log('assistant.request.query', assistant.request.query);
-  assistant.log('assistant.request.headers', assistant.request.headers);
-  assistant.log('assistant.request.data', assistant.request.data);
-  assistant.log('assistant.settings', assistant.settings);
+  ctx.log('Running test');
+  ctx.log('ctx.request.body', ctx.request.body);
+  ctx.log('ctx.request.query', ctx.request.query);
+  ctx.log('ctx.request.headers', ctx.request.headers);
+  ctx.log('ctx.request.data', ctx.request.data);
+  ctx.log('ctx.settings', ctx.settings);
 
   // Return success
-  return assistant.respond({timestamp: new Date().toISOString(), id: assistant.id});
+  return ctx.respond({timestamp: new Date().toISOString(), id: ctx.id});
 };

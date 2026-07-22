@@ -12,14 +12,14 @@ Manager.isProduction()      // true ONLY in production
 
 **The Manager is the single source of truth.** `getEnvironment()` is the ONLY function that reads the raw signals (`OMEGA_TEST_MODE` / `ENVIRONMENT` / `FUNCTIONS_EMULATOR` / `TERM_PROGRAM`). The three `is*()` checks **derive** from it live on every call — they never read raw signals themselves, so they can never disagree with `getEnvironment()`.
 
-**The assistant forwards to the Manager.** Request handlers receive an `assistant`, so the same methods are exposed there and return identical results — call whichever is in scope:
+**the route context (ctx) forwards to the Manager.** Request handlers receive an `ctx`, so the same methods are exposed there and return identical results — call whichever is in scope:
 
 ```javascript
-assistant.getEnvironment()  // === Manager.getEnvironment() — a thin forward
-assistant.isTesting()       // === Manager.isTesting()
+ctx.getEnvironment()  // === Manager.getEnvironment() — a thin forward
+ctx.isTesting()       // === Manager.isTesting()
 ```
 
-(An assistant always has a Manager — `init()` throws without one. The `assistant.meta.environment` field is still populated for code that reads it, but the `is*()` checks no longer depend on that snapshot.)
+(An ctx always has a Manager — `init()` throws without one. The `ctx.meta.environment` field is still populated for code that reads it, but the `is*()` checks no longer depend on that snapshot.)
 
 **Resolution order:** testing wins first, then production, else development. The three checks are mutually exclusive — exactly one is true. `isDevelopment()` is **false** during testing, and `isProduction()` is a real positive check (it is NOT `!isDevelopment()`).
 
@@ -59,13 +59,13 @@ Resolving local in test mode is required because tests hit the local emulator �
 
 **Local scheme follows the https stack:** when this process runs behind the mkcert TLS proxy (`omega serve` / `omega emulator` set `OMEGA_HTTPS_PORT`), the local URLs carry `https` — `getApiUrl()` → `https://localhost:5002`, and `getWebsiteUrl()` follows the same signal for the website dev server (`https://localhost:4000`), since one mkcert install drives web and backend dev alike. Without the proxy (`--no-https` / no mkcert) both stay plain `http`.
 
-> `getFunctionsUrl()` (raw Cloud Functions URL) exists for the ONE internal case that must name a specific deployed function by its raw address (`assistant.tryUrl()`). Application/route code should never need it — use `getApiUrl()`.
+> `getFunctionsUrl()` (raw Cloud Functions URL) exists for the ONE internal case that must name a specific deployed function by its raw address (`ctx.tryUrl()`). Application/route code should never need it — use `getApiUrl()`.
 
 **Exception — parent helpers stay live:** `Manager.getParentApiUrl()` / `getParentUrl()` ALWAYS return the live production URL, even in dev/test. The parent @omega.js/backend is a real remote server with no localhost equivalent, so cross-brand parent calls are never redirected to localhost.
 
 ## Where they live
 
-Source: [src/manager/index.js](../src/manager/index.js). @omega.js/backend has a single Manager (no multi-context mixin like EM/UJM/BXM), so `getEnvironment()` + `is*()` + the URL helpers live directly on the Manager. The `assistant` exposes the same methods and forwards each to its Manager (`assistant.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
+Source: [src/manager/index.js](../src/manager/index.js). @omega.js/backend has a single Manager (no multi-context mixin like EM/UJM/BXM), so `getEnvironment()` + `is*()` + the URL helpers live directly on the Manager. The `ctx` exposes the same methods and forwards each to its Manager (`ctx.isTesting()` → `Manager.isTesting()`), so request handlers can call whichever object is in scope.
 
 ## How detection works
 
@@ -78,7 +78,7 @@ Source: [src/manager/index.js](../src/manager/index.js). @omega.js/backend has a
 
 ## Adding a new helper
 
-If you need a new environment-derived helper, add it next to the others on the Manager in [src/manager/index.js](../src/manager/index.js), and forward it from the assistant if request handlers need it. Don't read `process.env` ad-hoc elsewhere — derive from `getEnvironment()` so there is one source of truth and no chance of drift.
+If you need a new environment-derived helper, add it next to the others on the Manager in [src/manager/index.js](../src/manager/index.js), and forward it from the route context (ctx) if request handlers need it. Don't read `process.env` ad-hoc elsewhere — derive from `getEnvironment()` so there is one source of truth and no chance of drift.
 
 ## Why this matters
 

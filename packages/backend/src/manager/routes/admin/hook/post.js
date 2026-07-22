@@ -8,33 +8,33 @@
  *   4. Consumer hooks/ directory
  *
  * Supports both calling conventions:
- *   - Function export: module.exports = async ({ Manager, assistant, ... }) => {}
- *   - Class export: module.exports = class { main(assistant) {} }
+ *   - Function export: module.exports = async ({ Manager, ctx, ... }) => {}
+ *   - Class export: module.exports = class { main(ctx) {} }
  */
-module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
-  if (!user.authenticated && assistant.isProduction()) {
-    return assistant.respond('Authentication required', { code: 401 });
+  if (!user.authenticated && ctx.isProduction()) {
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
-  if (!user.roles.admin && assistant.isProduction()) {
-    return assistant.respond('Admin required.', { code: 403 });
+  if (!user.roles.admin && ctx.isProduction()) {
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   if (!settings.path) {
-    return assistant.respond('Missing required parameter: path', { code: 400 });
+    return ctx.respond('Missing required parameter: path', { code: 400 });
   }
 
-  assistant.log('Running hook:', settings.path);
+  ctx.log('Running hook:', settings.path);
 
-  const loaded = loadHook(assistant, settings.path);
+  const loaded = loadHook(ctx, settings.path);
 
   if (!loaded) {
-    return assistant.respond(`Hook not found: ${settings.path}`, { code: 404 });
+    return ctx.respond(`Hook not found: ${settings.path}`, { code: 404 });
   }
 
   const hookName = settings.path.split('/').pop();
-  assistant.setLogPrefix(`hook/${hookName}()`);
+  ctx.setLogPrefix(`hook/${hookName}()`);
 
   try {
     let result;
@@ -42,30 +42,30 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
     if (loaded.type === 'function') {
       result = await loaded.handler({
         Manager,
-        assistant,
+        ctx,
         context: {},
         libraries: Manager.libraries,
       });
     } else {
       const instance = loaded.handler;
       instance.Manager = Manager;
-      instance.assistant = assistant;
+      instance.ctx = ctx;
       instance.context = null;
       instance.libraries = Manager.libraries;
-      result = await instance.main(assistant);
+      result = await instance.main(ctx);
     }
 
     analytics.event('admin/hook', { path: settings.path });
 
-    return assistant.respond(result || { success: true });
+    return ctx.respond(result || { success: true });
   } catch (e) {
-    assistant.error(`Hook error: ${e.message}`, e);
-    return assistant.respond(e.message, { code: 500 });
+    ctx.error(`Hook error: ${e.message}`, e);
+    return ctx.respond(e.message, { code: 500 });
   }
 };
 
-function loadHook(assistant, hookPath) {
-  const Manager = assistant.Manager;
+function loadHook(ctx, hookPath) {
+  const Manager = ctx.Manager;
   const path = require('path');
 
   const searchPaths = [
@@ -81,7 +81,7 @@ function loadHook(assistant, hookPath) {
 
   for (const searchPath of searchPaths) {
     const resolved = pathify(searchPath);
-    assistant.log('Trying path:', resolved);
+    ctx.log('Trying path:', resolved);
 
     try {
       const mod = require(resolved);

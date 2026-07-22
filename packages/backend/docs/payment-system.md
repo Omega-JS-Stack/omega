@@ -169,7 +169,7 @@ Note: Trials are NOT a separate transition. The `new-subscription` handler check
 All handlers are in `src/manager/events/firestore/payments-webhooks/transitions/` and export a single async function:
 
 ```javascript
-module.exports = async function ({ before, after, uid, userDoc, admin, assistant, Manager, eventType, eventId }) {
+module.exports = async function ({ before, after, uid, userDoc, admin, ctx, Manager, eventType, eventId }) {
   // before: previous subscription state (null for new/one-time)
   // after: new unified state (subscription or one-time)
   // userDoc: full user document data
@@ -182,7 +182,7 @@ module.exports = async function ({ before, after, uid, userDoc, admin, assistant
 
 1. Add detection logic in `transitions/index.js` (in priority order)
 2. Create handler file in `transitions/{category}/{name}.js`
-3. Handler receives full context — use `assistant.log()` for logging, `Manager.getApiUrl()` for API calls
+3. Handler receives full context — use `ctx.log()` for logging, `Manager.getApiUrl()` for API calls
 
 ## Processor Interface
 
@@ -192,7 +192,7 @@ Each processor implements three modules:
 
 ```javascript
 module.exports = {
-  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, Manager, assistant }) {
+  async createIntent({ uid, orderId, product, productId, frequency, trial, confirmationUrl, cancelUrl, Manager, ctx }) {
     return { id, url, raw };
   },
 };
@@ -211,7 +211,7 @@ module.exports = {
 
 ```javascript
 module.exports = {
-  async cancelAtPeriodEnd({ resourceId, uid, subscription, assistant }) { /* cancel at end of period */ },
+  async cancelAtPeriodEnd({ resourceId, uid, subscription, ctx }) { /* cancel at end of period */ },
 };
 ```
 
@@ -219,7 +219,7 @@ module.exports = {
 
 ```javascript
 module.exports = {
-  async processRefund({ resourceId, uid, subscription, assistant }) {
+  async processRefund({ resourceId, uid, subscription, ctx }) {
     return { amount, currency, full };
   },
 };
@@ -229,7 +229,7 @@ module.exports = {
 
 ```javascript
 module.exports = {
-  async createPortalSession({ resourceId, uid, returnUrl, assistant }) {
+  async createPortalSession({ resourceId, uid, returnUrl, ctx }) {
     return { url };
   },
 };

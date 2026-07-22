@@ -6,14 +6,14 @@
  * Handles the unified cross-provider message conventions:
  *   - { role: 'system'|'developer'|'user'|'assistant', content: string }
  *   - { role: 'assistant', content?, toolCalls: [{ id, name, arguments }] }
- *     → assistant turn with tool_use blocks
+ *     → ctx turn with tool_use blocks
  *   - { role: 'tool', toolCallId, content } → tool_result block; consecutive
  *     tool turns merge into ONE user turn (the Messages API requires all
- *     results for an assistant turn in a single following user message)
+ *     results for an ctx turn in a single following user message)
  *   - raw Anthropic block arrays (content: [{ type, ... }]) pass through untouched
  *
  * All functions are pure — no network, no SDK — so they're unit-testable
- * without an assistant.
+ * without an ctx.
  */
 
 /**

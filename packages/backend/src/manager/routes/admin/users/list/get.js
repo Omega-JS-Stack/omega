@@ -9,17 +9,17 @@
  *   search     - email/uid prefix filter (Firestore range scan on auth.email)
  *   startAfter - uid cursor from the previous page's nextCursor
  */
-module.exports = async ({ assistant, user, settings, analytics, libraries }) => {
+module.exports = async ({ ctx, user, settings, analytics, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication (allow in dev)
-  if (!user.authenticated && assistant.isProduction()) {
-    return assistant.respond('Authentication required', { code: 401 });
+  if (!user.authenticated && ctx.isProduction()) {
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin (allow in dev)
-  if (!user.roles.admin && assistant.isProduction()) {
-    return assistant.respond('Admin required.', { code: 403 });
+  if (!user.roles.admin && ctx.isProduction()) {
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   const limit = Math.min(Math.max(parseInt(settings.limit, 10) || 20, 1), 100);
@@ -51,7 +51,7 @@ module.exports = async ({ assistant, user, settings, analytics, libraries }) => 
   const snapshot = await query.limit(limit).get().catch((e) => e);
 
   if (snapshot instanceof Error) {
-    return assistant.respond(snapshot.message, { code: 500 });
+    return ctx.respond(snapshot.message, { code: 500 });
   }
 
   let docs = snapshot.docs;
@@ -102,7 +102,7 @@ module.exports = async ({ assistant, user, settings, analytics, libraries }) => 
   // Track analytics
   analytics.event('admin/users/list', { count: users.length, search: !!search });
 
-  return assistant.respond({
+  return ctx.respond({
     users,
     count: users.length,
     nextCursor: docs.length === limit ? docs[docs.length - 1].id : null,

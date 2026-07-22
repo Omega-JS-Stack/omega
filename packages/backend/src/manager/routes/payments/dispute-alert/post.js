@@ -12,15 +12,15 @@ const safeCompare = require('../../../helpers/safe-compare.js');
  *   - provider: alert provider name (default: 'chargeblast')
  *   - key: must match OMEGA_WEBHOOK_KEY
  */
-module.exports = async ({ assistant, Manager, libraries }) => {
+module.exports = async ({ ctx, Manager, libraries }) => {
   const { admin } = libraries;
-  const body = assistant.request.body;
-  const query = assistant.request.query;
+  const body = ctx.request.body;
+  const query = ctx.request.query;
 
   // Validate key
   const key = query.key;
   if (!safeCompare(key, process.env.OMEGA_WEBHOOK_KEY)) {
-    return assistant.respond('Invalid key', { code: 401 });
+    return ctx.respond('Invalid key', { code: 401 });
   }
 
   // Determine alert provider (default: chargeblast)
@@ -31,7 +31,7 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   try {
     processorModule = loadProcessor(path.join(__dirname, 'processors'), provider);
   } catch (e) {
-    return assistant.respond(`Unknown alert provider: ${provider}`, { code: 400 });
+    return ctx.respond(`Unknown alert provider: ${provider}`, { code: 400 });
   }
 
   // Normalize the payload using the processor
@@ -39,22 +39,22 @@ module.exports = async ({ assistant, Manager, libraries }) => {
   try {
     alert = processorModule.normalize(body);
   } catch (e) {
-    return assistant.respond(`Failed to normalize alert: ${e.message}`, { code: 400 });
+    return ctx.respond(`Failed to normalize alert: ${e.message}`, { code: 400 });
   }
 
   const alertId = alert.id;
 
-  assistant.log(`Parsed dispute alert: id=${alertId}, provider=${provider}, processor=${alert.processor}, amount=${alert.amount}, card=****${alert.card.last4}`);
+  ctx.log(`Parsed dispute alert: id=${alertId}, provider=${provider}, processor=${alert.processor}, amount=${alert.amount}, card=****${alert.card.last4}`);
 
   // Check for duplicate (skip if already processing/completed)
   const existingDoc = await admin.firestore().doc(`payments-disputes/${alertId}`).get();
   if (existingDoc.exists) {
     const existingStatus = existingDoc.data()?.status;
     if (existingStatus !== 'failed') {
-      assistant.log(`Duplicate dispute alert ${alertId}, existing status=${existingStatus}, skipping`);
-      return assistant.respond({ received: true, duplicate: true });
+      ctx.log(`Duplicate dispute alert ${alertId}, existing status=${existingStatus}, skipping`);
+      return ctx.respond({ received: true, duplicate: true });
     }
-    assistant.log(`Retrying previously failed dispute alert ${alertId}`);
+    ctx.log(`Retrying previously failed dispute alert ${alertId}`);
   }
 
   // Build timestamps
@@ -88,8 +88,8 @@ module.exports = async ({ assistant, Manager, libraries }) => {
     raw: body,
   });
 
-  assistant.log(`Saved payments-disputes/${alertId}: provider=${provider}, processor=${alert.processor}`);
+  ctx.log(`Saved payments-disputes/${alertId}: provider=${provider}, processor=${alert.processor}`);
 
   // Return 200 immediately — async processing via Firestore trigger
-  return assistant.respond({ received: true });
+  return ctx.respond({ received: true });
 };

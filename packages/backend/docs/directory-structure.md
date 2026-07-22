@@ -7,7 +7,7 @@ src/
   manager/
     index.js                          # Main Manager class
     helpers/                          # Helper classes
-      assistant.js                    # Request/response handling
+      ctx.js                    # Request/response handling
       user.js                         # User property structure + schema
       analytics.js                    # GA4 integration
       usage.js                        # Rate limiting

@@ -2,7 +2,7 @@ let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
     this.libraries = Manager.libraries;
-    this.assistant = Manager.Assistant({req: data.req, res: data.res})
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res})
     this.req = data.req;
     this.res = data.res;
 
@@ -11,10 +11,10 @@ let Module = {
   main: async function() {
     const self = this;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
     let req = self.req;
     let res = self.res;
-    let options = self.assistant.request.data;
+    let options = self.ctx.request.data;
     let admin = self.Manager.libraries.admin;
 
     let response = {
@@ -23,11 +23,11 @@ let Module = {
     };
 
     return libraries.cors(req, res, async () => {
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       // Analytics
       let analytics = self.Manager.Analytics({
-        assistant: assistant,
+        ctx: ctx,
         uuid: user.auth.uid,
       })
       .event({
@@ -52,7 +52,7 @@ let Module = {
         await admin.firestore().doc(options.path)
         .set(options.document, options.options)
         .then(r => {
-          assistant.log(`Wrote to ${options.path}:`, options.document, options.options)
+          ctx.log(`Wrote to ${options.path}:`, options.document, options.options)
         })
         .catch(e => {
           response.status = 500;
@@ -63,7 +63,7 @@ let Module = {
       if (response.status === 200) {
         return res.status(response.status).json(response.data);
       } else {
-        assistant.error(response.error)
+        ctx.error(response.error)
         return res.status(response.status).send(response.error.message);
       }
     });

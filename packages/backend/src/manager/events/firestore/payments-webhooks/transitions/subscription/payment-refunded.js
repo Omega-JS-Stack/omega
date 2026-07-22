@@ -10,15 +10,15 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant, refundDetails }) {
-  assistant.log(`Transition [subscription/payment-refunded]: uid=${uid}, product=${after?.product?.id}, amount=${refundDetails?.amount} ${refundDetails?.currency}, reason=${refundDetails?.reason || 'none'}`);
+module.exports = async function ({ before, after, order, uid, userDoc, ctx, refundDetails }) {
+  ctx.log(`Transition [subscription/payment-refunded]: uid=${uid}, product=${after?.product?.id}, amount=${refundDetails?.amount} ${refundDetails?.currency}, reason=${refundDetails?.reason || 'none'}`);
 
   sendOrderEmail({
     template: 'order',
     subject: `Your payment has been refunded #${order?.id || ''}`,
     categories: ['order/refunded'],
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'refunded',
         ...order,

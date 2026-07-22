@@ -31,30 +31,30 @@ const IMAGE_JPEG_QUALITY = 80;
 // Anything not in this list (and not already .jpg) is still rejected.
 const CONVERTIBLE_IMAGE_EXTS = ['.png', '.webp'];
 
-module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, user, settings, analytics }) => {
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Require admin or blogger
   if (!user.roles.admin && !user.roles.blogger) {
-    return assistant.respond('Admin required.', { code: 403 });
+    return ctx.respond('Admin required.', { code: 403 });
   }
 
   // Check for GitHub configuration
   if (!process.env.GH_TOKEN) {
-    return assistant.respond('GitHub API key not configured.', { code: 500 });
+    return ctx.respond('GitHub API key not configured.', { code: 500 });
   }
 
   if (!brandRepoOwner(Manager.config) || !brandRepoName(Manager.config)) {
-    return assistant.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
+    return ctx.respond('GitHub repo not configured (set github.repo — "owner/name" or bare name — or github.org + brand.id).', { code: 500 });
   }
 
-  assistant.log('main(): settings', settings);
+  ctx.log('main(): settings', settings);
 
-  const now = assistant.meta.startTime.timestamp;
+  const now = ctx.meta.startTime.timestamp;
   const bemRepo = { user: brandRepoOwner(Manager.config), name: brandRepoName(Manager.config) };
 
   // Setup Octokit
@@ -64,19 +64,19 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
 
   // Check for required values
   if (!settings.title) {
-    return assistant.respond('Missing required parameter: title', { code: 400 });
+    return ctx.respond('Missing required parameter: title', { code: 400 });
   }
   if (!settings.url) {
-    return assistant.respond('Missing required parameter: url', { code: 400 });
+    return ctx.respond('Missing required parameter: url', { code: 400 });
   }
   if (!settings.description) {
-    return assistant.respond('Missing required parameter: description', { code: 400 });
+    return ctx.respond('Missing required parameter: description', { code: 400 });
   }
   if (!settings.headerImageURL) {
-    return assistant.respond('Missing required parameter: headerImageURL', { code: 400 });
+    return ctx.respond('Missing required parameter: headerImageURL', { code: 400 });
   }
   if (!settings.body) {
-    return assistant.respond('Missing required parameter: body', { code: 400 });
+    return ctx.respond('Missing required parameter: body', { code: 400 });
   }
 
   // Fix URL — strip blog/ prefix then slugify (slugify handles slashes/special chars)
@@ -103,12 +103,12 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   settings.githubUser = bemRepo.user;
   settings.githubRepo = bemRepo.name;
 
-  assistant.log('main(): Creating post...', settings);
+  ctx.log('main(): Creating post...', settings);
 
   // Download all images and collect file data
-  const imageFiles = await downloadImages(assistant, settings).catch(e => e);
+  const imageFiles = await downloadImages(ctx, settings).catch(e => e);
   if (imageFiles instanceof Error) {
-    return assistant.respond(imageFiles.message, { code: 400 });
+    return ctx.respond(imageFiles.message, { code: 400 });
   }
 
   // Rewrite body to use @post/ prefix for extracted images
@@ -140,24 +140,24 @@ module.exports = async ({ assistant, Manager, user, settings, analytics }) => {
   ];
 
   // Commit all files in a single commit
-  const commitResult = await commitAll(assistant, octokit, settings, allFiles).catch(e => e);
+  const commitResult = await commitAll(ctx, octokit, settings, allFiles).catch(e => e);
   if (commitResult instanceof Error) {
-    return assistant.respond(commitResult.message, { code: 500 });
+    return ctx.respond(commitResult.message, { code: 500 });
   }
 
-  assistant.log('main(): commitAll', commitResult);
+  ctx.log('main(): commitAll', commitResult);
 
   // D13: content-publish implies deploy (deploy: false opts out)
-  await dispatchDeploy(assistant, octokit, settings);
+  await dispatchDeploy(ctx, octokit, settings);
 
   // Track analytics
   analytics.event('admin/post', { action: 'create' });
 
-  return assistant.respond(settings);
+  return ctx.respond(settings);
 };
 
 // Helper: Download all images and return file data (no GitHub uploads)
-async function downloadImages(assistant, settings) {
+async function downloadImages(ctx, settings) {
   const files = [];
   const assetsPath = powertools.template(IMAGE_PATH_SRC, settings);
 
@@ -180,7 +180,7 @@ async function downloadImages(assistant, settings) {
   const dedup = deduplicateImageAlts(images, settings.body);
   settings.body = dedup.body;
 
-  assistant.log('downloadImages(): images', images);
+  ctx.log('downloadImages(): images', images);
 
   if (!images.length) {
     return files;
@@ -190,15 +190,15 @@ async function downloadImages(assistant, settings) {
     const image = images[index];
 
     // Download image
-    const download = await downloadImage(assistant, image.src, image.alt).catch(e => e);
+    const download = await downloadImage(ctx, image.src, image.alt).catch(e => e);
 
-    assistant.log('downloadImages(): download', download);
+    ctx.log('downloadImages(): download', download);
 
     if (download instanceof Error) {
       if (image.header) {
         throw download;
       } else {
-        assistant.warn('downloadImages(): Skipping NON-HEADER image download due to error', download);
+        ctx.warn('downloadImages(): Skipping NON-HEADER image download due to error', download);
         continue;
       }
     }
@@ -263,20 +263,20 @@ function formatImageDownloadError(src, e) {
 }
 
 // Helper: Download image
-async function downloadImage(assistant, src, alt) {
-  const fetch = assistant.Manager.require('wonderful-fetch');
-  const hyphenated = assistant.Manager.Utilities().slugify(alt);
+async function downloadImage(ctx, src, alt) {
+  const fetch = ctx.Manager.require('wonderful-fetch');
+  const hyphenated = ctx.Manager.Utilities().slugify(alt);
 
   // Request a server-side resize from supported CDNs so we never download
   // a massive original (e.g. 5184×3456 → ~71MB decoded). This keeps peak
   // memory well within Cloud Functions limits even at 256MB.
   const url = applyImageCDNParams(src);
 
-  assistant.log(`downloadImage(): src=${src}, url=${url}, alt=${alt}, hyphenated=${hyphenated}`);
+  ctx.log(`downloadImage(): src=${src}, url=${url}, alt=${alt}, hyphenated=${hyphenated}`);
 
   const result = await fetch(url, {
     method: 'get',
-    download: `${assistant.tmpdir}/${hyphenated}`,
+    download: `${ctx.tmpdir}/${hyphenated}`,
   }).catch(e => {
     throw new Error(formatImageDownloadError(src, e));
   });
@@ -284,11 +284,11 @@ async function downloadImage(assistant, src, alt) {
   result.filename = path.basename(result.path);
   result.ext = path.extname(result.path);
 
-  assistant.log('downloadImage(): Result', result.path);
+  ctx.log('downloadImage(): Result', result.path);
 
   // Convert supported non-JPG formats in place (mutates result.path/filename/ext)
   if (CONVERTIBLE_IMAGE_EXTS.includes(result.ext)) {
-    await convertToJpeg(assistant, result);
+    await convertToJpeg(ctx, result);
   }
 
   if (result.ext !== '.jpg') {
@@ -296,7 +296,7 @@ async function downloadImage(assistant, src, alt) {
   }
 
   // Resize in place if the long edge exceeds IMAGE_MAX_DIMENSION
-  await resizeImage(assistant, result.path);
+  await resizeImage(ctx, result.path);
 
   return result;
 }
@@ -306,8 +306,8 @@ async function downloadImage(assistant, src, alt) {
 // Mutates result.path/filename/ext to the new .jpg file and removes the
 // original so the rest of the pipeline (resize, base64, GitHub path) only ever
 // sees JPGs.
-async function convertToJpeg(assistant, result) {
-  const sharp = assistant.Manager.require('sharp');
+async function convertToJpeg(ctx, result) {
+  const sharp = ctx.Manager.require('sharp');
   sharp.cache(false);
 
   const newPath = result.path.replace(/\.[^.]+$/, '.jpg');
@@ -326,7 +326,7 @@ async function convertToJpeg(assistant, result) {
   result.filename = path.basename(newPath);
   result.ext = '.jpg';
 
-  assistant.log(`convertToJpeg(): Converted to ${newPath}`);
+  ctx.log(`convertToJpeg(): Converted to ${newPath}`);
 
   return result;
 }
@@ -338,15 +338,15 @@ async function convertToJpeg(assistant, result) {
 // Disables sharp's pixel cache so decoded buffers are freed immediately —
 // without this, processing several large images serially can OOM a 256MB
 // Cloud Function even though only one image is "active" at a time.
-async function resizeImage(assistant, filepath) {
-  const sharp = assistant.Manager.require('sharp');
+async function resizeImage(ctx, filepath) {
+  const sharp = ctx.Manager.require('sharp');
   sharp.cache(false);
 
   const meta = await sharp(filepath).metadata();
   const longEdge = Math.max(meta.width, meta.height);
 
   if (longEdge <= IMAGE_MAX_DIMENSION) {
-    assistant.log(`resizeImage(): No resize needed (${meta.width}x${meta.height})`);
+    ctx.log(`resizeImage(): No resize needed (${meta.width}x${meta.height})`);
     return { resized: false, width: meta.width, height: meta.height };
   }
 
@@ -366,17 +366,17 @@ async function resizeImage(assistant, filepath) {
 
   // Read the resized dimensions back for the log
   const resizedMeta = await sharp(filepath).metadata();
-  assistant.log(`resizeImage(): Resized ${meta.width}x${meta.height} -> ${resizedMeta.width}x${resizedMeta.height} (max ${IMAGE_MAX_DIMENSION}px, q${IMAGE_JPEG_QUALITY})`);
+  ctx.log(`resizeImage(): Resized ${meta.width}x${meta.height} -> ${resizedMeta.width}x${resizedMeta.height} (max ${IMAGE_MAX_DIMENSION}px, q${IMAGE_JPEG_QUALITY})`);
 
   return { resized: true, width: resizedMeta.width, height: resizedMeta.height };
 }
 
 // Helper: Commit all files (images + post) in a single commit using Git Trees API
-async function commitAll(assistant, octokit, settings, files) {
+async function commitAll(ctx, octokit, settings, files) {
   const owner = settings.githubUser;
   const repo = settings.githubRepo;
 
-  assistant.log('commitAll(): Committing', files.length, 'files');
+  ctx.log('commitAll(): Committing', files.length, 'files');
 
   // Get the latest commit SHA on the default branch
   const refResult = await octokit.rest.git.getRef({
@@ -395,7 +395,7 @@ async function commitAll(assistant, octokit, settings, files) {
   const latestCommitSha = refResult.data.object.sha;
   const branch = refResult.data.ref;
 
-  assistant.log('commitAll(): Latest commit', latestCommitSha, 'on', branch);
+  ctx.log('commitAll(): Latest commit', latestCommitSha, 'on', branch);
 
   // Get the tree SHA of the latest commit
   const commitResult = await octokit.rest.git.getCommit({
@@ -417,7 +417,7 @@ async function commitAll(assistant, octokit, settings, files) {
       encoding: file.encoding,
     });
 
-    assistant.log('commitAll(): Created blob for', file.path, blob.data.sha);
+    ctx.log('commitAll(): Created blob for', file.path, blob.data.sha);
 
     treeItems.push({
       path: file.path,
@@ -435,7 +435,7 @@ async function commitAll(assistant, octokit, settings, files) {
     tree: treeItems,
   });
 
-  assistant.log('commitAll(): Created tree', newTree.data.sha);
+  ctx.log('commitAll(): Created tree', newTree.data.sha);
 
   // Create the commit
   const postPath = files[files.length - 1].path;
@@ -447,7 +447,7 @@ async function commitAll(assistant, octokit, settings, files) {
     parents: [latestCommitSha],
   });
 
-  assistant.log('commitAll(): Created commit', newCommit.data.sha);
+  ctx.log('commitAll(): Created commit', newCommit.data.sha);
 
   // Update the branch ref to point to the new commit
   const updateResult = await octokit.rest.git.updateRef({
@@ -457,7 +457,7 @@ async function commitAll(assistant, octokit, settings, files) {
     sha: newCommit.data.sha,
   });
 
-  assistant.log('commitAll(): Updated ref', updateResult.data.object.sha);
+  ctx.log('commitAll(): Updated ref', updateResult.data.object.sha);
 
   return updateResult;
 }

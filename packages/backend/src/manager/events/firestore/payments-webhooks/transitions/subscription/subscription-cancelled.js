@@ -4,8 +4,8 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant }) {
-  assistant.log(`Transition [subscription/subscription-cancelled]: uid=${uid}, previousProduct=${before?.product?.id}, previousStatus=${before?.status}`);
+module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
+  ctx.log(`Transition [subscription/subscription-cancelled]: uid=${uid}, previousProduct=${before?.product?.id}, previousStatus=${before?.status}`);
 
   // Check if subscription has a future expiry (e.g., cancelled at period end)
   // Trials don't get future access — cancelling a trial revokes access immediately
@@ -17,7 +17,7 @@ module.exports = async function ({ before, after, order, uid, userDoc, assistant
     subject: `Your subscription has been cancelled #${order?.id || ''}`,
     categories: ['order/cancelled'],
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'cancelled',
         ...order,

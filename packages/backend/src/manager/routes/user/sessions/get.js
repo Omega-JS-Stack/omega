@@ -2,12 +2,12 @@
  * GET /user/sessions - Get active sessions
  * Returns all active sessions for a user
  */
-module.exports = async ({ assistant, user, settings, libraries }) => {
+module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID
@@ -15,13 +15,13 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Require admin to view other users' sessions
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   const sessionId = settings.id;
   const sessionPath = `sessions/${sessionId}`;
 
-  assistant.log(`Getting active sessions for ${uid} @ ${sessionPath}`);
+  ctx.log(`Getting active sessions for ${uid} @ ${sessionPath}`);
 
   // Query sessions
   const snapshot = await admin.database().ref(sessionPath)
@@ -31,10 +31,10 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     .catch((e) => e);
 
   if (snapshot instanceof Error) {
-    return assistant.respond(`Session query error: ${snapshot}`, { code: 500 });
+    return ctx.respond(`Session query error: ${snapshot}`, { code: 500 });
   }
 
   const data = snapshot.val() || {};
 
-  return assistant.respond(data);
+  return ctx.respond(data);
 };

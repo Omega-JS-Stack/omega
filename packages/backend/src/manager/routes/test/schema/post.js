@@ -2,14 +2,14 @@
  * POST /test/schema - Test schema validation
  * Returns the resolved settings for testing purposes
  */
-module.exports = async ({ assistant, user, settings }) => {
-  assistant.log('test/schema: User subscription info', {
+module.exports = async ({ ctx, user, settings }) => {
+  ctx.log('test/schema: User subscription info', {
     subscriptionId: user.subscription?.product?.id,
     subscriptionStatus: user.subscription?.status,
     fullSubscription: user.subscription,
   });
 
-  return assistant.respond({
+  return ctx.respond({
     settings,
     user: {
       authenticated: user.authenticated,

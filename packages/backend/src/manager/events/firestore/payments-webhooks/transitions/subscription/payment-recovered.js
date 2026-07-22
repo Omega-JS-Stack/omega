@@ -4,8 +4,8 @@
  */
 const { sendOrderEmail, formatDate } = require('../send-email.js');
 
-module.exports = async function ({ before, after, order, uid, userDoc, assistant }) {
-  assistant.log(`Transition [subscription/payment-recovered]: uid=${uid}, product=${after.product?.id}`);
+module.exports = async function ({ before, after, order, uid, userDoc, ctx }) {
+  ctx.log(`Transition [subscription/payment-recovered]: uid=${uid}, product=${after.product?.id}`);
 
   sendOrderEmail({
     template: 'order',
@@ -13,7 +13,7 @@ module.exports = async function ({ before, after, order, uid, userDoc, assistant
     categories: ['order/payment-recovered'],
     internalOnly: true,
     userDoc,
-    assistant,
+    ctx,
     data: {
       content: { event: 'payment-recovered',
         ...order,

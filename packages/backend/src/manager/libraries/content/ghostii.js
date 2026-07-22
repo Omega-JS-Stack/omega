@@ -123,7 +123,7 @@ function blocksToPost(json) {
 /**
  * Publish a Ghostii article to the brand's website repo via the admin/post route.
  *
- * @param {object} assistant - @omega.js/backend assistant instance
+ * @param {object} ctx - @omega.js/backend ctx instance
  * @param {object} args
  * @param {object} args.brand - Public brand config ({ brand: { url, ... } }); the target repo is
  *   never sent — admin/post always derives it from ITS OWN brand config
@@ -135,8 +135,8 @@ function blocksToPost(json) {
  * @param {string} [args.postPath='ghostii'] - Sub-folder under _posts/{year}/
  * @returns {Promise<object>} { post, url, slug, path } — `url` is the public blog URL
  */
-async function publishArticle(assistant, { brand, article, id, author, postPath, source }) {
-  const apiUrl = assistant.Manager.getApiUrl();
+async function publishArticle(ctx, { brand, article, id, author, postPath, source }) {
+  const apiUrl = ctx.Manager.getApiUrl();
 
   // Transform Ghostii's generic JSON into @omega.js/backend's post shape (title + header image
   // as separate fields, body = content only). Fall back to the legacy flat fields

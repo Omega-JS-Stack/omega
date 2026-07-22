@@ -14,9 +14,9 @@ module.exports = {
    * @param {string} options.resourceId - Chargebee subscription ID
    * @param {string} options.uid - User's UID (for logging)
    * @param {object} options.subscription - User's current subscription object
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    */
-  async cancelAtPeriodEnd({ resourceId, uid, subscription, assistant }) {
+  async cancelAtPeriodEnd({ resourceId, uid, subscription, ctx }) {
     const ChargebeeLib = require('../../../../libraries/payment/processors/chargebee.js');
     ChargebeeLib.init();
 
@@ -30,14 +30,14 @@ module.exports = {
         method: 'POST',
         body: { cancel_option: 'immediately' },
       });
-      assistant.log(`Chargebee cancel immediate (trialing): sub=${resourceId}, uid=${uid}`);
+      ctx.log(`Chargebee cancel immediate (trialing): sub=${resourceId}, uid=${uid}`);
     } else {
       // Cancel at end of billing period
       await ChargebeeLib.request(`/subscriptions/${resourceId}/cancel_for_items`, {
         method: 'POST',
         body: { cancel_option: 'end_of_term' },
       });
-      assistant.log(`Chargebee cancel at period end: sub=${resourceId}, uid=${uid}`);
+      ctx.log(`Chargebee cancel at period end: sub=${resourceId}, uid=${uid}`);
     }
   },
 };

@@ -13,24 +13,24 @@ const moment = require('moment');
  * @param {string[]} options.categories - SendGrid categories for filtering
  * @param {object} options.data - Template data (passed as-is to the email)
  * @param {object} options.userDoc - User document data (passed as `to` — email.js extracts email/name and user template data)
- * @param {object} options.assistant - Assistant instance
+ * @param {object} options.ctx - Assistant instance
  */
-function sendOrderEmail({ template, subject, categories, data, userDoc, assistant, copy, internalOnly, sender = 'orders' }) {
-  const email = assistant.Manager.Email(assistant);
+function sendOrderEmail({ template, subject, categories, data, userDoc, ctx, copy, internalOnly, sender = 'orders' }) {
+  const email = ctx.Manager.Email(ctx);
   const uid = userDoc?.auth?.uid;
 
   if (!internalOnly && !userDoc?.auth?.email) {
-    assistant.error(`sendOrderEmail(): No email found for uid=${uid}, skipping`);
+    ctx.error(`sendOrderEmail(): No email found for uid=${uid}, skipping`);
     return;
   }
 
-  const brandContact = assistant.Manager.config?.brand?.contact;
+  const brandContact = ctx.Manager.config?.brand?.contact;
   const to = internalOnly
-    ? { email: brandContact?.email, name: brandContact?.name || assistant.Manager.config?.brand?.name }
+    ? { email: brandContact?.email, name: brandContact?.name || ctx.Manager.config?.brand?.name }
     : userDoc;
 
   const content = data?.content || {};
-  assistant.log(`sendOrderEmail(): template=${template}, price=${content.unified?.payment?.price}, frequency=${content.unified?.payment?.frequency}, totalToday=${content._computed?.totalToday}, firstCharge=${content._computed?.firstChargeAmount}, trial=${content.unified?.trial?.claimed}, productId=${content.unified?.product?.id}`);
+  ctx.log(`sendOrderEmail(): template=${template}, price=${content.unified?.payment?.price}, frequency=${content.unified?.payment?.frequency}, totalToday=${content._computed?.totalToday}, firstCharge=${content._computed?.firstChargeAmount}, trial=${content.unified?.trial?.claimed}, productId=${content.unified?.product?.id}`);
 
   email.send({
     sender,
@@ -42,10 +42,10 @@ function sendOrderEmail({ template, subject, categories, data, userDoc, assistan
     data,
   })
     .then((result) => {
-      assistant.log(`sendOrderEmail(): Success template=${template}, uid=${uid}, status=${result.status}`);
+      ctx.log(`sendOrderEmail(): Success template=${template}, uid=${uid}, status=${result.status}`);
     })
     .catch((e) => {
-      assistant.error(`sendOrderEmail(): Failed template=${template}, uid=${uid}: ${e.message}`);
+      ctx.error(`sendOrderEmail(): Failed template=${template}, uid=${uid}: ${e.message}`);
     });
 }
 

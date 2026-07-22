@@ -148,14 +148,14 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
           const Manager = makeManager({ parent: 'https://api.itwcreativeworks.com' }); // NOT 'self'
           const admin = makeAdminMock([]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
-          assert.equal(assistant._responses.length, 1, 'should respond once');
-          assert.equal(assistant._responses[0].code, 404, 'should return 404');
+          assert.equal(ctx._responses.length, 1, 'should respond once');
+          assert.equal(ctx._responses[0].code, 404, 'should return 404');
           assert.equal(fetchCalls.length, 0, 'should NOT call fetch when gated');
         });
       },
@@ -166,14 +166,14 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' } });
           const Manager = makeManager({ parent: 'self' });
           const admin = makeAdminMock([]); // No brands — but route still reaches the fan-out step
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
-          assert.equal(assistant._responses[0].code, 200, 'should return 200 when parent: self');
-          assert.equal(assistant._responses[0].data.forwarded, 0, 'no brands means 0 forwarded');
+          assert.equal(ctx._responses[0].code, 200, 'should return 200 when parent: self');
+          assert.equal(ctx._responses[0].data.forwarded, 0, 'no brands means 0 forwarded');
         });
       },
     },
@@ -185,13 +185,13 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { key: 'test-key' } }); // no provider
+          const ctx = makeAssistant({ query: { key: 'test-key' } }); // no provider
           const Manager = makeManager();
           const admin = makeAdminMock([]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
-          assert.equal(assistant._responses[0].code, 400, 'missing provider → 400');
+          assert.equal(ctx._responses[0].code, 400, 'missing provider → 400');
         });
       },
     },
@@ -201,13 +201,13 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid' } }); // no key
+          const ctx = makeAssistant({ query: { provider: 'sendgrid' } }); // no key
           const Manager = makeManager();
           const admin = makeAdminMock([]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
-          assert.equal(assistant._responses[0].code, 401, 'missing key → 401');
+          assert.equal(ctx._responses[0].code, 401, 'missing key → 401');
         });
       },
     },
@@ -217,13 +217,13 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'real-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'wrong-key' } });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'wrong-key' } });
           const Manager = makeManager();
           const admin = makeAdminMock([]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
-          assert.equal(assistant._responses[0].code, 401, 'wrong key → 401');
+          assert.equal(ctx._responses[0].code, 401, 'wrong key → 401');
         });
       },
     },
@@ -236,7 +236,7 @@ module.exports = {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
           const body = [{ sg_event_id: 'evt1', event: 'group_unsubscribe', email: 't@example.com' }];
-          const assistant = makeAssistant({
+          const ctx = makeAssistant({
             query: { provider: 'sendgrid', key: 'test-key' },
             body,
           });
@@ -246,7 +246,7 @@ module.exports = {
             { id: 'chatsy', data: { brand: { id: 'chatsy', url: 'https://chatsy.com' } } },
           ]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
           assert.equal(fetchCalls.length, 2, 'should fan out to both brands');
           assert.equal(
@@ -260,7 +260,7 @@ module.exports = {
             'second child URL derived correctly'
           );
           assert.deepEqual(fetchCalls[0].opts.body, body, 'raw body forwarded unchanged');
-          assert.equal(assistant._responses[0].data.succeeded, 2, '2 children succeeded');
+          assert.equal(ctx._responses[0].data.succeeded, 2, '2 children succeeded');
         });
       },
     },
@@ -276,7 +276,7 @@ module.exports = {
             email: 'x@example.com',
             publication_id: 'pub_abc',
           };
-          const assistant = makeAssistant({
+          const ctx = makeAssistant({
             query: { provider: 'beehiiv', key: 'test-key' },
             body,
           });
@@ -285,7 +285,7 @@ module.exports = {
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
           ]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
           assert.equal(fetchCalls.length, 1);
           assert.ok(fetchCalls[0].url.includes('provider=beehiiv'), 'provider param preserved');
@@ -299,7 +299,7 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
@@ -307,7 +307,7 @@ module.exports = {
             { id: 'no-brand-key', data: { /* no brand at all */ } },
           ]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
           assert.equal(fetchCalls.length, 1, 'only the brand with a URL should be fanned to');
           assert.ok(fetchCalls[0].url.includes('api.somiibo.com'), 'somiibo was the one called');
@@ -327,7 +327,7 @@ module.exports = {
             return { received: true };
           };
 
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
@@ -335,10 +335,10 @@ module.exports = {
             { id: 'dashqr', data: { brand: { id: 'dashqr', url: 'https://dashqr.com' } } },
           ]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
           assert.equal(fetchCalls.length, 3, 'all 3 children attempted');
-          const response = assistant._responses[0];
+          const response = ctx._responses[0];
           assert.equal(response.code, 200, 'response is still 200 — provider should not retry parent');
           assert.equal(response.data.succeeded, 2, '2 children succeeded');
           assert.equal(response.data.failed, 1, '1 child failed');
@@ -353,16 +353,16 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();
           const admin = makeAdminMock([
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
             { id: 'broken', data: { brand: { id: 'broken', url: 'not-a-valid-url' } } },
           ]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
-          const response = assistant._responses[0];
+          const response = ctx._responses[0];
           assert.equal(response.code, 200, 'route still returns 200');
           assert.equal(response.data.succeeded, 1, 'somiibo succeeded');
           assert.equal(response.data.failed, 1, 'broken brand counted as failed');
@@ -379,14 +379,14 @@ module.exports = {
         // @omega.js/backend processes its own user updates the same way as siblings.
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager({ brand: { id: 'itw-creative-works' } });
           const admin = makeAdminMock([
             { id: 'itw-creative-works', data: { brand: { id: 'itw-creative-works', url: 'https://itwcreativeworks.com' } } },
             { id: 'somiibo', data: { brand: { id: 'somiibo', url: 'https://somiibo.com' } } },
           ]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
           assert.equal(fetchCalls.length, 2, 'parent fans out to ALL brands including itself');
           assert.ok(
@@ -402,15 +402,15 @@ module.exports = {
       async run({ assert }) {
         await withEnv({ OMEGA_WEBHOOK_KEY: 'test-key' }, async () => {
           resetFetchMock();
-          const assistant = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
+          const ctx = makeAssistant({ query: { provider: 'sendgrid', key: 'test-key' }, body: [] });
           const Manager = makeManager();
           const admin = makeAdminMock([]);
 
-          await route({ assistant, Manager, libraries: { admin } });
+          await route({ ctx, Manager, libraries: { admin } });
 
           assert.equal(fetchCalls.length, 0);
-          assert.equal(assistant._responses[0].code, 200, 'still 200 with no brands');
-          assert.equal(assistant._responses[0].data.forwarded, 0);
+          assert.equal(ctx._responses[0].code, 200, 'still 200 with no brands');
+          assert.equal(ctx._responses[0].data.forwarded, 0);
         });
       },
     },

@@ -4,7 +4,7 @@
  * Pipeline: prepare (shared) → content → audience → render → deliver
  *
  * Usage:
- *   const email = Manager.Email(assistant);
+ *   const email = Manager.Email(ctx);
  *
  *   // Add a new contact (newsletter subscribe, lightweight)
  *   await email.add({ email, firstName, lastName, source });
@@ -39,11 +39,11 @@ const prepare = require('../prepare.js');
 const sendgridProvider = require('../providers/sendgrid.js');
 const beehiivProvider = require('../providers/beehiiv.js');
 
-function Marketing(assistant) {
+function Marketing(ctx) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant.Manager;
+  self.ctx = ctx;
+  self.Manager = ctx.Manager;
   self.admin = self.Manager.libraries.admin;
 
   const marketing = self.Manager.config?.marketing || {};
@@ -78,17 +78,17 @@ function isMarketingRevoked(userDoc) {
  * a rare duplicate add is recoverable; silently dropping contacts is not).
  *
  * @param {object} admin - firebase-admin instance
- * @param {object} assistant - Assistant (for logging)
+ * @param {object} ctx - Assistant (for logging)
  * @param {string} email - Email address
  * @returns {Promise<object|null>}
  */
-async function findUserByEmail(admin, assistant, email) {
+async function findUserByEmail(admin, ctx, email) {
   const snapshot = await admin.firestore().collection('users')
     .where('auth.email', '==', email.trim().toLowerCase())
     .limit(1)
     .get()
     .catch((e) => {
-      assistant.error('Marketing: User lookup by email failed (proceeding without consent gate):', e);
+      ctx.error('Marketing: User lookup by email failed (proceeding without consent gate):', e);
       return null;
     });
 
@@ -105,36 +105,36 @@ Marketing.findUserByEmail = findUserByEmail;
 
 Marketing.prototype.add = async function (options) {
   const self = this;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
   const { email, firstName, lastName, company, source, customFields } = options;
 
   if (!email) {
-    assistant.warn('Marketing.add(): No email provided, skipping');
+    ctx.warn('Marketing.add(): No email provided, skipping');
     return {};
   }
 
   // Consent gate — if this email maps to a user who revoked marketing consent, never
   // re-add them. No user doc → proceed (pure newsletter contact). Lookup failure →
   // proceed (fail open, logged in findUserByEmail).
-  const userDoc = await findUserByEmail(self.admin, assistant, email);
+  const userDoc = await findUserByEmail(self.admin, ctx, email);
 
   if (isMarketingRevoked(userDoc)) {
-    assistant.warn(`Marketing.add(): Consent revoked, skipping: ${email}`);
+    ctx.warn(`Marketing.add(): Consent revoked, skipping: ${email}`);
     return { blocked: 'consent', email };
   }
 
   const validation = await validate(email);
   if (!validation.valid) {
-    assistant.warn(`Marketing.add(): Validation failed, skipping: ${email}`, validation.checks);
+    ctx.warn(`Marketing.add(): Validation failed, skipping: ${email}`, validation.checks);
     return { blocked: 'validation', email, checks: validation.checks };
   }
 
-  if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) {
-    assistant.log('Marketing.add(): Skipping providers (testing mode)');
+  if (ctx.isTesting() && !process.env.TEST_EXTENDED_MODE) {
+    ctx.log('Marketing.add(): Skipping providers (testing mode)');
     return {};
   }
 
-  assistant.log('Marketing.add():', { email });
+  ctx.log('Marketing.add():', { email });
 
   const results = {};
   const promises = [];
@@ -144,7 +144,7 @@ Marketing.prototype.add = async function (options) {
       sendgridProvider.addContact({ email, firstName, lastName, company, customFields })
         .then((r) => { results.campaigns = r; })
         .catch((e) => {
-          assistant.error('Marketing.add(): SendGrid failed:', e);
+          ctx.error('Marketing.add(): SendGrid failed:', e);
           results.campaigns = { success: false, error: e.message };
         })
     );
@@ -155,7 +155,7 @@ Marketing.prototype.add = async function (options) {
       beehiivProvider.addContact({ email, firstName, lastName, company, source })
         .then((r) => { results.newsletter = r; })
         .catch((e) => {
-          assistant.error('Marketing.add(): Beehiiv failed:', e);
+          ctx.error('Marketing.add(): Beehiiv failed:', e);
           results.newsletter = { success: false, error: e.message };
         })
     );
@@ -163,26 +163,26 @@ Marketing.prototype.add = async function (options) {
 
   await Promise.all(promises);
 
-  assistant.log('Marketing.add() result:', results);
+  ctx.log('Marketing.add() result:', results);
 
   return results;
 };
 
 Marketing.prototype.sync = async function (userDocOrUid) {
   const self = this;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   let userDoc;
 
   if (typeof userDocOrUid === 'string') {
     const snap = await self.admin.firestore().doc(`users/${userDocOrUid}`).get()
       .catch((e) => {
-        assistant.error('Marketing.sync(): Failed to fetch user doc:', e);
+        ctx.error('Marketing.sync(): Failed to fetch user doc:', e);
         return null;
       });
 
     if (!snap || !snap.exists) {
-      assistant.warn(`Marketing.sync(): User ${userDocOrUid} not found, skipping`);
+      ctx.warn(`Marketing.sync(): User ${userDocOrUid} not found, skipping`);
       return {};
     }
 
@@ -194,29 +194,29 @@ Marketing.prototype.sync = async function (userDocOrUid) {
   const email = _.get(userDoc, 'auth.email');
 
   if (!email) {
-    assistant.warn('Marketing.sync(): No email found in user doc, skipping');
+    ctx.warn('Marketing.sync(): No email found in user doc, skipping');
     return {};
   }
 
   // Consent gate — never re-add a user who revoked marketing consent (payment-event
   // syncs, admin re-syncs, and batch syncs all funnel through here).
   if (isMarketingRevoked(userDoc)) {
-    assistant.warn(`Marketing.sync(): Consent revoked, skipping: ${email}`);
+    ctx.warn(`Marketing.sync(): Consent revoked, skipping: ${email}`);
     return { blocked: 'consent', email };
   }
 
   const validation = await validate(email);
   if (!validation.valid) {
-    assistant.warn(`Marketing.sync(): Validation failed, skipping: ${email}`, validation.checks);
+    ctx.warn(`Marketing.sync(): Validation failed, skipping: ${email}`, validation.checks);
     return { blocked: 'validation', email, checks: validation.checks };
   }
 
-  if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) {
-    assistant.log('Marketing.sync(): Skipping providers (testing mode)');
+  if (ctx.isTesting() && !process.env.TEST_EXTENDED_MODE) {
+    ctx.log('Marketing.sync(): Skipping providers (testing mode)');
     return {};
   }
 
-  assistant.log('Marketing.sync():', { email });
+  ctx.log('Marketing.sync():', { email });
 
   const firstName = _.get(userDoc, 'personal.name.first');
   const lastName = _.get(userDoc, 'personal.name.last');
@@ -230,7 +230,7 @@ Marketing.prototype.sync = async function (userDocOrUid) {
         sendgridProvider.addContact({ email, firstName, lastName, customFields })
       ).then((r) => { results.campaigns = r; })
         .catch((e) => {
-          assistant.error('Marketing.sync(): SendGrid failed:', e);
+          ctx.error('Marketing.sync(): SendGrid failed:', e);
           results.campaigns = { success: false, error: e.message };
         })
     );
@@ -243,7 +243,7 @@ Marketing.prototype.sync = async function (userDocOrUid) {
         customFields: beehiivProvider.buildFields(userDoc),
       }).then((r) => { results.newsletter = r; })
         .catch((e) => {
-          assistant.error('Marketing.sync(): Beehiiv failed:', e);
+          ctx.error('Marketing.sync(): Beehiiv failed:', e);
           results.newsletter = { success: false, error: e.message };
         })
     );
@@ -251,26 +251,26 @@ Marketing.prototype.sync = async function (userDocOrUid) {
 
   await Promise.all(promises);
 
-  assistant.log('Marketing.sync() result:', results);
+  ctx.log('Marketing.sync() result:', results);
 
   return results;
 };
 
 Marketing.prototype.remove = async function (email) {
   const self = this;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   if (!email) {
-    assistant.warn('Marketing.remove(): No email provided, skipping');
+    ctx.warn('Marketing.remove(): No email provided, skipping');
     return {};
   }
 
-  if (assistant.isTesting() && !process.env.TEST_EXTENDED_MODE) {
-    assistant.log('Marketing.remove(): Skipping providers (testing mode)');
+  if (ctx.isTesting() && !process.env.TEST_EXTENDED_MODE) {
+    ctx.log('Marketing.remove(): Skipping providers (testing mode)');
     return {};
   }
 
-  assistant.log('Marketing.remove():', { email });
+  ctx.log('Marketing.remove():', { email });
 
   const results = {};
   const promises = [];
@@ -280,7 +280,7 @@ Marketing.prototype.remove = async function (email) {
       sendgridProvider.removeContact(email)
         .then((r) => { results.campaigns = r; })
         .catch((e) => {
-          assistant.error('Marketing.remove(): SendGrid failed:', e);
+          ctx.error('Marketing.remove(): SendGrid failed:', e);
           results.campaigns = { success: false, error: e.message };
         })
     );
@@ -291,7 +291,7 @@ Marketing.prototype.remove = async function (email) {
       beehiivProvider.removeContact(email)
         .then((r) => { results.newsletter = r; })
         .catch((e) => {
-          assistant.error('Marketing.remove(): Beehiiv failed:', e);
+          ctx.error('Marketing.remove(): Beehiiv failed:', e);
           results.newsletter = { success: false, error: e.message };
         })
     );
@@ -299,7 +299,7 @@ Marketing.prototype.remove = async function (email) {
 
   await Promise.all(promises);
 
-  assistant.log('Marketing.remove() result:', results);
+  ctx.log('Marketing.remove() result:', results);
 
   return results;
 };
@@ -339,7 +339,7 @@ Marketing.prototype.remove = async function (email) {
 Marketing.prototype.sendCampaign = async function (settings) {
   const self = this;
   const Manager = self.Manager;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   const useProviders = settings.providers || Object.keys(self.providers).filter(p => self.providers[p]);
 
@@ -349,7 +349,7 @@ Marketing.prototype.sendCampaign = async function (settings) {
   let resolved = resolveTemplateVars(settings, templateContext);
 
   if (settings.test) {
-    assistant.log('Marketing.sendCampaign(): TEST MODE — targeting test_admin segment only');
+    ctx.log('Marketing.sendCampaign(): TEST MODE — targeting test_admin segment only');
     resolved = {
       ...resolved,
       name: `[TEST] ${resolved.name}`,
@@ -396,7 +396,7 @@ Marketing.prototype.sendCampaign = async function (settings) {
     };
   }
 
-  assistant.log('Marketing.sendCampaign():', {
+  ctx.log('Marketing.sendCampaign():', {
     name: resolved.name,
     providers: useProviders,
     sendAt: settings.sendAt || 'draft',
@@ -438,13 +438,13 @@ Marketing.prototype.sendCampaign = async function (settings) {
 
   await Promise.all(promises);
 
-  assistant.log('Marketing.sendCampaign() results:', results);
+  ctx.log('Marketing.sendCampaign() results:', results);
 
   return results;
 };
 
 Marketing.prototype.cancelCampaign = async function (campaignId) {
-  this.assistant.log('Marketing.cancelCampaign():', campaignId);
+  this.ctx.log('Marketing.cancelCampaign():', campaignId);
   return sendgridProvider.cancelSingleSend(campaignId);
 };
 

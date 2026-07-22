@@ -2,12 +2,12 @@
  * POST /user/token - Create custom Firebase token
  * Creates a custom auth token for the authenticated user
  */
-module.exports = async ({ assistant, user, settings, libraries }) => {
+module.exports = async ({ ctx, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Get target UID
@@ -15,7 +15,7 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
 
   // Require admin to create tokens for other users
   if (uid !== user.auth.uid && !user.roles.admin) {
-    return assistant.respond('Admin required', { code: 403 });
+    return ctx.respond('Admin required', { code: 403 });
   }
 
   // Create custom token
@@ -23,8 +23,8 @@ module.exports = async ({ assistant, user, settings, libraries }) => {
     .catch((e) => e);
 
   if (token instanceof Error) {
-    return assistant.respond(`Failed to create custom token: ${token}`, { code: 500 });
+    return ctx.respond(`Failed to create custom token: ${token}`, { code: 500 });
   }
 
-  return assistant.respond({ token });
+  return ctx.respond({ token });
 };

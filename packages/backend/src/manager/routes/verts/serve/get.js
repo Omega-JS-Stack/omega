@@ -17,7 +17,7 @@
  */
 const { getInventory, selectVert, normalizeHost, normalizeOrigin, parseTags, renderVertUnit } = require('../utils.js');
 
-module.exports = async ({ assistant, Manager, settings, analytics }) => {
+module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   const parentHost = normalizeHost(settings.parent);
   const tags = parseTags(settings.tags);
@@ -28,7 +28,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
 
   // No fill — the host's fallback ladder moves on
   if (!vert) {
-    return assistant.respond('', { code: 204 });
+    return ctx.respond('', { code: 204 });
   }
 
   // Clicks route through the fail-closed redirect (UTM'd, stored link only)
@@ -42,7 +42,7 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
   // Track the view server-side (Analytics lane — no gtag inside the frame)
   analytics.event('verts/serve', { action: 'view', vertId: vert.id, parent: parentHost });
 
-  assistant.log('verts/serve: Serving vert', { vertId: vert.id, parent: parentHost, tags });
+  ctx.log('verts/serve: Serving vert', { vertId: vert.id, parent: parentHost, tags });
 
   const html = renderVertUnit({
     vert,
@@ -55,5 +55,5 @@ module.exports = async ({ assistant, Manager, settings, analytics }) => {
     theme: settings.theme,
   });
 
-  return assistant.respond(html, { log: false });
+  return ctx.respond(html, { log: false });
 };

@@ -15,10 +15,10 @@ module.exports = {
    * @param {object} options
    * @param {string} options.resourceId - PayPal subscription ID (e.g., 'I-xxx')
    * @param {string} options.uid - User's UID (for logging)
-   * @param {object} options.assistant - Assistant instance for logging
+   * @param {object} options.ctx - Assistant instance for logging
    * @returns {{ amount: number, currency: string, full: boolean }}
    */
-  async processRefund({ resourceId, uid, assistant }) {
+  async processRefund({ resourceId, uid, ctx }) {
     const PayPalLib = require('../../../../libraries/payment/processors/paypal.js');
 
     // 1. Get subscription transactions to find the latest payment
@@ -94,7 +94,7 @@ module.exports = {
       }),
     });
 
-    assistant.log(`PayPal refund issued: saleId=${saleId}, amount=${refundAmount}, full=${isFullRefund}, uid=${uid}`);
+    ctx.log(`PayPal refund issued: saleId=${saleId}, amount=${refundAmount}, full=${isFullRefund}, uid=${uid}`);
 
     // 4. Cancel the subscription
     try {
@@ -102,10 +102,10 @@ module.exports = {
         method: 'POST',
         body: JSON.stringify({ reason: 'Refund requested' }),
       });
-      assistant.log(`PayPal subscription cancelled after refund: sub=${resourceId}, uid=${uid}`);
+      ctx.log(`PayPal subscription cancelled after refund: sub=${resourceId}, uid=${uid}`);
     } catch (e) {
       // Already cancelled — that's fine
-      assistant.log(`PayPal subscription cancel after refund failed (may already be cancelled): ${e.message}`);
+      ctx.log(`PayPal subscription cancel after refund failed (may already be cancelled): ${e.message}`);
     }
 
     return {

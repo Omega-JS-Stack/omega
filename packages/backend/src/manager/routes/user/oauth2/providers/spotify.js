@@ -18,15 +18,15 @@ module.exports = {
 
   // Spotify does not support token revocation
   async revokeToken(token, context) {
-    const { assistant } = context;
+    const { ctx } = context;
 
-    assistant.log('Spotify does not support token revocation');
+    ctx.log('Spotify does not support token revocation');
 
     return { revoked: false, reason: 'Spotify does not support token revocation' };
   },
 
-  async verifyIdentity(tokenizeResult, Manager, assistant) {
-    assistant.log('verifyIdentity(): tokenizeResult', tokenizeResult);
+  async verifyIdentity(tokenizeResult, Manager, ctx) {
+    ctx.log('verifyIdentity(): tokenizeResult', tokenizeResult);
 
     // Get identity from Spotify API
     const identityResponse = await fetch('https://api.spotify.com/v1/me', {
@@ -40,7 +40,7 @@ module.exports = {
       },
     });
 
-    assistant.log('verifyIdentity(): identityResponse', identityResponse);
+    ctx.log('verifyIdentity(): identityResponse', identityResponse);
 
     // Check if exists
     const snap = await Manager.libraries.admin.firestore().collection('users')

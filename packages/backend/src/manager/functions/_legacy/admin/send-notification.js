@@ -2,7 +2,7 @@ let Module = {
   init: async function (Manager, data) {
     this.Manager = Manager;
     this.libraries = Manager.libraries;
-    this.assistant = Manager.Assistant({req: data.req, res: data.res})
+    this.ctx = Manager.RouteContext({req: data.req, res: data.res})
     this.req = data.req;
     this.res = data.res
 
@@ -11,7 +11,7 @@ let Module = {
   main: async function() {
     let self = this;
     let libraries = self.libraries;
-    let assistant = self.assistant;
+    let ctx = self.ctx;
     let req = self.req;
     let res = self.res;
 
@@ -23,11 +23,11 @@ let Module = {
 
     return libraries.cors(req, res, async () => {
       // authenticate admin!
-      let user = await assistant.authenticate();
+      let user = await ctx.authenticate();
 
       // Analytics
       let analytics = self.Manager.Analytics({
-        assistant: assistant,
+        ctx: ctx,
         uuid: user.auth.uid,
       })
       .event({
@@ -36,25 +36,25 @@ let Module = {
         // label: '',
       });
 
-      let payload = self.assistant.request.data.payload || {};
+      let payload = self.ctx.request.data.payload || {};
 
       if (!payload.title || !payload.body) {
         response.status = 400;
         response.error = new Error('Not enough notification parameters supplied.');
-        assistant.error(response.error)
+        ctx.error(response.error)
         return res.status(response.status).send(response.error.message);
       }
 
       if (!user.roles.admin) {
         response.status = 401;
         response.error = new Error('Unauthenticated, admin required.');
-        assistant.error(response.error)
+        ctx.error(response.error)
         return res.status(response.status).send(response.error.message);
       } else {
         await self.getTokens({tags: false});
       }
 
-      assistant.log('Notification', assistant.request.data, response);
+      ctx.log('Notification', ctx.request.data, response);
 
       if (response.status === 200) {
         return res.status(response.status).json(response.data);
@@ -79,22 +79,22 @@ let batchPromises = [];
 
 function sendBatch(batch, id) {
   let self = this;
-  // self.assistant.log(`Sending batch ID: ${id}`, batch);
-  self.assistant.log(`Sending batch ID: ${id}`);
+  // self.ctx.log(`Sending batch ID: ${id}`, batch);
+  self.ctx.log(`Sending batch ID: ${id}`);
 
-  // self.assistant.log('payload', payload);
+  // self.ctx.log('payload', payload);
   return new Promise(async function(resolve, reject) {
     let payload = {};
     payload.notification = {};
-    payload.notification.title = self.assistant.request.data.payload.title;
-    payload.notification.click_action = self.assistant.request.data.payload.click_action;
-    payload.notification.body = self.assistant.request.data.payload.body;
-    payload.notification.icon = self.assistant.request.data.payload.icon;
+    payload.notification.title = self.ctx.request.data.payload.title;
+    payload.notification.click_action = self.ctx.request.data.payload.click_action;
+    payload.notification.body = self.ctx.request.data.payload.body;
+    payload.notification.icon = self.ctx.request.data.payload.icon;
 
     await self.libraries.admin.messaging().sendToDevice(batch, payload)
       .then(async function (response) {
         // self.result.batches.list.push('#' + id + ' | ' + '✅  ' + response.successCount + ' | ' + '❌  ' + response.failureCount);
-        self.assistant.log('Sent batch #' + id);
+        self.ctx.log('Sent batch #' + id);
         // self.result.successes += response.successCount;
         // self.result.failures += response.failureCount;
         // console.log('RESP', response);
@@ -104,7 +104,7 @@ function sendBatch(batch, id) {
         resolve();
       })
       .catch(function (e) {
-        self.assistant.error('Error sending batch #' + id, e);
+        self.ctx.error('Error sending batch #' + id, e);
         // self.result.status = 'fail';
         reject(e);
       })
@@ -123,7 +123,7 @@ function getTokens(options) {
     await subs
       .get()
       .then(function(querySnapshot) {
-        self.assistant.log(`Queried ${querySnapshot.size} tokens.`);
+        self.ctx.log(`Queried ${querySnapshot.size} tokens.`);
         // self.result.subscriptionsStart = querySnapshot.size;
         let batchCurrentSize = 0;
         let batchSizeMax = 1000;
@@ -150,16 +150,16 @@ function getTokens(options) {
         });
       })
       .catch(function(e) {
-        self.assistant.error('Error querying tokens: ', e)
+        self.ctx.error('Error querying tokens: ', e)
         reject(error);
       });
 
     await Promise.all(batchPromises)
       .then(function(values) {
-        self.assistant.log('Finished all batches.');
+        self.ctx.log('Finished all batches.');
       })
       .catch(function(e) {
-        self.assistant.error('Error sending batches: ', e)
+        self.ctx.error('Error sending batches: ', e)
       });
     resolve();
 
@@ -169,21 +169,21 @@ function getTokens(options) {
 function cleanTokens(batch, results, id) {
   let self = this;
   let cleanPromises = [];
-  // self.assistant.log(`Cleaning tokens of batch ID: ${id}`, results);
-  self.assistant.log(`Cleaning tokens of batch ID: ${id}`);
+  // self.ctx.log(`Cleaning tokens of batch ID: ${id}`, results);
+  self.ctx.log(`Cleaning tokens of batch ID: ${id}`);
   return new Promise(async function(resolve, reject) {
     results.forEach(function (item, index) {
       if (!item.error) { return false; }
       let curCode = item.error.code;
       let token = batch[index];
-      self.assistant.log(`Found bad token: ${index} = ${curCode}`);
+      self.ctx.log(`Found bad token: ${index} = ${curCode}`);
       if (badTokenReasons.includes(curCode)) {
         cleanPromises.push(self.deleteToken(token, curCode));
       }
     })
     await Promise.all(cleanPromises)
       .catch(function(e) {
-        self.assistant.log('error', "Error cleaning failed tokens: ", e);
+        self.ctx.log('error', "Error cleaning failed tokens: ", e);
       });
     resolve();
   });
@@ -195,11 +195,11 @@ function deleteToken(token, errorCode) {
     self.libraries.admin.firestore().doc(`${path_subscriptions}/${token}`)
       .delete()
       .then(function() {
-        self.assistant.log(`Deleting bad token: ${token} for reason ${errorCode}`);
+        self.ctx.log(`Deleting bad token: ${token} for reason ${errorCode}`);
         resolve();
       })
       .catch(function(error) {
-        self.assistant.log('error', `Error deleting bad token: ${token} for reason ${errorCode} because of error ${error}`);
+        self.ctx.log('error', `Error deleting bad token: ${token} for reason ${errorCode} because of error ${error}`);
         resolve();
       })
   });

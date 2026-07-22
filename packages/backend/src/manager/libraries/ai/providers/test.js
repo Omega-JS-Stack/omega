@@ -7,7 +7,7 @@
  *
  * Behavior is scripted by directives embedded in the LAST user message. The
  * directives form a SEQUENCE consumed across the turns of a tool loop: call N
- * executes directive N-1 (indexed by how many assistant turns follow the last
+ * executes directive N-1 (indexed by how many ctx turns follow the last
  * user turn in options.messages). Directive content must not contain `]]`.
  *
  *   [[tool:check_order {"orderNumber":"123"}]]   — one tool call this step
@@ -30,11 +30,11 @@ const JSON5 = require('json5');
 // still unsupported
 const DIRECTIVE_REGEX = /\[\[(tool|tools|reply|delay|error)(?::([\s\S]*?))?\]\](?!\])/g;
 
-function TestProvider(assistant, key) {
+function TestProvider(ctx, key) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant?.Manager;
+  self.ctx = ctx;
+  self.Manager = ctx?.Manager;
   self.key = key || 'test';
 
   self.tokens = {
@@ -64,8 +64,8 @@ TestProvider.prototype.request = async function (options) {
 
   const { steps, cleanText } = parseScript(scriptSource);
 
-  // Which step of the script is this call? One assistant turn is appended per
-  // loop iteration, so call N sees N-1 assistant turns after the last user turn.
+  // Which step of the script is this call? One ctx turn is appended per
+  // loop iteration, so call N sees N-1 ctx turns after the last user turn.
   const lastUserIdx = messages.lastIndexOf(lastUserMessage);
   const stepIndex = messages.slice(lastUserIdx + 1).filter((m) => m.role === 'assistant').length;
 

@@ -10,20 +10,20 @@ const discountCodes = require('../../../libraries/payment/discount-codes.js');
  * Creates a payment intent (e.g., Stripe Checkout Session) for subscription or one-time purchase
  * Requires authentication
  */
-module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
+module.exports = async ({ ctx, Manager, user, settings, libraries }) => {
   const { admin } = libraries;
 
   // Require authentication
   if (!user.authenticated) {
-    return assistant.respond('Authentication required', { code: 401 });
+    return ctx.respond('Authentication required', { code: 401 });
   }
 
   // Verify reCAPTCHA (skip during automated tests)
-  if (!assistant.isTesting()) {
+  if (!ctx.isTesting()) {
     const recaptchaToken = settings.verification?.['g-recaptcha-response'];
     const recaptchaValid = await recaptcha.verify(recaptchaToken);
     if (!recaptchaValid) {
-      return assistant.respond('Request could not be verified', { code: 403 });
+      return ctx.respond('Request could not be verified', { code: 403 });
     }
   }
 
@@ -36,32 +36,32 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   const supplemental = settings.supplemental;
   let trial = settings.trial;
 
-  assistant.log(`Intent request: uid=${uid}, processor=${processor}, product=${productId}, frequency=${frequency}, trial=${trial}`);
+  ctx.log(`Intent request: uid=${uid}, processor=${processor}, product=${productId}, frequency=${frequency}, trial=${trial}`);
 
   // Validate product exists in config
   const product = (Manager.config.payment?.products || []).find(p => p.id === productId);
   if (!product) {
-    assistant.log(`Product "${productId}" not found (available: ${(Manager.config.payment?.products || []).map(p => p.id).join(', ')})`);
-    return assistant.respond(`Product '${productId}' not found`, { code: 400 });
+    ctx.log(`Product "${productId}" not found (available: ${(Manager.config.payment?.products || []).map(p => p.id).join(', ')})`);
+    return ctx.respond(`Product '${productId}' not found`, { code: 400 });
   }
 
   const productType = product.type || 'subscription';
 
-  assistant.log(`Product resolved: id=${product.id}, name=${product.name}, type=${productType}, trialDays=${product.trial?.days || 'none'}`);
+  ctx.log(`Product resolved: id=${product.id}, name=${product.name}, type=${productType}, trialDays=${product.trial?.days || 'none'}`);
 
   // Subscription-specific guards
   if (productType === 'subscription') {
     // Require frequency for subscriptions
     if (!frequency) {
-      return assistant.respond('Frequency is required for subscription products', { code: 400 });
+      return ctx.respond('Frequency is required for subscription products', { code: 400 });
     }
 
     // Block checkout unless user has no subscription or is fully cancelled
     const subProductId = user.subscription?.product?.id || 'basic';
     const subStatus = user.subscription?.status;
     if (subProductId !== 'basic' && subStatus !== 'cancelled') {
-      assistant.log(`User ${uid} has existing subscription: product=${subProductId}, status=${subStatus}, resourceId=${user.subscription.payment?.resourceId}`);
-      return assistant.respond('You already have a subscription. Please cancel your existing subscription before purchasing a new one.', { code: 400 });
+      ctx.log(`User ${uid} has existing subscription: product=${subProductId}, status=${subStatus}, resourceId=${user.subscription.payment?.resourceId}`);
+      return ctx.respond('You already have a subscription. Please cancel your existing subscription before purchasing a new one.', { code: 400 });
     }
 
     // Resolve trial eligibility: if requested but user has subscription history, silently downgrade
@@ -74,7 +74,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
         .get();
 
       if (!historySnapshot.empty) {
-        assistant.log(`User ${uid} not eligible for trial (has subscription history), continuing without trial`);
+        ctx.log(`User ${uid} not eligible for trial (has subscription history), continuing without trial`);
         trial = false;
       }
     }
@@ -88,16 +88,16 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   if (discount) {
     const discountResult = discountCodes.validate(discount, user);
     if (!discountResult.valid) {
-      return assistant.respond(`Invalid discount code: ${discount}`, { code: 400 });
+      return ctx.respond(`Invalid discount code: ${discount}`, { code: 400 });
     }
     resolvedDiscount = discountResult;
-    assistant.log(`Discount validated: code=${resolvedDiscount.code}, percent=${resolvedDiscount.percent}, duration=${resolvedDiscount.duration}`);
+    ctx.log(`Discount validated: code=${resolvedDiscount.code}, percent=${resolvedDiscount.percent}, duration=${resolvedDiscount.duration}`);
   }
 
   // Generate order ID
   const orderId = OrderId.generate();
 
-  assistant.log(`Generated orderId=${orderId}`);
+  ctx.log(`Generated orderId=${orderId}`);
 
   // Build redirect URLs
   const confirmationUrl = buildConfirmationUrl(Manager.project.websiteUrl, { product, productId, productType, frequency, processor, trial, orderId });
@@ -108,7 +108,7 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
   try {
     processorModule = loadProcessor(path.join(__dirname, 'processors'), processor);
   } catch (e) {
-    return assistant.respond(`Unknown processor: ${processor}`, { code: 400 });
+    return ctx.respond(`Unknown processor: ${processor}`, { code: 400 });
   }
 
   // Create the intent via the processor
@@ -124,14 +124,14 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
       discount: resolvedDiscount,
       confirmationUrl,
       cancelUrl,
-      assistant,
+      ctx,
     });
   } catch (e) {
-    assistant.log(`Failed to create ${processor} intent: ${e.message}`);
-    return assistant.respond(`Failed to create intent: ${e.message}`, { code: 500, sentry: true });
+    ctx.log(`Failed to create ${processor} intent: ${e.message}`);
+    return ctx.respond(`Failed to create intent: ${e.message}`, { code: 500 });
   }
 
-  assistant.log(`${processor} intent created: id=${result.id}, url=${result.url}`);
+  ctx.log(`${processor} intent created: id=${result.id}, url=${result.url}`);
 
   // Build timestamps
   const now = powertools.timestamp(new Date(), { output: 'string' });
@@ -160,9 +160,9 @@ module.exports = async ({ assistant, Manager, user, settings, libraries }) => {
     },
   });
 
-  assistant.log(`Saved payments-intents/${orderId}: uid=${uid}, product=${productId}, type=${productType}, frequency=${frequency}, trial=${trial}`);
+  ctx.log(`Saved payments-intents/${orderId}: uid=${uid}, product=${productId}, type=${productType}, frequency=${frequency}, trial=${trial}`);
 
-  return assistant.respond({
+  return ctx.respond({
     id: result.id,
     orderId: orderId,
     url: result.url,

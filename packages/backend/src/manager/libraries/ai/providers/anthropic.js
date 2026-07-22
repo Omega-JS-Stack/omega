@@ -2,7 +2,7 @@
  * Anthropic provider for the unified AI library.
  *
  * Public surface matches the OpenAI provider:
- *   new Anthropic(assistant, key).request(options) → { content, output, tokens, raw }
+ *   new Anthropic(ctx, key).request(options) → { content, output, tokens, raw }
  *
  * Maps the Claude Messages API onto the OpenAI provider's option shape so callers
  * can swap providers without rewriting call sites.
@@ -21,12 +21,12 @@ const MODEL_TABLE = {
   'claude-haiku-4-5':  { input: 1.00,  output: 5.00,  features: { json: true, temperature: true, reasoning: false } },
 };
 
-function Anthropic(assistant, key) {
+function Anthropic(ctx, key) {
   const self = this;
 
-  self.assistant = assistant;
-  self.Manager = assistant?.Manager;
-  self.user = assistant?.user;
+  self.ctx = ctx;
+  self.Manager = ctx?.Manager;
+  self.user = ctx?.user;
   self.key = key
     || self.Manager?.config?.anthropic?.key
     || process.env.ANTHROPIC_API_KEY
@@ -43,7 +43,7 @@ function Anthropic(assistant, key) {
 
 Anthropic.prototype.request = async function (options) {
   const self = this;
-  const assistant = self.assistant;
+  const ctx = self.ctx;
 
   options = _.merge({}, options);
   options.model = options.model || DEFAULT_MODEL;
@@ -60,7 +60,7 @@ Anthropic.prototype.request = async function (options) {
   const client = new SDK({ apiKey: self.key });
 
   // Build messages from the OpenAI-style option shape (prompt + message) or
-  // unified messages turns (incl. assistant toolCalls + role:'tool' results)
+  // unified messages turns (incl. ctx toolCalls + role:'tool' results)
   const { system, messages } = format.buildMessages(options);
 
   // JSON output via system prompt instruction (Anthropic's structured output is via prompt, not a flag)
@@ -103,7 +103,7 @@ Anthropic.prototype.request = async function (options) {
   try {
     raw = await client.messages.create(requestBody);
   } catch (e) {
-    assistant?.error?.(`Anthropic request failed: ${e.message}`, e);
+    ctx?.error?.(`Anthropic request failed: ${e.message}`, e);
     throw e;
   }
 

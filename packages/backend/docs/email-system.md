@@ -20,8 +20,8 @@ Caller (route/transition/cron)
 
 | Context | API | Delivers via |
 |---|---|---|
-| Transactional (individual) | `Manager.Email(assistant).send(settings)` | SendGrid Mail Send |
-| Marketing (campaign) | `Manager.Email(assistant).sendCampaign(settings)` | SendGrid Single Send + Beehiiv |
+| Transactional (individual) | `Manager.Email(ctx).send(settings)` | SendGrid Mail Send |
+| Marketing (campaign) | `Manager.Email(ctx).sendCampaign(settings)` | SendGrid Single Send + Beehiiv |
 | Newsletter (generated) | `generators/newsletter.js` → `renderNewsletter()` | Same as marketing |
 
 ### Shared Preparation (`prepare.js`)

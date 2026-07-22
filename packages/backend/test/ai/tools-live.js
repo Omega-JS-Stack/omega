@@ -24,17 +24,17 @@ const WEATHER_TOOL = {
   },
 };
 
-const SYSTEM = 'You are a weather assistant. Use the get_weather tool to answer weather questions, then summarize the result in one sentence.';
+const SYSTEM = 'You are a weather ctx. Use the get_weather tool to answer weather questions, then summarize the result in one sentence.';
 const QUESTION = 'What is the weather in Paris right now?';
 const TOOL_RESULT = '{"temperature":"21C","conditions":"sunny"}';
 
-// Minimal assistant context for direct provider construction — live tests
+// Minimal ctx context for direct provider construction — live tests
 // bypass Manager.AI() to pin provider behavior precisely
 function directAssistant() {
   return {
     log: () => {},
     error: () => {},
-    errorify: (message) => new Error(message),
+    report: (message) => new Error(message),
     getUser: () => ({ auth: { uid: 'backend-ai-live-test' } }),
     request: { geolocation: { ip: '127.0.0.1' } },
   };
@@ -86,7 +86,7 @@ module.exports = {
           'extracted the city',
         );
 
-        // Step 2 — replay the raw assistant blocks + tool result, get the answer
+        // Step 2 — replay the raw ctx blocks + tool result, get the answer
         const second = await provider.request({
           model: 'claude-haiku-4-5',
           maxTokens: 1024,
