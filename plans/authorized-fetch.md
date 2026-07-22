@@ -48,7 +48,9 @@ const data = await omega.api('/omega/user/token', { method: 'POST', body: {} });
 
 ## Open for Ian
 
-1. Name: `omega.api()` vs `omega.authorizedFetch()` vs `omega.fetch()`.
+1. Name — `omega.api()` REJECTED (Ian 2026-07-22 "not sure I like that"). Candidates on the table:
+   `omega.request()` (recommended), `omega.authorizedFetch()` (legacy continuity),
+   `omega.call()`, `omega.fetch()`.
 2. Bindings key for server usage (legacy used top-level `usage`; client's local-usage module also binds
    `usage` — one must move or merge).
 3. Sequence: standalone, or folded into the assistant refactor (plans/assistant-refactor.md) since

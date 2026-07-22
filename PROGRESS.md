@@ -12,7 +12,7 @@
 - 28 items: bugs (contact, redirect rebuild, auth kick-out), design/copy (pricing, about, checkout), features (uj_ rename, ad slots, FA-Pro PROPOSE-FIRST) → plans/website-polish-backlog.md
 ### Ian-queued (2026-07-22)
 - Assistant library review+optimization: rename, module split, signatures, sentry rework; KEEP headers/status-code semantics; propose-first → plans/assistant-refactor.md
-- claude.md/agents.md + omega:* skills reorganization for monorepo naming — after the review waves → plans/agent-docs-skills-reorg.md
+- Docs+skills revamp (WIDENED 07-22): rewrite all 7 omega:* skills + COMPLETE AGENTS.md rewrite — after waves → plans/agent-docs-skills-reorg.md
 - authorizedFetch: one client-side API-fetch layer + automatic omega-properties→bindings usage sync — shape awaits Ian → plans/authorized-fetch.md
 - Test harmonization + comprehensiveness pass (real-Chrome extension auth e2e, real-Electron desktop auth e2e, per-package gap table) — after the review waves → plans/test-comprehensiveness.md
 ### Phase B — Launch wiring (after reviews)
