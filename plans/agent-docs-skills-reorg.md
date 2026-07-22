@@ -23,9 +23,16 @@ All seven refer to the OLD system (separate repos, UJM/BEM/BXM/EM names, old com
   never a second home for facts. Rename question (omega:bem → omega:backend etc.) decided in the pass.
 
 ### 2. Monorepo entry point — complete AGENTS.md rewrite
-- `/Users/ian/Developer/Repositories/Omega/omega/AGENTS.md`: rewrite from scratch for the
-  new-agent-opens-the-monorepo experience — what this is, the map, hard rules, how to run/test/build,
-  where every deep doc lives. Efficient over exhaustive; ≤250-line budget stands.
+- Ian's diagnosis (2026-07-22, refined): the current file "is just not good — not targeted, a bunch
+  of legacy notes; read it and then look at our actual work and it's not a good instruction." The
+  rewrite is not about a single audience: it is THE entry point, and its job is to describe each
+  framework (web, desktop, backend, extension, client, manager, devkit, …) and LINK to their specific
+  docs — a real map, not accumulated history. Rewrite from scratch; ≤250-line budget stands.
+- Docs reorganization to design in the same pass (Ian's direction, exploratory): split docs the way
+  the frameworks split — shared/cross-framework concepts in ONE shared home, framework-unique detail
+  in that framework's own docs, entry point linking both. Interacts with the existing mirror-spec
+  (mirrored per-package CLAUDE.md skeletons) — decide whether mirroring survives or the shared layer
+  replaces the mirrored copies (SSOT favors the latter).
 - KEEP the migration story: a short "migrated from backend-manager/UJM/BXM/EM/WM" section so the
   lineage is discoverable.
 - PRESERVE the old-system CLAUDE.md/AGENTS.md files: archive copies (e.g. `_attic/legacy-agent-docs/`
