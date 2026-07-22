@@ -46,19 +46,3 @@ assistant.respond({ created: true }, { code: 201 });
 // Redirect
 assistant.respond('https://example.com', { code: 302 });
 ```
-
-## Use Hooks (Consumer Project)
-
-```javascript
-Manager.handlers.omega_api = function (mod, position) {
-  const assistant = mod.assistant;
-  const command = assistant.request.data.command;
-
-  return new Promise(async function(resolve, reject) {
-    if (position === 'pre' && command === 'user:sign-up') {
-      // Before sign-up logic
-    }
-    return resolve();
-  });
-};
-```

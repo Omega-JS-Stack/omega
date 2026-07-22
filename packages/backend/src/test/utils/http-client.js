@@ -3,8 +3,7 @@ const fetch = require('wonderful-fetch');
 /**
  * HTTP Client wrapper for making API calls during tests
  * Supports:
- *   - Legacy commands: http.command('general:generate-uuid', payload)
- *   - New RESTful API: http.post('general/uuid', body), http.get(...), http.delete(...)
+ *   - RESTful API: http.post('general/uuid', body), http.get(...), http.delete(...)
  *   - Auth contexts: http.as('admin').post(...), http.as('basic').get(...)
  */
 class HttpClient {
@@ -119,17 +118,15 @@ class HttpClient {
   /**
    * Create a request helper bound to a specific auth context
    * Usage:
-   *   - Legacy: http.as('admin').command('admin:write', data)
-   *   - New RESTful: http.as('admin').post('marketing/contact', data)
-   *   - New RESTful: http.as('none').get('general/uuid', {version: '4'})
+   *   - http.as('admin').post('marketing/contact', data)
+   *   - http.as('none').get('general/uuid', {version: '4'})
    * @param {string} accountType - 'admin', 'basic', 'premium', 'expired', 'none'
-   * @returns {object} - Object with command(), get(), post(), put(), delete() methods
+   * @returns {object} - Object with get(), post(), put(), delete() methods
    */
   as(accountType) {
     const authConfig = this._getAuthConfig(accountType);
 
     return {
-      command: (command, payload, options) => this._commandWithAuth(command, payload, authConfig, options),
       get: (route, params, options) => this._fetch('get', route, params, authConfig, options),
       post: (route, body, options) => this._fetch('post', route, body, authConfig, options),
       put: (route, body, options) => this._fetch('put', route, body, authConfig, options),
@@ -141,10 +138,9 @@ class HttpClient {
    * Create a request helper with a specific private key
    * Useful when testing with dynamically generated keys
    * Usage:
-   *   - Legacy: http.withPrivateKey(key).command('user:action', data)
-   *   - New RESTful: http.withPrivateKey(key).post('user/profile', data)
+   *   - http.withPrivateKey(key).post('user/profile', data)
    * @param {string} privateKey - The private key to use for authentication
-   * @returns {object} - Object with command(), get(), post(), put(), delete() methods
+   * @returns {object} - Object with get(), post(), put(), delete() methods
    */
   withPrivateKey(privateKey) {
     const authConfig = {
@@ -153,7 +149,6 @@ class HttpClient {
     };
 
     return {
-      command: (command, payload, options) => this._commandWithAuth(command, payload, authConfig, options),
       get: (route, params, options) => this._fetch('get', route, params, authConfig, options),
       post: (route, body, options) => this._fetch('post', route, body, authConfig, options),
       put: (route, body, options) => this._fetch('put', route, body, authConfig, options),
@@ -162,30 +157,16 @@ class HttpClient {
   }
 
   /**
-   * Internal: Make legacy command with specific auth
-   * Legacy commands use POST with command in body: {command: 'general:generate-uuid', payload: {...}}
-   */
-  async _commandWithAuth(command, payload, authConfig, options) {
-    options = options || {};
-
-    return this._fetch('post', '/omega/', {
-      command: command,
-      payload: payload || {},
-      options: options.commandOptions || {},
-    }, authConfig, options, true);
-  }
-
-  /**
    * Internal: Make HTTP request with specific auth
    * - GET: auth params merged into query string
    * - POST/PUT/DELETE: auth params merged into body
    */
-  async _fetch(method, route, data, authConfig, options, isFullEndpoint) {
+  async _fetch(method, route, data, authConfig, options) {
     options = options || {};
     data = data || {};
 
     const isGet = method === 'get';
-    const endpoint = isFullEndpoint ? route : `/${route}`;
+    const endpoint = `/${route}`;
     const url = `${this.baseUrl}${endpoint}`;
     const headers = { ...authConfig.headers, ...options.headers };
 
@@ -241,13 +222,6 @@ class HttpClient {
    */
   async delete(route, body, options) {
     return this._fetch('delete', route, body, this._getDefaultAuthConfig(), options);
-  }
-
-  /**
-   * Call a omega_api command (uses default auth from setAuth)
-   */
-  async command(command, payload, options) {
-    return this._commandWithAuth(command, payload, this._getDefaultAuthConfig(), options);
   }
 }
 

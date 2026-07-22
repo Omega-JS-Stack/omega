@@ -15,7 +15,7 @@
 | Auth: on-delete | `src/manager/events/auth/on-delete.js` |
 | Auth: shared utilities | `src/manager/events/auth/utils.js` |
 | Cron runner | `src/manager/events/cron/runner.js` |
-| Main API handler | `src/manager/functions/core/actions/api.js` |
+| Main API handler (middleware) | `src/manager/helpers/middleware.js` |
 | Config template | `templates/config/omega.json5` |
 | CLI entry | `src/cli/index.js` |
 | Stripe webhook forwarding | `src/cli/commands/stripe.js` |

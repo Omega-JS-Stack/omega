@@ -94,7 +94,6 @@ class TestCommand extends BaseCommand {
       projectDir,
       testPaths,
       emulatorPorts,
-      includeLegacy: argv.legacy || false, // Include legacy tests from test/functions/
       isFrameworkSelfTest: isSelfTest, // gates the boot/ smoke layer (excluded for consumers)
     };
 

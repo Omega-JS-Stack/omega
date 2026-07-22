@@ -335,11 +335,6 @@ class TestRunner {
         continue;
       }
 
-      // Skip legacy 'functions' directory unless --legacy flag is set
-      if (item === 'functions' && !this.options.includeLegacy) {
-        continue;
-      }
-
       const fullPath = path.join(dir, item);
       const stat = jetpack.inspect(fullPath);
 

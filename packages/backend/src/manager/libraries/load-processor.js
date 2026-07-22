@@ -27,25 +27,21 @@ function loadProcessor(dir, name) {
 }
 
 /**
- * Load a module by colon-joined id (e.g. "general:download-app-link"), rejecting
- * any id that could escape the directory: every segment is strictly [a-z0-9_-].
+ * Load a module by colon-joined id (e.g. "general:download-app-link" →
+ * `${dir}/general/download-app-link.js`), rejecting any id that could escape
+ * the directory: every segment is strictly [a-z0-9_-].
  *
  * @param {string} dir - Absolute path of the modules directory
  * @param {string} id - Colon-joined module id
- * @param {object} [options] - `flat: true` keeps the colon-joined id as the literal filename instead of mapping colons to nested folders
  * @returns {*} The required module
  * @throws {Error} When the id is not a valid module id
  */
-function loadTemplate(dir, id, options) {
-  options = options || {};
-
+function loadTemplate(dir, id) {
   if (typeof id !== 'string' || !ID_PATTERN.test(id)) {
     throw new Error(`Invalid template id: ${id}`);
   }
 
-  const relative = options.flat ? id : id.split(':').join('/');
-
-  return require(path.join(dir, `${relative}.js`));
+  return require(path.join(dir, `${id.split(':').join('/')}.js`));
 }
 
 module.exports = loadProcessor;

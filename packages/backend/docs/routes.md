@@ -1,38 +1,6 @@
-# Creating Routes, API Commands, Events, Cron Jobs
+# Creating Routes, Events, Cron Jobs
 
-Recipes for building consumer-side routes plus @omega.js/backend-side API commands, event handlers, and cron jobs. See also [docs/schemas.md](schemas.md) for schema definitions, [docs/auth-hooks.md](auth-hooks.md) for auth lifecycle hooks, and [docs/common-operations.md](common-operations.md) for inside-the-handler patterns.
-
-## New API Command
-
-Create `src/manager/functions/core/actions/api/{category}/{action}.js`:
-
-```javascript
-function Module() {}
-
-Module.prototype.main = function () {
-  const self = this;
-  const Manager = self.Manager;
-  const Api = self.Api;
-  const assistant = self.assistant;
-  const payload = self.payload;
-
-  return new Promise(async function(resolve, reject) {
-    // Validate input
-    if (!payload.data.payload.requiredField) {
-      return reject(assistant.errorify('Missing required field', { code: 400 }));
-    }
-
-    // Business logic here
-    const result = { success: true };
-
-    // Log and return
-    assistant.log('Action completed', result);
-    return resolve({ data: result });
-  });
-};
-
-module.exports = Module;
-```
+Recipes for building consumer-side routes plus @omega.js/backend-side event handlers and cron jobs. See also [docs/schemas.md](schemas.md) for schema definitions, [docs/auth-hooks.md](auth-hooks.md) for auth lifecycle hooks, and [docs/common-operations.md](common-operations.md) for inside-the-handler patterns.
 
 ## New Route (Consumer Project)
 

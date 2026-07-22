@@ -286,75 +286,16 @@ Manager.Middleware(req, res).run('routeName', {
 });
 ```
 
-## Hook System
-
-Intercept and modify `omega_api` requests before/after processing:
-
-```javascript
-const Manager = (new (require('@omega.js/backend'))).init(exports, {});
-
-Manager.handlers.omega_api = function (mod, position) {
-  const assistant = mod.assistant;
-
-  return new Promise(async function(resolve, reject) {
-    const command = mod.assistant.request.data.command || '';
-    const payload = mod.assistant.request.data.payload || {};
-
-    assistant.log('Intercepted omega_api', position, command, payload);
-
-    // Handle specific commands
-    if (command === 'user:sign-up') {
-      if (position === 'pre') {
-        // Before sign-up: validate, modify payload, etc.
-        assistant.log('Pre sign-up hook');
-      } else if (position === 'post') {
-        // After sign-up: send notifications, etc.
-        assistant.log('Post sign-up hook');
-      }
-    }
-
-    // Handle all commands
-    if (command === '*') {
-      if (position === 'pre') {
-        // Before any command
-      } else if (position === 'post') {
-        // After any command
-      }
-    }
-
-    return resolve();
-  });
-};
-```
-
 ## Built-in Functions
 
 ### HTTP API (`omega_api`)
 
-The main API endpoint accepts commands in the format `category:action`:
+The main API endpoint serves the RESTful routes system. Requests to `/omega/<route>` (hosting rewrite; the legacy `/backend-manager/` prefix works as an alias) resolve to `routes/{name}/{method}.js` handlers with their matching schemas — see [Creating Custom Functions](#creating-custom-functions) above.
 
 ```javascript
-// POST to https://us-central1-{project}.cloudfunctions.net/omega_api
-{
-  "command": "general:generate-uuid",
-  "payload": {
-    "version": "4"
-  },
-  "apiKey": "optional-api-key"
-}
+// POST https://api.<yourdomain>/omega/user/token
+// → routes/user/token/post.js (responds { token })
 ```
-
-**Available Commands:**
-
-| Category | Commands |
-|----------|----------|
-| `admin` | `firestore-write`, `firestore-read`, `firestore-query`, `database-write`, `database-read`, `send-email`, `send-notification`, `payment-processor`, `backup`, `cron`, `create-post`, `edit-post`, `get-stats`, `run-hook`, `sync-users`, `write-repo-content` |
-| `user` | `sign-up`, `delete`, `oauth2`, `resolve`, `get-subscription-info`, `get-active-sessions`, `sign-out-all-sessions`, `create-custom-token`, `regenerate-api-keys`, `submit-feedback`, `validate-settings` |
-| `general` | `generate-uuid`, `send-email`, `fetch-post` |
-| `handler` | `create-post` |
-| `firebase` | `get-providers` |
-| `test` | `authenticate`, `webhook`, `lab`, `redirect` |
-| `special` | `setup-electron-manager-client` |
 
 ### Auth Events
 

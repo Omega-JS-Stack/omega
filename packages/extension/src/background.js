@@ -2,6 +2,7 @@
 import extension from './lib/extension.js';
 import LoggerLite from './lib/logger-lite.js';
 import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
+import { attachTo as attachUrlHelpers } from './utils/url-helpers.js';
 
 // Firebase (static imports - dynamic import() doesn't work in service workers with webpack chunking)
 import { initializeApp, getApp } from 'firebase/app';
@@ -177,23 +178,22 @@ class Manager {
       // Background is signed in, context is not (or different user) → provide token
       this.logger.log('[AUTH] syncAuth: Fetching fresh custom token for context...', bgUser.email);
 
-      // Get API URL from config
-      const apiUrl = this.config?.web_manager?.api?.url || 'https://api.itwcreativeworks.com';
+      // Resolve the API URL (throws when cloud.config.authDomain is missing —
+      // a misconfigured brand should fail loudly, never call a foreign host)
+      const apiUrl = this.getApiUrl();
 
       // Get fresh ID token for authorization
       const idToken = await bgUser.getIdToken(true);
 
-      // Fetch fresh custom token from server
-      const response = await fetch(`${apiUrl}/omega`, {
+      // Fetch fresh custom token from the /user/token route
+      // (uid defaults server-side to the authenticated caller)
+      const response = await fetch(`${apiUrl}/omega/user/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          command: 'user:create-custom-token',
-          payload: {},
-        }),
+        body: JSON.stringify({}),
       });
 
       // Check response
@@ -201,11 +201,11 @@ class Manager {
         throw new Error(`Server responded with ${response.status}`);
       }
 
-      // Parse response
+      // Parse response ({ token } at the top level)
       const data = await response.json();
 
       // Check for token in response
-      if (!data.response?.token) {
+      if (!data.token) {
         throw new Error('No token in server response');
       }
 
@@ -214,7 +214,7 @@ class Manager {
       // Send user info and fresh custom token
       sendResponse({
         needsSync: true,
-        customToken: data.response.token,
+        customToken: data.token,
         user: {
           uid: bgUser.uid,
           email: bgUser.email,
@@ -272,7 +272,7 @@ class Manager {
   // Initialize Firebase
   initializeFirebase() {
     // Get Firebase config
-    const firebaseConfig = this.config?.web_manager?.firebase?.app?.config;
+    const firebaseConfig = this.config?.cloud?.config;
 
     // Check if Firebase config is available
     if (!firebaseConfig) {
@@ -332,13 +332,12 @@ class Manager {
     console.log('[AUTH] this.config:', this.config);
     console.log('[AUTH] OMEGA_BUILD_JSON:', serviceWorker.OMEGA_BUILD_JSON);
 
-    // Get auth domain from config
-    // Structure is: this.config.firebase.app.config.authDomain
-    const authDomain = this.config?.firebase?.app?.config?.authDomain;
+    // Get auth domain from config (canonical omega.json5 shape: cloud.config)
+    const authDomain = this.config?.cloud?.config?.authDomain;
 
     // Log config for debugging
     this.logger.log('[AUTH] Config paths:', {
-      firebase_path: this.config?.firebase?.app?.config?.authDomain,
+      cloud_path: this.config?.cloud?.config?.authDomain,
       resolved: authDomain,
     });
 
@@ -399,7 +398,7 @@ class Manager {
   // Firebase Auth persists sessions in IndexedDB - we just need to initialize it
   initializeAuth() {
     // Get Firebase config
-    const firebaseConfig = this.config?.firebase?.app?.config;
+    const firebaseConfig = this.config?.cloud?.config;
     if (!firebaseConfig) {
       this.logger.log('[AUTH] Firebase config not available, skipping auth initialization');
       return;
@@ -425,7 +424,7 @@ class Manager {
     }
 
     // Get Firebase config
-    const firebaseConfig = this.config?.firebase?.app?.config;
+    const firebaseConfig = this.config?.cloud?.config;
     if (!firebaseConfig) {
       throw new Error('Firebase config not available');
     }
@@ -673,8 +672,9 @@ function setupGlobalHandlers() {
   });
 }
 
-// Cross-context helpers — Manager.isTesting() / isDevelopment() / etc.
+// Cross-context helpers — Manager.isTesting() / isDevelopment() / getApiUrl() / etc.
 attachModeHelpers(Manager);
+attachUrlHelpers(Manager);
 
 // Export
 export default Manager;

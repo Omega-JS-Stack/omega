@@ -315,22 +315,20 @@ const bridge = {
   },
 
   // Fetch a fresh custom token for the currently-signed-in user.
-  // Mirrors BXM: POST <apiUrl>/omega with command 'user:create-custom-token'.
+  // Mirrors BXM: POST <apiUrl>/omega/user/token — the route defaults uid to the
+  // authenticated caller and responds { token } at the top level.
   async _fetchCustomToken(user) {
     const apiUrl = bridge._manager.getApiUrl();
 
     const idToken = await user.getIdToken(true);
 
-    const res = await fetch(`${apiUrl}/omega`, {
+    const res = await fetch(`${apiUrl}/omega/user/token`, {
       method: 'POST',
       headers: {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${idToken}`,
       },
-      body: JSON.stringify({
-        command: 'user:create-custom-token',
-        payload: {},
-      }),
+      body: JSON.stringify({}),
     });
 
     if (!res.ok) {
@@ -338,7 +336,7 @@ const bridge = {
     }
 
     const data = await res.json();
-    const token = data?.response?.token;
+    const token = data?.token;
     if (!token) {
       throw new Error('@omega.js/backend response missing token.');
     }

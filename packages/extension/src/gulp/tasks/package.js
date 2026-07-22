@@ -102,7 +102,7 @@ async function generateBuildJs(outputDir) {
         lazyLoading: { enabled: true, config: {} },
         socialSharing: { enabled: false, config: {} },
         pushNotifications: { enabled: false, config: {} },
-        validRedirectHosts: ['itwcreativeworks.com'],
+        validRedirectHosts: [],
         refreshNewVersion: { enabled: true, config: {} },
         serviceWorker: { enabled: false, config: {} },
 

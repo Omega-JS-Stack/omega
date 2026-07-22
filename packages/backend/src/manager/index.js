@@ -11,7 +11,6 @@ const util = require('util');
 // let User;
 // let Analytics;
 // Paths
-const core = './functions/core';
 const wrappers = './functions/wrappers';
 const _legacy = './functions/_legacy';
 const events = path.resolve(__dirname, './events');
@@ -499,46 +498,6 @@ Manager.prototype.init = function (exporter, options) {
 };
 
 // HELPERS
-Manager.prototype._process = function (mod, options) {
-  const self = this;
-
-  return new Promise(async function(resolve, reject) {
-    const name = mod.assistant.meta.name;
-    const hook = self.handlers && self.handlers[name];
-    const req = mod.req;
-    const res = mod.res;
-    let error;
-
-    function _reject(e, log) {
-      if (log) {
-        // self.assistant.error(e);
-        mod.assistant.respond(e, {code: 500, sentry: true});
-      }
-      // res.status(500).send(e.message);
-      return resolve()
-    }
-
-    // Run pre
-    if (hook) {
-      await hook(mod, 'pre').catch(e => {error = e});
-    }
-    if (error) { return _reject(error, true) }
-
-    // Run main
-    await mod.main().catch(e => {error = e});
-    if (error) { return _reject(error, false) }
-
-    // Run post
-    if (hook) {
-      await hook(mod, 'post').catch(e => {error = e});
-    }
-    if (error) { return _reject(error, true) }
-
-    // Fin
-    return resolve();
-  });
-};
-
 Manager.prototype._preProcess = function (mod) {
   const self = this;
   const name = mod.assistant.meta.name;
@@ -706,32 +665,6 @@ Manager.prototype.AI = function (assistant, key) {
   self.libraries.AI = self.libraries.AI || require('./libraries/ai/index.js');
   return new self.libraries.AI(assistant, key);
 };
-
-// For importing API libraries
-Manager.prototype.Api = function () {
-  const self = this;
-  // self.libraries.Api = self.libraries.Api || require('./helpers/subscription-resolver.js');
-  // return new self.libraries.Api(...arguments);
-  // return self._process((new (require(`${core}/actions/api.js`))()).init(self, { req: req, res: res, }))
-
-  const Api = (new (require(`${core}/actions/api.js`))()).init(self, { req: {}, res: {}, });
-
-  return Api;
-};
-
-// Manager.prototype.Api = function () {
-//   const self = this;
-//   // self.libraries.Api = self.libraries.Api || require('./helpers/subscription-resolver.js');
-//   // return new self.libraries.Api(...arguments);
-//   // return self._process((new (require(`${core}/actions/api.js`))()).init(self, { req: req, res: res, }))
-//   return new Promise(function(resolve, reject) {
-//     const Api = (new (require(`${core}/actions/api.js`))()).init(self, { req: {}, res: {}, });
-
-//     Api.main()
-
-//     return Api;
-//   });
-// };
 
 // Manager.prototype.Utilities = function () {
 //   const self = this;
@@ -955,13 +888,8 @@ Manager.prototype.setupFunctions = function (exporter, options) {
       return self._handleMcp(req, res, mcpRoutePath);
     }
 
-    if (route.isLegacy) {
-      // Legacy command-based API -> goes through api.js + _process() for hooks
-      return self._process((new (require(`${core}/actions/api.js`))()).init(self, { req, res }));
-    } else {
-      // New RESTful middleware system -> direct to middleware (no hooks)
-      return self._processMiddleware(req, res, route.routePath);
-    }
+    // RESTful middleware system
+    return self._processMiddleware(req, res, route.routePath);
   });
 
   // Setup legacy functions

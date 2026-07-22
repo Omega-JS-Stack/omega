@@ -17,7 +17,6 @@
  *
  * Used by:
  * - routes/marketing/contact/post.js
- * - functions/core/actions/api/general/add-marketing-contact.js
  * - routes/user/signup/post.js (ALL_CHECKS before marketing sync; isDisposable() for affiliate fraud prevention)
  * - libraries/email/marketing/index.js (safety net before Beehiiv/SendGrid add/sync)
  */

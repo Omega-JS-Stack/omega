@@ -483,7 +483,7 @@ function getTemplateReplaceOptions() {
     lazyLoading: webManagerConfig.lazyLoading || { enabled: true, config: {} },
     socialSharing: webManagerConfig.socialSharing || { enabled: false, config: {} },
     pushNotifications: webManagerConfig.pushNotifications || { enabled: false, config: {} },
-    validRedirectHosts: webManagerConfig.validRedirectHosts || ['itwcreativeworks.com'],
+    validRedirectHosts: webManagerConfig.validRedirectHosts || [],
     refreshNewVersion: webManagerConfig.refreshNewVersion || { enabled: true, config: {} },
     serviceWorker: webManagerConfig.serviceWorker || { enabled: false, config: {} },
   });

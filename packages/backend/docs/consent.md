@@ -204,7 +204,7 @@ The parent @omega.js/backend has its own brand (e.g. `itw-creative-works`) with 
 
 [src/manager/libraries/email/marketing/index.js](../src/manager/libraries/email/marketing/index.js)
 
-`email.add()` and `email.sync()` check the user's `consent.marketing.status` IN THE LIBRARY, before validation and provider calls. Because the gate lives in the library rather than at call sites, every caller is covered: the signup route, the email-preferences toggle, payment-event syncs ([events/firestore/payments-webhooks/on-write.js](../src/manager/events/firestore/payments-webhooks/on-write.js)), the admin PUT re-sync (`routes/marketing/contact/put.js`), the public newsletter form (`routes/marketing/contact/post.js`), and the legacy API-command twins (`functions/core/actions/api/general/add-marketing-contact.js`).
+`email.add()` and `email.sync()` check the user's `consent.marketing.status` IN THE LIBRARY, before validation and provider calls. Because the gate lives in the library rather than at call sites, every caller is covered: the signup route, the email-preferences toggle, payment-event syncs ([events/firestore/payments-webhooks/on-write.js](../src/manager/events/firestore/payments-webhooks/on-write.js)), the admin PUT re-sync (`routes/marketing/contact/put.js`), the public newsletter form (`routes/marketing/contact/post.js`).
 
 **Semantics:**
 

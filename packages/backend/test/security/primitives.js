@@ -3,7 +3,7 @@
  *
  * - safeCompare: constant-time secret comparison (admin key, webhook keys)
  * - loadProcessor: processor-name confinement for dynamic require()
- * - loadTemplate: email-template-id confinement (colon-joined ids, nested + flat layouts)
+ * - loadTemplate: email-template-id confinement (colon-joined ids → nested folders)
  */
 const path = require('path');
 const safeCompare = require('../../src/manager/helpers/safe-compare.js');
@@ -12,7 +12,6 @@ const { loadTemplate } = loadProcessor;
 
 const PROCESSORS_DIR = path.join(__dirname, '../../src/manager/routes/payments/webhook/processors');
 const TEMPLATES_DIR = path.join(__dirname, '../../src/manager/routes/general/email/templates');
-const EMAILS_DIR = path.join(__dirname, '../../src/manager/functions/core/actions/api/general/emails');
 
 module.exports = {
   description: 'safeCompare + loadProcessor security primitives',
@@ -80,9 +79,6 @@ module.exports = {
       async run({ assert }) {
         const nested = loadTemplate(TEMPLATES_DIR, 'general:download-app-link');
         if (!(typeof nested === 'function')) { assert.fail('nested template loads by colon-joined id'); }
-
-        const flat = loadTemplate(EMAILS_DIR, 'general:download-app-link', { flat: true });
-        if (!(typeof flat === 'function')) { assert.fail('flat email loads by literal colon-joined filename'); }
       },
     },
 
