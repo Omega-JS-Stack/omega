@@ -108,9 +108,14 @@ class Firestore {
       },
 
       onSnapshot(callback, errorCallback) {
-        let unsubscribe = function () {};
+        // Cancellation-safe lazy subscribe: unsubscribing before init
+        // resolves must stop the listener from ever attaching — a
+        // placeholder noop would let it attach undetachably.
+        let cancelled = false;
+        let unsubscribe = null;
 
         self._ensureInitialized().then(function () {
+          if (cancelled) return;
           const docRef = self._firestoreMethods.doc(self._db, docPath);
 
           unsubscribe = self._firestoreMethods.onSnapshot(docRef, function (docSnap) {
@@ -123,7 +128,10 @@ class Firestore {
           }, errorCallback);
         });
 
-        return function () { unsubscribe(); };
+        return function () {
+          cancelled = true;
+          if (unsubscribe) unsubscribe();
+        };
       }
     };
   }
@@ -208,9 +216,12 @@ class Firestore {
       },
 
       onSnapshot(callback, errorCallback) {
-        let unsubscribe = function () {};
+        // Same cancellation-safe pattern as the doc onSnapshot above
+        let cancelled = false;
+        let unsubscribe = null;
 
         self._ensureInitialized().then(function () {
+          if (cancelled) return;
           const collRef = self._firestoreMethods.collection(self._db, collectionPath);
           const queryConstraints = self._buildConstraints(constraints);
           const q = self._firestoreMethods.query(collRef, ...queryConstraints);
@@ -230,7 +241,10 @@ class Firestore {
           }, errorCallback);
         });
 
-        return function () { unsubscribe(); };
+        return function () {
+          cancelled = true;
+          if (unsubscribe) unsubscribe();
+        };
       }
     };
 

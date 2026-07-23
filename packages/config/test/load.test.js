@@ -500,3 +500,25 @@ test('hasOmegaConfig is brand-aware: an app with NO app-layer file counts when t
   // a dir with no brand above it stays false (fail-soft in non-consumer dirs)
   assert.strictEqual(hasOmegaConfig(path.join(brandRoot, 'apps')), false);
 });
+
+// ─── wave-4 regression (F16): probe and load agree from a functions/ dir ───
+
+test('hasOmegaConfig mirrors loadConfig\'s functions/ → app-root fallback', (t) => {
+  const root = makeFixture('probe-functions-fallback', {
+    'config/omega.json5': `{ brand: { id: 'acme', name: 'Acme' }, targets: { backend: {} } }`,
+    'functions/index.js': `// runtime`,
+  });
+  cleanup(t, root);
+
+  const functionsDir = path.join(root, 'functions');
+  // loadConfig succeeds from the functions dir (app-root fallback)…
+  assert.strictEqual(loadConfig(functionsDir, 'backend').config.brand.id, 'acme');
+  // …so the probe must say true too — a false here made framework gates
+  // proceed with an empty config (cp142 class)
+  assert.strictEqual(hasOmegaConfig(functionsDir), true);
+
+  // A functions dir with NO config anywhere above stays false
+  const bare = makeFixture('probe-functions-bare', { 'functions/index.js': `// runtime` });
+  cleanup(t, bare);
+  assert.strictEqual(hasOmegaConfig(path.join(bare, 'functions')), false);
+});

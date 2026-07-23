@@ -24,6 +24,11 @@ let _beforeUnloadRegistered = false;
 
 function _sharedBeforeUnloadHandler(e) {
   for (const instance of _instances) {
+    // A form torn out of the DOM (view swap, modal teardown) must not keep
+    // blocking navigation with a stale dirty flag
+    if (!instance.$form.isConnected) {
+      continue;
+    }
     if (instance.config.warnOnUnsavedChanges && instance._isDirty) {
       e.preventDefault();
       e.returnValue = '';
@@ -120,7 +125,8 @@ export class FormManager {
     }
 
     // Handle page restored from bfcache (e.g., back button after OAuth redirect)
-    window.addEventListener('pageshow', (e) => this._handlePageShow(e));
+    this._pageShowHandler = (e) => this._handlePageShow(e);
+    window.addEventListener('pageshow', this._pageShowHandler);
 
     // Initialize file drop zones
     this._initFileDropZones();
@@ -1034,6 +1040,19 @@ export class FormManager {
   }
 
   /**
+   * Tear down this instance: leave the shared beforeunload registry and
+   * detach window listeners. Call when the form leaves the DOM for good
+   * (view swap, modal teardown) — otherwise the instance accumulates in
+   * the module-level Set and a stale dirty flag can block navigation.
+   * Form-element listeners die with the element; only window-level ones
+   * need explicit removal.
+   */
+  destroy() {
+    _instances.delete(this);
+    window.removeEventListener('pageshow', this._pageShowHandler);
+  }
+
+  /**
    * Set the input group filter for getData()
    * When set, getData() only returns fields matching the group (via data-input-group attribute)
    * Fields without data-input-group or with empty value are considered "global" and always included
@@ -1346,7 +1365,7 @@ export class FormManager {
 
       // Wildcard MIME match (e.g., "image/*")
       if (type.endsWith('/*')) {
-        const prefix = type.slice(0, -2) + '/';
+        const prefix = `${type.slice(0, -2)}/`;
 
         // Check actual MIME type
         if (fileType && fileType.startsWith(prefix)) {
@@ -1355,7 +1374,7 @@ export class FormManager {
 
         // Fallback: check extension when browser doesn't provide MIME type
         if (!fileType) {
-          const ext = '.' + fileName.split('.').pop();
+          const ext = `.${fileName.split('.').pop()}`;
           const guessedCategory = extToCategory[ext] || '';
           if (guessedCategory.startsWith(prefix)) {
             return true;

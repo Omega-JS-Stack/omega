@@ -58,8 +58,13 @@ function runSchema(config, schema) {
     // ─── Required check ─────────────────────────────────────────────────────
     let isRequired = false;
     if (typeof rule.required === 'function') {
+      // A throwing required() is a broken first-party schema rule — report
+      // it loud instead of silently treating the field as optional
       try { isRequired = !!rule.required(config); }
-      catch (_) { isRequired = false; }
+      catch (e) {
+        errors.push(`config.${rule.path} required() threw: ${e.message}`);
+        continue;
+      }
     } else {
       isRequired = !!rule.required;
     }

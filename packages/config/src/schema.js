@@ -114,6 +114,12 @@ const SHARED_SCHEMA = [
     required:    false,
     description: 'Drives auth, emulator project selection, analytics uuidv5 namespace, remote-config URL fallbacks.',
   },
+  {
+    path:        'cloud.messaging.vapidKey',
+    type:        'string',
+    required:    false,
+    description: 'Web-push VAPID public key (Firebase console → Cloud Messaging → Web Push certificates). Public by design — it ships to every browser; the private half stays in the console.',
+  },
 
   // ── analytics ────────────────────────────────────────────────────────────
   {

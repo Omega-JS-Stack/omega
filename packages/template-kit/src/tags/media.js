@@ -41,6 +41,17 @@ function resolveNameArg(ctx, arg) {
   return typeof resolved === 'string' ? stripQuotes(resolved) : stripQuotes(arg);
 }
 
+// Attribute-position escaping for caller-supplied strings — frontmatter can
+// legitimately carry quotes (e.g. a post title used as the default alt), and
+// an unescaped quote breaks out of the attribute.
+function escapeAttr(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function readFileIfExists(filePath) {
   if (!filePath) return null;
   try {
@@ -62,10 +73,10 @@ const ujIcon = {
     if (!iconSvg) return '';
 
     const processed = injectSvgAttributes(iconSvg);
-    const dataAttr = iconName ? ` data-icon="${iconName}"` : '';
+    const dataAttr = iconName ? ` data-icon="${escapeAttr(iconName)}"` : '';
 
     if (cssClasses) {
-      return `<i class="fa ${cssClasses}"${dataAttr}>${processed}</i>`;
+      return `<i class="fa ${escapeAttr(cssClasses)}"${dataAttr}>${processed}</i>`;
     }
     return `<i class="fa"${dataAttr}>${processed}</i>`;
   },
@@ -240,22 +251,26 @@ function buildImageHtml(src, options = {}) {
   const isExternal = /^https?:\/\//.test(src);
   if (isExternal) return buildExternalImage(src, options);
 
-  const extension = path.extname(src);
-  const srcPath = extension ? src.slice(0, -extension.length) : src;
+  const rawExtension = path.extname(src);
+  // src is caller-supplied like the options — escape once at derivation;
+  // every interpolation below is attribute-position
+  const srcPath = escapeAttr(rawExtension ? src.slice(0, -rawExtension.length) : src);
+  const extension = escapeAttr(rawExtension);
+  src = escapeAttr(src);
   const maxWidthRaw = options.max_width || options['max-width'] || false;
   const maxWidth = maxWidthRaw ? String(maxWidthRaw) : false;
 
   let html = '<picture>\n';
-  if (options.webp !== 'false') {
+  if (options.webp !== 'false' && options.webp !== false) {
     html += buildWebpSources(srcPath, maxWidth);
   }
   html += buildOriginalSources(srcPath, extension, maxWidth, src);
 
-  const alt = options.alt || '';
-  const cssClass = options.class || '';
-  const style = options.style || '';
-  const width = options.width || '';
-  const height = options.height || '';
+  const alt = escapeAttr(options.alt || '');
+  const cssClass = escapeAttr(options.class || '');
+  const style = escapeAttr(options.style || '');
+  const width = escapeAttr(options.width || '');
+  const height = escapeAttr(options.height || '');
 
   html += '<img\n';
   html += `src="${IMAGE_PLACEHOLDER}"\n`;
@@ -310,12 +325,13 @@ function buildOriginalSources(srcPath, extension, maxWidth, src) {
 }
 
 function buildExternalImage(src, options) {
-  const alt = options.alt || '';
-  const cssClass = options.class || '';
-  const style = options.style || '';
-  const width = options.width || '';
-  const height = options.height || '';
-  const loading = options.loading || 'lazy';
+  src = escapeAttr(src);
+  const alt = escapeAttr(options.alt || '');
+  const cssClass = escapeAttr(options.class || '');
+  const style = escapeAttr(options.style || '');
+  const width = escapeAttr(options.width || '');
+  const height = escapeAttr(options.height || '');
+  const loading = escapeAttr(options.loading || 'lazy');
 
   let html = '<img';
   html += ` src="${IMAGE_PLACEHOLDER}"`;
@@ -361,8 +377,11 @@ function buildVideoHtml(src, options) {
   const isExternal = /^https?:\/\//.test(src);
   if (isExternal) return buildExternalVideo(src, options);
 
-  const extension = path.extname(src);
-  const srcPath = extension ? src.slice(0, -extension.length) : src;
+  const rawExtension = path.extname(src);
+  // Same attribute-position escaping at derivation as buildImageHtml
+  const srcPath = escapeAttr(rawExtension ? src.slice(0, -rawExtension.length) : src);
+  const extension = escapeAttr(rawExtension);
+  src = escapeAttr(src);
   const maxWidthRaw = options.max_width || options['max-width'] || false;
   const maxWidth = maxWidthRaw ? String(maxWidthRaw) : false;
 
@@ -387,17 +406,18 @@ function videoAttributes(options, sep) {
   const flagOn = (value) => value && value !== '' && value !== 'false';
 
   let html = '';
-  if (options.class) html += attr(`class="${options.class}"`);
-  if (options.style) html += attr(`style="${options.style}"`);
-  if (options.width) html += attr(`width="${options.width}"`);
-  if (options.height) html += attr(`height="${options.height}"`);
+  if (options.class) html += attr(`class="${escapeAttr(options.class)}"`);
+  if (options.style) html += attr(`style="${escapeAttr(options.style)}"`);
+  if (options.width) html += attr(`width="${escapeAttr(options.width)}"`);
+  if (options.height) html += attr(`height="${escapeAttr(options.height)}"`);
   if (flagOn(options.autoplay)) html += attr('autoplay');
   if (flagOn(options.loop)) html += attr('loop');
   if (flagOn(options.muted)) html += attr('muted');
-  if ((options.controls || 'true') !== 'false') html += attr('controls');
+  // controls defaults ON; bare `controls=false` now resolves to boolean false
+  if (options.controls !== 'false' && options.controls !== false) html += attr('controls');
   if (flagOn(options.playsinline)) html += attr('playsinline');
-  html += attr(`preload="${options.preload || 'metadata'}"`);
-  if (options.poster) html += attr(`poster="${options.poster}"`);
+  html += attr(`preload="${escapeAttr(options.preload || 'metadata')}"`);
+  if (options.poster) html += attr(`poster="${escapeAttr(options.poster)}"`);
 
   return html;
 }
@@ -429,7 +449,7 @@ function buildExternalVideo(src, options) {
   html += '>';
 
   const mime = getVideoMimeType(path.extname(src));
-  html += `<source data-lazy="@src ${src}" type="video/${mime}">`;
+  html += `<source data-lazy="@src ${escapeAttr(src)}" type="video/${mime}">`;
   html += 'Your browser does not support the video tag.';
   html += '</video>';
   html += '</div>';

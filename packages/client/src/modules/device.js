@@ -56,13 +56,27 @@ class Device {
     const now = Date.now();
     const currentVersion = this.manager.config?.version || null;
 
+    // Stored data is raw JSON.parse output — only a plain object is usable;
+    // a primitive or array entry falls through to the first-time payload
+    if (existing && typeof existing !== 'object') {
+      existing = null;
+    }
+    if (Array.isArray(existing)) {
+      existing = null;
+    }
+
     if (existing) {
       this.data = existing;
 
       // Check if this is a new session (last activity was more than SESSION_TIMEOUT ago)
       const timeSinceLastActive = now - (this.data.lastActive || 0);
       if (timeSinceLastActive > SESSION_TIMEOUT) {
-        this.data.session.count = (this.data.session?.count || 0) + 1;
+        // A malformed entry missing `session` (or carrying a non-object
+        // there) must not break the whole manager boot
+        if (!this.data.session || typeof this.data.session !== 'object') {
+          this.data.session = {};
+        }
+        this.data.session.count = (this.data.session.count || 0) + 1;
         this.data.session.started = now;
       }
 

@@ -126,6 +126,14 @@ class Analytics {
       return;
     }
 
+    // Normalize to GA4's charset/length rule — same core call desktop makes,
+    // so an event name lands (or is rejected) identically on every surface
+    const name = core.normalizeEventName(eventName);
+    if (!name) {
+      console.warn(`[Analytics] Dropping event with unusable name: ${eventName}`);
+      return;
+    }
+
     // Merge page data with provided params
     const eventParams = {
       ...this._getPageData(),
@@ -133,10 +141,10 @@ class Analytics {
     };
 
     // Log event
-    console.log(`[Analytics] Event: ${eventName}${this.devMode ? ' (dev mode)' : ''}`, eventParams);
+    console.log(`[Analytics] Event: ${name}${this.devMode ? ' (dev mode)' : ''}`, eventParams);
 
     // Send via Measurement Protocol (fetch)
-    this._sendViaFetch(eventName, eventParams);
+    this._sendViaFetch(name, eventParams);
   }
 
   // Send event via Measurement Protocol (fetch)

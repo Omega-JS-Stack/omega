@@ -23,7 +23,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   // SHARED sections — identical spelling in every project type.
   // (`SHARED_SECTIONS` in @omega.js/config is the authoritative list.)
   brand:          { id, name, url, description, tagline, contact: { email }, address: {…}, images: {…} },
-  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId } },
+  cloud:          { provider: 'firebase', config: { apiKey, authDomain, databaseURL, projectId, storageBucket, messagingSenderId, appId, measurementId }, messaging: { vapidKey } },   // vapidKey: web-push public key (console → Cloud Messaging), public by design
   analytics:      { providers: { google: { id }, meta: { id }, tiktok: { id } } },
   advertising:    { providers: { 'google-adsense': { client, 'display-slot', 'in-article-slot', 'in-feed-slot', 'multiplex-slot' }, inhouse: { source } } },   // C4 cp105; inhouse source: 'self' | 'company' | full URL (ads spec)
   payment:        { processors: { stripe: { publishableKey }, paypal: { clientId }, chargebee: { site }, coinbase: { enabled } }, products: […] },

@@ -9,7 +9,11 @@
  * API key is public) all fail to match.
  */
 
-const SECRET_KEY_PATTERN = /(secret|privateKey|apiSecret)$/i;
+// Suffix-anchored shapes: *secret / *password / *token / *credential(s) /
+// secretKey / secret_key / privateKey / private_key (+ _id — the pasted
+// service-account JSON classic). Public credentials stay non-matching by
+// design: publishableKey, clientId, apiKey, vapidKey, site-key.
+const SECRET_KEY_PATTERN = /(secret|password|passwd|token|credentials?|(secret|private)[_-]?key([_-]?id)?)$/i;
 
 function walk(node, path, found) {
   if (Array.isArray(node)) {

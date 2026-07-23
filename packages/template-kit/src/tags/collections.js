@@ -10,34 +10,8 @@
  */
 
 // Libraries
-const { resolveVariable, parseArguments, isQuoted, stripQuotes } = require('../variable-resolver.js');
+const { resolveVariable, parseArguments, parseOptions, isQuoted, stripQuotes } = require('../variable-resolver.js');
 const { buildImageHtml } = require('./media.js');
-
-/**
- * Parse image-tag option args ("key=value" strings) with variable resolution.
- */
-function parseImageOptions(optionArgs, lookup) {
-  const options = {};
-
-  for (const arg of optionArgs || []) {
-    if (!arg.includes('=')) continue;
-
-    const index = arg.indexOf('=');
-    const key = stripQuotes(arg.slice(0, index).trim()).trim();
-    let value = arg.slice(index + 1).trim();
-
-    if (/^['"].*['"]$/.test(value)) {
-      value = stripQuotes(value);
-    } else if (lookup) {
-      const resolved = resolveVariable(lookup, value);
-      value = resolved === null || resolved === undefined ? value : resolved;
-    }
-
-    options[key] = value;
-  }
-
-  return options;
-}
 
 // {% uj_member member_id, "property" %} — look up a team member doc
 const ujMember = {
@@ -70,7 +44,7 @@ const ujMember = {
       case 'image':
         return memberImagePath(member);
       case 'image-tag': {
-        const options = parseImageOptions(args.slice(2), null);
+        const options = parseOptions(args.slice(2), null);
         if (!options.alt && memberData.name) options.alt = memberData.name;
         return buildImageHtml(memberImagePath(member), options);
       }
@@ -147,7 +121,7 @@ const ujPost = {
         const src = postImagePath(post);
         if (!src) return ''; // image: false — deliberately no media
 
-        const options = parseImageOptions(args.slice(2), ctx.lookup);
+        const options = parseOptions(args.slice(2), ctx.lookup);
         if (!options.alt) {
           const defaultAlt = (post.data.post && post.data.post.title) || post.data.title;
           if (defaultAlt) options.alt = defaultAlt;

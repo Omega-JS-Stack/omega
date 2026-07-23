@@ -103,6 +103,12 @@ function configureOmega(eleventyConfig, options) {
     site.web_manager.firebase.app = site.web_manager.firebase.app || {};
     site.web_manager.firebase.app.config = site.cloud.config;
   }
+  if (site.cloud && site.cloud.messaging && site.cloud.messaging.vapidKey) {
+    site.web_manager.firebase = site.web_manager.firebase || {};
+    site.web_manager.firebase.messaging = site.web_manager.firebase.messaging || {};
+    site.web_manager.firebase.messaging.config = site.web_manager.firebase.messaging.config || {};
+    site.web_manager.firebase.messaging.config.vapidKey = site.cloud.messaging.vapidKey;
+  }
   if (site.payment) site.web_manager.payment = site.payment;
 
   // Pricing view-model (C2): payment.products is the ONLY plan source — the

@@ -5,7 +5,13 @@ class Notifications {
   }
 
   initialize(config) {
-    this._vapidKey = this.manager.config?.firebase?.messaging?.config?.vapidKey || null;
+    // Canonical home: omega.json5 `cloud.messaging.vapidKey` (public by
+    // design — VAPID public keys ship to every browser). The nested
+    // firebase.messaging shape is the web/extension bridge contract,
+    // mirroring _resolveFirebaseConfig's cloud-first order.
+    this._vapidKey = this.manager.config?.cloud?.messaging?.vapidKey
+      || this.manager.config?.firebase?.messaging?.config?.vapidKey
+      || null;
 
     const storage = this.manager.storage();
     const stored = storage.get('notifications');
@@ -22,7 +28,7 @@ class Notifications {
     // Arm auto-request if not currently subscribed (including just-cleared)
     const autoRequest = config?.autoRequest;
     if ((!stored?.subscribed || permission !== 'granted') && autoRequest > 0) {
-      console.log('[@omega.js/client:push] Arming auto-request (delay:', autoRequest + 'ms)');
+      console.log('[@omega.js/client:push] Arming auto-request (delay:', `${autoRequest}ms)`);
       this._setupAutoRequest(autoRequest);
     }
 
@@ -305,7 +311,7 @@ class Notifications {
         return false;
       }
 
-      console.log('[@omega.js/client:push:sync] Token valid:', currentToken.slice(-8), storedNotification?.token ? (storedNotification.token.slice(-8) === currentToken.slice(-8) ? '(unchanged)' : '(CHANGED from ' + storedNotification.token.slice(-8) + ')') : '(recovered — localStorage was empty)');
+      console.log('[@omega.js/client:push:sync] Token valid:', currentToken.slice(-8), storedNotification?.token ? (storedNotification.token.slice(-8) === currentToken.slice(-8) ? '(unchanged)' : `(CHANGED from ${storedNotification.token.slice(-8)})`) : '(recovered — localStorage was empty)');
 
       await this._saveSubscription(currentToken);
 

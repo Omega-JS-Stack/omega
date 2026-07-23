@@ -128,3 +128,40 @@ describe('Analytics Module (C4 cp106a — de-ITW)', () => {
   });
 
 });
+
+describe('Analytics event-name normalization (wave-4 F7)', () => {
+
+  it('event() normalizes names through analytics-core — same rule as desktop', async () => {
+    const Analytics = (await import(SOURCE_PATH)).default;
+
+    global.window = global.window || { location: { pathname: '/t', href: 'http://t/t' } };
+    global.document = global.document || { title: 't' };
+
+    const bodies = [];
+    const realFetch = global.fetch;
+    global.fetch = (url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return Promise.resolve({ ok: true });
+    };
+
+    try {
+      const prod = new Analytics({
+        utilities: () => ({ getRuntime: () => 'electron' }),
+        isDevelopment: () => false,
+      });
+      prod.init({ id: 'G-TESTONLY', secret: 'test-secret' });
+      bodies.length = 0;
+
+      prod.event('signup-completed!');
+      const names = bodies.flatMap((b) => (b.events || []).map((e) => e.name));
+      assert(names.includes('signup_completed'), `GA4-invalid chars must normalize (got: ${names.join(', ')})`);
+
+      // A name that normalizes to nothing is dropped, not posted raw
+      bodies.length = 0;
+      prod.event('!!!');
+      assert.strictEqual(bodies.length, 0, 'unusable names must be dropped');
+    } finally {
+      global.fetch = realFetch;
+    }
+  });
+});

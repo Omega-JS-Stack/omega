@@ -400,3 +400,29 @@ test('uj_post media contract: explicit post.image wins, image:false renders noth
   // No image key → the blog-assets convention stands
   assert.strictEqual(TAGS.uj_post.render(ctx, '"conventional", "image"'), '/assets/images/blog/post-9000003/conventional.jpg');
 });
+
+// ─── wave-4 regressions (F13, F14, F17) ───
+
+test('uj_image: bare literal options resolve to values — max_width=640 and webp=false work unquoted (F13)', () => {
+  const ctx = makeCtx({});
+  const html = TAGS.uj_image.render(ctx, '"/assets/img/hero.png", max_width=640, webp=false');
+
+  // webp=false → no webp sources at all
+  assert.ok(!html.includes('.webp'), 'webp sources should be suppressed');
+  // max_width=640 → capped source set (no 1024px variant)
+  assert.ok(html.includes('hero-640px.png'), '640px source expected');
+  assert.ok(!html.includes('hero-1024px.png'), '1024px source should be capped away');
+});
+
+test('option parsers are unified: unresolvable unquoted values keep their literal text (F14)', () => {
+  const ctx = makeCtx({});
+  const html = TAGS.uj_image.render(ctx, '"/assets/img/hero.png", class=hero-img');
+  assert.ok(html.includes('class="hero-img"'), 'unresolvable bare value should fall back to its literal text');
+});
+
+test('caller-supplied attribute values are escaped (F17)', () => {
+  const ctx = makeCtx({ title: 'He said "hi" & left' });
+  const html = TAGS.uj_image.render(ctx, '"/assets/img/hero.png", alt=title');
+  assert.ok(html.includes('alt="He said &quot;hi&quot; &amp; left"'), `alt should be attribute-escaped, got: ${html}`);
+  assert.ok(!html.includes('alt="He said "hi"'), 'raw quote must not break out of the attribute');
+});

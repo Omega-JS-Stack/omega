@@ -52,3 +52,11 @@ describe('FormManager Module', () => {
     assert(fs.existsSync(DIST_PATH), 'dist/modules/form-manager.js exists after prepare');
   });
 });
+
+describe('FormManager teardown (wave-4 F10)', () => {
+  it('ships a destroy() that leaves the shared registry, and the beforeunload handler skips disconnected forms', () => {
+    assert(SOURCE.includes('destroy()'), 'destroy() method exists');
+    assert(SOURCE.includes('_instances.delete(this)'), 'destroy leaves the shared instance Set');
+    assert(SOURCE.includes('isConnected'), 'shared beforeunload handler skips forms no longer in the DOM');
+  });
+});

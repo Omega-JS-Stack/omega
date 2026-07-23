@@ -185,4 +185,25 @@ describe('Request Module', () => {
 
     assert.strictEqual(updates.length, 0);
   });
+
+  it('mergeUsageIntoBindings should keep the seeded limit when the payload omits a feature limit (wave-4 F8)', () => {
+    const context = { usage: { credits: { monthly: 2, limit: 50 } } };
+    const updates = [];
+    const bindings = {
+      getContext: () => context,
+      update: (data) => updates.push(data),
+    };
+
+    mergeUsageIntoBindings(bindings, {
+      usage: { current: { credits: { monthly: 6 } }, limits: {} },
+    });
+
+    assert.deepStrictEqual(updates[0].usage.credits, { monthly: 6, limit: 50 });
+
+    // An explicit server limit of 0 still wins (?? keeps 0, only null/undefined fall back)
+    mergeUsageIntoBindings(bindings, {
+      usage: { current: { credits: { monthly: 6 } }, limits: { credits: 0 } },
+    });
+    assert.strictEqual(updates[1].usage.credits.limit, 0);
+  });
 });

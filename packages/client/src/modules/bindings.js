@@ -262,7 +262,8 @@ class Bindings {
       }
 
       // Parse the condition to extract left side, operator, and right side
-      const comparisonMatch = condition.match(/^(.+?)\s*(===|!==|==|!=|>|<|>=|<=)\s*(.+)$/);
+      // Longest alternatives first — `>` before `>=` would shadow `>=` forever
+      const comparisonMatch = condition.match(/^(.+?)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+)$/);
 
       if (comparisonMatch) {
         const [, leftPath, operator, rightValue] = comparisonMatch;

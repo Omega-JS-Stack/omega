@@ -74,6 +74,7 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 - **Class**: `Notifications`
 - **Key Methods**: `isSupported()`, `isSubscribed()`, `subscribe()`, `unsubscribe()`, `getToken()`, `onMessage()`
 - **Storage**: Saves to localStorage and Firestore
+- **VAPID key**: resolved from `config.cloud.messaging.vapidKey` (the omega.json5 home; the web engine bridges it into the `firebase.messaging.config.vapidKey` contract shape too). Public by design.
 
 ## ServiceWorker (`service-worker.js`)
 

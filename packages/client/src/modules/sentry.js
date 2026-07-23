@@ -21,6 +21,9 @@ class mod {
     this.initialized = false;
     this.Sentry = null;
     this.config = null;
+    // Session-hours baseline for beforeSend — no config key carries a page
+    // start time (config.page was a legacy read nothing wrote).
+    this._startTime = Date.now();
   }
 
   /**
@@ -88,8 +91,7 @@ class mod {
 
     // Configure beforeSend to enrich events with user data and session info
     config.beforeSend = (event, hint) => {
-      const startTime = this.manager.config.page.startTime || Date.now();
-      const hoursSinceStart = (Date.now() - startTime) / (1000 * 3600);
+      const hoursSinceStart = (Date.now() - this._startTime) / (1000 * 3600);
       const storage = this.manager.storage();
 
       // Add custom tags
@@ -102,8 +104,8 @@ class mod {
       // Add user info from storage
       event.user = {
         ...event.user,
-        email: storage.get('user.auth.email', ''),
-        uid: storage.get('user.auth.uid', ''),
+        email: storage.get('auth.user.email', ''),
+        uid: storage.get('auth.user.uid', ''),
       };
 
       // Log error to console for debugging

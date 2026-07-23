@@ -76,7 +76,16 @@ function resolveConfigPath(projectDir) {
  * @returns {boolean}
  */
 function hasOmegaConfig(projectDir) {
-  return resolveConfigPath(projectDir) !== null || findBrandConfigPath(projectDir) !== null;
+  if (resolveConfigPath(projectDir) !== null || findBrandConfigPath(projectDir) !== null) {
+    return true;
+  }
+
+  // Mirror loadConfig's functions/ → app-root fallback so probe and load
+  // always agree — a probe-false/load-success split makes framework gates
+  // proceed with an empty config (the cp142-class failure this probe exists
+  // to prevent).
+  return path.basename(path.resolve(projectDir)) === 'functions'
+    && resolveConfigPath(path.dirname(path.resolve(projectDir))) !== null;
 }
 
 function readConfigFile(absolutePath) {

@@ -72,8 +72,11 @@ class Auth {
       options = {};
     }
 
-    // If Firebase isn't configured (no resolvable config blob), call callback immediately with null.
-    if (!this.manager._resolveFirebaseConfig()) {
+    // If Firebase can't boot, call callback immediately with null. Same
+    // condition as initialize(): a projectId-only blob resolves (URL
+    // derivation) but never registers onAuthStateChanged, so _authReady
+    // would never settle and listeners would hang forever.
+    if (!this.manager._resolveFirebaseConfig()?.apiKey) {
       callback({
         user: null,
         account: resolveAccount({}),
@@ -87,12 +90,9 @@ class Auth {
       const state = { user: this.getUser() };
 
       // Fetch account data if the user is logged in and Firestore is available
+      // (failures are captured inside _getAccountData and degrade to null)
       if (user && this.manager.firebaseFirestore) {
-        try {
-          state.account = await this._getAccountData(user.uid);
-        } catch (error) {
-          this.manager.sentry().captureException(new Error('Failed to get account data', { cause: error }));
-        }
+        state.account = await this._getAccountData(user.uid);
       }
 
       // Ensure account is always a resolved object
@@ -280,7 +280,11 @@ class Auth {
       // If no account exists, return resolved empty object for consistent structure
       return resolveAccount({}, { user: firebaseUser });
     } catch (error) {
+      // Capture here — this catch is the only one that ever sees the failure
+      // (returning null means callers' catches can't fire), and a permission
+      // or network error during account resolution must reach monitoring.
       console.error('Get account data error:', error);
+      this.manager.sentry().captureException(new Error('Failed to get account data', { cause: error }));
       return null;
     }
   }

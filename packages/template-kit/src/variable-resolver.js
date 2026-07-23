@@ -44,6 +44,17 @@ function isTruthyLookup(value) {
  */
 function resolveVariable(lookup, variableName) {
   if (!variableName) return null;
+
+  // Bare literals evaluate to their values before any scope lookup — Ruby
+  // parity: Jekyll's context[...] evaluates Liquid expressions, so ported
+  // templates rely on max_width=640 / webp=false meaning the literal, not
+  // an (always-missing) scope path.
+  const trimmed = String(variableName).trim();
+  if (trimmed === 'nil' || trimmed === 'null') return null;
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+
   const value = lookup(variableName);
   return value === undefined ? null : value;
 }
@@ -93,13 +104,18 @@ function parseOptions(args, lookup) {
     if (!arg.includes('=')) continue;
 
     const index = arg.indexOf('=');
-    const key = arg.slice(0, index).trim();
+    const key = stripQuotes(arg.slice(0, index).trim());
     let value = arg.slice(index + 1).trim();
 
     if (lookup) {
-      value = resolveInput(lookup, value);
+      // The ONE option parser (the image-tag lane in collections.js imports
+      // it too), on Ruby's preferLiteral rule: bare words keep their literal
+      // text unless they exist in context (class=hero works), while dotted
+      // paths resolve — and a missing path yields null so a typo'd variable
+      // never renders its own name into the page.
+      value = resolveInput(lookup, value, true);
     } else {
-      value = value.replace(/^['"]|['"]$/g, '');
+      value = stripQuotes(value);
     }
 
     options[key] = value;

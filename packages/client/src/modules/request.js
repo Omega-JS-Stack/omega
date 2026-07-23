@@ -129,7 +129,9 @@ function mergeUsageIntoBindings(bindings, properties) {
     usage[key] = {
       ...existing[key],
       ...current[key],
-      limit: limits[key] || 0,
+      // A key the server reports usage for but omits from limits must not
+      // clobber the catalog-seeded limit from auth settle
+      limit: limits[key] ?? existing[key]?.limit ?? 0,
     };
   }
 

@@ -37,3 +37,21 @@ describe('Bindings Module', () => {
     assert.deepStrictEqual(bindings.getContext(), {});
   });
 });
+
+describe('Bindings condition operators (wave-4 F2)', () => {
+
+  before(async () => {
+    await getManager().initialize(TEST_CONFIG);
+  });
+
+  it('should evaluate >= and <= (longest-first alternation — > must not shadow >=)', () => {
+    const bindings = getManager().bindings();
+    assert.strictEqual(bindings._evaluateCondition('count >= 5', { count: 5 }), true);
+    assert.strictEqual(bindings._evaluateCondition('count >= 5', { count: 4 }), false);
+    assert.strictEqual(bindings._evaluateCondition('count <= 5', { count: 5 }), true);
+    assert.strictEqual(bindings._evaluateCondition('count <= 5', { count: 6 }), false);
+    // Plain > and < keep working
+    assert.strictEqual(bindings._evaluateCondition('count > 4', { count: 5 }), true);
+    assert.strictEqual(bindings._evaluateCondition('count < 4', { count: 5 }), false);
+  });
+});
