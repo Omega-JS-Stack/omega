@@ -44,6 +44,20 @@ describe('Request Module', () => {
     assert.throws(() => createRequest({}), /getApiUrl and getIdToken/);
   });
 
+  it('should default to POST when a body is present (GET with a body is a guaranteed fetch TypeError)', async () => {
+    const calls = fetchStub([{ headers: { 'content-type': 'application/json' }, json: {} }]);
+    const request = createRequest({
+      getApiUrl: () => 'https://api.example.com',
+      getIdToken: () => null,
+    });
+
+    await request('/omega/marketing/contact', { auth: false, body: { email: 'a@b.co' } });
+    await request('/omega/verts/serve', { auth: false });
+
+    assert.strictEqual(calls[0].options.method, 'POST', 'body and no method infers POST');
+    assert.strictEqual(calls[1].options.method, 'GET', 'no body stays GET');
+  });
+
   it('should resolve route-relative paths through getApiUrl and attach a Bearer token', async () => {
     const calls = fetchStub([{ headers: { 'content-type': 'application/json' }, json: { token: 'abc' } }]);
     const request = createRequest({

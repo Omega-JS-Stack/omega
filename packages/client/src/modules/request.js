@@ -63,7 +63,10 @@ function createRequest(deps) {
       try {
         response = await fetch(target, {
           ...options,
-          method: options.method || 'GET',
+          // A body with no explicit method infers POST — fetch throws a
+          // TypeError on GET/HEAD carrying a body, so the GET default is
+          // never right there.
+          method: options.method || (options.body ? 'POST' : 'GET'),
           headers,
           body,
           ...(options.timeout ? { signal: AbortSignal.timeout(options.timeout) } : {}),

@@ -33,6 +33,21 @@ test('W8 + W11: og:locale/hreflang carry the default language; quoted brand stri
   assert.equal(schema.description, 'Mini "quoted" \\ brand', 'quote and backslash survive escaping intact');
 });
 
+test('W16 (Ian 2026-07-23): synthesized aggregateRating count is seeded into 10k-30k', async () => {
+  const pages = await buildWith({
+    ...miniData,
+    schema: { software_application: { enabled: true } },
+  });
+  const html = pages.get('/blog');
+
+  const match = html.match(/<script id="uj-schema-software-application"[^>]*>([\s\S]*?)<\/script>/);
+  assert.ok(match, 'SoftwareApplication schema block present when enabled');
+  const schema = JSON.parse(match[1]);
+  const count = Number(schema.aggregateRating.ratingCount);
+  assert.ok(count >= 10000 && count < 30000, `ratingCount ${count} inside the seeded 10k-30k band`);
+  assert.ok(['4.8', '4.9'].includes(schema.aggregateRating.ratingValue), 'rating value stays 4.8/4.9');
+});
+
 test('W13: unconfigured comments never inject the Giscus client script', async () => {
   const pages = await buildWith(miniData);
   const postUrl = [...pages.keys()].find((url) => /^\/blog\/.+/.test(url) && !url.includes('categories'));

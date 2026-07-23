@@ -1,6 +1,6 @@
 // API calls for checkout
 import fetch from 'wonderful-fetch';
-import { getRecaptchaToken } from './recaptcha.js';
+import { getRecaptchaToken } from '../../../../libs/recaptcha.js';
 import omega from '@omega.js/client';
 
 // Check trial eligibility via backend endpoint

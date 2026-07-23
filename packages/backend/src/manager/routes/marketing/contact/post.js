@@ -67,14 +67,14 @@ module.exports = async ({ ctx, Manager, settings, analytics }) => {
 
   // Public access protection (after validation so we don't waste reCAPTCHA on garbage)
   if (!isAdmin) {
-    // Verify reCAPTCHA (skip during automated tests)
+    // Verify reCAPTCHA (skip during automated tests). verify() owns the
+    // whole decision: no RECAPTCHA_SECRET_KEY configured → pass (unkeyed
+    // brands are a sanctioned population — cp257: keys are optional and
+    // per-brand); secret + missing/bad token → fail. No pre-check here — an
+    // empty-token 403 before verify() would permanently reject every
+    // subscribe from a brand that never configured reCAPTCHA.
     if (!ctx.isTesting()) {
-      const recaptchaToken = settings['g-recaptcha-response'];
-      if (!recaptchaToken) {
-        return ctx.respond('Request could not be verified', { code: 403 });
-      }
-
-      const recaptchaValid = await recaptcha.verify(recaptchaToken);
+      const recaptchaValid = await recaptcha.verify(settings['g-recaptcha-response']);
       if (!recaptchaValid) {
         return ctx.respond('Request could not be verified', { code: 403 });
       }

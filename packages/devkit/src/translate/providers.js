@@ -114,8 +114,14 @@ async function sendClaude(model, message) {
     await Promise.race([
       consume(),
       new Promise((resolve, reject) => {
+        // NOT unref'd on purpose: the finally-clearTimeout already stops a
+        // settled call from holding the process, and an unref'd watchdog
+        // lets a stalled SDK call with no other live handles drain the
+        // event loop and exit SILENTLY before the timer can fire — the
+        // exact opposite of failing loud (and a test-run flake: the
+        // stalled-call test was cancelled whenever nothing else kept the
+        // loop alive for the 80ms window).
         timer = setTimeout(() => reject(new Error(`Claude translate call exceeded ${Math.round(timeoutMs / 1000)}s — a stalled SDK call (often the session limit); wait for the window to reset or build with --cached-only.`)), timeoutMs);
-        timer.unref?.();
       }),
     ]);
   } finally {

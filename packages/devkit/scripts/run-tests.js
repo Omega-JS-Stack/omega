@@ -55,8 +55,18 @@ const mainFiles = fs.readdirSync(TEST_DIR)
   .filter((name) => name.endsWith('.test.js') && name !== ISOLATED)
   .map((name) => path.join(TEST_DIR, name));
 
-const main = runPass(mainFiles);
+// Captured so a failure leaves evidence — main-pass failures under the
+// commit gate's own npm test historically vanished without a trace (the
+// gate only echoes the workspace summary), which kept the flake mechanism
+// uncaptured. Output is re-emitted verbatim either way.
+const main = runPass(mainFiles, { capture: true });
+process.stdout.write(main.stdout || '');
+process.stderr.write(main.stderr || '');
 if (main.status !== 0) {
+  const mainEvidence = path.join(PKG, '.temp', `main-pass-fail-${Date.now()}.log`);
+  fs.mkdirSync(path.dirname(mainEvidence), { recursive: true });
+  fs.writeFileSync(mainEvidence, `${main.stdout || ''}\n${main.stderr || ''}`);
+  console.warn(`\n⚠ main pass failed — output saved to ${mainEvidence}`);
   process.exit(main.status || 1);
 }
 

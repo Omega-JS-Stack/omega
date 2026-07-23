@@ -4,7 +4,7 @@ import { getPaymentConfig, getProcessors, getProductById } from '__main_assets__
 import { fetchTrialEligibility, warmupServer, createPaymentIntent } from './modules/api.js';
 import { state, buildBindingsState, resolveProcessor, FREQUENCIES, getAvailableFrequencies } from './modules/state.js';
 import { applyDiscountCode } from './modules/discount.js';
-import { initializeRecaptcha } from './modules/recaptcha.js';
+import { initializeRecaptcha } from '../../../libs/recaptcha.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from './modules/tracking.js';
 import omega from '@omega.js/client';
 

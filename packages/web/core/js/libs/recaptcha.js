@@ -1,4 +1,6 @@
-// reCAPTCHA management for checkout
+// Shared reCAPTCHA v3 management — lazy script load + token mint for any
+// public form that posts to a recaptcha-gated backend route (checkout
+// payment intent, newsletter capture). Site key: omega.config.recaptcha['site-key'].
 import omega from '@omega.js/client';
 
 let recaptchaReady = false;
@@ -57,16 +59,16 @@ export async function initializeRecaptcha(siteKey) {
 }
 
 // Get reCAPTCHA token
-export async function getRecaptchaToken(action = 'checkout') {
+export async function getRecaptchaToken(action = 'submit') {
   /* @dev-only:start */
   {
     const devRecaptcha = new URLSearchParams(window.location.search).get('_dev_recaptcha');
     if (devRecaptcha === 'invalid') {
-      console.warn('[Checkout Dev] Sending invalid reCAPTCHA token');
+      console.warn('[Recaptcha Dev] Sending invalid reCAPTCHA token');
       return 'invalid-dev-token';
     }
     if (devRecaptcha === 'empty') {
-      console.warn('[Checkout Dev] Sending empty reCAPTCHA token');
+      console.warn('[Recaptcha Dev] Sending empty reCAPTCHA token');
       return '';
     }
   }

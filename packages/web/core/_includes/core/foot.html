@@ -416,7 +416,8 @@
   {% else %}
     {% assign sa-rating-value = "4.9" %}
   {% endif %}
-  {% assign sa-review-count = sa-hash-seed | uj_hash: 800000 | plus: 200000 %}
+  {% comment %} Seeded 10k-30k (Ian 2026-07-23: keep synthesized, just not as high) {% endcomment %}
+  {% assign sa-review-count = sa-hash-seed | uj_hash: 20000 | plus: 10000 %}
   <script id="uj-schema-software-application" type="application/ld+json">
     {
       "@context": "https://schema.org",

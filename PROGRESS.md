@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-22] cp264 SHIPPED; next Ian input: wave 4 GO, or W7 newsletter provider / W16 synthesized-rating rulings → plans/wave3-review-findings.md
+- [fable 2026-07-23] cp265 SHIPPED (all 21 wave-3 findings closed); next Ian input: wave 4 GO, or triage (26 inbox entries) → CHANGELOG
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -67,6 +67,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp265 2026-07-23 newsletter wired to marketing/contact + shared recaptcha lib + W16 seeded 10k-30k (battery EXIT 0) → CHANGELOG
 - cp264 2026-07-22 wave-3 remediation: 20/21 web engine+theme defects closed (2× Fable review; battery EXIT 0) → CHANGELOG
 - cp263 2026-07-22 assistant → RouteContext/ctx: module split, one respond door, report() + auto-Sentry rule (battery EXIT 0) → CHANGELOG
 - cp262 2026-07-22 legacy-name sweep: wm/em/bem/bxm/ujm identifiers → omega/current names on every runtime surface (battery EXIT 0) → CHANGELOG
@@ -76,4 +77,3 @@
 - cp258 2026-07-21 FULL vert rename: every runtime surface adblock-safe; zero-hit sweep; battery GREEN → CHANGELOG
 - cp257 2026-07-21 de-ITW recaptcha ask + company-default GA account id (manager 774/0; battery EXIT 0) → CHANGELOG
 - cp256 2026-07-21 `omega update` verb: devkit core + 5-surface wiring, 7-day quarantine, npu-routed apply (battery PASSED) → CHANGELOG
-- cp255 2026-07-21 per-service requires preflight: REQUIRES registry + consolidated walkthroughs + --strict (manager 762/0; battery EXIT 0) → CHANGELOG

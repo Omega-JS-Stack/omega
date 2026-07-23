@@ -1,5 +1,5 @@
 ---
-status: active
+status: ratified
 created: 2026-07-22
 wave: 3 (web engine + themes)
 source: Workflow wf_1fc7d0e0-574 (2× Fable medium, read-only); every finding hand-verified by coordinator
@@ -19,7 +19,7 @@ Findings are ordered by priority (P0 = fix first; none this wave). Each entry na
 
 **Resolved and tested (20):** W1-W6, W8-W15, W17-W21, plus W7's loud-stub half. Regression tests: purge-safelist suite, head/foot build pins (og:locale/hreflang, JSON-LD parseable with quoted config, no Giscus injection unconfigured), pricing catalog-order warning, malformed-escape fall-through. Web suite 270, full root battery EXIT 0.
 
-**Open, awaiting Ian:** W7 capture wiring (provider/endpoint pick), W16 (synthesized aggregateRating removal).
+**Closed 2026-07-23 (cp265, Ian's rulings):** W7 — Ian delegated the pick ("decide W7 for me, it needs to work"); the newsletter section now posts to the backend's existing public subscribe endpoint `POST /omega/marketing/contact` via `omega.request()` (reCAPTCHA token from the checkout module, promoted to the shared `core/js/libs/recaptcha.js`, lazily loaded on first form interaction). W16 — Ian kept the synthesized rating but lowered the count: seeded 10k-30k (was 200k-1M). All 21 findings are now resolved.
 
 ## Engine (reviewer A — src, core/js, sw, runtime, bin)
 
