@@ -5,10 +5,10 @@
 The Classy theme is designed to be fully customizable. All theme variables use `!default` which means you can override them BEFORE the theme is imported.
 
 > **How the import actually resolves:** Your project's `src/assets/css/main.scss`
-> does `@use 'ultimate-jekyll-manager' as *;`. That entry point `@forward`s the
-> theme, and UJM's SASS `loadPaths` resolve `theme` to whichever
+> does `@use 'omega:main' with (…);`. That entry point `@forward`s the
+> theme, and the framework's SASS `loadPaths` resolve the theme to whichever
 > `src/assets/themes/<theme.id>/_theme.scss` wins — your project's copy first,
-> then UJM's packaged copy. You never import the theme file by path directly.
+> then the packaged copy. You never import the theme file by path directly.
 > See [`docs/themes.md`](../../../../docs/themes.md) for the full mechanism.
 
 ### Example: Customizing Colors in Your Project
@@ -16,24 +16,24 @@ The Classy theme is designed to be fully customizable. All theme variables use `
 In your consuming project's `src/assets/css/main.scss`:
 
 ```scss
-// 1. Override Classy theme variables FIRST (they are !default, so yours win)
-$primary: #FF0000;          // Change primary color to red
-$classy-bg-light: #F5F5F5;  // Change light mode background
-$classy-bg-dark: #1A1A1A;   // Change dark mode background
-$font-family-sans-serif: 'Inter', sans-serif;  // Change font
+// 1. Import the framework, configuring Classy's !default variables — the
+//    theme loads with YOUR values
+@use 'omega:main' with (
+  $primary: #FF0000,          // Change primary color to red
+  $classy-bg-light: #F5F5F5,  // Change light mode background
+  $classy-bg-dark: #1A1A1A,   // Change dark mode background
+  $font-family-sans-serif: ('Inter', sans-serif),  // Change font
+);
 
-// 2. Import the framework — it loads the theme using YOUR values above
-@use 'ultimate-jekyll-manager' as *;
-
-// 3. Add your custom styles below
+// 2. Add your custom styles below
 .my-custom-class {
   // Your custom CSS
 }
 ```
 
 To customize beyond variables — change actual component styles or markup —
-**shadow the theme**: create `src/assets/themes/classy/` in your project. UJM's
-loadPaths resolve your copy before the packaged one. (To build a wholly new
+**shadow the theme**: create `src/assets/themes/classy/` in your project. The
+framework's loadPaths resolve your copy before the packaged one. (To build a wholly new
 look, author a new theme instead — see `docs/themes.md`.)
 
 ## Available Customizable Variables

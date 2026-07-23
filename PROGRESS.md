@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-22] cp263 SHIPPED; next Ian input: wave 3 GO or the queued after-waves items → CHANGELOG
+- [fable 2026-07-22] cp264 SHIPPED; next Ian input: wave 4 GO, or W7 newsletter provider / W16 synthesized-rating rulings → plans/wave3-review-findings.md
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -23,7 +23,7 @@
 - Brand rebuilds somiibo → sweet-saucy — HARD GATE: explicitly ask Ian before starting either; password formula → company hook at migration
 
 ## Blocked
-- GO wave3+: Ian gates between waves (wave 2 GO given 07-21; protocol in Phase B line)
+- GO wave4+: Ian gates between waves (wave 3 GO given + shipped 07-22; protocol in Phase B line)
 - GO publish: first 0.1.0 publish-proving after waves — prereq: npm org `omega.js` rights for itwcw2000 (`npm org ls` 403s; first publish is the definitive test; 2FA surfaces then)
 - GO org-move: move project `omegajs` into `itw-creative-works-org` + org-level manage grant (propose-first; project is currently org-less — why API owner grants failed)
 - GO skins: both skins await Ian's eyes — classy/Paperloom (cp147–185) + The Daily Build (cp186–193); fall-through two-lane direction stands
@@ -67,6 +67,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp264 2026-07-22 wave-3 remediation: 20/21 web engine+theme defects closed (2× Fable review; battery EXIT 0) → CHANGELOG
 - cp263 2026-07-22 assistant → RouteContext/ctx: module split, one respond door, report() + auto-Sentry rule (battery EXIT 0) → CHANGELOG
 - cp262 2026-07-22 legacy-name sweep: wm/em/bem/bxm/ujm identifiers → omega/current names on every runtime surface (battery EXIT 0) → CHANGELOG
 - cp261 2026-07-22 omega.request() harmonized fetch layer + usage/device bindings split + desktop/extension callers (battery EXIT 0) → CHANGELOG
@@ -76,4 +77,3 @@
 - cp257 2026-07-21 de-ITW recaptcha ask + company-default GA account id (manager 774/0; battery EXIT 0) → CHANGELOG
 - cp256 2026-07-21 `omega update` verb: devkit core + 5-surface wiring, 7-day quarantine, npu-routed apply (battery PASSED) → CHANGELOG
 - cp255 2026-07-21 per-service requires preflight: REQUIRES registry + consolidated walkthroughs + --strict (manager 762/0; battery EXIT 0) → CHANGELOG
-- cp254 2026-07-21 multi-instance targets: config normalization SSOT + manager/web iteration + 2-instance corpus cell (battery PASSED) → CHANGELOG

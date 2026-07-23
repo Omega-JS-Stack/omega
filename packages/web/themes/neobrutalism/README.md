@@ -24,17 +24,17 @@ defaults (via the Classy layout fallback) and restyled in neobrutalist form.
 ## Customize it (without editing the theme)
 
 All design tokens are `!default` variables. Override them **before** the theme
-is imported — in your project's `src/assets/css/main.scss`, set the variables,
-then `@use 'ultimate-jekyll-manager' as *;`:
+is imported — in your project's `src/assets/css/main.scss`, configure them
+through `@use 'omega:main' with (…);`:
 
 ```scss
-// Change the accent + structure, then import the framework (which loads the theme)
-$primary:           #FF5C00;   // your brand color
-$nb-border-width:   4px;       // chunkier borders
-$nb-shadow-offset:  7px;       // deeper hard shadow
-$nb-accent-yellow:  #D4FF00;   // swap the signature highlight
-
-@use 'ultimate-jekyll-manager' as *;
+// Change the accent + structure while importing the framework (which loads the theme)
+@use 'omega:main' with (
+  $primary:           #FF5C00,   // your brand color
+  $nb-border-width:   4px,       // chunkier borders
+  $nb-shadow-offset:  7px,       // deeper hard shadow
+  $nb-accent-yellow:  #D4FF00,   // swap the signature highlight
+);
 ```
 
 ### Key tokens (see `_config.scss` for the full list)

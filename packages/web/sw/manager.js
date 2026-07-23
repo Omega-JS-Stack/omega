@@ -35,10 +35,21 @@ setupGlobalHandlers();
 
 // Firebase compat libraries for background messaging (FCM push). The version
 // is pinned at build time to @omega.js/client's own firebase dependency.
-importScripts(
-  `https://www.gstatic.com/firebasejs/${__OMEGA_FIREBASE_VERSION__}/firebase-app-compat.js`,
-  `https://www.gstatic.com/firebasejs/${__OMEGA_FIREBASE_VERSION__}/firebase-messaging-compat.js`,
-);
+// Skipped when the brand has no firebase config, and guarded either way — a
+// failed CDN fetch (offline, CSP, blocked gstatic) must never abort script
+// evaluation and take down the SW's cache-eviction/takeover role.
+let firebaseScriptsLoaded = false;
+if (sw.OMEGA_BUILD_JSON && sw.OMEGA_BUILD_JSON.firebase) {
+  try {
+    importScripts(
+      `https://www.gstatic.com/firebasejs/${__OMEGA_FIREBASE_VERSION__}/firebase-app-compat.js`,
+      `https://www.gstatic.com/firebasejs/${__OMEGA_FIREBASE_VERSION__}/firebase-messaging-compat.js`,
+    );
+    firebaseScriptsLoaded = true;
+  } catch (e) {
+    console.error('[service-worker] Firebase libraries failed to load; push messaging disabled:', e);
+  }
+}
 
 // Manager Class
 class Manager {
@@ -129,6 +140,11 @@ class Manager {
     // Check if Firebase config is available
     if (!firebaseConfig) {
       console.log('[service-worker] Firebase config not available, skipping Firebase initialization');
+      return;
+    }
+
+    // Check the libraries actually loaded (guarded top-level importScripts)
+    if (!firebaseScriptsLoaded) {
       return;
     }
 

@@ -179,6 +179,7 @@ test('devCleanUrls middleware: /signin, /signin/ and dotted slugs resolve to fla
   assert.equal(rewritten('/updates/v1.0.0'), '/updates/v1.0.0.html', 'dotted slug is a page URL too');
   assert.equal(rewritten('/real.txt'), '/real.txt', 'real files pass through');
   assert.equal(rewritten('/missing'), '/missing', 'no .html candidate — untouched');
+  assert.equal(rewritten('/%E0%A4%A'), '/%E0%A4%A', 'malformed percent-escape falls through instead of throwing URIError (wave-3 W6)');
 });
 
 test('applyDevSiteUrl: dev builds link to the local origin, never the live site', () => {

@@ -1,6 +1,10 @@
 // Navbar scroll effect for the Neobrutalism theme.
-// Toggles a `.scrolled` class on the floating navbar once the page is scrolled
-// past a threshold; the SCSS turns that into a hard offset shadow under the bar.
+// Stamps data-omega-scrolled on the floating navbar once the page is scrolled
+// past a threshold; the SCSS turns that into a hard offset shadow under the
+// bar. The attribute lives in the omega- namespace (the same contract the
+// shared motion engine's data-omega-scroll-watch stamps) so the PurgeCSS
+// greedy /omega-/ safelist keeps the rule — a bare runtime-toggled class
+// would be purged from the production bundle.
 // Threshold is configurable via the data-nb-scroll-threshold attribute on the navbar.
 export default function setupNavbarScroll() {
   const navbar = document.querySelector('.navbar-floating');
@@ -12,7 +16,7 @@ export default function setupNavbarScroll() {
 
   let ticking = false;
   function update() {
-    navbar.classList.toggle('scrolled', window.scrollY > threshold);
+    navbar.setAttribute('data-omega-scrolled', window.scrollY > threshold ? 'true' : 'false');
     ticking = false;
   }
 

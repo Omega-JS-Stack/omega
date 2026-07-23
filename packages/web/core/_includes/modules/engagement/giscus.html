@@ -1,11 +1,15 @@
 <!-- Module - Giscus -->
+<!-- Gated HERE (one home) so unconfigured brands never inject the client
+     script with an empty data-repo — a failed third-party embed on every
+     post page. -->
+{% iftruthy resolved.comments.giscus.repo %}
 <div data-lazy='@script {
   "src": "https://giscus.app/client.js",
   "attributes": {
-    "data-repo": "{{ resolved.comments.gisqus.repo }}",
-    "data-repo-id": "{{ resolved.comments.gisqus.repo-id }}",
-    "data-category": "{{ resolved.comments.gisqus.category }}",
-    "data-category-id": "{{ resolved.comments.gisqus.category-id }}",
+    "data-repo": "{{ resolved.comments.giscus.repo }}",
+    "data-repo-id": "{{ resolved.comments.giscus.repo-id }}",
+    "data-category": "{{ resolved.comments.giscus.category }}",
+    "data-category-id": "{{ resolved.comments.giscus.category-id }}",
     "data-mapping": "url",
     "data-strict": "1",
     "data-reactions-enabled": "0",
@@ -19,3 +23,4 @@
   }
 }'>
 </div>
+{% endiftruthy %}

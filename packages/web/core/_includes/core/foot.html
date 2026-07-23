@@ -124,13 +124,13 @@
 
 <!-- Script - Google Analytics Tracking Script -->
 {% iftruthy resolved.analytics.providers.google.id %}
-  <script type="text/javascript" src="https://www.googletagmanager.com/gtag/js?id={{ site.analytics.providers.google.id }}" async></script>
+  <script type="text/javascript" src="https://www.googletagmanager.com/gtag/js?id={{ resolved.analytics.providers.google.id }}" async></script>
   <script type="text/javascript">
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
 
-    gtag('config', '{{ site.analytics.providers.google.id }}');
+    gtag('config', '{{ resolved.analytics.providers.google.id }}');
   </script>
 {% endiftruthy %}
 {% iffalsy resolved.analytics.providers.google.id %}
@@ -151,12 +151,12 @@
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
 
-    fbq('init', '{{ site.analytics.providers.meta.id }}');
+    fbq('init', '{{ resolved.analytics.providers.meta.id }}');
     fbq('track', 'PageView');
   </script>
   <noscript>
     <img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id={{ site.analytics.providers.meta.id }}&ev=PageView&noscript=1"
+    src="https://www.facebook.com/tr?id={{ resolved.analytics.providers.meta.id }}&ev=PageView&noscript=1"
     />
   </noscript>
 {% endiftruthy %}
@@ -174,7 +174,7 @@
       w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
 
       //part2
-      ttq.load('{{ site.analytics.providers.tiktok.id }}');
+      ttq.load('{{ resolved.analytics.providers.tiktok.id }}');
       ttq.page();
     }(window, document, 'ttq');
   </script>
@@ -208,7 +208,7 @@
     {% if breadcrumbs-size > -1 %}
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
-      "name": "{{ site.brand.name }}",
+      "name": "{{ site.brand.name | uj_json_escape }}",
     {% endif %}
     "itemListElement": [
       {%- for breadcrumb in breadcrumbs -%}
@@ -219,7 +219,7 @@
             "position": {{ forloop.index | minus: 1 }},
             "item": {
               "@id": "{{ breadcrumb-url }}",
-              "name": "{{ breadcrumb }}"
+              "name": "{{ breadcrumb | uj_json_escape }}"
             }
           }{% unless forloop.last %},{% endunless %}
         {%- endunless -%}
@@ -235,8 +235,8 @@
     "@type": "{{ site.brand.type }}",
     "@id": "{{ site.url }}#{{ site.brand.type }}",
     "url": "{{ site.url }}",
-    "name": "{{ site.brand.name }}",
-    "description": "{{ site.brand.description }}",
+    "name": "{{ site.brand.name | uj_json_escape }}",
+    "description": "{{ site.brand.description | uj_json_escape }}",
     "logo": "{% uj_external site.brand.images.brandmark %}",
     "sameAs": [
       {%- for social in site.socials -%}
@@ -258,10 +258,10 @@
     "contactPoint": {
       "@type": "ContactPoint",
       "contactType": "Customer Support",
-      "email": "{{ site.brand.contact.email }}",
+      "email": "{{ site.brand.contact.email | uj_json_escape }}",
       "url": "{{ site.url }}/contact"
     },
-    "telephone": "{{ site.brand.contact.phone }}",
+    "telephone": "{{ site.brand.contact.phone | uj_json_escape }}",
     "areaServed": {
       "@type": "Place",
       "name": "Worldwide"
@@ -296,7 +296,7 @@
     "@type": "WebSite",
     "@id": "{{ site.url }}#WebSite",
     "url": "{{ site.url }}",
-    "name": "{{ site.brand.name }}",
+    "name": "{{ site.brand.name | uj_json_escape }}",
     "potentialAction": {
       "@type": "SearchAction",
       "target": "{{ site.url }}/search/cse?q={search_term_string}",
@@ -316,9 +316,9 @@
       "@type": "BlogPosting",
       "@id": "{{ site.url }}{{ page.url }}#BlogPosting",
       "url": "{{ site.url }}{{ page.url }}",
-      "name": "{{ resolved.post.title | uj_liquify }}",
-      "description": "{{ resolved.post.description | uj_liquify }} ",
-      "headline": "{{ resolved.post.title | uj_liquify }}",
+      "name": "{{ resolved.post.title | uj_liquify | uj_json_escape }}",
+      "description": "{{ resolved.post.description | uj_liquify | uj_json_escape }} ",
+      "headline": "{{ resolved.post.title | uj_liquify | uj_json_escape }}",
       "datePublished": "{{ page.date | date_to_xmlschema }}",
       "dateModified": "{{ site.time | date_to_xmlschema }}",
       "author": {
@@ -350,9 +350,9 @@
     {
       "@context": "http://schema.org",
       "@type": "Person",
-      "@id": "{%- uj_member resolved.post.author, "url" -%}#Person",
-      "url": "{%- uj_member resolved.post.author, "url" -%}",
-      "name": "{%- uj_member resolved.post.author, "name" -%}",
+      "@id": "{%- uj_member resolved.member.id, "url" -%}#Person",
+      "url": "{%- uj_member resolved.member.id, "url" -%}",
+      "name": "{%- uj_member resolved.member.id, "name" -%}",
       "image": {
         "@type": "ImageObject",
         "url": "{{ site.url }}{%- uj_member resolved.member.id, "image" -%}"

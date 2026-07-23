@@ -56,7 +56,6 @@
     demo: {
       enabled: false,
       type: 'input',
-      placement: 'bottom',
       options: {
         class: 'mw-md',
         placeholder: 'Enter your email',

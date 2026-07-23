@@ -180,10 +180,12 @@ Resilience rules (load-bearing):
   stamp (head.html) — **no JS means a fully visible page**.
 - `prefers-reduced-motion` renders final states: reveals resolve instantly,
   count-ups show their target, rotators hold the first word, marquees park.
-- The PurgeCSS safelist keeps every `omega-`-namespaced selector
-  (`src/assets.js`) because motion/shell state is runtime-stamped and never
-  visible to the content scan. **New runtime-stamped classes must live in the
-  `omega-` namespace** (or join the safelist explicitly).
+- The PurgeCSS safelist keeps every `omega-`-namespaced selector plus
+  Bootstrap's own JS-toggled transition classes (`collapse`/`collapsing`/
+  `show`/`showing`/`fade` — `src/assets.js`) because that state is
+  runtime-stamped and never visible to the content scan. **New
+  runtime-stamped classes must live in the `omega-` namespace** (or join the
+  safelist explicitly).
 
 ## classy v2 (the flagship skin)
 

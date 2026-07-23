@@ -183,6 +183,34 @@ for (const theme of ['classy', 'neobrutalism', 'newsflash']) {
   });
 }
 
+test('wave-3 W5: out-of-order catalog warns (comparison inherits by catalog order)', () => {
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (message) => warnings.push(message);
+
+  try {
+    composePricing({
+      products: [
+        { id: 'pro', name: 'Pro', prices: { monthly: 20 } },
+        { id: 'basic', name: 'Basic', prices: { monthly: 5 } },
+      ],
+    });
+    assert.equal(warnings.length, 1, 'non-monotonic prices warn');
+    assert.ok(warnings[0].includes('"basic"') && warnings[0].includes('"pro"'), 'names both plans');
+
+    warnings.length = 0;
+    composePricing({
+      products: [
+        { id: 'basic', name: 'Basic', prices: { monthly: 5 } },
+        { id: 'pro', name: 'Pro', prices: { monthly: 20 } },
+      ],
+    });
+    assert.equal(warnings.length, 0, 'ascending catalog stays silent');
+  } finally {
+    console.warn = original;
+  }
+});
+
 test('classy: monthly-only catalog hides the billing toggle', async () => {
   const pages = await buildWith({
     ...miniData,

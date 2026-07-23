@@ -21,36 +21,12 @@ export default (el) => {
     submittedText: 'Subscribed!',
   });
 
-  formManager.on('submit', async ({ data }) => {
-    console.log('Newsletter subscription:', data.email);
+  formManager.on('submit', async () => {
+    // No capture wiring exists yet (Ian decides the provider/endpoint) — a
+    // LOUD stub: never confirm success on a submission that goes nowhere,
+    // and never log the address (a live dead form is the cp217/cp218 class).
+    console.warn('[newsletter-cta] No newsletter integration is configured — the submission was NOT captured. Wire this section to a capture endpoint.');
 
-    // Here you would integrate with your newsletter service
-    // For example: Mailchimp, SendGrid, ConvertKit, etc.
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Track signup
-    trackNewsletterSignup();
-
-    formManager.showSuccess('Thank you for subscribing! Check your email to confirm.');
+    formManager.showError('Newsletter signup is not configured yet.');
   });
 };
-
-// Tracking
-function trackNewsletterSignup() {
-  gtag('event', 'newsletter_signup', {
-    event_category: 'engagement',
-    event_label: 'blog_page',
-    value: 1,
-  });
-  fbq('track', 'Lead', {
-    content_name: 'Newsletter',
-    status: 'success',
-  });
-  ttq.track('Subscribe', {
-    content_id: 'newsletter-blog',
-    content_type: 'product',
-    content_name: 'Newsletter',
-  });
-}

@@ -352,7 +352,11 @@ async function purgeCss(options) {
     // and the motion engine stamps data-omega-inview / data-omega-scrolled /
     // data-omega-active client-side — so the content scan can never see those
     // states. Keep every omega-namespaced rule.
-    safelist: { greedy: [/omega-/] },
+    // greedy: the framework's own runtime-stamped namespace. standard:
+    // Bootstrap's JS-toggled transition classes — added at runtime, absent
+    // from the rendered HTML the content scan reads, so without the safelist
+    // the collapse/fade transitions get purged and snap.
+    safelist: { greedy: [/omega-/], standard: ['collapse', 'collapsing', 'show', 'showing', 'fade'] },
   });
 
   fs.writeFileSync(cssFile, results[0].css);

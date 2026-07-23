@@ -14,7 +14,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { execSync } = require('node:child_process');
+const { execSync, execFileSync } = require('node:child_process');
 const Logger = require('@omega.js/devkit/logger');
 const { deployViaDispatch, findLocalSpecs, syncWorkingTree } = require('@omega.js/devkit/deploy');
 
@@ -101,12 +101,14 @@ function deployDirect({ dryRun }) {
   fs.writeFileSync(path.join(dist, '.nojekyll'), '');
   fs.rmSync(path.join(dist, '.git'), { recursive: true, force: true });
 
-  const git = (cmd) => execSync(`git ${cmd}`, { cwd: dist, stdio: ['ignore', 'pipe', 'inherit'] });
+  // Config-derived values (pushUrl/branch/cname) pass as their own argv
+  // elements — no shell parses them.
+  const git = (...args) => execFileSync('git', args, { cwd: dist, stdio: ['ignore', 'pipe', 'inherit'] });
   try {
-    git(`init -q -b ${plan.branch}`);
-    git('add -A');
-    git(`-c commit.gpgsign=false commit -q -m "Deploy ${plan.cname} (omega deploy --direct)"`);
-    git(`push -q -f ${plan.pushUrl} ${plan.branch}`);
+    git('init', '-q', '-b', plan.branch);
+    git('add', '-A');
+    git('-c', 'commit.gpgsign=false', 'commit', '-q', '-m', `Deploy ${plan.cname} (omega deploy --direct)`);
+    git('push', '-q', '-f', plan.pushUrl, plan.branch);
   } finally {
     fs.rmSync(path.join(dist, '.git'), { recursive: true, force: true });
   }

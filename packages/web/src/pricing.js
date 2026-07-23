@@ -175,6 +175,20 @@ function composePricing(payment) {
       features: composeFeatures(product),
     }));
 
+  // The comparison inherits feature values by catalog position (tiers
+  // accumulate), so `payment.products` must be authored lowest tier first —
+  // warn when prices are non-monotonic instead of silently composing a
+  // wrong matrix.
+  for (let i = 1; i < plans.length; i++) {
+    const prev = plans[i - 1].prices;
+    const curr = plans[i].prices;
+    const prevRank = prev.monthly || prev.annually;
+    const currRank = curr.monthly || curr.annually;
+    if (currRank < prevRank) {
+      console.warn(`[omega:pricing] payment.products lists "${plans[i].id}" after the pricier "${plans[i - 1].id}" — the comparison matrix inherits values by catalog order (lowest tier first); reorder the catalog.`);
+    }
+  }
+
   // Definitions unify BEFORE the comparison copies feature objects
   backfillDefinitions([
     ...plans.map((plan) => plan.features),

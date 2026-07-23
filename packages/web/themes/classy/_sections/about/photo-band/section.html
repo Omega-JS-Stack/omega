@@ -4,14 +4,14 @@
       <div class="classy-photo-band" data-omega-reveal-stagger="90">
         {% for photo in args.items %}
           {% if photo.wide %}
-            <div class="classy-photo-band__tile classy-photo-band__tile--wide lazy-loading" data-lazy="@bg {{ photo.src }}&w=1600" role="img" aria-label="{{ photo.alt }}" data-omega-reveal>
+            <div class="classy-photo-band__tile classy-photo-band__tile--wide lazy-loading" data-lazy="@bg {{ photo.src | uj_append_param: 'w', 1600 }}" role="img" aria-label="{{ photo.alt }}" data-omega-reveal>
               {% iftruthy photo.caption %}<span class="classy-photo-band__caption">{{ photo.caption }}</span>{% endiftruthy %}
             </div>
           {% else %}
             <figure class="classy-photo-band__tile" data-omega-reveal>
               <img
                 src="{{ args.placeholder }}"
-                data-lazy="@srcset {{ photo.src }}&w=640 640w, {{ photo.src }}&w=1080 1080w"
+                data-lazy="@srcset {{ photo.src | uj_append_param: 'w', 640 }} 640w, {{ photo.src | uj_append_param: 'w', 1080 }} 1080w"
                 sizes="(min-width: 992px) 40vw, 100vw"
                 alt="{{ photo.alt }}"/>
               {% iftruthy photo.caption %}<figcaption class="classy-photo-band__caption">{{ photo.caption }}</figcaption>{% endiftruthy %}

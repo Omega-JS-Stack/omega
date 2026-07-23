@@ -29,8 +29,9 @@
   border-bottom: $nb-border-width-lg solid var(--nb-border-color);
   transition: $nb-transition;
 
-  // Slight shadow only once scrolled (set by _theme.js)
-  &.scrolled {
+  // Slight shadow only once scrolled (data-omega-scrolled stamped by
+  // js/navbar-scroll.js; omega- namespace so the purge safelist keeps it)
+  &[data-omega-scrolled='true'] {
     @include nb-shadow(sm);
   }
 

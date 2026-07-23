@@ -3,7 +3,7 @@
   numerals under a rule head. Same items contract as the classy base
   (number / label / sublabel); absent items suppresses the whole band.
 {% endcomment %}
-{% iftruthy args.items %}
+{% if args.items and args.items.size > 0 %}
   <section>
     <div class="container">
       {% component "heading/rule-head", text: args.head %}
@@ -22,4 +22,4 @@
       {{ args.after }}{% endif %}
     </div>
   </section>
-{% endiftruthy %}
+{% endif %}

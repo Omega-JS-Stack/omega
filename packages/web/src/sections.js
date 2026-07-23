@@ -51,12 +51,12 @@
  * default section composition. Three page states, all byte-parity with the
  * `{{ content | uj_content_format }}` layout line the wrap replaces:
  *   - empty page → the wrapped one-liners render (absence is the spine)
- *   - body content → renders BELOW the composition (the legacy append
- *     contract, preserved verbatim)
- *   - body content + `composition: true` frontmatter → the body REPLACES
- *     the composition — what `omega customize <url>` materializes, so a
- *     customized composition supersedes the default while the sections
- *     inside keep flowing from the theme.
+ *   - body content → the body REPLACES the composition (a page that writes
+ *     a body means it — Ian's 2026-07-19 ruling; what `omega customize
+ *     <url>` materializes supersedes the default while the sections inside
+ *     keep flowing from the theme)
+ *   - body content + `append: true` frontmatter → the body renders BELOW
+ *     the composition (the legacy add-below contract, opt-in)
  */
 const fs = require('node:fs');
 const path = require('node:path');

@@ -29,7 +29,7 @@ sitemap:
       <guid isPermaLink="true">{{ site.url }}{{ post.url }}</guid>
       <pubDate>{{ post.date | date: "%a, %d %b %Y %H:%M:%S" }} GMT</pubDate>
       <description><![CDATA[ {{ post.data.post.description | default: post.data.meta.description }} ]]></description>
-      <content:encoded><![CDATA[ {{ post.templateContent | uj_strip_ads }} ]]></content:encoded>
+      <content:encoded><![CDATA[ {{ post.templateContent }} ]]></content:encoded>
       <dc:creator><![CDATA[ {{ site.brand.name }} ]]></dc:creator>
       <category><![CDATA[ {{ post.data.post.categories | first }} ]]></category>
     </item>

@@ -300,7 +300,17 @@ function devCleanUrls(outDir) {
 
   return (req, res, next) => {
     const [pathname, query] = (req.url || '').split('?');
-    const clean = decodeURIComponent(pathname).replace(/\/+$/, '');
+
+    // A malformed percent-escape throws URIError — not a clean-URL
+    // candidate, fall through to the static handler.
+    let decoded;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch (e) {
+      return next();
+    }
+
+    const clean = decoded.replace(/\/+$/, '');
 
     if (!clean) {
       return next();
@@ -309,7 +319,7 @@ function devCleanUrls(outDir) {
     // Legacy serve.js contract: rewrite only when the request doesn't hit a
     // real file but `<path>.html` exists. No extension sniffing — dotted
     // slugs (/updates/v1.0.0) are page URLs too.
-    const original = path.resolve(root, `.${decodeURIComponent(pathname)}`);
+    const original = path.resolve(root, `.${decoded}`);
     const resolved = path.resolve(root, `.${clean}.html`);
     if (
       resolved.startsWith(root + path.sep)
