@@ -294,7 +294,13 @@ async function main() {
       return `signin rejected: ${signinError.slice(0, 60)}`;
     });
   } catch (error) {
-    // step() already reported it; fall through to teardown
+    // Errors thrown INSIDE harness.step() are already in harness.failures;
+    // anything else (puppeteer.launch, newPage, preparePage) must be recorded
+    // here or exit() would report a false PASSED with exit 0.
+    if (!harness.failures.some((f) => f.error === error)) {
+      console.error(`  ✗ harness setup failed: ${error.message}`);
+      harness.failures.push({ name: 'harness setup', error });
+    }
   } finally {
     if (browser) {
       await browser.close().catch(() => {});

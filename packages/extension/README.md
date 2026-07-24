@@ -150,7 +150,7 @@ Only stores with configured credentials get published to. Full guide: [docs/publ
 
 ### Setup
 
-1. Add `authDomain` to your Firebase config in `config/omega.json5`
+1. Set `brand.url` in `config/omega.json5` (background.js watches that host for the /token redirect)
 2. Add `tabs` permission to `src/manifest.json`
 
 ### Auth button classes

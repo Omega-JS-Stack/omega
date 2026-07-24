@@ -69,7 +69,7 @@ await new Manager().initialize();
 ```
 
 After `initialize()`, the Manager exposes:
-- `manager.extension` — cross-browser `chrome.*` / `browser.*` / `window.*` API wrapper ([docs/extension.md](docs/extension.md))
+- `manager.extension` — cross-browser `chrome.*` / `browser.*` API wrapper ([docs/extension.md](docs/extension.md))
 - `manager.logger` — timestamped per-context logger
 - `manager.omega` — Web Manager singleton (Firebase, auth, analytics, reactive bindings)
 - `manager.messenger` — `chrome.runtime.onMessage` listener wired automatically
@@ -102,7 +102,7 @@ Background.js is the source of truth for authentication. Other contexts compare 
 
 Three flows: sign-in (website `/token` redirect → broadcast), context-load (`omega:syncAuth`), sign-out (`omega:signOut` broadcast). Auth-button CSS classes (`.auth-signin-btn`, `.auth-signout-btn`, `.auth-account-btn`) wire UI without writing JS. @omega.js/client reactive bindings (`data-omega-bind="@show auth.user"`) handle DOM state.
 
-Required setup: `cloud.config.authDomain` in config, `tabs` permission in manifest. See [docs/auth.md](docs/auth.md).
+Required setup: `brand.url` in config (background.js watches that host for the /token redirect), `tabs` permission in manifest. See [docs/auth.md](docs/auth.md).
 
 ### Build system
 

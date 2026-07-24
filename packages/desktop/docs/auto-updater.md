@@ -7,8 +7,9 @@ Wraps `electron-updater` with three triggers: startup check, periodic check, and
 | Trigger | When | Behavior |
 |---|---|---|
 | **Startup check** | `startupDelayMs` after `app.whenReady()` (default 10s) | Non-blocking. Fires once. |
-| **Periodic check** | Every `intervalMs` (default 60s) | Fires forever, also re-evaluates the 30-day gate each tick. |
-| **30-day gate** | At init + every periodic tick | If a pending update was downloaded ≥ `maxAgeMs` ago (default 30 days), force `quitAndInstall()`. |
+| **Feed check** | Every `feedCheckIntervalMs` (default 1h) | HTTP poll of the release feed; also re-evaluates the 30-day gate each tick. |
+| **Idle evaluation** | Every `idleEvalIntervalMs` (default 60s) | Cheap in-process check: install a downloaded update once the user has been idle long enough. |
+| **30-day gate** | When a download lands + every feed tick | If a pending update was downloaded ≥ `maxAgeMs` ago (default 30 days), force `quitAndInstall()`. A pending update carried from a prior session keeps its original `downloadedAt`, so the gate trips as soon as the startup check re-downloads it. |
 | **Manual check** | `manager.autoUpdater.checkNow()` (main) or `window.desktop.autoUpdater.checkNow()` (renderer) | Same as a periodic check but `userInitiated: true`. |
 
 ## State machine
@@ -29,12 +30,13 @@ error           — checkForUpdates() or download failed; status.error.message h
 
 ```jsonc
 autoUpdate: {
-  enabled:        true,
-  channel:        'latest',          // latest / beta / alpha
-  startupDelayMs: 10000,             // 10s after whenReady
-  intervalMs:     60000,             // 60s — also when the 30-day gate is re-checked
-  maxAgeMs:       2592000000,        // 30 days; if pendingUpdate is older, force install
-  autoDownload:   true,              // electron-updater downloads automatically
+  enabled:             true,
+  channel:             'latest',     // latest / beta / alpha
+  startupDelayMs:      10000,        // 10s after whenReady
+  feedCheckIntervalMs: 3600000,      // 1h — release-feed poll cadence (HTTP; also re-checks the 30-day gate)
+  idleEvalIntervalMs:  60000,        // 60s — idle-install evaluator cadence (in-process)
+  maxAgeMs:            2592000000,   // 30 days; if pendingUpdate is older, force install
+  autoDownload:        true,         // electron-updater downloads automatically
 }
 ```
 
@@ -46,14 +48,14 @@ The gate:
 
 1. **First download wins.** When `update-downloaded` fires, @omega.js/desktop stores `pendingUpdate = { version, downloadedAt: Date.now() }` to `storage.autoUpdater.pendingUpdate`.
 2. **Subsequent downloads do NOT reset the timer.** If a newer update downloads later, `downloadedAt` stays at the original time. (Otherwise the user could keep dodging by triggering re-checks.)
-3. **Every poll tick + at init**, @omega.js/desktop checks if `Date.now() - downloadedAt >= maxAgeMs`. If yes → `quitAndInstall()`. Force.
+3. **When a download lands + every feed tick**, @omega.js/desktop checks if `Date.now() - downloadedAt >= maxAgeMs`. If yes → `quitAndInstall()`. Force. (At init the artifact isn't re-downloaded yet — the restored `downloadedAt` makes the gate trip the moment the startup check's download completes.)
 4. **Cleared on apply.** When the app next launches and `app.getVersion() === pendingUpdate.version`, the flag is cleared automatically (the user successfully restarted into the new version).
 
-This guarantees no app on @omega.js/desktop stays > maxAgeMs days behind a downloaded update.
+This guarantees no app on @omega.js/desktop stays > maxAgeMs days behind a downloaded update — provided `autoDownload` stays on (default): the cross-session gate enforces when the startup check's re-download lands, so with `autoDownload: false` it waits for the next download, whenever the consumer triggers one.
 
 ## Idle-aware install (15-min default)
 
-When an update finishes downloading via a background poll (NOT a user-initiated check), @omega.js/desktop does NOT immediately quit-and-install. Instead, the install decision is folded into the existing periodic tick (`_periodicTick`, fires every `intervalMs`, default 60s) which runs three steps in order: re-check the feed → enforce the 30-day max-age gate → evaluate idle install. Single timer, single decision flow.
+When an update finishes downloading via a background poll (NOT a user-initiated check), @omega.js/desktop does NOT immediately quit-and-install. Two independent timers own the decision: the feed-check timer (`feedCheckIntervalMs`, HTTP, also enforces the 30-day gate) and the idle-eval timer (`idleEvalIntervalMs`, cheap in-process arithmetic) which installs the downloaded update once the user has been idle past the threshold. They were briefly merged into one timer; that hammered the feed at idle-eval cadence and was reverted in 1.3.1.
 
 ### Activity signals
 
@@ -104,14 +106,14 @@ Long enough that an actively-used app won't surprise-quit mid-task. Short enough
 
 - `_promptedForVersion` tracks the version we've already shown the dialog for. Reset on `shutdown()`. If a *newer* update downloads later, the version flips and the prompt fires again (different version).
 - The first `_evaluateIdleInstall` after a download lands waits up to one tick (default 60s) before any prompt or install — gives an active user a small grace window to reach a natural pause before the dialog appears.
-- The 30-day gate firing short-circuits idle eval: `_periodicTick` returns after `_enforceMaxAgeGate()` returns true, since the install is already in flight.
+- The 30-day gate firing short-circuits idle eval: `_feedCheckTick` returns after `_enforceMaxAgeGate()` returns true, since the install is already in flight.
 
 ### Test mode behavior
 
 When `manager.isTesting() === true` (canonical signal: `OMEGA_TEST_MODE=true`), the auto-updater swaps in test-friendly defaults so a real download → idle wait → install can complete in seconds instead of minutes:
 
 - **Idle threshold**: `IDLE_INSTALL_THRESHOLD_MS_TESTING = 3000ms` (3 sec) instead of 15 min.
-- **Periodic tick**: `IDLE_TICK_MS_TESTING = 500ms` instead of `intervalMs` (default 60s).
+- **Both timers**: `IDLE_TICK_MS_TESTING = 500ms` replaces `feedCheckIntervalMs` and `idleEvalIntervalMs`.
 - **`_promptToInstall` short-circuits** before invoking `dialog.showMessageBox`. The native dialog is modal + blocking + would pop a window the test process can't dismiss programmatically. In test mode the prompt logs `[testing] _promptToInstall(...) — skipped native dialog.` and returns. Tests that want to assert prompt behavior override `_promptToInstall` per-test (see `auto-updater.test.js`).
 
 This lets the framework's own integration tests drive the full sequence (`OMEGA_DEV_UPDATE=available` → state machine → 500ms tick → 3s idle threshold elapses → stubbed `installNow` fires) in ~5s. Consumers running their own tests should set `OMEGA_TEST_MODE=true` to inherit the same defaults.

@@ -143,17 +143,19 @@ export function setupSignOutListener(context) {
 export function openAuthPage(context, options = {}) {
   const { extension, omega, logger } = context;
 
-  // Get auth domain from config
-  const authDomain = omega.config?.firebase?.app?.config?.authDomain;
+  // The /token page lives on the BRAND site (wave-5 F9) — background.js
+  // watches the same brand.url host for the redirect. Never authDomain:
+  // OAuth pins that to <projectId>.firebaseapp.com, where no site exists.
+  const brandUrl = omega.config?.brand?.url;
 
-  if (!authDomain) {
-    logger.error('No authDomain configured');
+  if (!brandUrl) {
+    logger.error('No brand.url configured');
     return;
   }
 
   // Build the URL
   const path = options.path || '/token';
-  const authUrl = new URL(path, `https://${authDomain}`);
+  const authUrl = new URL(path, brandUrl);
 
   // Add return URL if provided (for electron/deep links)
   if (options.authReturnUrl) {

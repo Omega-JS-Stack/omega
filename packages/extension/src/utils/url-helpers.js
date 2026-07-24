@@ -33,13 +33,15 @@ function getApiUrl(environment) {
       : `http://localhost:${envPort('OMEGA_HOSTING_PORT') || 5002}`;
   }
 
-  // Prod: api.<authDomain>. Mirrors @omega.js/client.getApiUrl behavior.
-  const authDomain = this?.config?.cloud?.config?.authDomain;
-  if (!authDomain) {
-    throw new Error('cloud.config.authDomain not set in config/omega.json5');
+  // Prod: api.<brand host>. Mirrors @omega.js/client.getApiUrl. Never derive
+  // from authDomain — OAuth pins it to <projectId>.firebaseapp.com (site
+  // domains don't serve /__/auth/handler), which has no api.* subdomain.
+  const brandUrl = this?.config?.brand?.url;
+  if (!brandUrl) {
+    throw new Error('brand.url not set in config/omega.json5');
   }
 
-  return `https://api.${authDomain}`;
+  return `https://api.${new URL(brandUrl).hostname}`;
 }
 
 // Mix the URL helpers into a Manager constructor's prototype + the constructor

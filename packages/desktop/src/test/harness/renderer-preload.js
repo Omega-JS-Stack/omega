@@ -188,8 +188,13 @@ contextBridge.exposeInMainWorld('__emTestManager', {
 contextBridge.exposeInMainWorld('desktop', {
   ipc: {
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
-    on:     (channel, handler) => ipcRenderer.on(channel, (_, payload) => handler(payload)),
-    send:   (channel, payload) => ipcRenderer.send(channel, payload),
+    // Mirror production preload (wave-5 F4): returns an unsubscribe fn.
+    on: (channel, handler) => {
+      const wrapped = (_, payload) => handler(payload);
+      ipcRenderer.on(channel, wrapped);
+      return () => ipcRenderer.removeListener(channel, wrapped);
+    },
+    send: (channel, payload) => ipcRenderer.send(channel, payload),
   },
   storage: {
     get:    (key, def) => ipcRenderer.invoke('desktop:storage:get',    { key, def }),

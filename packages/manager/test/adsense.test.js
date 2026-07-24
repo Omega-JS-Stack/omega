@@ -27,7 +27,7 @@ const SITES_URL = `https://adsense.google.com/adsense/u/0/${ACCOUNT_ID}/sites/li
 function brandConfig({ url = `https://${DOMAIN}`, accountId = ACCOUNT_ID } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
-    adsense: { ...structuredClone(DEFAULTS.adsense), accountId },
+    adsense: { accountId },
     targets: { web: {} },
   };
 }
@@ -88,8 +88,30 @@ test('adsense: skips without adsense.accountId — and the default carries no co
   assert.match(result.reason, /adsense\.accountId/);
 
   // omega-manager defaulted this to the company's shared pub- account — the
-  // manager defaults layer must not carry any account at all
-  assert.equal(DEFAULTS.adsense.accountId, null);
+  // manager defaults layer must not carry an adsense section AT ALL (wave-5
+  // F10: defaults merge under every brand, so a seeded section would defeat
+  // the presence gate below)
+  assert.equal(DEFAULTS.adsense, undefined);
+});
+
+test('adsense: NO adsense section = deliberate absence — skips before any account resolution (wave-5 F10)', async () => {
+  // Build the config the way the real pipeline does: the manager DEFAULTS
+  // merge under the brand file. The gate must survive that merge — a seeded
+  // DEFAULTS.adsense would resurrect the section for every brand.
+  const { deepMerge } = require('@omega.js/config');
+  const authored = brandConfig();
+  delete authored.adsense; // the brand never opted in
+  const config = deepMerge(structuredClone(DEFAULTS), authored);
+  assert.equal(config.adsense, undefined);
+
+  const api = fakeAdsense();
+  const result = await runService(config, { adsense: api });
+
+  assert.equal(result.status, 'skipped');
+  assert.match(result.reason, /no adsense section/);
+  // The account-selection flow must never run — it lands a shared account
+  // into the brand config, which is exactly the writeback this gate prevents.
+  assert.equal(api.calls.length, 0);
 });
 
 // ─── Site present ────────────────────────────────────────────────────────────

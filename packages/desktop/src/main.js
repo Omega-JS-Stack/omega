@@ -453,6 +453,12 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
   self.windows.initialize(self);
 
   self._initialized = true;
+
+  // 14. Release deep-link dispatch — cold-start URLs (and any early open-url)
+  // were queued so handlers like auth/token never fire before client-bridge
+  // has Firebase up. Everything they touch exists now.
+  self.deepLink.markManagerReady();
+
   self.logger.log('@omega.js/desktop (main) initialized.');
 
   // Boot test harness — runs against the live manager AFTER all libs are up. Test runner
@@ -479,7 +485,6 @@ Manager.prototype.initialize = async function (consumerConfig, options) {
           // __non_webpack_require__ is webpack's magic escape hatch — preserves a runtime
           // require() that webpack won't try to inline. In plain Node it's undefined, so
           // `typeof` gates the branch without ReferenceError.
-          // eslint-disable-next-line import/no-dynamic-require, global-require, no-undef
           const realRequire = (typeof __non_webpack_require__ !== 'undefined') ? __non_webpack_require__ : require;
           const harness = realRequire(harnessPath);
           harness.run(self);

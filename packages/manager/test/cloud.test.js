@@ -195,10 +195,10 @@ const RAW_SDK = {
   measurementId: 'G-FAKE1',
 };
 
-/** What sdk-config derives from RAW_SDK (custom authDomain + default RTDB URL). */
+/** What sdk-config derives from RAW_SDK (Firebase-reported authDomain kept —
+ * the OAuth handler only lives on firebaseapp.com (wave-5 F9) — + default RTDB URL). */
 const EXPECTED_SDK = {
   ...RAW_SDK,
-  authDomain: DOMAIN,
   databaseURL: `https://${PROJECT}-default-rtdb.firebaseio.com`,
 };
 
@@ -334,7 +334,7 @@ test('cloud: fully converged project is a zero-mutation no-op across all 13 oper
 
   // Durable IDs accumulated for later services
   assert.equal(result.state.serviceAccount.email, SA_EMAIL);
-  assert.equal(result.state.sdkConfig.authDomain, DOMAIN);
+  assert.equal(result.state.sdkConfig.authDomain, `${PROJECT}.firebaseapp.com`);
   assert.equal(result.state.hosting.domains[0].status, 'verified');
 });
 
@@ -729,7 +729,7 @@ test('sdk-config: missing omega.json5 cloud.config is written back, comments int
 
   const written = readConfigSource(brandRoot);
   assert.ok(written.includes(`apiKey: "${EXPECTED_SDK.apiKey}"`));
-  assert.ok(written.includes(`authDomain: "${DOMAIN}"`)); // the custom auth domain, not firebaseapp.com
+  assert.ok(written.includes(`authDomain: "${PROJECT}.firebaseapp.com"`)); // OAuth handler home — never the site domain (wave-5 F9)
   assert.ok(written.includes('// Fixture Brand — hand-edited writeback target'));
 });
 

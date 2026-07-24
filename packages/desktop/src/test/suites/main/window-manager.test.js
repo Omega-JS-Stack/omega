@@ -59,6 +59,21 @@ module.exports = {
         // No assertion beyond "didn't throw" — visibility is OS-side state we can't reliably read.
       },
     },
+    {
+      // wave-5 F6: the rehide path deref'd config.startup.mode bare; a config
+      // without a startup block (schema: optional) threw inside the hide handler.
+      name: '_maybeRehideDock survives a config without a startup block',
+      run: (ctx) => {
+        const orig = ctx.manager.config.startup;
+        delete ctx.manager.config.startup;
+        try {
+          ctx.manager.windows._maybeRehideDock(); // must not throw
+          ctx.expect(ctx.manager.startup.getMode()).toBe('normal');
+        } finally {
+          if (orig !== undefined) ctx.manager.config.startup = orig;
+        }
+      },
+    },
 
     // ── Test stealth (this harness IS Testing mode, so stealth is active) ────
     {

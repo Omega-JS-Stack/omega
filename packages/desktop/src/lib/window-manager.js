@@ -471,7 +471,7 @@ const windowManager = {
   _maybeRehideDock() {
     if (process.platform !== 'darwin') return;
     const manager = windowManager._manager;
-    if (manager.config.startup.mode !== 'hidden') return;
+    if (manager.startup.getMode() !== 'hidden') return;
     if (manager._isQuitting === true) return;
 
     const anyVisible = Object.values(windowManager._windows)

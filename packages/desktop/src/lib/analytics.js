@@ -101,6 +101,13 @@ const analytics = {
       || manager.config.brand.id;
     analytics._namespace = core.deriveNamespace(projectId);
 
+    // Apply a uid stored by a pre-init setUserId() call — the auth
+    // subscription below still overrides it when auth resolves.
+    if (analytics._pendingUid) {
+      analytics.setUserId(analytics._pendingUid);
+      analytics._pendingUid = null;
+    }
+
     // client_id = stable per-device UUID. context.session.deviceId is async-resolved;
     // by the time analytics.initialize() runs (post-context init in boot sequence),
     // it's already populated. Fall back to a fresh UUID if for any reason it isn't.

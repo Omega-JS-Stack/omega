@@ -7,7 +7,7 @@ function Messaging(init) {
   const self = this;
 
   // Check init
-  if (!init || !init) {
+  if (!init || !init.sender) {
     throw new Error('No init and/or init.sender')
   }
 

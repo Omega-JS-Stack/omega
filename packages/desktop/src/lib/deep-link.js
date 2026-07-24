@@ -56,6 +56,8 @@ const deepLink = {
   _coldStartUrl:   null,        // the URL the app was launched with (if any)
   _wired:          false,       // open-url + second-instance + queueing wired?
   _pendingUrls:    [],          // urls received before whenReady — drained on init
+  _managerReady:   false,       // manager.initialize() finished — safe to dispatch
+  _bootQueue:      [],          // dispatches held until _managerReady (client-bridge et al. are up)
 
   initialize(manager) {
     if (deepLink._initialized) {
@@ -74,8 +76,9 @@ const deepLink = {
     if (coldUrl) {
       deepLink._coldStartUrl = coldUrl;
       manager.appState.setLaunchedFromDeepLink(true);
-      // Defer dispatch so the rest of init can finish.
-      setImmediate(() => deepLink._handle(coldUrl, 'cold-start', { argv: process.argv, cwd: process.cwd() }));
+      // _handle queues until markManagerReady() — a cold-start auth/token must
+      // not dispatch before client-bridge has booted Firebase.
+      deepLink._handle(coldUrl, 'cold-start', { argv: process.argv, cwd: process.cwd() });
     }
 
     // Drain anything that came in via open-url before initialize ran.
@@ -86,7 +89,7 @@ const deepLink = {
         deepLink._coldStartUrl = urls[0];
         manager.appState.setLaunchedFromDeepLink(true);
       }
-      urls.forEach((u) => setImmediate(() => deepLink._handle(u, 'cold-start', { argv: process.argv, cwd: process.cwd() })));
+      urls.forEach((u) => deepLink._handle(u, 'cold-start', { argv: process.argv, cwd: process.cwd() }));
     }
 
     logger.log(`initialize — coldStartUrl=${deepLink._coldStartUrl || '(none)'} handlers=${deepLink._handlers.length}`);
@@ -236,8 +239,28 @@ const deepLink = {
     return params;
   },
 
+  // Called by main.js once manager.initialize() completes — every LIB a handler
+  // touches (client-bridge Firebase, the windows registry, tray) is up from here
+  // on. (Consumer-created windows may still be pending — consumers create them
+  // in initialize().then(); app/show on a not-yet-created window warns + drops,
+  // same as always.) Any dispatch that arrived earlier drains now.
+  markManagerReady() {
+    deepLink._managerReady = true;
+    const queued = deepLink._bootQueue.slice();
+    deepLink._bootQueue = [];
+    queued.forEach(({ url, source, env }) => deepLink._handle(url, source, env));
+  },
+
   // Run the dispatch pipeline for a single URL.
   _handle(url, source, env) {
+    // Hold every dispatch until the manager is fully initialized — handlers
+    // deref manager surfaces that don't exist yet during boot.
+    if (!deepLink._managerReady) {
+      logger.log(`queueing ${source} dispatch until manager ready — ${url}`);
+      deepLink._bootQueue.push({ url, source, env });
+      return;
+    }
+
     const parsed = deepLink._parseUrl(url);
     if (!parsed) return;
 

@@ -157,31 +157,40 @@ module.exports = {
       },
     },
     {
-      name: 'getApiUrl: prod returns api.<authDomain>',
+      // wave-5 F9: authDomain is pinned to <projectId>.firebaseapp.com for the
+      // OAuth handler — the API base must come from brand.url instead.
+      name: 'getApiUrl: prod returns api.<brand.url host>, never api.<authDomain>',
       run: (ctx) => {
         const m = ctx.manager;
+        m.config.brand = m.config.brand || {};
+        const origUrl = m.config.brand.url;
+        m.config.brand.url = 'https://demo-app.example.com';
         m.config.cloud = m.config.cloud || {};
         m.config.cloud.config = m.config.cloud.config || {};
-        const orig = m.config.cloud.config.authDomain;
+        const origAuth = m.config.cloud.config.authDomain;
         m.config.cloud.config.authDomain = 'demo-app.firebaseapp.com';
         try {
-          ctx.expect(m.getApiUrl('production')).toBe('https://api.demo-app.firebaseapp.com');
-        } finally { m.config.cloud.config.authDomain = orig; }
+          ctx.expect(m.getApiUrl('production')).toBe('https://api.demo-app.example.com');
+        } finally {
+          m.config.brand.url = origUrl;
+          m.config.cloud.config.authDomain = origAuth;
+        }
       },
     },
     {
-      name: 'getApiUrl: throws when authDomain missing in prod',
+      name: 'getApiUrl: throws when brand.url missing in prod',
       run: (ctx) => {
         const m = ctx.manager;
-        const orig = m.config.cloud?.config?.authDomain;
-        if (m.config.cloud?.config) delete m.config.cloud.config.authDomain;
+        m.config.brand = m.config.brand || {};
+        const orig = m.config.brand.url;
+        delete m.config.brand.url;
         try {
           let threw;
           try { m.getApiUrl('production'); } catch (e) { threw = e; }
           ctx.expect(threw).toBeDefined();
-          ctx.expect(threw.message).toMatch(/cloud\.config\.authDomain/);
+          ctx.expect(threw.message).toMatch(/brand\.url/);
         } finally {
-          if (orig !== undefined) m.config.cloud.config.authDomain = orig;
+          if (orig !== undefined) m.config.brand.url = orig;
         }
       },
     },

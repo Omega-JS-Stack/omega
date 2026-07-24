@@ -25,7 +25,13 @@ const CREATE_ACCOUNT_URL = 'https://adsense.google.com/start/';
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    const adsense = context.brandConfig.adsense || {};
+    // No adsense section = deliberate absence — never resolve or write back
+    // an account the brand didn't opt into (authoring `adsense: {}` opts in).
+    if (!context.brandConfig.adsense) {
+      return { skip: true, reason: 'no adsense section in omega.json5 (author `adsense: {}` to opt in)' };
+    }
+
+    const adsense = context.brandConfig.adsense;
 
     if (adsense.enabled === false) {
       return { skip: true, reason: 'adsense.enabled = false' };

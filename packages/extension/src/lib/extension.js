@@ -77,23 +77,20 @@ function Extension () {
       }
     } catch (e) {}
 
-    // Try window
+    // Try browser (Firefox)
     try {
-      if (window[api]) {
-        self[api] = window[api];
-      }
-    } catch (e) {}
-
-    // Try browser
-    try {
-      if (browser[api]) {
+      if (!self[api] && browser[api]) {
         self[api] = browser[api];
       }
     } catch (e) {}
 
-    // Try browser.extension
+    // Try browser.extension (legacy Firefox surface)
+    // NEVER probe window[api]: DOM globals like window.history would shadow
+    // the chrome API of the same name in popup/options/content contexts.
     try {
-      self.api = browser.extension[api]
+      if (!self[api] && browser.extension[api]) {
+        self[api] = browser.extension[api];
+      }
     } catch (e) {}
   })
 

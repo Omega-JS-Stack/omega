@@ -93,13 +93,16 @@ describe('Manager Methods', () => {
     assert.strictEqual(Manager.getApiUrl(), 'https://localhost:5002');
   });
 
-  it('should return API URL with api. subdomain for production', async () => {
+  it('should derive the production API URL from brand.url, never authDomain (wave-5 F9)', async () => {
     const Manager = getManager();
     await Manager.initialize({
       ...TEST_CONFIG,
+      brand: { ...TEST_CONFIG.brand, url: 'https://playground.omegajs.dev' },
+      // authDomain is pinned to firebaseapp.com for the OAuth handler — an
+      // api.* subdomain can never exist under it.
       firebase: { app: { enabled: false, config: { authDomain: 'example.firebaseapp.com' } } },
     });
-    assert.strictEqual(Manager.getApiUrl(), 'https://api.example.firebaseapp.com');
+    assert.strictEqual(Manager.getApiUrl(), 'https://api.playground.omegajs.dev');
   });
 });
 

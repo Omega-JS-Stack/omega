@@ -13,11 +13,11 @@ This pattern avoids `chrome.storage` (no cross-context tokens on disk, no race c
 ```
 User clicks .auth-signin-btn (in popup/options/sidepanel/page)
   ↓
-openAuthPage() opens https://<authDomain>/token?authSourceTabId=<n>
+openAuthPage() opens https://<brand.url host>/token?authSourceTabId=<n>
   ↓
 Website authenticates, redirects to /token?authToken=xxx
   ↓
-background.js's tabs.onUpdated listener detects authDomain URL + authToken param
+background.js's tabs.onUpdated listener detects the brand-site URL + authToken param
   ↓
 background.js calls signInWithCustomToken(authToken)
   ↓
@@ -64,20 +64,18 @@ All contexts sign out
 
 ## Required setup
 
-1. **Add `authDomain`** to your Firebase config in `config/omega.json5`:
+1. **Set `brand.url`** in `config/omega.json5` — the sign-in round trip lands on the
+   brand website's `/token` page, and background.js watches for that host:
    ```jsonc
    {
-     cloud: {
-       provider: 'firebase',
-       config: {
-         apiKey: '...',
-         authDomain: 'tabblar.com',   // ← required for /token redirect flow
-         projectId: 'tabblar',
-         // ...
-       },
-     }
+     brand: {
+       id: 'tabblar',
+       url: 'https://tabblar.com',   // ← required for the /token redirect flow
+     },
    }
    ```
+   (`cloud.config.authDomain` stays the Firebase-reported `<projectId>.firebaseapp.com`
+   value — only that host serves the OAuth handler; it plays no role in this flow.)
 2. **Add `tabs` permission** to `src/manifest.json` — needed for `chrome.tabs.onUpdated` listener that detects the `/token` redirect.
 
 ## Functions in `lib/auth-helpers.js`
@@ -139,7 +137,7 @@ These bindings live in Web Manager, not @omega.js/extension — but they're how 
 
 2. **Firebase in service workers requires static imports.** Dynamic `import()` fails with webpack chunking inside SWs. @omega.js/extension's background.js uses static `import { initializeApp } from 'firebase/app'`.
 
-3. **Config path is fixed.** `authDomain` comes from omega.json5's `cloud.config.authDomain` (bridged into the packaged snapshot's `firebase.app.config` via the `OMEGA_BUILD_JSON` webpack DefinePlugin replacement).
+3. **Config path is fixed.** The watched host comes from omega.json5's `brand.url` (bridged into the packaged snapshot via the `OMEGA_BUILD_JSON` webpack DefinePlugin replacement).
 
 4. **Tabs permission required.** Without it, background.js can't watch for `/token?authToken=…` redirects.
 

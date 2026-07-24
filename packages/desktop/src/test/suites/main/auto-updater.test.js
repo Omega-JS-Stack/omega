@@ -123,7 +123,7 @@ module.exports = {
       },
     },
     {
-      name: 'subsequent download does NOT reset downloadedAt — first download wins',
+      name: 'subsequent download keeps downloadedAt but tracks the NEW version (first timer wins, clear-on-apply matches)',
       run: async (ctx) => {
         const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: 'available' });
         try {
@@ -135,8 +135,12 @@ module.exports = {
           ctx.manager.autoUpdater._recordDownloadedAt('999.0.0');
 
           const stored = ctx.manager.storage.get(`${STORAGE_KEY}.pendingUpdate`);
-          ctx.expect(stored.version).toBe('888.0.0');           // unchanged
-          ctx.expect(stored.downloadedAt).toBe(oldTs);          // unchanged
+          // Timer unchanged (first-download-wins) — but the version must track
+          // the newest download: after installing 999.0.0, the clear-on-apply
+          // check (pending.version === getVersion()) has to match, or the stale
+          // flag would force-install every future download instantly forever.
+          ctx.expect(stored.downloadedAt).toBe(oldTs);
+          ctx.expect(stored.version).toBe('999.0.0');
         } finally { await restore(); }
       },
     },
@@ -161,6 +165,44 @@ module.exports = {
 
           ctx.manager.autoUpdater.installNow = origInstall;
         } finally { await restore(); }
+      },
+    },
+    {
+      // wave-5 F3: at reconcile the gate provably CANNOT install (state is
+      // 'idle' and installNow requires 'downloaded') — the install must fire
+      // when the startup re-download lands, via the update-downloaded handler.
+      name: '30-day gate: carried-over stale pending installs when update-downloaded fires (real installNow state guard)',
+      run: async (ctx) => {
+        const restore = await reinit(ctx, { OMEGA_DEV_UPDATE: null });
+        const updater = ctx.manager.autoUpdater;
+        let quitCalled = false;
+        let origQuit;
+        try {
+          // Plant a >30-day pending update, then reconcile like a fresh boot.
+          const oldTs = Date.now() - (31 * 24 * 60 * 60 * 1000);
+          ctx.manager.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version: '777.0.0', downloadedAt: oldTs });
+          updater._options.maxAgeMs = 30 * 24 * 60 * 60 * 1000;
+          updater._reconcilePendingUpdate();
+
+          // Reconcile alone cannot install — the REAL installNow refuses on 'idle'.
+          ctx.expect(updater._state.code).toBe('idle');
+          ctx.expect(await updater.installNow()).toBe(false);
+
+          // The startup re-download lands: the wired update-downloaded handler
+          // must enforce the gate against the restored ORIGINAL downloadedAt.
+          origQuit = updater._library.quitAndInstall;
+          updater._library.quitAndInstall = () => { quitCalled = true; };
+          updater._library.emit('update-downloaded', { version: '777.0.0' });
+          ctx.expect(updater._state.code).toBe('downloaded');
+          ctx.expect(updater._state.downloadedAt).toBe(oldTs); // first-download-wins
+          ctx.expect(quitCalled).toBe(true);
+        } finally {
+          // The spy sat on the shared electron-updater singleton; the install
+          // path also flipped the manager's quit latch — undo both.
+          if (origQuit) updater._library.quitAndInstall = origQuit;
+          ctx.manager._allowQuit = false;
+          await restore();
+        }
       },
     },
     {

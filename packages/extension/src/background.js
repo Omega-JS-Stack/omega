@@ -181,8 +181,8 @@ class Manager {
 
       // Fetch a fresh custom token from the /user/token route via the shared
       // request layer (uid defaults server-side to the authenticated caller).
-      // getApiUrl() throws when cloud.config.authDomain is missing — a
-      // misconfigured brand should fail loudly, never call a foreign host.
+      // getApiUrl() throws when brand.url is missing — a misconfigured
+      // brand should fail loudly, never call a foreign host.
       const request = createRequest({
         getApiUrl: () => this.getApiUrl(),
         getIdToken: (force) => bgUser.getIdToken(force),
@@ -317,23 +317,21 @@ class Manager {
     console.log('[AUTH] this.config:', this.config);
     console.log('[AUTH] OMEGA_BUILD_JSON:', serviceWorker.OMEGA_BUILD_JSON);
 
-    // Get auth domain from config (canonical omega.json5 shape: cloud.config)
-    const authDomain = this.config?.cloud?.config?.authDomain;
+    // The sign-in round trip lands on the BRAND site (/token redirects with
+    // ?authToken=…), so match the brand.url host — never authDomain, which
+    // OAuth pins to <projectId>.firebaseapp.com.
+    const brandUrl = this.config?.brand?.url;
 
-    // Log config for debugging
-    this.logger.log('[AUTH] Config paths:', {
-      cloud_path: this.config?.cloud?.config?.authDomain,
-      resolved: authDomain,
-    });
-
-    // Skip if no auth domain configured
-    if (!authDomain) {
-      this.logger.log('[AUTH] No authDomain configured, skipping auth token listener');
+    // Skip if no brand url configured
+    if (!brandUrl) {
+      this.logger.log('[AUTH] No brand.url configured, skipping auth token listener');
       return;
     }
 
+    const brandHost = new URL(brandUrl).hostname;
+
     // Log
-    this.logger.log(`[AUTH] Setting up auth token listener for domain: ${authDomain}`);
+    this.logger.log(`[AUTH] Setting up auth token listener for domain: ${brandHost}`);
 
     // Listen for tab URL changes
     this.extension.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -351,10 +349,10 @@ class Manager {
       }
 
       // Log every tab update for auth domain matching
-      this.logger.log(`[AUTH] Tab updated: ${tabUrl.hostname} (looking for: ${authDomain})`);
+      this.logger.log(`[AUTH] Tab updated: ${tabUrl.hostname} (looking for: ${brandHost})`);
 
-      // Check if this is our auth domain
-      if (tabUrl.hostname !== authDomain) {
+      // Check if this is our brand site
+      if (tabUrl.hostname !== brandHost) {
         return;
       }
 

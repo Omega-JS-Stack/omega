@@ -93,10 +93,12 @@ module.exports = {
       },
     },
     {
-      name: 'getApiUrl: prod → api.<authDomain>',
+      // wave-5 F9: API base rides brand.url, never authDomain (which OAuth
+      // pins to firebaseapp.com — no api.* subdomain can exist there).
+      name: 'getApiUrl: prod → api.<brand.url host>',
       run: (ctx) => {
         ctx.expect(window.__emTestManager.getApiUrl('production'))
-          .toBe('https://api.demo-app.firebaseapp.com');
+          .toBe('https://api.example.com');
       },
     },
     {

@@ -1,6 +1,6 @@
 # Cross-Browser API Wrapper (`lib/extension.js`)
 
-A singleton that normalizes the `chrome.*` / `browser.*` / `window.*` extension API surface so consumers write their extension once and it works on Chrome, Firefox, Edge, and other Chromium-based browsers.
+A singleton that normalizes the `chrome.*` / `browser.*` extension API surface so consumers write their extension once and it works on Chrome, Firefox, Edge, and other Chromium-based browsers.
 
 ## Import
 
@@ -17,11 +17,10 @@ const { extension } = Manager;     // same singleton
 
 For each known extension API, the wrapper tries in order:
 1. `chrome.<api>` (Chrome, Edge, Opera, Brave)
-2. `window.<api>` (some content-script contexts where chrome is exposed under window)
-3. `browser.<api>` (Firefox)
-4. `browser.extension.<api>` (legacy fallback)
+2. `browser.<api>` (Firefox)
+3. `browser.extension.<api>` (legacy Firefox fallback)
 
-The first one that resolves becomes the singleton's `<api>` property. Each lookup is wrapped in try/catch so unknown globals don't throw at module-load time — that's what makes the wrapper safe to import from Node contexts too (where none of these globals exist).
+The first one that resolves becomes the singleton's `<api>` property. `window` is deliberately never probed: no chrome extension API lives on it, and DOM globals of the same name (`window.history` in any DOM context) would shadow the real API. Each lookup is wrapped in try/catch so unknown globals don't throw at module-load time — that's what makes the wrapper safe to import from Node contexts too (where none of these globals exist).
 
 ## Supported APIs
 

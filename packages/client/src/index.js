@@ -135,7 +135,7 @@ class Manager {
       // bridge contract shape).
       // Initialize Firebase only when the resolved config can actually boot the
       // SDK — apiKey is mandatory (init without one crashes with auth/invalid-api-key).
-      // Configs carrying only projectId/authDomain still resolve for URL derivation.
+      // Configs carrying only projectId still resolve for getFunctionsUrl derivation.
       if (this._resolveFirebaseConfig()?.apiKey) {
         await this._initializeFirebase();
       } else {
@@ -597,7 +597,7 @@ class Manager {
       return `http://localhost:${this._devPorts().functions}/${projectId}/us-central1`;
     }
 
-    return 'https://us-central1-' + projectId + '.cloudfunctions.net';
+    return `https://us-central1-${projectId}.cloudfunctions.net`;
   }
 
   getApiUrl(environment, url) {
@@ -625,16 +625,17 @@ class Manager {
       return 'https://localhost:5002';
     }
 
-    const apiDomain = this._resolveFirebaseConfig()?.authDomain; // Has to be this since some projects like Clockii use ITW Universal Auth
-    // const apiDomain = this.config.brand.url;
-    const baseUrl = url || (apiDomain ? `https://${apiDomain}` : window.location.origin);
-    const urlObj = new URL(baseUrl);
+    // The API rides the BRAND domain (api.<brand host>). Never derive from
+    // authDomain: OAuth forces authDomain to <projectId>.firebaseapp.com (site
+    // domains don't serve /__/auth/handler — live find 2026-07-19), and no
+    // api.* subdomain can exist under firebaseapp.com.
+    const brandUrl = this.config.brand?.url; // schema enforces an http(s) URL
+    const baseUrl = url || brandUrl || window.location.origin;
 
-    // Prepend 'api.' subdomain (universal-auth.itwcreativeworks.com -> api.universal-auth.itwcreativeworks.com)
-    urlObj.hostname = `api.${urlObj.hostname}`;
-
-    // Strip trailing slash
-    return urlObj.toString().replace(/\/$/, '');
+    // Prepend 'api.' subdomain, hostname-only (playground.omegajs.dev ->
+    // api.playground.omegajs.dev) — any path/port on brand.url is dropped,
+    // exactly like the desktop/extension url-helpers mirrors.
+    return `https://api.${new URL(baseUrl).hostname}`;
   }
 
   isValidRedirectUrl(url) {
@@ -651,7 +652,7 @@ class Manager {
       }
 
       return returnUrlObject.host === currentUrlObject.host
-        || returnUrlObject.protocol === this.config.brand?.id + ':'
+        || returnUrlObject.protocol === `${this.config.brand?.id}:`
         || (this.config.validRedirectHosts || []).includes(returnUrlObject.host);
     } catch (e) {
       return false;
@@ -805,7 +806,7 @@ const safeEvaluate = (str) => {
 
   try {
     // Use Function constructor instead of eval for safer evaluation
-    return new Function('return ' + str)();
+    return new Function(`return ${str}`)();
   } catch (e) {
     console.warn('Failed to evaluate expression:', str, e);
     return str;

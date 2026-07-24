@@ -239,7 +239,7 @@ Manager.verts();          // Verts (provider ladder + in-house fallback units)
 Manager.isDevelopment();                        // Check if in development mode
 Manager.getFunctionsUrl();                      // Get Firebase Functions URL
 Manager.getFunctionsUrl('development');         // Force development URL
-Manager.getApiUrl();                            // Get API URL (derived from firebase authDomain)
+Manager.getApiUrl();                            // Get API URL (api.<brand.url host>)
 Manager.isValidRedirectUrl('https://...');      // Validate redirect URL
 
 // Firebase instances (after initialization)

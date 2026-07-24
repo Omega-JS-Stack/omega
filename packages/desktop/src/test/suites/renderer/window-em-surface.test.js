@@ -26,6 +26,16 @@ module.exports = {
       },
     },
     {
+      // wave-5 F4: ipc.on used to return ipcRenderer (stripped to a useless
+      // object across the contextBridge) — docs/ipc.md promises an unsubscribe fn.
+      name: 'ipc.on returns an unsubscribe function (docs contract)',
+      run: (ctx) => {
+        const off = window.desktop.ipc.on('em-test:noop-channel', () => {});
+        ctx.expect(typeof off).toBe('function');
+        off(); // must not throw
+      },
+    },
+    {
       name: 'window.desktop.storage has get / set / delete / has / clear',
       run: (ctx) => {
         ctx.expect(typeof window.desktop.storage.get).toBe('function');

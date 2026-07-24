@@ -516,8 +516,10 @@ const autoUpdater = {
     autoUpdater._state.downloadedAt = pending.downloadedAt;
     autoUpdater._state.version      = pending.version;
     logger.log(`Pending update v${pending.version} carried from prior session (downloadedAt=${new Date(pending.downloadedAt).toISOString()})`);
-    // Check the gate immediately at startup.
-    autoUpdater._enforceMaxAgeGate();
+    // The gate can't install HERE — electron-updater has no download this
+    // session (installNow() requires state 'downloaded'). The startup check
+    // (startupDelayMs) re-downloads; update-downloaded then enforces the gate
+    // against the restored original downloadedAt.
   },
 
   _recordDownloadedAt(version) {
@@ -525,9 +527,15 @@ const autoUpdater = {
     if (!m || !m.storage) return;
 
     const existing = m.storage.get(`${STORAGE_KEY}.pendingUpdate`);
-    // FIRST download wins — don't reset the timer if an existing pending entry is present.
+    // FIRST download wins for the TIMER — but the stored version must track the
+    // NEWEST download, or the clear-on-apply check (version === getVersion())
+    // never matches after the install and the stale flag force-installs every
+    // future download instantly, forever.
     if (existing && existing.downloadedAt) {
       logger.log(`pendingUpdate already recorded (v${existing.version} @ ${new Date(existing.downloadedAt).toISOString()}) — keeping existing timestamp.`);
+      if (existing.version !== version) {
+        m.storage.set(`${STORAGE_KEY}.pendingUpdate`, { version, downloadedAt: existing.downloadedAt });
+      }
       autoUpdater._state.downloadedAt = existing.downloadedAt;
       return;
     }
@@ -573,6 +581,11 @@ const autoUpdater = {
     lib.on('update-downloaded', (info) => {
       autoUpdater._recordDownloadedAt(info?.version);
       autoUpdater._setState({ code: 'downloaded', version: info?.version, percent: 100, error: null });
+      // A pending update carried from a prior session keeps its ORIGINAL
+      // downloadedAt (first-download-wins), so the 30-day gate can trip the
+      // moment the startup re-download lands — installNow() only works from
+      // the 'downloaded' state, which exists from this line on.
+      autoUpdater._enforceMaxAgeGate();
     });
     lib.on('error', (e) => {
       const err = (e instanceof Error) ? e : new Error(String(e || 'Unknown auto-update error'));

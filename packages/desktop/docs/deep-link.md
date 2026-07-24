@@ -131,6 +131,10 @@ tray.item({
 });
 ```
 
+## Boot queueing
+
+Every dispatch is held until `manager.initialize()` completes (main.js calls `deepLink.markManagerReady()` as its last step). A cold-start `auth/token` link — the OS launching the app from the sign-in round trip — therefore never fires before client-bridge has Firebase up; it queues and drains the moment the manager is ready. Warm-start dispatches on a running app pass straight through.
+
 ## Single-instance behavior
 
 @omega.js/desktop acquires the OS-level single-instance lock during `protocol.initialize()` (boot step 5, before deep-link inits). If another copy of the app is already running:

@@ -2,6 +2,7 @@
 import omega from '@omega.js/client';
 import extension from './lib/extension.js';
 import LoggerLite from './lib/logger-lite.js';
+import Messaging from './lib/messaging.js';
 import { syncWithBackground, setupAuthBroadcastListener, setupSignOutListener, setupAuthEventListeners, openAuthPage as openAuthPageHelper } from './lib/auth-helpers.js';
 import { attachTo as attachModeHelpers } from './utils/mode-helpers.js';
 import { wireAds } from './lib/verts.js';
@@ -28,7 +29,7 @@ class Manager {
 
     // Set properties
     this.extension = extension;
-    this.messenger = null;
+    this.messenger = new Messaging({ sender: 'page' });
     this.logger = new LoggerLite('page');
 
     // Initialize

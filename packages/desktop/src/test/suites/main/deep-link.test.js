@@ -244,6 +244,31 @@ module.exports = {
       },
     },
     {
+      // wave-5 F1: a cold-start auth/token used to dispatch via setImmediate,
+      // long before client-bridge booted Firebase — the token was dropped.
+      name: 'dispatches before markManagerReady() are queued and drained on it',
+      run: (ctx) => {
+        const dl = ctx.manager.deepLink;
+        const calls = [];
+        const off = dl.on('queued/route', (c) => calls.push(c.query.v));
+        const origReady = dl._managerReady;
+        try {
+          dl._managerReady = false;
+          dl._handle('myapp://queued/route?v=early', 'cold-start');
+          ctx.expect(calls).toEqual([]);            // held, not dispatched
+          ctx.expect(dl._bootQueue.length).toBe(1);
+
+          dl.markManagerReady();
+          ctx.expect(calls).toEqual(['early']);     // drained in order
+          ctx.expect(dl._bootQueue.length).toBe(0);
+          ctx.expect(dl._managerReady).toBe(true);
+        } finally {
+          dl._managerReady = origReady;
+          off();
+        }
+      },
+    },
+    {
       name: 'handler errors do not stop subsequent handlers',
       run: (ctx) => {
         const calls = [];

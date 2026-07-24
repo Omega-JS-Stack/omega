@@ -119,6 +119,36 @@ module.exports = {
       },
     },
     {
+      // wave-5 F5: a pre-init setUserId stored _pendingUid that initialize()
+      // never read — the uid was silently discarded.
+      name: 'setUserId before initialize is applied at init (pending uid)',
+      run: async (ctx) => {
+        // Hand-rolled (not reinit()): the helper's leading shutdown() would
+        // wipe the very _pendingUid this test plants.
+        const a = ctx.manager.analytics;
+        a.shutdown(); // _namespace null — the pre-init state
+
+        a.setUserId('early-uid-before-boot');
+        ctx.expect(a._pendingUid).toBe('early-uid-before-boot');
+
+        const savedSecret = process.env.GOOGLE_ANALYTICS_SECRET;
+        process.env.GOOGLE_ANALYTICS_SECRET = 'fake-secret';
+        const cfgOrig = ctx.manager.config.analytics;
+        ctx.manager.config.analytics = { enabled: true, providers: { google: { id: 'G-TESTID12' } } };
+        try {
+          a.initialize(ctx.manager);
+          ctx.expect(a._pendingUid).toBe(null);
+          ctx.expect(a._userId).toBe(uuidv5('early-uid-before-boot', a._namespace));
+        } finally {
+          a.shutdown();
+          if (savedSecret == null) delete process.env.GOOGLE_ANALYTICS_SECRET;
+          else process.env.GOOGLE_ANALYTICS_SECRET = savedSecret;
+          ctx.manager.config.analytics = cfgOrig;
+          a.initialize(ctx.manager);
+        }
+      },
+    },
+    {
       name: 'setUserId(null) clears user_id',
       run: async (ctx) => {
         const restore = await reinit(ctx, { GOOGLE_ANALYTICS_SECRET: 'fake-secret' }, {

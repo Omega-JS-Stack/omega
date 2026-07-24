@@ -19,8 +19,8 @@ is continuously dogfooded.
   (`.env`, `service-account.json`, `.firebaserc`, the root-proxy
   `package.json`) are deliberately committed here (re-included in
   `.gitignore`'s Custom Values section).
-- **Frameworks link to the monorepo.** `apps/backend/functions` depends on
-  `@omega.js/backend` via `file:../../../../../packages/backend`, so the sandbox
+- **Frameworks link to the monorepo.** `apps/backend` depends on
+  `@omega.js/backend` via `file:../../../../packages/backend`, so the sandbox
   always exercises HEAD.
 
 ## Apps

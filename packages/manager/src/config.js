@@ -168,16 +168,12 @@ const DEFAULTS = {
     sitemapPaths: ['/sitemap.xml'], // submitted as https://{domain}{path}
   },
 
-  // AdSense. The Management API v2 is read-only — sites can't be added or
-  // configured programmatically — so the service verifies the domain is
-  // present and reports its approval state; adding is a console deep-link.
-  // accountId is required config (omega-manager defaulted it to the company's
-  // shared pub- account; put it in company config for that). Interactive
-  // runs offer the account selection flow. Auth: the same GOOGLE creds
-  // (adsense.readonly scope, own token cache).
-  adsense: {
-    accountId: null, // 'pub-XXXXXXXXXXXXXXXX' — the service skips until set (the selection flow lands it)
-  },
+  // AdSense: deliberately NO defaults entry (wave-5 F10). The service gates on
+  // the section's PRESENCE in the merged config — a seeded `adsense: {}` here
+  // would defeat that gate (defaults merge under every brand), and the
+  // account-selection flow would land a shared account into brands that never
+  // opted in. A brand (or the company layer) authors `adsense: {}` to opt in;
+  // accountId comes from config or the interactive selection flow.
 
   // Marketing. campaigns = the email-marketing provider (the sendgrid
   // service); newsletter = the newsletter provider (the newsletter service (Beehiiv)).

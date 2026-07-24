@@ -37,5 +37,45 @@ module.exports = {
         ctx.expect(true).toBe(true);
       },
     },
+    {
+      // wave-5 F8: the window[api] probe ran AFTER the chrome probe and won —
+      // in any DOM context window.history (the page's History object) shadowed
+      // chrome.history even when the extension held the permission.
+      name: 'chrome API wins over a window global of the same name (history shadow)',
+      run: (ctx) => {
+        const modPath = require.resolve(path.join(__dirname, '..', '..', '..', 'lib', 'extension.js'));
+        const chromeHistory = { search: () => [] };
+        global.chrome = { history: chromeHistory };
+        global.window = { history: { back: () => {} } }; // DOM History imposter
+        delete require.cache[modPath];
+        try {
+          const fresh = require(modPath);
+          ctx.expect(fresh.history).toBe(chromeHistory);
+        } finally {
+          delete global.chrome;
+          delete global.window;
+          delete require.cache[modPath]; // next require re-resolves in a clean Node context
+        }
+      },
+    },
+    {
+      // wave-5 F8: `self.api = browser.extension[api]` (literal `.api` typo) —
+      // the browser.extension fallback never landed on the named slot.
+      name: 'browser.extension fallback lands on the named API slot (typo pin)',
+      run: (ctx) => {
+        const modPath = require.resolve(path.join(__dirname, '..', '..', '..', 'lib', 'extension.js'));
+        const extTabs = { query: () => [] };
+        global.browser = { extension: { tabs: extTabs } };
+        delete require.cache[modPath];
+        try {
+          const fresh = require(modPath);
+          ctx.expect(fresh.tabs).toBe(extTabs);
+          ctx.expect(fresh.api).toBeUndefined(); // the junk `.api` property must not exist
+        } finally {
+          delete global.browser;
+          delete require.cache[modPath];
+        }
+      },
+    },
   ],
 };

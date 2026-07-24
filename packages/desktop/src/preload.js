@@ -29,8 +29,14 @@ Manager.prototype.initialize = async function () {
   contextBridge.exposeInMainWorld('desktop', {
     ipc: {
       invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
-      on:     (channel, handler) => ipcRenderer.on(channel, (_, payload) => handler(payload)),
-      send:   (channel, payload) => ipcRenderer.send(channel, payload),
+      // Returns an unsubscribe fn (docs/ipc.md contract — same shape as the
+      // sibling onChange subscriptions below).
+      on: (channel, handler) => {
+        const wrapped = (_, payload) => handler(payload);
+        ipcRenderer.on(channel, wrapped);
+        return () => ipcRenderer.removeListener(channel, wrapped);
+      },
+      send: (channel, payload) => ipcRenderer.send(channel, payload),
     },
     storage: {
       get:    (key, def) => ipcRenderer.invoke('desktop:storage:get',    { key, def }),
