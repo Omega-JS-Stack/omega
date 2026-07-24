@@ -21,11 +21,4 @@ logs/
 # Per-run port-bumped emulator config (N7 auto-allocation)
 firebase.resolved.json
 
-# Bake-off generated corpus (deterministic — regenerate via `npm run generate` in spikes/bakeoff-shared)
-spikes/bakeoff-shared/corpus/
-
-# Bake-off candidate build output
-spikes/bakeoff-eleventy/_site/
-spikes/bakeoff-astro/_site/
-spikes/bakeoff-astro/.astro/
 _attic/

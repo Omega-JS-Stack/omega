@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-24] cp269 SHIPPED (last wave done); next Ian input: rekey naming + spikes deletion + legacy-dep checkpoint (plans/wave6-review-findings.md), then triage (33 inbox)
+- [fable 2026-07-24] cp270 SHIPPED; remaining Ian input: rekey naming ruling (plans/wave6-review-findings.md — D3/D4 ride it), then triage (35 inbox)
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -56,18 +56,16 @@
 
 ## Parked
 - Publish-time checklist (nothing gated; Ian 2026-07-22 "stop reminding"): next backend deploy ships B3 + regenerate omega-brand firestore.rules (pre-B7); live verify sweep after
-- Desktop remote-scripts lane: code-sign the payload vs ship default-off (system-review H1) — cp269's TLS gate closed only the transport slice; Ian's call
-- Next push resolves the stale dependabot slice (deleted manifests; origin/main sits at cp121c) — push stays Ian-gated
 - Dev-mode `source: 'company'` resolves the LOCAL stack, ignoring company.url (getApiUrl dev branch) — defensible; Ian ratifies or we add a dev override (cp253 finding)
 - AdSense slot schema drift: schema documents flat '-slot' keys, client reads spec-shape `slots.*` — its own pass at the GO adsense gate (cp253 finding)
 - devkit e2e-harness ~1-in-15 flake (mechanism uncaptured; two-pass runner + retry saves failing output to .temp/) → CHANGELOG 124
-- 61 dependabot alerts on github.com/itw-creative-works/omega → wave-6 security review triages
 - web ships @anthropic-ai/claude-agent-sdk ^0.2.138 as runtime dep (backend ^0.3.153) — diet later (wave-1 finding)
 - prepare-package swallows after-hook (vendor) failures as non-blocking — release-check is the net; upstream fix would be in the external package
 - blogify/optimize NOT ported (cp140 verdict) — revisit post-launch if Ian wants
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp270 2026-07-24 Ian's wave-6 calls: spikes→_attic, mailchimp/npm-api dropped (devkit npm-registry), remote-scripts OPT-IN (battery EXIT 0) → CHANGELOG
 - cp269 2026-07-24 wave-6 remediation: CLI help/unknown contract, TLS gate on desktop remote lanes, alias+docs parity, dependabot triage (battery EXIT 0) → CHANGELOG
 - cp268 2026-07-23 authDomain=brand host + self-hosted OAuth handler, @dev-only strip, advertising rekey, CLAUDE.md→AGENTS.md (battery EXIT 0) → CHANGELOG
 - cp267 2026-07-23 wave-5 remediation: all 15 desktop/extension/brand defects closed incl. authDomain contract (battery EXIT 0) → CHANGELOG
@@ -77,4 +75,3 @@
 - cp263 2026-07-22 assistant → RouteContext/ctx: module split, one respond door, report() + auto-Sentry rule (battery EXIT 0) → CHANGELOG
 - cp262 2026-07-22 legacy-name sweep: wm/em/bem/bxm/ujm identifiers → omega/current names on every runtime surface (battery EXIT 0) → CHANGELOG
 - cp261 2026-07-22 omega.request() harmonized fetch layer + usage/device bindings split + desktop/extension callers (battery EXIT 0) → CHANGELOG
-- cp260 2026-07-22 legacy command lane retired + token callers fixed + test:auth e2e lane + de-ITW extension fallbacks (battery EXIT 0) → CHANGELOG

@@ -1,7 +1,7 @@
 const BaseCommand = require('./base-command');
 const chalk = require('chalk').default;
 const local = require('@omega.js/devkit/local');
-const Npm = require('npm-api');
+const { getPackageManifest } = require('@omega.js/devkit/npm-registry');
 const jetpack = require('fs-jetpack');
 const wonderfulVersion = require('wonderful-version');
 const { safeInstall } = require('../utils/safe-install');
@@ -105,18 +105,7 @@ class InstallCommand extends BaseCommand {
   }
 
   async getPackageInfo(packageName) {
-    const npm = new Npm();
-
-    return new Promise((resolve) => {
-      npm.repo(packageName)
-        .package()
-        .then((pkg) => {
-          resolve(pkg);
-        })
-        .catch(() => {
-          resolve(null);
-        });
-    });
+    return getPackageManifest(packageName);
   }
 
   async installPkg(name, version, type) {

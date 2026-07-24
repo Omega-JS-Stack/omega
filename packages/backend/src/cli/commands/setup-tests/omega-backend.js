@@ -2,7 +2,7 @@ const BaseTest = require('./base-test');
 const chalk = require('chalk').default;
 const wonderfulVersion = require('wonderful-version');
 const powertools = require('node-powertools');
-const Npm = require('npm-api');
+const { getLatestVersion } = require('@omega.js/devkit/npm-registry');
 const helpers = require('./helpers');
 
 class OmegaBackendTest extends BaseTest {
@@ -35,17 +35,7 @@ class OmegaBackendTest extends BaseTest {
   }
 
   async getPkgVersion(packageName) {
-    const npm = new Npm();
-
-    return new Promise((resolve, reject) => {
-      npm.repo(packageName)
-        .package()
-        .then(function(pkg) {
-          resolve(pkg.version);
-        }, function(err) {
-          resolve('0.0.0');
-        });
-    });
+    return (await getLatestVersion(packageName)) || '0.0.0';
   }
 }
 

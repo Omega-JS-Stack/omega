@@ -6,7 +6,7 @@ const jetpack = require('fs-jetpack');
 const version = require('wonderful-version');
 const { execute, force } = require('node-powertools');
 const { safeInstall } = require('../utils/safe-install');
-const NPM = require('npm-api');
+const { getLatestVersion } = require('@omega.js/devkit/npm-registry');
 
 // Load packages
 const package = Manager.getPackage('main');
@@ -149,7 +149,6 @@ async function logCWD() {
 }
 
 async function updateManager() {
-  const npm = new NPM();
   // Either section counts (friction #12) — the framework is a build-time dep,
   // but web/backend accept dependencies too; one rule everywhere.
   const installedVersion = project.devDependencies[package.name] || project.dependencies[package.name];
@@ -158,9 +157,7 @@ async function updateManager() {
     throw new Error(`No installed version of ${package.name} found in dependencies or devDependencies.`);
   }
 
-  const latestVersion = await npm.repo(package.name)
-    .package()
-    .then((pkg) => pkg.version, () => '0.0.0');
+  const latestVersion = (await getLatestVersion(package.name)) || '0.0.0';
 
   const isUpToDate = version.is(installedVersion, '>=', latestVersion);
   const levelDifference = version.levelDifference(installedVersion, latestVersion);
@@ -236,12 +233,12 @@ function ensureNvmrc(requiredMajor) {
 async function ensurePeerDependencies() {
   const requiredPeerDependencies = package.peerDependencies || {};
 
-  for (let [dependency, ver] of Object.entries(requiredPeerDependencies)) {
+  for (const [dependency, rawVer] of Object.entries(requiredPeerDependencies)) {
     const projectDependencyVersion = version.clean(project?.dependencies?.[dependency] || project?.devDependencies?.[dependency]);
     const location = DEPENDENCY_MAP[dependency] === 'dev' ? '--save-dev' : '';
-    const isUpToDate = version.is(projectDependencyVersion, '>=', ver);
+    const isUpToDate = version.is(projectDependencyVersion, '>=', rawVer);
 
-    ver = version.clean(ver);
+    const ver = version.clean(rawVer);
 
     logVersionCheck(dependency, projectDependencyVersion, ver, isUpToDate);
 

@@ -51,6 +51,10 @@ https://www.relume.ai/?r=0
 ## From cp269 review (fable 2026-07-24)
 * backend HELP_TEXT is hand-maintained ("keep in sync with the process() chain") while the four router frameworks generate help from the live dispatch table — a tiny generator over a backend command table would remove the drift risk the review already caught once (the install-spelling mismatch).
 
+## From cp270 review (fable 2026-07-24)
+* `remoteScripts` is not declared in the @omega.js/config schema (pre-existing; the opt-in flip makes it visible since brands now AUTHOR the key) — declare it in TARGET_SCHEMAS.desktop, natural rider on the rekey batch's schema work.
+* packages/desktop/CHANGELOG.md carries no per-package entry for the remote-scripts opt-in flip (checkpoint era logs at the ROOT changelog) — needs a package-level entry before the first publish.
+
 ## DE-BRAND config + more
 * we need to DE-brand the config keys. for example
   * chatsy

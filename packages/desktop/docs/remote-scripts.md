@@ -2,6 +2,8 @@
 
 Emergency remote code execution for when the normal update pipeline is broken. Fetches a single JS file from the brand's website and executes it in the main process.
 
+**Off by default.** Because this lane executes fetched code, a brand must opt in explicitly with `config.remoteScripts.enabled = true`. The URL must also be `https:` (loopback `http:` allowed for dev) — non-TLS URLs disable the lane.
+
 ## Why it exists
 
 Auto-updater failures, storage corruption, stuck states — any situation where the app is deployed and you need to push a fix but can't ship a new version through the normal pipeline. Remote scripts let you patch running apps from a single JS file on your website.
@@ -121,13 +123,13 @@ Optional `remoteScripts` block in `config/omega.json5`:
 ```json5
 {
   "remoteScripts": {
-    "enabled": true,          // default: true. Set false to disable entirely.
-    "url": "https://..."      // override the auto-derived URL
+    "enabled": true,          // default: false. The lane runs ONLY when set true.
+    "url": "https://..."      // override the auto-derived URL (https required; loopback http allowed)
   }
 }
 ```
 
-If `enabled` is omitted or `true`, remote-scripts initializes automatically. If `brand.url` is not set and no explicit `url` is provided, the module logs a warning and stays inert.
+If `enabled` is omitted or `false`, remote-scripts stays inert (a log line notes the opt-in flag). If `brand.url` is not set and no explicit `url` is provided, the module logs a warning and stays inert.
 
 ## Boot sequence position
 
@@ -138,3 +140,5 @@ Step 12c — after `remote-config` (12b), before `analytics` (12d). Non-blocking
 Remote scripts are **first-party trusted code** — same trust level as the app bundle itself. The URL resolves to the brand's own domain (derived from `brand.url`). In production, `getWebsiteUrl()` returns an `https://` URL. The code runs in the main process with full Node.js access.
 
 This is intentional: the escape-hatch use case requires the same privilege level as a shipped update. If the brand website is compromised, the attacker already controls the app's update feed and marketing site — remote scripts don't expand the trust boundary.
+
+Two guards bound the lane anyway: it is **opt-in** (`enabled: true` required — apps that never use the escape hatch never carry a live remote-execution path), and delivery is **TLS-gated** (`https:` only; loopback `http:` for dev) so the body can't be swapped in transit.

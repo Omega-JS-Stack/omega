@@ -1,6 +1,10 @@
 // Remote emergency scripts — fetches a single JS file from the brand's website
 // so developers can push hotfixes when the normal update pipeline is broken.
 //
+// OFF BY DEFAULT. This lane executes fetched code in the main process, so a
+// brand must opt in explicitly with config.remoteScripts.enabled = true
+// (Ian 2026-07-24 — resolves the system-review H1 open call).
+//
 // Source URL:     `${brand.url}/data/scripts/main.js` (override via config.remoteScripts.url)
 // Cadence:        matches remote-config (auto-updater feedCheckIntervalMs, ~1h)
 // Fetch timeout:  60s
@@ -29,7 +33,7 @@ const remoteScripts = {
   _initialized: false,
   _manager:     null,
   _url:         null,
-  _enabled:     true,
+  _enabled:     false,
   _intervalId:  null,
 
   initialize(manager) {
@@ -38,10 +42,10 @@ const remoteScripts = {
     remoteScripts._manager = manager;
 
     const cfg = manager.config.remoteScripts || {};
-    remoteScripts._enabled = cfg.enabled !== false;
+    remoteScripts._enabled = cfg.enabled === true;
 
     if (!remoteScripts._enabled) {
-      logger.log('remote-scripts disabled via config.remoteScripts.enabled=false');
+      logger.log('remote-scripts off (default) — set config.remoteScripts.enabled=true to opt in.');
       return;
     }
 
@@ -145,7 +149,7 @@ const remoteScripts = {
     remoteScripts._initialized = false;
     remoteScripts._manager     = null;
     remoteScripts._url         = null;
-    remoteScripts._enabled     = true;
+    remoteScripts._enabled     = false;
   },
 };
 

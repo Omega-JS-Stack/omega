@@ -20,10 +20,45 @@ module.exports = {
       },
     },
     {
-      name: 'URL derived from brand.url + /data/scripts/main.js',
+      name: 'off by default: no config.remoteScripts → lane disabled (no URL, no interval)',
       run: (ctx) => {
-        const u = ctx.manager.remoteScripts._url;
-        ctx.expect(u === null || u.endsWith('/data/scripts/main.js')).toBe(true);
+        ctx.manager.remoteScripts.shutdown();
+        const orig = ctx.manager.config.remoteScripts;
+        delete ctx.manager.config.remoteScripts;
+        try {
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+          ctx.expect(ctx.manager.remoteScripts._enabled).toBe(false);
+          ctx.expect(ctx.manager.remoteScripts._url).toBe(null);
+          ctx.expect(ctx.manager.remoteScripts._intervalId).toBe(null);
+        } finally {
+          ctx.manager.remoteScripts.shutdown();
+          ctx.manager.config.remoteScripts = orig;
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+        }
+      },
+    },
+    {
+      name: 'opted in without explicit url: URL derived from brand.url + /data/scripts/main.js',
+      run: (ctx) => {
+        ctx.manager.remoteScripts.shutdown();
+        const orig = ctx.manager.config.remoteScripts;
+        const origBrandUrl = ctx.manager.config.brand.url;
+        // Synthetic loopback brand.url: initialize() fires a real refreshNow(),
+        // and in a CONSUMER test run the real brand.url could serve a script
+        // this lane would EXECUTE. Port 59987 is deliberately unlikely to listen.
+        ctx.manager.config.brand.url = 'http://localhost:59987';
+        ctx.manager.config.remoteScripts = { enabled: true };
+        try {
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+          // brand.url is set, so the URL must actually derive — a null here
+          // would let the assertion pass vacuously.
+          ctx.expect(ctx.manager.remoteScripts._url).toBe('http://localhost:59987/data/scripts/main.js');
+        } finally {
+          ctx.manager.remoteScripts.shutdown();
+          ctx.manager.config.remoteScripts = orig;
+          ctx.manager.config.brand.url = origBrandUrl;
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+        }
       },
     },
     {
@@ -31,7 +66,7 @@ module.exports = {
       run: (ctx) => {
         ctx.manager.remoteScripts.shutdown();
         const orig = ctx.manager.config.remoteScripts;
-        ctx.manager.config.remoteScripts = { url: 'https://override.example/patch.js' };
+        ctx.manager.config.remoteScripts = { enabled: true, url: 'https://override.example/patch.js' };
         try {
           ctx.manager.remoteScripts.initialize(ctx.manager);
           ctx.expect(ctx.manager.remoteScripts._url).toBe('https://override.example/patch.js');
@@ -48,7 +83,7 @@ module.exports = {
         const orig = ctx.manager.config.remoteScripts;
         try {
           ctx.manager.remoteScripts.shutdown();
-          ctx.manager.config.remoteScripts = { url: 'http://insecure.example/patch.js' };
+          ctx.manager.config.remoteScripts = { enabled: true, url: 'http://insecure.example/patch.js' };
           ctx.manager.remoteScripts.initialize(ctx.manager);
           ctx.expect(ctx.manager.remoteScripts._url).toBe(null);
           ctx.expect(ctx.manager.remoteScripts._intervalId).toBe(null);
@@ -57,7 +92,7 @@ module.exports = {
           // fires a real refreshNow(), and a live port (4000 = the web dev
           // server) would have its response body EXECUTED by this lane.
           ctx.manager.remoteScripts.shutdown();
-          ctx.manager.config.remoteScripts = { url: 'http://localhost:59987/patch.js' };
+          ctx.manager.config.remoteScripts = { enabled: true, url: 'http://localhost:59987/patch.js' };
           ctx.manager.remoteScripts.initialize(ctx.manager);
           ctx.expect(ctx.manager.remoteScripts._url).toBe('http://localhost:59987/patch.js');
         } finally {
@@ -229,7 +264,7 @@ module.exports = {
         ctx.expect(rs._initialized).toBe(false);
         ctx.expect(rs._manager).toBe(null);
         ctx.expect(rs._url).toBe(null);
-        ctx.expect(rs._enabled).toBe(true);
+        ctx.expect(rs._enabled).toBe(false);
         ctx.expect(rs._intervalId).toBe(null);
         // Re-init for cleanup handler
         rs.initialize(ctx.manager);

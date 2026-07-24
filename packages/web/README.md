@@ -2,7 +2,7 @@
 
 The OMEGA web framework — the UJM (Jekyll) successor, built on **Eleventy 3 +
 LiquidJS + [@omega.js/template-kit](../template-kit)** per the Phase 2 bake-off
-decision ([spikes/bakeoff-shared/DECISION.md](../../spikes/bakeoff-shared/DECISION.md):
+decision ([_attic/spikes/bakeoff-shared/DECISION.md](../../_attic/spikes/bakeoff-shared/DECISION.md) — the bake-off trees retired to the local `_attic/`, out of git:
 Eleventy 4.70 vs Astro 3.55 weighted). B1 promoted the engine core from the
 winning spike; **B2 ported the REAL UJM content** — the full blueprint layout
 set, 3 Liquid themes + the bootstrap asset layer, ~60 default pages, and the
@@ -67,7 +67,7 @@ npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme
 A bare consumer (`omega setup` in an empty dir, edit brand in
 config/omega.json5) builds the full ~56-page default set in under 2 s.
 
-Corpus-scale benching lives in [spikes/bakeoff-eleventy](../../spikes/bakeoff-eleventy)
+Corpus-scale benching lives in [_attic/spikes/bakeoff-eleventy](../../_attic/spikes/bakeoff-eleventy)
 (the promoted spike, now a thin harness). With the REAL content the corpus
 (1,135 docs → 1,397 pages incl. the full default set) builds in ~20 s total —
 see the harness README for the honest before/after numbers.
@@ -411,8 +411,8 @@ original, so build-time markup resolves in dev too.
     layout/blueprint sample content (jekyll-uj-powertools 1.8.1's `defaults:`
     layer; pinned in slice.test.js).
 
-The full findings log + scorecard: [RESULTS.md](../../spikes/bakeoff-shared/RESULTS.md),
-[DECISION.md](../../spikes/bakeoff-shared/DECISION.md). The codemod rule
+The full findings log + scorecard: [RESULTS.md](../../_attic/spikes/bakeoff-shared/RESULTS.md),
+[DECISION.md](../../_attic/spikes/bakeoff-shared/DECISION.md). The codemod rule
 table (DECISION.md) is EXECUTABLE as of B4 — [src/migrate/rules.js](src/migrate/rules.js),
 semantically proven in the suite (the capture hoist renders byte-identical to
 a literal arg; the parentloop hoist renders the right outer indexes). B4 also

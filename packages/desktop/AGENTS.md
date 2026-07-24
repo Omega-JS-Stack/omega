@@ -92,7 +92,7 @@ new (require('@omega.js/desktop/renderer'))().initialize();
 | `context` | runtime info — `manager.context.{geolocation,client,session,app}` |
 | `usage` | `opens` / `hoursTotal` / `hoursThisSession`; crash-safe |
 | `remote-config` | "Hot config" fetched from `${brand.url}/data/resources/main.json`, polled hourly |
-| `remote-scripts` | Emergency remote code execution — fetches `${brand.url}/data/scripts/main.js`, content-hash dedup, async `manager` + `require` in scope |
+| `remote-scripts` | Emergency remote code execution — OPT-IN (`remoteScripts.enabled: true`) + https-only; fetches `${brand.url}/data/scripts/main.js`, content-hash dedup, async `manager` + `require` in scope |
 | `analytics` | GA4 Measurement Protocol; cross-platform `uuidv5` identity |
 | `restart-manager` | external guardian app for crash relaunches — localhost HTTP protocol v1 (register/heartbeat/deregister), silent install when missing (mac zip / win NSIS `/S` / linux AppImage; RM self-updates via its own @omega.js/desktop autoUpdater); split dir ships the protocol SSOT the RM app imports |
 
@@ -236,7 +236,7 @@ API references for each subsystem live in `docs/`. **Whenever you make a behavio
 - [docs/context.md](docs/context.md) — runtime context block (geolocation, client, session, app)
 - [docs/usage.md](docs/usage.md) — opens / hoursTotal / hoursThisSession; clean-exit accumulation
 - [docs/remote-config.md](docs/remote-config.md) — "hot config" fetched from brand site
-- [docs/remote-scripts.md](docs/remote-scripts.md) — emergency remote code execution, content-hash dedup
+- [docs/remote-scripts.md](docs/remote-scripts.md) — emergency remote code execution (opt-in, https-only), content-hash dedup
 - [docs/restart-manager.md](docs/restart-manager.md) — the external guardian app: HTTP protocol v1 (SSOT), silent install, self-updates via its own @omega.js/desktop autoUpdater, threat model
 - [docs/config-schema.md](docs/config-schema.md) — canonical schema + validator
 - [docs/sentry.md](docs/sentry.md) — per-context split, auto auth attribution

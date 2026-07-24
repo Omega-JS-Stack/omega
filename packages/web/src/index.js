@@ -1,7 +1,7 @@
 /**
  * @omega.js/web — the OMEGA web framework: Eleventy 3 + LiquidJS +
  * @omega.js/template-kit engine core (promoted from the winning bake-off
- * spike — decision memo: spikes/bakeoff-shared/DECISION.md) plus the `omega`
+ * spike — decision memo: _attic/spikes/bakeoff-shared/DECISION.md) plus the `omega`
  * CLI (bin/omega → src/cli.js → src/commands/), which consumes these same
  * entry points.
  */

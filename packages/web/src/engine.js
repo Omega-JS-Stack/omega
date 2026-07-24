@@ -5,7 +5,7 @@
  * (page.resolved equivalent — native data cascade), Jekyll conventions (dated
  * post filenames, permalink normalization), blog collections + taxonomy, and
  * default pages as virtual templates suppressed by same-URL consumer files.
- * Promoted from the winning bake-off spike (spikes/bakeoff-shared/DECISION.md).
+ * Promoted from the winning bake-off spike (_attic/spikes/bakeoff-shared/DECISION.md).
  */
 const fs = require('node:fs');
 const path = require('node:path');
