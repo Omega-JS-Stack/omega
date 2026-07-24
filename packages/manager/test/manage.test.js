@@ -217,10 +217,10 @@ test('runManage: full loop — workspace, update (build), testing all pass; run 
   // No Google credentials in the environment → clean skip
   assert.equal(report.results['search-console'].status, 'skipped');
   assert.match(report.results['search-console'].reason, /GOOGLE_CLIENT_ID/);
-  // No adsense section authored → clean skip (wave-5 F10: through the REAL
-  // pipeline — proves the DEFAULTS merge doesn't resurrect the section)
+  // No advertising provider authored → clean skip (wave-5 F10: through the
+  // REAL pipeline — proves the DEFAULTS merge doesn't resurrect the entry)
   assert.equal(report.results.adsense.status, 'skipped');
-  assert.match(report.results.adsense.reason, /no adsense section/);
+  assert.match(report.results.adsense.reason, /no advertising\.providers\.google-adsense/);
   // No monitoring section configured → clean skip
   assert.equal(report.results.monitoring.status, 'skipped');
   assert.match(report.results.monitoring.reason, /no monitoring config/);

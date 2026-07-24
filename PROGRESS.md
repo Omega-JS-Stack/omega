@@ -3,7 +3,7 @@
 > Board only — detail lives in CHANGELOG.md, docs/, plans/, commits. Master plan: plans/omega-redesign-master-plan.md. Full pre-v2 board: `_attic/PROGRESS.v1.md`.
 
 ## Now
-- [fable 2026-07-23] cp267 SHIPPED (all 15 wave-5 findings closed); next Ian input: wave 6 GO (DX+security, last wave), or triage (26 inbox entries) → CHANGELOG
+- [fable 2026-07-23] cp268 SHIPPED; next Ian input: wave 6 GO (DX+security, last wave), then triage (25 inbox entries) → CHANGELOG
 
 ## Next
 ### Phase A — Ian-ratified queue (2026-07-20)
@@ -67,6 +67,7 @@
 - Brand-migration tooling (PINNED) must convert pre-family file formats (legacy markers) — evergreen setup speaks one marker family → CHANGELOG 75
 
 ## Done
+- cp268 2026-07-23 authDomain=brand host + self-hosted OAuth handler, @dev-only strip, advertising rekey, CLAUDE.md→AGENTS.md (battery EXIT 0) → CHANGELOG
 - cp267 2026-07-23 wave-5 remediation: all 15 desktop/extension/brand defects closed incl. authDomain contract (battery EXIT 0) → CHANGELOG
 - cp266 2026-07-23 wave-4 remediation: all 17 config/client/template-kit defects closed (2× Fable review; battery EXIT 0) → CHANGELOG
 - cp265 2026-07-23 newsletter wired to marketing/contact + shared recaptcha lib + W16 seeded 10k-30k (battery EXIT 0) → CHANGELOG
@@ -76,4 +77,3 @@
 - cp261 2026-07-22 omega.request() harmonized fetch layer + usage/device bindings split + desktop/extension callers (battery EXIT 0) → CHANGELOG
 - cp260 2026-07-22 legacy command lane retired + token callers fixed + test:auth e2e lane + de-ITW extension fallbacks (battery EXIT 0) → CHANGELOG
 - cp259 2026-07-21 wave-2 fix-batch + 3-pass review (email loadTemplate, errorify guard closed; backend 1332/44) → CHANGELOG
-- cp258 2026-07-21 FULL vert rename: every runtime surface adblock-safe; zero-hit sweep; battery GREEN → CHANGELOG

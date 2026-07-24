@@ -38,7 +38,8 @@
     "bin/",
     "dist/",
     "docs/",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "AGENTS.md"
   ],
   "preparePackage": {
     "input": "./src",

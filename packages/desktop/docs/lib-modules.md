@@ -1,6 +1,6 @@
 # Lib Modules
 
-`src/lib/*.js` — every Electron concern is its own module. Each exports a singleton with `initialize(manager)`; the main-process Manager wires them in a fixed order at boot (see [boot-sequence.md](boot-sequence.md)). The per-module catalog with one-line descriptions lives in [CLAUDE.md](../CLAUDE.md#lib-modules); each row links its own deep reference (`docs/<lib-name>.md`).
+`src/lib/*.js` — every Electron concern is its own module. Each exports a singleton with `initialize(manager)`; the main-process Manager wires them in a fixed order at boot (see [boot-sequence.md](boot-sequence.md)). The per-module catalog with one-line descriptions lives in [AGENTS.md](../AGENTS.md#lib-modules); each row links its own deep reference (`docs/<lib-name>.md`).
 
 ## Lib initialization contract
 
@@ -37,7 +37,7 @@ Don't use `EventEmitter` unless the lib genuinely emits multiple event types. Fo
 2. Wire it into the boot order in `src/main.js` (or the renderer/preload Manager if it's a per-context lib) — check [boot-sequence.md](boot-sequence.md) for where it belongs and what it may depend on.
 3. Attach it to `Manager.prototype` as `manager.<camelCaseName>` so consumers can access it at runtime.
 4. Write tests at every layer the lib has a surface in (see [test-framework.md](test-framework.md)) — at minimum `src/test/suites/main/<name>.test.js`.
-5. Add a `docs/<name>.md` deep reference and link it from the CLAUDE.md lib catalog + Documentation index.
+5. Add a `docs/<name>.md` deep reference and link it from the AGENTS.md lib catalog + Documentation index.
 
 ## Flat file vs directory split
 

@@ -195,10 +195,12 @@ const RAW_SDK = {
   measurementId: 'G-FAKE1',
 };
 
-/** What sdk-config derives from RAW_SDK (Firebase-reported authDomain kept —
- * the OAuth handler only lives on firebaseapp.com (wave-5 F9) — + default RTDB URL). */
+/** What sdk-config derives from RAW_SDK: authDomain becomes the BRAND host
+ * (first-party redirect under storage partitioning; the build self-hosts
+ * /__/auth/* — Ian's ruling 2026-07-23) + default RTDB URL. */
 const EXPECTED_SDK = {
   ...RAW_SDK,
+  authDomain: DOMAIN,
   databaseURL: `https://${PROJECT}-default-rtdb.firebaseio.com`,
 };
 
@@ -309,6 +311,23 @@ test('cloud: shared project only runs service-account + sdk-config', async () =>
   assert.equal(api.mutations().length, 0);
 });
 
+test('cloud: brand.url with a path/port derives a hostname-only domain — authDomain never carries them (cp268)', async () => {
+  const config = brandConfig({
+    firebase: { shared: true },
+    firebaseConfig: { ...EXPECTED_SDK },
+  });
+  config.brand.url = `https://${DOMAIN}:8443/app`; // schema allows any http(s) URL
+  const api = fakeFirebase(convergedResponses());
+
+  const result = await runService(config, {
+    firebase: api,
+    brandRoot: stagedRoot(),
+  });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.state.sdkConfig.authDomain, DOMAIN); // hostname only — no :8443, no /app
+});
+
 // ─── The flagship: converged project = zero-mutation no-op ───────────────────
 
 test('cloud: fully converged project is a zero-mutation no-op across all 13 operations', async () => {
@@ -334,7 +353,7 @@ test('cloud: fully converged project is a zero-mutation no-op across all 13 oper
 
   // Durable IDs accumulated for later services
   assert.equal(result.state.serviceAccount.email, SA_EMAIL);
-  assert.equal(result.state.sdkConfig.authDomain, `${PROJECT}.firebaseapp.com`);
+  assert.equal(result.state.sdkConfig.authDomain, DOMAIN);
   assert.equal(result.state.hosting.domains[0].status, 'verified');
 });
 
@@ -729,7 +748,7 @@ test('sdk-config: missing omega.json5 cloud.config is written back, comments int
 
   const written = readConfigSource(brandRoot);
   assert.ok(written.includes(`apiKey: "${EXPECTED_SDK.apiKey}"`));
-  assert.ok(written.includes(`authDomain: "${PROJECT}.firebaseapp.com"`)); // OAuth handler home — never the site domain (wave-5 F9)
+  assert.ok(written.includes(`authDomain: "${DOMAIN}"`)); // brand host — the build self-hosts /__/auth/* (cp268)
   assert.ok(written.includes('// Fixture Brand — hand-edited writeback target'));
 });
 

@@ -96,9 +96,10 @@
     provider: "firebase",
     config: {
       apiKey: "AIzaSyDyiP9jWao8bjZML4uQr2gk0MdOEL_Umc8",
-      // firebaseapp.com serves /__/auth/handler; the site domain 404s it on
-      // Pages (found live 2026-07-19) — OAuth popup/redirect needs this host.
-      authDomain: "omegajs-playground.firebaseapp.com",
+      // Brand host (cp268): first-party sign-in redirects under storage
+      // partitioning — `omega build` self-hosts /__/auth/* so the handler
+      // resolves here (the 2026-07-19 404 was the missing self-hosting).
+      authDomain: "playground.omegajs.dev",
       projectId: "omegajs-playground",
       storageBucket: "omegajs-playground.firebasestorage.app",
       messagingSenderId: "644778453321",
@@ -205,8 +206,13 @@
 
   // Shared ITW AdSense account (from legacy omega-manager — one pub id
   // account-wide). The service reports Google's approval state read-only.
-  adsense: {
-    accountId: "pub-7372939085773564",
+  // Rekeyed cp268: provider-neutral advertising section (client = ca-pub-…).
+  advertising: {
+    providers: {
+      'google-adsense': {
+        client: "ca-pub-7372939085773564",
+      },
+    },
   },
 
   // 2b create-on-missing (Ian 2026-07-13/14): the playground mints its OWN

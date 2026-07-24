@@ -63,13 +63,13 @@ The singleton owns twelve feature modules under `src/modules/`: `storage`, `auth
 Whenever you make a behavioral change (new module, new method, new pattern, removed feature), update:
 
 1. **`README.md`** — user-facing summary
-2. **`CLAUDE.md`** (this file) — architecture overview, one paragraph or cross-link
+2. **`AGENTS.md`** (this file) — architecture overview, one paragraph or cross-link
 3. **`docs/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
 4. **`CHANGELOG.md`** — if the project keeps one
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** @omega.js/client follows the library subset of the canonical OMEGA CLAUDE.md skeleton (the scaffolding frameworks UJM / @omega.js/backend / @omega.js/extension / @omega.js/desktop / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
+**The OMEGA docs are structurally MIRRORED.** @omega.js/client follows the library subset of the canonical OMEGA AGENTS.md skeleton (the scaffolding frameworks UJM / @omega.js/backend / @omega.js/extension / @omega.js/desktop / MAM carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sister repos and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
 
 ## Documentation
 

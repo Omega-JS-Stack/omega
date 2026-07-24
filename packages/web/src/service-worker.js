@@ -18,6 +18,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
 
 // Fallback when @omega.js/client's package.json can't be resolved from the
 // clientEntry path — keep in step with packages/client's firebase dependency.
@@ -71,6 +72,7 @@ async function buildServiceWorker(options) {
     format: 'iife',
     outfile: path.join(options.outDir, 'service-worker.js'),
     alias: { '@omega.js/web/service-worker': path.resolve(__dirname, '..', 'sw', 'manager.js') },
+    plugins: options.dev ? [] : [stripDevBlocksPlugin],
     logLevel: 'silent',
     define: {
       'process.env.NODE_ENV': options.dev ? '"development"' : '"production"',

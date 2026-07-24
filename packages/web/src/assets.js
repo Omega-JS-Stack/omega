@@ -36,6 +36,7 @@ const esbuild = require('esbuild');
 const sass = require('sass');
 const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
+const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
 
 // A page file is an ENTRY when it's a per-page index.js/index.scss, or a flat
 // file at most two segments below pages/ (pages/index.js, pages/blog/[slug].js).
@@ -205,7 +206,7 @@ async function buildAssets(options) {
       metafile: true,
       // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js)
       alias: { '@omega.js/client': path.dirname(options.clientEntry) },
-      plugins: [bootPlugin],
+      plugins: options.dev ? [bootPlugin] : [bootPlugin, stripDevBlocksPlugin],
       logLevel: 'silent',
       define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
     });
@@ -238,6 +239,7 @@ async function buildAssets(options) {
         format: 'iife',
         outdir: path.join(options.outDir, 'assets', 'js'),
         entryNames: '[dir]/[name]',
+        plugins: options.dev ? [] : [stripDevBlocksPlugin],
         logLevel: 'silent',
         define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
       });

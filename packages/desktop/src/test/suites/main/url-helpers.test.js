@@ -157,8 +157,8 @@ module.exports = {
       },
     },
     {
-      // wave-5 F9: authDomain is pinned to <projectId>.firebaseapp.com for the
-      // OAuth handler — the API base must come from brand.url instead.
+      // wave-5 F9 (as amended cp268): authDomain is an auth-only concern —
+      // the API base must come from brand.url, never authDomain.
       name: 'getApiUrl: prod returns api.<brand.url host>, never api.<authDomain>',
       run: (ctx) => {
         const m = ctx.manager;

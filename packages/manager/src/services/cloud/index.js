@@ -75,7 +75,10 @@ module.exports.run = createServiceRunner({
       return { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };
     }
 
-    const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+    // Hostname-only (cp268): this value feeds authDomain + api.{domain} — a
+    // brand.url carrying a path or port must never leak them into either.
+    const brandUrl = context.brandConfig.brand?.url;
+    const domain = brandUrl ? new URL(brandUrl).hostname : '';
     if (!domain) {
       return { skip: true, reason: 'no brand.url configured' };
     }

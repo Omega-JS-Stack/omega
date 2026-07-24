@@ -626,9 +626,9 @@ class Manager {
     }
 
     // The API rides the BRAND domain (api.<brand host>). Never derive from
-    // authDomain: OAuth forces authDomain to <projectId>.firebaseapp.com (site
-    // domains don't serve /__/auth/handler — live find 2026-07-19), and no
-    // api.* subdomain can exist under firebaseapp.com.
+    // authDomain: it is an auth concern (the brand host, with /__/auth/*
+    // self-hosted at build time) and its value must stay free to change
+    // without moving the API base.
     const brandUrl = this.config.brand?.url; // schema enforces an http(s) URL
     const baseUrl = url || brandUrl || window.location.origin;
 

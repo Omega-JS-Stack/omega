@@ -181,7 +181,7 @@ All `npm install` calls in @omega.js/extension CLI commands (`npx omega setup`, 
 
 ## 📚 Documentation
 
-In-depth docs for every subsystem live in [docs/](docs/). See [CLAUDE.md](CLAUDE.md) for the architecture overview + table of contents.
+In-depth docs for every subsystem live in [docs/](docs/). See [AGENTS.md](AGENTS.md) for the architecture overview + table of contents.
 
 ## 🧰 Sister projects
 

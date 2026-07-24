@@ -169,11 +169,12 @@ const DEFAULTS = {
   },
 
   // AdSense: deliberately NO defaults entry (wave-5 F10). The service gates on
-  // the section's PRESENCE in the merged config — a seeded `adsense: {}` here
-  // would defeat that gate (defaults merge under every brand), and the
-  // account-selection flow would land a shared account into brands that never
-  // opted in. A brand (or the company layer) authors `adsense: {}` to opt in;
-  // accountId comes from config or the interactive selection flow.
+  // the PRESENCE of `advertising.providers.google-adsense` in the merged
+  // config — seeding it here would defeat that gate (defaults merge under
+  // every brand), and the account-selection flow would land a shared account
+  // into brands that never opted in. A brand (or the company layer) authors
+  // the provider entry — even empty — to opt in; `client` (ca-pub-…) comes
+  // from config or the interactive selection flow.
 
   // Marketing. campaigns = the email-marketing provider (the sendgrid
   // service); newsletter = the newsletter provider (the newsletter service (Beehiiv)).
@@ -866,7 +867,10 @@ const REQUIRES = {
 
   adsense: {
     why: 'verifies the domain is present + approved in the AdSense account (read-only API)',
-    when: (config) => config.adsense?.enabled !== false && Boolean(config.adsense?.accountId),
+    when: (config) => {
+      const provider = config.advertising?.providers?.['google-adsense'];
+      return provider?.enabled !== false && Boolean(provider?.client);
+    },
     env: GOOGLE_ENV,
     scopes: ['https://www.googleapis.com/auth/adsense.readonly'],
   },

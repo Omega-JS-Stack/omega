@@ -98,8 +98,8 @@ describe('Manager Methods', () => {
     await Manager.initialize({
       ...TEST_CONFIG,
       brand: { ...TEST_CONFIG.brand, url: 'https://playground.omegajs.dev' },
-      // authDomain is pinned to firebaseapp.com for the OAuth handler — an
-      // api.* subdomain can never exist under it.
+      // authDomain is an auth-only concern (the brand host, with /__/auth/*
+      // self-hosted at build time) — the API base never derives from it.
       firebase: { app: { enabled: false, config: { authDomain: 'example.firebaseapp.com' } } },
     });
     assert.strictEqual(Manager.getApiUrl(), 'https://api.playground.omegajs.dev');

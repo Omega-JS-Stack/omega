@@ -44,8 +44,8 @@ function getApiUrl(environment) {
   }
 
   // Prod: api.<brand host>. Mirrors @omega.js/client.getApiUrl. Never derive
-  // from authDomain — OAuth pins it to <projectId>.firebaseapp.com (site
-  // domains don't serve /__/auth/handler), which has no api.* subdomain.
+  // from authDomain — it is an auth concern (the brand host, with /__/auth/*
+  // self-hosted at build time) and must stay free to change independently.
   const brandUrl = this?.config?.brand?.url;
   if (!brandUrl) {
     throw new Error('brand.url not set in config/omega.json5');

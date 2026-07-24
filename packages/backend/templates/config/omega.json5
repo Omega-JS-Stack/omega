@@ -146,7 +146,7 @@
     provider: 'firebase',
     config: {
       apiKey: '123-456',
-      authDomain: 'PROJECT-ID.firebaseapp.com',
+      authDomain: 'YOUR-BRAND-DOMAIN.com', // brand host — the web build self-hosts /__/auth/*
       projectId: 'PROJECT-ID',
       storageBucket: 'PROJECT-ID.appspot.com',
       messagingSenderId: '123',

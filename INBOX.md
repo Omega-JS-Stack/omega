@@ -19,8 +19,6 @@ https://www.relume.ai/?r=0
 * We can certainly initialize the repo with these two files for the consumer, but I don't wanna edit them any further other than initializing them. claude.md (if it doesnt exist) should initialize wiht a pointer to agnets.md. and agents.md should be the one that we exclusively check for the first line importing the omega entry point which is /Users/ian/Developer/Repositories/Omega/omega/AGENTS.md, i think?
 
 # Web
-* you definitely dont have tests for signin with google because i clicekd the button and it took me to "https://omegajs.dev/__/auth/handler" which is a 404 page, and also i saw the "OAuth redirect may fail in development. Use localhost:4000 or add ?authPopup=true to the URL" message while in LIVE mode... wtf?
-  * probably does NOT download the firebase things from the firebae server on build
 * cookie polixcy code is missing the sass ignore whatever its called because its styling is BAD
 * pricing page chcks not liningup with texts
 * checks on homepage shoud be blue, same with signup page (UNIFY THIS EVERYWHER)
@@ -43,5 +41,8 @@ https://www.relume.ai/?r=0
   * we have some things liek classes that click triggers, like log out class that triggers logout, etc. UNIFY THEM ACROSS THE FRAMEWORK. so put it in a universal library and it should used in all frameworks and work, and thers definitely more. so chagne the names so they are sensible and unified (no more uj-* or X-* thats not omega-* prefixed right?)
 
 ## From cp265 review (fable 2026-07-23)
-* web build has no `@dev-only:start/end` strip (extension has a webpack loader; web esbuild lane keeps the code, only minifies away the comments) — the `_dev_recaptcha` URL-param bypass and every other dev-only block ship live in the main bundle of every built site. Harmless server-side today, but the marker's promise is false in the web lane. Fix idea: esbuild onLoad transform mirroring extension's strip-dev-blocks loader.
 * checkout `payments/intent` has the same 403-before-verify empty-token pre-check the newsletter route just dropped (pre-existing, behind the payment gate) — align it with verify()'s no-secret leniency when payment work reopens.
+
+## From cp268 review (fable 2026-07-23)
+* desktop has NO `@dev-only` strip in its webpack lane (extension has a loader, web got one in cp268) — if desktop production bundles carry @omega.js/client's dev-only blocks, the same live-dev-code class exists there. Also: the strip marker constants now live in two homes (extension webpack loader + web esbuild plugin) — SSOT candidate (devkit).
+* `packages/manager/AGENTS.md` tells brand consumers to read `node_modules/@omega.js/web/CLAUDE.md`, but the web package ships neither CLAUDE.md nor AGENTS.md (pre-existing) — fold into the docs+skills revamp.

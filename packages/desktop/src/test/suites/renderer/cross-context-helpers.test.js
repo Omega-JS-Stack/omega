@@ -93,8 +93,8 @@ module.exports = {
       },
     },
     {
-      // wave-5 F9: API base rides brand.url, never authDomain (which OAuth
-      // pins to firebaseapp.com — no api.* subdomain can exist there).
+      // wave-5 F9 (as amended cp268): API base rides brand.url, never
+      // authDomain — that value is an auth-only concern.
       name: 'getApiUrl: prod → api.<brand.url host>',
       run: (ctx) => {
         ctx.expect(window.__emTestManager.getApiUrl('production'))

@@ -2,9 +2,13 @@
  * Ensure the web SDK config is fetched into state — and that the brand's
  * omega.json5 `cloud.config` section matches it.
  *
- * authDomain stays the Firebase-reported {projectId}.firebaseapp.com value:
- * only that host serves /__/auth/handler (site domains 404 it — live find
- * 2026-07-19), and the API base derives from brand.url, not authDomain.
+ * authDomain is the BRAND host (Ian's ruling 2026-07-23): a first-party
+ * authDomain keeps signInWithRedirect working under browser storage
+ * partitioning, and the site self-hosts Firebase's /__/auth/* helper files
+ * at build time (`omega build` fetches them from
+ * {projectId}.firebaseapp.com), so the handler no longer 404s on site
+ * domains (the 2026-07-19 live find). The API base derives from brand.url,
+ * never authDomain.
  * The fetched config is durable state; drift against omega.json5 is written
  * back into the file key-by-key (comment-preserving), so per-key comments
  * survive. Dry-run prints the paste-able block instead and warns.
@@ -17,7 +21,7 @@ const { dryRunPlan } = require('../../../lib/run-gates.js');
 const SDK_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
 
 module.exports = async function ensureSdkConfig(context) {
-  const { firebaseApi: api, brandConfig, projectId, options = {} } = context;
+  const { firebaseApi: api, brandConfig, projectId, domain, options = {} } = context;
 
   // === READ (web app must exist; project-settings creates it too) ===
   const apps = await api.listWebApps(projectId);
@@ -41,7 +45,7 @@ module.exports = async function ensureSdkConfig(context) {
 
   const sdkConfig = {
     apiKey: raw.apiKey,
-    authDomain: raw.authDomain || `${projectId}.firebaseapp.com`, // OAuth handler only lives on firebaseapp.com
+    authDomain: domain || raw.authDomain, // brand host — the build self-hosts /__/auth/* (header comment)
     databaseURL: raw.databaseURL || `https://${projectId}-default-rtdb.firebaseio.com`,
     projectId: raw.projectId,
     storageBucket: raw.storageBucket,

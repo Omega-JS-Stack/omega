@@ -17,6 +17,7 @@ const { consumerPaths, loadSiteData } = require('../consumer.js');
 const { resolveStaticDirs } = require('../static-assets.js');
 const { resolveClientEntry } = require('../paths.js');
 const { translateSite } = require('../translate/index.js');
+const { fetchFirebaseAuthHelpers } = require('../firebase-auth-helpers.js');
 
 const logger = new Logger('omega:build');
 
@@ -72,6 +73,14 @@ module.exports = async function (options) {
   if (cname) {
     jetpack.write(path.join(paths.out, 'CNAME'), cname);
   }
+
+  // Self-host Firebase's /__/auth/* helper files so authDomain can be the
+  // brand host on static hosting (translation excludes __/auth by design).
+  await fetchFirebaseAuthHelpers({
+    siteData,
+    outDir: paths.out,
+    logger,
+  });
 
   // Post-build translation (site.* IS the resolved config shape).
   // Default: translate EVERYTHING — warm strings from the committed cache

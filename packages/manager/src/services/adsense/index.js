@@ -8,10 +8,13 @@
  * and poll until the site appears. Never mutates AdSense — dry-run is
  * identical to a normal run.
  *
- * accountId (pub-…) is required config — omega-manager defaulted it to the
- * company's shared account (company-level config supplies that now).
- * Interactive runs offer the account selection flow when it's missing
- * (create-new opens the AdSense signup) and land it in omega.json5.
+ * Config home: `advertising.providers.google-adsense` (the provider-neutral
+ * advertising section — never a brand-named top-level key). `client`
+ * (ca-pub-…) is required config; the API accountId is the same id without
+ * the `ca-` prefix. omega-manager defaulted the account to the company's
+ * shared one (company-level config supplies that now). Interactive runs
+ * offer the account selection flow when it's missing (create-new opens the
+ * AdSense signup) and land it in omega.json5.
  * Auth: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in the brand .env
  * (adsense.readonly scope, own token cache).
  */
@@ -25,16 +28,16 @@ const CREATE_ACCOUNT_URL = 'https://adsense.google.com/start/';
 module.exports.run = createServiceRunner({
   serviceDir: __dirname,
   setup: async (context) => {
-    // No adsense section = deliberate absence — never resolve or write back
-    // an account the brand didn't opt into (authoring `adsense: {}` opts in).
-    if (!context.brandConfig.adsense) {
-      return { skip: true, reason: 'no adsense section in omega.json5 (author `adsense: {}` to opt in)' };
+    // No provider entry = deliberate absence — never resolve or write back an
+    // account the brand didn't opt into (wave-5 F10; authoring
+    // `advertising: { providers: { 'google-adsense': {} } }` opts in).
+    const provider = context.brandConfig.advertising?.providers?.['google-adsense'];
+    if (!provider) {
+      return { skip: true, reason: 'no advertising.providers.google-adsense section in omega.json5 (author it — even empty — to opt in)' };
     }
 
-    const adsense = context.brandConfig.adsense;
-
-    if (adsense.enabled === false) {
-      return { skip: true, reason: 'adsense.enabled = false' };
+    if (provider.enabled === false) {
+      return { skip: true, reason: 'advertising.providers.google-adsense.enabled = false' };
     }
 
     const domain = (context.brandConfig.brand?.url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -52,26 +55,32 @@ module.exports.run = createServiceRunner({
       tokenStorePath: googleTokenStorePath(context.brandRoot),
     });
 
-    // Missing account → offer the interactive selection flow (lands in
-    // omega.json5); needs credentials
-    let accountId = adsense.accountId;
-    if (!accountId && haveCreds) {
+    // Missing client id → offer the interactive selection flow (lands in
+    // omega.json5); needs credentials. The Management API wants the bare
+    // pub-… account id — `client` carries the embed-ready ca-pub-… form.
+    let client = provider.client;
+    if (!client && haveCreds) {
       const flowApi = makeApi();
-      accountId = await resolveConfigValue(context, {
-        path: 'adsense.accountId',
+      client = await resolveConfigValue(context, {
+        path: 'advertising.providers.google-adsense.client',
+        // Disable must NOT land `client: false` — client is schema-typed as a
+        // string and the config would hard-fail validation forever. The
+        // enabled flag is the gate this service already honors.
+        disablePath: 'advertising.providers.google-adsense.enabled',
         label: 'AdSense account',
         choices: () => flowApi.listAccounts(),
         getName: (account) => {
           const id = account.name.replace('accounts/', '');
           return `${account.displayName || id} (${id})`;
         },
-        getValue: (account) => account.name.replace('accounts/', ''),
+        getValue: (account) => `ca-${account.name.replace('accounts/', '')}`,
         createNew: { label: 'account', url: CREATE_ACCOUNT_URL, refreshChoices: true },
       });
     }
-    if (!accountId) {
-      return { skip: true, reason: 'no adsense.accountId configured (pub-… from https://adsense.google.com → Settings → Account information — or rerun interactively)' };
+    if (!client) {
+      return { skip: true, reason: 'no advertising.providers.google-adsense.client configured (ca-pub-… from https://adsense.google.com → Settings → Account information — or rerun interactively)' };
     }
+    const accountId = client.replace(/^ca-/, '');
 
     if (!haveCreds) {
       return { skip: true, reason: 'no GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET configured (set them in the brand .env)' };

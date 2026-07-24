@@ -135,7 +135,7 @@ Create `config/omega.json5` in your functions directory (`npx omega setup` scaff
     provider: 'firebase',
     config: {
       apiKey: 'xxx',
-      authDomain: 'project-id.firebaseapp.com',
+      authDomain: 'your-brand.com', // brand host — the web build self-hosts /__/auth/*
       projectId: 'project-id',
       storageBucket: 'project-id.appspot.com',
       messagingSenderId: '123456789',
@@ -379,7 +379,7 @@ Built-in marketing system with multi-provider support (SendGrid + Beehiiv + FCM 
 - **Contact pruning** — monthly 2-stage re-engagement + deletion of inactive contacts
 - **Template variables** — `{brand.name}`, `{holiday.name}`, `{season.name}`, `{date.*}` resolved at send time
 
-Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See CLAUDE.md for full documentation.
+Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See AGENTS.md for full documentation.
 
 ## Marketing Consent
 
@@ -900,7 +900,7 @@ module.exports = {
 
 **Auth levels:** `none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`
 
-See `CLAUDE.md` for complete test API documentation.
+See `AGENTS.md` for complete test API documentation.
 
 ## Subscription System
 

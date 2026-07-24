@@ -2,7 +2,7 @@
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to deep references. The **meat** (per-subsystem APIs, behavior tables, recipes) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
-> **Mirrored structure:** @omega.js/backend, UJM, BXM, and EM CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** @omega.js/backend, UJM, BXM, and EM AGENTS.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
 ## Identity
 
@@ -12,7 +12,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 
 ## Recommended skills
 
-- **`omega:bem`** — router skill. Auto-loads on @omega.js/backend-specific keywords (`route`, `schema`, `endpoint`, `omega_api`, `Manager.init`, `npx omega test`, `gcloud logs`, etc.) and points back to this CLAUDE.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
+- **`omega:bem`** — router skill. Auto-loads on @omega.js/backend-specific keywords (`route`, `schema`, `endpoint`, `omega_api`, `Manager.init`, `npx omega test`, `gcloud logs`, etc.) and points back to this AGENTS.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 
 ## Quick Start
@@ -129,7 +129,7 @@ See [docs/code-patterns.md](docs/code-patterns.md) for code-pattern detail, [doc
 Whenever you make a behavioral change (new command, new flag, new pattern, removed feature), update:
 
 1. **`README.md`** — user-facing summary
-2. **`CLAUDE.md`** (this file) — architecture overview, one paragraph or cross-link
+2. **`AGENTS.md`** (this file) — architecture overview, one paragraph or cross-link
 3. **`docs/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
 4. **`CHANGELOG.md`** — if the project keeps one
 

@@ -30,7 +30,7 @@ const CANONICAL_TOP_LEVEL_ORDER = [
   'cloudflare', 'cloud', 'firebase', 'gcp', 'recaptcha', 'analytics',
   'monitoring', 'advertising', 'payment', 'oauth2', 'sponsorships',
   'marketing', 'blog', 'devlog', 'reviews', 'seo', 'searchConsole',
-  'testing', 'adsense', 'dataRequest', 'slapform', 'chatsy', 'replyify',
+  'testing', 'dataRequest', 'slapform', 'chatsy', 'replyify',
   'server', 'assets',
   'certificates', 'theme', 'translation', 'migrations', 'targets',
 ];

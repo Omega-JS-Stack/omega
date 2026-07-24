@@ -145,7 +145,7 @@ export function openAuthPage(context, options = {}) {
 
   // The /token page lives on the BRAND site (wave-5 F9) — background.js
   // watches the same brand.url host for the redirect. Never authDomain:
-  // OAuth pins that to <projectId>.firebaseapp.com, where no site exists.
+  // it is an auth concern that must stay free to change independently.
   const brandUrl = omega.config?.brand?.url;
 
   if (!brandUrl) {

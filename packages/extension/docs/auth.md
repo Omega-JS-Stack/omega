@@ -74,8 +74,9 @@ All contexts sign out
      },
    }
    ```
-   (`cloud.config.authDomain` stays the Firebase-reported `<projectId>.firebaseapp.com`
-   value — only that host serves the OAuth handler; it plays no role in this flow.)
+   (`cloud.config.authDomain` is the brand host too — the website build
+   self-hosts Firebase's `/__/auth/*` handler — but it plays no role in this
+   flow; the extension only watches `brand.url`.)
 2. **Add `tabs` permission** to `src/manifest.json` — needed for `chrome.tabs.onUpdated` listener that detects the `/token` redirect.
 
 ## Functions in `lib/auth-helpers.js`

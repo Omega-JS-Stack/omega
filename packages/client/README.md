@@ -64,7 +64,7 @@ await Manager.initialize({
       enabled: true,
       config: {
         apiKey: 'your-api-key',
-        authDomain: 'your-app.firebaseapp.com',
+        authDomain: 'your-app.com', // brand host — the site self-hosts /__/auth/*
         projectId: 'your-project-id',
         storageBucket: 'your-app.appspot.com',
         messagingSenderId: '123456789',
@@ -141,7 +141,7 @@ await Manager.initialize({
       enabled: true,
       config: {
         apiKey: 'your-api-key',
-        authDomain: 'your-app.firebaseapp.com',
+        authDomain: 'your-app.com', // brand host — the site self-hosts /__/auth/*
         projectId: 'your-project-id',
         storageBucket: 'your-app.appspot.com',
         messagingSenderId: '123456789',

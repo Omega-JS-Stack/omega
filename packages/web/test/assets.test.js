@@ -176,7 +176,10 @@ test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runti
 
   const graph = readGraph(manifest.js.main);
   assert.ok(graph.includes('Global module loaded successfully'), 'core runtime module in the graph');
-  assert.ok(graph.includes('Classy theme loaded successfully'), 'active theme _theme.js inlined via __theme__');
+  // The theme's dev-only "loaded successfully" log is STRIPPED from this
+  // production build (cp268) — assert on durable theme code instead.
+  assert.ok(graph.includes('window.bootstrap'), 'active theme _theme.js inlined via __theme__');
+  assert.ok(!graph.includes('Classy theme loaded successfully'), 'theme dev-only block stripped in production');
   assert.ok(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph');
 });
 

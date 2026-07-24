@@ -20,14 +20,15 @@ delete process.env.GOOGLE_CLIENT_SECRET;
 
 const DOMAIN = 'fixture-brand.test';
 const ACCOUNT_ID = 'pub-0000000000000000';
+const CLIENT = `ca-${ACCOUNT_ID}`; // config carries the embed-ready ca-pub-… form
 const SITES_URL = `https://adsense.google.com/adsense/u/0/${ACCOUNT_ID}/sites/list?url=${DOMAIN}`;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-function brandConfig({ url = `https://${DOMAIN}`, accountId = ACCOUNT_ID } = {}) {
+function brandConfig({ url = `https://${DOMAIN}`, client = CLIENT } = {}) {
   return {
     brand: { id: 'fixture-brand', name: 'Fixture Brand', url },
-    adsense: { accountId },
+    advertising: { providers: { 'google-adsense': { client } } },
     targets: { web: {} },
   };
 }
@@ -67,13 +68,13 @@ test('adsense: skips without Google credentials in .env', async () => {
   assert.match(result.reason, /GOOGLE_CLIENT_ID\/GOOGLE_CLIENT_SECRET/);
 });
 
-test('adsense: adsense.enabled = false skips the service', async () => {
+test('adsense: provider enabled = false skips the service', async () => {
   const config = brandConfig();
-  config.adsense.enabled = false;
+  config.advertising.providers['google-adsense'].enabled = false;
 
   const result = await runService(config, { adsense: fakeAdsense() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /adsense\.enabled/);
+  assert.match(result.reason, /google-adsense\.enabled/);
 });
 
 test('adsense: skips without brand.url', async () => {
@@ -82,33 +83,33 @@ test('adsense: skips without brand.url', async () => {
   assert.match(result.reason, /brand\.url/);
 });
 
-test('adsense: skips without adsense.accountId — and the default carries no company account', async () => {
-  const result = await runService(brandConfig({ accountId: null }), { adsense: fakeAdsense() });
+test('adsense: skips without a client id — and the default carries no company account', async () => {
+  const result = await runService(brandConfig({ client: null }), { adsense: fakeAdsense() });
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /adsense\.accountId/);
+  assert.match(result.reason, /google-adsense\.client/);
 
   // omega-manager defaulted this to the company's shared pub- account — the
-  // manager defaults layer must not carry an adsense section AT ALL (wave-5
+  // manager defaults layer must not seed the provider entry AT ALL (wave-5
   // F10: defaults merge under every brand, so a seeded section would defeat
   // the presence gate below)
-  assert.equal(DEFAULTS.adsense, undefined);
+  assert.equal(DEFAULTS.advertising?.providers?.['google-adsense'], undefined);
 });
 
-test('adsense: NO adsense section = deliberate absence — skips before any account resolution (wave-5 F10)', async () => {
+test('adsense: NO provider entry = deliberate absence — skips before any account resolution (wave-5 F10)', async () => {
   // Build the config the way the real pipeline does: the manager DEFAULTS
   // merge under the brand file. The gate must survive that merge — a seeded
-  // DEFAULTS.adsense would resurrect the section for every brand.
+  // provider entry in DEFAULTS would resurrect it for every brand.
   const { deepMerge } = require('@omega.js/config');
   const authored = brandConfig();
-  delete authored.adsense; // the brand never opted in
+  delete authored.advertising; // the brand never opted in
   const config = deepMerge(structuredClone(DEFAULTS), authored);
-  assert.equal(config.adsense, undefined);
+  assert.equal(config.advertising?.providers?.['google-adsense'], undefined);
 
   const api = fakeAdsense();
   const result = await runService(config, { adsense: api });
 
   assert.equal(result.status, 'skipped');
-  assert.match(result.reason, /no adsense section/);
+  assert.match(result.reason, /no advertising\.providers\.google-adsense/);
   // The account-selection flow must never run — it lands a shared account
   // into the brand config, which is exactly the writeback this gate prevents.
   assert.equal(api.calls.length, 0);
@@ -186,7 +187,7 @@ test('adsense: dry-run behaves identically — the API has no writes at all', as
 
 // ─── Interactive account selection (config-landing flow) ─────────────────────
 
-test('setup: interactive run offers account selection and lands adsense.accountId in omega.json5', async () => {
+test('setup: interactive run offers account selection and lands the client id in omega.json5', async () => {
   const api = fakeAdsense({ sites: [{ domain: DOMAIN, state: 'READY', autoAdsEnabled: true }] });
   api.listAccounts = async () => {
     api.calls.push({ method: 'listAccounts' });
@@ -198,7 +199,7 @@ test('setup: interactive run offers account selection and lands adsense.accountI
   const brandRoot = makeBrandRoot(`{
   // Fixture Brand — adsense writeback target
   brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
-  adsense: { enabled: true }, // accountId lands here
+  advertising: { providers: { 'google-adsense': { enabled: true } } }, // client lands here
   targets: { web: {} },
 }
 `);
@@ -206,7 +207,7 @@ test('setup: interactive run offers account selection and lands adsense.accountI
   const tty = openTtyPrompt();
 
   try {
-    const run = runService(brandConfig({ accountId: null }), { adsense: api, brandRoot });
+    const run = runService(brandConfig({ client: null }), { adsense: api, brandRoot });
     await tty.answer('Set up now?', '\r'); // Yes
     // Cursor lands on the brand match "Fixture Brand (pub-…)" — ENTER picks it
     await tty.answer('Select AdSense account:', '\r');
@@ -215,11 +216,38 @@ test('setup: interactive run offers account selection and lands adsense.accountI
     assert.equal(result.status, 'success'); // READY site via the landed account
     assert.deepEqual(api.calls.at(-1), { method: 'listSites', accountId: ACCOUNT_ID });
     const written = readConfigSource(brandRoot);
-    assert.ok(written.includes(`accountId: "${ACCOUNT_ID}"`));
-    assert.ok(written.includes('// accountId lands here'));
+    assert.ok(written.includes(`client: "${CLIENT}"`)); // ca-pub-… form, the schema's embed-ready value
+    assert.ok(written.includes('// client lands here'));
   } finally {
     tty.close();
     setBrowserOpener(null);
+  }
+});
+
+test('setup: Disable lands enabled: false — never a false where the schema wants a string (cp268)', async () => {
+  const api = fakeAdsense();
+  api.listAccounts = async () => [];
+  const brandRoot = makeBrandRoot(`{
+  // Fixture Brand — adsense disable target
+  brand: { id: 'fixture-brand', name: 'Fixture Brand', url: 'https://fixture-brand.test' },
+  advertising: { providers: { 'google-adsense': {} } }, // opted in, no client yet
+  targets: { web: {} },
+}
+`);
+  const tty = openTtyPrompt();
+
+  try {
+    const run = runService(brandConfig({ client: null }), { adsense: api, brandRoot });
+    // Arrow down twice: Yes → Skip → Disable (stop prompting)
+    await tty.answer('Set up now?', '\x1B[B\x1B[B\r');
+    const result = await run;
+
+    assert.equal(result.status, 'skipped');
+    const written = readConfigSource(brandRoot);
+    assert.ok(written.includes('enabled: false'), 'Disable writes the enabled gate');
+    assert.ok(!written.includes('client: false'), 'client (schema string) never receives a boolean');
+  } finally {
+    tty.close();
   }
 });
 

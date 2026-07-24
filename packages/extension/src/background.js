@@ -319,7 +319,7 @@ class Manager {
 
     // The sign-in round trip lands on the BRAND site (/token redirects with
     // ?authToken=…), so match the brand.url host — never authDomain, which
-    // OAuth pins to <projectId>.firebaseapp.com.
+    // is an auth concern that must stay free to change independently.
     const brandUrl = this.config?.brand?.url;
 
     // Skip if no brand url configured

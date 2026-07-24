@@ -31,7 +31,8 @@ npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
                     #   dev.ports chrome, so the browser always targets THIS brand's stack
                     #   --local: first link every @omega.js dep brand-wide from the local
                     #   Omega monorepo + start its src→dist watch (docs/local-dev.md there)
-npx omega build     # production: assets (hashed) → Eleventy → PurgeCSS → dist/
+npx omega build     # production: assets (hashed, @dev-only blocks stripped) → Eleventy → PurgeCSS → Firebase auth helpers (/__/auth/*) → dist/
+                    # the auth-helper fetch fails the build loudly on error (demo-*/projectless brands skip); escape hatch: OMEGA_SKIP_FIREBASE_AUTH=true
 npx omega test      # PROJECT scope: production build + smoke checks + consumer test/
                     #   framework:/omega:/web: = @omega.js/web's own suite; full: = both
                     #   (C5 scoping — docs/testing.md in the Omega repo)

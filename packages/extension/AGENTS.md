@@ -2,7 +2,7 @@
 
 > **Note for contributors and Claude:** This file is the architectural overview — identity, top-level conventions, and a map to deep references. The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in `docs/<topic>.md`. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one. Goal: keep this file under 250 lines.
 
-> **Mirrored structure:** @omega.js/backend, UJM, @omega.js/extension, and @omega.js/desktop CLAUDE.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
+> **Mirrored structure:** @omega.js/backend, UJM, @omega.js/extension, and @omega.js/desktop AGENTS.md files mirror each other — shared sections (Supply-Chain Security, Development Workflow, File Conventions, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
 ## Identity
 
@@ -10,7 +10,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 
 ## Recommended skills
 
-- **`omega:bxm`** — router skill. Auto-loads on extension-specific keywords (`manifest.json`, `extension popup`, `extension background`, `offscreen document`, `chrome extension`, etc.) and points back to this CLAUDE.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
+- **`omega:bxm`** — router skill. Auto-loads on extension-specific keywords (`manifest.json`, `extension popup`, `extension background`, `offscreen document`, `chrome extension`, etc.) and points back to this AGENTS.md + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 
 ## 🚨 READ WEB-MANAGER TOO
@@ -18,7 +18,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 **@omega.js/extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/extension.
 
 **Required reading:**
-- **`node_modules/@omega.js/client/CLAUDE.md`** — top-level overview + index
+- **`node_modules/@omega.js/client/AGENTS.md`** — top-level overview + index
 - **`node_modules/@omega.js/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start
@@ -228,7 +228,7 @@ All `npm install` calls in CLI commands (`npx omega i`, `npx omega setup`) route
 Whenever you make a behavioral change (new command, new flag, new pattern, removed feature), update:
 
 1. **`README.md`** — user-facing summary
-2. **`CLAUDE.md`** (this file) — architecture overview, one paragraph or cross-link
+2. **`AGENTS.md`** (this file) — architecture overview, one paragraph or cross-link
 3. **`docs/<topic>.md`** — the meat. If a topic doesn't have a doc yet, create one.
 4. **`CHANGELOG.md`** — if the project keeps one
 

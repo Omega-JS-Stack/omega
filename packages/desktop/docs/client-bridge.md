@@ -151,7 +151,7 @@ keeps the user signed in; renderers then re-resolve the account and re-push the 
     "provider": "firebase",
     "config": {
       "apiKey":            "...",
-      "authDomain":        "myapp.firebaseapp.com",
+      "authDomain":        "myapp.com",
       "projectId":         "myapp",
       // ... etc.
     }
@@ -255,5 +255,5 @@ Without the extended-mode opt-in the suite skips cleanly with a clear reason; sa
 - Firebase app name in main is `omega-auth` (avoids clashes if a consumer's main code also wants its own Firebase instance).
 - The bridge does NOT persist user info to @omega.js/desktop storage — Firebase's IndexedDB persistence handles session restoration. Matches BXM.
 - Custom tokens are NEVER stored. Renderers receive them once via broadcast, sign in, discard. Fresh tokens are minted on demand from `POST /omega/user/token` via @omega.js/client's shared request layer (`createRequest` from `@omega.js/client/modules/request.js`) — same code path as the extension background's token sync.
-- `manager.getApiUrl()` returns the dev or prod URL, so the bridge automatically hits the right backend. Available across all four Manager contexts (main / renderer / preload / build) via the shared `src/utils/url-helpers.js` module — same code path everywhere. See CLAUDE.md → "Cross-context helpers."
+- `manager.getApiUrl()` returns the dev or prod URL, so the bridge automatically hits the right backend. Available across all four Manager contexts (main / renderer / preload / build) via the shared `src/utils/url-helpers.js` module — same code path everywhere. See AGENTS.md → "Cross-context helpers."
 - All sensitive Firebase user fields (`stsTokenManager`, `providerData`, etc.) are stripped before sending over IPC. Only `{uid, email, displayName, photoURL, emailVerified}` cross the bridge.
