@@ -82,10 +82,10 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `auth:token` | Mint a custom token + one-click sign-in URL (QA "log in as anyone"; emulator by default, `--production` explicit) |
 | `logs:read` / `logs:tail` | Cloud Function logs from Google Cloud Logging |
 | `stripe` | Standalone Stripe CLI webhook forwarding |
-| `indexes` | Sync required Firestore indexes into `firestore.indexes.json` |
-| `firebase-init` | Run Firebase Admin SDK initialization helper |
-| `clean` | Remove generated artifacts (logs, test outputs) |
+| `indexes` | Sync deployed Firestore indexes into `firestore.indexes.json` (aliases `indexes:get`, `firestore:indexes:get`) |
+| `clean` | Remove node_modules + lockfile and reinstall (alias `clean:npm`) |
 | `version` | Print @omega.js/backend version |
+| `help` | Print the command listing (also `-h`/`--help`); bare `omega` runs `setup`, unknown commands print the listing and exit 1 |
 
 See [docs/cli-firestore-auth.md](docs/cli-firestore-auth.md) and [docs/cli-logs.md](docs/cli-logs.md) for full flag references.
 

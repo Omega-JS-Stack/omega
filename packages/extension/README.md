@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/npm/l/@omega.js/extension.svg">
   <br>
   <br>
-  <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/@omega.js/extension">NPM Module</a> | <a href="https://github.com/ITW-Creative-Works/omega">Omega Monorepo</a>
+  <a href="https://itwcreativeworks.com">Site</a> | <a href="https://www.npmjs.com/package/@omega.js/extension">NPM Module</a> | <a href="https://github.com/Omega-JS-Stack/omega">Omega Monorepo</a>
   <br>
   <br>
   <strong>OMEGA Extension</strong> is a framework for building modern cross-browser extensions. One-line bootstrap per context, component-based architecture, multi-browser build pipeline, cross-context auth, auto-translation across 16 languages, and a four-layer test framework.
@@ -32,18 +32,17 @@
 
 ## 🚀 Getting started
 
-1. [Create a repo](https://github.com/itw-creative-works/ultimate-browser-extension/generate) from the **Ultimate Browser Extension** template (or `npm i @omega.js/extension` in an existing project).
-2. Clone the repo to your local machine.
-3. Set up + run:
+1. `npm i @omega.js/extension` in your project (or start from an empty directory — `npx omega setup` scaffolds everything).
+2. Set up + run:
    ```bash
    npm install
    npx omega setup
    npm start
    ```
-4. Open Chrome and navigate to `chrome://extensions`.
-5. Enable **Developer mode**.
-6. Click **Load unpacked** and select the `packaged/chromium/raw` folder in your project.
-7. Your extension is loaded and live-reloads on source changes.
+3. Open Chrome and navigate to `chrome://extensions`.
+4. Enable **Developer mode**.
+5. Click **Load unpacked** and select the `packaged/chromium/raw` folder in your project.
+6. Your extension is loaded and live-reloads on source changes.
 
 ## 📦 Sync with the template
 

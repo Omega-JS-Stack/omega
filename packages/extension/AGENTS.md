@@ -180,14 +180,16 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 
 ## CLI
 
-`npx omega <command>` (aliases `xm`, `ext`, `mgr`, `@omega.js/extension`):
+`npx omega <command>` (bins `omega`, `omg`, `mgr`, `omega-extension`):
 
 | Command | Description |
 |---|---|
 | `setup` | scaffold consumer, copy `src/defaults/`, ensure peer deps. Default when no command given. |
 | `clean` | remove `dist/`, `packaged/`, `.cache/`, `.temp/` |
 | `install` | install peer deps |
+| `deploy` | dispatch the CI publish workflow (the deliberate-deploy verb; see docs/deploys.md in the Omega repo) |
 | `version` | print versions |
+| `help` | command listing (router built-in; also `-h`/`--help`) |
 | `test` | run framework + project test suites |
 | `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/updates.md in the Omega repo |
 

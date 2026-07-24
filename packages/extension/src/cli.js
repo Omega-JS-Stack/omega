@@ -14,6 +14,7 @@ module.exports = createCliRouter({
   defaultCommand: 'setup',
   aliases: {
     clean: ['-c', '--clean'],
+    deploy: ['-d', '--deploy'],
     install: ['-i', 'i', '--install'],
     setup: ['-s', '--setup'],
     test: ['-t', '--test'],

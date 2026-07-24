@@ -44,6 +44,34 @@ module.exports = {
       },
     },
     {
+      name: 'transport gate: non-https URL refused (defaults only), loopback http allowed',
+      run: async (ctx) => {
+        const orig = ctx.manager.config.remoteConfig;
+        try {
+          ctx.manager.remoteConfig.shutdown();
+          ctx.manager.config.remoteConfig = { url: 'http://insecure.example/custom.json' };
+          ctx.manager.remoteConfig.initialize(ctx.manager);
+          ctx.expect(ctx.manager.remoteConfig._url).toBe(null);
+          // Defaults still served — the gate disables the fetch, not the API —
+          // and the renderer IPC handler is registered BEFORE the gate returns
+          // (the preload exposes the invoke unconditionally).
+          ctx.expect(ctx.manager.remoteConfig.get('status')).toBe('online');
+          const viaIpc = await ctx.manager.ipc.invoke('desktop:remote-config:get', 'status');
+          ctx.expect(viaIpc).toBe('online');
+
+          // Unlikely-to-be-listening port — initialize() fires a real fetch.
+          ctx.manager.remoteConfig.shutdown();
+          ctx.manager.config.remoteConfig = { url: 'http://127.0.0.1:59987/custom.json' };
+          ctx.manager.remoteConfig.initialize(ctx.manager);
+          ctx.expect(ctx.manager.remoteConfig._url).toBe('http://127.0.0.1:59987/custom.json');
+        } finally {
+          ctx.manager.remoteConfig.shutdown();
+          ctx.manager.config.remoteConfig = orig;
+          ctx.manager.remoteConfig.initialize(ctx.manager);
+        }
+      },
+    },
+    {
       name: 'enabled=false: skip everything',
       run: async (ctx) => {
         ctx.manager.remoteConfig.shutdown();

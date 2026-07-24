@@ -44,6 +44,7 @@ const DEFAULTS = Object.freeze({
 const LoggerLite       = require('./logger-lite.js');
 const fetch            = require('wonderful-fetch');
 const formatFetchError = require('../utils/format-fetch-error.js');
+const { isSecureRemoteUrl } = require('../utils/secure-remote-url.js');
 
 const logger = new LoggerLite('remote-config');
 
@@ -69,6 +70,19 @@ const remoteConfig = {
     // 'online', versionRequired: '0.0.0', etc.) instead of undefined.
     remoteConfig._data = { ...DEFAULTS };
 
+    // IPC: renderer reads via invoke. Registered BEFORE every early return
+    // (disabled / no URL / transport gate) — the preload exposes these invokes
+    // unconditionally, so an unregistered handler would reject every renderer
+    // call instead of serving the defaults the early-return paths promise.
+    manager.ipc.unhandle('desktop:remote-config:get');
+    manager.ipc.handle('desktop:remote-config:get',         (path) => remoteConfig.get(path));
+    manager.ipc.unhandle('desktop:remote-config:refresh-now');
+    manager.ipc.handle('desktop:remote-config:refresh-now', () => remoteConfig.refreshNow());
+    // Broadcast updates to renderers.
+    remoteConfig.on('update', (data) => {
+      manager.ipc.broadcast('desktop:remote-config:update', data);
+    });
+
     const cfg = manager.config.remoteConfig || {};
     remoteConfig._enabled = cfg.enabled !== false;       // default on
 
@@ -88,6 +102,14 @@ const remoteConfig = {
 
     if (!remoteConfig._url) {
       logger.warn('remote-config: no URL resolvable (set config.brand.url or config.remoteConfig.url) — using defaults only.');
+      return;
+    }
+
+    // Transport gate: fetched values flip app behavior (force-update,
+    // maintenance), so cleartext delivery is refused (loopback excepted for dev).
+    if (!isSecureRemoteUrl(remoteConfig._url)) {
+      logger.warn(`remote-config: refusing non-https URL "${remoteConfig._url}" — remote config only loads over TLS (localhost excepted); using defaults only.`);
+      remoteConfig._url = null;
       return;
     }
 
@@ -111,17 +133,6 @@ const remoteConfig = {
     remoteConfig._intervalId = setInterval(() => {
       remoteConfig.refreshNow().catch((e) => logger.warn(`periodic fetch failed: ${formatFetchError(e)}`));
     }, interval);
-
-    // IPC: renderer reads via invoke. Subscribe-to-update is an IPC broadcast,
-    // wired into the in-process listener below.
-    manager.ipc.unhandle('desktop:remote-config:get');
-    manager.ipc.handle('desktop:remote-config:get',         (path) => remoteConfig.get(path));
-    manager.ipc.unhandle('desktop:remote-config:refresh-now');
-    manager.ipc.handle('desktop:remote-config:refresh-now', () => remoteConfig.refreshNow());
-    // Broadcast updates to renderers.
-    remoteConfig.on('update', (data) => {
-      manager.ipc.broadcast('desktop:remote-config:update', data);
-    });
 
     logger.log(`remote-config initialized — url=${remoteConfig._url} interval=${interval}ms (using defaults until first fetch)`);
   },

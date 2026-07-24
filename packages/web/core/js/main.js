@@ -76,7 +76,7 @@ export default async function ({ manager, options } = {}) {
           .catch(error => console.error(`Failed to load ${module.path}:`, error))
       );
     } else {
-      console.log(`Skipping ${module.path} (disabled in config)`);
+      console.log(`Skipping ${module.path} (no ${module.configKey} config section enables it)`);
     }
   }
 

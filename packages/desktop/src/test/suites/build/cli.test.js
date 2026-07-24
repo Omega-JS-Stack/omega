@@ -54,5 +54,23 @@ module.exports = {
         ctx.expect((stat.mode & 0o100) !== 0).toBeTruthy();
       },
     },
+    {
+      name: 'cli-run disables yargs built-in --help/--version (router owns both)',
+      run: (ctx) => {
+        // The built-ins printed an empty stub and version "0.0.0" instead of
+        // reaching the alias table / the router's generated help (wave-6 D1).
+        const source = fs.readFileSync(path.join(root, 'dist', 'cli-run.js'), 'utf8');
+        ctx.expect(source.includes('.version(false)')).toBeTruthy();
+        ctx.expect(source.includes('.help(false)')).toBeTruthy();
+      },
+    },
+    {
+      name: 'mirrored aliases: -t routes to test, -d routes to deploy (wave-6 D6)',
+      run: (ctx) => {
+        const { aliases } = require(path.join(root, 'dist', 'cli.js')).config;
+        ctx.expect(aliases.test.includes('-t')).toBe(true);
+        ctx.expect(aliases.deploy.includes('-d')).toBe(true);
+      },
+    },
   ],
 };

@@ -9,7 +9,14 @@ async function run() {
 
   // Value-less flags must be declared boolean — otherwise yargs treats the next
   // positional as the flag's VALUE. Mirrors the same fix in @omega.js/backend's CLI.
-  const argv = require('yargs')(process.argv.slice(2)).boolean(['extended']).parseSync();
+  // yargs' built-in --version/--help are disabled so both route through the
+  // alias table / the router's built-in help (the built-ins printed an empty
+  // stub and version "0.0.0" — yargs can't resolve our package version here).
+  const argv = require('yargs')(process.argv.slice(2))
+    .boolean(['extended'])
+    .version(false)
+    .help(false)
+    .parseSync();
   const cli = new (require('./cli.js'))(argv);
 
   await cli.process(argv);

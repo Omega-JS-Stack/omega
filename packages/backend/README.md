@@ -737,7 +737,8 @@ npx @omega.js/backend <command>
 | `mgr version`, `mgr v` | Show @omega.js/backend version |
 | `mgr clear` | Clear cache and temp files |
 | `mgr install`, `mgr i` | Install @omega.js/backend (local — links every `@omega.js/*` dep from the Omega monorepo — or production) |
-| `mgr clean:npm` | Clean and reinstall npm modules |
+| `mgr clean` | Clean and reinstall npm modules (alias `clean:npm`) |
+| `mgr help`, `mgr -h` | Print the command listing; bare `mgr` runs `setup`, unknown commands print the listing and exit 1 |
 | `mgr firestore:indexes:get` | Get Firestore indexes |
 | `mgr cwd` | Show current working directory |
 | `mgr firestore:get <path>` | Read a Firestore document |

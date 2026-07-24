@@ -43,6 +43,31 @@ module.exports = {
       },
     },
     {
+      name: 'transport gate: non-https URL refused (lane disabled), loopback http allowed',
+      run: (ctx) => {
+        const orig = ctx.manager.config.remoteScripts;
+        try {
+          ctx.manager.remoteScripts.shutdown();
+          ctx.manager.config.remoteScripts = { url: 'http://insecure.example/patch.js' };
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+          ctx.expect(ctx.manager.remoteScripts._url).toBe(null);
+          ctx.expect(ctx.manager.remoteScripts._intervalId).toBe(null);
+
+          // Port 59987 is deliberately unlikely to be listening — initialize()
+          // fires a real refreshNow(), and a live port (4000 = the web dev
+          // server) would have its response body EXECUTED by this lane.
+          ctx.manager.remoteScripts.shutdown();
+          ctx.manager.config.remoteScripts = { url: 'http://localhost:59987/patch.js' };
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+          ctx.expect(ctx.manager.remoteScripts._url).toBe('http://localhost:59987/patch.js');
+        } finally {
+          ctx.manager.remoteScripts.shutdown();
+          ctx.manager.config.remoteScripts = orig;
+          ctx.manager.remoteScripts.initialize(ctx.manager);
+        }
+      },
+    },
+    {
       name: 'enabled=false: skip everything',
       run: (ctx) => {
         ctx.manager.remoteScripts.shutdown();

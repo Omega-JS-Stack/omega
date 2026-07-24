@@ -36,6 +36,11 @@ test('dispatch table: every aliased command has a command file', () => {
   for (const name of ['setup', 'install', 'dev', 'build', 'deploy', 'update', 'translate', 'audit', 'test', 'clean', 'version']) {
     assert.ok(aliases[name], `${name} is routed`);
   }
+
+  // -t = test on EVERY framework (mirrored-implementation rule, wave-6 D6) —
+  // translate deliberately carries no single-letter alias.
+  assert.ok(aliases.test.includes('-t'), '-t routes to test');
+  assert.ok(!aliases.translate.includes('-t'), 'translate has no -t');
 });
 
 test('scaffold: files land with rename rules applied, no pages, no Ruby', () => {

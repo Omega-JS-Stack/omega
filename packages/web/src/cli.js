@@ -20,10 +20,12 @@ const ALIASES = {
   update: ['-u', '--update', 'outdated', 'out'],
   migrate: ['-m', '--migrate', 'migration'],
   customize: ['-cz', '--customize'],
-  translate: ['-t', '--translate', 'translation'],
+  translate: ['--translate', 'translation'],
   audit: ['-a', '--audit'],
   purge: ['-cf', '--purge', 'cloudflare-purge'],
-  test: ['--test'],
+  // -t = test on EVERY framework (mirrored-implementation rule) — translate
+  // deliberately has no single-letter alias so the muscle-memory flag is safe
+  test: ['-t', '--test'],
   clean: ['-c', '--clean'],
   version: ['-v', '--version'],
 };

@@ -91,17 +91,22 @@ module.exports = {
       },
     },
     {
-      name: 'unknown command throws "Command not found"',
+      name: 'unknown command prints the available listing + exit code 1 (no throw — wave-6 D7)',
       run: async (ctx) => {
         const Main = freshCli();
-        let threw = false;
+        const errors = [];
+        const origError = console.error;
+        const origExitCode = process.exitCode;
+        console.error = (...args) => errors.push(args.join(' '));
         try {
           await new Main().process({ _: ['totally-not-a-command-xyz'] });
-        } catch (e) {
-          threw = true;
-          ctx.expect(e.message).toContain('not found');
+          ctx.expect(errors.join('\n')).toContain('Unknown command "totally-not-a-command-xyz"');
+          ctx.expect(errors.join('\n')).toContain('Available:');
+          ctx.expect(process.exitCode).toBe(1);
+        } finally {
+          console.error = origError;
+          process.exitCode = origExitCode;
         }
-        ctx.expect(threw).toBe(true);
       },
     },
     {
@@ -117,6 +122,24 @@ module.exports = {
         } finally {
           unstub('test');
         }
+      },
+    },
+    {
+      name: 'cli-run disables yargs built-in --help/--version (router owns both)',
+      run: (ctx) => {
+        // The built-ins printed an empty stub and version "0.0.0" instead of
+        // reaching the alias table / the router's generated help (wave-6 D1).
+        const source = require('fs').readFileSync(path.join(__dirname, '..', '..', '..', 'cli-run.js'), 'utf8');
+        ctx.expect(source.includes('.version(false)')).toBeTruthy();
+        ctx.expect(source.includes('.help(false)')).toBeTruthy();
+      },
+    },
+    {
+      name: 'mirrored aliases: -t routes to test, -d routes to deploy (wave-6 D6)',
+      run: (ctx) => {
+        const { aliases } = freshCli().config;
+        ctx.expect(aliases.test.includes('-t')).toBe(true);
+        ctx.expect(aliases.deploy.includes('-d')).toBe(true);
       },
     },
   ],

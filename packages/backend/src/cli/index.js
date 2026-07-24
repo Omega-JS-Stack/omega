@@ -4,8 +4,13 @@ const path = require('path');
 // positional as the flag's VALUE (`mgr test --extended project:foo` became
 // extended='project:foo' with NO targets, silently running EVERYTHING in
 // extended mode against real external APIs).
+// yargs' built-in --help/--version are disabled — they fired at this module-
+// level parse (printing an empty stub / "0.0.0") before process() could ever
+// reach the real help/version branches. Mirrors the router frameworks' cli-run.
 const argv = require('yargs')(process.argv.slice(2))
   .boolean(['extended', 'legacy', 'force', 'raw', 'emulator', 'seed'])
+  .version(false)
+  .help(false)
   .argv;
 const _ = require('lodash');
 
@@ -39,6 +44,33 @@ const LogsCommand = require('./commands/logs');
 const UpdateCommand = require('./commands/update');
 const McpCommand = require('./commands/mcp');
 
+// The dispatchable surface, one line per branch below — shown by `omega help`
+// and after an unknown command. Keep in sync with the process() chain.
+const HELP_TEXT = `Usage: omega <command> [options]
+
+Commands:
+  setup                          validate + heal the app [default]
+  build                          stage src/ into dist/
+  serve                          run the local Firebase emulator suite
+  deploy                         deploy to Firebase
+  test                           run the test suites
+  emulator | emulators           emulator keep-alive mode
+  watch                          hot-reload on framework source changes
+  update | outdated | out        dependency freshness report
+  install local | install live   switch the installed framework copy (i = install)
+  clean | clean:npm              remove node_modules + lockfile and reinstall
+  clear                          clear caches
+  cwd                            print the resolved app root
+  stripe | stripe:listen         forward Stripe webhooks locally
+  firestore:get|set|query|delete Firestore utilities
+  indexes                        sync deployed Firestore indexes into firestore.indexes.json
+                                 (aliases: indexes:get, firestore:indexes:get)
+  auth:get|list|delete|set-claims|token  Auth utilities
+  logs | logs:read|tail|stream   Cloud Logging utilities
+  mcp                            run the MCP server
+  version | -v                   print the framework version
+  help | -h                      this listing`;
+
 function Main() {}
 
 Main.prototype.process = async function (args) {
@@ -56,7 +88,7 @@ Main.prototype.process = async function (args) {
   self.default.version = self.packageJSON.version;
 
   // Parse arguments into options
-  for (var i = 0; i < args.length; i++) {
+  for (let i = 0; i < args.length; i++) {
     self.options[args[i]] = true;
   }
 
@@ -64,6 +96,12 @@ Main.prototype.process = async function (args) {
   if (self.options.v || self.options.version || self.options['-v'] || self.options['-version']) {
     const cmd = new VersionCommand(self);
     return await cmd.execute();
+  }
+
+  // Help — never falls through to another command
+  if (self.options.help || self.options['--help'] || self.options.h || self.options['-h']) {
+    console.log(HELP_TEXT);
+    return;
   }
 
   // Clear command
@@ -102,14 +140,22 @@ Main.prototype.process = async function (args) {
     return await cmd.execute('live');
   }
 
+  // Install without a mode — name the real spellings instead of falling to
+  // the unknown-command tail (which would misreport a listed command)
+  if (self.options.i || self.options.install) {
+    console.error('install needs a mode: `omega install local` or `omega install live` (aliases: dev/development, prod/production).');
+    process.exitCode = 1;
+    return;
+  }
+
   // Serve firebase
   if (self.options.serve) {
     const cmd = new ServeCommand(self);
     return await cmd.execute();
   }
 
-  // Get indexes
-  if (self.options['firestore:indexes:get'] || self.options['firestore:indexes'] || self.options['indexes:get']) {
+  // Get indexes (`indexes` accepted bare — the documented sync verb)
+  if (self.options['indexes'] || self.options['firestore:indexes:get'] || self.options['firestore:indexes'] || self.options['indexes:get']) {
     const cmd = new IndexesCommand(self);
     return await cmd.get(undefined, true);
   }
@@ -132,8 +178,8 @@ Main.prototype.process = async function (args) {
     return await cmd.execute();
   }
 
-  // Clean
-  if (self.options['clean:npm']) {
+  // Clean (`clean` accepted bare — every router framework answers it)
+  if (self.options['clean:npm'] || self.options.clean) {
     const cmd = new CleanCommand(self);
     return await cmd.execute();
   }
@@ -182,6 +228,20 @@ Main.prototype.process = async function (args) {
     const cmd = new McpCommand(self);
     return await cmd.execute();
   }
+
+  // Nothing matched. run.js passes full process.argv, so the real command
+  // tokens start at index 2. Bare invocation mirrors every router framework's
+  // default: setup. Anything else is an unknown command — the old chain
+  // returned undefined and exited 0 in silence.
+  const commandArgs = args.slice(2);
+  if (commandArgs.length === 0) {
+    const cmd = new SetupCommand(self);
+    return await cmd.execute();
+  }
+
+  console.error(`Unknown command "${commandArgs.join(' ')}".`);
+  console.error(HELP_TEXT);
+  process.exitCode = 1;
 };
 
 // Test method for setup command
@@ -203,7 +263,7 @@ Main.prototype.test = async function(name, fn, fix, args) {
     console.log(`${ui.indent(2)}${chalk.dim(bracket)} ${color(ui.SYMBOLS[kind])} ${name}${suffix}`);
   };
 
-  let passed = await fn();
+  const passed = await fn();
 
   // A check that returns an Error is a hard, unrecoverable failure (e.g. wrong
   // Node version). Print it cleanly and stop — no auto-fix is possible.

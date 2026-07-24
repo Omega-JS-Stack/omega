@@ -52,6 +52,8 @@ npx omega customize <url>  # materialize a default page into src/pages/ (spec §
                     #   customizable URL + lane (docs/sections.md in the Omega repo)
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
+npx omega help      # command listing (also -h/--help; router built-in — never
+                    #   falls through to setup like the old flag handling did)
 npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place
 npx omega migrate --check   # full report (config + codemod preview + lint), zero writes
 npx omega translate         # translate dist/ into translation.languages (committed cache;

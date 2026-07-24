@@ -15,9 +15,10 @@
 //   manager.remoteScripts.getLastRun()    → { hash, timestamp } or null
 //   manager.remoteScripts.clearExecuted() → wipe stored hash (forces re-run next poll)
 
-const LoggerLite       = require('./logger-lite.js');
-const fetch            = require('wonderful-fetch');
-const formatFetchError = require('../utils/format-fetch-error.js');
+const LoggerLite           = require('./logger-lite.js');
+const fetch                = require('wonderful-fetch');
+const formatFetchError     = require('../utils/format-fetch-error.js');
+const { isSecureRemoteUrl } = require('../utils/secure-remote-url.js');
 
 const logger = new LoggerLite('remote-scripts');
 
@@ -53,6 +54,14 @@ const remoteScripts = {
 
     if (!remoteScripts._url) {
       logger.warn('remote-scripts: no URL resolvable (set config.brand.url or config.remoteScripts.url) — disabled.');
+      return;
+    }
+
+    // Transport gate: this lane EXECUTES the fetched body in the main process,
+    // so cleartext delivery is never acceptable (loopback excepted for dev).
+    if (!isSecureRemoteUrl(remoteScripts._url)) {
+      logger.warn(`remote-scripts: refusing non-https URL "${remoteScripts._url}" — remote scripts only load over TLS (localhost excepted); disabled.`);
+      remoteScripts._url = null;
       return;
     }
 

@@ -26,7 +26,7 @@ https://www.relume.ai/?r=0
   * i notice ome are tagged like [@omega.js/client:push] Auto-subscription failed: Notification permission denied
   * [Form-manager]
 * https://omegajs.dev/status
-  *all systems operationsal green is different than the green for hte status bars under. just make it the same, universal acros THE ENTIRE WEBSITE
+  * all systems operationsal green is different than the green for hte status bars under. just make it the same, universal acros THE ENTIRE WEBSITE
   * lots of stuff issing from the build manifest. fix and add more shit if its missing
 * https://omegajs.dev/download
   * logos for platforms need to be bigger and more prominent
@@ -46,3 +46,17 @@ https://www.relume.ai/?r=0
 ## From cp268 review (fable 2026-07-23)
 * desktop has NO `@dev-only` strip in its webpack lane (extension has a loader, web got one in cp268) — if desktop production bundles carry @omega.js/client's dev-only blocks, the same live-dev-code class exists there. Also: the strip marker constants now live in two homes (extension webpack loader + web esbuild plugin) — SSOT candidate (devkit).
 * `packages/manager/AGENTS.md` tells brand consumers to read `node_modules/@omega.js/web/CLAUDE.md`, but the web package ships neither CLAUDE.md nor AGENTS.md (pre-existing) — fold into the docs+skills revamp.
+
+
+## From cp269 review (fable 2026-07-24)
+* backend HELP_TEXT is hand-maintained ("keep in sync with the process() chain") while the four router frameworks generate help from the live dispatch table — a tiny generator over a backend command table would remove the drift risk the review already caught once (the install-spelling mismatch).
+
+## DE-BRAND config + more
+* we need to DE-brand the config keys. for example
+  * chatsy
+  * replyify
+  * gcp
+  * slapform
+  * adsense
+  * and anything else.... help me decide the proper de-branded key name and then set these as PROVIDERS (just like weve been doing)
+
