@@ -1,6 +1,6 @@
 /**
  * Multi-instance targets — the normalization trick and the app-dir mapping
- * (plans/multi-instance-targets.md, shape ratified by Ian 2026-07-20).
+ * (_attic/plans/multi-instance-targets.md, shape ratified by Ian 2026-07-20).
  *
  * `targets.<type>` may be an object (today's single-instance shape) or an
  * ARRAY of id'd instance entries. Normalization is the whole mechanism: a

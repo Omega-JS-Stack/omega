@@ -9,6 +9,6 @@ const Logger = require('@omega.js/devkit/logger');
 const logger = new Logger('omega:audit');
 
 module.exports = async function (options) {
-  logger.error('`omega audit` is not ported yet — the audit subsystem arrives with a later B-phase checkpoint (see PROGRESS.md Task 2.7 follow-ups).');
+  logger.error('`omega audit` is not ported yet — the audit subsystem arrives with a later B-phase checkpoint.');
   process.exitCode = 1;
 };

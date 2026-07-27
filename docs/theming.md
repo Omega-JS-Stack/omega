@@ -1,7 +1,7 @@
 # Theming — the OMEGA design system contract
 
 > classy v2 (the flagship skin) + the shared machinery every theme and, at C4,
-> every target rides. Visual spec: [plans/classy-v2/DIRECTION.md](../plans/classy-v2/DIRECTION.md).
+> every target rides. Visual spec: [docs/classy-v2/DIRECTION.md](classy-v2/DIRECTION.md).
 
 ## The three layers
 

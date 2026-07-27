@@ -1,5 +1,5 @@
 /**
- * The section/component library machinery (plans/omega-sections-spec.md):
+ * The section/component library machinery (docs/omega-sections-spec.md):
  * dual-form {% section %}/{% component %} tags, layer resolution, defaults ←
  * data ← args merge, call-site liquification, schema warnings, and the
  * context-free render — plus build-level pins for the frontmatter bridge

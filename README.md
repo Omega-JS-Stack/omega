@@ -18,4 +18,4 @@ Published packages live under the `@omega.js` npm scope. Private shared internal
 
 ## Status
 
-Early bootstrap — see [PROGRESS.md](PROGRESS.md).
+Live work is tracked as [GitHub issues](https://github.com/Omega-JS-Stack/omega/issues) (the queue is a query: `gh issue list`); standing rulings live in [docs/rulings.md](docs/rulings.md).

@@ -229,7 +229,7 @@ function configureOmega(eleventyConfig, options) {
   eleventyConfig.amendLibrary('liquid', (engine) => {
     // The section/component library tags resolve through the same precedence
     // as every other layer: consumer-local _sections/_components → active
-    // theme → classy base (plans/omega-sections-spec.md).
+    // theme → classy base (docs/omega-sections-spec.md).
     registerSectionTags(engine, { baseDirs: [options.consumerDir, ...themeLayers] });
     registerLiquid(engine, {
       site,

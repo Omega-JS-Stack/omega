@@ -3,7 +3,7 @@
 The section/component library: pages are compositions of one-line calls;
 markup, styles, behavior, and the arg contract live together in a folder the
 framework owns. Design rationale and the arc's sequencing live in
-[plans/omega-sections-spec.md](../plans/omega-sections-spec.md) — this doc is
+[docs/omega-sections-spec.md](omega-sections-spec.md) — this doc is
 the landed contract.
 
 ## The two tiers

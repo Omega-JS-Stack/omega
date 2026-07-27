@@ -1,7 +1,7 @@
 /**
  * Admin Verts Index Page JavaScript
  *
- * House vert inventory management (plans/verts-system.md phase 3): lists the
+ * House vert inventory management (docs/ads-system.md phase 3): lists the
  * verts collection through the admin CRUD routes (GET/POST/PUT/DELETE
  * /omega/verts — the serve route's inventory), with a single editor modal
  * for create + edit, an enable/disable toggle, and delete. Images ride

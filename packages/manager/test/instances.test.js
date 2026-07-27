@@ -1,5 +1,5 @@
 /**
- * Multi-instance targets in the manager (plans/multi-instance-targets.md):
+ * Multi-instance targets in the manager (_attic/plans/multi-instance-targets.md):
  * the workspace structure op's per-instance app-dir expectations (enabled
  * instance without its dir = the same create-this-dir error as today) and
  * the testing service's per-instance live-URL checks + per-instance deploy

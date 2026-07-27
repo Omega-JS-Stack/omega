@@ -1,0 +1,66 @@
+# Checks (workflow spec) — the test gate that runs on every pull request.
+# Making it a REQUIRED check is a repo setting (branch protection / ruleset)
+# a human turns on; until then it runs and reports, and the ship skill treats
+# a red run as unmergeable.
+# Installed once by workflow/standards.sh; after that this copy is the repo's
+# own, so repo-specific steps (extra tools, matrix builds) belong here, not in
+# the workflow core's template.
+#
+# The jobs mirror what the local hooks run: the npm test suite
+# (safety/commit-gate) and the CHANGELOG entry format (docs/changelog-guard).
+# A repo without a test script or without a CHANGELOG passes trivially — the
+# checks exist so a pull request from ANY author (cloud agent, collaborator,
+# laptop without the hooks) meets the same bar before merge.
+#
+# The `changelog` job is the only job the heal adds to an EXISTING checks.yml,
+# appended once at the end of `jobs:`. Its linter is the copy of the kit's
+# changelog.js the heal vendors to .github/changelog-lint.js on every run.
+name: checks
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      # A runner has no global git identity, so any test that builds a scratch
+      # repo and commits into it fails at "Author identity unknown".
+      - name: Configure git identity
+        run: |
+          git config --global user.name "checks"
+          git config --global user.email "checks@ci.local"
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          elif [ -f package.json ]; then
+            npm install --no-audit --no-fund
+          fi
+      # Repo-specific trim: root `npm test` is the full battery — its e2e lanes
+      # (test:verts, test:auth, e2e-journey) spawn Firebase emulators via
+      # `mgr emulator`, and firebase-tools is not a dependency of this repo, so
+      # the full chain cannot run on a bare runner. The package suites are the
+      # CI gate; the battery stays the local commit-gate's job.
+      - name: Test
+        run: npm run test:packages
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      # Only the [Unreleased] section: released history is already published,
+      # and a maintainer editing it is not what this gate is for.
+      - name: CHANGELOG entry format
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            node .github/changelog-lint.js CHANGELOG.md --unreleased-only
+          else
+            echo "no CHANGELOG.md — nothing to check"
+          fi

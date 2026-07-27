@@ -1,6 +1,6 @@
 /**
  * Root `npm run test:verts` — verts (verts) step 6: the COMPANY-MODE PROOF
- * (plans/verts-system.md, sequencing 6: "Paperloom serves, a second in-repo
+ * (docs/ads-system.md, sequencing 6: "Paperloom serves, a second in-repo
  * brand consumes"). Runs in root `npm test` between the sandbox e2e and the
  * wizard journey. Fully offline: local emulators only, nothing cloud.
  *

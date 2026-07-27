@@ -7,7 +7,7 @@
  * schemas built with the `fields` builders run the SAME field pipeline as the
  * declarative engine (shared in schema-engine.js — coerce-never-reject,
  * clamp/truncate, required fires on undefined/'') — see
- * plans/zod-route-schemas-design.md for the full preservation checklist.
+ * _attic/plans/archive/zod-route-schemas-design.md for the full preservation checklist.
  *
  * Builders (mirror the declarative node options one-to-one):
  *   const { z, fields: f } = require('../../helpers/schema-zod.js');

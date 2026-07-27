@@ -74,7 +74,7 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 
 One brand can run N instances of the SAME target type (the legacy `brand.subdomains` need:
 admin/cdn/app sites of one brand) — `targets.<type>` takes an **object OR an array of id'd
-instances** ([plans/multi-instance-targets.md](../plans/multi-instance-targets.md), ratified
+instances** ([_attic/plans/multi-instance-targets.md](../_attic/plans/multi-instance-targets.md), ratified
 2026-07-20):
 
 ```json5
@@ -243,7 +243,7 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   resolving) and boots firebase-tools with `--config`; the committed firebase.json never
   changes. Gitignored; removed on shutdown.
 
-Design + slice plan: [plans/n7-port-allocation.md](../plans/n7-port-allocation.md).
+Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../_attic/plans/archive/n7-port-allocation.md).
 
 ## Validation
 

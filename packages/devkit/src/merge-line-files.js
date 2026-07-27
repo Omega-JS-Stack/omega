@@ -8,7 +8,7 @@
 //
 // Convention (the ONE OMEGA marker grammar — `<comment> ========== <Label> ==========`,
 // comment token per file type; the rules-file managed block is the `//` flavor of the
-// same family, owned by @omega.js/backend — see plans/marker-harmonization.md):
+// same family, owned by @omega.js/backend — see _attic/plans/archive/marker-harmonization.md):
 //
 //   # ========== Default Values ==========
 //   # framework-managed; overwritten on every setup

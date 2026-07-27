@@ -1,5 +1,5 @@
 /**
- * Multi-instance targets (plans/multi-instance-targets.md): normalization
+ * Multi-instance targets (_attic/plans/multi-instance-targets.md): normalization
  * (object → [{ id: 'main', ...entry }]), the app-dir ↔ instance walk, the
  * validator's array rules (ids required/dir-safe/unique; >1 backend warns),
  * the instance dimension in loadConfig/composeTargetConfig, port offsets,

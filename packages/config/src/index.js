@@ -102,7 +102,7 @@ module.exports = {
   portsToEnv,
   envPort,
 
-  // Multi-instance targets (plans/multi-instance-targets.md): normalization
+  // Multi-instance targets (_attic/plans/multi-instance-targets.md): normalization
   // is the ONE iteration mechanism — object form = [{ id: 'main', ...entry }]
   APP_DIR_TARGETS,
   TARGET_APP_DIRS,

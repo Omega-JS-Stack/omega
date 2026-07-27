@@ -22,3 +22,7 @@ logs/
 firebase.resolved.json
 
 _attic/
+
+# Workflow state (workflow spec) — only settings.json is committed
+.workkit/*
+!.workkit/settings.json

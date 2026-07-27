@@ -139,7 +139,7 @@ function assertWebInvariants(cell, pages) {
 }
 
 /**
- * The multi-instance proof (plans/multi-instance-targets.md step 3): flip the
+ * The multi-instance proof (_attic/plans/multi-instance-targets.md step 3): flip the
  * born brand's targets.web to the 2-instance array form and exercise the
  * whole sweep through the REAL mechanisms — the workspace structure op's
  * per-instance dir expectations, per-instance compose (the admin entry

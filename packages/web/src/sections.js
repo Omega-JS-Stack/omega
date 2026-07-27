@@ -1,5 +1,5 @@
 /**
- * The section/component library machinery (plans/omega-sections-spec.md):
+ * The section/component library machinery (docs/omega-sections-spec.md):
  * `{% section "marketing/hero", key: value %}` and `{% component "frame/x" %}`
  * Liquid tags. One tag, two authoring forms:
  *

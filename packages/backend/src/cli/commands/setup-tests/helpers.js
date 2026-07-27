@@ -4,7 +4,7 @@ const JSON5 = require('json5');
 // Rules-file marker (shared by setup.js + the firestore/realtime rules tests):
 // the OMEGA-managed block marks where the core rules belong, in the one OMEGA
 // marker grammar (`<comment> ========== <Label> ==========` — see
-// plans/marker-harmonization.md). The open marker carries the version stamp:
+// _attic/plans/archive/marker-harmonization.md). The open marker carries the version stamp:
 //
 //   // ========== OMEGA Rules (v6.2.0) ==========
 //   ...core rules (framework-owned, replaced wholesale)...

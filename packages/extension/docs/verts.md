@@ -1,7 +1,7 @@
 # Verts — the `data-omega-vert` auto-bind
 
 @omega.js/extension page surfaces auto-bind the OMEGA verts (ads) system (monorepo
-`plans/ads-system.md`, phase 4): drop a `[data-omega-vert]` element into a
+`docs/ads-system.md`, phase 4): drop a `[data-omega-vert]` element into a
 popup/options/sidepanel/page view and the surface Manager hands it to
 `@omega.js/client`'s verts module — zero consumer JS, same element vocabulary
 as the web `verts/unit` section and @omega.js/desktop.
