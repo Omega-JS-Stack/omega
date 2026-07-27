@@ -239,7 +239,7 @@ test('signed-in URL scheme: user app under /dashboard, staff app rooted at /admi
   assert.ok(pages.get('/admin/dashboard').includes('data-url="/admin"'), '/admin/dashboard redirects to the root overview');
 });
 
-test('admin verts card serves at /admin/verts (docs/ads-system.md phase 3)', () => {
+test('admin verts card serves at /admin/verts (docs/web/ads-system.md phase 3)', () => {
   const verts = pages.get('/admin/verts');
   assert.ok(verts, 'verts card serves at /admin/verts');
   assert.ok(verts.includes('omega-shell'), 'verts card wears the app shell (admin/core/minimal gate)');

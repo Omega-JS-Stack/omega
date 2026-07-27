@@ -1,63 +1,94 @@
 # OMEGA Monorepo
 
-> Architectural overview only — deep references live in `docs/<topic>.md`. Keep this file under 250 lines.
+> The entry point. Read this top to bottom (it is short), then follow the map. This file is a MAP, not a manual: the knowledge lives in `docs/` (segregated by framework), and the omega Claude plugin's hooks load it into a session deterministically, by where the work is happening. Keep this file under 250 lines.
 
-## Identity
+## What this is
 
-The OMEGA monorepo holds the `@omega.js` framework ecosystem: the successors to backend-manager (BEM), browser-extension-manager (BXM), electron-manager (EM), web-manager (WM), and ultimate-jekyll-manager (UJM — replaced by the new `@omega.js/web`, not ported). One repo, npm workspaces, changesets for independent versioning. Remote: [github.com/Omega-JS-Stack/omega](https://github.com/Omega-JS-Stack/omega) (npm org `omega.js`, GH org `Omega-JS-Stack` — both Ian's, names final).
+The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for independent versioning. Remote: [github.com/Omega-JS-Stack/omega](https://github.com/Omega-JS-Stack/omega) (npm org `omega.js`, GH org `Omega-JS-Stack` — both Ian's, names final).
+
+**Lineage** (the migration story, kept short): OMEGA consolidates the legacy manager ecosystem — backend-manager (BEM) became `@omega.js/backend`; ultimate-jekyll-manager (UJM) was replaced by `@omega.js/web` (rebuilt on Eleventy 3, not ported); electron-manager (EM) became `@omega.js/desktop`; browser-extension-manager (BXM) became `@omega.js/extension`; web-manager (WM) was absorbed into `@omega.js/client` — WM no longer exists as a concept; jekyll-uj-powertools became `@omega.js/template-kit`; omega-manager's brains became `@omega.js/manager`. The legacy repos keep serving production and are read-only reference (HARD RULE 1).
 
 ## HARD RULES
 
 1. 🚫 **The legacy repos are READ-ONLY.** Never modify `omega-manager`, `backend-manager`, `ultimate-jekyll-manager`, `browser-extension-manager`, `electron-manager`, `mobile-app-manager`, `web-manager`, `jekyll-uj-powertools`, or any consumer brand repo. They are reference/history and keep serving production. All work happens HERE.
-2. **Every package here is `@omega.js/*`-named; zero npm publishes until Ian finalizes versions.** Old-name releases (backend-manager@5.x, electron-manager@1.x, …) ship from the LEGACY repos (Ian-owned); the monorepo's `pre-*-rename` tags are the backup lane.
-3. **Publish policy — internal by default**: private shared packages (`account`, `config`, `devkit`, `template-kit`) are vendored into published frameworks at prepare time and never publish. Published = frameworks + `@omega.js/manager` + `@omega.js/client` (a real runtime dependency of desktop/extension since the client cutover — never vendored; see [docs/local-dev.md](docs/local-dev.md)).
+2. **Every package here is `@omega.js/*`-named; zero npm publishes until Ian finalizes versions.** Old-name releases ship from the LEGACY repos; the monorepo's `pre-*-rename` tags are the backup lane.
+3. **Publish policy — internal by default**: private shared packages (`account`, `config`, `devkit`, `template-kit`) are vendored into published frameworks at prepare time and never publish. Published = frameworks + `@omega.js/manager` + `@omega.js/client` (a real runtime dependency of desktop/extension — never vendored). All six publishables carry a mechanical `private: true` latch until the proving checkpoint ([docs/shared/publishing.md](docs/shared/publishing.md)) unlatches them.
 4. **MAM is parked.** No `packages/mobile`, no mobile work — slot reserved only.
 5. **Preserve semantics, replace plumbing.** Blueprints/default-pages, FILE_MAP scaffolding semantics, `mgr i local`, prepare-watch, the frontend↔backend contract, and the disperse model must keep working exactly as consumers expect.
 6. **Every extraction/normalization step is gated**: golden-master where applicable, package test suites, cross-stack e2e, canary consumer.
 
-## Config: omega.json5
+## How knowledge loads (the doctrine)
 
-Single config format everywhere: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme) + a `targets` object (key presence = target enabled; values = target config; any shared key inside a target entry overrides it). Merge chain: `defaults ← company ← brand shared ← brand targets.<type> ← app shared ← app targets.<type>`. Secrets stay in `.env` — the validator hard-fails secret-shaped keys in config. **No dual-read (Ian's call, 2026-07-06)**: frameworks flip to omega.json5 outright; legacy brands convert once via the mapping tables in [docs/config.md](docs/config.md). Owned by `@omega.js/config`; EM flipped first (desktop settings under `targets.desktop`, per-OS `targets` renamed `platforms`).
+- **`docs/` is the SSOT.** Cross-framework contracts live in `docs/shared/`; each framework's guide is `docs/<framework>/index.md` with its deep docs beside it. No line budget applies inside `docs/`.
+- **AGENTS.md files are pointers, never content.** This file is the repo map; each `packages/<framework>/AGENTS.md` is a thin pointer at its `docs/<framework>/` home (with `CLAUDE.md` = `@AGENTS.md`). Do not inline knowledge into any AGENTS.md — write it in `docs/` and point.
+- **Loading is deterministic, not preloaded.** The omega Claude plugin's hooks detect where the chat is working — a `packages/<framework>/` tree here, or an app's target in a consumer repo — and inject the relevant docs then. Nobody reads guides "just in case".
+- **The one exception**: `packages/manager/AGENTS.md` is the brand-facing guide SHIPPED to consumer brand roots, imported by their AGENTS.md chain from `node_modules`. It stays exactly where it is. Contract: [docs/shared/agent-docs.md](docs/shared/agent-docs.md).
+- **Consumers get version-matched knowledge.** In the local era, `node_modules/@omega.js/*` symlinks into this monorepo, so the pointers resolve as-is. Published packages will carry their docs inside the package (prepare-time vendoring — gated on the publish checkpoint), so the plugin reads knowledge that matches the installed version, never a global copy.
 
-## Brand topology (who is who — settled with Ian 2026-07-11)
+## The Claude plugin
 
-- **`apps/sandbox-brand`** — synthetic fixture for the AUTOMATED corpus/e2e (offline, `demo-*` Firebase, deterministic; test runs may mangle and reset it). Never touches real cloud.
-- **`apps/omega-playground`** (renamed from omega-brand, Ian 2026-07-11 — zero ambiguity) — the standing live TEST brand: born through the real wizard (id `omega-playground`, url playground.omegajs.dev — a SUBDOMAIN so derived surfaces never claim the real omegajs.dev) and pointed at the real-but-throwaway Firebase project `omegajs-playground` (ITW-org-owned since 2026-07-11; sanctioned for live proofs — Blaze it, break it, delete it; it is TEST INFRASTRUCTURE, never production). REBRANDED **Paperloom** (Ian 2026-07-19): a fictional quiet-writing-studio brand — now that the real omegajs.dev exists, the playground stops posing as "here's the OMEGA framework" so drift never reads as a broken copy; infra identity unchanged, name/copy/color/catalog display are the fiction (forest-ink green, classy). Secrets live only in `.env`/`.omega/secrets` (gitignored; the config loader hard-fails secret-shaped keys) — the committed omega.json5 carries public-by-design values only.
-- **`apps/newsflash-brand`** (added with Ian 2026-07-17) — "The Daily Build" (id `daily-build`, url dailybuild.omegajs.dev — same subdomain rule): the standing SECOND-SKIN brand, a fictional dev-news publication wearing the newsflash theme permanently so both first-party skins stay alive in real consumers (classy = playground, newsflash = here). Born by COPY of the playground — the wizard rehearsal is a separate queued exercise; OFFLINE-only (demo-* Firebase, no real cloud/services, never production); website + backend targets only; website dev port pinned 4100 for side-by-side, backend rides N7 bumps.
-- **The real OMEGA brand — BORN 2026-07-18 (cp229), LIVE 2026-07-19 (cp232), LOCAL ERA**: lives at `../omega-brand` (sibling repo with its own git history; folder + repo renamed from omegajs.dev per Ian 2026-07-19 — consistent with the `*-brand` family, and bare "omega" is the monorepo; GitHub: `itw-creative-works/omega-brand` via the `github.repo` slug — the legacy orgWebsite housing). Id `omega`, name "OMEGA", url omegajs.dev (LIVE — GitHub Pages + Cloudflare), classy theme, website port 4200, website + backend targets. Born by FORKING the playground's polished content 1:1 (never a promotion of the test project; stale es caches dropped and re-translated fresh), it is the first SUB-BRAND of Ian's eventual company umbrella (the config `company` layer models this). **Local era (Ian 2026-07-18: "still use local … until we are fully locked on all decisions that may result in breaking changes")**: every `@omega.js/*` dep is a committed relative `file:` spec into THIS monorepo; versions re-reset to 0.1.0 (cp238, supersedes cp228 — Ian: 0.x until live publishes are proven; 1.0.0 is a later deliberate graduation) so first publish flips them to `^0.1.0` seamlessly, and all six publishables carry a mechanical `private: true` latch until the proving checkpoint unlatches them. Backend config FLIPPED to the real project `omegajs` 2026-07-19 (sdkconfig baked, `.firebaserc` real, Blaze linked to the Main Billing Account; authDomain = the BRAND host per cp268 — `omega build` self-hosts Firebase's `/__/auth/*` helper files, which is what the 2026-07-19 live 404 was actually missing, and a first-party authDomain keeps sign-in redirects working under browser storage partitioning). The identity seam SELF-HEALS in the cloud service (Ian 2026-07-19: "wrapped in npm start — self healing idempotent"): access probe → grant the manage identity via any able local gcloud account (owner first; editor+firebase.admin fallback — no-org projects refuse API owners) → re-probe through propagation. The FIRST healing run must be Ian's own `npm start` from the brand root (the session classifier refuses Claude-fired IAM mutation, even wrapped); every run after is plain reconcile. REMAINING GATES: that first `npm start`; the npm publish; one CI-dispatch exercise. The in-repo brands and the playground project stay test-only forever; nothing in this monorepo is ever the production brand. Content/section architecture: [docs/omega-sections-spec.md](docs/omega-sections-spec.md).
+The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the repo-root marketplace manifest `.claude-plugin/marketplace.json`; its commit is in flight as its own work stream). It is the ONLY home of the `omega:*` skills — skill folders carry no prefix; each skill's frontmatter `name` is `omega:<skill>`; the old global copies are deleted — plus the hooks that do the deterministic loading above. It serves both audiences: developing this monorepo, and every consumer working on a brand built from these frameworks. Install is AUTOMATIC (Ian 2026-07-27): the repo's committed `.claude/settings.json` registers the marketplace and enables the plugin — Claude Code asks one trust question on first open, then it loads every session. Live plugin development needs `claude --plugin-dir ./agent-plugins/claude` (installed plugins are cache copies) or `/reload-plugins` after edits. The contract: [#62](https://github.com/Omega-JS-Stack/omega/issues/62) until it ships.
 
-## Local dev loop
+## The map — packages
 
-Root `npm start` watches every dist-building package concurrently (single-instance lock); `omega dev --local` in a brand's website app links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per app. Mechanics: `@omega.js/devkit/local`. Full contract: [docs/local-dev.md](docs/local-dev.md).
+| Package | What it is | The guide |
+|---|---|---|
+| `@omega.js/web` | Web framework (UJM successor): Eleventy 3 + LiquidJS, sections/themes, asset lanes, translation | [docs/web/index.md](docs/web/index.md) |
+| `@omega.js/backend` | Firebase Cloud Functions backend framework: build, test, deploy | [docs/backend/index.md](docs/backend/index.md) |
+| `@omega.js/desktop` | Electron desktop framework: build, test, package for macOS/Windows/Linux | [docs/desktop/index.md](docs/desktop/index.md) |
+| `@omega.js/extension` | Chrome/Firefox MV3 extension framework | [docs/extension/index.md](docs/extension/index.md) |
+| `@omega.js/client` | Shared frontend runtime singleton (Firebase auth, account, analytics, notifications, bindings) embedded by web/desktop/extension | [docs/client/index.md](docs/client/index.md) |
+| `@omega.js/manager` | Brand orchestration engine: walks every service in dependency order, reconciles a brand monorepo to its omega.json5 | [docs/manager/index.md](docs/manager/index.md) |
+| `@omega.js/devkit` | Internal: shared build-time internals (logger, local linking, CLI router, prompts, deploy/update executors), vendored into every framework | [docs/devkit/index.md](docs/devkit/index.md) |
+| `@omega.js/config` | Internal: the omega.json5 loader, schema, merge, validator | [docs/shared/config.md](docs/shared/config.md) |
+| `@omega.js/account` | Internal: user/account schema + subscription resolution, shared by backend and client | [packages/account/src](packages/account/src) |
+| `@omega.js/template-kit` | Internal: the `uj_*` template filters/tags as engine-neutral JS | [docs/web/template-kit.md](docs/web/template-kit.md) |
+
+## The map — brands
+
+| App | Who it is | Cloud |
+|---|---|---|
+| `apps/sandbox-brand` | Synthetic fixture for the automated corpus/e2e; test runs may mangle and reset it | Offline, `demo-*` only |
+| `apps/omega-playground` | "Paperloom" — the standing LIVE test brand, classy theme | Real-but-throwaway project `omegajs-playground` |
+| `apps/newsflash-brand` | "The Daily Build" — the standing second-skin brand, newsflash theme | Offline, `demo-*` only |
+| `../omega-brand` (sibling repo) | The REAL brand: omegajs.dev, LIVE | Real project `omegajs` |
+
+The in-repo brands and the playground project are test-only forever; nothing in this monorepo is ever the production brand. Full topology, history, the local-era `file:` dependency contract, and the remaining launch gates: [docs/shared/brands.md](docs/shared/brands.md).
+
+## Getting started (the dev loop)
+
+- Root `npm start` watches every dist-building package concurrently (single-instance lock).
+- In a brand's website app, `omega dev --local` links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per app. Full contract: [docs/shared/local-dev.md](docs/shared/local-dev.md).
+- **Upstream-first**: consumer work on a locally linked brand that reveals a framework-level hole fixes it HERE, in the framework — never as a consumer-side patch to repeat in the next project. The rule (and its "within reason" line) lives in [docs/shared/local-dev.md](docs/shared/local-dev.md) and ships to brand sessions via the brand guide.
+- Tests run in lanes: `npm run test:packages` (unit), then corpus/e2e/verts/auth/journey — the full pipeline and when each lane gates is in [docs/shared/testing.md](docs/shared/testing.md).
 
 ## CLI bins
 
-Every framework ships `omega` + `omg` + `mgr` — all three are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest package.json walking up from cwd (incl. a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct. No app context (fresh dir) → falls back to the HOST framework's CLI with a stderr note, which keeps `omega setup` bootstrap working. `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
+Every framework ships `omega` + `omg` + `mgr` — all three are the SAME context-aware dispatcher (`@omega.js/devkit/omega-bin`): the nearest package.json walking up from cwd (including a backend's `functions/`) names the framework, and THAT framework's CLI runs via its `./cli` export — so npm's arbitrary hoist-winner in a brand monorepo is always correct. No app context (fresh dir) → falls back to the HOST framework's CLI with a stderr note, which keeps `omega setup` bootstrap working. `omega-<framework>` bins run their own CLI directly, no dispatch. Docs say `npx omega`; `omg`/`mgr` are supported aliases.
 
-## Brand agent docs
+## Config: omega.json5
 
-Every brand root carries `CLAUDE.md` = `@AGENTS.md` and an `AGENTS.md` whose first line imports the framework-owned guide shipped in `@omega.js/manager` (`packages/manager/AGENTS.md` — the SSOT; live via the local-era symlink). The manage cycle's workspace service creates/heals the chain idempotently. Contract: [docs/agent-docs.md](docs/agent-docs.md).
+Single config format everywhere: shared sections (brand, firebaseConfig, analytics, payment, sentry, oauth2, theme) + a `targets` object (key presence = target enabled; any shared key inside a target entry overrides it). Merge chain: `defaults ← company ← brand shared ← brand targets.<type> ← app shared ← app targets.<type>`. Secrets stay in `.env` — the validator hard-fails secret-shaped keys in config. **No dual-read (Ian's call, 2026-07-06)**: frameworks flip to omega.json5 outright; legacy brands convert once via the mapping tables. Owned by `@omega.js/config`. Full reference: [docs/shared/config.md](docs/shared/config.md).
 
-## Deliberate deploys (D13)
+## Docs index
 
-Commits never auto-publish: scaffolded workflows carry NO push triggers (workflow_dispatch + repository_dispatch only). Publishing is the explicit `omega deploy` verb on every target — web/extension dispatch their CI workflow, desktop delegates to its release flow, backend runs `firebase deploy` directly (`--only hosting` works on Spark) — and at a BRAND ROOT the same verb fans out over the apps (manager `deploy` command, cp251): backend first, then web, then the rest; `--only`/`--except` filter apps, other flags forward, a failing app stops the run. Content-publish implies deploy (the admin post routes dispatch the website build; `deploy: false` opts out). One executor for all surfaces: `@omega.js/devkit/deploy`. Full contract: [docs/deploys.md](docs/deploys.md).
+`docs/shared/` — cross-framework contracts:
 
-## Dependency updates
+- [config.md](docs/shared/config.md) — the omega.json5 schema, merge chain, legacy mapping tables
+- [local-dev.md](docs/shared/local-dev.md) — local linking + watch mechanics
+- [testing.md](docs/shared/testing.md) — the tiered verification pipeline (unit → corpus → e2e → verts → journey)
+- [deploys.md](docs/shared/deploys.md) — the deliberate `omega deploy` verb on every target (no push triggers, ever)
+- [updates.md](docs/shared/updates.md) — the `omega update` dependency-update contract
+- [publishing.md](docs/shared/publishing.md) — the publish proving-checkpoint runbook (gated, not yet run)
+- [icons.md](docs/shared/icons.md) — the one Font Awesome mechanism on every surface
+- [theming.md](docs/shared/theming.md) — the `--omega-*` design-system contract, shell chrome, motion
+- [translation.md](docs/shared/translation.md) — the AI translation engine + config-driven cache
+- [agent-docs.md](docs/shared/agent-docs.md) — the agent-docs chain: thin pointers here, the brand chain in consumers
+- [brands.md](docs/shared/brands.md) — brand topology, history, the local era
+- [rulings.md](docs/shared/rulings.md) — standing rulings from the retired board era
 
-`omega update` on every framework + the manager (aliases `outdated`/`out`): installed/wanted/latest + patch/minor/major per dep, releases < 7 days old QUARANTINED (npu `--min-age` semantics), `--apply` installs the non-breaking non-quarantined set via `npu install` (plain npm + loud note without it), `--major` explicit. Brand root fans out over apps (deploy's shape, apps independent); `file:` specs skipped. One devkit implementation: `@omega.js/devkit/update`. Full contract: [docs/updates.md](docs/updates.md).
+`docs/<framework>/` — each framework's guide (`index.md`) plus its deep docs. Web carries the extra set: [sections.md](docs/web/sections.md) (the sections & components contract), [omega-sections-spec.md](docs/web/omega-sections-spec.md) (the ratified architecture spec), [template-kit.md](docs/web/template-kit.md), [classy-v2/DIRECTION.md](docs/web/classy-v2/DIRECTION.md) (the locked visual spec), [ads-system.md](docs/web/ads-system.md) (the ratified vert/ads architecture).
 
-## Icons
+## Project state
 
-One Font Awesome mechanism everywhere: plain `fa-*` markup (static or set via JS — the shared `@omega.js/client` icon-renderer watches both), `uj_icon` for build-time inlining, best-first asset chain with brand-supplied Pro (never redistributed). Full contract: [docs/icons.md](docs/icons.md).
-
-## Theming (classy v2)
-
-One design-system contract: the `--omega-*` token sheet (names = stable API; light+dark plumbing built in), `brand.color` → light + dark accent ramps emitted into every head, the `.omega-shell` app chrome, and the shared motion library (`@omega.js/client` motion engine + `data-omega-*` attributes; no-JS and reduced-motion safe). classy v2 is the flagship skin: warm-paper/charcoal neutrals, zero gradients, ink primaries, serif marketing display; consumers customize colors/vibe/type from their main.scss (or fork `themes/_template`). Full contract: [docs/theming.md](docs/theming.md). Visual spec: [docs/classy-v2/DIRECTION.md](docs/classy-v2/DIRECTION.md).
-
-## Sections & components
-
-Pages are compositions of `{% section %}`/`{% component %}` calls; each entry is a folder owning markup + scss + js + json5 schema (resolution: consumer `_sections` → active theme → classy base, whole-folder first-wins). Markup is context-free (`{ args }` only; call-site liquification), section scss/js ride the §7 asset lanes (main sheet via `omega:sections`, main bundle behind DOM-presence init), and SHARED bands keep neutral json5 defaults — every page owns its copy. Consumer page frontmatter is META-ONLY (layout/permalink/meta/schema/theme/sitemap/append) — content keys are STRIPPED from the cascade with a build warning, so the machinery can never consume them (Ian softened cp235's build-error same day); content entries (`_posts`/`_team`/…) keep frontmatter as their document. Full contract: [docs/sections.md](docs/sections.md). Spec/sequencing: [docs/omega-sections-spec.md](docs/omega-sections-spec.md).
-
-## The plan
-
-The redesign board is retired; the master plan and every closed plan file are history in `_attic/plans/` (on disk, out of git). Live work is GitHub issues (project-state spec v4): the queue is a query (`gh issue list`), status labels carry state, and a spec is the `## Spec` section of its issue — never a file. Standing rulings from the board era: [docs/rulings.md](docs/rulings.md).
+Live work is GitHub issues (project-state spec v4): the queue is a query (`gh issue list`), status labels carry state, and a spec is the `## Spec` section of its issue — never a file. The retired board era's plan files are history in `_attic/plans/` (on disk, out of git); its durable rulings live in [docs/shared/rulings.md](docs/shared/rulings.md).

@@ -26,7 +26,7 @@
 // Imported EARLY on purpose: the floor sits UNDER the theme's own voice, so
 // later newsflash rules win every collision (e.g. classy's .badge base).
 // Partial/consumer themes take the whole-chain hatch instead
-// (`@forward 'omega:theme'` — see docs/theming.md).
+// (`@forward 'omega:theme'` — see docs/shared/theming.md).
 @import '../classy/css/layout/shell';
 @import '../classy/css/layout/footer';
 @import '../classy/css/app/panels';

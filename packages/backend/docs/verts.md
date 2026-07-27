@@ -1,6 +1,6 @@
 # Verts — house inventory module (adblock-safe ad system)
 
-The backend half of the OMEGA ads system (spec: monorepo `docs/ads-system.md`): a brand (or the parent COMPANY — sub-brands point at its api) hosts its own ad inventory and serves self-contained ad units. Providers (AdSense) and the fallback ladder live in the client (`verts/unit` section) — this module is the in-house lane they fall back to.
+The backend half of the OMEGA ads system (spec: monorepo `docs/web/ads-system.md`): a brand (or the parent COMPANY — sub-brands point at its api) hosts its own ad inventory and serves self-contained ad units. Providers (AdSense) and the fallback ladder live in the client (`verts/unit` section) — this module is the in-house lane they fall back to.
 
 ## Firestore collection `verts`
 

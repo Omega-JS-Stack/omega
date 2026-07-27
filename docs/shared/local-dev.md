@@ -44,6 +44,8 @@ In a brand's website app, `omega dev --local` runs the full local-mode prelude b
 
 Then the standard `omega dev` loop runs. Result: edit any framework's `src/` and the consumer picks it up live — no N windows, no N × `mgr i local`.
 
+**Upstream-first (Ian 2026-07-27).** The live link is not just a convenience — it is how framework holes get found and fixed. Building a real consumer app regularly exposes gaps in OMEGA; when a defect or missing piece would hit EVERY consumer (a broken core style, a wrong default, a missing option), fix it in the framework right here through the link, not in the consumer project — a consumer-side patch has to be rediscovered and repeated in the next project. The test: would the next consumer need the same change? Then it belongs upstream. Brand-specific looks, content, and one-off behavior stay in the brand. The same rule ships to brand sessions in the brand guide (`packages/manager/AGENTS.md`).
+
 ## Per-app linking: `mgr i local`
 
 Unchanged contract for consumers, now monorepo-backed: `mgr i local` (web, desktop, extension — web gained its install command in cp194) and `mgr i local` / `mgr install --local` (backend) call the same `linkLocalPackages()`. Backend links its app-root manifest like every other target (`functions/` is staged output; the CLI normalizes a `functions/` cwd up to the app root). `mgr i live/prod` still installs from the registry and is untouched.
@@ -63,7 +65,7 @@ Two different mechanisms keep consumers working:
 | Private shared internals | `devkit`, `config`, `account`, `template-kit` (devDependencies of the frameworks) | Vendored into `dist/vendor/<pkg>` at prepare time by `@omega.js/devkit/vendor`; requires rewritten to relative paths. Never published. |
 | Published runtime deps | `@omega.js/client` (dependency of web + desktop + extension), `@omega.js/backend` (dependency of manager) | Normal npm dependency — **never vendored** (a vendored copy would pin a stale snapshot and duplicate the shared client singleton). Requires stay as package requires. |
 
-The vendor tool derives the split from the host's package.json: anything in `dependencies`/`peerDependencies`/`optionalDependencies` is published-runtime and skipped; devDependency workspace packages get vendored. ALL SIX publishables (backend, client, desktop, extension, manager, web) are dist-building with the vendor after-hook. Two mirrored gates prove self-containment: CI's pack-smoke and the local `npm run release:check` — both pack, scratch-install with tarball `overrides` for the published runtime deps, resolve, and grep the whole shipped tree for raw private `@omega.js/(devkit|config|account|template-kit)` refs. The publish runbook lives in [docs/publishing.md](publishing.md).
+The vendor tool derives the split from the host's package.json: anything in `dependencies`/`peerDependencies`/`optionalDependencies` is published-runtime and skipped; devDependency workspace packages get vendored. ALL SIX publishables (backend, client, desktop, extension, manager, web) are dist-building with the vendor after-hook. Two mirrored gates prove self-containment: CI's pack-smoke and the local `npm run release:check` — both pack, scratch-install with tarball `overrides` for the published runtime deps, resolve, and grep the whole shipped tree for raw private `@omega.js/(devkit|config|account|template-kit)` refs. The publish runbook lives in [docs/shared/publishing.md](publishing.md).
 
 ## API surface (`@omega.js/devkit/local`)
 

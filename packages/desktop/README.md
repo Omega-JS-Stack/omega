@@ -42,7 +42,7 @@ npm run build            # local production build (bundles only, no installer)
 npm run package:quick    # fast packaged build for host platform/arch (.app/.exe-folder/linux-unpacked, ~20-30s) — for smoke-testing packaged behavior
 npm run package          # full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux)
 npm run release          # signed + published release via GitHub Actions
-npx omega test             # YOUR project tests only (C5 scoping — docs/testing.md)
+npx omega test             # YOUR project tests only (C5 scoping — docs/shared/testing.md)
 npx omega test framework:  # the framework's own suite (aliases: omega:, mgr:, desktop:, em:; add a path to narrow)
 npx omega test full:       # both sources
 npx omega test --extended  # opt into tests that hit real external services (or TEST_EXTENDED_MODE=true)

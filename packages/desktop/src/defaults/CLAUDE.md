@@ -15,7 +15,7 @@ This project consumes **OMEGA Desktop** (@omega.js/desktop) — a comprehensive 
 - **`node_modules/@omega.js/desktop/CLAUDE.md`** — top-level overview + index
 - **`node_modules/@omega.js/desktop/docs/`** — subsystem deep references (read the relevant ones for the task at hand)
 
-## 🚨 READ WEB-MANAGER TOO
+## 🚨 READ @omega.js/client TOO
 
 **@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 

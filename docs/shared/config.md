@@ -30,7 +30,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
   monitoring:     { provider: 'sentry', dsn },
   oauth2:         { /* public client IDs only */ },
   theme:          { id, appearance },            // project-owned; seeded at onboarding
-  translation:    { enabled, default, languages: [], provider: 'claude'|'chatgpt', model, exclude: [] }, // docs/translation.md
+  translation:    { enabled, default, languages: [], provider: 'claude'|'chatgpt', model, exclude: [] }, // docs/shared/translation.md
 
   // TARGET-scoped config. KEY PRESENCE = "this brand enables this target"
   // (replaces the legacy brand-config targets ARRAY). `extension: {}` means
@@ -74,7 +74,7 @@ framework defaults ← brand shared ← brand targets[target] ← app shared ←
 
 One brand can run N instances of the SAME target type (the legacy `brand.subdomains` need:
 admin/cdn/app sites of one brand) — `targets.<type>` takes an **object OR an array of id'd
-instances** ([_attic/plans/multi-instance-targets.md](../_attic/plans/multi-instance-targets.md), ratified
+instances** ([_attic/plans/multi-instance-targets.md](../../_attic/plans/multi-instance-targets.md), ratified
 2026-07-20):
 
 ```json5
@@ -104,8 +104,8 @@ targets: {
   behavior, suffixed dirs included); the array form is exact-id — an app dir with no matching
   id rides shared config alone. The workspace structure op expects every instance's exact dir
   (missing = the same create-this-dir error as today).
-- **Per-instance surfaces**: dev ports offset by array position (docs/local-dev.md), deploy
-  records key per app (docs/deploys.md), the manager's live-URL checks use each instance's
+- **Per-instance surfaces**: dev ports offset by array position (docs/shared/local-dev.md), deploy
+  records key per app (docs/shared/deploys.md), the manager's live-URL checks use each instance's
   `url` (instance entry `url` → instance `brand.url` → brand shared `brand.url`).
 - **Legacy `brand.subdomains` conversion rule**: each subdomain becomes a web instance —
   `["admin", "cdn"]` → `web: [{ id: 'main' }, { id: 'admin', url: 'https://admin.<domain>' },
@@ -243,7 +243,7 @@ byte-identical to the pre-N7 behavior (no bumping, no artifacts).
   resolving) and boots firebase-tools with `--config`; the committed firebase.json never
   changes. Gitignored; removed on shutdown.
 
-Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../_attic/plans/archive/n7-port-allocation.md).
+Design + slice plan: [_attic/plans/archive/n7-port-allocation.md](../../_attic/plans/archive/n7-port-allocation.md).
 
 ## Validation
 

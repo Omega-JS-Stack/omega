@@ -238,7 +238,7 @@ function loadConfig(projectDir, target, options) {
   // no omega.json5 of its own rides the brand file alone. Standalone
   // projects (no brand config above) still require their own file.
   if (!appPath && !brandPath) {
-    throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')}) — probe with hasOmegaConfig() first; legacy configs must be migrated (see docs/config.md)`);
+    throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')}) — probe with hasOmegaConfig() first; legacy configs must be migrated (see docs/shared/config.md)`);
   }
 
   const app = appPath ? readConfigFile(appPath) : {};

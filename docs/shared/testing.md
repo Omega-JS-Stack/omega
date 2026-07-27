@@ -19,11 +19,11 @@
 
 ## The brand-shape corpus (cp197)
 
-Tier 2's opening act ([scripts/corpus-shapes.js](../scripts/corpus-shapes.js)): a matrix of brand SHAPES — target combos (web-only, default web+backend derivation, all-four, backend-only, desktop+extension), themes (classy, newsflash), content (a real `_posts` entry the blog must list) — each born through the REAL onboard in a temp dir (config validates, git initializes) and, for web cells, built by the REAL Eleventy engine straight from the monorepo (no installs — the zero-page-pin lane) with per-cell invariants: branded homepage, `data-theme-id`, `/blog`, sitemap + robots. Fully offline; failing cells keep their temp brand for autopsy. A new shape = a new `CELLS` row, never a new harness. The journey lane (below) covers the one axis this can't: the outside-monorepo install/boot/manage story.
+Tier 2's opening act ([scripts/corpus-shapes.js](../../scripts/corpus-shapes.js)): a matrix of brand SHAPES — target combos (web-only, default web+backend derivation, all-four, backend-only, desktop+extension), themes (classy, newsflash), content (a real `_posts` entry the blog must list) — each born through the REAL onboard in a temp dir (config validates, git initializes) and, for web cells, built by the REAL Eleventy engine straight from the monorepo (no installs — the zero-page-pin lane) with per-cell invariants: branded homepage, `data-theme-id`, `/blog`, sitemap + robots. Fully offline; failing cells keep their temp brand for autopsy. A new shape = a new `CELLS` row, never a new harness. The journey lane (below) covers the one axis this can't: the outside-monorepo install/boot/manage story.
 
 ## The wizard journey lane (cp195)
 
-The scripted form of the cp194 hand rehearsal — proof that a consumer OUTSIDE the monorepo (where hoist-luck can't save anything) can live the whole story. Mechanics: `@omega.js/devkit/test/journey-harness` (spec-driven: `{ id, url, targets, expect }` — a corpus of brand shapes can reuse it); runner: [scripts/e2e-journey.js](../scripts/e2e-journey.js).
+The scripted form of the cp194 hand rehearsal — proof that a consumer OUTSIDE the monorepo (where hoist-luck can't save anything) can live the whole story. Mechanics: `@omega.js/devkit/test/journey-harness` (spec-driven: `{ id, url, targets, expect }` — a corpus of brand shapes can reuse it); runner: [scripts/e2e-journey.js](../../scripts/e2e-journey.js).
 
 - **Preconditions skip, never lie**: no network or no java → the lane prints SKIPPED and exits 0 (`OMEGA_JOURNEY_STRICT=1` turns that into a failure). `OMEGA_SKIP_JOURNEY=1` skips outright.
 - **Runtime legs run creds-scrubbed**: `omega dev` and manage children get credential-shaped env vars stripped — the journey must never reach a real cloud. Install legs (onboard/link/setup) keep the machine env.
@@ -55,7 +55,7 @@ Inside a framework package itself (cwd package name === the framework), a bare r
 
 ## Corpus spelling
 
-The sandbox brand's backend corpus is the framework suite run in consumer context — its scripts say so explicitly since cp94: `npx omega test framework:` ([apps/sandbox-brand/apps/backend/package.json](../apps/sandbox-brand/apps/backend/package.json)).
+The sandbox brand's backend corpus is the framework suite run in consumer context — its scripts say so explicitly since cp94: `npx omega test framework:` ([apps/sandbox-brand/apps/backend/package.json](../../apps/sandbox-brand/apps/backend/package.json)).
 
 ## Per-framework notes
 
@@ -80,7 +80,7 @@ At a **brand root** (a directory carrying `config/omega.json5` with no framework
 - An id with no matching app warns and runs nothing (exit 0 — same semantics as an app-level filter matching no tests). Only-invalid targets fall back to bare-everywhere, mirroring the app-level parser.
 - Apps run **sequentially** with streamed output; any failing app makes the whole run exit 1 (per-app summary at the end).
 - **Flags are not fanned out** (`--layer`, `--extended`, …) — flagged runs are app-level invocations; run them from the app dir.
-- Other manager commands ride the same handoff: bare `omega` at a brand root means the manager's manage cycle, `omega onboard` reaches the wizard, and `omega deploy` is the brand-root deliberate-deploy fan-out (docs/deploys.md).
+- Other manager commands ride the same handoff: bare `omega` at a brand root means the manager's manage cycle, `omega onboard` reaches the wizard, and `omega deploy` is the brand-root deliberate-deploy fan-out (docs/shared/deploys.md).
 
 ## CI runner notes
 

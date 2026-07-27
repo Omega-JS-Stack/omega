@@ -9,13 +9,13 @@ Published packages live under the `@omega.js` npm scope. Private shared internal
 | Directory | Contents |
 |-----------|----------|
 | `packages/` | Framework packages (`web`, `backend`, `extension`, `desktop`) + the orchestration engine (`manager`) + shared internals (`client`, `account`, `config`, `devkit`, `template-kit`) |
-| `apps/` | Sandbox brand for dogfooding and cross-stack e2e |
+| `apps/` | The three in-repo test brands: `sandbox-brand` (synthetic fixture for the corpus/e2e), `omega-playground` ("Paperloom", classy theme), `newsflash-brand` ("The Daily Build", newsflash theme) — the real brand lives in a sibling repo |
 | `docs/` | Shared-concept deep references |
 
 ## Development
 
-`npm start` at the root watches every dist-building package concurrently (src→dist). In a brand repo, `omega dev --local` links all `@omega.js/*` deps from this monorepo and starts the watch for you; `mgr i local` does the same for a single app. See [docs/local-dev.md](docs/local-dev.md).
+`npm start` at the root watches every dist-building package concurrently (src→dist). In a brand repo, `omega dev --local` links all `@omega.js/*` deps from this monorepo and starts the watch for you; `mgr i local` does the same for a single app. See [docs/shared/local-dev.md](docs/shared/local-dev.md).
 
 ## Status
 
-Live work is tracked as [GitHub issues](https://github.com/Omega-JS-Stack/omega/issues) (the queue is a query: `gh issue list`); standing rulings live in [docs/rulings.md](docs/rulings.md).
+Live work is tracked as [GitHub issues](https://github.com/Omega-JS-Stack/omega/issues) (the queue is a query: `gh issue list`); standing rulings live in [docs/shared/rulings.md](docs/shared/rulings.md).

@@ -47,6 +47,10 @@ npx omega i live     # restore published registry versions
 
 `omega`, `omg`, and `mgr` are the same context-aware dispatcher — the nearest app names the framework that runs.
 
+## Working locally against the framework (upstream-first)
+
+When this brand runs `omega i local` / `omega dev --local`, every `@omega.js/*` dep is linked LIVE from the local framework monorepo — a framework change reflects here instantly. That linkage exists for a reason: real applications expose framework holes. **When you hit a defect or gap that EVERY consumer would face — a broken core style, a missing option, a wrong default — fix it in the FRAMEWORK (the linked monorepo), not in this brand.** The test: would the next consumer project need the same patch? Then it belongs upstream. Within reason: brand-specific looks, content, and one-off behavior stay in the brand; framework edits follow the framework's own rules (its docs, its tests). When the link is NOT active (published versions installed), file the gap upstream instead of patching around it locally.
+
 ## Hard rules
 
 - **Never edit generated output**: `dist/`, `packaged/`, anything gitignored. Edit `src/`, run the build.

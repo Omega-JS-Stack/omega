@@ -75,7 +75,7 @@ function resolveContext(startDir, explicitId) {
   if (!root) {
     throw new Error(
       `No brand or company workspace found at or above ${startDir} — `
-      + 'expected a config/omega.json5 at the root (see docs/config.md).',
+      + 'expected a config/omega.json5 at the root (see docs/shared/config.md).',
     );
   }
 

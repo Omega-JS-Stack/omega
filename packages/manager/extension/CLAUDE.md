@@ -15,7 +15,7 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`) — a comprehe
 - **`node_modules/@omega.js/extension/CLAUDE.md`** — top-level overview + index
 - **`node_modules/@omega.js/extension/docs/`** — subsystem deep references (read the relevant ones for the task at hand)
 
-## 🚨 READ WEB-MANAGER TOO
+## 🚨 READ @omega.js/client TOO
 
 **OMEGA Extension ships `@omega.js/client` as a runtime singleton across every extension context** (background service worker, popup, options, sidepanel, content scripts) — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with the extension framework.
 

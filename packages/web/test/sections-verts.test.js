@@ -1,5 +1,5 @@
 /**
- * The verts/unit section (docs/ads-system.md phase 2) — the classy-base
+ * The verts/unit section (docs/web/ads-system.md phase 2) — the classy-base
  * fallback-ladder vert band. Pins: context-free markup (host element + data
  * attrs from args, the standard @hide auth binding), neutral mechanical
  * defaults, §7 asset-lane registration (section.js in the main bundle,

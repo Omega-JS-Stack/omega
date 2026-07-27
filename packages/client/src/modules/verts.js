@@ -1,6 +1,6 @@
 /**
  * Verts module — the fallback-ladder ad engine shared by every surface
- * (docs/ads-system.md, phase 2).
+ * (docs/web/ads-system.md, phase 2).
  *
  * Two lanes, one implementation:
  *   1. Provider lane (web only): AdSense. Script-load failure IS the adblock

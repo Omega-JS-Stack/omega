@@ -152,7 +152,7 @@ export default function () {
     $button.setAttribute('data-platform', platformKey);
 
     // Icon — plain fa-* markup; the client icon-renderer resolves it through
-    // the best-first asset chain (no hardcoded CDN URL — docs/icons.md).
+    // the best-first asset chain (no hardcoded CDN URL — docs/shared/icons.md).
     const [iconFamily, iconName] = platform.icon.split('/');
     const $icon = document.createElement('i');
     $icon.classList.add(`fa-${iconFamily}`, `fa-${iconName}`, 'fa-md');

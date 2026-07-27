@@ -229,7 +229,7 @@ function configureOmega(eleventyConfig, options) {
   eleventyConfig.amendLibrary('liquid', (engine) => {
     // The section/component library tags resolve through the same precedence
     // as every other layer: consumer-local _sections/_components → active
-    // theme → classy base (docs/omega-sections-spec.md).
+    // theme → classy base (docs/web/omega-sections-spec.md).
     registerSectionTags(engine, { baseDirs: [options.consumerDir, ...themeLayers] });
     registerLiquid(engine, {
       site,
@@ -363,7 +363,7 @@ function configureOmega(eleventyConfig, options) {
         console.warn(
           `[omega] ${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
           + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, sitemap, append); `
-          + `content lives in {% section %} calls in the page body (docs/sections.md).`,
+          + `content lives in {% section %} calls in the page body (docs/web/sections.md).`,
         );
       }
     }

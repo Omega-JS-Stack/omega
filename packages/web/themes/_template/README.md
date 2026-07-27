@@ -6,7 +6,7 @@ in your own consumer project (`<project>/themes/<id>/` — the consumer-local
 copy beats the packaged one with the same id).
 
 > The design-system contract (tokens, motion, brand ramps, the classy
-> vocabulary): [`docs/theming.md`](../../../../docs/theming.md).
+> vocabulary): [`docs/shared/theming.md`](../../../../docs/shared/theming.md).
 
 ## Create a theme from this template
 
@@ -35,7 +35,7 @@ copy beats the packaged one with the same id).
 Unlike layouts/includes, the MAIN stylesheet does **not** fall through:
 exactly one `_theme.scss` loads — yours. The shared layouts you inherit emit
 classy's `classy-*` content vocabulary (nav, footer, marketing sections,
-auth/form panels — see `docs/theming.md`), so a theme that doesn't restyle
+auth/form panels — see `docs/shared/theming.md`), so a theme that doesn't restyle
 that vocabulary renders those pages structurally intact but unstyled beyond
 Bootstrap + core tokens/shell/motion. Budget for it: restyle the vocabulary
 namespaces you keep, or override the layouts whose markup you replace.
@@ -53,7 +53,7 @@ _template/
     └── components/_components.scss  ← restyle Bootstrap classes here
 ```
 
-## Principles (the contract lives in docs/theming.md)
+## Principles (the contract lives in docs/shared/theming.md)
 
 - **Tokens are `!default`** so consumers can override without forking your theme.
 - **Bridge to CSS variables** in `_root.scss` — the `--omega-*` token names are

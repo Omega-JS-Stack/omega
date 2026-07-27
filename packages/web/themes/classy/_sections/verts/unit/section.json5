@@ -1,5 +1,5 @@
 {
-  description: 'Vert unit — the fallback-ladder vert band (docs/ads-system.md). Its section.js arms lazily near the viewport and drives the shared client verts module: AdSense when configured (script-load failure IS the adblock detector), the in-house/company inventory as the fallback lane (sandboxed iframe, origin-validated postMessage, host-owned rotation + staleness recovery), no-fill collapse otherwise. Hidden for paying users via the standard auth binding. Renders nothing useful without advertising config — key presence enables.',
+  description: 'Vert unit — the fallback-ladder vert band (docs/web/ads-system.md). Its section.js arms lazily near the viewport and drives the shared client verts module: AdSense when configured (script-load failure IS the adblock detector), the in-house/company inventory as the fallback lane (sandboxed iframe, origin-validated postMessage, host-owned rotation + staleness recovery), no-fill collapse otherwise. Hidden for paying users via the standard auth binding. Renders nothing useful without advertising config — key presence enables.',
 
   args: {
     type: { type: 'string', description: "Unit type: 'display' | 'in-article' | 'in-feed' | 'multiplex' (AdSense lanes) | 'house' (straight to the in-house inventory)" },

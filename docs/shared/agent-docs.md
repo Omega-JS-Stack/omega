@@ -30,6 +30,11 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/manager/AGENTS.md  (the frame
 
 Pinned by `packages/manager/test/agents-md.test.js` (guide shipped + files whitelist, path resolution, create/heal/idempotence, content preservation).
 
+## The two deliberate gaps
+
+- **`packages/manager` carries NO `CLAUDE.md`.** Its `AGENTS.md` is the guide SHIPPED TO BRAND ROOTS, so a pointer file there would import brand guidance into work on the manager package itself. Work on the package starts from [packages/manager/README.md](../../packages/manager/README.md).
+- **`apps/sandbox-brand` carries NO agent-docs chain.** It is a synthetic fixture the automated corpus/e2e runs mangle and reset — nothing durable lives there, so nothing agent-facing is written there.
+
 ## Editing the guide
 
 The guide is `packages/manager/AGENTS.md` — framework-owned, brand-agnostic (structure, verbs, per-target required-reading pointers, hard rules). Brand-specific knowledge never goes there; it belongs below the import in that brand's `AGENTS.md`.

@@ -3,7 +3,7 @@
  * publish out over the brand's apps, each in its own framework's hands
  * (each app's own `omega deploy` verb — web sync/dispatch or direct lane,
  * backend `firebase deploy`, desktop release, extension publish; the full
- * per-target contract is docs/deploys.md).
+ * per-target contract is docs/shared/deploys.md).
  *
  *   omega deploy                       → every app, backend first
  *   omega deploy --only backend        → one app (target or app dir name)

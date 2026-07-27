@@ -1,6 +1,6 @@
 # Config schema
 
-@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, cloud, analytics, payment, monitoring, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/config.md` for the format).
+@omega.js/desktop validates `config/omega.json5` against the canonical OMEGA schema in **`@omega.js/config`** (vendored into `dist/vendor/config/` at prepare time; also exposed to consumers as `require('@omega.js/desktop/config')`). The shared schema covers the cross-framework sections (brand, cloud, analytics, payment, monitoring, oauth2, theme, targets); the desktop-specific refinements (app.category, platforms.win.signing.strategy, startup.mode, restartManager.*, …) live in the same package's `TARGET_SCHEMAS.desktop` and apply when validating with `{ target: 'desktop' }`. Validation always runs against the RESOLVED config — `targets.desktop` contents land at the top level (see the monorepo's `docs/shared/config.md` for the format).
 
 Validation runs in two places:
 

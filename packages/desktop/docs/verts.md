@@ -1,7 +1,7 @@
 # Verts — the `data-omega-vert` auto-bind
 
 @omega.js/desktop renderers auto-bind the OMEGA verts (ads) system (monorepo
-`docs/ads-system.md`, phase 4): drop a `[data-omega-vert]` element into any
+`docs/web/ads-system.md`, phase 4): drop a `[data-omega-vert]` element into any
 view and the renderer bootstrap hands it to `@omega.js/client`'s verts module —
 zero consumer JS, same element vocabulary as the web `verts/unit` section and
 @omega.js/extension.

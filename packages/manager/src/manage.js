@@ -90,7 +90,7 @@ async function runManage(startDir, options = {}) {
   if (!brandRoot) {
     throw new Error(
       `No brand monorepo found at or above ${startDir} — `
-      + `expected a config/omega.json5 at the brand root (see docs/config.md).`,
+      + `expected a config/omega.json5 at the brand root (see docs/shared/config.md).`,
     );
   }
 

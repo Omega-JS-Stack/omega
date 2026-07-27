@@ -12,9 +12,9 @@ npx omega onboard              # create (or converge) a brand — wizard in a TT
                                #   (incl. the managed-accounts step: keep the inherited list —
                                #    company config or the support@{domain} default — or write your own)
 npx omega deploy               # DELIBERATE publish fan-out: each app's own deploy verb, backend first
-                               #   (--only/--except filter apps; every other flag forwards; docs/deploys.md)
+                               #   (--only/--except filter apps; every other flag forwards; docs/shared/deploys.md)
 npx omega update               # dependency-freshness fan-out: each app's own update verb (apps
-                               #   independent — one failure never blocks the rest; docs/updates.md)
+                               #   independent — one failure never blocks the rest; docs/shared/updates.md)
 npx omega help                 # command listing (also -h/--help; router built-in — --help no
                                #   longer falls through to the manage cycle)
 
@@ -140,8 +140,8 @@ All prompts go through `@omega.js/devkit/prompt` — a TTY-safe wrapper around `
 - `src/lib/config-flow.js` — config-landing interactive flows (`resolveConfigValue`): Yes/Skip/Disable gate, brand-match-sorted selections, create-new via API handler or browser + refresh, paste-back entry — values land via config-write and patch the in-memory config
 - `src/devlog/` — the standalone devlog command: collect (gh api over `orgs` listings + brand repos) → project map (the brand configs are the backlink SSOT) → generate (Ghostii digest/brief/links) → publish (website app, post-file-only commit + push)
 - `src/cli.js` + `src/commands/` — devkit cli-router; `manage` is the default command; `src/cli-run.js` is the `'@omega.js/manager/cli'` surface the omega-bin dispatcher hands over to at a brand root (so `omega test`/`omega onboard`/bare `omega` there reach the manager)
-- `src/commands/test.js` — the brand-root C5 test fan-out: universal targets to every target-mapped app, per-framework ids (`web:`/`desktop:`/…) only to the owning app, sequential per-app `omega test` spawns (each app's own framework bin, cwd = the app), aggregate exit — grammar + semantics in [docs/testing.md](../../docs/testing.md)
-- `src/commands/deploy.js` — the brand-root D13 deploy fan-out: each app's own framework `omega deploy` verb, backend first then web then the rest, `--only`/`--except` app filters (a filter matching nothing is an error, never a deploy-everything fallback), every other flag forwarded verbatim, stop-on-failure unless `--continue-on-error` — contract in [docs/deploys.md](../../docs/deploys.md)
+- `src/commands/test.js` — the brand-root C5 test fan-out: universal targets to every target-mapped app, per-framework ids (`web:`/`desktop:`/…) only to the owning app, sequential per-app `omega test` spawns (each app's own framework bin, cwd = the app), aggregate exit — grammar + semantics in [docs/shared/testing.md](../../docs/shared/testing.md)
+- `src/commands/deploy.js` — the brand-root D13 deploy fan-out: each app's own framework `omega deploy` verb, backend first then web then the rest, `--only`/`--except` app filters (a filter matching nothing is an error, never a deploy-everything fallback), every other flag forwarded verbatim, stop-on-failure unless `--continue-on-error` — contract in [docs/shared/deploys.md](../../docs/shared/deploys.md)
 
 ## Tests
 

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- [#45](https://github.com/Omega-JS-Stack/omega/issues/45) — Docs architecture rebuilt: knowledge moved to docs/shared/ + docs/&lt;framework&gt;/ (each framework's guide is index.md, including the new web guide), package AGENTS.md files reduced to thin pointers, root AGENTS.md rewritten as the map with the plugin story and the deterministic-loading doctrine, stale WEB-MANAGER headings fixed, 52 files repointed.
+
 ### Fixed
 - (no issue) — cp270 desktop remote-scripts is now opt-in: the remote-execution lane initializes only when a brand sets `config.remoteScripts.enabled: true`, otherwise inert with a log line. cp269's TLS gate still applies. Docs and tests updated.
 - (no issue) — cp270 dropped two unmaintained runtime deps: `mailchimp-api-v3` removed from the manifest (only the disabled legacy function lane used it) and `npm-api`'s four call sites moved to the new `@omega.js/devkit/npm-registry` helper. `automately` and `chatsy` stay. Root lock regenerated.

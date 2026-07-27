@@ -1,5 +1,5 @@
 // Tier-1 consumer entry (REHEARSAL — this brand's job is to exercise the
-// extension points a real consumer gets, docs/theming.md → Consumer
+// extension points a real consumer gets, docs/shared/theming.md → Consumer
 // customization). This file WINS the layered main.scss lookup, pulls the
 // whole stock chain via the self-skipping omega:main import (configuring a
 // Sass knob through core's @forward), and appends brand-local overrides.

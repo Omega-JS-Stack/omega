@@ -11,7 +11,7 @@
  * Replaces the per-framework config zoo (UJM's _config.yml + JSON split,
  * EM's config/electron-manager.json, @omega.js/backend's backend-manager-config.json,
  * BXM's config) with NO dual-read: each framework flips to omega.json5
- * outright and legacy brands migrate their file once (docs/config.md has
+ * outright and legacy brands migrate their file once (docs/shared/config.md has
  * the mapping tables). omega-manager's disperse enumerates SHARED_SECTIONS
  * instead of hardcoding per-target mapping blocks.
  *

@@ -30,26 +30,26 @@ npx omega dev       # dev server: Eleventy watch/serve + in-place asset rebuilds
                     #   resolved (possibly bumped) ports reach the page via the injected
                     #   dev.ports chrome, so the browser always targets THIS brand's stack
                     #   --local: first link every @omega.js dep brand-wide from the local
-                    #   Omega monorepo + start its src→dist watch (docs/local-dev.md there)
+                    #   Omega monorepo + start its src→dist watch (docs/shared/local-dev.md there)
 npx omega build     # production: assets (hashed, @dev-only blocks stripped) → Eleventy → PurgeCSS → Firebase auth helpers (/__/auth/*) → dist/
                     # the auth-helper fetch fails the build loudly on error (demo-*/projectless brands skip); escape hatch: OMEGA_SKIP_FIREBASE_AUTH=true
 npx omega test      # PROJECT scope: production build + smoke checks + consumer test/
                     #   framework:/omega:/web: = @omega.js/web's own suite; full: = both
-                    #   (C5 scoping — docs/testing.md in the Omega repo)
+                    #   (C5 scoping — docs/shared/testing.md in the Omega repo)
 npx omega deploy    # THE publish verb (D13): sync (push triggers nothing) → dispatch
                     #   build.yml so CI builds + publishes; --dry-run prints the exact
-                    #   POST, --local builds only (docs/deploys.md in the Omega repo)
+                    #   POST, --local builds only (docs/shared/deploys.md in the Omega repo)
 npx omega update    # dependency freshness (npu semantics): installed/wanted/latest +
                     #   patch/minor/major per dep; releases < 7 days old QUARANTINED
                     #   --apply installs the non-breaking non-quarantined set via npu
                     #   (--major explicit; --min-age N / --force-fresh tune the hold;
-                    #   file: specs skipped — docs/updates.md in the Omega repo)
+                    #   file: specs skipped — docs/shared/updates.md in the Omega repo)
 npx omega customize <url>  # materialize a default page into src/pages/ (spec §8):
                     #   composition-wrapped pages prefill the theme's section
                     #   one-liners (no copy inlined — sections keep flowing),
                     #   everything else copies the thin default verbatim for
                     #   frontmatter-args customization; no URL lists every
-                    #   customizable URL + lane (docs/sections.md in the Omega repo)
+                    #   customizable URL + lane (docs/web/sections.md in the Omega repo)
 npx omega clean     # remove dist/ + .omega/
 npx omega version   # framework version
 npx omega help      # command listing (also -h/--help; router built-in — never
@@ -58,7 +58,7 @@ npx omega migrate           # UJM (Jekyll) consumer → @omega.js/web, in place
 npx omega migrate --check   # full report (config + codemod preview + lint), zero writes
 npx omega translate         # translate dist/ into translation.languages (committed cache;
                             #   `omega build` runs it automatically when enabled — see
-                            #   docs/translation.md in the Omega repo)
+                            #   docs/shared/translation.md in the Omega repo)
 # audit: explicit not-ported-yet stub (subsystem rides a later checkpoint)
 
 npm test    # engine slice + assets/ESM + CLI/scaffold + migrate + ports + theme contract + translate
@@ -82,7 +82,7 @@ see the harness README for the honest before/after numbers.
 | [layers.js](src/layers.js) | `collectLayered()` — first-layer-wins file resolution (themes, page modules, default pages) |
 | [frontmatter-liquid.js](src/frontmatter-liquid.js) | Frontmatter-value Liquid (cached site-scope renders; page-scoped values defer to a per-page copy-on-write pass) |
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
-| [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/sections.md in the Omega repo) |
+| [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/web/sections.md in the Omega repo) |
 | [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
 | [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass |
 | [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`) |
@@ -94,7 +94,7 @@ see the harness README for the honest before/after numbers.
 | [cli.js](src/cli.js) + [commands/](src/commands) | The `omega` CLI — devkit's shared router (bin/omega → cli.js → commands/<name>.js); dotenv from the consumer root |
 | [consumer.js](src/consumer.js) | Consumer layout (`src/`, `dist/`, `.omega/`) + omega.json5 → site data (loadConfig + toSiteGlobal) |
 | [scaffold.js](src/scaffold.js) | `scaffoldDefaults()` — devkit defaults engine + the web FILE_MAP over `scaffold/` (marker merges, JSON5 config merge, CI/nvmrc templating) |
-| [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/config.md](../../docs/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registerLiquid path), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
+| [migrate/](src/migrate) | `runMigration()` — [config-convert.js](src/migrate/config-convert.js) (_config.yml + ultimate-jekyll-manager.json → omega.json5, mapping in [docs/shared/config.md](../../docs/shared/config.md)), [rules.js](src/migrate/rules.js) (the DECISION.md codemod table as pure text transforms), [codemod.js](src/migrate/codemod.js) (src/** walker), [lint.js](src/migrate/lint.js) (liquid-lint — known names derived from the REAL registerLiquid path), [consumer-assets.js](src/migrate/consumer-assets.js) (seed main.js removal, `omega:main` scss rewrite, page-css self-@use drop) |
 | [runtime/](runtime) | The BROWSER boot runtime (ESM, bundled into every build): `boot.js` bootMain/bootPage handshake, `manager.js` frontend Manager (omega + mode helpers) |
 
 ## Packaged content (the real UJM port, B2)
@@ -103,7 +103,7 @@ see the harness README for the honest before/after numbers.
   admin layouts, includes, css, js, vendored webfonts): warm-paper/charcoal
   token-driven skin, zero gradients, ink primaries, serif marketing display
   (Newsreader) over an Inter UI, `.omega-shell` app chrome — see
-  [docs/theming.md](../../docs/theming.md). Every default frontend page ships
+  [docs/shared/theming.md](../../docs/shared/theming.md). Every default frontend page ships
   in the v2 language (page-hero/prose/timeline/post-card/person/facts
   vocabulary in `css/marketing/_content.scss` + the cp147 compositional set:
   hero-split, duo, statement, numbered, channel, band, form-panel — pages are
