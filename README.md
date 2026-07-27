@@ -10,7 +10,8 @@ Published packages live under the `@omega.js` npm scope. Private shared internal
 |-----------|----------|
 | `packages/` | Framework packages (`web`, `backend`, `extension`, `desktop`) + the orchestration engine (`manager`) + shared internals (`client`, `account`, `config`, `devkit`, `template-kit`) |
 | `apps/` | The three in-repo test brands: `sandbox-brand` (synthetic fixture for the corpus/e2e), `omega-playground` ("Paperloom", classy theme), `newsflash-brand` ("The Daily Build", newsflash theme) — the real brand lives in a sibling repo |
-| `docs/` | Shared-concept deep references |
+| `docs/` | The knowledge home: cross-framework contracts in `docs/shared/`, each framework's guide in `docs/<framework>/` |
+| `agent-plugins/` | Knowledge shipped to coding agents — `claude/` is a Claude Code plugin (skills + hooks) that the committed `.claude/settings.json` auto-installs after one trust prompt |
 
 ## Development
 

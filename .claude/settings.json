@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "omega": {
+      "source": {
+        "source": "directory",
+        "path": "./"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "omega@omega": true
+  }
+}
