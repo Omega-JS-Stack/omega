@@ -13,7 +13,7 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo** — `docs/backend/index.md` is the guide (identity, architecture, the CLI table, file conventions). The per-subsystem meat lives in `packages/backend/docs/*.md`: routes, schemas, firestore, test-framework, common-mistakes, environment-detection, logging, payment-system, email-system, usage-rate-limiting, auth-hooks, mcp, verts. Cross-framework contracts live in `docs/shared/`.
-- **Working in a consumer project** — `node_modules/@omega.js/backend/AGENTS.md` and follow its pointer. In the local era that path is a symlink into this monorepo, so the chain resolves to the live guide; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+- **Working in a consumer project** — read `docs/backend/index.md` in the framework monorepo (the local era links `node_modules/@omega.js/backend` straight into it; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
 
 ## Non-negotiables
 

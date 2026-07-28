@@ -1,51 +1,115 @@
 /**
- * Brand agent-docs chain (Ian 2026-07-20): every brand root carries an
- * AGENTS.md whose FIRST line imports the framework-owned guide shipped
- * inside @omega.js/manager, plus a one-line CLAUDE.md pointer (`@AGENTS.md`).
- * The import path is RELATIVE (node_modules/...) so it works on any machine,
- * and in the local era the file: symlink makes it resolve straight to the
- * monorepo's live file. Idempotent: create when missing, heal a missing
- * first-line import in place, never touch consumer content below the import.
+ * Brand agent-docs chain (Ian 2026-07-20, amended 2026-07-27): every brand
+ * root carries an AGENTS.md whose FIRST line imports the TOP-LEVEL omega
+ * AGENTS.md — the map, the one agent entry — through the scope path
+ * `node_modules/@omega.js/AGENTS.md`, plus a one-line CLAUDE.md pointer
+ * (`@AGENTS.md`). The scope file is a symlink this service maintains: it
+ * resolves the framework monorepo through the installed manager package and
+ * links straight at the live top-level map (published installs get the map
+ * vendored into the package — the docs-vendoring issue retargets this).
+ * Idempotent: create when missing, heal a missing/stale first-line import in
+ * place, never touch consumer content below the import.
  */
-const { join } = require('node:path');
+const { join, dirname } = require('node:path');
+const fs = require('node:fs');
 const jetpack = require('fs-jetpack');
 
-const GUIDE_SUBPATH = 'node_modules/@omega.js/manager/AGENTS.md';
+const GUIDE_SUBPATH = 'node_modules/@omega.js/AGENTS.md';
 const IMPORT_LINE = `@${GUIDE_SUBPATH}`;
+// The pre-2026-07-27 chain imported the guide shipped inside the manager
+// package — heals rewrite it to the scope path.
+const LEGACY_GUIDE_SUBPATH = 'node_modules/@omega.js/manager/AGENTS.md';
 // cp244 shipped a verbose marker comment under the import; Ian culled it
 // (2026-07-20: keep it short) — heals scrub any legacy copy by prefix.
 const LEGACY_MARKER_PREFIX = '<!-- ^ OMEGA framework agent guide';
 const LEGACY_SKELETON_LINE = 'Everything below the import is yours — the framework never rewrites it.';
 const CLAUDE_POINTER = '@AGENTS.md';
 
+const SCOPE_PREFIXES = ['', '../', '../../', '../../../'];
+
 /**
- * Is this line an import of the framework guide (any relative depth)?
+ * Is this line an import of the framework guide (any relative depth,
+ * current or legacy target)?
  *
  * @param {string} line - A single file line
  * @returns {boolean}
  */
 function isImportLine(line) {
   const trimmed = line.trim();
-  return trimmed.startsWith('@') && trimmed.endsWith(GUIDE_SUBPATH);
+  return trimmed.startsWith('@')
+    && (trimmed.endsWith(GUIDE_SUBPATH) || trimmed.endsWith(LEGACY_GUIDE_SUBPATH));
 }
 
 /**
- * Resolve the import line for THIS brand: the guide normally sits in the
- * brand's own node_modules, but in-repo brands hoist to an ancestor (npm
- * workspaces) — walk up until the file exists. Falls back to the canonical
- * brand-local path when nothing resolves yet (pre-install).
+ * The @omega.js scope directory serving this brand: the brand's own
+ * node_modules normally, an ancestor's when hoisted (npm workspaces).
+ *
+ * @param {string} brandRoot - Absolute brand monorepo root
+ * @returns {{prefix: string, scopeDir: string}|null}
+ */
+function findScope(brandRoot) {
+  for (const prefix of SCOPE_PREFIXES) {
+    const scopeDir = join(brandRoot, prefix, 'node_modules', '@omega.js');
+    if (jetpack.exists(scopeDir) === 'dir') {
+      return { prefix, scopeDir };
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the import line for THIS brand — the depth that reaches the scope
+ * directory holding `@omega.js/AGENTS.md`. Falls back to the canonical
+ * brand-local path when nothing is installed yet (pre-install).
  *
  * @param {string} brandRoot - Absolute brand monorepo root
  * @returns {string} - The `@<relative path>` import line
  */
 function resolveImportLine(brandRoot) {
-  const prefixes = ['', '../', '../../', '../../../'];
-  for (const prefix of prefixes) {
-    if (jetpack.exists(join(brandRoot, prefix, GUIDE_SUBPATH)) === 'file') {
-      return `@${prefix}${GUIDE_SUBPATH}`;
-    }
+  const scope = findScope(brandRoot);
+  return scope ? `@${scope.prefix}${GUIDE_SUBPATH}` : IMPORT_LINE;
+}
+
+/**
+ * Ensure `node_modules/@omega.js/AGENTS.md` links at the top-level omega
+ * AGENTS.md. The monorepo is found by resolving the installed manager
+ * package's real path (the local-era file: symlink) and stepping up to its
+ * repo root; when that resolution yields no map (published install, no
+ * vendored map yet), the link is left alone and the step reports skipped.
+ *
+ * @param {string} brandRoot - Absolute brand monorepo root
+ * @returns {'present'|'created'|'healed'|'skipped'} - What happened
+ */
+function ensureGuideLink(brandRoot) {
+  const scope = findScope(brandRoot);
+  if (!scope) {
+    return 'skipped';
   }
-  return IMPORT_LINE;
+
+  let mapFile;
+  try {
+    const managerReal = fs.realpathSync(join(scope.scopeDir, 'manager'));
+    mapFile = join(dirname(dirname(managerReal)), 'AGENTS.md');
+  } catch {
+    return 'skipped';
+  }
+  if (jetpack.exists(mapFile) !== 'file') {
+    return 'skipped';
+  }
+
+  const linkPath = join(scope.scopeDir, 'AGENTS.md');
+  try {
+    if (fs.readlinkSync(linkPath) === mapFile) {
+      return 'present';
+    }
+  } catch {
+    // Not a symlink (missing, or a stale regular file) — fall through and place it.
+  }
+
+  const existed = jetpack.exists(linkPath) !== false;
+  jetpack.remove(linkPath);
+  fs.symlinkSync(mapFile, linkPath);
+  return existed ? 'healed' : 'created';
 }
 
 /**
@@ -66,7 +130,8 @@ function renderAgentsMd(brandName, importLine = IMPORT_LINE) {
 /**
  * Ensure the brand-root AGENTS.md exists with the framework import as its
  * first line. Existing consumer content is preserved verbatim; a stray copy
- * of the import lower in the file is removed when healing (no duplicates).
+ * of the import lower in the file (current or legacy target) is removed when
+ * healing (no duplicates).
  *
  * @param {string} brandRoot - Absolute brand monorepo root
  * @param {string} brandName - Display name used when creating fresh
@@ -91,8 +156,9 @@ function ensureAgentsMd(brandRoot, brandName) {
     return 'present';
   }
 
-  // Heal: the resolved import goes to the top; drop any stray/stale-depth
-  // import copy and any legacy marker comment so heals never stack cruft
+  // Heal: the resolved import goes to the top; drop any stray/stale-depth/
+  // legacy-target import copy and any legacy marker comment so heals never
+  // stack cruft
   const body = lines.filter((line) => !isImportLine(line)
     && !line.trim().startsWith(LEGACY_MARKER_PREFIX)
     && line.trim() !== LEGACY_SKELETON_LINE);
@@ -128,10 +194,13 @@ function ensureClaudePointer(brandRoot) {
 module.exports = {
   GUIDE_SUBPATH,
   IMPORT_LINE,
+  LEGACY_GUIDE_SUBPATH,
   LEGACY_MARKER_PREFIX,
   CLAUDE_POINTER,
   isImportLine,
+  findScope,
   resolveImportLine,
+  ensureGuideLink,
   renderAgentsMd,
   ensureAgentsMd,
   ensureClaudePointer,

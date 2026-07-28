@@ -1,6 +1,6 @@
 # OMEGA Desktop (@omega.js/desktop)
 
-> **Note for contributors and Claude:** This file is the guide for `@omega.js/desktop` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; [packages/desktop/AGENTS.md](../../packages/desktop/AGENTS.md) is a pointer at it, not a second copy). The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in the package's own [`docs/<topic>.md`](../../packages/desktop/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
+> **Note for contributors and Claude:** This file is the guide for `@omega.js/desktop` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (per-subsystem APIs, edge cases, behavior tables, defaults lists) lives in the package's own [`docs/<topic>.md`](../../packages/desktop/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
 > **Mirrored structure:** the four framework guides — `docs/web/index.md`, `docs/backend/index.md`, `docs/extension/index.md`, and `docs/desktop/index.md` — mirror each other (the legacy UJM/BEM/BXM/EM lineage): shared sections (Supply-Chain Security, Development Workflow, File Conventions, Doc-update parity, etc.) appear in the **same order at the same position** across all four. When adding a section that applies to multiple frameworks, insert it in the same spot in all of them.
 
@@ -18,7 +18,7 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 **@omega.js/desktop ships `@omega.js/client` as a runtime singleton inside the renderer process** — it powers auth, Firebase, reactive `data-omega-bind` directives, analytics, error tracking, and utilities (`escapeHTML`, etc.). Any task that touches auth flows, Firestore reads/writes, subscription resolution, push notifications, or DOM bindings means you are working with @omega.js/client as much as with @omega.js/desktop.
 
 **Required reading:**
-- **`node_modules/@omega.js/client/AGENTS.md`** — top-level overview + index
+- **`docs/client/index.md`** (in the framework monorepo) — the client guide: identity, module list, conventions
 - **`node_modules/@omega.js/client/docs/`** — module deep references (Auth, Bindings, Firestore, Notifications, etc.)
 
 ## Quick Start

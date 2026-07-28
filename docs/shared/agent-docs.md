@@ -1,19 +1,21 @@
 # Brand agent-docs chain (AGENTS.md / CLAUDE.md)
 
-**The problem**: every brand needs current framework guidance for AI agents, but copying it into each brand drifts. **The design (Ian 2026-07-20)**: the guidance has ONE home — `packages/manager/AGENTS.md`, shipped inside `@omega.js/manager` — and every brand root imports it.
+**The problem**: every brand needs current framework guidance for AI agents, but copying it into each brand drifts. **The design (Ian 2026-07-20, amended 2026-07-27)**: every brand reads the SAME entry the monorepo uses — the top-level omega `AGENTS.md`, the map — and the map's pointers (plus the omega plugin's hooks) orchestrate which docs load. The brand-root knowledge itself lives in `docs/manager/brand.md`; no AGENTS.md anywhere carries content.
 
 ## The chain
 
 ```
-brand/CLAUDE.md            @AGENTS.md                                  (one line, Claude Code's entry)
-brand/AGENTS.md   line 1:  @node_modules/@omega.js/manager/AGENTS.md  (the framework guide import)
+brand/CLAUDE.md            @AGENTS.md                          (one line, Claude Code's entry)
+brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level omega map — see below)
                   below:   `# <brand> — brand notes` + the brand's own notes — NEVER touched by the framework
 ```
 
+`node_modules/@omega.js/AGENTS.md` is a SYMLINK the workspace service maintains: it resolves the framework monorepo through the installed manager package's real path and links straight at the live top-level map. It sits in the scope directory — no package in the path — because the map belongs to the ecosystem, not to any one package. Published installs get the map vendored into the package and the link retargeted (gated on the docs-vendoring issue, [#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+
 (The cp244 marker comment under the import was culled — Ian 2026-07-20: keep it short; heals scrub any legacy copy.)
 
-- The import path is **relative** (portable to any machine). For hoisted installs (the in-repo test brands are npm workspaces of this monorepo) the ensure step walks up and writes the correct depth, e.g. `@../../node_modules/@omega.js/manager/AGENTS.md`.
-- In the local era, `node_modules/@omega.js/manager` is a `file:` symlink into this monorepo — the import resolves to the LIVE `packages/manager/AGENTS.md`, so framework edits are instantly visible to every brand session. Published installs read the shipped copy, which updates with the package.
+- The import path is **relative** (portable to any machine). For hoisted installs (the in-repo test brands are npm workspaces of this monorepo) the ensure step walks up and writes the correct depth, e.g. `@../../node_modules/@omega.js/AGENTS.md`.
+- The service resolves the monorepo through the installed manager package's real path (the local-era `file:` symlink), so the link always lands on the LIVE top-level map — framework edits are instantly visible to every brand session.
 - Non-Claude agents read `AGENTS.md` but don't follow `@` imports — the import line itself names the target path for them.
 
 ## Maintenance
@@ -28,16 +30,18 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/manager/AGENTS.md  (the frame
 | No `CLAUDE.md` | Created as the one-line `@AGENTS.md` pointer |
 | `CLAUDE.md` carries content | WARNED (never clobbered) with the move-it-to-AGENTS.md message |
 
-Pinned by `packages/manager/test/agents-md.test.js` (guide shipped + files whitelist, path resolution, create/heal/idempotence, content preservation).
+Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + files whitelist, guide-link create/heal/skip, path resolution, create/heal/idempotence, content preservation).
 
-## The two deliberate gaps
+## Packages carry no agent docs (Ian 2026-07-27)
 
-- **`packages/manager` carries NO `CLAUDE.md`.** Its `AGENTS.md` is the guide SHIPPED TO BRAND ROOTS, so a pointer file there would import brand guidance into work on the manager package itself. Work on the package starts from [packages/manager/README.md](../../packages/manager/README.md).
+No `packages/<pkg>/` has an `AGENTS.md` or `CLAUDE.md` — deleted outright, no exceptions. Monorepo sessions get the map from the parent walk; consumer brands get it through the maintained scope symlink; a standalone package install has no resolvable chain anyway; the publish era generates whatever a shipped package needs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+
+## The one deliberate gap
 - **`apps/sandbox-brand` carries NO agent-docs chain.** It is a synthetic fixture the automated corpus/e2e runs mangle and reset — nothing durable lives there, so nothing agent-facing is written there.
 
 ## Editing the guide
 
-The guide is `packages/manager/AGENTS.md` — framework-owned, brand-agnostic (structure, verbs, per-target required-reading pointers, hard rules). Brand-specific knowledge never goes there; it belongs below the import in that brand's `AGENTS.md`.
+The brand-root guide is [docs/manager/brand.md](../manager/brand.md) — framework-owned, brand-agnostic (structure, verbs, per-target required-reading pointers, hard rules). Brand-specific knowledge belongs below the import in that brand's own `AGENTS.md`.
 
 ## Per-app docs — RETIRED in brand context (cp246)
 

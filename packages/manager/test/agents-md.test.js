@@ -1,9 +1,10 @@
 // Tests for src/lib/agents-md.js + the workspace `agents` ensure op — the
-// brand agent-docs chain (Ian 2026-07-20): AGENTS.md line 1 imports the
-// framework guide shipped in @omega.js/manager, CLAUDE.md is the one-line
-// `@AGENTS.md` pointer. Create / present / heal are idempotent, consumer
-// content survives every path, content-bearing CLAUDE.md warns (never
-// clobbered), and the shipped guide actually exists in the package.
+// brand agent-docs chain (Ian 2026-07-20, amended 2026-07-27): AGENTS.md
+// line 1 imports the TOP-LEVEL omega AGENTS.md through the scope path
+// `node_modules/@omega.js/AGENTS.md` (a symlink this service maintains),
+// CLAUDE.md is the one-line `@AGENTS.md` pointer. Create / present / heal
+// are idempotent, consumer content survives every path, content-bearing
+// CLAUDE.md warns (never clobbered), and no package ships agent docs.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,10 +14,12 @@ const path = require('node:path');
 
 const {
   IMPORT_LINE,
+  LEGACY_GUIDE_SUBPATH,
   LEGACY_MARKER_PREFIX,
   CLAUDE_POINTER,
   ensureAgentsMd,
   ensureClaudePointer,
+  ensureGuideLink,
 } = require('../src/lib/agents-md.js');
 const agentsOp = require('../src/services/workspace/ensure/agents.js');
 
@@ -28,18 +31,20 @@ function read(dir, file) {
   return fs.readFileSync(path.join(dir, file), 'utf8');
 }
 
-// ─── The shipped guide ───────────────────────────────────────────────────────
+// ─── The map is the target — no package ships agent docs ─────────────────────
 
-test('agents-md: the framework guide ships at the package root and the files whitelist carries it', () => {
+test('agents-md: no package agent docs — the top-level map is the one entry', () => {
   const pkgRoot = path.join(__dirname, '..');
-  assert.ok(fs.existsSync(path.join(pkgRoot, 'AGENTS.md')), 'packages/manager/AGENTS.md must exist — it is the import target');
+  assert.ok(!fs.existsSync(path.join(pkgRoot, 'AGENTS.md')), 'packages/manager must carry NO AGENTS.md (Ian 2026-07-27)');
 
   const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8'));
-  assert.ok(pkg.files.includes('AGENTS.md'), 'files whitelist must ship AGENTS.md');
+  assert.ok(!pkg.files.includes('AGENTS.md'), 'files whitelist must not ship AGENTS.md');
+
+  assert.ok(fs.existsSync(path.join(pkgRoot, '..', '..', 'AGENTS.md')), 'the top-level AGENTS.md map must exist — it is the import target');
 });
 
-test('agents-md: the import line resolves relative to a brand root (node_modules path)', () => {
-  assert.equal(IMPORT_LINE, '@node_modules/@omega.js/manager/AGENTS.md');
+test('agents-md: the import line is the scope path to the top-level map', () => {
+  assert.equal(IMPORT_LINE, '@node_modules/@omega.js/AGENTS.md');
   assert.ok(!IMPORT_LINE.includes('/Users/'), 'never an absolute machine path');
 });
 
@@ -53,14 +58,63 @@ test('agents-md: resolveImportLine walks up to a hoisted install and falls back 
   assert.equal(resolveImportLine(brand), IMPORT_LINE);
 
   // Hoisted two levels up (in-repo brand shape) → upward relative path
-  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  fs.writeFileSync(path.join(root, GUIDE_SUBPATH), '# guide');
+  fs.mkdirSync(path.join(root, 'node_modules', '@omega.js'), { recursive: true });
   assert.equal(resolveImportLine(brand), `@../../${GUIDE_SUBPATH}`);
 
   // Brand-local install wins over the hoisted one
-  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js', 'manager'), { recursive: true });
-  fs.writeFileSync(path.join(brand, GUIDE_SUBPATH), '# guide');
+  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js'), { recursive: true });
   assert.equal(resolveImportLine(brand), IMPORT_LINE);
+});
+
+test('agents-md: a legacy manager-package import heals to the scope path', () => {
+  const dir = tmpdir();
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `@${LEGACY_GUIDE_SUBPATH}\n\n# Notes survive\n`);
+
+  assert.equal(ensureAgentsMd(dir, 'X'), 'healed');
+  const lines = read(dir, 'AGENTS.md').split('\n');
+  assert.equal(lines[0], IMPORT_LINE, 'the legacy manager-package target rewritten to the scope path');
+  assert.ok(!read(dir, 'AGENTS.md').includes(LEGACY_GUIDE_SUBPATH), 'no legacy target remains');
+  assert.match(read(dir, 'AGENTS.md'), /# Notes survive/);
+});
+
+// ─── ensureGuideLink ─────────────────────────────────────────────────────────
+
+// A fixture consumer: a fake monorepo (top-level AGENTS.md + packages/manager)
+// and a brand whose node_modules/@omega.js/manager symlinks into it — the
+// local-era file: shape.
+function linkFixture() {
+  const root = tmpdir();
+  const monorepo = path.join(root, 'omega');
+  fs.mkdirSync(path.join(monorepo, 'packages', 'manager'), { recursive: true });
+  fs.writeFileSync(path.join(monorepo, 'AGENTS.md'), '# the map\n');
+
+  const brand = path.join(root, 'brand');
+  fs.mkdirSync(path.join(brand, 'node_modules', '@omega.js'), { recursive: true });
+  fs.symlinkSync(path.join(monorepo, 'packages', 'manager'), path.join(brand, 'node_modules', '@omega.js', 'manager'));
+  return { monorepo, brand };
+}
+
+test('agents-md: ensureGuideLink links the scope AGENTS.md at the top-level map, idempotently', () => {
+  const { monorepo, brand } = linkFixture();
+
+  assert.equal(ensureGuideLink(brand), 'created');
+  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+  assert.equal(fs.readFileSync(link, 'utf8'), '# the map\n', 'the link resolves to the live map');
+  assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(monorepo, 'AGENTS.md')));
+
+  assert.equal(ensureGuideLink(brand), 'present');
+});
+
+test('agents-md: ensureGuideLink replaces a stale regular file and skips when nothing resolves', () => {
+  const { brand } = linkFixture();
+  const link = path.join(brand, 'node_modules', '@omega.js', 'AGENTS.md');
+  fs.writeFileSync(link, 'stale copy\n');
+
+  assert.equal(ensureGuideLink(brand), 'healed');
+  assert.ok(fs.lstatSync(link).isSymbolicLink(), 'the stale copy became the live link');
+
+  const bare = tmpdir();
+  assert.equal(ensureGuideLink(bare), 'skipped', 'no scope directory → skipped');
 });
 
 test('agents-md: a stale-depth import line is healed to the resolved path', () => {
@@ -165,7 +219,7 @@ test('agents-md: op creates both files on a fresh brand and is a no-op second ru
   const context = { brandRoot: dir, brand: { id: 'fixture', config: { brand: { name: 'Fixture' } } } };
 
   const first = await agentsOp(context);
-  assert.deepEqual(first.output, { agents: 'created', claude: 'created' });
+  assert.deepEqual(first.output, { guide: 'skipped', agents: 'created', claude: 'created' });
   assert.equal(read(dir, 'AGENTS.md').split('\n')[0], IMPORT_LINE);
   assert.equal(read(dir, 'CLAUDE.md'), `${CLAUDE_POINTER}\n`);
 

@@ -13,7 +13,7 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo** — `docs/client/index.md` is the guide (identity, the module list, file conventions). The meat lives in `packages/client/docs/*.md`: architecture, modules, bindings, code-patterns, common-tasks, build-system, cdp-debugging, testing. Cross-framework contracts live in `docs/shared/`.
-- **Working in a consumer project** — `node_modules/@omega.js/client/AGENTS.md` and follow its pointer. In the local era that path is a symlink into this monorepo, so the chain resolves to the live guide; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)). Consumer-side work is normally routed by the embedding framework's skill — `omega:web`, `omega:desktop`, or `omega:extension` — with this one for the runtime's own behavior.
+- **Working in a consumer project** — read `docs/client/index.md` in the framework monorepo (the local era links `node_modules/@omega.js/client` straight into it; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64))). Consumer-side work is normally routed by the embedding framework's skill — `omega:web`, `omega:desktop`, or `omega:extension` — with this one for the runtime's own behavior.
 
 ## Non-negotiables
 

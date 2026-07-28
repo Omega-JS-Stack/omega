@@ -4,4 +4,4 @@ The package's own long-form reference is [packages/manager/README.md](../../pack
 
 The `omega:manager` router skill from the omega Claude plugin loads automatically in any project with `@omega.js/manager` (and inside `packages/manager` here); it points back at this map and the brand guide.
 
-`packages/manager/AGENTS.md` is NOT this package's guide. It is the brand-facing guide shipped inside `@omega.js/manager` and imported by the first line of every consumer brand's root `AGENTS.md` (contract: [agent-docs.md](../shared/agent-docs.md)). It must stay exactly where it is — never move it into `docs/`, and never rewrite it as a pointer.
+The brand-root guide is [brand.md](brand.md) — what a session inside any consumer brand reads first (anatomy, verbs, brand hard rules, upstream-first). Every consumer brand's root `AGENTS.md` imports `node_modules/@omega.js/AGENTS.md`, a symlink the workspace service maintains at the monorepo's top-level `AGENTS.md` (the map) — contract: [agent-docs.md](../shared/agent-docs.md). No package carries agent docs.

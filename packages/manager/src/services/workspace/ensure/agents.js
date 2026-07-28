@@ -6,10 +6,19 @@
  */
 const chalk = require('chalk').default;
 
-const { ensureAgentsMd, ensureClaudePointer, IMPORT_LINE, CLAUDE_POINTER } = require('../../../lib/agents-md.js');
+const { ensureAgentsMd, ensureClaudePointer, ensureGuideLink, IMPORT_LINE, CLAUDE_POINTER } = require('../../../lib/agents-md.js');
 
 module.exports = async ({ brandRoot, brand }) => {
   const brandName = brand.config?.brand?.name || brand.id;
+
+  const guide = ensureGuideLink(brandRoot);
+  const guideLabel = {
+    present: 'node_modules/@omega.js/AGENTS.md links the framework map',
+    created: 'Linked node_modules/@omega.js/AGENTS.md at the framework map',
+    healed: 'Relinked node_modules/@omega.js/AGENTS.md at the framework map',
+    skipped: 'No resolvable framework map yet (pre-install or published without vendored docs) — link skipped',
+  }[guide];
+  console.log(`      ${chalk.green('✓')} ${guideLabel}`);
 
   const agents = ensureAgentsMd(brandRoot, brandName);
   const agentsLabel = {
@@ -22,12 +31,12 @@ module.exports = async ({ brandRoot, brand }) => {
   const claude = ensureClaudePointer(brandRoot);
   if (claude === 'content-bearing') {
     console.log(`      ${chalk.yellow('⚠')} CLAUDE.md carries content — move it into AGENTS.md (below the import) and reduce CLAUDE.md to the one-line \`${CLAUDE_POINTER}\` pointer`);
-    return { status: 'warned', output: { agents, claude } };
+    return { status: 'warned', output: { guide, agents, claude } };
   }
   console.log(`      ${chalk.green('✓')} CLAUDE.md ${claude === 'created' ? 'created as' : 'is'} the \`${CLAUDE_POINTER}\` pointer`);
 
-  if (agents === 'present' && claude === 'present') {
+  if (agents === 'present' && claude === 'present' && (guide === 'present' || guide === 'skipped')) {
     return null;
   }
-  return { output: { agents, claude } };
+  return { output: { guide, agents, claude } };
 };

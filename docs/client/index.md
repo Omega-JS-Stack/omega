@@ -1,6 +1,6 @@
 # OMEGA Client (@omega.js/client)
 
-> **Note for contributors and Claude:** This file is the guide for `@omega.js/client` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; [packages/client/AGENTS.md](../../packages/client/AGENTS.md) is a pointer at it, not a second copy). The **meat** (module APIs, patterns, behavior tables) lives in the package's own [`docs/<topic>.md`](../../packages/client/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
+> **Note for contributors and Claude:** This file is the guide for `@omega.js/client` — identity, top-level conventions, and a map to the deep references. It lives in the monorepo's `docs/` tree and is loaded on demand (the omega Claude plugin's hooks inject it by context; the repo-root AGENTS.md map is the one agent entry — packages carry no agent docs). The **meat** (module APIs, patterns, behavior tables) lives in the package's own [`docs/<topic>.md`](../../packages/client/docs) files. When extending or adding content, write it in the matching `docs/*.md` file and cross-link from here — do NOT inline it. If a topic doesn't have a doc yet, create one.
 
 ## Identity
 

@@ -162,7 +162,11 @@ function checkSkill(skill, source, surface) {
 
   for (const raw of matchAll(source, PATTERNS.consumerPath)) {
     if (isPlaceholder(raw)) continue;
-    const claimed = stripTrailing(raw).replace('node_modules/@omega.js/', 'packages/');
+    // The scope path `node_modules/@omega.js/AGENTS.md` is the maintained
+    // symlink at the repo-root map — no package segment to translate.
+    const claimed = stripTrailing(raw) === 'node_modules/@omega.js/AGENTS.md'
+      ? 'AGENTS.md'
+      : stripTrailing(raw).replace('node_modules/@omega.js/', 'packages/');
     if (!pathExists(claimed)) report('consumer path', stripTrailing(raw), `does not resolve to ${claimed}`);
   }
 
@@ -208,7 +212,7 @@ test('checker: placeholders and globs are not paths', () => {
 });
 
 test('checker: a consumer node_modules path is translated into packages/', () => {
-  const source = 'Read `node_modules/@omega.js/web/AGENTS.md` and `node_modules/@omega.js/web/NOPE.md`.';
+  const source = 'Read `node_modules/@omega.js/web/README.md` and `node_modules/@omega.js/web/NOPE.md`.';
   assert.deepEqual(checkSkill('fixture', source, FIXTURE_SURFACE), [
     'fixture: consumer path "node_modules/@omega.js/web/NOPE.md" does not resolve to packages/web/NOPE.md',
   ]);

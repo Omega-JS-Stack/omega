@@ -20,9 +20,9 @@ The `@omega.js` framework ecosystem in one repo: npm workspaces, changesets for 
 ## How knowledge loads (the doctrine)
 
 - **`docs/` is the SSOT.** Cross-framework contracts live in `docs/shared/`; each framework's guide is `docs/<framework>/index.md` with its deep docs beside it. No line budget applies inside `docs/`.
-- **AGENTS.md files are pointers, never content.** This file is the repo map; each `packages/<framework>/AGENTS.md` is a thin pointer at its `docs/<framework>/` home (with `CLAUDE.md` = `@AGENTS.md`). Do not inline knowledge into any AGENTS.md — write it in `docs/` and point.
+- **This file is the ONE agent entry — packages carry no agent docs.** Agents work at this level; the parent walk hands every session this map, and the map plus the plugin's hooks route to `docs/`. No `packages/<pkg>/AGENTS.md` or `CLAUDE.md` exists, none. Knowledge lives in `docs/`, never in any AGENTS.md.
 - **Loading is deterministic, not preloaded.** The omega Claude plugin's hooks detect where the chat is working — a `packages/<framework>/` tree here, or an app's target in a consumer repo — and inject the relevant docs then. Nobody reads guides "just in case".
-- **The one exception**: `packages/manager/AGENTS.md` is the brand-facing guide SHIPPED to consumer brand roots, imported by their AGENTS.md chain from `node_modules`. It stays exactly where it is. Contract: [docs/shared/agent-docs.md](docs/shared/agent-docs.md).
+- **Consumer brands read THIS file.** A brand root's `AGENTS.md` line-1 import is `@node_modules/@omega.js/AGENTS.md` — a symlink the manager's workspace service maintains, pointing at this map (published installs get the map vendored, gated on the docs-vendoring issue). Brand-root knowledge (the app table, the verbs, the brand hard rules, upstream-first) lives in [docs/manager/brand.md](docs/manager/brand.md). Contract: [docs/shared/agent-docs.md](docs/shared/agent-docs.md).
 - **Consumers get version-matched knowledge.** In the local era, `node_modules/@omega.js/*` symlinks into this monorepo, so the pointers resolve as-is. Published packages will carry their docs inside the package (prepare-time vendoring — gated on the publish checkpoint), so the plugin reads knowledge that matches the installed version, never a global copy.
 
 ## The Claude plugin
@@ -53,13 +53,13 @@ The monorepo ships a Claude Code plugin (`agent-plugins/claude/`, listed by the 
 | `apps/newsflash-brand` | "The Daily Build" — the standing second-skin brand, newsflash theme | Offline, `demo-*` only |
 | `../omega-brand` (sibling repo) | The REAL brand: omegajs.dev, LIVE | Real project `omegajs` |
 
-The in-repo brands and the playground project are test-only forever; nothing in this monorepo is ever the production brand. Full topology, history, the local-era `file:` dependency contract, and the remaining launch gates: [docs/shared/brands.md](docs/shared/brands.md).
+The in-repo brands and the playground project are test-only forever; nothing in this monorepo is ever the production brand. Full topology, history, the local-era `file:` dependency contract, and the remaining launch gates: [docs/shared/brands.md](docs/shared/brands.md). **Working inside a consumer brand right now?** Read [docs/manager/brand.md](docs/manager/brand.md) first — the brand-root anatomy, the verbs, and the brand hard rules.
 
 ## Getting started (the dev loop)
 
 - Root `npm start` watches every dist-building package concurrently (single-instance lock).
 - In a brand's website app, `omega dev --local` links every `@omega.js/*` dep brand-wide from this monorepo and starts the watch; `omega i local` does the same per app. Full contract: [docs/shared/local-dev.md](docs/shared/local-dev.md).
-- **Upstream-first**: consumer work on a locally linked brand that reveals a framework-level hole fixes it HERE, in the framework — never as a consumer-side patch to repeat in the next project. The rule (and its "within reason" line) lives in [docs/shared/local-dev.md](docs/shared/local-dev.md) and ships to brand sessions via the brand guide.
+- **Upstream-first**: consumer work on a locally linked brand that reveals a framework-level hole fixes it HERE, in the framework — never as a consumer-side patch to repeat in the next project — and a consumer session asks first: it surfaces the proposed framework change and waits for Ian's go (or files an issue), never editing the monorepo unprompted. The rule (and its "within reason" line) lives in [docs/shared/local-dev.md](docs/shared/local-dev.md) and ships to brand sessions via the brand guide.
 - Tests run in lanes: `npm run test:packages` (unit), then corpus/e2e/verts/auth/journey — the full pipeline and when each lane gates is in [docs/shared/testing.md](docs/shared/testing.md).
 
 ## CLI bins

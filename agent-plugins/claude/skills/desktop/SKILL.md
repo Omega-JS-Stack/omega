@@ -13,7 +13,7 @@ user-invocable: true
 This skill routes; the docs are the source of truth. Read the guide BEFORE touching files.
 
 - **Working in this monorepo** — `docs/desktop/index.md` is the guide (per-process singletons, the lib-module table, windows, icons, build system, config flow, CDP debugging, the CLI table). The per-subsystem meat lives in `packages/desktop/docs/*.md`. Cross-framework contracts live in `docs/shared/` (config, theming, icons, deploys, updates, testing, local-dev).
-- **Working in a consumer project** — `node_modules/@omega.js/desktop/AGENTS.md` and follow its pointer. In the local era that path is a symlink into this monorepo, so the chain resolves to the live guide; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
+- **Working in a consumer project** — read `docs/desktop/index.md` in the framework monorepo (the local era links `node_modules/@omega.js/desktop` straight into it; published installs will carry the docs inside the package ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
 - **`@omega.js/client` comes with it.** The client singleton runs in the renderer, so any task touching auth, Firestore, subscriptions, notifications, or `data-omega-bind` is client work too — `docs/client/index.md` and the `omega:client` skill.
 
 ## Non-negotiables

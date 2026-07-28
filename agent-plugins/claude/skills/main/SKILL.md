@@ -29,7 +29,7 @@ Every framework ships the same context-aware `omega` / `omg` / `mgr` dispatcher:
 
 `docs/` is the SSOT. Cross-framework contracts are `docs/shared/*.md` — config, local-dev, testing, deploys, updates, publishing, icons, theming, translation, agent-docs, brands, rulings. Each framework's guide is `docs/<framework>/index.md` with its deep docs beside it, and the package's own `README.md` carries long-form detail. The four framework guides (web, backend, extension, desktop) mirror each other section for section — each guide's header states the rule.
 
-`AGENTS.md` files are pointers, never content; `CLAUDE.md` is one line importing `AGENTS.md`. The single exception is `packages/manager/AGENTS.md`, the brand-facing guide shipped to consumer brand roots (`docs/shared/agent-docs.md`).
+The repo-root `AGENTS.md` is the ONE agent entry — packages carry no agent docs (the parent walk hands every monorepo session the map). Consumer brands import `node_modules/@omega.js/AGENTS.md`, a symlink the workspace service maintains at the map. The brand-root guide is `docs/manager/brand.md`; the contract is `docs/shared/agent-docs.md`.
 
 ## The brands
 
