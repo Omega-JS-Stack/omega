@@ -9,7 +9,9 @@
    `--omega-*` custom-property contract: neutrals (`ground`, `surface`,
    `surface-2`, `ink`, `ink-muted`, `ink-faint`, `line`, `line-strong`), the
    accent family (`accent`, `-hover`, `-active`, `-subtle`, `-ink`, `-ring`),
-   status (`ok`/`warn`/`danger`), charts (`chart-1`/`chart-2`), shadows
+   status (`ok`/`warn`/`danger`), the categorical ramp (`chart-1`…`chart-6` —
+   series-1 rides the accent, the rest are CVD-validated muted hues, cool half
+   before warm), shadows
    (`shadow-1`/`shadow-2`), shape (`radius-xs/s/m/l/xl`), motion (`speed`,
    `speed-slow`, `ease`), and the type slots (`font-ui`, `font-serif`,
    `font-mono`, plus the pairing slots `font-marketing` and `font-display`).
@@ -148,12 +150,36 @@ language there.
 
 `themes/classy/css/app/_panels.scss`: `classy-statgrid` (the DIRECTION
 merged stat card — ONE card, hairline column dividers, micro-label +
-tabular value + delta chip per cell; `--classy-statgrid-cols` sets the
-lg column count), `classy-panel-title` (the 14/650 card-title voice), and
+tabular value + delta chip per cell; it sizes off ITS OWN width, never the
+viewport — `--classy-statgrid-cols` sets the column CEILING and cells reflow
+below a 10rem floor, so a statgrid nested in a half-width card wraps instead
+of overflowing), `classy-panel-title` (the 14/650 card-title voice), and
 `classy-activity` (hairline-divided feed rows with neutral icon chips).
 The backend dashboard layout and the admin dashboard/users blueprints
 render on these; every JS-populated id (`stat-*`, tables, charts) is a
 contract and stays.
+
+## Categorical tones + the interactive affordance (#72)
+
+Two shared utility sets in `core/css` — core, not classy, so every theme
+inherits them:
+
+- **Tones** (`core/css/core/_tones.scss`): `.omega-tone-1`…`.omega-tone-6` set
+  `--omega-tone` to the matching `--omega-chart-*` slot, and
+  `.omega-badge-tone` paints a chip with it (`color-mix` tint, no
+  uppercasing — a tone label is an identifier, not a word). ONE ramp for two
+  surfaces: a chart series and the badge naming the same thing are the same
+  color. Which name falls in which slot is the page's business. The sheet
+  loads after the theme forward, so it outranks a theme's own chip rules.
+- **`.omega-interactive`** (`core/css/motion/_index.scss`): the whole-surface
+  click affordance — the surface warms on hover AND `:focus-visible`, an
+  accent ring on focus, an accent-subtle tint on press. `--lift` adds the
+  card lift (2px up, shadow-2) that presses back down; a row takes the base
+  class alone. `prefers-reduced-motion` drops the transition and the lift.
+
+Charts read the same ramp: `core/js/libs/charts.js` (`chartColors()`) resolves
+`--omega-chart-1…6` off `:root`, so a chart follows the brand ramp and dark
+mode without knowing either exists.
 
 ## Motion library
 
@@ -172,6 +198,7 @@ desktop/extension at C4 exactly like icon-renderer.
 | `data-omega-segmented` | gliding-thumb segmented control: engine injects `.omega-segmented__thumb` and tracks the checked/`.active` segment (billing toggle, platform rails, footer appearance) |
 | `data-omega-dotfield="22"` | canvas dot grid (value = px spacing): slow traveling wave, dots tint along ONE drifting rainbow gradient, pointer glow (tracked window-level so the fixed nav can't blind it); static CSS dots remain for no-JS/reduced-motion |
 | `.omega-hover-lift/-raise/-dim`, `.omega-pressable`, `.omega-hover-nudge .omega-nudge` | pure-CSS hover/press effects |
+| `.omega-interactive` (+ `--lift`) | whole-surface click affordance: warm on hover/focus-visible, ring on focus, tint on press |
 | `.omega-float`, `.omega-caret` | ambient float, terminal caret |
 
 Resilience rules (load-bearing):

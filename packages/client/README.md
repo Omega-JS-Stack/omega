@@ -93,7 +93,7 @@ Web Manager is designed to work in multiple environments:
 - **Firebase v12 Integration**: Modern Firebase Auth, Firestore, and Cloud Messaging
 - **Data Binding System**: Reactive DOM updates with `data-omega-bind` attributes
 - **Storage API**: Enhanced localStorage/sessionStorage with path-based access and JSON serialization
-- **Utilities**: `clipboardCopy()`, `escapeHTML()`, `getContext()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`
+- **Utilities**: `clipboardCopy()`, `escapeHTML()`, `sanitizeURL()`, `renderMarkdown()`, `getContext()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`
 - **DOM Utilities**: Dynamic script loading with retry/timeout support
 - **Service Worker Management**: Registration, messaging, and state tracking
 - **Push Notifications**: Firebase Cloud Messaging with auto-subscription
@@ -714,6 +714,8 @@ await loadScript('https://example.com/script.js');
 import {
   clipboardCopy,
   escapeHTML,
+  sanitizeURL,
+  renderMarkdown,
   showNotification,
   getPlatform,
   getBrowser,
@@ -731,6 +733,15 @@ await clipboardCopy(document.querySelector('#input')); // From element
 // Escape HTML (XSS prevention)
 const safe = escapeHTML('<script>alert("xss")</script>');
 // '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
+
+// Sanitize a URL (returns '' for javascript:, data:, and every non-http(s) scheme)
+sanitizeURL('https://example.com/a'); // 'https://example.com/a'
+sanitizeURL('javascript:alert(1)');   // ''
+
+// Render untrusted text as safe markup — escape-first mini-markdown
+// (headings, fenced + inline code, lists, bold/italic, http(s) links only)
+renderMarkdown('## Spec\n\nOne **bold** and `code`.');
+// '<h5 class="h6 mt-3 mb-2">Spec</h5><p>One <strong>bold</strong> and <code>code</code>.</p>'
 
 // Show notification (Bootstrap-styled)
 showNotification('Success!', { type: 'success', timeout: 5000 });

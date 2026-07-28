@@ -473,6 +473,19 @@ division: the THEME is generic, promoting OMEGA is the BRAND's job. The
 framework's own dev-only /test/* surfaces keep their omega references
 (they demo the framework's real machinery and are purged from production).
 
+The data lane (#72, ported from the workkit tower): `data/org-chart` — one
+root card over a connected row of node cards (`{ title, sub, meta, tone }`
+each), joined by ANIMATED dashed connectors. Every line is a repeating
+gradient, not a border: a gradient's position is animatable and a border's
+dash pattern is not, and a chart of what is happening right now reads as live
+only if something on it is. Under 768px the tree tilts onto its side (spine
+down the left, an elbow into each card), `prefers-reduced-motion` parks the
+animation, and the `tone` arg rides the shared categorical ramp
+([docs/shared/theming.md](../shared/theming.md)) so a node's chip matches the
+same name's chart series. The class vocabulary is `omega-`-namespaced on
+purpose — a live page rendering it from JS keeps the connectors AND survives
+the PurgeCSS content scan. Pinned in `test/dataviz.test.js`.
+
 Pending (spec §13): the arc close — THE FORK (real omegajs.dev sub-brand
 born outside the monorepo on published omega; Ian-gated on publish/launch
 decisions).

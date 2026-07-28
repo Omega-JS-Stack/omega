@@ -1,0 +1,33 @@
+{
+  description: 'Org chart — one root card over a connected row of node cards, joined by animated dashed connectors (repeating gradients, because a border\'s dash pattern cannot move). Under 768px the tree tilts onto its side: a spine down the left with an elbow into each card. The animation stops under prefers-reduced-motion. Each entry takes { title, sub, meta, tone } — `tone` is a 1–6 slot of the shared categorical ramp (--omega-chart-*), so a node\'s chip matches the same name\'s series on a chart. A live page rendering this class vocabulary from JS gets the same connectors.',
+
+  args: {
+    root: { type: 'object', description: 'The top card: { title, sub, meta, tone }' },
+    nodes: { type: 'array', description: 'The connected row, each { title, sub, meta, tone }' },
+    class: 'string',
+  },
+
+  // Mechanical only — the chart has no copy of its own to keep neutral
+  defaults: {},
+
+  demo: [
+    {
+      label: 'Root over four nodes',
+      args: {
+        root: { title: 'Manager', sub: 'orchestration', meta: 'lead', tone: 1 },
+        nodes: [
+          { title: 'Scout', sub: 'reads the repo', meta: 'research', tone: 2 },
+          { title: 'Worker', sub: 'builds the change', meta: 'build', tone: 3 },
+          { title: 'Verifier', sub: 'proves it', meta: 'review', tone: 4 },
+          { title: 'Advisor', sub: 'weighs the call', meta: 'counsel', tone: 5 },
+        ],
+      },
+    },
+    {
+      label: 'Root alone',
+      args: {
+        root: { title: 'Manager', sub: 'nobody dispatched yet' },
+      },
+    },
+  ],
+}

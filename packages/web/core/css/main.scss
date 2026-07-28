@@ -35,6 +35,7 @@
 // Import default Ultimate Jekyll Manager styles
 @use 'core/_initialize' as *;
 @use 'core/_utilities' as *;
+@use 'core/_tones' as *;
 @use 'core/_animations' as *;
 @use 'core/_alert' as *;
 @use 'core/_exit-popup' as *;

@@ -39,6 +39,10 @@
   --omega-warn: #c47206;
   --omega-danger: #d92d20;
   --omega-chart-2: #0f8fa9;
+  --omega-chart-3: #7a45b5;
+  --omega-chart-4: #b0416a;
+  --omega-chart-5: #a06a08;
+  --omega-chart-6: #6a7f2b;
   --omega-shadow-1: 0 1px 2px rgb(24 23 21 / 5%);
   --omega-shadow-2: 0 18px 44px rgb(24 23 21 / 10%);
 }
@@ -62,6 +66,10 @@
   --omega-warn: #f5a524;
   --omega-danger: #f0574d;
   --omega-chart-2: #1f9fb4;
+  --omega-chart-3: #c09aec;
+  --omega-chart-4: #ee89a8;
+  --omega-chart-5: #e0a33c;
+  --omega-chart-6: #a9c153;
   --omega-shadow-1: 0 1px 2px rgb(0 0 0 / 30%);
   --omega-shadow-2: 0 18px 44px rgb(0 0 0 / 45%);
 }
@@ -91,7 +99,12 @@
   --omega-font-marketing: var(--omega-font-serif);
   --omega-font-display: var(--omega-font-ui);
 
-  // Chart series-1 rides the accent; series-2 is the CVD-validated teal above.
+  // Chart series-1 rides the accent; 2–6 are the CVD-validated categorical
+  // ramp above (cool half first, warm half after — what keeps two vocabularies
+  // apart at a glance). It is ONE ramp for two surfaces: a chart series
+  // (core/js/libs/charts.js) and a `.omega-badge-tone` chip read the same slot,
+  // so the same thing is the same color wherever it appears. Muted on purpose
+  // — status is told by a dot and a label, never by color alone.
   --omega-chart-1: var(--omega-accent);
 }
 

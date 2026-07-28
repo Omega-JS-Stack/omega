@@ -98,6 +98,48 @@
   }
 }
 
+// The whole-surface click affordance: a card or a row that IS the click
+// target says so the way every other control does — the surface warms under
+// the pointer, pressing tints it, and the keyboard gets the same treatment
+// through :focus-visible (these are often divs carrying a button role).
+// The lift is a MODIFIER, not a `.card` rule: a card has edges to lift, a row
+// does not, and core css never names a theme's vocabulary.
+.omega-interactive {
+  cursor: pointer;
+  transition:
+    background-color var(--omega-speed) var(--omega-ease),
+    box-shadow var(--omega-speed) var(--omega-ease),
+    transform var(--omega-speed) var(--omega-ease);
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--omega-surface-2);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--omega-accent-ring);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    background-color: var(--omega-accent-subtle);
+  }
+}
+
+.omega-interactive--lift {
+  &:hover,
+  &:focus-visible {
+    box-shadow: var(--omega-shadow-2);
+    transform: translateY(-2px);
+  }
+
+  // Pressing puts the lift back down, so the click has somewhere to land.
+  &:active {
+    box-shadow: var(--omega-shadow-1);
+    transform: translateY(0);
+  }
+}
+
 // Icon-nudge microinteraction: the child .omega-nudge slides on parent hover
 // (arrows in buttons/links).
 .omega-hover-nudge .omega-nudge {
@@ -259,6 +301,7 @@ html[data-omega-motion] [data-omega-rotate] > [data-omega-active] {
   .omega-hover-lift,
   .omega-hover-raise,
   .omega-pressable,
+  .omega-interactive,
   .omega-hover-nudge .omega-nudge,
   .omega-segmented__thumb,
   html[data-omega-motion] [data-omega-rotate] > * {
@@ -268,6 +311,9 @@ html[data-omega-motion] [data-omega-rotate] > [data-omega-active] {
   .omega-hover-lift:hover,
   .omega-hover-raise:hover,
   .omega-pressable:active,
+  .omega-interactive--lift:hover,
+  .omega-interactive--lift:focus-visible,
+  .omega-interactive--lift:active,
   .omega-hover-nudge:hover .omega-nudge {
     transform: none;
     box-shadow: none;

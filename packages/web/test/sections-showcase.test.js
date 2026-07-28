@@ -22,8 +22,8 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
 
   // Classy entries + the index. A new section folder appears with zero
   // authoring — this count is the "new section → appears automatically" pin
-  // (+1 declared add: verts/unit, cp246).
-  assert.equal(showcaseUrls(pages).length, 19, 'index + 18 entry pages');
+  // (+2 declared adds: verts/unit cp246, data/org-chart #72).
+  assert.equal(showcaseUrls(pages).length, 20, 'index + 19 entry pages');
 
   const index = pages.get('/test/sections');
   assert.ok(index.includes('Section library'), 'index masthead');
@@ -53,8 +53,9 @@ test('cp219: the classy showcase — index + one page per resolved entry, docs f
 test('cp219: the newsflash showcase — overrides and fallthroughs chip their owning layer', async () => {
   const pages = await buildWith(nfData);
 
-  // Shared ids + nf-only entries + the index (+1 declared add: verts/unit, cp246)
-  assert.equal(showcaseUrls(pages).length, 25, 'index + 24 entry pages under newsflash');
+  // Shared ids + nf-only entries + the index (+2 declared adds: verts/unit
+  // cp246, data/org-chart #72)
+  assert.equal(showcaseUrls(pages).length, 26, 'index + 25 entry pages under newsflash');
 
   const cta = pages.get('/test/sections/section/marketing/cta');
   assert.ok(cta.includes('>newsflash<'), 'override entry chips its owning layer');

@@ -72,6 +72,8 @@ test('token sheet compiles clean — modern sass, ZERO deprecations, full plumbi
   assert.match(result.css, /--omega-accent: #2563eb/, 'classy v2 placeholder accent (light)');
   assert.match(result.css, /--omega-accent: #5484ef/, 'classy v2 placeholder accent (dark variant)');
   assert.match(result.css, /--omega-font-marketing/, 'type pairing slots present (D5 seam)');
+  assert.match(result.css, /--omega-chart-6: #6a7f2b/, 'the categorical ramp runs to six (light)');
+  assert.match(result.css, /--omega-chart-6: #a9c153/, 'and carries its own dark values');
   assert.match(result.css, /prefers-color-scheme: dark/, 'OS preference carries (D2)');
   assert.match(result.css, /data-bs-theme=['"]?dark/, 'appearance.js stamp beats OS — dark');
   assert.match(result.css, /data-bs-theme=['"]?light/, 'appearance.js stamp beats OS — light');

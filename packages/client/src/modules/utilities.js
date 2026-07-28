@@ -4,6 +4,47 @@
 //   const escape = omega.utilities().escapeHTML; // ✓ works
 //   items.map(omega.utilities().escapeHTML); // ✓ works
 // Safe because omega.utilities() is a singleton — only one instance ever exists.
+
+// renderMarkdown links are restricted to the two schemes a browser may navigate
+// safely. sanitizeURL already rejects javascript:/data:, but it resolves a bare
+// path against the current origin and returns it — and the bracket syntax is the
+// one place the source supplies an attribute VALUE rather than text, so a link is
+// only ever minted from a URL that says its own scheme out loud.
+const SAFE_HREF = /^https?:\/\//i;
+
+// The inline grammar, applied to an already-escaped line.
+const renderInline = (text, sanitizeURL) => text
+  // Code first: what is inside a span of backticks is literal, and running the
+  // emphasis rules over it would eat the asterisks in a code sample.
+  .split(/(`[^`]+`)/)
+  .map((part) => {
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 1) {
+      return `<code>${part.slice(1, -1)}</code>`;
+    }
+
+    // Built anchors are stashed behind a NUL sentinel while the emphasis rules
+    // run — an href may legitimately contain asterisks, and the emphasis pass
+    // must never see markup it built.
+    const anchors = [];
+
+    return part
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (whole, label, href) => {
+        const safe = sanitizeURL(href);
+
+        // Not a scheme a browser may follow — leave the bracket text as text.
+        if (!safe || !SAFE_HREF.test(safe)) {
+          return whole;
+        }
+
+        anchors.push(`<a href="${safe}" target="_blank" rel="noopener">${label}</a>`);
+        return `\u0000${anchors.length - 1}\u0000`;
+      })
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+      .replace(/\u0000(\d+)\u0000/g, (match, index) => anchors[Number(index)]);
+  })
+  .join('');
+
 class Utilities {
   constructor(manager) {
     this.manager = manager;
@@ -105,6 +146,119 @@ class Utilities {
     } catch (e) {
       return '';
     }
+  }
+
+  // Render hostile text as safe markup with a small markdown grammar: headings,
+  // fenced and inline code, lists, bold/italic, and links restricted to http(s).
+  //
+  // The input is untrusted (an API answer, another user's words), so nothing here
+  // ever passes markup through: the text is ESCAPED FIRST, once, and every rule
+  // below works on that escaped string — a `<script>` is already `&lt;script&gt;`
+  // before any rule decides what a line means, so no rule can resurrect it.
+  // Escaping is escapeHTML's job and scheme safety is sanitizeURL's; this method
+  // only decides what a line MEANS.
+  //
+  // Not a markdown engine and not trying to be one — anything outside the grammar
+  // renders as the text it was. Empty input renders as '', so the caller can say
+  // what empty means in its own words.
+  renderMarkdown = (text) => {
+    const source = String(text === null || text === undefined ? '' : text);
+    if (!source.trim()) {
+      return '';
+    }
+
+    const lines = this.escapeHTML(source.replace(/\r\n/g, '\n')).split('\n');
+    const out = [];
+    let paragraph = [];
+    let list = null;
+    let code = null;
+
+    const closeParagraph = () => {
+      if (!paragraph.length) {
+        return;
+      }
+
+      out.push(`<p>${renderInline(paragraph.join('<br>'), this.sanitizeURL)}</p>`);
+      paragraph = [];
+    };
+
+    const closeList = () => {
+      if (!list) {
+        return;
+      }
+
+      const items = list.items.map((item) => `<li>${renderInline(item, this.sanitizeURL)}</li>`).join('');
+      out.push(`<${list.tag}>${items}</${list.tag}>`);
+      list = null;
+    };
+
+    const closeBlocks = () => {
+      closeParagraph();
+      closeList();
+    };
+
+    for (const line of lines) {
+      // A fence swallows everything until the next one — inside it, no rule but
+      // "this is literal" applies.
+      const fence = /^\s*```/.test(line);
+      if (code !== null) {
+        if (fence) {
+          out.push(`<pre class="p-2 rounded"><code>${code.join('\n')}</code></pre>`);
+          code = null;
+        } else {
+          code.push(line);
+        }
+        continue;
+      }
+      if (fence) {
+        closeBlocks();
+        code = [];
+        continue;
+      }
+
+      const heading = line.match(/^(#{1,6})\s+(.*)$/);
+      if (heading) {
+        closeBlocks();
+
+        // Rendered text is a fragment inside a host page, not a document: its
+        // headings start below the host's own title rather than competing with it.
+        const level = Math.min(heading[1].length + 3, 6);
+        out.push(`<h${level} class="h6 mt-3 mb-2">${renderInline(heading[2], this.sanitizeURL)}</h${level}>`);
+        continue;
+      }
+
+      const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+      const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+      if (bullet || numbered) {
+        closeParagraph();
+
+        const tag = bullet ? 'ul' : 'ol';
+        if (list && list.tag !== tag) {
+          closeList();
+        }
+
+        list = list || { tag, items: [] };
+        list.items.push((bullet || numbered)[1]);
+        continue;
+      }
+
+      if (!line.trim()) {
+        closeBlocks();
+        continue;
+      }
+
+      closeList();
+      paragraph.push(line);
+    }
+
+    // An unterminated fence is still content — render what it holds rather than
+    // dropping the rest of the text on the floor.
+    if (code !== null) {
+      out.push(`<pre class="p-2 rounded"><code>${code.join('\n')}</code></pre>`);
+    }
+    closeBlocks();
+
+    return out.join('');
   }
 
   // Show notification

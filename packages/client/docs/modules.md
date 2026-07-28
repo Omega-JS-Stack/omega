@@ -100,7 +100,30 @@ Auth uses a promise-based settler (`_authReady`) that resolves once Firebase's f
 
 ## Utilities (`utilities.js`)
 
-- **Exports**: `clipboardCopy()`, `escapeHTML()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`, `getContext()`
+- **Exports**: `clipboardCopy()`, `escapeHTML()`, `sanitizeURL()`, `renderMarkdown()`, `showNotification()`, `getPlatform()`, `getBrowser()`, `getRuntime()`, `isMobile()`, `getDevice()`, `getContext()`
+- **escapeHTML(input)**: walks strings, arrays and objects recursively; escapes `& < > " '` (quotes too, so an escaped value is safe inside an attribute). Non-strings pass through.
+- **sanitizeURL(url)**: returns the URL unchanged when it resolves to `http:`/`https:`, `''` for every other scheme (`javascript:`, `data:`, …).
+
+### renderMarkdown(text)
+
+Untrusted text as safe markup — an escape-first mini renderer for API answers and user-supplied prose (ported from the workkit tower's issue dialog). It composes the two helpers above rather than owning escaping: the source is escaped ONCE up front and every rule then works on that escaped string, so no rule can resurrect a `<script>` that is already `&lt;script&gt;`.
+
+- **Grammar**: `#`–`######` headings, fenced blocks (```` ``` ````), inline code, `-`/`*` bullet and `1.`/`1)` numbered lists, `**bold**`, `*italic*`, and `[label](href)` links. Anything else renders as the text it was — it is not a markdown engine.
+- **Links**: `sanitizeURL` gives the scheme verdict and the href must additionally be absolute `http(s)` — a `javascript:`/`data:`/relative href leaves the bracket text as text, never an anchor. Built anchors are stashed behind a NUL sentinel while the emphasis rules run, so an href holding asterisks survives untouched. Anchors carry `target="_blank" rel="noopener"`.
+- **Output shape**: headings render three levels down (`#` → `<h4 class="h6 mt-3 mb-2">`, floored at `h6`) so a rendered fragment never competes with its host page's title; fenced blocks render `<pre class="p-2 rounded"><code>` (Bootstrap utilities, same idiom as `showNotification`).
+- **Edges**: empty/whitespace/`null` input returns `''` (the caller says what empty means); an unterminated fence still renders its content.
+
+## Live Page (`live-page.js`) — the self-refreshing page primitives
+
+- **Exports**: `loading(message)`, `swap(host, markup)`, `createFeedPoller(options)`
+- **Pattern**: transport-free standalone module (like `motion`) with the deps-injected seam `request` uses — the page boots it and hands it a fetcher; there is no singleton coupling. Ported from the workkit tower's page runtime.
+- **`swap($host, markup)`**: writes `innerHTML` ONLY when the markup differs from what swap itself last wrote (a WeakMap keyed by the element), so an unchanged section keeps its DOM, focus, scroll position and open `details` across a poll. The comparison never reads `host.innerHTML` back — the browser re-serializes what it parses, so a read-back never matches the string that produced it and every tick would count as a change. Returns `true` when it wrote, which is what post-draw work (charts, listeners) hangs off.
+- **`loading(message)`**: the spinner line a section shows while its feed has never answered — a first paint says which read it is waiting on instead of drawing an empty region. The message is escaped through `utilities.escapeHTML`.
+- **`createFeedPoller({ feeds, fetcher, onChange })`**: `feeds` is the declared table (`{ name: { path, every, fresh? } }` — `fresh` is the cache-bypass path a user-triggered refresh uses); `fetcher` is an `omega.request`-shaped function (resolves with the body, throws an `Error` carrying `.code`), so a page passes `omega.request` and a non-singleton context passes its own `createRequest(...)`; `onChange` fires at every state transition (a read starting, a read landing) and is where the page repaints.
+- **Poller surface**: `state` (`{ feeds, pending, stamp }`), `read(name, fresh)`, `readAll(fresh)`, `staleFeeds()`, `start()` (first pass, then arms one interval per feed; idempotent), `stop()`.
+- **Feed result shape**: `{ ok, data, status, reason }` — `status` is the thrown error's `.code` (null for a transport failure), `reason` its message.
+- **Keep-last-good**: a refresh that fails does NOT clear the page — the last good result stays in `state.feeds[name]` with a `stale` key naming why the refresh missed. A feed that has never answered simply carries its own latest failure. `staleFeeds()` returns `[{ name, reason }]` for both cases, which is what a chrome bar's "N feeds unavailable" chip draws from.
+- **`state.pending`**: how many reads are in flight — a refresh is visible while it happens and the page under it keeps showing the data it already has.
 
 ## Verts (`verts.js`) — adblock-safe ad engine
 

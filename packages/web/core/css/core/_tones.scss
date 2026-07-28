@@ -1,0 +1,32 @@
+// Categorical tones — the recognition color for a NAME (a plan, a model, a
+// class, a channel), drawn from the same `--omega-chart-*` ramp the charts
+// paint with (core/css/tokens/_index.scss), so a bar and the badge beside it
+// are the same color for the same thing.
+//
+// Two classes compose: `.omega-tone-<n>` picks the slot, `.omega-badge-tone`
+// paints a chip with whatever slot is set. Which NAME falls in which slot is
+// the page's business — this sheet only owns the palette seam.
+//
+// The tone tokens ride the token sheet's light/dark plumbing, so appearance
+// follows with no second palette here.
+
+@for $i from 1 through 6 {
+  .omega-tone-#{$i} {
+    --omega-tone: var(--omega-chart-#{$i});
+  }
+}
+
+// A chip in its slot's color. `text-transform` is off because a tone label is
+// an identifier, not a word — `CLAUDE-OPUS-5` is not a name to title-case.
+.omega-badge-tone {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--omega-tone, var(--omega-ink-muted));
+  background: color-mix(in srgb, var(--omega-tone, var(--omega-ink-muted)) 14%, transparent);
+  border-color: transparent;
+  text-overflow: ellipsis;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}

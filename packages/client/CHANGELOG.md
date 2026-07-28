@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- [#71](https://github.com/Omega-JS-Stack/omega/issues/71) — Live-page primitives as the standalone `modules/live-page.js`: `swap` writes a section only when its markup changed, `loading` gives a feed's first paint a spinner line, and `createFeedPoller` owns the declared feed table with in-flight tracking and keep-last-good-on-failure. The fetcher arrives as an argument, so any `omega.request`-shaped function works.
+- [#70](https://github.com/Omega-JS-Stack/omega/issues/70) — Untrusted text renders as safe markup: `utilities.renderMarkdown(text)` escapes once via `escapeHTML`, then renders headings, fenced and inline code, lists, bold/italic, and links `sanitizeURL` clears as absolute http(s). Ported from the workkit tower with its adversarial tests.
 - **`modules/motion.js` — the shared animation engine (classy v2, C3).** Icon-renderer-pattern factory (`createMotion()` → `start/stop/scan`) driving the `data-omega-*` motion attributes: scroll reveals (+ parent stagger), count-ups (final value lives in markup; parser handles `$`, `%`, commas, decimals, suffixes), word rotators, seamless marquee track duplication, and scroll-position watchers. Resilient by contract: no-JS pages render visible, `prefers-reduced-motion` gets static final states, missing observers degrade to instant reveal. Booted by @omega.js/web's `core/js/core/motion.js`; desktop/extension pick it up at C4.
 - **`ServiceWorker.unregisterAll()`** — unregisters every worker claiming the origin; called automatically when `serviceWorker.enabled` is false so a previous project's worker can't keep serving stale caches on a shared localhost port.
 

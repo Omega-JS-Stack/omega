@@ -132,6 +132,34 @@ test('font preloads: classy emits Inter + Newsreader normal-latin preloads (cp19
   assert.ok(home.includes('crossorigin'), 'crossorigin attribute present');
 });
 
+// ─── App panels: the statgrid reflows to its CONTAINER (#69) ────────────────
+
+test('statgrid: columns come from the container, never the viewport (#69)', () => {
+  const warnings = [];
+  const css = sass.compile(path.join(PKG, 'themes', 'classy', 'css', 'app', '_panels.scss'), {
+    logger: { warn: (message) => warnings.push(message), debug: () => {} },
+  }).css;
+
+  assert.deepEqual(warnings, [], 'the app panel floor compiles clean');
+
+  // The whole partial is viewport-free: nested in a half-width card, the
+  // statgrid reflows off ITS OWN width (the #69 consumer defect).
+  assert.ok(!css.includes('@media'), 'no viewport media query in the app panel vocabulary');
+
+  const tracks = css.match(/grid-template-columns:[^;]+;/g) || [];
+  assert.equal(tracks.length, 1, 'one track definition, no breakpoint variant');
+  assert.ok(tracks[0].includes('auto-fit'), 'intrinsic sizing fits as many cells as the container holds');
+  assert.ok(
+    tracks[0].includes('var(--classy-statgrid-cols'),
+    'the --classy-statgrid-cols knob still caps the column count',
+  );
+
+  // Hairlines can't count columns anymore (the reflow decides how many land
+  // per row), so cells draw their own rules and the card clips the outer ones.
+  assert.ok(!css.includes('nth-child'), 'no column-count-dependent divider selectors');
+  assert.ok(css.includes('overflow: hidden'), 'the card still clips to its rounded frame');
+});
+
 test('font preloads: newsflash emits Fraunces + Schibsted normal-latin preloads (cp198)', async () => {
   const pages = await buildWith({ ...miniData, theme: { id: 'newsflash' } });
   const home = pages.get('/');

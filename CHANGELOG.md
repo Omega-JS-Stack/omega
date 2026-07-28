@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - [#61](https://github.com/Omega-JS-Stack/omega/issues/61) — The plugin staleness gate: scripts/skill-claims.test.js extracts every claim a skill makes (repo paths, consumer node_modules paths, omega: skill references, @omega.js package names, CLI verbs) and fails the battery when the repo no longer has it.
+- [#72](https://github.com/Omega-JS-Stack/omega/issues/72) — The web framework owns dataviz and the affordances around it: a chart helper with Chart.js lazily code-split (consumers never name the library), an org-chart component with animated connectors and a reduced-motion carve-out, the `--omega-chart-1…6` categorical ramp, and `.omega-tone-*` / `.omega-badge-tone` / `.omega-interactive` shared-core utilities.
+- [#71](https://github.com/Omega-JS-Stack/omega/issues/71) — @omega.js/client ships live-page primitives (`modules/live-page.js`): write-on-change `swap`, first-paint `loading`, and a declared-feed poller with keep-last-good-on-failure — the fetcher is an argument, never the singleton.
+- [#70](https://github.com/Omega-JS-Stack/omega/issues/70) — @omega.js/client ships `utilities.renderMarkdown(text)`: escape-first mini-markdown for hostile text (headings, code, lists, bold/italic, http(s)-only links), composing `escapeHTML` and `sanitizeURL`, with the tower's adversarial tests ported.
 - [#59](https://github.com/Omega-JS-Stack/omega/issues/59) — The Claude plugin ships from the monorepo: agent-plugins/claude carries seven ported skills plus the inject hook that loads the matching framework skill per project, the repo-root marketplace manifest lists it, and committed project settings auto-install it after one trust prompt. Structure and hook behavior pinned by scripts/agent-plugins.test.js.
 
 ### Changed
@@ -15,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#45](https://github.com/Omega-JS-Stack/omega/issues/45) — Docs architecture rebuilt: knowledge moved to docs/shared/ + docs/&lt;framework&gt;/ (each framework's guide is index.md, including the new web guide), package AGENTS.md files reduced to thin pointers, root AGENTS.md rewritten as the map with the plugin story and the deterministic-loading doctrine, stale WEB-MANAGER headings fixed, 52 files repointed.
 
 ### Fixed
+- [#69](https://github.com/Omega-JS-Stack/omega/issues/69) — The classy statgrid sizes from its container instead of the viewport: `--classy-statgrid-cols` is now a column ceiling and cells reflow below a 10rem floor, so one nested in a half-width card wraps on its own width. Its hairline dividers no longer depend on the column count.
+- [#66](https://github.com/Omega-JS-Stack/omega/issues/66) — The web build's PurgeCSS pass scans the built JS as well as the HTML, so classes that appear only inside JS-rendered markup are no longer stripped by `omega build`.
 - (no issue) — cp270 desktop remote-scripts is now opt-in: the remote-execution lane initializes only when a brand sets `config.remoteScripts.enabled: true`, otherwise inert with a log line. cp269's TLS gate still applies. Docs and tests updated.
 - (no issue) — cp270 dropped two unmaintained runtime deps: `mailchimp-api-v3` removed from the manifest (only the disabled legacy function lane used it) and `npm-api`'s four call sites moved to the new `@omega.js/devkit/npm-registry` helper. `automately` and `chatsy` stay. Root lock regenerated.
 - (no issue) — cp270 commit-time three-lens review fix-ins: desktop setup's const-reassignment crash fixed, the opt-in derivation test pinned to a loopback URL, stale spikes references repointed to `_attic/`, extraneous lock stanzas pruned, and consumer locks regenerated.

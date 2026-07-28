@@ -4,41 +4,32 @@
 
 // ── Merged stat card — ONE card, hairline column dividers ───────────────────
 .classy-statgrid {
+  // The cell floor: below it a column drops out of the row.
+  --classy-statgrid-cell: 10rem;
+
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  // Container-driven, never viewport-driven: `--classy-statgrid-cols` is the
+  // CEILING (100% / cols is the widest a cell asks for, so at most that many
+  // fit), the cell floor is the collapse point, and auto-fit picks the count
+  // from the grid's OWN width — so a statgrid nested in a half-width card
+  // reflows instead of overflowing.
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(max(var(--classy-statgrid-cell), calc(100% / var(--classy-statgrid-cols, 4))), 1fr)
+  );
   background: var(--omega-surface);
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
   overflow: hidden;
 
-  @media (min-width: 1200px) {
-    grid-template-columns: repeat(var(--classy-statgrid-cols, 4), minmax(0, 1fr));
-  }
-
   .classy-statgrid__cell {
     padding: 1.125rem 1.25rem 1.25rem;
-    border-top: 1px solid var(--omega-line);
-    border-inline-start: 1px solid var(--omega-line);
-
-    &:nth-child(2n + 1) {
-      border-inline-start: 0;
-    }
-
-    &:nth-child(-n + 2) {
-      border-top: 0;
-    }
-
-    @media (min-width: 1200px) {
-      border-top: 0;
-
-      &:nth-child(2n + 1) {
-        border-inline-start: 1px solid var(--omega-line);
-      }
-
-      &:first-child {
-        border-inline-start: 0;
-      }
-    }
+    // Hairlines that never count columns: each cell paints its start/top rule
+    // 1px OUTSIDE its box, and the card's overflow clip eats the ones on the
+    // first column and first row whatever count the reflow lands on.
+    box-shadow:
+      -1px 0 0 var(--omega-line),
+      0 -1px 0 var(--omega-line);
   }
 
   .classy-statgrid__label {

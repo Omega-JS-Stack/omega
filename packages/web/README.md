@@ -84,7 +84,7 @@ see the harness README for the honest before/after numbers.
 | [consumer-scan.js](src/consumer-scan.js) | Consumer permalink scan → default-page suppression |
 | [sections.js](src/sections.js) | The section/component library: `{% section %}`/`{% component %}` tags (layered resolution, json5 schemas/defaults, data bridge, call-site liquification), `buildSectionLibrary()` (the showcase/docs collector), `collectSectionAssets()` (§7 lanes), and the `{% composition %}` page-body guard (docs/web/sections.md in the Omega repo) |
 | [customize.js](src/customize.js) | `omega customize <url>` mechanics (spec §8): default-URL → materialization plan (composition lane prefills the theme's wrapped one-liners, shell lane copies the thin default verbatim), idempotent writes, `listCustomizable()` |
-| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass |
+| [assets.js](src/assets.js) | esbuild page modules + main bundle over LAYER ROOTS (boot stubs, `@omega.js/client` → @omega.js/client dir alias, `__main_assets__`/`__theme__` resolution), layered sass (`omega:theme`), page css namespaces, layered `fonts/` → `/assets/fonts` copy, PurgeCSS post-pass (content scan = `dist/**/*.html` + `dist/**/*.js`, so classes that live only in JS-built markup survive — #66) |
 | [service-worker.js](src/service-worker.js) | `buildServiceWorker()` — esbuild iife bundle of the consumer's `src/service-worker.js` (or the packaged `sw/entry.js`) to dist root `/service-worker.js`; `writeBuildMeta()` — `/build.js` (JSONP config transport for the worker) + `/build.json` (page-side; the client version check reads `timestamp`) |
 | [build.js](src/build.js) | `buildSite()` — assets → service worker/meta → static → imagemin → Eleventy → PurgeCSS orchestration with per-phase timings (what `omega build` runs) |
 | [imagemin.js](src/imagemin.js) | Responsive image matrix (the UJM imagemin successor): 320/640/1024 + original × source-format + webp @ q80 over `dist/assets/images` (favicon dir exempt), content-addressed cache at the brand `.omega`, `devImageFallback()` dev-server middleware |
@@ -299,6 +299,15 @@ WCAG-picked on-accent ink, subtle/ring alphas) and head.html emits it
 inline AFTER the bundles so the brand wins the cascade. No/invalid color
 → the sheet's neutral placeholder stands. Token VALUES are C3 scaffolding
 until Ian's direction notes land; the names + plumbing are the contract.
+
+The categorical ramp (`--omega-chart-1`…`-6`) serves two surfaces from one
+palette: chart series ([core/js/libs/charts.js](core/js/libs/charts.js) — the
+framework's Chart.js, lazily split into its own chunk, so a chartless page
+pays nothing) and the `.omega-tone-<n>` / `.omega-badge-tone` chips
+([core/css/core/_tones.scss](core/css/core/_tones.scss)), so the same thing is
+the same color wherever it appears. `.omega-interactive` (+ `--lift`) is the
+shared whole-surface click affordance. Both are core, so every theme inherits
+them: [docs/shared/theming.md](../../docs/shared/theming.md).
 
 ## Theming — two consumer tiers (C3)
 

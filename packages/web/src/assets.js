@@ -336,7 +336,7 @@ async function buildAssets(options) {
 
 /**
  * PurgeCSS post-pass: strip unused selectors from the MAIN css bundle using
- * the rendered HTML as content.
+ * the rendered HTML AND the built JS as content.
  * @param {object} options
  * @param {string} options.outDir
  * @param {object} options.manifest - from buildAssets()
@@ -348,7 +348,10 @@ async function purgeCss(options) {
   const before = fs.statSync(cssFile).size;
 
   const results = await new PurgeCSS().purge({
-    content: [path.join(options.outDir, '**/*.html')],
+    // The built JS is content too: a client-rendered app's markup exists only
+    // as strings in its bundle, so scanning HTML alone strips a consumer's own
+    // classes at build time (#66 — they survive `omega dev`, which never purges).
+    content: [path.join(options.outDir, '**/*.html'), path.join(options.outDir, '**/*.js')],
     css: [cssFile],
     // The omega namespace is runtime-driven — app-shell.js stamps data-shell-*
     // and the motion engine stamps data-omega-inview / data-omega-scrolled /

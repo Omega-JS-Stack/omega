@@ -1,0 +1,183 @@
+// data/org-chart — the tree's connector geometry (§7 omega:sections lane).
+//
+// Every line is a repeating gradient rather than a border, for one reason:
+// a gradient's position is animatable and a border's dash pattern is not, and
+// the lines on this chart MOVE — a chart of what is happening RIGHT NOW reads
+// as live only if something on it is.
+//
+// Wide: the root centred over a row of nodes, a trunk down to a horizontal
+// bus, a stub down into each card. Under 768px the same tree turns on its
+// side — one spine down the left with an elbow into each card — because six
+// 16rem columns on a phone is not a chart, it is a scrollbar.
+
+.omega-org-chart {
+  --omega-org-line: var(--omega-line);
+  --omega-org-line-size: 2px;
+  --omega-org-drop: 1.5rem;
+}
+
+.omega-org-chart__root,
+.omega-org-chart__node {
+  flex: 0 0 auto;
+  position: relative;
+  width: 16rem;
+}
+
+.omega-org-chart__root {
+  margin-inline: auto;
+}
+
+.omega-org-chart__title {
+  font-weight: 650;
+}
+
+.omega-org-chart__children {
+  display: flex;
+  // `safe` keeps an overflowing row reachable: centring a row wider than its
+  // container puts the first card off the scrollable edge. An engine that
+  // does not know the keyword drops the declaration and starts the row at the
+  // left, which is the same rescue.
+  justify-content: safe center;
+  gap: 1rem;
+  // A row wider than the container scrolls sideways rather than wrapping into
+  // rows the bus cannot connect. The trunk is drawn INSIDE this padding
+  // rather than above the box, because a scroll container clips what hangs
+  // outside it.
+  overflow-x: auto;
+  padding-top: var(--omega-org-drop);
+  padding-bottom: 0.25rem;
+  position: relative;
+}
+
+// The trunk: from the root's bottom edge down to the bus.
+.omega-org-chart__children::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(50% - (var(--omega-org-line-size) / 2));
+  width: var(--omega-org-line-size);
+  height: var(--omega-org-drop);
+  background-image: repeating-linear-gradient(180deg, var(--omega-org-line) 0 6px, transparent 6px 12px);
+  animation: omega-org-flow-down 1.2s linear infinite;
+}
+
+// Each node holds the drop the bus and its own stub are drawn in.
+.omega-org-chart__node {
+  padding-top: var(--omega-org-drop);
+}
+
+// The bus, in segments: one per node, reaching half the gap either side so
+// the segments meet. The first and last stop at their own centre, which is
+// what makes the bus span exactly from the first card to the last.
+.omega-org-chart__node::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -0.5rem;
+  right: -0.5rem;
+  height: var(--omega-org-line-size);
+  background-image: repeating-linear-gradient(90deg, var(--omega-org-line) 0 6px, transparent 6px 12px);
+  animation: omega-org-flow-right 1.2s linear infinite;
+}
+
+.omega-org-chart__node:first-child::after {
+  left: calc(50% - (var(--omega-org-line-size) / 2));
+}
+
+.omega-org-chart__node:last-child::after {
+  right: calc(50% - (var(--omega-org-line-size) / 2));
+}
+
+// The stub: down from the bus into the card.
+.omega-org-chart__node::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(50% - (var(--omega-org-line-size) / 2));
+  width: var(--omega-org-line-size);
+  height: var(--omega-org-drop);
+  background-image: repeating-linear-gradient(180deg, var(--omega-org-line) 0 6px, transparent 6px 12px);
+  animation: omega-org-flow-down 1.2s linear infinite;
+}
+
+@keyframes omega-org-flow-down {
+  to {
+    background-position: 0 12px;
+  }
+}
+
+@keyframes omega-org-flow-right {
+  to {
+    background-position: 12px 0;
+  }
+}
+
+// Narrow: the same tree, stacked. The bus becomes a spine down the left and
+// each node's stub becomes an elbow into its card, so nothing floats free.
+@media (max-width: 767.98px) {
+  .omega-org-chart__root,
+  .omega-org-chart__node {
+    width: auto;
+  }
+
+  .omega-org-chart__children {
+    display: block;
+    overflow-x: visible;
+    padding-left: var(--omega-org-drop);
+  }
+
+  .omega-org-chart__children::before {
+    left: 0;
+  }
+
+  .omega-org-chart__node {
+    padding-top: 0;
+    margin-top: 1rem;
+  }
+
+  // The elbow, at the card's shoulder.
+  .omega-org-chart__node::before {
+    top: var(--omega-org-drop);
+    left: calc(var(--omega-org-drop) * -1);
+    width: var(--omega-org-drop);
+    height: var(--omega-org-line-size);
+    background-image: repeating-linear-gradient(90deg, var(--omega-org-line) 0 6px, transparent 6px 12px);
+    animation: omega-org-flow-right 1.2s linear infinite;
+  }
+
+  // The spine, in segments: each node carries the piece above it, and the
+  // last one stops at its own elbow instead of running past the bottom card.
+  //
+  // The first and last node are named here too. Their wide-layout rules trim
+  // the bus to a half segment, a media query adds no specificity of its own,
+  // and without the same two selectors on this side they would keep winning.
+  .omega-org-chart__node::after,
+  .omega-org-chart__node:first-child::after,
+  .omega-org-chart__node:last-child::after {
+    top: -1rem;
+    bottom: 0;
+    left: calc(var(--omega-org-drop) * -1);
+    right: auto;
+    width: var(--omega-org-line-size);
+    height: auto;
+    background-image: repeating-linear-gradient(180deg, var(--omega-org-line) 0 6px, transparent 6px 12px);
+    animation: omega-org-flow-down 1.2s linear infinite;
+  }
+
+  .omega-org-chart__node:last-child::after {
+    bottom: auto;
+    height: calc(1rem + var(--omega-org-drop));
+  }
+}
+
+// Last, and naming the trimmed segments too: this has to outrank BOTH
+// layouts, and a media query lends a rule no specificity to outrank them with.
+@media (prefers-reduced-motion: reduce) {
+  .omega-org-chart__children::before,
+  .omega-org-chart__node::before,
+  .omega-org-chart__node::after,
+  .omega-org-chart__node:first-child::after,
+  .omega-org-chart__node:last-child::after {
+    animation: none;
+  }
+}
