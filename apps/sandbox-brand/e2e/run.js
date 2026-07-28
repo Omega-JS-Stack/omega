@@ -85,6 +85,20 @@ async function main() {
       }
     });
 
+    await harness.step('the chart helper draws all four chart types on a real canvas', async () => {
+      // #74: the builders are the one half of core/js/libs/charts.js node's
+      // suite cannot reach — Chart.js needs a real 2d context. Here it has one.
+      const result = await page.evaluate(() => window.__omega.drawCharts());
+      if (!result.loaded) {
+        throw new Error('Chart.js never loaded — the lazy chunk did not arrive');
+      }
+      const blank = Object.entries(result.drew).filter(([, chart]) => !chart.built || chart.painted === 0);
+      if (blank.length) {
+        throw new Error(`chart(s) drew nothing: ${JSON.stringify(Object.fromEntries(blank))}`);
+      }
+      return Object.keys(result.drew).join(', ');
+    });
+
     await harness.step('seeded persona signs in with the known password', async () => {
       // The cp85 manual-dev DX, proven in a real browser: the emulator seeded
       // personas during boot, so email + TEST_ACCOUNT_PASSWORD just works.

@@ -31,6 +31,9 @@
  */
 const MarkdownIt = require('markdown-it');
 
+const { escapeHtml } = require('../../../constants.js');
+
+// Newsletter bodies are AI-authored — raw HTML stays disabled here.
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true });
 
 // ---------- Default tokens ----------
@@ -51,13 +54,7 @@ function markdownToHtml(markdown) {
   return md.render(markdown).replace(/\n+$/, '');
 }
 
-function escape(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+const escape = escapeHtml;
 
 /**
  * Render markdown then strip the surrounding <p> tags so it can be dropped

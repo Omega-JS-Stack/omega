@@ -2,6 +2,7 @@ const moment = require('moment');
 const _ = require('lodash');
 const { inferContact } = require('../../../libraries/infer-contact.js');
 const { validate: validateEmail, isDisposable, ALL_CHECKS } = require('../../../libraries/email/validation.js');
+const prepare = require('../../../libraries/email/prepare.js');
 
 const MAX_POLL_TIME_MS = 30000;
 const POLL_INTERVAL_MS = 500;
@@ -400,10 +401,13 @@ async function sendWelcomeEmails(ctx, uid, firstName) {
 /**
  * Send welcome email (immediate)
  */
-function sendWelcomeEmail(ctx, uid, firstName) {
+async function sendWelcomeEmail(ctx, uid, firstName) {
   const Manager = ctx.Manager;
   const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}, welcome` : 'Welcome';
+  // Throws when brand.contact.person is unconfigured — the send is individually
+  // caught + logged by sendWelcomeEmails(), so signup still succeeds.
+  const person = prepare.resolvePerson(Manager.config.brand);
 
   return mailer.send({
     to: uid,
@@ -414,23 +418,21 @@ function sendWelcomeEmail(ctx, uid, firstName) {
     copy: false,
     data: {
       email: {
-        preview: `Welcome aboard! I'm Ian, the CEO and founder of ${Manager.config.brand.name}. I'm here to ensure your journey with us gets off to a great start.`,
+        preview: `Welcome aboard! I'm ${person.firstName}, the CEO and founder of ${Manager.config.brand.name}. I'm here to ensure your journey with us gets off to a great start.`,
       },
       content: {
         title: `Welcome to ${Manager.config.brand.name}!`,
         message: `${greeting} aboard!
 
-I'm Ian, the founder and CEO of **${Manager.config.brand.name}**, and I'm thrilled to have you with us. Your journey begins today, and we are committed to supporting you every step of the way.
+I'm ${person.firstName}, the founder and CEO of **${Manager.config.brand.name}**, and I'm thrilled to have you with us. Your journey begins today, and we are committed to supporting you every step of the way.
 
 We are dedicated to ensuring your experience is exceptional. Feel free to reply directly to this email with any questions you may have.
 
 Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginnings!`,
       },
+      // Identity comes from brand.contact.person via prepare.resolveSignoff().
       signoff: {
         type: 'personal',
-        name: 'Ian Wiedenman, CEO',
-        url: 'https://ianwiedenman.com',
-        urlText: '@ianwieds',
       },
     },
   })
@@ -458,13 +460,15 @@ Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginning
  * intrigue framing ("something for you 🎁") rather than spam-trigger words ("free",
  * "claim", "bonus") to protect deliverability.
  */
-function sendDiscountNudgeEmail(ctx, uid, firstName) {
+async function sendDiscountNudgeEmail(ctx, uid, firstName) {
   const Manager = ctx.Manager;
   const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}` : 'Hey there';
   const subject = firstName
     ? `${firstName}, I've got something for you 🎁`
     : `I've got something for you 🎁`;
+  // Throws when brand.contact.person is unconfigured — caught per-send by the caller.
+  const person = prepare.resolvePerson(Manager.config.brand);
 
   return mailer.send({
     to: uid,
@@ -482,7 +486,7 @@ function sendDiscountNudgeEmail(ctx, uid, firstName) {
         title: `How's it going?`,
         message: `${greeting},
 
-It's Ian, the founder of **${Manager.config.brand.name}**.
+It's ${person.firstName}, the founder of **${Manager.config.brand.name}**.
 
 As a thank-you for giving us a try, I'd love to send you a code for a **premium upgrade**.
 
@@ -490,11 +494,9 @@ As a thank-you for giving us a try, I'd love to send you a code for a **premium 
 
 I read every reply and I'm looking forward to hearing from you!`,
       },
+      // Identity comes from brand.contact.person via prepare.resolveSignoff().
       signoff: {
         type: 'personal',
-        name: 'Ian Wiedenman, CEO',
-        url: 'https://ianwiedenman.com',
-        urlText: '@ianwieds',
       },
     },
   })
@@ -507,10 +509,12 @@ I read every reply and I'm looking forward to hearing from you!`,
 /**
  * Send checkup email (7 days after signup)
  */
-function sendCheckupEmail(ctx, uid, firstName) {
+async function sendCheckupEmail(ctx, uid, firstName) {
   const Manager = ctx.Manager;
   const mailer = Manager.Email(ctx);
   const greeting = firstName ? `Hey ${firstName}` : 'Hi there';
+  // Throws when brand.contact.person is unconfigured — caught per-send by the caller.
+  const person = prepare.resolvePerson(Manager.config.brand);
 
   return mailer.send({
     to: uid,
@@ -528,7 +532,7 @@ function sendCheckupEmail(ctx, uid, firstName) {
         title: `How's everything going?`,
         message: `${greeting},
 
-It's Ian again from **${Manager.config.brand.name}**. Just checking in to see how things are going for you.
+It's ${person.firstName} again from **${Manager.config.brand.name}**. Just checking in to see how things are going for you.
 
 Have you had a chance to explore all our features? Any questions or feedback for us?
 
@@ -536,11 +540,9 @@ We're always here to help, so don't hesitate to reach out. Just reply to this em
 
 Thank you for choosing **${Manager.config.brand.name}**. Here's to new beginnings!`,
       },
+      // Identity comes from brand.contact.person via prepare.resolveSignoff().
       signoff: {
         type: 'personal',
-        name: 'Ian Wiedenman, CEO',
-        url: 'https://ianwiedenman.com',
-        urlText: '@ianwieds',
       },
     },
   })

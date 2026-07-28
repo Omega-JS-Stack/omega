@@ -43,6 +43,14 @@
   }
 }
 
+// A document with no section headings has no TOC, so the page JS marks the
+// rail `hidden` (core/js/pages/legal/_document.js). A display:none grid item
+// leaves the grid, and without this the document would drop into the rail's
+// 15rem track instead of the content one — the whole page squeezed left.
+.classy-legal:has(.classy-legal__rail[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .classy-legal__rail-inner {
   position: sticky;
   top: 5.5rem;

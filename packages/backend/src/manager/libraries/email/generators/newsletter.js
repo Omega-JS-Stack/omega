@@ -39,6 +39,7 @@ function resolveSectionImageFn(newsletterConfig) {
   return method === 'svg' ? generateSvgSection : generateImageSection;
 }
 const { renderMarkdown } = require('./lib/markdown-renderer.js');
+const { escapeHtml } = require('../constants.js');
 const { uploadAssets, USE_CDN_URLS, REPO_OWNER, REPO_NAME, RAW_BASE } = require('./lib/image-host.js');
 const { buildPublicConfig } = require('../../../routes/brand/get.js');
 const { writeArticle, publishArticle } = require('../../../libraries/content/ghostii.js');
@@ -641,6 +642,10 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
 
   try {
     const email = Manager.Email(ctx);
+
+    // The report body is hand-built markup (trustedContent below). Everything it
+    // interpolates is AI-authored (subject, preheader, tags) or scraped from a source
+    // (titles, URLs), so it gets escaped on the way in.
     const messageLines = [];
 
     // --- Status ---
@@ -651,24 +656,24 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
       messageLines.push('');
       messageLines.push('<strong>Beehiiv failure reason</strong>');
       messageLines.push('<ul>');
-      messageLines.push(`<li>${args.beehiivFailureReason || 'unknown'}</li>`);
+      messageLines.push(`<li>${escapeHtml(args.beehiivFailureReason || 'unknown')}</li>`);
       messageLines.push('</ul>');
     }
     messageLines.push('');
 
     // --- Preview button (big, prominent) ---
     if (args.previewUrl) {
-      messageLines.push(`<p style="text-align:center;margin:16px 0;"><a href="${args.previewUrl}" style="display:inline-block;padding:14px 32px;background:#1a1a2e;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;font-size:16px;">Preview Newsletter</a></p>`);
+      messageLines.push(`<p style="text-align:center;margin:16px 0;"><a href="${escapeHtml(args.previewUrl)}" style="display:inline-block;padding:14px 32px;background:#1a1a2e;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;font-size:16px;">Preview Newsletter</a></p>`);
       messageLines.push('');
     }
 
     // --- Details ---
     messageLines.push('<strong>Newsletter details</strong>');
     messageLines.push('<ul>');
-    messageLines.push(`<li>Subject: ${args.subject}</li>`);
-    messageLines.push(`<li>Preheader: ${args.preheader || '(none)'}</li>`);
+    messageLines.push(`<li>Subject: ${escapeHtml(args.subject)}</li>`);
+    messageLines.push(`<li>Preheader: ${escapeHtml(args.preheader || '(none)')}</li>`);
     if (args.tags?.length) {
-      messageLines.push(`<li>Tags: ${args.tags.join(', ')}</li>`);
+      messageLines.push(`<li>Tags: ${escapeHtml(args.tags.join(', '))}</li>`);
     }
     messageLines.push('</ul>');
     messageLines.push('');
@@ -677,7 +682,7 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
     if (args.htmlUrl) {
       messageLines.push('<strong>Full HTML</strong> — one-shot paste into Beehiiv');
       messageLines.push('<ul>');
-      messageLines.push(`<li><a href="${args.htmlUrl}">View raw HTML</a></li>`);
+      messageLines.push(`<li><a href="${escapeHtml(args.htmlUrl)}">View raw HTML</a></li>`);
       messageLines.push('</ul>');
       messageLines.push('');
     }
@@ -686,7 +691,7 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
     if (args.markdownUrl) {
       messageLines.push('<strong>Per-section markdown</strong> — paste as separate blocks, ads between');
       messageLines.push('<ul>');
-      messageLines.push(`<li><a href="${args.markdownUrl}">View markdown</a></li>`);
+      messageLines.push(`<li><a href="${escapeHtml(args.markdownUrl)}">View markdown</a></li>`);
       messageLines.push('</ul>');
       messageLines.push('');
     }
@@ -695,7 +700,7 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
     if (args.summaryUrl) {
       messageLines.push('<strong>Summary</strong> — 2-3 sentence recap');
       messageLines.push('<ul>');
-      messageLines.push(`<li><a href="${args.summaryUrl}">View summary</a></li>`);
+      messageLines.push(`<li><a href="${escapeHtml(args.summaryUrl)}">View summary</a></li>`);
       messageLines.push('</ul>');
       messageLines.push('');
     }
@@ -705,7 +710,7 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
       messageLines.push('<strong>Linked articles</strong>');
       messageLines.push('<ul>');
       for (const article of args.articles) {
-        messageLines.push(`<li><a href="${article.url}">${article.title || 'Article'}</a></li>`);
+        messageLines.push(`<li><a href="${escapeHtml(article.url)}">${escapeHtml(article.title || 'Article')}</a></li>`);
       }
       messageLines.push('</ul>');
       messageLines.push('');
@@ -716,13 +721,13 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
       messageLines.push(`<strong>Sources</strong> — ${args.sources.length} used`);
       messageLines.push('<ul>');
       for (const source of args.sources) {
-        const label = source.title || source.url || 'Untitled';
+        const label = escapeHtml(source.title || source.url || 'Untitled');
         let fromLabel = '';
         if (source.from) {
-          try { fromLabel = ` (${new URL(source.from).hostname})`; } catch { fromLabel = ` (${source.from})`; }
+          try { fromLabel = ` (${escapeHtml(new URL(source.from).hostname)})`; } catch { fromLabel = ` (${escapeHtml(source.from)})`; }
         }
         if (source.url) {
-          messageLines.push(`<li><a href="${source.url}">${label}</a>${fromLabel}</li>`);
+          messageLines.push(`<li><a href="${escapeHtml(source.url)}">${label}</a>${fromLabel}</li>`);
         } else {
           messageLines.push(`<li>${label}${fromLabel}</li>`);
         }
@@ -735,7 +740,7 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
     if (args.folderUrl) {
       messageLines.push('<strong>All assets</strong> — full GitHub archive');
       messageLines.push('<ul>');
-      messageLines.push(`<li><a href="${args.folderUrl}">Browse folder</a></li>`);
+      messageLines.push(`<li><a href="${escapeHtml(args.folderUrl)}">Browse folder</a></li>`);
       messageLines.push('</ul>');
     }
 
@@ -750,6 +755,8 @@ async function sendNewsletterReportEmail(Manager, ctx, args) {
       subject: subjectLine,
       template: 'card',
       categories: ['marketing/newsletter-report'],
+      // Body is first-party markup built above; its AI/scraped values are escaped.
+      trustedContent: true,
       data: {
         email: {
           preview: beehiivOk

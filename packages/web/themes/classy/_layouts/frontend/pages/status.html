@@ -277,6 +277,32 @@ build_info:
             </div>
           </div>
 
+          <!-- Version -->
+          <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                {% uj_icon "tag", "fa-sm" %}
+              </span>
+              <div>
+                <div class="classy-micro mb-1">Version</div>
+                <div id="build-version" class="fw-semibold">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theme -->
+          <div class="col-md-6">
+            <div class="d-flex align-items-start gap-3">
+              <span class="classy-icon-chip classy-icon-chip--neutral flex-shrink-0">
+                {% uj_icon "palette", "fa-sm" %}
+              </span>
+              <div>
+                <div class="classy-micro mb-1">Theme</div>
+                <div id="build-theme" class="fw-semibold">—</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Packages -->
           <div class="col-12">
             <div class="d-flex align-items-start gap-3">
@@ -301,6 +327,7 @@ build_info:
               <div>
                 <div class="classy-micro mb-1">Repository</div>
                 <div id="build-repo" class="fw-semibold">—</div>
+                <div id="build-commit" class="classy-quiet small font-monospace"></div>
               </div>
             </div>
           </div>

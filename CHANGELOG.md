@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#86](../../issues/86) — Stock-brand builds fail on any missing-icon marker in dist, so a Pro-only icon name can never ship silently again.
+- [#52](../../issues/52) — Email identity is config-driven: new `brand.contact.person.*`, `brand.contact.carbonCopy`, and `brand.images.companyWordmark` keys replace every hardcoded personal name, headshot, wordmark, and BCC; a personal signoff without a configured name fails loudly instead of substituting a framework identity.
+
+### Changed
+- [#74](../../issues/74) — The admin dashboard draws its charts through the shared charts helper (status hues kept); a browser-level check proves a chart actually paints.
+- [#83](../../issues/83) — The manager no longer folds company config itself; @omega.js/config owns the layer and a regression test pins that both paths merge identically.
+- [#63](../../issues/63) — The desktop and extension consumer scaffolds become AGENTS.md plus a one-line CLAUDE.md pointer, with required-reading pointers healed to the live agent-docs chain.
+- [#87](../../issues/87) — The framework-dependency reader moves to @omega.js/devkit as the one SSOT and web's esbuild hook reads it; the desktop/extension webpack half stays open on the issue.
+
+### Removed
+- [#84](../../issues/84) — The backend CLI's stale command barrel is removed; the command table is the one dispatch and help home.
+
+### Fixed
+- [#9](../../issues/9) — The cookie policy blueprint is real markdown again, so legal pages render with the same document treatment as terms and privacy; a heading-less legal doc can no longer collapse the layout grid.
+- [#13](../../issues/13) — Status greens (and warning/danger) match site-wide in dark mode via token bridges, and the build manifest gains theme, package versions, repo, and commit fields the status page now renders.
+
+### Security
+- [#53](../../issues/53) — Third-party and AI-generated content renders with HTML disabled in outbound email; only two first-party alert lanes opt into trusted rendering, and both escape every interpolated external value.
+
 ## [0.1.0] (2026-07-28)
 
 ### Added

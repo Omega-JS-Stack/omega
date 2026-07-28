@@ -9,7 +9,8 @@
    `--omega-*` custom-property contract: neutrals (`ground`, `surface`,
    `surface-2`, `ink`, `ink-muted`, `ink-faint`, `line`, `line-strong`), the
    accent family (`accent`, `-hover`, `-active`, `-subtle`, `-ink`, `-ring`),
-   status (`ok`/`warn`/`danger`), the affirmation check (`check` — rides the
+   status (`ok`/`warn`/`danger`, each with an `-rgb` channel twin — see
+   "One status hue site-wide" below), the affirmation check (`check` — rides the
    accent; see below), the categorical ramp (`chart-1`…`chart-6` —
    series-1 rides the accent, the rest are CVD-validated muted hues, cool half
    before warm), shadows
@@ -187,7 +188,28 @@ inherits them:
 
 Charts read the same ramp: `core/js/libs/charts.js` (`chartColors()`) resolves
 `--omega-chart-1…6` off `:root`, so a chart follows the brand ramp and dark
-mode without knowing either exists.
+mode without knowing either exists. A surface that means a STATUS passes the
+status tokens explicitly instead (`colors: ['var(--omega-ok)', …]` — the
+helper's `resolveColor` reads them off the live sheet); the admin dashboard's
+plan doughnut is the reference case ([#74](https://github.com/Omega-JS-Stack/omega/issues/74)).
+
+## One status hue site-wide
+
+`--omega-ok` / `--omega-warn` / `--omega-danger` are the ONLY greens, ambers
+and reds on a site. Each ships with an `-rgb` channel twin (`--omega-ok-rgb:
+18, 146, 92`) because Bootstrap's translucency utilities paint from
+`rgba(var(--bs-success-rgb), …)`, which no `var()` can feed a hex to. Every
+theme's root bridge points `--bs-success`/`-warning`/`-danger` and their `-rgb`
+companions at the tokens, AFTER Bootstrap compiles, so `bg-success`,
+`.text-success` and a token-painted glyph are the same color in both modes —
+the /status page's "all systems operational" and the uptime bars beneath it
+were two different greens in dark mode until this landed
+([#13](https://github.com/Omega-JS-Stack/omega/issues/13)).
+
+**A theme that re-values a status hue MUST re-value its `-rgb` twin** (only
+newsflash does today) or the two drift apart again. `test/tokens.test.js` pins
+both halves: the twins exist in every stamp, and the bridge is the LAST
+`--bs-success` in every theme's compiled css.
 
 ## Motion library
 

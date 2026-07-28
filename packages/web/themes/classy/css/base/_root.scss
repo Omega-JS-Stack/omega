@@ -29,6 +29,17 @@
   --bs-border-color: var(--omega-line);
   --bs-border-color-translucent: var(--omega-line);
 
+  // Status (#13): Bootstrap compiles ONE hex per level at build time, so
+  // `bg-success` kept the light green in dark mode while every token-painted
+  // glyph followed --omega-ok. Pointing both halves at the token gives the
+  // whole site one green (one amber, one red) that flips with the scheme.
+  --bs-success: var(--omega-ok);
+  --bs-success-rgb: var(--omega-ok-rgb);
+  --bs-warning: var(--omega-warn);
+  --bs-warning-rgb: var(--omega-warn-rgb);
+  --bs-danger: var(--omega-danger);
+  --bs-danger-rgb: var(--omega-danger-rgb);
+
   // Type
   --bs-body-font-family: var(--omega-font-ui);
   --bs-font-monospace: var(--omega-font-mono);

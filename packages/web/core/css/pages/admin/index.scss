@@ -1,7 +1,9 @@
 // Admin Dashboard Styles
 
-// Chart containers
-#chart-plans,
-#chart-frequency {
-  max-height: 280px;
+// Chart containers — the charts helper draws with maintainAspectRatio off
+// (core/js/libs/charts.js), so the BOX carries the height and the canvas
+// fills it. Same contract as the helper's own `chartSlot` markup.
+.admin-chart-box {
+  position: relative;
+  height: 280px;
 }

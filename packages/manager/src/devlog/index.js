@@ -23,7 +23,7 @@ const { loadEnvChain } = require('@omega.js/config');
 
 const { resolveBrandRoot, loadBrand } = require('../lib/brand.js');
 const {
-  isCompanyRoot, discoverBrands, loadCompanyConfig, readCompanyMarker,
+  isCompanyRoot, discoverBrands, readCompanyMarker,
 } = require('../lib/company.js');
 const { GitHubAPI } = require('../services/github/lib/github-api.js');
 const { collectCommits } = require('./lib/collect-commits.js');
@@ -79,11 +79,11 @@ function resolveContext(startDir, explicitId) {
     );
   }
 
-  // Company root: every managed brand loads with the company layer; the
+  // Company root: every managed brand loads with the company layer (folded by
+  // @omega.js/config off each brand's own .omega/company.json stamp — #83); the
   // publishing brand is picked from among them.
   if (isCompanyRoot(root)) {
-    const companyConfig = loadCompanyConfig(root);
-    const brands = discoverBrands(root).brands.map((b) => loadBrand(b.root, { companyConfig }));
+    const brands = discoverBrands(root).brands.map((b) => loadBrand(b.root));
 
     if (brands.length === 0) {
       throw new Error(`No brands found under ${root} — nothing to devlog about`);
@@ -93,20 +93,18 @@ function resolveContext(startDir, explicitId) {
   }
 
   // Brand root: this brand publishes. The company stamp (when present and
-  // fresh) layers company defaults AND surfaces the sibling brands for the
-  // project map.
+  // fresh) surfaces the sibling brands for the project map and the company
+  // .env; the config layer itself rides the same stamp inside loadBrand.
   const marker = readCompanyMarker(root);
   let companyRoot = null;
-  let companyConfig = null;
 
   if (marker?.stale) {
     console.log(chalk.yellow(`⚠ .omega/company.json points at ${marker.companyRoot}, which is no longer a company workspace — running standalone`));
   } else if (marker) {
     companyRoot = marker.companyRoot;
-    companyConfig = loadCompanyConfig(companyRoot);
   }
 
-  const brand = loadBrand(root, { companyConfig });
+  const brand = loadBrand(root);
 
   if (explicitId && explicitId !== brand.id) {
     throw new Error(`--brand=${explicitId} does not match this brand root (${brand.id}) — run from the company root to target siblings`);
@@ -116,7 +114,7 @@ function resolveContext(startDir, explicitId) {
   if (companyRoot) {
     const siblings = discoverBrands(companyRoot).brands
       .filter((b) => b.id !== brand.id)
-      .map((b) => loadBrand(b.root, { companyConfig }));
+      .map((b) => loadBrand(b.root));
     brands = [brand, ...siblings];
   }
 

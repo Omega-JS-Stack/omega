@@ -308,13 +308,17 @@ async function copyDefaults(targetDir) {
       // framework section live-synced without clobbering the consumer's values.
       '_.env': { mergeLines: true, template: templateContext },
       '_.gitignore': { mergeLines: true, template: templateContext },
-      'CLAUDE.md': { mergeLines: true, template: templateContext },
+      // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
+      // like .env), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied when
+      // missing by the `**/*` rule above, never clobbered.
+      'AGENTS.md': { mergeLines: true, template: templateContext },
       // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-      // BRAND ROOT is the one doc home — per-app CLAUDE.md/CHANGELOG.md/docs/
+      // BRAND ROOT is the one doc home — per-app AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/
       // never scaffold, and existing framework-owned-only copies are swept
       // (retire rules; consumer content is never destroyed). Standalone apps
       // keep them. Last-match-wins: these override the rules above.
       ...(isBrandApp ? {
+        'AGENTS.md': { retire: true, template: templateContext },
         'CLAUDE.md': { retire: true, template: templateContext },
         'CHANGELOG.md': { retire: true },
         'docs/**/*': { retire: true },

@@ -6,15 +6,22 @@
 import { getPrerenderedIcon } from '__main_assets__/js/libs/prerendered-icons.js';
 import { getProducts } from '__main_assets__/js/libs/payment-config.js';
 import { formatTimeAgo, capitalize, setStatValue, setStatSubValue } from '__main_assets__/js/libs/admin-helpers.js';
-import { Chart, DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+import { loadCharts, barChart, doughnutChart } from '__main_assets__/js/libs/charts.js';
 import omega from '@omega.js/client';
 
-// Register Chart.js components
-Chart.register(DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
-
-// State
-let planChart = null;
-let signupsChart = null;
+// The plan doughnut paints STATUS hues, not the categorical ramp (#74, Ian's
+// triage call): the slices mean healthy/attention/trouble, and the ramp would
+// trade that meaning for a set of colors that only say "different". Passed as
+// var() tokens so the helper's resolveColor reads them off the live sheet —
+// brand ramp and dark mode follow with no work here.
+const PLAN_HUES = [
+  'var(--omega-accent)',
+  'var(--omega-ok)',
+  'var(--omega-warn)',
+  'var(--omega-danger)',
+  'var(--omega-ink-faint)',
+  'var(--omega-accent-active)',
+];
 
 // Module
 export default () => {
@@ -149,7 +156,7 @@ async function loadSignupsTrend() {
     )).then((snap) => snap.data().count).catch(() => 0)
   ));
 
-  renderSignupsChart(buckets.map((b) => b.label), counts);
+  await renderSignupsChart(buckets.map((b) => b.label), counts);
 }
 
 // ============================================
@@ -217,35 +224,17 @@ async function loadSubscriberData() {
     $mrrCount.textContent = `${totalSubscribers.toLocaleString()} subscriber${totalSubscribers === 1 ? '' : 's'}`;
   }
 
-  renderPlanChart(plans);
+  await renderPlanChart(plans);
 }
 
 // ============================================
 // Charts
 // ============================================
-function getChartColors() {
-  // Paint from the classy token sheet so charts follow the brand ramp + mode
-  const style = getComputedStyle(document.documentElement);
-  const token = (name) => style.getPropertyValue(name).trim();
+// Both charts go through the framework's chart helper
+// (core/js/libs/charts.js): it owns the lazy Chart.js chunk, the token reads,
+// and the four builders, so this page never names the library (#74).
 
-  const accent = token('--omega-accent') || '#2563eb';
-
-  return {
-    text: token('--omega-ink-muted') || token('--bs-body-color'),
-    border: token('--omega-line') || token('--bs-border-color'),
-    accent: accent,
-    palette: [
-      accent,
-      token('--omega-ok') || '#198754',
-      token('--omega-warn') || '#ffc107',
-      token('--omega-danger') || '#dc3545',
-      token('--omega-ink-faint') || '#6c757d',
-      token('--omega-accent-active') || accent,
-    ],
-  };
-}
-
-function renderPlanChart(plans) {
+async function renderPlanChart(plans) {
   const $loading = document.getElementById('chart-plans-loading');
   const $canvas = document.getElementById('chart-plans');
   if (!$canvas) {
@@ -253,7 +242,7 @@ function renderPlanChart(plans) {
   }
 
   const labels = Object.keys(plans);
-  const data = Object.values(plans);
+  const values = Object.values(plans);
 
   if (labels.length === 0) {
     if ($loading) {
@@ -262,93 +251,45 @@ function renderPlanChart(plans) {
     return;
   }
 
-  const colors = getChartColors();
+  if (!await loadCharts()) {
+    if ($loading) {
+      $loading.innerHTML = '<span class="text-muted">Chart library unavailable</span>';
+    }
+    return;
+  }
 
   if ($loading) {
     $loading.classList.add('d-none');
   }
-  $canvas.classList.remove('d-none');
+  $canvas.parentElement.classList.remove('d-none');
 
-  planChart = new Chart($canvas, {
-    type: 'doughnut',
-    data: {
-      labels: labels.map(capitalize),
-      datasets: [{
-        data: data,
-        backgroundColor: colors.palette.slice(0, labels.length),
-        borderWidth: 0,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: colors.text, padding: 16 },
-        },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-              const pct = ((ctx.parsed / total) * 100).toFixed(1);
-              return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} (${pct}%)`;
-            },
-          },
-        },
-      },
-    },
+  doughnutChart('chart-plans', {
+    labels: labels.map(capitalize),
+    values,
+    colors: PLAN_HUES.slice(0, labels.length),
   });
 }
 
-function renderSignupsChart(labels, counts) {
+async function renderSignupsChart(labels, values) {
   const $loading = document.getElementById('chart-signups-loading');
   const $canvas = document.getElementById('chart-signups');
   if (!$canvas) {
     return;
   }
 
-  const colors = getChartColors();
+  if (!await loadCharts()) {
+    if ($loading) {
+      $loading.innerHTML = '<span class="text-muted">Chart library unavailable</span>';
+    }
+    return;
+  }
 
   if ($loading) {
     $loading.classList.add('d-none');
   }
-  $canvas.classList.remove('d-none');
+  $canvas.parentElement.classList.remove('d-none');
 
-  signupsChart = new Chart($canvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Signups',
-        data: counts,
-        backgroundColor: colors.accent,
-        borderRadius: 4,
-        maxBarThickness: 28,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      scales: {
-        x: {
-          ticks: { color: colors.text },
-          grid: { display: false },
-        },
-        y: {
-          beginAtZero: true,
-          ticks: {
-            color: colors.text,
-            stepSize: 1,
-          },
-          grid: { color: colors.border },
-        },
-      },
-      plugins: {
-        legend: { display: false },
-      },
-    },
-  });
+  barChart('chart-signups', { labels, values, label: 'Signups' });
 }
 
 // ============================================

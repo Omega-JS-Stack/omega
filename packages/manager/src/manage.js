@@ -114,7 +114,10 @@ async function runManage(startDir, options = {}) {
     companyConfig ? join(marker.companyRoot, '.env') : null,
   ]);
 
-  const brand = loadBrand(brandRoot, { companyConfig });
+  // The company layer itself is folded by @omega.js/config off the same stamp
+  // (#83) — loadBrand takes no company argument; what we resolved here is
+  // provenance and the .env chain.
+  const brand = loadBrand(brandRoot);
 
   // Company-shared resources (Apple signing material) live at the company
   // workspace root — services resolve it via context.companyRoot
@@ -146,7 +149,7 @@ async function runManage(startDir, options = {}) {
   }
 
   console.log(chalk.cyan('━'.repeat(70)));
-  console.log(`  ${chalk.bold.white(brand.config.brand?.name || brand.id)} ${chalk.cyan(brand.config.brand?.url || '')} ${chalk.dim('@ ' + new Date().toLocaleTimeString())}`);
+  console.log(`  ${chalk.bold.white(brand.config.brand?.name || brand.id)} ${chalk.cyan(brand.config.brand?.url || '')} ${chalk.dim(`@ ${new Date().toLocaleTimeString()}`)}`);
   console.log(chalk.cyan('━'.repeat(70)));
   console.log(`  ${chalk.dim('Root:')}     ${brand.root}`);
   if (companyConfig) {

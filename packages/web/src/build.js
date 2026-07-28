@@ -86,6 +86,8 @@ async function buildSite(options) {
       outDir: options.outDir,
       environment: options.environment,
       version: options.version,
+      consumerDir: options.consumerDir,
+      clientEntry: options.clientEntry,
       manifest,
     });
     return buildServiceWorker({

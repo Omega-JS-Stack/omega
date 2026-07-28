@@ -92,7 +92,8 @@ See [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.
 ## Dependency Resolution
 
 - **Consumer code can use `Manager.require(name)`** to load any @omega.js/backend dependency from @omega.js/backend's own module context (static + prototype). Consumer projects do NOT need to install @omega.js/backend's transitive deps directly.
-- **@omega.js/client owns Firebase on the client side.** Consumer frontend code (UJM pages, BXM popup/options, EM renderers) NEVER imports Firebase directly — `firebase.firestore()` → `omega.firestore()`, `firebase.auth()` → `omega.auth()`. @omega.js/backend backend code uses `firebase-admin` directly (server-side is different). The three frontend frameworks (EM/BXM/UJM) additionally resolve deps via webpack `resolve.modules`.
+- **No bundler hook is needed here (#87).** @omega.js/web gives consumers bare imports of framework-declared libraries through an esbuild resolve hook ([docs/devkit/index.md](../devkit/index.md) owns the declared-set reader behind it). Backend functions are NOT bundled: they run under plain node resolution, and `Manager.require(name)` resolves from @omega.js/backend's own module context, which already delivers the same guarantee — the framework's copy, one copy, from the framework's installation. Bare `require('<framework dep>')` in consumer code is NOT part of the contract here; use `Manager.require`.
+- **@omega.js/client owns Firebase on the client side.** Consumer frontend code (UJM pages, BXM popup/options, EM renderers) NEVER imports Firebase directly — `firebase.firestore()` → `omega.firestore()`, `firebase.auth()` → `omega.auth()`. @omega.js/backend backend code uses `firebase-admin` directly (server-side is different).
 
 ## Development Workflow
 

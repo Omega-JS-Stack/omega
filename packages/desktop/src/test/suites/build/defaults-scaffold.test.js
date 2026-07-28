@@ -29,7 +29,10 @@ module.exports = {
 
         ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBeTruthy();
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
-        ctx.expect(jetpack.exists(path.join(tmp, 'CLAUDE.md'))).toBeTruthy();
+        // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is
+        // the one-line `@AGENTS.md` pointer.
+        ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toContain('node_modules/@omega.js/AGENTS.md');
+        ctx.expect(jetpack.read(path.join(tmp, 'CLAUDE.md')).trim()).toBe('@AGENTS.md');
         ctx.expect(jetpack.exists(path.join(tmp, '_mas'))).toBe(false);
         // `_`-prefixed FILENAMES are not archives — test/_init.js ships.
         ctx.expect(jetpack.exists(path.join(tmp, 'test', '_init.js'))).toBeTruthy();
@@ -109,6 +112,7 @@ module.exports = {
         jetpack.dir(appDir);
 
         await copyDefaults(appDir);
+        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
@@ -125,20 +129,22 @@ module.exports = {
 
         // Standalone scaffold first (no brand config yet) — per-app docs land.
         await copyDefaults(appDir);
+        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBeTruthy();
         ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBeTruthy();
 
         // Wrap it in a brand monorepo: the next setup sweeps the untouched docs.
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         await copyDefaults(appDir);
+        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
 
         // Consumer content is never destroyed: real notes below the Custom marker keep the file.
-        jetpack.write(path.join(appDir, 'CLAUDE.md'),
+        jetpack.write(path.join(appDir, 'AGENTS.md'),
           `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
         await copyDefaults(appDir);
-        ctx.expect(jetpack.read(path.join(appDir, 'CLAUDE.md'))).toContain('VPN');
+        ctx.expect(jetpack.read(path.join(appDir, 'AGENTS.md'))).toContain('VPN');
       },
     },
   ],

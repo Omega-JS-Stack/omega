@@ -18,14 +18,17 @@ module.exports = {
   description: 'defaults scaffold (devkit engine)',
   tests: [
     {
-      name: 'fresh scaffold: `_.` renames land, omega.json5 + CLAUDE.md ship, .nvmrc renders',
+      name: 'fresh scaffold: `_.` renames land, omega.json5 + the agent-docs chain ship, .nvmrc renders',
       run: (ctx) => {
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'extension-defaults-'));
         scaffoldDefaults({ outputDir: tmp });
 
         ctx.expect(jetpack.exists(path.join(tmp, '.env'))).toBeTruthy();
         ctx.expect(jetpack.exists(path.join(tmp, '.gitignore'))).toBeTruthy();
-        ctx.expect(jetpack.exists(path.join(tmp, 'CLAUDE.md'))).toBeTruthy();
+        // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is
+        // the one-line `@AGENTS.md` pointer.
+        ctx.expect(jetpack.read(path.join(tmp, 'AGENTS.md'))).toContain('node_modules/@omega.js/AGENTS.md');
+        ctx.expect(jetpack.read(path.join(tmp, 'CLAUDE.md')).trim()).toBe('@AGENTS.md');
         ctx.expect(jetpack.exists(path.join(tmp, 'config', 'omega.json5'))).toBeTruthy();
 
         // .nvmrc template rendered ({{ versions.node }} → engines.node), no raw tokens left.
@@ -126,6 +129,7 @@ module.exports = {
         jetpack.dir(appDir);
 
         scaffoldDefaults({ outputDir: appDir });
+        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CHANGELOG.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
@@ -144,20 +148,22 @@ module.exports = {
 
         // Standalone scaffold first (no brand config yet) — per-app docs land.
         scaffoldDefaults({ outputDir: appDir });
+        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBeTruthy();
         ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBeTruthy();
 
         // Wrap it in a brand monorepo: the next scaffold sweeps the untouched docs.
         jetpack.write(path.join(tmp, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const swept = scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(swept.removed.slice().sort().join(',')).toBe('CHANGELOG.md,CLAUDE.md,docs/README.md');
+        ctx.expect(swept.removed.slice().sort().join(',')).toBe('AGENTS.md,CHANGELOG.md,CLAUDE.md,docs/README.md');
+        ctx.expect(jetpack.exists(path.join(appDir, 'AGENTS.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'CLAUDE.md'))).toBe(false);
         ctx.expect(jetpack.exists(path.join(appDir, 'docs'))).toBe(false);
 
         // Consumer content is never destroyed: real notes below the Custom marker keep the file.
-        jetpack.write(path.join(appDir, 'CLAUDE.md'),
+        jetpack.write(path.join(appDir, 'AGENTS.md'),
           `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
         scaffoldDefaults({ outputDir: appDir });
-        ctx.expect(jetpack.read(path.join(appDir, 'CLAUDE.md'))).toContain('VPN');
+        ctx.expect(jetpack.read(path.join(appDir, 'AGENTS.md'))).toContain('VPN');
       },
     },
   ],

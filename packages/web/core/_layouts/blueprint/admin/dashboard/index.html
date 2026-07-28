@@ -85,7 +85,12 @@ prerender_icons:
         <div id="chart-signups-loading" class="text-center text-muted py-4">
           <span class="spinner-border spinner-border-sm"></span>
         </div>
-        <canvas id="chart-signups" class="d-none"></canvas>
+        <!-- The chart helper draws without an aspect ratio (a polled panel
+             must not resize itself under the reader), so the BOX carries the
+             height — same contract as its `chartSlot` markup. -->
+        <div class="admin-chart-box w-100 d-none">
+          <canvas id="chart-signups"></canvas>
+        </div>
       </div>
     </div>
   </div>
@@ -231,7 +236,9 @@ prerender_icons:
         <div id="chart-plans-loading" class="text-center text-muted py-4">
           <span class="spinner-border spinner-border-sm"></span>
         </div>
-        <canvas id="chart-plans" class="d-none"></canvas>
+        <div class="admin-chart-box w-100 d-none">
+          <canvas id="chart-plans"></canvas>
+        </div>
       </div>
     </div>
   </div>

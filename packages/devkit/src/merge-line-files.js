@@ -1,4 +1,4 @@
-// Merge line-based files (.env, .gitignore, CLAUDE.md) during framework setup —
+// Merge line-based files (.env, .gitignore, AGENTS.md) during framework setup —
 // the OMEGA marker-section protocol. Canonical version is EM's (it added .env
 // double-quote normalization and order-safe key substitution over the older
 // BXM/UJM inline copies) plus @omega.js/backend's custom-key promotion (a key the framework
@@ -37,7 +37,7 @@
 //     in Default; an existing EMPTY value (`KEY=` / `KEY=""`) converges to the
 //     commented placeholder instead of migrating to Custom.
 //   - .gitignore: same logic, line-based instead of key-based (no quoting).
-//   - CLAUDE.md: same logic as .gitignore (line-based, no quoting). The markers
+//   - AGENTS.md: same logic as .gitignore (line-based, no quoting). The markers
 //     render as visible H1 headings in markdown — that's intentional UX.
 //   - First setup (no existing file): the framework template lands as-is.
 

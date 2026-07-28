@@ -15,6 +15,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
+const { loadConfig } = require('@omega.js/config');
 
 const {
   isCompanyRoot,
@@ -26,6 +27,7 @@ const {
   filterChildArgs,
 } = require('../src/lib/company.js');
 const { loadBrand } = require('../src/lib/brand.js');
+const { DEFAULTS } = require('../src/config.js');
 const { runCompany, collectChildResult } = require('../src/company.js');
 const { runManage } = require('../src/manage.js');
 const { RunSummary } = require('../src/lib/run-summary.js');
@@ -144,17 +146,41 @@ test('company: loadCompanyConfig strips the brands key and hard-fails on secret-
   assert.throws(() => loadCompanyConfig(leaky.root), /Secret-shaped keys in company config/);
 });
 
-test('company: loadBrand layers DEFAULTS ← company ← brand, brand values winning', () => {
-  const { brands } = stageCompany({ brandIds: ['brand-a'] });
-  const companyConfig = { monitoring: { provider: 'sentry', dsn: 'company-dsn' }, brand: { name: 'Company Name' } };
-
-  const layered = loadBrand(brands['brand-a'], { companyConfig });
-  assert.equal(layered.config.monitoring.dsn, 'company-dsn');   // company fills the gap
-  assert.equal(layered.config.brand.name, 'brand-a brand');     // brand wins
-  assert.equal(layered.config.enabled, true);                   // manager DEFAULTS underneath
+test('company: loadBrand layers DEFAULTS ← company ← brand off the stamp, brand values winning', () => {
+  const { root, brands } = stageCompany({ brandIds: ['brand-a'] });
 
   const standalone = loadBrand(brands['brand-a']);
-  assert.equal(standalone.config.monitoring, undefined);        // no layer without a company
+  assert.equal(standalone.config.monitoring, undefined);        // no layer without a stamp
+
+  stampCompanyMarker(brands['brand-a'], root);
+
+  const layered = loadBrand(brands['brand-a']);
+  assert.equal(layered.config.monitoring.dsn, 'https://company@sentry.example/1'); // company fills the gap
+  assert.equal(layered.config.brand.name, 'brand-a brand');     // brand wins over 'Fixture Co'
+  assert.equal(layered.config.enabled, true);                   // manager DEFAULTS underneath
+});
+
+test('company: the manager adds NO company fold of its own — loadBrand equals a direct loadConfig (#83)', () => {
+  const { root, brands } = stageCompany({ brandIds: ['brand-a'] });
+  const brandRoot = brands['brand-a'];
+
+  // No brand.url → loadBrand's `{ domain }` templating is a no-op, so the two
+  // configs can differ ONLY by how the layers were merged.
+  fs.writeFileSync(
+    path.join(brandRoot, 'config', 'omega.json5'),
+    `{ brand: { id: 'brand-a', name: 'brand-a brand' }, targets: { web: {} } }`,
+  );
+  stampCompanyMarker(brandRoot, root);
+
+  const viaManager = loadBrand(brandRoot).config;
+  const direct = loadConfig(brandRoot, undefined, { defaults: DEFAULTS }).config;
+
+  // The company layer is genuinely in play (this equality is not vacuous) …
+  assert.equal(viaManager.monitoring.dsn, 'https://company@sentry.example/1');
+  assert.equal(viaManager.brand.name, 'brand-a brand');
+  // … and the manager contributes nothing on top of @omega.js/config's chain:
+  // re-adding a manager-side fold at a different rung breaks this equality.
+  assert.deepEqual(viaManager, direct);
 });
 
 test('company: stamp is idempotent — unchanged marker is never rewritten', () => {
@@ -176,7 +202,7 @@ test('company: a marker pointing at a non-company is stale; no marker is standal
 
   assert.equal(readCompanyMarker(brands['brand-a']), null);
 
-  const gone = path.join(os.tmpdir(), 'omega-company-gone-' + Date.now());
+  const gone = path.join(os.tmpdir(), `omega-company-gone-${Date.now()}`);
   stampCompanyMarker(brands['brand-a'], gone);
   assert.deepEqual(readCompanyMarker(brands['brand-a']), { companyRoot: gone, stale: true });
 });

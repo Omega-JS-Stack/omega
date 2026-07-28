@@ -21,6 +21,13 @@ async function build() {
     bundle: true,
     format: 'iife',
     outfile: path.join(DIST, 'assets', 'main.js'),
+    alias: {
+      // The web framework's chart helper, reached by name instead of by a
+      // six-deep relative climb. `@omega.js/web` declares an export map, so a
+      // deep import of core/ is not reachable through the package name — and
+      // this fixture is inside the monorepo, where the source always is.
+      '@omega.js/web-charts': path.join(__dirname, '..', '..', '..', '..', 'packages', 'web', 'core', 'js', 'libs', 'charts.js'),
+    },
   });
 
   console.log(`Built sandbox website → ${DIST}`);

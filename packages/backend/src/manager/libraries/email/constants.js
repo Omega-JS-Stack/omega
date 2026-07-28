@@ -100,7 +100,7 @@ function nextWeekday(dayOfWeek, hour, minute = 0) {
 function nextNthWeekday(nth, dayOfWeek, hour, minute = 0) {
   function findNthWeekdayInMonth(m) {
     const first = m.clone().startOf('month');
-    let day = first.clone();
+    const day = first.clone();
 
     // Advance to the first matching weekday
     while (day.day() !== dayOfWeek) {
@@ -256,6 +256,22 @@ function sanitizeImagesForEmail(images, brandUrl) {
  */
 function encode(s) {
   return encodeURIComponent(Buffer.from(String(s)).toString('base64'));
+}
+
+/**
+ * Escape a value for safe interpolation into email HTML.
+ *
+ * Every value that did NOT come from us — third-party webhook payloads (Stripe,
+ * Ethoca), AI-authored strings, user-submitted fields — must go through this before
+ * it lands inside a first-party markup string, or the markup lane becomes an
+ * injection lane.
+ */
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /**
@@ -436,6 +452,7 @@ module.exports = {
   SEND_AT_LIMIT,
   sanitizeImagesForEmail,
   encode,
+  escapeHtml,
   errorWithCode,
   resolveFieldValues,
   nextWeekday,

@@ -54,6 +54,16 @@
   --bs-border-color: var(--nb-ink);
   --bs-card-bg: #{$nb-surface};
   --bs-emphasis-color: #{$nb-ink};
+
+  // Status (#13) — one green/amber/red site-wide. Declared once: the tokens
+  // themselves flip with the scheme (core/css/tokens), so this needs no
+  // dark-mode twin below.
+  --bs-success: var(--omega-ok);
+  --bs-success-rgb: var(--omega-ok-rgb);
+  --bs-warning: var(--omega-warn);
+  --bs-warning-rgb: var(--omega-warn-rgb);
+  --bs-danger: var(--omega-danger);
+  --bs-danger-rgb: var(--omega-danger-rgb);
 }
 
 // ============================================

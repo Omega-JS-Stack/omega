@@ -19,6 +19,14 @@
 //
 // Type presets: `data-omega-type` on <html> re-pairs the font tokens
 // (mix is the default pairing — serif marketing display over sans UI).
+//
+// Status hues ship in PAIRS: `--omega-ok` and `--omega-ok-rgb` (same for
+// warn/danger). Bootstrap's translucency utilities paint from
+// `rgba(var(--bs-success-rgb), …)`, which no var() can feed a hex to, so each
+// theme's root bridge points --bs-success/-warning/-danger and their -rgb
+// companions at these — ONE green for `bg-success`, `.text-success` and every
+// token-painted glyph, in both modes (#13). A theme that re-values a status
+// hue MUST re-value its -rgb twin or the two drift apart again.
 
 @mixin light-tokens {
   --omega-ground: #f5f5f4;
@@ -36,8 +44,11 @@
   --omega-accent-ink: #ffffff;
   --omega-accent-ring: rgba(37, 99, 235, 0.35);
   --omega-ok: #12925c;
+  --omega-ok-rgb: 18, 146, 92;
   --omega-warn: #c47206;
+  --omega-warn-rgb: 196, 114, 6;
   --omega-danger: #d92d20;
+  --omega-danger-rgb: 217, 45, 32;
   --omega-chart-2: #0f8fa9;
   --omega-chart-3: #7a45b5;
   --omega-chart-4: #b0416a;
@@ -63,8 +74,11 @@
   --omega-accent-ink: #111213;
   --omega-accent-ring: rgba(84, 132, 239, 0.35);
   --omega-ok: #3ecf8e;
+  --omega-ok-rgb: 62, 207, 142;
   --omega-warn: #f5a524;
+  --omega-warn-rgb: 245, 165, 36;
   --omega-danger: #f0574d;
+  --omega-danger-rgb: 240, 87, 77;
   --omega-chart-2: #1f9fb4;
   --omega-chart-3: #c09aec;
   --omega-chart-4: #ee89a8;

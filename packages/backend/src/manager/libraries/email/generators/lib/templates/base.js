@@ -10,9 +10,6 @@
  */
 const { escape } = require('./shared-campaign.js');
 
-const PARENT_NAME = 'ITW Creative Works';
-const PARENT_WORDMARK = 'https://cdn.itwcreativeworks.com/assets/itw-creative-works/images/logo/itw-creative-works-wordmark-black-1024x.png';
-
 const DEFAULT_STYLES = `
   body { background-color: #F7FAFC; }
   h1, h2, h3 { color: #1A202C; margin: 0 0 12px; font-weight: 500; }
@@ -151,7 +148,11 @@ function button(btn) {
 }
 
 /**
- * Full footer — ITW wordmark, footer text, divider, links, copyright, address.
+ * Full footer — company wordmark, footer text, divider, links, copyright, address.
+ *
+ * The parent/legal entity comes from config: `brand.company` (falling back to
+ * `brand.name`, the documented schema chain) and `brand.images.companyWordmark`.
+ * An unset wordmark renders NO wordmark — never another company's logo.
  */
 function footer(brand, email) {
   const brandUrl = brand?.url || '#';
@@ -160,13 +161,19 @@ function footer(brand, email) {
   const footerText = email?.footer?.text || 'You are receiving this email because you recently interacted with our website.';
   const unsubscribeUrl = email?.unsubscribeUrl || `${brandUrl}/portal/email-preferences`;
   const year = new Date().getFullYear();
+  const companyName = brand?.company || brand?.name || '';
+  const companyWordmark = brand?.images?.companyWordmark || '';
 
-  return `
+  const wordmarkSection = companyWordmark
+    ? `
     <mj-section padding="0 32px">
       <mj-column>
-        <mj-image src="${PARENT_WORDMARK}" alt="${escape(PARENT_NAME)}" width="160px" padding="0" />
+        <mj-image src="${escape(companyWordmark)}" alt="${escape(companyName)}" width="160px" padding="0" />
       </mj-column>
-    </mj-section>
+    </mj-section>`
+    : '';
+
+  return `${wordmarkSection}
 
     <mj-section padding="8px 32px 0 32px">
       <mj-column>
@@ -196,7 +203,7 @@ function footer(brand, email) {
     <mj-section padding="4px 32px 0 32px">
       <mj-column>
         <mj-text align="center" font-size="13px" color="#A0AEC0" padding="0">
-          &copy; ${year} ${escape(PARENT_NAME)}
+          &copy; ${year} ${escape(companyName)}
         </mj-text>
       </mj-column>
     </mj-section>
@@ -219,6 +226,4 @@ module.exports = {
   footer,
   escape,
   HIDDEN_ASM,
-  PARENT_NAME,
-  PARENT_WORDMARK,
 };

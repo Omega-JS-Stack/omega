@@ -140,6 +140,8 @@ module.exports = async function (options) {
       outDir: paths.out,
       environment: 'development',
       version: jetpack.read(path.join(paths.root, 'package.json'), 'json')?.version,
+      consumerDir: paths.src,
+      clientEntry,
       manifest,
     });
     await buildServiceWorker({

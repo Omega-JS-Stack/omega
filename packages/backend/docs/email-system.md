@@ -32,12 +32,46 @@ Both transactional and marketing paths share the same preparation layer:
 |---|---|
 | `resolveBrand(Manager)` | Clones brand config, sanitizes images (SVG→PNG via CDN naming) |
 | `resolveSender({ sender, from, group }, brand, brandDomain)` | Resolves sender from/display-name/ASM group by category key |
-| `renderContent({ content, html }, utmOptions)` | Markdown→HTML via markdown-it, applies UTM link tagging |
-| `resolveSignoff(signoff)` | Fills personal signoff defaults (headshot, name, URL) when `type: 'personal'` |
+| `renderContent({ content, html, trusted }, utmOptions)` | Markdown→HTML via markdown-it, applies UTM link tagging. Raw HTML in `content` is DISABLED unless `trusted` is set — see [Content trust](#content-trust) |
+| `resolvePerson(brand)` | The `brand.contact.person` identity for personal email. Throws 400 when unconfigured — see [Identity is config, or it is an error](#identity-is-config-or-it-is-an-error) |
+| `resolveSignoff(signoff, brand)` | Fills personal signoff details (name, headshot, URL) from `brand.contact.person` when `type: 'personal'` |
 | `buildCategories(type, brandId, extra)` | Builds categories array: `['transactional', brandId, ...extra]` |
 | `buildUnsubscribeUrl({ email, groupId, template, websiteUrl })` | HMAC-signed one-click unsubscribe URL |
 | `buildTemplateData({ brand, subject, ... })` | Deep-merges system defaults with caller data into the template data tree |
 | `render({ brand, template, data, utm })` | Compiles MJML template to email-safe HTML via `renderEmail()` |
+
+### Identity is config, or it is an error
+
+Nothing in the email path carries a built-in human or company identity. Every name, face, link and audit address comes from the merged config, and a missing one **fails loudly instead of falling back** — a silent default would sign a brand's mail as someone else.
+
+| Surface | Config key | Missing behavior |
+|---|---|---|
+| Personal signoff (name, headshot, link) | `brand.contact.person.{name,image,url,urlText}` | `prepare.resolvePerson()` **throws 400** when `name` is unset and a `personal` signoff was requested |
+| Personal copy in email bodies ("I'm Jane, the founder…") | `brand.contact.person.firstName` | Defaults to the first word of the configured `person.name` — derived from the brand's own value, never a framework one |
+| Email footer parent entity | `brand.company` | Falls back to `brand.name` (the documented schema chain) |
+| Email footer parent wordmark | `brand.images.companyWordmark` | The wordmark block is **omitted** — never another company's logo |
+| Audit BCCs on `copy: true` sends | `brand.contact.carbonCopy` (`[{ email, name }]`) | No BCCs. A listed entry missing `email` throws 400 |
+
+`copy: true` still CCs the brand's own `brand.contact.email` — that is the brand copying itself and needs no extra config.
+
+A team signoff (the default) needs none of this. Only `signoff.type: 'personal'` requires a configured person; the signup welcome/nudge/checkup emails are the in-framework users of that path, and each one's send is individually caught and logged, so an unconfigured brand logs a loud error per email rather than failing signup.
+
+### Content trust
+
+Email bodies arrive from two very different places, so `renderContent()` has two lanes and the SAFE one is the default:
+
+| Lane | Who uses it | markdown-it |
+|---|---|---|
+| **Untrusted** (default) | AI-authored campaign/newsletter bodies, user-submitted fields, anything arriving over a route or the MCP `send_email`/`create_campaign` tools | `html: false` — smuggled `<script>`/`<img onerror>` renders as inert text |
+| **Trusted** (`trustedContent: true` on the send settings) | First-party callers that hand-build markup: the dispute alert (`events/firestore/payments-disputes/on-write.js`) and the newsletter report email (`generators/newsletter.js`) | `html: true` |
+
+Rules for the trusted lane:
+
+- A caller may set `trustedContent: true` ONLY for markup it authored itself.
+- Every third-party or AI-authored value interpolated into that markup must go through `escapeHtml()` (`constants.js`) first — otherwise the trusted lane becomes an injection lane. Both current trusted callers do this for their webhook/AI values.
+- `data.content.html` is a raw-HTML passthrough by declaration; never point it at untrusted input.
+
+Newsletter template rendering (`generators/lib/templates/newsletter-shared.js`) is independently `html: false` — those bodies are always AI-authored — and escapes every AI field it interpolates via the shared `escapeHtml()`.
 
 ### Transactional Pipeline (`transactional/index.js`)
 
@@ -97,6 +131,8 @@ The template receives one `data` object with a clear separation of concerns:
 - **`data.content`** — template-specific payload. **Callers provide this.** What goes inside depends on the template.
 - **`data.signoff`** — shared across templates. **Callers provide this** (defaults to team if omitted).
 - **`data.brand`** / **`data.email`** / **`data.personalization`** — **system-injected by `prepare.js`**. Callers never touch these.
+
+`trustedContent: true` (a top-level send setting, not part of `data`) opts the body out of HTML escaping — first-party markup only, see [Content trust](#content-trust).
 
 Every caller — transactional, marketing, transition handler — passes data the same way:
 
@@ -308,6 +344,14 @@ All email tests live under `test/email/`, mirroring the source at `src/manager/l
 
 Extended tests (`TEST_EXTENDED_MODE`) send real emails to `_test-*@{domain}` addresses. See [test-framework.md](test-framework.md) for the full test framework reference.
 
+Some email tests are plain-node scripts colocated with the source instead — no emulator, no network. Run them directly:
+
+- `node src/manager/libraries/email/render-content.test.js` — the [content-trust](#content-trust) render lanes (15 cases)
+- `node src/manager/libraries/email/identity.test.js` — config-driven identity + the loud failures (16 cases)
+- `node src/manager/libraries/email/validation.test.js` — all free validation checks (69 cases)
+- `node src/manager/libraries/email/sanitize-images.test.js` — brand-image absolutization
+- `node src/manager/libraries/email/marketing/consent-gate.test.js` — the marketing consent gate (28 cases)
+
 ### Test recipient convention
 
 All extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_test-email-send@somiibo.com`). This keeps test emails separate from real user traffic and makes filtering easy.
@@ -335,5 +379,7 @@ All extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_te
 | NeverBounce provider | `src/manager/libraries/email/validation-provider-neverbounce.js` |
 | ZeroBounce provider | `src/manager/libraries/email/validation-provider-zerobounce.js` |
 | Validation test | `src/manager/libraries/email/validation.test.js` |
+| Content-trust test (render lanes + escaping) | `src/manager/libraries/email/render-content.test.js` |
+| Identity test (config-driven + loud failures) | `src/manager/libraries/email/identity.test.js` |
 | Seed campaigns | `src/cli/commands/setup-tests/helpers/seed-campaigns.js` |
 | Transition email dispatcher | `src/manager/events/firestore/payments-webhooks/transitions/send-email.js` |

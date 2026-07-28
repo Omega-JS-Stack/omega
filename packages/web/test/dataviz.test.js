@@ -105,6 +105,40 @@ test('charts.js names Chart.js ONLY in the lazy import — a chartless page pays
   assert.match(source, /await import\('chart\.js\/auto'\)/, 'the split chunk is fetched when a page asks');
 });
 
+// #74: the admin dashboard carried its own getChartColors and a STATIC
+// `import 'chart.js'`, which folded the library into the entry every admin
+// visit paid for. It goes through the helper now — keeping status hues,
+// because a plan slice means healthy/attention/trouble, not "category 3".
+test('#74: the admin dashboard draws through the helper, and never names Chart.js', () => {
+  const source = fs.readFileSync(path.join(PKG, 'core', 'js', 'pages', 'admin', 'index.js'), 'utf8');
+
+  assert.ok(!/from ['"]chart\.js/.test(source), 'the page never imports the library — delivery stays the helper\'s to change');
+  assert.ok(!/\bnew Chart\b/.test(source), 'and never constructs one');
+  assert.ok(!/getChartColors/.test(source), 'no second copy of the token reads');
+  assert.match(source, /import \{[^}]*loadCharts[^}]*\} from '__main_assets__\/js\/libs\/charts\.js'/, 'the lazy load goes through the helper');
+  assert.match(source, /await loadCharts\(\)/, 'and it is awaited before a builder is called');
+
+  // Status hues, passed as tokens so the helper's resolveColor reads the live
+  // sheet — the categorical ramp would trade the meaning for "different".
+  for (const token of ['--omega-accent', '--omega-ok', '--omega-warn', '--omega-danger']) {
+    assert.ok(source.includes(`'var(${token})'`), `the plan doughnut keeps its ${token} slice`);
+  }
+  assert.ok(!/colors\.palette/.test(source), 'nothing reaches for the categorical ramp');
+});
+
+test('#74: the admin chart canvases sit in height-bearing boxes (the helper drops the aspect ratio)', () => {
+  const layout = fs.readFileSync(path.join(PKG, 'core', '_layouts', 'blueprint', 'admin', 'dashboard', 'index.html'), 'utf8');
+  const css = sass.compile(path.join(PKG, 'core', 'css', 'pages', 'admin', 'index.scss'), {
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+
+  for (const id of ['chart-signups', 'chart-plans']) {
+    assert.match(layout, new RegExp(`admin-chart-box[^>]*>\\s*<canvas id="${id}"`), `${id} is wrapped in the sized box`);
+  }
+  assert.match(css, /\.admin-chart-box\s*\{[^}]*position: relative/s, 'the box is the canvas\' positioning parent');
+  assert.match(css, /\.admin-chart-box\s*\{[^}]*height: \d+px/s, 'a canvas has no intrinsic height — the box carries it');
+});
+
 test('the real bundler splits Chart.js into its own chunk — the page entry stays free of it', async () => {
   // A one-page consumer layer that does what a charting page does: import the
   // framework helper, never the library.

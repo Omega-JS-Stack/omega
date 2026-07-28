@@ -36,6 +36,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const sass = require('sass');
+const { frameworkDependencyNames, frameworkDepsPattern } = require('@omega.js/devkit/framework-deps');
 const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
 const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
@@ -58,19 +59,6 @@ function isPageEntry(rel) {
 const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
 
 /**
- * The set of libraries a consumer may import by BARE specifier (#2): every
- * package `@omega.js/web` declares as a dependency — no hand-curated list, the
- * declared set IS the list. `@omega.js/*` deps are excluded: the client is
- * wired explicitly (the caller-supplied clientEntry alias) and the private
- * packages are vendored, so neither resolves through node_modules here.
- * @returns {string[]} dependency names
- */
-function frameworkDependencyNames() {
-  const pkg = JSON.parse(fs.readFileSync(path.join(FRAMEWORK_ROOT, 'package.json'), 'utf8'));
-  return Object.keys(pkg.dependencies || {}).filter((name) => !name.startsWith('@omega.js/'));
-}
-
-/**
  * esbuild plugin resolving framework-provided libraries from the FRAMEWORK's
  * installation, whoever imports them. A consumer page module lives outside
  * `@omega.js/web`, so `import 'chart.js'` would otherwise resolve from the
@@ -84,12 +72,11 @@ function frameworkDependencyNames() {
  * @returns {object|null} the plugin, or null when the package declares no deps
  */
 function frameworkDepsPlugin() {
-  const names = frameworkDependencyNames();
+  const names = frameworkDependencyNames(FRAMEWORK_ROOT);
   if (!names.length) return null;
   // A filter built from the declared names (bare specifier + subpaths) keeps
   // the hook off every other import esbuild resolves.
-  const escaped = names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const filter = new RegExp(`^(${escaped.join('|')})(/|$)`);
+  const filter = frameworkDepsPattern(names);
 
   return {
     name: 'omega-framework-deps',

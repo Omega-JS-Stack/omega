@@ -198,6 +198,7 @@ See [docs/cli.md](../../packages/extension/docs/cli.md).
 ## Dependency Resolution
 
 - **Consumer code can `require()` any @omega.js/extension dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `@omega.js/client`, or any other @omega.js/extension transitive dep. If a dep doesn't resolve, the fix is in @omega.js/extension's webpack config — not the consumer's `package.json`.
+- **The framework's copy does NOT always win here (open: [#87](https://github.com/Omega-JS-Stack/omega/issues/87)).** A consumer that declares its own copy of a framework dependency can get two copies in the build — the guarantee @omega.js/web's esbuild hook provides has no webpack equivalent yet. See the same note in [docs/desktop/index.md](../desktop/index.md) for the two shapes that were tried and reverted.
 - **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `import omega from '@omega.js/client'` → `omega.auth()`, `omega.firestore()`. Same rule in EM and UJM.
 - **`Manager.require(name)`** resolves from @omega.js/extension's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
 
@@ -236,7 +237,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`; web's lives at `scaffold/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 

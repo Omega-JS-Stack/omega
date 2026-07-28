@@ -132,6 +132,37 @@ test('match, enum, and type violations are reported', () => {
   assert.ok(errors.some((e) => e.includes('config.payment.products has wrong type')));
 });
 
+test('email identity keys are optional but typed when present', () => {
+  // The email path reads these instead of carrying a built-in identity
+  // (packages/backend docs/email-system.md → "Identity is config, or it is an error").
+  const configured = validateConfig({
+    ...VALID,
+    brand: {
+      ...VALID.brand,
+      company: 'Sandbox Holdings Inc',
+      contact: {
+        email: 'hello@sandbox.example',
+        person: { name: 'Jane Doe, CEO', firstName: 'Jane', image: 'https://x.com/j.jpg', url: 'https://jane.example', urlText: '@jane' },
+        carbonCopy: [{ email: 'audit@sandbox.example', name: 'Audit' }],
+      },
+      images: { companyWordmark: 'https://x.com/wordmark.png' },
+    },
+  });
+
+  assert.deepStrictEqual(configured.errors, []);
+  // Absence is fine — a brand that sends no personal email configures none of it.
+  assert.deepStrictEqual(validateConfig(VALID).errors, []);
+
+  const { errors } = validateConfig({
+    ...VALID,
+    brand: { ...VALID.brand, contact: { person: { name: 42, url: 'ftp://nope' }, carbonCopy: 'not-an-array' } },
+  });
+
+  assert.ok(errors.some((e) => e.includes('config.brand.contact.person.name has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.brand.contact.person.url') && e.includes('does not match')));
+  assert.ok(errors.some((e) => e.includes('config.brand.contact.carbonCopy has wrong type')));
+});
+
 test("parent accepts 'self', a URL string, or the deliberate false opt-out — union types (backend rule)", () => {
   const opts = { target: 'backend' };
   assert.deepStrictEqual(validateConfig({ ...VALID, parent: 'self' }, opts).errors, []);

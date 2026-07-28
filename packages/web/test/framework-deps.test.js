@@ -50,15 +50,18 @@ function walkJs(dir) {
     .map((e) => path.join(e.parentPath, e.name));
 }
 
-// The entry bundle plus every chunk it transitively imports.
+// The entry bundle plus every chunk it transitively imports — static AND
+// dynamic. Chunk-to-chunk hops are same-directory (`./chunk-X.js`), so the
+// walk cannot key on the `chunks/` segment an entry's references carry.
 function readGraph(outDir, manifestUrl) {
   const seen = new Map();
   const visit = (file) => {
     if (seen.has(file)) return;
     const content = fs.readFileSync(file, 'utf8');
     seen.set(file, content);
-    for (const m of content.matchAll(/["']([^"']*chunks\/[\w.-]+-[A-Z0-9]+\.js)["']/g)) {
-      visit(path.resolve(path.dirname(file), m[1]));
+    for (const m of content.matchAll(/["']([^"']*[\w.-]+-[A-Z0-9]{8}\.js)["']/g)) {
+      const next = path.resolve(path.dirname(file), m[1]);
+      if (fs.existsSync(next)) visit(next);
     }
   };
   visit(path.join(outDir, manifestUrl.slice(1)));

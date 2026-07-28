@@ -87,6 +87,45 @@ test('markdown legal layout renders its default text as HTML (append pattern)', 
   assert.ok(terms.includes('Contract'), 'brand name templated into legal text');
 });
 
+// #9: the cookie policy shipped as raw INDENTED html inside a .md blueprint,
+// so markdown mangled it (`<p><li>`, literal `**Brand**`) and — because it
+// carried no headings — the page JS hid the TOC rail, dropping the document
+// into the rail's 15rem grid track. Every legal blueprint is markdown now, and
+// the three pages get the SAME document treatment.
+test('#9: every legal page gets the same document treatment as terms/privacy', () => {
+  for (const theme of THEMES) {
+    for (const file of ['terms.html', 'privacy.html', 'cookies.html']) {
+      const html = page(theme, file);
+      // Comments are not rendered text — terms.md parks a draft clause in one.
+      const doc = html.slice(html.indexOf('data-legal-doc'), html.indexOf('classy-legal__doc-foot')).replace(/<!--[\s\S]*?-->/g, '');
+
+      assert.ok(html.includes('<article class="classy-legal__doc classy-prose" data-legal-doc>'), `${theme}/${file}: the document wrapper`);
+      assert.ok(doc.includes('<h2>'), `${theme}/${file}: section headings — no headings means the JS hides the rail and the doc falls into its track`);
+      assert.ok(!doc.includes('**'), `${theme}/${file}: markdown emphasis resolved, never literal`);
+      assert.ok(!/<p>\s*<li>/.test(doc), `${theme}/${file}: no list mangled by markdown's indented-html handling`);
+      assert.ok(doc.includes('Contract'), `${theme}/${file}: brand name templated into the legal text`);
+    }
+  }
+});
+
+// #86: consumers cannot fix stock-chrome icon misses, so a Pro-only icon name
+// in packaged markup must break the build lane. uj_icon (template-kit media.js)
+// tags every unresolved name onto its fallback triangle.
+test('#86: no stock page ships a missing-icon marker', () => {
+  for (const theme of THEMES) {
+    const outDir = path.join(PKG, '.omega', `contract-${theme}`);
+    const misses = [];
+    for (const entry of fs.readdirSync(outDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.html')) continue;
+      const html = fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8');
+      for (const [, slug] of html.matchAll(/data-omega-icon-missing="([^"]*)"/g)) {
+        misses.push(`${path.relative(outDir, path.join(entry.parentPath, entry.name))}: ${slug}`);
+      }
+    }
+    assert.deepStrictEqual([...new Set(misses)], [], `${theme}: icon names that resolved to the fallback triangle`);
+  }
+});
+
 test('manifest-injected assets on every theme (hashed main css/js, valid Configuration)', () => {
   for (const theme of THEMES) {
     const html = page(theme, 'pricing.html');

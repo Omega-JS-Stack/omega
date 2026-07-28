@@ -17,6 +17,7 @@
     "./flows": "./src/flows.js",
     "./icons": "./src/icons.js",
     "./defaults-engine": "./src/defaults-engine.js",
+    "./framework-deps": "./src/framework-deps.js",
     "./merge-line-files": "./src/merge-line-files.js",
     "./translate": "./src/translate/index.js",
     "./deploy": "./src/deploy.js",

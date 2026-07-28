@@ -79,6 +79,42 @@ test('token sheet compiles clean — modern sass, ZERO deprecations, full plumbi
   assert.match(result.css, /data-bs-theme=['"]?light/, 'appearance.js stamp beats OS — light');
 });
 
+// #13: "all systems operational" wore --omega-ok while the uptime bars under
+// it wore Bootstrap's compiled $success — one green in light mode, two in
+// dark. The token owns the hue now, and every theme's root bridge re-points
+// Bootstrap's variable at it (hex AND the -rgb channels the translucency
+// utilities paint from) AFTER Bootstrap compiles, so the bridge wins.
+test('#13: one success token site-wide — every theme bridges Bootstrap onto it', () => {
+  const LEVELS = [['success', 'ok'], ['warning', 'warn'], ['danger', 'danger']];
+
+  for (const theme of ['classy', 'newsflash', 'neobrutalism']) {
+    const css = sass.compile(path.join(PKG, 'themes', theme, '_theme.scss'), {
+      quietDeps: true,
+      logger: { warn: () => {}, debug: () => {} },
+    }).css;
+
+    for (const [level, token] of LEVELS) {
+      for (const [property, value] of [[`--bs-${level}`, `var(--omega-${token})`], [`--bs-${level}-rgb`, `var(--omega-${token}-rgb)`]]) {
+        const last = css.slice(css.lastIndexOf(`${property}:`));
+        assert.match(last, new RegExp(`^${property}: ${value.replace(/[()-]/g, '\\$&')};`), `${theme}: the LAST ${property} is the token bridge, not Bootstrap's compiled hex`);
+      }
+    }
+  }
+});
+
+test('#13: every status hue ships its -rgb twin, in both modes', () => {
+  const css = sass.compile(path.join(PKG, 'core', 'css', 'tokens', '_index.scss'), {
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+
+  for (const token of ['ok', 'warn', 'danger']) {
+    const hues = css.match(new RegExp(`--omega-${token}: #[0-9a-f]{6}`, 'g')) || [];
+    const channels = css.match(new RegExp(`--omega-${token}-rgb: \\d+, \\d+, \\d+`, 'g')) || [];
+    assert.ok(hues.length >= 2, `--omega-${token} carries a light AND a dark value`);
+    assert.equal(channels.length, hues.length, `--omega-${token}-rgb tracks it stamp for stamp — a lone hue is the #13 drift`);
+  }
+});
+
 test('main.scss wires the token sheet ahead of the theme', () => {
   const fs = require('node:fs');
   const main = fs.readFileSync(path.join(PKG, 'core', 'css', 'main.scss'), 'utf8');

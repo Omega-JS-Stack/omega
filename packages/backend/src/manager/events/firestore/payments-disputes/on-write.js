@@ -1,6 +1,7 @@
 const path = require('path');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
+const { escapeHtml } = require('../../../libraries/email/constants.js');
 
 /**
  * Firestore trigger: payments-disputes/{alertId} onWrite
@@ -156,6 +157,8 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   const matched = match ? 'Matched' : 'Unmatched';
   const subject = `Dispute Alert: ${matched} — $${alert.amount} on ****${alert.card.last4} [${alertId}]`;
 
+  // The alert body is hand-built markup (trustedContent below), so every value that
+  // came off the dispute webhook or the processor match gets escaped on the way in.
   const messageLines = [];
 
   // Status banner
@@ -172,15 +175,15 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   // Alert details
   messageLines.push('<strong>Alert Details:</strong>');
   messageLines.push('<ul>');
-  messageLines.push(`<li><strong>Alert ID:</strong> ${alertId}</li>`);
-  messageLines.push(`<li><strong>Type:</strong> ${alert.alertType || 'N/A'}</li>`);
-  messageLines.push(`<li><strong>Card:</strong> ****${alert.card.last4} (${alert.card.brand || 'unknown'})</li>`);
-  messageLines.push(`<li><strong>Amount:</strong> $${alert.amount}</li>`);
-  messageLines.push(`<li><strong>Transaction Date:</strong> ${alert.transactionDate}</li>`);
-  messageLines.push(`<li><strong>Processor:</strong> ${alert.processor}</li>`);
-  messageLines.push(`<li><strong>Reason:</strong> ${alert.reasonCode || 'N/A'}</li>`);
-  messageLines.push(`<li><strong>Network:</strong> ${alert.subprovider || 'N/A'}</li>`);
-  messageLines.push(`<li><strong>Customer Email:</strong> ${alert.customerEmail || 'N/A'}</li>`);
+  messageLines.push(`<li><strong>Alert ID:</strong> ${escapeHtml(alertId)}</li>`);
+  messageLines.push(`<li><strong>Type:</strong> ${escapeHtml(alert.alertType || 'N/A')}</li>`);
+  messageLines.push(`<li><strong>Card:</strong> ****${escapeHtml(alert.card.last4)} (${escapeHtml(alert.card.brand || 'unknown')})</li>`);
+  messageLines.push(`<li><strong>Amount:</strong> $${escapeHtml(alert.amount)}</li>`);
+  messageLines.push(`<li><strong>Transaction Date:</strong> ${escapeHtml(alert.transactionDate)}</li>`);
+  messageLines.push(`<li><strong>Processor:</strong> ${escapeHtml(alert.processor)}</li>`);
+  messageLines.push(`<li><strong>Reason:</strong> ${escapeHtml(alert.reasonCode || 'N/A')}</li>`);
+  messageLines.push(`<li><strong>Network:</strong> ${escapeHtml(alert.subprovider || 'N/A')}</li>`);
+  messageLines.push(`<li><strong>Customer Email:</strong> ${escapeHtml(alert.customerEmail || 'N/A')}</li>`);
   messageLines.push(`<li><strong>Already Refunded:</strong> ${alert.isRefunded ? 'Yes' : 'No'}</li>`);
   messageLines.push('</ul>');
 
@@ -188,27 +191,27 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
   if (match) {
     messageLines.push('<strong>Match Details:</strong>');
     messageLines.push('<ul>');
-    messageLines.push(`<li><strong>Method:</strong> ${match.method}</li>`);
-    messageLines.push(`<li><strong>Charge:</strong> ${match.chargeId || 'N/A'}</li>`);
-    messageLines.push(`<li><strong>Invoice:</strong> ${match.invoiceId || 'N/A'}</li>`);
-    messageLines.push(`<li><strong>Subscription:</strong> ${match.subscriptionId || 'N/A'}</li>`);
-    messageLines.push(`<li><strong>Customer:</strong> ${match.customerId || 'N/A'}</li>`);
-    messageLines.push(`<li><strong>Customer Email:</strong> ${match.email || 'N/A'}</li>`);
-    messageLines.push(`<li><strong>UID:</strong> ${match.uid || 'unknown'}</li>`);
+    messageLines.push(`<li><strong>Method:</strong> ${escapeHtml(match.method)}</li>`);
+    messageLines.push(`<li><strong>Charge:</strong> ${escapeHtml(match.chargeId || 'N/A')}</li>`);
+    messageLines.push(`<li><strong>Invoice:</strong> ${escapeHtml(match.invoiceId || 'N/A')}</li>`);
+    messageLines.push(`<li><strong>Subscription:</strong> ${escapeHtml(match.subscriptionId || 'N/A')}</li>`);
+    messageLines.push(`<li><strong>Customer:</strong> ${escapeHtml(match.customerId || 'N/A')}</li>`);
+    messageLines.push(`<li><strong>Customer Email:</strong> ${escapeHtml(match.email || 'N/A')}</li>`);
+    messageLines.push(`<li><strong>UID:</strong> ${escapeHtml(match.uid || 'unknown')}</li>`);
     messageLines.push('</ul>');
 
     if (result) {
       messageLines.push('<strong>Actions Taken:</strong>');
       messageLines.push('<ul>');
-      messageLines.push(`<li><strong>Refund:</strong> ${result.refundStatus}${result.refundId ? ` (${result.refundId})` : ''}${result.amountRefunded ? ` — $${(result.amountRefunded / 100).toFixed(2)} ${result.currency || ''}` : ''}</li>`);
-      messageLines.push(`<li><strong>Cancel Subscription:</strong> ${result.cancelStatus}</li>`);
+      messageLines.push(`<li><strong>Refund:</strong> ${escapeHtml(result.refundStatus)}${result.refundId ? ` (${escapeHtml(result.refundId)})` : ''}${result.amountRefunded ? ` — $${(result.amountRefunded / 100).toFixed(2)} ${escapeHtml(result.currency || '')}` : ''}</li>`);
+      messageLines.push(`<li><strong>Cancel Subscription:</strong> ${escapeHtml(result.cancelStatus)}</li>`);
       messageLines.push('</ul>');
     }
   }
 
   // Stripe link
   if (alert.stripeUrl) {
-    messageLines.push(`<br><a href="${alert.stripeUrl}">View in Stripe Dashboard</a>`);
+    messageLines.push(`<br><a href="${escapeHtml(alert.stripeUrl)}">View in Stripe Dashboard</a>`);
   }
 
   // Errors
@@ -217,7 +220,7 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
     messageLines.push('<strong>Errors:</strong>');
     messageLines.push('<ul>');
     result.errors.forEach((err) => {
-      messageLines.push(`<li>${err}</li>`);
+      messageLines.push(`<li>${escapeHtml(err)}</li>`);
     });
     messageLines.push('</ul>');
   }
@@ -229,6 +232,8 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
     template: 'card',
     categories: ['order/dispute-alert'],
     copy: true,
+    // Body is first-party markup built above; its third-party values are escaped.
+    trustedContent: true,
     data: {
       email: {
         preview: `Dispute Alert: ${matched} — $${alert.amount} on ****${alert.card.last4}`,

@@ -15,10 +15,10 @@
  */
 const _ = require('lodash');
 const moment = require('moment');
+const powertools = require('node-powertools');
 const pushid = require('pushid');
 
 const { SEND_AT_LIMIT, errorWithCode } = require('../constants.js');
-const { tagLinks } = require('../utm.js');
 const prepare = require('../prepare.js');
 
 function Transactional(ctx) {
@@ -54,7 +54,7 @@ Transactional.prototype.build = async function (settings) {
   const { brand, brandDomain } = prepare.resolveBrand(Manager);
   const { from, groupId } = prepare.resolveSender(settings, brand, brandDomain);
   const categories = prepare.buildCategories('transactional', brand.id, settings.categories);
-  const signoff = prepare.resolveSignoff(settings?.data?.signoff);
+  const signoff = prepare.resolveSignoff(settings?.data?.signoff, brand);
 
   // TEMPORARY: shim for emails queued before the MJML migration (old template names)
   const LEGACY_TEMPLATE_MAP = { 'default': 'card', 'core/engagement/feedback': 'feedback' };
@@ -92,10 +92,16 @@ Transactional.prototype.build = async function (settings) {
 
   if (copy) {
     cc.push({ email: brand.contact.email, name: brand.name });
-    bcc.push(
-      { email: 'support@itwcreativeworks.com', name: 'ITW Creative Works' },
-      { email: 'parser+carboncopy@sendgrid-parser.itwcreativeworks.com', name: 'ITW Creative Works (Carbon Copy)' },
-    );
+
+    // Audit BCCs are per-brand config (brand.contact.carbonCopy). Unset = no audit
+    // copies; the framework never inserts its own addresses into a brand's mail.
+    for (const entry of powertools.arrayify(brand.contact.carbonCopy || [])) {
+      if (!entry?.email) {
+        throw errorWithCode('Each brand.contact.carbonCopy entry needs an email in config/omega.json5', 400);
+      }
+
+      bcc.push({ email: entry.email, name: entry.name || brand.company || brand.name });
+    }
   }
 
   ({ to, cc, bcc } = deduplicateRecipients(to, cc, bcc));
@@ -144,7 +150,11 @@ Transactional.prototype.build = async function (settings) {
     utm: settings.utm,
   };
   const contentHtml = prepare.renderContent(
-    { content: settings?.data?.content?.message, html: settings?.data?.content?.html },
+    {
+      content: settings?.data?.content?.message,
+      html: settings?.data?.content?.html,
+      trusted: settings.trustedContent,
+    },
     utmOptions,
   );
 
@@ -164,12 +174,14 @@ Transactional.prototype.build = async function (settings) {
     },
   });
 
-  // Process markdown in any remaining body fields that the caller set directly
-  const MarkdownIt = require('markdown-it');
-  const md = new MarkdownIt({ html: true, breaks: true, linkify: true });
-
+  // Process markdown in any remaining body fields that the caller set directly.
+  // Goes through renderContent so this render honors the same trust decision as the
+  // one above — a second html:true renderer here would reopen the escaped lane.
   if (templateData.content?.message && typeof templateData.content.message === 'string' && !templateData.content.message.startsWith('<')) {
-    templateData.content.message = tagLinks(md.render(templateData.content.message), utmOptions);
+    templateData.content.message = prepare.renderContent(
+      { content: templateData.content.message, trusted: settings.trustedContent },
+      utmOptions,
+    );
   }
 
   // Render through MJML template

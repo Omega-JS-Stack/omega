@@ -45,8 +45,11 @@ const config = {
     buildTime: '#build-time',
     buildTimeAgo: '#build-time-ago',
     buildEnvironment: '#build-environment',
+    buildVersion: '#build-version',
+    buildTheme: '#build-theme',
     buildPackages: '#build-packages',
     buildRepo: '#build-repo',
+    buildCommit: '#build-commit',
   },
   // Maps status levels to Bootstrap bg-* classes
   statusClasses: {
@@ -262,8 +265,11 @@ async function initializeBuildInfo() {
     const buildData = {
       timestamp: data.timestamp || null,
       environment: data.environment || (data.serving ? 'development' : 'production'),
+      version: data.version || null,
+      theme: data.theme || null,
       packages: data.packages || null,
       repo: data.repo || null,
+      commit: data.commit || null,
     };
 
     // Test older dates
@@ -286,8 +292,11 @@ function displayBuildInfo(data) {
   const $time = document.querySelector(config.selectors.buildTime);
   const $timeAgo = document.querySelector(config.selectors.buildTimeAgo);
   const $environment = document.querySelector(config.selectors.buildEnvironment);
+  const $version = document.querySelector(config.selectors.buildVersion);
+  const $theme = document.querySelector(config.selectors.buildTheme);
   const $packages = document.querySelector(config.selectors.buildPackages);
   const $repo = document.querySelector(config.selectors.buildRepo);
+  const $commit = document.querySelector(config.selectors.buildCommit);
 
   // Build time
   if ($time && data.timestamp) {
@@ -316,6 +325,16 @@ function displayBuildInfo(data) {
     $environment.innerHTML = `<span class="${envClass}">${omega.utilities().escapeHTML(envText)}</span>`;
   }
 
+  // Version
+  if ($version && data.version) {
+    $version.textContent = `v${data.version}`;
+  }
+
+  // Theme
+  if ($theme && data.theme) {
+    $theme.textContent = data.theme.charAt(0).toUpperCase() + data.theme.slice(1);
+  }
+
   // Packages
   if ($packages && data.packages) {
     const packageBadges = Object.entries(data.packages)
@@ -330,6 +349,14 @@ function displayBuildInfo(data) {
   if ($repo && data.repo) {
     const repoUrl = `https://github.com/${encodeURIComponent(data.repo.user)}/${encodeURIComponent(data.repo.name)}`;
     $repo.innerHTML = `<a href="${omega.utilities().escapeHTML(repoUrl)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${omega.utilities().escapeHTML(data.repo.user)}/${omega.utilities().escapeHTML(data.repo.name)}</a>`;
+  }
+
+  // Commit — the sha links into the repo when there is one to link into
+  if ($commit && data.commit) {
+    const sha = omega.utilities().escapeHTML(data.commit);
+    $commit.innerHTML = data.repo
+      ? `<a href="${omega.utilities().escapeHTML(`https://github.com/${encodeURIComponent(data.repo.user)}/${encodeURIComponent(data.repo.name)}/commit/${encodeURIComponent(data.commit)}`)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${sha}</a>`
+      : sha;
   }
 }
 
@@ -379,7 +406,7 @@ function updateTimeAgo($element, timestamp) {
   }
   parts.push(`${seconds}s`);
 
-  $element.textContent = '(' + parts.join(' ') + ' ago)';
+  $element.textContent = `(${parts.join(' ')} ago)`;
 }
 
 // Fetch status data from API (if configured)

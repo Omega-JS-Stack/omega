@@ -32,8 +32,10 @@ function build({ data }) {
 
   // Signoff
   const signoffGreeting = content.signoff || 'Best';
-  const signoffName = signoffData.name
-    || (signoffData.type === 'personal' ? 'Ian Wiedenman, CEO' : `The ${brandName} Team`);
+  // A personal signoff always arrives named — prepare.resolveSignoff() fills it from
+  // brand.contact.person and fails loudly when that is not configured, so there is no
+  // personal-identity fallback to make here.
+  const signoffName = signoffData.name || `The ${brandName} Team`;
 
   // Hidden tags
   const hiddenAsm = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;"><a href="<%asm_group_unsubscribe_raw_url%>">unsubscribe</a><a href="<%asm_preferences_raw_url%>">preferences</a></div>`;

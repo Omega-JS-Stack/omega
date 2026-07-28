@@ -54,8 +54,11 @@ $nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mi
   --omega-accent-ink: #{$nf-ink}; // ink-on-vermilion (the ramp's WCAG pick too)
   --omega-accent-ring: #{rgba($nf-vermilion, 0.35)};
   --omega-ok: #2e7d4f;
+  --omega-ok-rgb: 46, 125, 79;
   --omega-warn: #b45309; // true status amber — volt is a highlight, never a warning
+  --omega-warn-rgb: 180, 83, 9;
   --omega-danger: #c81e1e;
+  --omega-danger-rgb: 200, 30, 30;
   --omega-chart-2: #0f8fa9; // the CVD-validated teal (contract value)
   --omega-shadow-1: 0 1px 2px rgb(23 19 16 / 8%);
   --omega-shadow-2: #{$nf-shadow-pop};
@@ -84,8 +87,11 @@ $nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mi
   --omega-accent-ink: #{$nf-ink}; // still ink — the brightened accent stays a light fill
   --omega-accent-ring: #{rgba($nf-primary-dark-mode, 0.35)};
   --omega-ok: #3fbf83;
+  --omega-ok-rgb: 63, 191, 131;
   --omega-warn: #f5a524;
+  --omega-warn-rgb: 245, 165, 36;
   --omega-danger: #f0574d;
+  --omega-danger-rgb: 240, 87, 77;
   --omega-chart-2: #1f9fb4;
   --omega-shadow-1: 0 1px 2px rgb(0 0 0 / 35%);
   --omega-shadow-2: 0 18px 40px -18px rgb(0 0 0 / 80%); // pop barely reads on dark paper — deeper, tighter
@@ -159,6 +165,14 @@ $nf-primary-dark-mode: if($primary == $nf-vermilion, $nf-vermilion-dark-mode, mi
   // Lines — soft dividers by default; frames opt into full ink via --nf-border
   --bs-border-color: var(--omega-line);
   --bs-border-color-translucent: var(--omega-line);
+
+  // Status (#13) — one green/amber/red across utilities and token paint alike
+  --bs-success: var(--omega-ok);
+  --bs-success-rgb: var(--omega-ok-rgb);
+  --bs-warning: var(--omega-warn);
+  --bs-warning-rgb: var(--omega-warn-rgb);
+  --bs-danger: var(--omega-danger);
+  --bs-danger-rgb: var(--omega-danger-rgb);
 
   // Accent + links track the ramp (replaces the cp71 dark-block primary hack)
   --bs-primary: var(--omega-accent);

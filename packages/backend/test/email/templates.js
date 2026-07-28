@@ -10,10 +10,14 @@ const { resolveEmailTemplate: resolveTemplate } = require('../../src/manager/lib
 const TEST_BRAND = {
   id: 'testco',
   name: 'TestCo',
+  // Deliberately different from brand.name so the footer assertions prove the parent
+  // identity is read from config rather than defaulted.
+  company: 'TestCo Holdings Inc',
   url: 'https://testco.example',
   contact: { email: 'hello@testco.example' },
   images: {
     brandmark: 'https://cdn.example.com/brandmark-1024.png',
+    companyWordmark: 'https://cdn.example.com/company-wordmark.png',
   },
   address: {
     line1: '123 Main St',
@@ -86,7 +90,8 @@ module.exports = {
         assert.ok(result.html.includes('Test Title'), 'card: title renders');
         assert.ok(result.html.includes('Hello <strong>world</strong>'), 'card: HTML message preserved');
         assert.ok(result.html.includes('Sincerely'), 'card: team signoff renders');
-        assert.ok(result.html.includes('ITW Creative Works'), 'card: parent company renders');
+        assert.ok(result.html.includes('TestCo Holdings Inc'), 'card: configured parent company renders');
+        assert.ok(result.html.includes('company-wordmark.png'), 'card: configured company wordmark renders');
         assert.ok(result.html.includes('123 Main St'), 'card: address renders');
       },
     },

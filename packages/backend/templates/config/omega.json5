@@ -17,6 +17,12 @@
     url: 'https://example.com',
     contact: {
       email: 'support@example.com',
+      // Email identity — deliberately UNSET here so this defaults layer never supplies
+      // an identity a brand did not choose. Set them in your own config when needed:
+      //   person:     { name: 'Jane Doe, CEO', firstName: 'Jane', image, url, urlText }
+      //               required to send email with a "personal" signoff (the send throws without it)
+      //   carbonCopy: [{ email: 'audit@example.com', name: 'Audit' }]
+      //               audit BCCs added to transactional sends with copy: true
     },
     // Physical postal address — required by CAN-SPAM in commercial email footers.
     // Rendered in the newsletter footer + transactional email footers.

@@ -9,6 +9,7 @@
  */
 import manager from '@omega.js/client';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { loadCharts, barChart, stackedBarChart, doughnutChart, lineChart } from '@omega.js/web-charts';
 
 const CONFIGURATION = {
   environment: 'development',
@@ -47,10 +48,58 @@ function authState() {
   });
 }
 
+/**
+ * Draw one of each chart the framework's helper builds (#74) and report what
+ * actually landed on the canvas. Chart.js needs a real 2d context, so this is
+ * the only place the four builders can be proven — node has no canvas, and
+ * "the builder returned an object" is not the same claim as "a chart drew".
+ * Pixels are the claim: a canvas with nothing painted is fully transparent.
+ */
+async function drawCharts() {
+  const box = document.createElement('div');
+  box.id = 'chart-probe';
+  document.body.appendChild(box);
+
+  if (!await loadCharts()) {
+    return { loaded: false };
+  }
+
+  const labels = ['Mon', 'Tue', 'Wed'];
+  const values = [3, 7, 5];
+  const builders = {
+    bar: (id) => barChart(id, { labels, values, label: 'Signups' }),
+    stacked: (id) => stackedBarChart(id, { labels, series: [{ label: 'A', values }, { label: 'B', values: [1, 2, 3] }] }),
+    doughnut: (id) => doughnutChart(id, { labels, values, colors: ['var(--omega-ok)', 'var(--omega-warn)', 'var(--omega-danger)'] }),
+    line: (id) => lineChart(id, { labels, series: [{ label: 'A', values }] }),
+  };
+
+  const drew = {};
+  for (const [name, build] of Object.entries(builders)) {
+    const id = `chart-probe-${name}`;
+    const slot = document.createElement('div');
+    slot.style.cssText = 'position: relative; width: 400px; height: 200px;';
+    slot.innerHTML = `<canvas id="${id}"></canvas>`;
+    box.appendChild(slot);
+
+    const chart = build(id);
+    const canvas = document.getElementById(id);
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let painted = 0;
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] !== 0) painted++;
+    }
+
+    drew[name] = { built: Boolean(chart), painted };
+  }
+
+  return { loaded: true, drew };
+}
+
 window.__omega = {
   isReady: false,
   initError: null,
   manager,
+  drawCharts,
 
   // Signup is page-side in the real stack too: pages create the Firebase auth
   // user directly; @omega.js/backend's auth onCreate trigger then creates the Firestore doc.

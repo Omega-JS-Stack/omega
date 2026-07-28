@@ -16,7 +16,7 @@
 //                             (tolerant: unknown keys survive verbatim, so GitHub
 //                             Actions' `${{ secrets.X }}` passes through)
 //   merge      bool           JSON5 defaults-merge with the existing file
-//   mergeLines bool           OMEGA marker-section line merge (.env/.gitignore/CLAUDE.md)
+//   mergeLines bool           OMEGA marker-section line merge (.env/.gitignore/AGENTS.md)
 //   retire     bool           brand-context per-app doc retirement: NEVER scaffold
 //                             the file; an existing framework-owned-only copy is
 //                             DELETED (one-time heal — the brand root is the doc
