@@ -6,8 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.0.2] (2026-07-27)
+
 ### Fixed
-- [#77](https://github.com/Omega-JS-Stack/omega/issues/77) — The plugin's `.mcp.json` launches the router from the checkout via `${CLAUDE_PLUGIN_ROOT}` — the npx form never resolved (private, unpublished package). A bare marketplace clone needs no install step: the bin installs its own dependencies on first launch, and the `omega-extension` launcher falls back to the sibling manager package.
+- [#77](https://github.com/Omega-JS-Stack/omega/issues/77) [`a747bda8`](../../commit/a747bda8) Thanks [@ianwieds]! — The plugin's `.mcp.json` launches the router from the checkout via `${CLAUDE_PLUGIN_ROOT}` — the npx form never resolved (private, unpublished package). A bare marketplace clone needs no install step: the bin installs its own dependencies on first launch, and the `omega-extension` launcher falls back to the sibling manager package.
 
 ## [0.0.1] (2026-07-27)
 
