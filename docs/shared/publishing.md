@@ -45,7 +45,7 @@ Registry-real internal ranges (everything else is workspace `*`): `@omega.js/cli
 5. **Brand proof**: brand `npm start` (manage cycle) + a website build — the brand
    now runs on registry packages; CI-dispatch web deploys become buildable (the
    deploy guard stops refusing once no `file:` specs remain).
-6. Record: CHANGELOG entry + PROGRESS collapse; re-latch nothing — published is the
+6. Record: CHANGELOG entry + close the tracking issue; re-latch nothing — published is the
    new normal, versions move by changesets from here.
 
 ## After the first publish

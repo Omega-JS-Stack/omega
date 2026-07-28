@@ -10,8 +10,6 @@
     "docs/",
     "templates/",
     "test/",
-    "CLAUDE.md",
-    "AGENTS.md",
     "cli.js"
   ],
   "bin": {

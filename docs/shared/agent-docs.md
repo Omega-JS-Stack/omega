@@ -24,7 +24,7 @@ brand/AGENTS.md   line 1:  @node_modules/@omega.js/AGENTS.md  (the top-level ome
 
 | State found | Action |
 |---|---|
-| No `AGENTS.md` | Created: import + marker + brand-notes skeleton |
+| No `AGENTS.md` | Created: import + brand-notes skeleton |
 | Import present at line 1 (right depth) | No-op |
 | Import missing / not first / stale depth | Healed: resolved import moved to line 1, duplicates removed, consumer content preserved verbatim |
 | No `CLAUDE.md` | Created as the one-line `@AGENTS.md` pointer |
@@ -37,6 +37,7 @@ Pinned by `packages/manager/test/agents-md.test.js` (no package agent docs + fil
 No `packages/<pkg>/` has an `AGENTS.md` or `CLAUDE.md` — deleted outright, no exceptions. Monorepo sessions get the map from the parent walk; consumer brands get it through the maintained scope symlink; a standalone package install has no resolvable chain anyway; the publish era generates whatever a shipped package needs ([#64](https://github.com/Omega-JS-Stack/omega/issues/64)).
 
 ## The one deliberate gap
+
 - **`apps/sandbox-brand` carries NO agent-docs chain.** It is a synthetic fixture the automated corpus/e2e runs mangle and reset — nothing durable lives there, so nothing agent-facing is written there.
 
 ## Editing the guide

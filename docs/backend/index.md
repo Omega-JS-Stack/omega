@@ -47,7 +47,7 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 2. `npm run prepare` — build once: copies `src/` → `dist/` via prepare-package
 3. `npm run prepare:watch` — watch mode
 4. `npm test` — run framework tests via the bundled fixture project (equivalent to `node bin/omega-backend test`). Accepts the same target syntax: `npm test -- mgr:helpers/content/blog-auto-publisher`. Bare = the fast `boot/` smoke; the FULL framework suite passes against the fixture too — `npm test -- backend:` (the fixture carries corpus-parity payment config and boot-syncs the canonical rules; see [docs/test-boot-layer.md](../../packages/backend/docs/test-boot-layer.md))
-5. Test in the **designated test consumer** — `../ultimate-jekyll-backend` is @omega.js/backend's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: emulator, tests, deploy paths). From inside it, run `npx omega install dev` to swap @omega.js/backend to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/backend`). Reverse with `npx omega install live`. If `npx omega` then errors with "could not determine executable to run", the local install skipped bin-linking — re-run `npm install` to relink, or call `node node_modules/@omega.js/backend/bin/omega-backend <cmd>` directly.
+5. Test in the **designated test consumer** — `../../ITW-Creative-Works/ultimate-jekyll-backend` is @omega.js/backend's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: emulator, tests, deploy paths). From inside it, run `npx omega install dev` to swap @omega.js/backend to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/backend`). Reverse with `npx omega install live`. If `npx omega` then errors with "could not determine executable to run", the local install skipped bin-linking — re-run `npm install` to relink, or call `node node_modules/@omega.js/backend/bin/omega-backend <cmd>` directly.
 
 ## Architecture
 
@@ -135,7 +135,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`; web's lives at `scaffold/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 

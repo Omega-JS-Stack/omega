@@ -47,7 +47,7 @@ To load the unpacked extension in Chrome: point chrome://extensions → "Load un
 
 1. `npm install`
 2. `npm start` — watch + compile `src/` → `dist/` via prepare-package
-3. Test in the **designated test consumer** — `../powertools-browser-extension` is @omega.js/extension's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From inside it, run `npx omega install dev` to swap @omega.js/extension to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/extension`). Reverse with `npx omega install live`.
+3. Test in the **designated test consumer** — `../../ITW-Creative-Works/powertools-browser-extension` is @omega.js/extension's consumer for validating framework changes end-to-end (exercise any consumer-level flow there freely: builds, tests, packaging, runtime). From inside it, run `npx omega install dev` to swap @omega.js/extension to this local repo — required whenever you edit the framework source and want the consumer to pick up the changes (the consumer otherwise keeps its installed `node_modules/@omega.js/extension`). Reverse with `npx omega install live`.
 4. `npm test` — runs the framework's own suites
 
 ## Architecture
@@ -236,7 +236,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`; web's lives at `scaffold/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 

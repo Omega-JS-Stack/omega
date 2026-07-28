@@ -11,7 +11,7 @@ Every check has a stable ID, a severity, and a scope. Findings are reported as `
 3. **Persist the report** — write the findings list to `.temp/audit/claude-audit.md` (create the dir; add `.temp/` to `.gitignore` if missing) so a long fix loop survives session breaks. Summarize counts by severity in chat.
 4. **Fix loop** — TodoWrite per finding, highest severity first, ONE at a time: mark in-progress → root cause → fix → verify → complete. Ask before structural or destructive fixes (file deletions, lib restructures, config reshapes).
 5. **Re-verify** — re-run every check that produced findings until clean; finish with `npx omega test` (must be green).
-6. **Doc parity** — if fixes changed behavior, update README / CLAUDE.md / `docs/<topic>.md` / CHANGELOG in the same change set.
+6. **Doc parity** — if fixes changed behavior, update README / the framework guide / `docs/<topic>.md` / CHANGELOG in the same change set.
 
 Severity: **CRIT** security or broken functionality · **HIGH** hard-rule violation · **MED** convention drift · **LOW** optional improvement.
 Scope: **C** consumer · **F** framework repo · **B** both.
@@ -31,9 +31,9 @@ Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / @omeg
 | U-07 | HIGH | B | Config canon — `config/omega.json5` validates against the schema (boot validator green); canonical cross-framework blocks (`brand`, `app`, `cloud.{provider,config}`, `monitoring`, `analytics`, `payment`) not reinvented ([config-schema.md](config-schema.md)) |
 | U-08 | CRIT | B | No private credentials committed — signing certs (`config/certs/` gitignored), `.env` secrets, tokens, API secret keys ([signing.md](signing.md)). (The Firebase WEB `apiKey` is public by design — do NOT flag it.) |
 | U-09 | HIGH | B | Source discipline — nothing edited in `dist/` or generated files (`dist/electron-builder.yml`, entitlements plist); no live code referencing `_legacy/` / `_backup/` ([build-system.md](build-system.md), [common-mistakes.md](common-mistakes.md)) |
-| U-10 | MED | B | Doc parity — README / CLAUDE.md / `docs/` / CHANGELOG match shipped behavior; CLAUDE.md < 250 lines; the docs index lists every `docs/*.md`; no stale names for renamed commands/patterns |
+| U-10 | MED | B | Doc parity — README / the framework guide / `docs/` / CHANGELOG match shipped behavior; the docs index lists every `docs/*.md`; no stale names for renamed commands/patterns |
 | U-11 | MED | B | SSOT/DRY — no duplicated constants/config/logic; one authoritative home per value, imported everywhere else |
-| U-12 | MED | B | JS conventions — file structure, JSDoc, short-circuit returns, leading logical operators, `fs-jetpack`, one `module.exports` per file (global `js:patterns` skill + [CLAUDE.md](../CLAUDE.md) §File Conventions) |
+| U-12 | MED | B | JS conventions — file structure, JSDoc, short-circuit returns, leading logical operators, `fs-jetpack`, one `module.exports` per file (global `js:patterns` skill + [the framework guide](../../../docs/desktop/index.md) §File Conventions) |
 | U-13 | MED | B | Dead code & stale patterns — no orphaned `src/` files nothing imports; no unused views/components/integrations; inventory TODO/FIXME (report only) |
 | U-14 | LOW | B | Dependency health — review `npm outdated` / `npm audit`; apply fixes via the `general:update-packages` workflow (includes supply-chain checks) |
 
@@ -41,7 +41,7 @@ Mirrored across all four OMEGA frameworks (UJM / @omega.js/backend / BXM / @omeg
 
 | ID | Sev | Scope | Check |
 |----|-----|-------|-------|
-| DSK-01 | CRIT | B | Zero-trust URLs — every DYNAMIC URL is gated through `sanitize-url.js` before `shell.openExternal` / `BrowserWindow.loadURL` / `window.location.href =` (hardcoded internal-scheme URLs bypass) ([CLAUDE.md](../CLAUDE.md) §File Conventions, [common-mistakes.md](common-mistakes.md)) |
+| DSK-01 | CRIT | B | Zero-trust URLs — every DYNAMIC URL is gated through `sanitize-url.js` before `shell.openExternal` / `BrowserWindow.loadURL` / `window.location.href =` (hardcoded internal-scheme URLs bypass) ([the framework guide](../../../docs/desktop/index.md) §File Conventions, [common-mistakes.md](common-mistakes.md)) |
 | DSK-02 | HIGH | B | Path resolution — `app.getAppPath()` / `utils/app-root.js`, never `process.cwd()`, in runtime code (it's `/` in packaged apps) ([common-mistakes.md](common-mistakes.md)) |
 | DSK-03 | HIGH | C | Windows — every `windows.create()` is `await`ed; the `main` window is ALWAYS created (even hidden launches, with `show: false`) so activate/second-instance can surface UI ([windows.md](windows.md), [common-mistakes.md](common-mistakes.md)) |
 | DSK-04 | HIGH | B | Zero-trust IPC — all channels go through `manager.ipc` (never raw `ipcMain`); handlers validate payload content before acting, especially in apps embedding remote web content ([ipc.md](ipc.md#zero-trust-payloads)) |
@@ -56,9 +56,9 @@ Only when auditing the @omega.js/desktop repo itself. Mirrored across the four f
 
 | ID | Sev | Check |
 |----|-----|-------|
-| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, CLAUDE.md skeleton, shared env/test conventions) in sync with UJM / @omega.js/backend / BXM; deviations are deliberate and documented |
+| F-01 | MED | Sister parity — mirrored sections (config shapes, test contract, guide skeleton, shared env/test conventions) in sync with UJM / @omega.js/backend / BXM; deviations are deliberate and documented |
 | F-02 | HIGH | Consumer-shipped defaults in sync — what `npx omega setup` scaffolds (`src/defaults/`) matches current conventions and docs |
-| F-03 | MED | Docs completeness — every `docs/*.md` indexed in CLAUDE.md; every lib module has a doc; no "(planned)" links for things that have shipped |
+| F-03 | MED | Docs completeness — every `docs/*.md` indexed in the framework guide; every lib module has a doc; no "(planned)" links for things that have shipped |
 | F-04 | HIGH | `npx omega test mgr:` green before treating the audit as complete |
 
 ## See also

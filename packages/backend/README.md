@@ -379,7 +379,7 @@ Built-in marketing system with multi-provider support (SendGrid + Beehiiv + FCM 
 - **Contact pruning** — monthly 2-stage re-engagement + deletion of inactive contacts
 - **Template variables** — `{brand.name}`, `{holiday.name}`, `{season.name}`, `{date.*}` resolved at send time
 
-Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See AGENTS.md for full documentation.
+Configure via the `marketing` section under `targets.backend` in `config/omega.json5`. See [docs/marketing-campaigns.md](docs/marketing-campaigns.md) and [docs/marketing-fields.md](docs/marketing-fields.md) for full documentation.
 
 ## Marketing Consent
 
@@ -901,7 +901,7 @@ module.exports = {
 
 **Auth levels:** `none`, `user`/`basic`, `admin`, `premium-active`, `premium-expired`
 
-See `AGENTS.md` for complete test API documentation.
+See [docs/test-framework.md](docs/test-framework.md) for complete test API documentation.
 
 ## Subscription System
 

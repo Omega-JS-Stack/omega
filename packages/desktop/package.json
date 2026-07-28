@@ -45,9 +45,7 @@
     "bin/",
     "dist/",
     "docs/",
-    "scripts/",
-    "CLAUDE.md",
-    "AGENTS.md"
+    "scripts/"
   ],
   "preparePackage": {
     "input": "./src",

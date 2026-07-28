@@ -180,7 +180,7 @@ All `npm install` calls in @omega.js/extension CLI commands (`npx omega setup`, 
 
 ## 📚 Documentation
 
-In-depth docs for every subsystem live in [docs/](docs/). See [AGENTS.md](AGENTS.md) for the architecture overview + table of contents.
+In-depth docs for every subsystem live in [docs/](docs/); the architecture overview is the framework guide, `docs/extension/index.md` in the omega monorepo.
 
 ## 🧰 Sister projects
 
