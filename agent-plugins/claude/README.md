@@ -25,6 +25,7 @@ A marketplace added from a local path is read in place — nothing is cloned, so
 agent-plugins/
 └── claude/
     ├── .claude-plugin/plugin.json   the manifest
+    ├── .mcp.json                    the one MCP declaration — the @omega.js/mcp-router endpoint
     ├── README.md                    this file
     ├── hooks/                       hooks.json + the inject hook that loads a skill
     └── skills/                      the skills, one directory each (see skills/README.md)
@@ -54,6 +55,6 @@ Each skill is asked for once per session (a marker file under `TMPDIR`, keyed on
 
 ## What is here, and what is not built yet
 
-Seven skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives) plus one router per package a session works in: `web`, `backend`, `desktop`, `extension`, `client`, `manager`. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
+Eight skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), and `browser` (driving the MCP router's Chrome upstreams). Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
 
 **The staleness mechanism.** This is the point of the move, not a bonus. Whatever ships needs something that fails when a skill names an export, a path, a config key, or a CLI command the code no longer has. A test in this repo is the strongest form; a generated section is next; a review trigger tied to a release is the floor. A plugin that goes stale quietly has only relocated the problem.

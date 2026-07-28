@@ -22,6 +22,7 @@ The `@omega.js` framework ecosystem lives in ONE monorepo: npm workspaces under 
 | `@omega.js/config` | — | `docs/shared/config.md` |
 | `@omega.js/account` | — | `packages/account/src` |
 | `@omega.js/template-kit` | — | `docs/web/template-kit.md` |
+| `@omega.js/mcp-router` | `omega:browser` | `docs/mcp-router/index.md` |
 
 Every framework ships the same context-aware `omega` / `omg` / `mgr` dispatcher: the nearest `package.json` walking up from cwd names the framework whose CLI runs.
 

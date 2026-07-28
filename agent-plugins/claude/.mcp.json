@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-router": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@omega.js/mcp-router"]
+    }
+  }
+}

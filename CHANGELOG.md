@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#75](https://github.com/Omega-JS-Stack/omega/issues/75) — @omega.js/mcp-router: one lazy stdio MCP endpoint proxying four bundled browser/extension upstreams, layered over a `~/.omega/mcp-router/` overlay, declared once by the plugin's .mcp.json and documented by the new `omega:browser` skill.
 - [#61](https://github.com/Omega-JS-Stack/omega/issues/61) — The plugin staleness gate: scripts/skill-claims.test.js extracts every claim a skill makes (repo paths, consumer node_modules paths, omega: skill references, @omega.js package names, CLI verbs) and fails the battery when the repo no longer has it.
 - [#72](https://github.com/Omega-JS-Stack/omega/issues/72) — The web framework owns dataviz and the affordances around it: a chart helper with Chart.js lazily code-split (consumers never name the library), an org-chart component with animated connectors and a reduced-motion carve-out, the `--omega-chart-1…6` categorical ramp, and `.omega-tone-*` / `.omega-badge-tone` / `.omega-interactive` shared-core utilities.
 - [#71](https://github.com/Omega-JS-Stack/omega/issues/71) — @omega.js/client ships live-page primitives (`modules/live-page.js`): write-on-change `swap`, first-paint `loading`, and a declared-feed poller with keep-last-good-on-failure — the fetcher is an argument, never the singleton.

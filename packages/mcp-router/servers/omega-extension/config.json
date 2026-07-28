@@ -1,0 +1,506 @@
+{
+  "enabled": true,
+  "default": "auto",
+  "command": "node",
+  "args": [
+    "${MCP_ROUTER_ROOT}/src/launch-omega-extension.js"
+  ],
+  "tools": [
+    {
+      "name": "screenshot",
+      "description": "Capture a screenshot of the current page. Returns a base64-encoded image that Claude can view directly.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg",
+              "webp"
+            ],
+            "description": "Image format. Default: png"
+          },
+          "quality": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Compression quality for jpeg/webp (0-100). Default: 80"
+          },
+          "fullPage": {
+            "type": "boolean",
+            "description": "Capture the full scrollable page instead of just the viewport"
+          },
+          "selector": {
+            "type": "string",
+            "description": "CSS selector of an element to capture. Overrides fullPage"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target. Omit for active tab",
+            "properties": {
+              "tabId": {
+                "type": "number",
+                "description": "Exact tab ID"
+              },
+              "url": {
+                "type": "string",
+                "description": "Find tab by URL (prefix match)"
+              },
+              "create": {
+                "type": "boolean",
+                "description": "Create new tab if URL not found"
+              }
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "click",
+      "description": "Click an element by CSS selector or coordinates. Generates trusted mouse events (isTrusted === true).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "description": "CSS selector of the element to click"
+          },
+          "x": {
+            "type": "number",
+            "description": "X coordinate (use instead of selector)"
+          },
+          "y": {
+            "type": "number",
+            "description": "Y coordinate (use instead of selector)"
+          },
+          "button": {
+            "type": "string",
+            "enum": [
+              "left",
+              "middle",
+              "right"
+            ],
+            "description": "Mouse button. Default: left"
+          },
+          "count": {
+            "type": "number",
+            "description": "Click count (2 for double-click). Default: 1"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Max ms to wait for selector. Default: 10000"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target. Omit for active tab",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "type",
+      "description": "Type text using trusted keyboard events. Can focus an element by selector first, optionally clear existing content.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to type. Special keys: Enter, Tab, Escape, Backspace, Delete, ArrowUp/Down/Left/Right, Home, End"
+          },
+          "selector": {
+            "type": "string",
+            "description": "CSS selector to click/focus before typing"
+          },
+          "delay": {
+            "type": "number",
+            "description": "Delay in ms between keystrokes. Default: 0"
+          },
+          "clear": {
+            "type": "boolean",
+            "description": "Clear existing content before typing (Ctrl+A + Backspace)"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Max ms to wait for selector. Default: 10000"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "navigate",
+      "description": "Navigate a tab to a URL and wait for the page to fully load.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL to navigate to"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Max ms to wait for page load. Default: 30000"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "read",
+      "description": "Read content from the page — text, HTML, attributes, properties, or arbitrary JS expressions. Use this to understand what is on the page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "description": "CSS selector to read from"
+          },
+          "expression": {
+            "type": "string",
+            "description": "Raw JS expression to evaluate (alternative to selector)"
+          },
+          "attribute": {
+            "type": "string",
+            "description": "Read a specific attribute (e.g. \"href\", \"src\")"
+          },
+          "property": {
+            "type": "string",
+            "description": "Read a specific DOM property (e.g. \"value\", \"checked\")"
+          },
+          "all": {
+            "type": "boolean",
+            "description": "Read all matching elements (returns array)"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "wait",
+      "description": "Wait for an element to appear/disappear, a JS condition to be truthy, or a fixed delay.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "description": "CSS selector to wait for"
+          },
+          "condition": {
+            "type": "string",
+            "description": "JS expression to wait to be truthy"
+          },
+          "delay": {
+            "type": "number",
+            "description": "Fixed delay in ms"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Max ms to wait. Default: 10000"
+          },
+          "visible": {
+            "type": "boolean",
+            "description": "Wait for element to be visible (not just in DOM)"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Wait for element to disappear"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "scroll",
+      "description": "Scroll the page to an element, coordinates, or direction (up/down/left/right).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "description": "CSS selector to scroll into view"
+          },
+          "x": {
+            "type": "number",
+            "description": "Scroll to X coordinate"
+          },
+          "y": {
+            "type": "number",
+            "description": "Scroll to Y coordinate"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "left",
+              "right"
+            ],
+            "description": "Scroll direction"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Scroll amount in pixels for direction. Default: 300"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "evaluate",
+      "description": "Run arbitrary JavaScript in the page context. Use for complex interactions or reading data not accessible via the read command.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "JavaScript expression to evaluate"
+          },
+          "returnByValue": {
+            "type": "boolean",
+            "description": "Return result by value (default: true). Set false for non-serializable results"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "mouse",
+      "description": "Move the mouse to coordinates with optional smooth interpolation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "description": "Target X coordinate"
+          },
+          "y": {
+            "type": "number",
+            "description": "Target Y coordinate"
+          },
+          "steps": {
+            "type": "number",
+            "description": "Number of intermediate steps for smooth movement. Default: 1"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "session",
+      "description": "Manage debugger sessions. Actions: \"list\" (show attached sessions), \"attach\" (attach to a tab), \"detach\" (detach from a tab or all).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "list",
+              "attach",
+              "detach"
+            ],
+            "description": "Session action"
+          },
+          "target": {
+            "type": "object",
+            "description": "Which tab to target (for attach/detach)",
+            "properties": {
+              "tabId": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "create": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "tabs",
+      "description": "List open browser tabs. Use this to see what tabs are available before interacting with them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Filter by URL pattern (e.g. \"https://example.com/*\")"
+          },
+          "title": {
+            "type": "string",
+            "description": "Filter by title pattern"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Filter to only active tabs"
+          },
+          "currentWindow": {
+            "type": "boolean",
+            "description": "Filter to current window only"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true
+      }
+    }
+  ]
+}

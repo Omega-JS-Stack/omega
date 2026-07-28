@@ -77,6 +77,16 @@ test('skills: each one is bare-named, matches its directory, and describes itsel
   }
 });
 
+test('mcp: the plugin declares exactly one MCP server — the router', () => {
+  const mcp = readJson(path.join(ROOT, 'agent-plugins', 'claude', '.mcp.json'));
+  assert.deepEqual(Object.keys(mcp.mcpServers), ['mcp-router']);
+  assert.deepEqual(mcp.mcpServers['mcp-router'], {
+    type: 'stdio',
+    command: 'npx',
+    args: ['-y', '@omega.js/mcp-router'],
+  });
+});
+
 // --- the inject hook ---
 
 // A project fixture: a directory with its own .git, so the hook's walk up to
