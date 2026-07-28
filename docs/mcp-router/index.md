@@ -74,13 +74,21 @@ Secrets live in `~/.omega/mcp-router/.env` and reach a command as `${NAME}`. Onl
 
 Two seams exist for tests and power users: `MCP_ROUTER_SERVERS_DIR` (overlay servers dir) and `MCP_ROUTER_ENV_FILE` (the `.env`).
 
+## Where the router comes from
+
+Brands and the router are two delivery channels that never touch. A brand's `npm install` puts the @omega.js packages in that brand's node_modules to run its own apps — ten brands means ten copies at ten versions, and none of them is ever consulted for the router. The router always launches from the ONE checkout the Claude plugin ships in, because the plugin is installed at the user level: every session on the machine gets it, in any directory, omega project or not. Each session spawns its own router process from that one engine, reads the bundled defaults beside it, layers the user's `~/.omega/mcp-router/` overlay on top, and serves the merged list to that session alone. Even the `omega-extension` upstream resolves the manager package from where the router sits — never from whatever project is the current directory.
+
 ## Plugin wiring
 
 The omega Claude plugin declares **exactly one** MCP server, in [agent-plugins/claude/.mcp.json](../../agent-plugins/claude/.mcp.json):
 
 ```json
-{ "mcpServers": { "mcp-router": { "type": "stdio", "command": "npx", "args": ["-y", "@omega.js/mcp-router"] } } }
+{ "mcpServers": { "mcp-router": { "type": "stdio", "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/../../packages/mcp-router/bin/mcp-router.js"] } } }
 ```
+
+`${CLAUDE_PLUGIN_ROOT}` is substituted by Claude Code with the plugin's own directory, so the entry launches the router straight from the checkout the plugin is installed from — no registry involved, works while the package is private.
+
+A marketplace clone arrives without node_modules, so the router's bin self-bootstraps: when its dependencies do not resolve, it runs one `npm install` in its own package root before starting (stderr-only — stdout is the MCP wire), and every later launch is a silent no-op. Nobody installing the plugin runs an install step, and a dev editing the checkout sees changes on the next session start with no publish.
 
 There are no other native MCP declarations anywhere in the plugin — anything else a user wants is an overlay entry. The usage pattern (session-owned Chrome, the safety rule about never quitting Chrome by app name, the electron and extension upstreams) is the plugin's `omega:browser` skill, [agent-plugins/claude/skills/browser/SKILL.md](../../agent-plugins/claude/skills/browser/SKILL.md).
 
@@ -90,5 +98,5 @@ There are no other native MCP declarations anywhere in the plugin — anything e
 
 ## Noted gaps
 
-- **`npx -y @omega.js/mcp-router` does not resolve from the public registry yet.** The package is latched private with the rest of the publishables, so in the local era the plugin's `.mcp.json` resolves it from the workspace/local link. It starts working off the registry when the publish checkpoint unlatches ([docs/shared/publishing.md](../shared/publishing.md)).
-- **The `omega-extension` launcher needs the manager's `extension/` tree on disk.** True in the local era, where `node_modules/@omega.js/manager` symlinks into this monorepo. Whether the published manager tarball carries `extension/` is a packaging decision gated with the publish checkpoint; until then the upstream fails loudly, naming the file it expected.
+- **`npx -y @omega.js/mcp-router` does not resolve from the public registry yet.** The package is latched private with the rest of the publishables, which is why the plugin's `.mcp.json` launches from the checkout via `${CLAUDE_PLUGIN_ROOT}` instead of npx (an npx entry 404s from any project cwd — Omega-JS-Stack/omega#77). Whether the entry ever moves to npx is a call for the publish checkpoint ([docs/shared/publishing.md](../shared/publishing.md)).
+- **The `omega-extension` launcher needs the manager's `extension/` tree on disk.** Covered in every checkout: `require.resolve` finds an installed manager, and when there is none the launcher falls back to the sibling `packages/manager` in this monorepo, passing this package's node_modules via `NODE_PATH` so the server's imports (the MCP SDK, `ws`) resolve without a manager install. Whether the published manager tarball carries `extension/` stays a packaging decision gated with the publish checkpoint; a tree missing the server still fails loudly, naming the file it expected.

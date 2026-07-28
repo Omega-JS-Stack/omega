@@ -6,6 +6,8 @@ An MCP client that declares five servers pays for five: every one is launched, e
 
 Tools surface to the client as `<upstream>__<tool>` — inside Claude Code that reads `mcp__mcp-router__chrome-devtools__click`.
 
+The omega Claude plugin launches the router straight from the monorepo checkout it ships in, and on a bare clone the bin installs its own dependencies on first launch — no install step for a user, no publish for a dev editing the checkout.
+
 ## What ships with it
 
 Four defaults, ready on install day:

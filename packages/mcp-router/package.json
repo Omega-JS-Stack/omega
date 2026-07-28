@@ -1,7 +1,7 @@
 {
   "name": "@omega.js/mcp-router",
   "version": "0.1.0",
-  "description": "One lazy MCP endpoint for every OMEGA session — a stdio server that proxies many upstream MCP servers and surfaces each upstream's tools only once it is activated",
+  "description": "One lazy MCP endpoint for every OMEGA session \u2014 a stdio server that proxies many upstream MCP servers and surfaces each upstream's tools only once it is activated",
   "private": true,
   "main": "./src/router.js",
   "bin": {
@@ -18,7 +18,8 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.21.0"
   },
   "engines": {
     "node": ">=22"

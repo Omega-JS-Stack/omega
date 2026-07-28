@@ -82,9 +82,17 @@ test('mcp: the plugin declares exactly one MCP server — the router', () => {
   assert.deepEqual(Object.keys(mcp.mcpServers), ['mcp-router']);
   assert.deepEqual(mcp.mcpServers['mcp-router'], {
     type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@omega.js/mcp-router'],
+    command: 'node',
+    args: ['${CLAUDE_PLUGIN_ROOT}/../../packages/mcp-router/bin/mcp-router.js'],
   });
+});
+
+test('mcp: the router entry resolves to a real file from the plugin root', () => {
+  const mcp = readJson(path.join(ROOT, 'agent-plugins', 'claude', '.mcp.json'));
+  const pluginRoot = path.join(ROOT, 'agent-plugins', 'claude');
+  const resolved = mcp.mcpServers['mcp-router'].args[0]
+    .replace('${CLAUDE_PLUGIN_ROOT}', pluginRoot);
+  assert.ok(fs.existsSync(path.resolve(resolved)), `no file at ${resolved}`);
 });
 
 // --- the inject hook ---

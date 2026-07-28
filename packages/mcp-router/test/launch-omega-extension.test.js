@@ -46,8 +46,21 @@ test('this monorepo resolves a real extension MCP server on disk', () => {
   assert.match(resolved.server, /manager[/\\]extension[/\\]mcp-server[/\\]index\.js$/);
 });
 
-test('an uninstalled manager fails loudly, naming the package', () => {
-  const resolved = resolveServerPath({ resolve: () => { throw new Error('Cannot find module'); } });
+test('an unresolvable manager falls back to the monorepo sibling package', () => {
+  const seen = [];
+  const root = resolveManagerRoot({
+    resolve: () => { throw new Error('Cannot find module'); },
+    exists: (file) => { seen.push(file); return true; },
+  });
+  assert.match(root, /packages[/\\]manager$/);
+  assert.deepEqual(seen, [path.join(root, 'package.json')]);
+});
+
+test('an uninstalled manager with no sibling fails loudly, naming the package', () => {
+  const resolved = resolveServerPath({
+    resolve: () => { throw new Error('Cannot find module'); },
+    exists: () => false,
+  });
   assert.match(resolved.error, /@omega\.js\/manager is not installed/);
 });
 
@@ -69,11 +82,14 @@ test('main runs the resolved server on this node and forwards its exit code', ()
       return { on: (event, handler) => { if (event === 'exit') handler(0, null); } };
     },
   });
-  assert.deepEqual(calls, [{
-    command: '/usr/bin/node',
-    args: [path.join('/pkgs/manager', 'extension', 'mcp-server', 'index.js')],
-    options: { stdio: 'inherit' },
-  }]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, '/usr/bin/node');
+  assert.deepEqual(calls[0].args, [path.join('/pkgs/manager', 'extension', 'mcp-server', 'index.js')]);
+  assert.equal(calls[0].options.stdio, 'inherit');
+  // The server's imports (the MCP SDK, ws) resolve through this package's
+  // node_modules when the manager tree has none of its own.
+  assert.ok(calls[0].options.env.NODE_PATH.split(path.delimiter)
+    .some((entry) => /mcp-router[/\\]node_modules$/.test(entry)));
   assert.deepEqual(exits, [0]);
 });
 

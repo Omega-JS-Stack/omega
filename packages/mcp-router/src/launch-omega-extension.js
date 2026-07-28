@@ -26,11 +26,15 @@ const SERVER_RELATIVE = path.join('extension', 'mcp-server', 'index.js');
  */
 function resolveManagerRoot(options = {}) {
   const resolve = options.resolve || require.resolve;
+  const exists = options.exists || fs.existsSync;
   try {
     // main is dist/index.js — two dirnames up from it is the package root.
     return path.dirname(path.dirname(resolve(MANAGER_PACKAGE)));
   } catch {
-    return null;
+    // A bare checkout has no workspace links, but the manager package sits
+    // beside this one in the monorepo.
+    const sibling = path.join(__dirname, '..', '..', 'manager');
+    return exists(path.join(sibling, 'package.json')) ? sibling : null;
   }
 }
 
@@ -66,7 +70,17 @@ function main(options = {}) {
     return exit(1);
   }
 
-  const child = spawnFn(options.execPath || process.execPath, [resolved.server], { stdio: 'inherit' });
+  // NODE_PATH carries this package's node_modules to the server: in a bare
+  // checkout the manager tree has none of its own, and the server's imports
+  // (the MCP SDK, ws) are declared here for exactly this launch. Ancestor
+  // node_modules still win wherever the monorepo is installed.
+  const nodePath = [path.join(__dirname, '..', 'node_modules'), process.env.NODE_PATH]
+    .filter(Boolean)
+    .join(path.delimiter);
+  const child = spawnFn(options.execPath || process.execPath, [resolved.server], {
+    stdio: 'inherit',
+    env: { ...process.env, NODE_PATH: nodePath },
+  });
   child.on('exit', (code, signal) => exit(signal ? 1 : code ?? 0));
   return undefined;
 }
