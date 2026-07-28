@@ -9,7 +9,8 @@
    `--omega-*` custom-property contract: neutrals (`ground`, `surface`,
    `surface-2`, `ink`, `ink-muted`, `ink-faint`, `line`, `line-strong`), the
    accent family (`accent`, `-hover`, `-active`, `-subtle`, `-ink`, `-ring`),
-   status (`ok`/`warn`/`danger`), the categorical ramp (`chart-1`…`chart-6` —
+   status (`ok`/`warn`/`danger`), the affirmation check (`check` — rides the
+   accent; see below), the categorical ramp (`chart-1`…`chart-6` —
    series-1 rides the accent, the rest are CVD-validated muted hues, cool half
    before warm), shadows
    (`shadow-1`/`shadow-2`), shape (`radius-xs/s/m/l/xl`), motion (`speed`,
@@ -171,6 +172,13 @@ inherits them:
   surfaces: a chart series and the badge naming the same thing are the same
   color. Which name falls in which slot is the page's business. The sheet
   loads after the theme forward, so it outranks a theme's own chip rules.
+- **`.omega-check`** (`core/css/core/_utilities.scss`): the ONE ink for every
+  affirmation tick — plan features, benefit lists, hero meta, comparison
+  "yes" cells. It reads `--omega-check`, which rides `--omega-accent` (blue by
+  default), so the check follows the brand ramp and dark mode everywhere at
+  once. The class goes on the icon OR its wrapper; a call site NEVER re-colors
+  a check (#11). Status green (`--omega-ok`) stays for state feedback — an
+  affirmation is not a status.
 - **`.omega-interactive`** (`core/css/motion/_index.scss`): the whole-surface
   click affordance — the surface warms on hover AND `:focus-visible`, an
   accent ring on focus, an accent-subtle tint on press. `--lift` adds the

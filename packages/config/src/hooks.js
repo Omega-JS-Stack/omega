@@ -29,7 +29,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { readCompanyRoot } = require('./env.js');
+const { readCompanyRoot } = require('./company.js');
 
 // Hook points are code-owned kebab-case path constants ('account/password') —
 // enforce the shape so a typo'd or traversal-shaped path fails loudly.
@@ -39,7 +39,7 @@ const HOOK_PATH_PATTERN = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
  * The candidate file for one hook point under one root.
  */
 function hookFile(root, hookPath) {
-  return path.join(root, 'config', 'hooks', ...hookPath.split('/')) + '.js';
+  return `${path.join(root, 'config', 'hooks', ...hookPath.split('/'))}.js`;
 }
 
 /**

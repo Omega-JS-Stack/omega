@@ -236,7 +236,13 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   `js/pages/**`, `css/main.scss`, `css/pages/**`, theme roots add
   `_theme.scss`/`_theme.js`). `__main_assets__/*` resolves to the core layer /
   themes dir, `__theme__/*` to the active theme (classy fallback),
-  `@omega.js/client` (subpaths included) to @omega.js/client. Manifest:
+  `@omega.js/client` (subpaths included) to @omega.js/client. Every package
+  the framework declares as a dependency resolves from the FRAMEWORK's
+  installation for whoever imports it, so a consumer page module writes
+  `import { Chart } from 'chart.js'` bare and shares one copy (one chunk)
+  with core's own users of the library — the framework's copy wins even if
+  the consumer declares its own; anything the framework does not declare the
+  consumer declares itself. Manifest:
   `{ js: { main, pages }, css: { main, pages, themePages } }` — base page css
   and the active theme's page css BOTH load. The engine's `pageAssets`
   computed resolves each page's entries from the URL alone (the `asset_path`

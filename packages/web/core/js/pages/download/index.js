@@ -64,7 +64,7 @@ function setupPlatformDetection() {
   }
 
   const platformName = $card.querySelector('.classy-dl-card__name, strong')?.textContent.trim() || detectedPlatform;
-  const $chipIcon = $card.querySelector('.classy-icon-chip, .fa');
+  const $chipIcon = $card.querySelector('.classy-dl-card__mark, .classy-icon-chip, .fa');
 
   $hero.href = $link.getAttribute('href');
   $hero.querySelector('[data-hero-label]').textContent = `Download for ${platformName}`;
@@ -342,22 +342,20 @@ function setupAutoDownload() {
   window.history.replaceState({}, '', url);
 }
 
-// Setup mobile email forms
+// Setup the mobile notify-me form (ONE form for every unshipped store — the
+// address is the same address whichever store lands first)
 function setupMobileEmailForms() {
   const $forms = document.querySelectorAll('.mobile-email-form');
 
   $forms.forEach($form => {
-    const platform = $form.dataset.platform;
-    const formId = `#mobile-email-form-${platform}`;
-
-    const formManager = new FormManager(formId, {
+    const formManager = new FormManager(`#${$form.id}`, {
       allowResubmit: false,
       submittingText: 'Sending...',
       submittedText: 'Email Sent!',
     });
 
     formManager.on('submit', async ({ data }) => {
-      console.log('Mobile email form submitted:', { platform, email: data.email });
+      console.log('Mobile email form submitted:', { email: data.email });
 
       // Get API endpoint
       const apiEndpoint = `${omega.getApiUrl()}/omega/general/email`;

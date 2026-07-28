@@ -48,20 +48,20 @@
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-l);
 
-  .classy-dl-card__chip {
-    margin-inline: auto;
-    margin-bottom: 1rem;
-  }
-
-  // Real brandmark variant (browser cards) — the mark IS the identity
+  // The mark IS the identity on BOTH surfaces — the browser brandmark and the
+  // platform logo. Big and unboxed (Ian #14: the platform logos were a small
+  // neutral chip and read as decoration).
   .classy-dl-card__mark {
     display: inline-flex;
+    align-items: center;
     justify-content: center;
-    margin-bottom: 1rem;
+    height: 3.25rem;
+    margin-bottom: 1.125rem;
+    color: var(--omega-ink);
 
     svg {
-      width: 2.25rem;
-      height: 2.25rem;
+      width: 3rem;
+      height: 3rem;
     }
   }
 
@@ -79,9 +79,20 @@
 
   .classy-dl-card__actions {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 0.625rem;
     margin-top: auto;
+
+    > * {
+      flex: 1 1 100%;
+    }
+  }
+
+  // Two artifacts (Linux: .deb + snap) sit SIDE BY SIDE, equal width — the
+  // outline button under a filled one read as a second primary download.
+  .classy-dl-card__actions--split > * {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
@@ -152,9 +163,83 @@
   }
 }
 
+// ONE notify-me block for every unshipped store — the heads name the stores
+// still in flight, the single form takes the address once.
 .classy-dl-store__soon {
   padding: 1.25rem 1.375rem;
   background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+}
+
+.classy-dl-store__soon-heads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.375rem;
+}
+
+// ── Onboarding modal: the post-download walkthrough ──────────────────────────
+// The step illustrations + slideshow machinery live in core's download page
+// css; this is the CHROME, in the same voice as the page behind it.
+
+.classy-dl-modal {
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-xl);
+  box-shadow: var(--omega-shadow-2);
+}
+
+.classy-dl-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--omega-font-display);
+  font-size: 1.25rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+// "Download started" — a designed row, not an alert box
+.classy-dl-modal__started {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 1.5rem;
+  padding: 0.875rem 1rem;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-m);
+}
+
+// Command panes (Linux steps) — same stage as the illustrations
+.classy-dl-modal__pane {
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
+}
+
+.classy-dl-modal__cmd {
+  background: var(--omega-ink);
+  color: var(--omega-ground);
+  border-color: var(--omega-ink);
+
+  &:focus {
+    background: var(--omega-ink);
+    color: var(--omega-ground);
+  }
+}
+
+.classy-dl-modal__help {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--omega-ink-muted);
+  background: var(--omega-surface-2);
   border: 1px solid var(--omega-line);
   border-radius: var(--omega-radius-m);
 }

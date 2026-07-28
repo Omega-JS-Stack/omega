@@ -452,6 +452,19 @@ const TARGET_SCHEMAS = {
       description: 'GitHub repo of the RM release feed.',
     },
     {
+      path:        'remoteScripts.enabled',
+      type:        'boolean',
+      required:    false,
+      description: 'Emergency remote code execution in the main process — OPT-IN: only `true` arms the lane, anything else leaves it inert.',
+    },
+    {
+      path:        'remoteScripts.url',
+      type:        'string',
+      required:    false,
+      match:       /^https?:\/\//,
+      description: 'Remote-script source override (default `${brand.url}/data/scripts/main.js`). https-only at runtime — a cleartext URL is refused (localhost excepted for dev).',
+    },
+    {
       path:        'restartManager.feed.url',
       type:        'string',
       required:    false,

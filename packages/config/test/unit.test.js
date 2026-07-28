@@ -211,6 +211,18 @@ test('target refinements only apply with options.target', () => {
   assert.ok(errors.some((e) => e.includes('config.startup.mode') && e.includes('must be one of [normal, hidden]')));
 });
 
+test('desktop remoteScripts is a declared key: the opt-in shape passes, wrong types are reported (#21)', () => {
+  const armed = { ...VALID, remoteScripts: { enabled: true, url: 'https://acme.example.com/data/scripts/main.js' } };
+  assert.deepStrictEqual(validateConfig(armed, { target: 'desktop' }).errors, []);
+
+  const { errors } = validateConfig(
+    { ...VALID, remoteScripts: { enabled: 'yes', url: 'ftp://acme.example.com/main.js' } },
+    { target: 'desktop' },
+  );
+  assert.ok(errors.some((e) => e.includes('config.remoteScripts.enabled has wrong type')));
+  assert.ok(errors.some((e) => e.includes('config.remoteScripts.url') && e.includes('does not match')));
+});
+
 test('unknown options.target throws (programmer error, not a config error)', () => {
   assert.throws(() => validateConfig(VALID, { target: 'website' }), /Unknown target "website"/);
 });

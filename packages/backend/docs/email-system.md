@@ -77,6 +77,19 @@ All marketing contact operations (`add`, `sync`) pass through `validate()` befor
 - Custom disposable domains go in `data/custom-disposable-domains.json` (not the vendor list)
 - Run `node src/manager/libraries/email/validation.test.js` to verify all checks
 
+### The disposable-domain dataset: seed + refresh cache
+
+The vendor list is a committed **seed** plus a gitignored **refresh cache**, owned by `libraries/email/disposable-domains.js`. A refresh can never dirty the git tree.
+
+| | Path | Written by |
+|---|---|---|
+| Seed (committed) | `src/manager/libraries/email/data/disposable-domains.json` | `node scripts/promote-disposable-domains.js` — nothing else, ever |
+| Cache (gitignored) | `.cache/email/disposable-domains.json` | `node scripts/update-disposable-domains.js` (also the `npm prepare` before-hook) |
+
+`load()` reads the cache when it is present and parseable, else the seed — so an offline clone, a CI box with no network, and a deployed function (which ships the seed and no cache) all resolve the same committed baseline.
+
+**To advance the committed baseline**: `node scripts/update-disposable-domains.js` to refresh the cache, then `node scripts/promote-disposable-domains.js` to copy it over the seed, then review and commit the diff.
+
 ## Data Contract
 
 The template receives one `data` object with a clear separation of concerns:
@@ -318,6 +331,7 @@ All extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_te
 | Email validation | `src/manager/libraries/email/validation.js` |
 | Typo domain prefixes | `src/manager/libraries/email/data/typo-domains.js` |
 | Custom disposable domains | `src/manager/libraries/email/data/custom-disposable-domains.json` |
+| Disposable-domain seed/cache contract | `src/manager/libraries/email/disposable-domains.js` |
 | NeverBounce provider | `src/manager/libraries/email/validation-provider-neverbounce.js` |
 | ZeroBounce provider | `src/manager/libraries/email/validation-provider-zerobounce.js` |
 | Validation test | `src/manager/libraries/email/validation.test.js` |

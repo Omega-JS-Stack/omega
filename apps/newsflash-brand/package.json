@@ -10,5 +10,8 @@
     "dev": "omega-manager dev",
     "deploy": "omega-manager deploy",
     "pipeline": "omega-manager pipeline --require=analytics,disperse,update,bookmark"
+  },
+  "devDependencies": {
+    "@omega.js/manager": "file:../../packages/manager"
   }
 }

@@ -1,5 +1,7 @@
-// Download Page Styles
-// Only custom styles that cannot be achieved with Bootstrap
+// Download Page Styles — the onboarding modal's step illustrations and the
+// slideshow machinery. Token-painted (--omega-*), so the walkthrough wears the
+// same design language as the page around it and reads correctly in dark mode;
+// the modal CHROME is classy vocabulary (themes/classy/css/marketing/_downloads).
 
 // Folder icon custom styling (gradient background and tab)
 .folder-icon {
@@ -49,10 +51,14 @@
   }
 }
 
-// File icon sizing
+// File icon — a surface tile with a hairline, not a 3px primary slab
 .file-to-click {
   width: 100px;
   height: 100px;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
+  border-radius: var(--omega-radius-l);
+  box-shadow: var(--omega-shadow-1);
 
   .brandmark {
     width: 64px;
@@ -81,6 +87,8 @@
     height: 30px;
     top: -2px;
     left: -2px;
+    border: 2px solid var(--omega-accent);
+    border-radius: 50%;
     animation: click-pulse 3s ease-in-out infinite;
     opacity: 0;
   }
@@ -119,13 +127,19 @@
   }
 }
 
-// Wizard window sizing
+// Wizard window — a token-painted mock, hairline framed
 .wizard-window {
   width: 250px;
   height: 150px;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
+  border-radius: var(--omega-radius-m);
+  box-shadow: var(--omega-shadow-2);
 
   .wizard-header {
     height: 30px;
+    background: var(--omega-accent);
+    color: var(--omega-accent-ink);
   }
 
   .wizard-content {
@@ -136,11 +150,13 @@
 // Progress bar container and animation
 .progress-bar-container {
   height: 20px;
+  background: var(--omega-surface-2);
+  border-radius: var(--omega-radius-pill);
 
   .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--bs-primary) 0%, var(--bs-info) 100%);
-    border-radius: 10px;
+    background: linear-gradient(90deg, var(--omega-accent) 0%, var(--omega-accent-hover) 100%);
+    border-radius: var(--omega-radius-pill);
     animation: install-progress 3s ease-in-out infinite;
   }
 }
@@ -154,16 +170,27 @@
   }
 }
 
-// Launch app icon sizing
+// Launch app icon — same tile as the file icon
 .app-icon {
   width: 100px;
   height: 100px;
+  background: var(--omega-surface);
+  border: 1px solid var(--omega-line-strong);
+  border-radius: var(--omega-radius-l);
+  box-shadow: var(--omega-shadow-1);
 
   .brandmark {
     width: 64px;
     height: 64px;
     object-fit: contain;
   }
+}
+
+// Terminal variant (Linux step 1) — ink tile, both schemes
+.app-icon--terminal {
+  background: var(--omega-ink);
+  color: var(--omega-ground);
+  border-color: var(--omega-ink);
 }
 
 
@@ -201,6 +228,8 @@
     height: 30px;
     top: -2px;
     left: -2px;
+    border: 2px solid var(--omega-accent);
+    border-radius: 50%;
     animation: drag-click-pulse 3s ease-in-out infinite;
     opacity: 0;
     z-index: 10;
@@ -293,9 +322,12 @@
   }
 }
 
-// Instruction step container
+// Instruction step container — the illustration stage
 .instruction-step-container {
   min-height: 200px;
+  background: var(--omega-surface-2);
+  border: 1px solid var(--omega-line);
+  border-radius: var(--omega-radius-l);
 }
 
 // Steps slideshow — uses a grid stack so all slides overlap in the same cell,
@@ -337,24 +369,27 @@
   }
 }
 
-// Big step number badge
+// Step number badge — a quiet accent pill, not a heavy disc
 .step-number-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 50%;
-  background: var(--bs-primary);
-  color: #fff;
-  font-size: 1.5rem;
-  font-weight: 700;
+  background: var(--omega-accent-subtle);
+  color: var(--omega-accent);
+  font-size: 1rem;
+  font-weight: 650;
   margin-bottom: 0.75rem;
 }
 
 // Step title
 .step-title {
-  font-weight: 600;
+  font-family: var(--omega-font-display);
+  font-size: 1.125rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
   margin-bottom: 1rem;
 }
 
@@ -365,7 +400,7 @@
   justify-content: space-between;
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--bs-border-color);
+  border-top: 1px solid var(--omega-line);
 }
 
 // Progress dots
@@ -375,22 +410,22 @@
   align-items: center;
 
   .step-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: var(--bs-border-color);
+    background: var(--omega-line-strong);
     border: none;
     padding: 0;
     cursor: pointer;
-    transition: background 0.2s, transform 0.2s;
+    transition: background var(--omega-speed) var(--omega-ease), transform var(--omega-speed) var(--omega-ease);
 
     &.active {
-      background: var(--bs-primary);
-      transform: scale(1.3);
+      background: var(--omega-accent);
+      transform: scale(1.4);
     }
 
     &:hover:not(.active) {
-      background: var(--bs-secondary);
+      background: var(--omega-ink-faint);
     }
   }
 }

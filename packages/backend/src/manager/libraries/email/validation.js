@@ -31,8 +31,10 @@ const resolveMx = promisify(dns.resolveMx);
 // All data lives in ./data/ — domains and local-part blocklists are co-located JSON files.
 const DATA_DIR = path.join(__dirname, 'data');
 
-// Load disposable domains: curated vendor list + custom additions
-const DISPOSABLE_DOMAINS = require(path.join(DATA_DIR, 'disposable-domains.json'));
+// Load disposable domains: curated vendor list + custom additions.
+// The vendor list comes through ./disposable-domains.js — gitignored refresh
+// cache if present, committed seed otherwise (see that module for the contract).
+const DISPOSABLE_DOMAINS = require('./disposable-domains').load();
 const CUSTOM_DISPOSABLE_DOMAINS = require(path.join(DATA_DIR, 'custom-disposable-domains.json'));
 const DISPOSABLE_SET = new Set([
   ...DISPOSABLE_DOMAINS.map(d => d.toLowerCase()),

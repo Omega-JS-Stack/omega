@@ -2,6 +2,10 @@
   Classy v2 in-card page header — title + actions. Breadcrumbs moved to the
   app topbar (global/sections/app-topbar.html) but keep their frontmatter API:
   resolved.theme.header.{title, actions} render here.
+
+  action.size is 'sm' | 'lg' (Bootstrap's button sizes) — anything else renders
+  no size class. NEVER test it for truthiness: Liquid answers `.size` on a hash
+  with its KEY COUNT, so every action would "have" a size (#43).
 {% endcomment %}
 {% unless resolved.theme.header.enabled == false %}
   <div class="page-header pb-3 mb-4 hairline-bottom">
@@ -32,10 +36,12 @@
                 {% else %}
                   {% capture action_btn %}btn-{{ action_color }}{% endcapture %}
                 {% endif %}
+                {% comment %}Liquid's `.size` on a hash is its KEY COUNT — test the value, never truthiness (#43).{% endcomment %}
+                {% assign action_size = '' %}{% if action.size == 'sm' or action.size == 'lg' %}{% assign action_size = action.size %}{% endif %}
                 {% if action.dropdown %}
                   <!-- Dropdown Button -->
                   <div class="dropdown">
-                    <button class="btn {{ action_btn }} {% if action.size %}btn-{{ action.size }}{% endif %} dropdown-toggle"
+                    <button class="btn {{ action_btn }} {% if action_size != '' %}btn-{{ action_size }}{% endif %} dropdown-toggle"
                             type="button"
                             data-bs-toggle="dropdown"
                             aria-expanded="false">
@@ -63,7 +69,7 @@
                   </div>
                 {% else %}
                   <!-- Regular Button -->
-                  {% capture action_class %}btn {{ action_btn }} {% if action.size %}btn-{{ action.size }}{% endif %} {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
+                  {% capture action_class %}btn {{ action_btn }} {% if action_size != '' %}btn-{{ action_size }}{% endif %} {% if action.class %}{{ action.class }}{% endif %}{% endcapture %}
                   {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
                   {% capture action_content %}
                     {% if action.icon %}

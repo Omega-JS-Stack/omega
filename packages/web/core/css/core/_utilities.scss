@@ -77,6 +77,17 @@ button *, a * {
 // }
 
 // ============================================
+// Affirmation Checks
+// ============================================
+// The ONE home for check-mark ink. Every "you get this" tick — plan features,
+// benefit lists, hero meta, comparison yes cells — carries this class, on the
+// icon itself or on its wrapper, and reads --omega-check (the accent). Never
+// re-color a check at the call site; re-point the token instead.
+.omega-check {
+  color: var(--omega-check);
+}
+
+// ============================================
 // Opacity Utilities
 // ============================================
 @for $i from 0 through 10 {

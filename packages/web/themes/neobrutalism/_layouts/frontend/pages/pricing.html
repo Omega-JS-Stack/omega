@@ -25,7 +25,7 @@ social_proof:
 # FAQs Section
 faqs:
   superheadline:
-    icon: "messages-question"
+    icon: "circle-question"
     text: "FAQs"
   headline: "Frequently asked"
   headline_accent: "questions"
@@ -132,7 +132,7 @@ faqs:
     {% endif %}
 
     <p class="text-center fw-medium mb-5">
-      {% uj_icon "shield-check", "me-1 text-success" %}
+      {% uj_icon "shield-halved", "me-1 text-success" %}
       {{ resolved.pricing.guarantee | default: "Every paid plan backed by a 7-day money-back guarantee" }}
     </p>
 
@@ -211,7 +211,7 @@ faqs:
             </p>
           {% else %}
             <p class="pricing-plan-guarantee">
-              {% uj_icon "shield-check", "me-1 text-success" %}{{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
+              {% uj_icon "shield-halved", "me-1 text-success" %}{{ resolved.pricing.card_guarantee | default: "7-day money-back guarantee" }}
             </p>
           {% endif %}
 
@@ -309,7 +309,7 @@ faqs:
           </div>
 
           <p class="pricing-plan-guarantee">
-            {% uj_icon "circle-check", "me-1 text-success" %}Yours forever — pay once
+            {% uj_icon "circle-check", "omega-check me-1" %}Yours forever — pay once
           </p>
 
           {% if product.features.size > 0 %}

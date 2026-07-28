@@ -98,6 +98,37 @@ test('isBrandRoot: true at a brand root, false for an app-of-brand config dir', 
   assert.equal(isBrandRoot(path.join(DISPATCH, 'brand', 'apps', 'site')), false);
 });
 
+// ─── Repo boundary (#73) ─────────────────────────────────────────────────────
+
+test('findTarget: the walk stops at the nearest .git — a context outside the repo is never adopted', () => {
+  // Outer dir = a framework app; inner repo = an unconfigured project. An
+  // unbounded walk would climb out of the repo and dispatch the outer app.
+  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-bin-gitbound-'));
+  fs.writeFileSync(
+    path.join(outer, 'package.json'),
+    JSON.stringify({ name: 'outer', dependencies: { '@omega.js/web': '*' } })
+  );
+  const repo = path.join(outer, 'repo');
+  fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(repo, 'src', 'deep'), { recursive: true });
+
+  assert.equal(findTarget(path.join(repo, 'src', 'deep')), null);
+  assert.equal(findTarget(repo), null);
+
+  // The git root itself is still CHECKED before the walk stops
+  fs.writeFileSync(
+    path.join(repo, 'package.json'),
+    JSON.stringify({ name: 'inner', devDependencies: { '@omega.js/desktop': '*' } })
+  );
+  assert.deepEqual(findTarget(path.join(repo, 'src', 'deep')), {
+    kind: 'framework',
+    name: '@omega.js/desktop',
+    dir: repo,
+  });
+
+  fs.rmSync(outer, { recursive: true, force: true });
+});
+
 // ─── run() dispatch ──────────────────────────────────────────────────────────
 
 test('run(): no app context falls back to the HOST CLI (bootstrap case, e.g. `omega setup` in a fresh dir)', async () => {

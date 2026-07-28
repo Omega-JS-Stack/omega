@@ -85,7 +85,7 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `indexes` | Sync deployed Firestore indexes into `firestore.indexes.json` (aliases `indexes:get`, `firestore:indexes:get`) |
 | `clean` | Remove node_modules + lockfile and reinstall (alias `clean:npm`) |
 | `version` | Print @omega.js/backend version |
-| `help` | Print the command listing (also `-h`/`--help`); bare `omega` runs `setup`, unknown commands print the listing and exit 1 |
+| `help` | Print the command listing (also `-h`/`--help`); bare `omega` runs `setup`, unknown commands print the listing and exit 1. The listing is GENERATED from the same command table the dispatcher reads (`src/cli/command-table.js`) — it cannot drift from what actually dispatches |
 
 See [docs/cli-firestore-auth.md](../../packages/backend/docs/cli-firestore-auth.md) and [docs/cli-logs.md](../../packages/backend/docs/cli-logs.md) for full flag references.
 

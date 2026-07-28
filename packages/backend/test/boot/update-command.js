@@ -7,9 +7,7 @@
  * selection with an injected registry + clock — no network).
  */
 
-const fs = require('fs');
-const path = require('path');
-
+const table = require('../../dist/cli/command-table.js');
 const UpdateCommand = require('../../dist/cli/commands/update.js');
 const devkitUpdate = require('@omega.js/devkit/update');
 
@@ -28,9 +26,11 @@ module.exports = {
     {
       name: 'dispatcher-routes-update-outdated-out',
       async run({ assert }) {
-        const source = fs.readFileSync(path.join(__dirname, '../../dist/cli/index.js'), 'utf8');
-        for (const token of ["options['update']", "options['outdated']", "options['out']"]) {
-          assert.ok(source.includes(token), `dist/cli/index.js dispatches on ${token}`);
+        const update = table.COMMANDS.find((command) => command.name === 'update');
+        assert.ok(update, 'the command table carries the update verb');
+
+        for (const token of ['update', 'outdated', 'out']) {
+          assert.equal(table.matchCommand(update, { [token]: true }), true, `\`omega ${token}\` dispatches update`);
         }
       },
     },

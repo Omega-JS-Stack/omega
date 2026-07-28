@@ -4,6 +4,10 @@
 .temp
 scripts/.temp
 
+# Generated data caches — the disposable-domains refresh writes ONLY here so a
+# build or suite run can never dirty the committed seed under src/ (issue #68)
+/.cache/
+
 # Logs
 logs
 *.log

@@ -23,53 +23,9 @@ if (__dirname.startsWith(path.join(_homeDir, 'node_modules'))) {
   process.exit(1);
 }
 
-// Import commands
-const VersionCommand = require('./commands/version');
-const ClearCommand = require('./commands/clear');
-const CwdCommand = require('./commands/cwd');
-const BuildCommand = require('./commands/build');
-const SetupCommand = require('./commands/setup');
-const InstallCommand = require('./commands/install');
-const ServeCommand = require('./commands/serve');
-const DeployCommand = require('./commands/deploy');
-const TestCommand = require('./commands/test');
-const EmulatorCommand = require('./commands/emulator');
-const CleanCommand = require('./commands/clean');
-const IndexesCommand = require('./commands/indexes');
-const WatchCommand = require('./commands/watch');
-const StripeCommand = require('./commands/stripe');
-const FirestoreCommand = require('./commands/firestore');
-const AuthCommand = require('./commands/auth');
-const LogsCommand = require('./commands/logs');
-const UpdateCommand = require('./commands/update');
-const McpCommand = require('./commands/mcp');
-
-// The dispatchable surface, one line per branch below — shown by `omega help`
-// and after an unknown command. Keep in sync with the process() chain.
-const HELP_TEXT = `Usage: omega <command> [options]
-
-Commands:
-  setup                          validate + heal the app [default]
-  build                          stage src/ into dist/
-  serve                          run the local Firebase emulator suite
-  deploy                         deploy to Firebase
-  test                           run the test suites
-  emulator | emulators           emulator keep-alive mode
-  watch                          hot-reload on framework source changes
-  update | outdated | out        dependency freshness report
-  install local | install live   switch the installed framework copy (i = install)
-  clean | clean:npm              remove node_modules + lockfile and reinstall
-  clear                          clear caches
-  cwd                            print the resolved app root
-  stripe | stripe:listen         forward Stripe webhooks locally
-  firestore:get|set|query|delete Firestore utilities
-  indexes                        sync deployed Firestore indexes into firestore.indexes.json
-                                 (aliases: indexes:get, firestore:indexes:get)
-  auth:get|list|delete|set-claims|token  Auth utilities
-  logs | logs:read|tail|stream   Cloud Logging utilities
-  mcp                            run the MCP server
-  version | -v                   print the framework version
-  help | -h                      this listing`;
+// The dispatchable surface lives in ONE table, read by both the dispatch loop
+// below and `omega help` — the listing cannot drift from what dispatches.
+const { COMMANDS, matchCommand, defaultCommand, buildHelpText } = require('./command-table');
 
 function Main() {}
 
@@ -92,155 +48,25 @@ Main.prototype.process = async function (args) {
     self.options[args[i]] = true;
   }
 
-  // Version command
-  if (self.options.v || self.options.version || self.options['-v'] || self.options['-version']) {
-    const cmd = new VersionCommand(self);
-    return await cmd.execute();
-  }
-
-  // Help — never falls through to another command
-  if (self.options.help || self.options['--help'] || self.options.h || self.options['-h']) {
-    console.log(HELP_TEXT);
-    return;
-  }
-
-  // Clear command
-  if (self.options.clear) {
-    const cmd = new ClearCommand(self);
-    return await cmd.execute();
-  }
-
-  // CWD command
-  if (self.options.cwd) {
-    const cmd = new CwdCommand(self);
-    return await cmd.execute();
-  }
-
-  // Build command (stage src/ → functions/)
-  if (self.options.build) {
-    const cmd = new BuildCommand(self);
-    return await cmd.execute();
-  }
-
-  // Setup command
-  if (self.options.setup) {
-    const cmd = new SetupCommand(self);
-    return await cmd.execute();
-  }
-
-  // Install local @omega.js/backend
-  if ((self.options.i || self.options.install) && (self.options.dev || self.options.development) || self.options.local) {
-    const cmd = new InstallCommand(self);
-    return await cmd.execute('local');
-  }
-
-  // Install live @omega.js/backend
-  if ((self.options.i || self.options.install) && (self.options.prod || self.options.production) || self.options.live) {
-    const cmd = new InstallCommand(self);
-    return await cmd.execute('live');
-  }
-
-  // Install without a mode — name the real spellings instead of falling to
-  // the unknown-command tail (which would misreport a listed command)
-  if (self.options.i || self.options.install) {
-    console.error('install needs a mode: `omega install local` or `omega install live` (aliases: dev/development, prod/production).');
-    process.exitCode = 1;
-    return;
-  }
-
-  // Serve firebase
-  if (self.options.serve) {
-    const cmd = new ServeCommand(self);
-    return await cmd.execute();
-  }
-
-  // Get indexes (`indexes` accepted bare — the documented sync verb)
-  if (self.options['indexes'] || self.options['firestore:indexes:get'] || self.options['firestore:indexes'] || self.options['indexes:get']) {
-    const cmd = new IndexesCommand(self);
-    return await cmd.get(undefined, true);
-  }
-
-  // Deploy
-  if (self.options.deploy) {
-    const cmd = new DeployCommand(self);
-    return await cmd.execute();
-  }
-
-  // Test
-  if (self.options['test']) {
-    const cmd = new TestCommand(self);
-    return await cmd.execute();
-  }
-
-  // Emulator (keep-alive mode)
-  if (self.options['emulator'] || self.options['emulators']) {
-    const cmd = new EmulatorCommand(self);
-    return await cmd.execute();
-  }
-
-  // Clean (`clean` accepted bare — every router framework answers it)
-  if (self.options['clean:npm'] || self.options.clean) {
-    const cmd = new CleanCommand(self);
-    return await cmd.execute();
-  }
-
-  // Watch (trigger hot reload when @omega.js/backend source changes)
-  if (self.options['watch']) {
-    const cmd = new WatchCommand(self);
-    return await cmd.execute();
-  }
-
-  // Stripe webhook forwarding (standalone)
-  if (self.options['stripe'] || self.options['stripe:listen']) {
-    const cmd = new StripeCommand(self);
-    return await cmd.execute();
-  }
-
-  // Firestore utility commands
-  if (self.options['firestore:get'] || self.options['firestore:set']
-    || self.options['firestore:query'] || self.options['firestore:delete']) {
-    const cmd = new FirestoreCommand(self);
-    return await cmd.execute();
-  }
-
-  // Auth utility commands
-  if (self.options['auth:get'] || self.options['auth:list']
-    || self.options['auth:delete'] || self.options['auth:set-claims']
-    || self.options['auth:token']) {
-    const cmd = new AuthCommand(self);
-    return await cmd.execute();
-  }
-
-  // Logs utility commands (`logs` is an alias for `logs:read`)
-  if (self.options['logs'] || self.options['logs:read'] || self.options['logs:tail'] || self.options['logs:stream']) {
-    const cmd = new LogsCommand(self);
-    return await cmd.execute();
-  }
-
-  // Update (dependency freshness — npu-outdated semantics)
-  if (self.options['update'] || self.options['outdated'] || self.options['out']) {
-    const cmd = new UpdateCommand(self);
-    return await cmd.execute();
-  }
-
-  // MCP server
-  if (self.options['mcp']) {
-    const cmd = new McpCommand(self);
-    return await cmd.execute();
+  // Dispatch down the command table, in order — first match wins.
+  for (const command of COMMANDS) {
+    const matched = matchCommand(command, self.options);
+    if (matched) {
+      return await command.run(self, matched, command);
+    }
   }
 
   // Nothing matched. run.js passes full process.argv, so the real command
   // tokens start at index 2. Bare invocation mirrors every router framework's
-  // default: setup. Anything else is an unknown command — the old chain
-  // returned undefined and exited 0 in silence.
+  // default: the table's default command. Anything else is an unknown command —
+  // the old chain returned undefined and exited 0 in silence.
   const commandArgs = args.slice(2);
   if (commandArgs.length === 0) {
-    const cmd = new SetupCommand(self);
-    return await cmd.execute();
+    return await defaultCommand().run(self);
   }
 
   console.error(`Unknown command "${commandArgs.join(' ')}".`);
-  console.error(HELP_TEXT);
+  console.error(buildHelpText());
   process.exitCode = 1;
 };
 

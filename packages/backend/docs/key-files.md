@@ -18,6 +18,7 @@
 | Main API handler (middleware) | `src/manager/helpers/middleware.js` |
 | Config template | `templates/config/omega.json5` |
 | CLI entry | `src/cli/index.js` |
+| CLI command table (dispatch order + generated help) | `src/cli/command-table.js` |
 | Stripe webhook forwarding | `src/cli/commands/stripe.js` |
 | Firebase init helper (CLI) | `src/cli/commands/firebase-init.js` |
 | Firestore CLI commands | `src/cli/commands/firestore.js` |

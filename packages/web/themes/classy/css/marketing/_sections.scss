@@ -232,10 +232,15 @@
       gap: 0.6875rem;
       padding-block: 0.5rem;
 
+      // The check is a one-line-tall box so the glyph centers on the FIRST
+      // line of its feature text (the old baseline + magic margin drifted as
+      // soon as a feature wrapped). Ink comes from `.omega-check`.
       .classy-price-card__check {
-        color: var(--omega-accent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
-        margin-top: 0.2em;
+        height: 1.5em; // = this list's line-height
       }
     }
 
@@ -542,12 +547,10 @@
 }
 
 .classy-compare {
-  // Included/absent marks (Ian 2026-07-16 ref): green filled-circle check,
-  // muted filled-circle X — state told by mark + color, readable both themes
-  .classy-compare__yes {
-    color: var(--omega-ok);
-  }
-
+  // Included/absent marks: filled-circle check, muted filled-circle X — state
+  // told by mark + color, readable in both themes. The check's ink is the
+  // shared `.omega-check` slot (#11 unified every affirmation check on
+  // --omega-check; it superseded the 2026-07-16 green for this mark).
   .classy-compare__no {
     color: var(--omega-ink-faint);
     opacity: 0.7;

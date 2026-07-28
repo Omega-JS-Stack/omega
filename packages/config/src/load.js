@@ -11,9 +11,15 @@
  *
  * Brand-monorepo hierarchy: when projectDir is an app inside a brand
  * monorepo ({brand}/apps/{app}), the brand root's config/omega.json5 is the
- * brand layer under the app's file. Resolution for a target:
+ * brand layer under the app's file, and a brand stamped with
+ * .omega/company.json inherits its company root's file underneath that.
+ * Resolution for a target:
  *
- *   defaults ← brand shared ← brand targets[target] ← app shared ← app targets[target]
+ *   defaults ← company ← brand shared ← brand targets[target] ← app shared ← app targets[target]
+ *
+ * The company file layers exactly like the brand file (shared, then its
+ * targets[target] entry) minus its `brands` key — company plumbing that means
+ * nothing inside a brand.
  *
  * Multi-instance targets: a targets[target] value may be an ARRAY of id'd
  * instance entries — the app dir names WHICH instance (apps/website-admin →
@@ -40,6 +46,7 @@ const path = require('node:path');
 const JSON5 = require('json5');
 
 const { deepMerge, isPlainObject } = require('./merge.js');
+const { readCompanyRoot } = require('./company.js');
 const { findSecretKeys } = require('./secrets.js');
 const { validateConfig } = require('./validate.js');
 const { TARGETS } = require('./schema.js');
@@ -127,6 +134,40 @@ function findBrandConfigPath(projectDir) {
 }
 
 /**
+ * The COMPANY layer of the chain: a brand stamped with `.omega/company.json`
+ * (written idempotently by company manage runs) inherits its company root's
+ * omega.json5 as the layer between framework defaults and the brand file —
+ * company-wide values (a shared monitoring org, an analytics account) are
+ * authored once at the company root. The marker sits at the BRAND root, so
+ * apps resolve it through their brand; a brand root (or standalone project)
+ * reads its own. Same rule as the .env cascade (env.js).
+ * @param {string} projectDir - App dir, brand root, or a functions/ dir.
+ * @returns {string|null} Absolute company omega.json5 path, or null.
+ */
+function findCompanyConfigPath(projectDir) {
+  let dir = path.resolve(projectDir);
+  if (path.basename(dir) === 'functions') dir = path.dirname(dir);
+
+  const markerRoot = findBrandRoot(dir) || dir;
+  const companyRoot = readCompanyRoot(markerRoot);
+
+  // A root stamped at ITSELF would merge its own file in twice.
+  if (!companyRoot || path.resolve(companyRoot) === markerRoot) return null;
+
+  return resolveConfigPath(companyRoot);
+}
+
+/**
+ * The inheritable company layer: the company file minus `brands` — the
+ * discovery roots are company plumbing and mean nothing inside a brand.
+ */
+function stripCompanyPlumbing(config) {
+  if (!config) return null;
+  const { brands, ...inheritable } = config;
+  return inheritable;
+}
+
+/**
  * SEARCH upward from any directory to the nearest brand-monorepo root: the
  * first ancestor carrying an omega.json5 that is not itself an APP of a brand
  * above it (app rule = findBrandRoot's: directly under an apps/ dir with a
@@ -137,6 +178,11 @@ function findBrandConfigPath(projectDir) {
  * else null): resolveBrandRoot works from anywhere in the tree — the brand
  * root itself, apps/{app}, apps/{app}/functions, or any subdirectory — and a
  * standalone config-carrying project resolves to itself.
+ *
+ * The walk is BOUNDED at the nearest `.git` (that directory is still checked
+ * first — a brand root is normally its own git root): past the repo boundary
+ * is somebody else's tree, never this project's brand. The plugin's inject
+ * hook bounds its identical walk the same way.
  *
  * @param {string} startDir - Any directory inside the project tree
  * @returns {string|null} Absolute brand (or standalone-project) root, or null
@@ -157,6 +203,10 @@ function resolveBrandRoot(startDir) {
         return dir;
       }
     }
+
+    // Repo boundary — stop here rather than statting out through the host
+    // filesystem to /.
+    if (fs.existsSync(path.join(dir, '.git'))) return null;
 
     const parent = path.dirname(dir);
     if (parent === dir) return null;
@@ -208,7 +258,7 @@ function getEnabledTargets(config) {
  *   omega-manager's disperse want.
  * @param {object} [options]
  * @param {object} [options.defaults] - Framework defaults, the lowest merge layer.
- * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, instance: string, files: { app: string, brand: string|null } }}
+ * @returns {{ config: object, errors: string[], warnings: string[], enabled: boolean|null, instance: string, files: { app: string, brand: string|null, company: string|null } }}
  *   `enabled` = whether `target` is listed under `targets` (null when no target
  *   was requested); schema `errors` are returned, not thrown — only secrets and
  *   unusable files throw. `warnings` are advisory findings (e.g. >1 backend
@@ -232,6 +282,7 @@ function loadConfig(projectDir, target, options) {
     appPath = resolveConfigPath(path.dirname(path.resolve(projectDir)));
   }
   const brandPath = findBrandConfigPath(projectDir);
+  const companyPath = findCompanyConfigPath(projectDir);
 
   // The app-layer file is OPTIONAL inside a brand monorepo (Ian 2026-07-13:
   // the brand file's targets section IS the per-target home) — an app with
@@ -243,13 +294,17 @@ function loadConfig(projectDir, target, options) {
 
   const app = appPath ? readConfigFile(appPath) : {};
   const brand = brandPath ? readConfigFile(brandPath) : null;
+  const company = companyPath ? readConfigFile(companyPath) : null;
 
+  assertUsableRawFile(companyPath, company);
   assertUsableRawFile(brandPath, brand);
   assertUsableRawFile(appPath, app);
 
+  const inherited = stripCompanyPlumbing(company);
+
   // ─── Resolve ─────────────────────────────────────────────────────────────
-  const hasTargets = !!((brand && brand.targets) || app.targets);
-  const targets = deepMerge(brand ? brand.targets : null, app.targets);
+  const hasTargets = !!((inherited && inherited.targets) || (brand && brand.targets) || app.targets);
+  const targets = deepMerge(inherited ? inherited.targets : null, brand ? brand.targets : null, app.targets);
 
   // Instance dimension (multi-instance targets): WHICH instance this app is
   // comes from its dir name (apps/website-admin → web/admin; the canonical
@@ -264,12 +319,14 @@ function loadConfig(projectDir, target, options) {
   const config = target
     ? deepMerge(
         options.defaults,
+        stripTargets(inherited),
+        inherited && inherited.targets ? resolveInstanceEntry(inherited.targets[target], instance) : null,
         stripTargets(brand),
         brand && brand.targets ? resolveInstanceEntry(brand.targets[target], instance) : null,
         stripTargets(app),
         app.targets ? resolveInstanceEntry(app.targets[target], instance) : null,
       )
-    : deepMerge(options.defaults, brand, app);
+    : deepMerge(options.defaults, inherited, brand, app);
 
   // Keep the merged targets map on the resolved config (presence = enabled)
   if (target && hasTargets) {
@@ -282,16 +339,17 @@ function loadConfig(projectDir, target, options) {
 
   const { errors, warnings } = validateConfig(config, { target });
 
-  return { config, errors, warnings, enabled, instance, files: { app: appPath, brand: brandPath } };
+  return { config, errors, warnings, enabled, instance, files: { app: appPath, brand: brandPath, company: companyPath } };
 }
 
 /**
- * Compose the brand+app layers into ONE self-contained config file for a
- * target's deploy upload (friction #31). The runtime's brand walk-up dies at
+ * Compose the company+brand+app layers into ONE self-contained config file for
+ * a target's deploy upload (friction #31). The runtime's brand walk-up dies at
  * the upload boundary — `firebase deploy` ships only the functions folder —
- * so the staged file must carry the brand layer itself. The target's full
- * interleave (brand shared ← brand targets[target] ← app shared ← app
- * targets[target]) is frozen into the shared namespace: the deployed
+ * so the staged file must carry the layers above it itself. The target's full
+ * interleave (company shared ← company targets[target] ← brand shared ← brand
+ * targets[target] ← app shared ← app targets[target]) is frozen into the
+ * shared namespace: the deployed
  * runtime's own `deepMerge(defaults, shared, targets[target])` then yields
  * EXACTLY the local resolution. `targets` keeps presence-only keys
  * (presence = enabled; every value is already folded in, so nothing
@@ -306,9 +364,10 @@ function loadConfig(projectDir, target, options) {
  *
  * @param {string} projectDir - App root or its functions/ dir.
  * @param {string} target - Canonical target the upload serves ('backend').
- * @returns {{ config: object, files: { app: string|null, brand: string|null } }}
+ * @returns {{ config: object, files: { app: string|null, brand: string|null, company: string|null } }}
  *   `files.brand` null = no brand layer above the app (already self-contained);
- *   `files.app` null = the app rides the brand file alone.
+ *   `files.app` null = the app rides the brand file alone; `files.company`
+ *   null = the brand is not stamped into a company workspace.
  */
 function composeTargetConfig(projectDir, target) {
   if (!TARGETS.includes(target)) {
@@ -326,34 +385,41 @@ function composeTargetConfig(projectDir, target) {
 
   const appPath = resolveConfigPath(appRoot);
   const brandPath = findBrandConfigPath(appRoot);
+  const companyPath = findCompanyConfigPath(appRoot);
   if (!appPath && !brandPath) {
     throw new Error(`No ${FILE_NAME} found under ${projectDir} (looked in ${CONFIG_LOCATIONS.join(', ')})`);
   }
 
   const app = appPath ? readConfigFile(appPath) : {};
   const brand = brandPath ? readConfigFile(brandPath) : null;
+  const company = companyPath ? readConfigFile(companyPath) : null;
 
+  assertUsableRawFile(companyPath, company);
   assertUsableRawFile(brandPath, brand);
   assertUsableRawFile(appPath, app);
+
+  const inherited = stripCompanyPlumbing(company);
 
   // Same instance dimension as loadConfig: the app dir names the instance
   // whose entry is this compose's target layer (main outside a brand).
   const instance = brandPath ? instanceIdFromDirName(path.basename(appRoot), target) : MAIN_INSTANCE;
 
   const config = deepMerge(
+    stripTargets(inherited),
+    inherited && inherited.targets ? resolveInstanceEntry(inherited.targets[target], instance) : null,
     stripTargets(brand),
     brand && brand.targets ? resolveInstanceEntry(brand.targets[target], instance) : null,
     stripTargets(app),
     app.targets ? resolveInstanceEntry(app.targets[target], instance) : null,
   );
 
-  const hasTargets = !!((brand && brand.targets) || app.targets);
+  const hasTargets = !!((inherited && inherited.targets) || (brand && brand.targets) || app.targets);
   if (hasTargets) {
-    const targets = deepMerge(brand ? brand.targets : null, app.targets);
+    const targets = deepMerge(inherited ? inherited.targets : null, brand ? brand.targets : null, app.targets);
     config.targets = Object.fromEntries(Object.keys(targets).map((name) => [name, {}]));
   }
 
-  return { config, files: { app: appPath, brand: brandPath } };
+  return { config, files: { app: appPath, brand: brandPath, company: companyPath } };
 }
 
 module.exports = { loadConfig, composeTargetConfig, hasOmegaConfig, resolveConfigPath, getEnabledTargets, findBrandRoot, resolveBrandRoot, FILE_NAME, CONFIG_LOCATIONS };

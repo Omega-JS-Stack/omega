@@ -10,6 +10,7 @@
     "test:backend": "cd apps/backend && npm run test:offline"
   },
   "devDependencies": {
+    "@omega.js/manager": "file:../../packages/manager",
     "puppeteer": "^24.43.1"
   }
 }

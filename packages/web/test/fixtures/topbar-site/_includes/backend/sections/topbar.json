@@ -1,0 +1,26 @@
+{
+  // Consumer override of the packaged topbar data — every action shape the
+  // sizing branch has to survive (#43): a four-key action with NO size, a
+  // sized one, and the dropdown lane.
+  actions: [
+    {
+      label: 'Unsized action',
+      href: '/unsized',
+      icon: 'bolt',
+      class: 'btn-adaptive',
+    },
+    {
+      label: 'Large action',
+      href: '/large',
+      size: 'lg',
+    },
+    {
+      label: 'Unsized dropdown',
+      icon: 'gear',
+      class: 'btn-adaptive',
+      dropdown: [
+        { label: 'One', href: '/one' },
+      ],
+    },
+  ],
+}

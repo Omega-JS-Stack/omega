@@ -342,6 +342,26 @@ test('resolveBrandRoot: null when no omega.json5 exists up the tree', (t) => {
   assert.equal(resolveBrandRoot(path.join(root, 'src')), null);
 });
 
+test('resolveBrandRoot: the walk stops at the nearest .git — an unconfigured repo never adopts a config above it (#73)', (t) => {
+  // The outer dir carries a brand config; the inner repo carries none. An
+  // unbounded walk would climb out of the repo and claim the outer brand.
+  const outer = makeFixture('walk-git-bound', {
+    'config/omega.json5': `{ brand: { id: 'outer', name: 'Outer' } }`,
+    'repo/.git/HEAD': `ref: refs/heads/main`,
+    'repo/src/lib/deep.js': `// depth fixture`,
+  });
+  cleanup(t, outer);
+
+  assert.equal(resolveBrandRoot(path.join(outer, 'repo', 'src', 'lib')), null);
+  assert.equal(resolveBrandRoot(path.join(outer, 'repo')), null);
+
+  // The git root itself is still CHECKED before the walk stops — a brand
+  // root is normally its own repo.
+  fs.mkdirSync(path.join(outer, 'repo', 'config'), { recursive: true });
+  fs.writeFileSync(path.join(outer, 'repo', 'config', 'omega.json5'), `{ brand: { id: 'inner', name: 'Inner' } }`);
+  assert.equal(resolveBrandRoot(path.join(outer, 'repo', 'src', 'lib')), path.join(outer, 'repo'));
+});
+
 // ─── composeTargetConfig (#31 — the deploy upload boundary) ───
 
 // Brand + app fixture exercising every interleave position, INCLUDING the
@@ -521,4 +541,95 @@ test('hasOmegaConfig mirrors loadConfig\'s functions/ → app-root fallback', (t
   const bare = makeFixture('probe-functions-bare', { 'functions/index.js': `// runtime` });
   cleanup(t, bare);
   assert.strictEqual(hasOmegaConfig(path.join(bare, 'functions')), false);
+});
+
+// ─── The company layer (#54 — the documented chain's lowest authored layer) ───
+
+// A company workspace holding one brand: the brand is stamped with
+// .omega/company.json (what a company manage run writes), so the company file
+// is the layer between framework defaults and the brand file.
+function makeCompanyFixture(name, extra) {
+  const workspace = makeFixture(name, Object.assign({
+    'company/config/omega.json5': `{
+      brands: { roots: ['./brands'] },
+      brand: { company: 'Acme Inc' },
+      monitoring: { org: 'acme-co', dsn: 'https://company.example.com' },
+      probe: { value: 'company-shared', fromCompanyShared: true },
+      targets: { backend: { probe: { value: 'company-target', fromCompanyTarget: true } } },
+    }`,
+    'company/brands/acme/config/omega.json5': `{
+      brand: { id: 'acme', name: 'Acme' },
+      probe: { value: 'brand-shared', fromBrandShared: true },
+      targets: { backend: {}, web: {} },
+    }`,
+    'company/brands/acme/apps/backend/package.json': `{ "name": "acme-backend" }`,
+  }, extra));
+
+  const companyRoot = path.join(workspace, 'company');
+  const brandRoot = path.join(companyRoot, 'brands', 'acme');
+  fs.mkdirSync(path.join(brandRoot, '.omega'), { recursive: true });
+  fs.writeFileSync(path.join(brandRoot, '.omega', 'company.json'), JSON.stringify({ root: companyRoot }));
+
+  return { workspace, companyRoot, brandRoot };
+}
+
+test('company layer: defaults < company shared < company target < brand shared < brand target < app', (t) => {
+  const { workspace, companyRoot, brandRoot } = makeCompanyFixture('company-chain');
+  cleanup(t, workspace);
+
+  const defaults = { probe: { value: 'defaults', fromDefaults: true } };
+  const { config, files } = loadConfig(path.join(brandRoot, 'apps', 'backend'), 'backend', { defaults });
+
+  // Every layer contributes; the brand still wins over the company
+  assert.strictEqual(config.probe.fromDefaults, true);
+  assert.strictEqual(config.probe.fromCompanyShared, true);
+  assert.strictEqual(config.probe.fromCompanyTarget, true);
+  assert.strictEqual(config.probe.value, 'brand-shared');
+
+  // Company-wide values the brand never restates flow all the way down
+  assert.strictEqual(config.monitoring.org, 'acme-co');
+  assert.strictEqual(config.monitoring.dsn, 'https://company.example.com');
+  assert.strictEqual(config.brand.company, 'Acme Inc');
+  assert.strictEqual(config.brand.id, 'acme');
+
+  // `brands` is company plumbing — it never inherits into a brand
+  assert.strictEqual(config.brands, undefined);
+
+  assert.strictEqual(files.company, path.join(companyRoot, 'config', 'omega.json5'));
+});
+
+test('company layer: the brand root itself reads its own stamp; an unstamped brand has no company layer', (t) => {
+  const { workspace, brandRoot } = makeCompanyFixture('company-brand-root');
+  cleanup(t, workspace);
+
+  assert.strictEqual(loadConfig(brandRoot).config.monitoring.org, 'acme-co');
+
+  fs.rmSync(path.join(brandRoot, '.omega'), { recursive: true, force: true });
+  assert.strictEqual(loadConfig(brandRoot).config.monitoring, undefined);
+  assert.strictEqual(loadConfig(brandRoot).files.company, null);
+});
+
+test('company layer: secrets in the company file hard-fail before any merge', (t) => {
+  const { workspace, companyRoot, brandRoot } = makeCompanyFixture('company-secrets');
+  cleanup(t, workspace);
+
+  fs.writeFileSync(
+    path.join(companyRoot, 'config', 'omega.json5'),
+    `{ brand: { company: 'Acme Inc' }, payment: { stripe: { secret: 'sk_live_x' } } }`,
+  );
+
+  assert.throws(() => loadConfig(path.join(brandRoot, 'apps', 'backend'), 'backend'), /Secret-shaped keys/);
+});
+
+test('company layer: composeTargetConfig freezes it into the upload (the walk-up dies at the deploy boundary)', (t) => {
+  const { workspace, brandRoot } = makeCompanyFixture('company-compose');
+  cleanup(t, workspace);
+
+  const appDir = path.join(brandRoot, 'apps', 'backend');
+  const { config } = composeTargetConfig(appDir, 'backend');
+
+  assert.strictEqual(config.monitoring.org, 'acme-co');
+  assert.strictEqual(config.probe.fromCompanyTarget, true);
+  assert.strictEqual(config.probe.value, 'brand-shared');
+  assert.deepStrictEqual(Object.keys(config.targets).sort(), ['backend', 'web']);
 });

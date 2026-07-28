@@ -79,6 +79,11 @@ function isBrandRoot(dir) {
  * an app, not a brand. The CLI entry normalizes a functions/ cwd up to the
  * app root (muscle-memory `cd functions` still works).
  *
+ * The walk is BOUNDED at the nearest `.git` (that directory is still checked
+ * first): past the repo boundary is somebody else's tree, never this dir's
+ * dispatch context. Same bound as @omega.js/config's resolveBrandRoot and the
+ * Claude plugin's inject hook.
+ *
  * @returns {{ kind: 'framework', name: string, dir: string }
  *   | { kind: 'brand', dir: string } | null} dir = where the framework dep is
  *   declared (framework) / the brand root (brand)
@@ -98,6 +103,10 @@ function findTarget(startDir) {
     if (isBrandRoot(dir)) {
       return { kind: 'brand', dir };
     }
+
+    // Repo boundary — stop here rather than statting out through the host
+    // filesystem to /.
+    if (fs.existsSync(path.join(dir, '.git'))) return null;
 
     const parent = path.dirname(dir);
     if (parent === dir) return null;

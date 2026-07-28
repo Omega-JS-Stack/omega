@@ -84,6 +84,12 @@ future FA families work with zero framework changes.
   zero runtime fetch, purge-safe. Prefer for chrome/layout icons.
 - **`<i class="fa-solid fa-rocket">`** — anything dynamic, JS-driven, or
   authored in markdown/HTML fragments: rendered by the shared watcher.
+- **Framework markup names FREE icons only** (#3). Pro is brand-owned and
+  never a package dependency, so a Pro-only name in a packaged theme, core
+  layout, or default page renders the tagged fallback in every consumer that
+  does not own Pro — and the consumer cannot fix it (the chain has no
+  consumer-local icon dir). Stock chrome must build with zero `uj_icon`
+  warnings; a brand's OWN pages are free to use whatever its set resolves.
 
 ## Testing
 

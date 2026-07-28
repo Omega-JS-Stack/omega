@@ -40,7 +40,7 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
     web:       { /* @omega.js/web settings — defined in Phase 2 */ },
     backend:   { parent, github, reviews, marketing, blog, dataRequest },
     desktop:   { app, platforms: { mac, win, linux }, autoUpdate, startup,
-                 releases, downloads, remoteConfig, restartManager },
+                 releases, downloads, remoteConfig, remoteScripts, restartManager },
     extension: { /* near-empty at launch */ },
     mobile:    { /* RESERVED — MAM parked */ },
   },
@@ -52,10 +52,15 @@ JSON5: comments, trailing commas, unquoted keys, single quotes all allowed.
 `loadConfig(projectDir, target, { defaults })` produces ONE resolved object per target:
 
 ```
-framework defaults ← brand shared ← brand targets[target] ← app shared ← app targets[target]
+framework defaults ← company ← brand shared ← brand targets[target] ← app shared ← app targets[target]
 ```
 
 - "shared" = the file minus its `targets` key. In a standalone repo only the app layers exist.
+- **The company layer** is the company workspace's own `config/omega.json5`, found through the
+  brand's `.omega/company.json` stamp (the same marker the `.env` cascade and owner hooks read —
+  see below). It layers exactly like the brand file (company shared ← company `targets[target]`)
+  minus its `brands` key, which is company plumbing and never inherits. An unstamped brand has no
+  company layer; the resolved result reports the file it used as `files.company`.
 - **`projectDir` may be a backend's `functions/` dir** (@omega.js/backend's runtime cwd): the brand
   walk-up treats the app root as one level up, so `loadConfig(functionsDir, 'backend')`
   and `loadConfig(appRoot, 'backend')` resolve identically.
@@ -402,12 +407,12 @@ its Phase-3 cutover (enumerating `SHARED_SECTIONS`, per-surface values into
 ```js
 const {
   loadConfig,          // (projectDir, target?, { defaults }?) → { config, errors, warnings, enabled, instance, files }
-  composeTargetConfig, // (projectDir, target) → { config, files } — brand+app frozen into ONE self-contained file (deploy upload boundary, #31)
+  composeTargetConfig, // (projectDir, target) → { config, files } — company+brand+app frozen into ONE self-contained file (deploy upload boundary, #31)
   hasOmegaConfig,      // (projectDir) → boolean — "is this project migrated?"
   resolveConfigPath,   // (projectDir) → abs path | null
   getEnabledTargets,   // (config) → ['web', 'backend', …]
   findBrandRoot,       // (projectDir) → brand root | null — CLASSIFIES one app dir (THE hierarchy rule)
-  resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself)
+  resolveBrandRoot,    // (startDir) → brand root | null — SEARCHES upward from anywhere (standalone → itself), bounded at the nearest .git
   loadEnv,             // (startDir) → { chain, loaded } — resolve + load the .env cascade
   resolveEnvChain,     // (startDir) → { app, brand, company } .env paths (no loading)
   loadEnvChain,        // (paths) → loaded[] — dotenv strongest-first, nulls/missing skip

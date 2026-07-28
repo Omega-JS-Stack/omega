@@ -99,6 +99,13 @@
   --omega-font-marketing: var(--omega-font-serif);
   --omega-font-display: var(--omega-font-ui);
 
+  // Affirmation checks ride the accent (blue by default) — ONE slot for every
+  // tick mark that says "you get this": plan features, benefit lists, hero
+  // meta, comparison "yes" cells. Status green (--omega-ok) stays for state
+  // feedback; an affirmation is not a status. Consumed through the
+  // `.omega-check` utility (core/css/core/_utilities.scss).
+  --omega-check: var(--omega-accent);
+
   // Chart series-1 rides the accent; 2–6 are the CVD-validated categorical
   // ramp above (cool half first, warm half after — what keeps two vocabularies
   // apart at a glance). It is ONE ramp for two surfaces: a chart series

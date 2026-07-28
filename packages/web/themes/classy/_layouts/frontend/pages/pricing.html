@@ -255,7 +255,7 @@ faqs:
                   <ul class="classy-price-card__features">
                     {% for feature in plan.commonFeatures %}
                       <li>
-                        <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                        <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                         <span>
                           {% if feature.value == 'Unlimited' %}
                             Unlimited
@@ -284,7 +284,7 @@ faqs:
                     <ul class="classy-price-card__features">
                       {% for feature in plan.extraFeatures %}
                         <li>
-                          <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                          <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                           <span>
                             {% if feature.value == 'Unlimited' or feature.value == '24/7' %}
                               {{ feature.value }}
@@ -361,26 +361,26 @@ faqs:
                   {% if resolved.pricing.enterprise.features %}
                     {% for feature in resolved.pricing.enterprise.features %}
                       <li>
-                        <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                        <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                         <span>{{ feature }}</span>
                       </li>
                     {% endfor %}
                   {% else %}
                     {% assign _last_plan = _plans | last %}
                     <li>
-                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                       <span>Everything in {{ _last_plan.name }}</span>
                     </li>
                     <li>
-                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                       <span>Custom volume &amp; terms</span>
                     </li>
                     <li>
-                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                       <span>Security review &amp; SLA</span>
                     </li>
                     <li>
-                      <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                      <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                       <span>Dedicated support</span>
                     </li>
                   {% endif %}
@@ -439,7 +439,7 @@ faqs:
               <ul class="classy-price-card__features">
                 {% for feature in product.features %}
                   <li>
-                    <span class="classy-price-card__check">{% uj_icon "check", "fa-sm" %}</span>
+                    <span class="classy-price-card__check omega-check">{% uj_icon "check", "fa-sm" %}</span>
                     <span>
                       {% if feature.value == 'Unlimited' %}
                         Unlimited
@@ -517,7 +517,7 @@ faqs:
                 {% assign _cell = feature.values[plan.id] %}
                 <td>
                   {% if _cell == true %}
-                    <span class="classy-compare__yes">{% uj_icon "circle-check", "fa-md" %}</span>
+                    <span class="classy-compare__yes omega-check">{% uj_icon "circle-check", "fa-md" %}</span>
                   {% elsif _cell == 'Unlimited' %}
                     Unlimited
                   {% elsif _cell %}

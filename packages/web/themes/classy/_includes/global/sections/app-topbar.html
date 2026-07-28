@@ -6,7 +6,11 @@
     search:  { enabled, action, name, placeholder }        (optional; form GET)
     status:  { label, tone: ok|warn|danger }                (optional env pill)
     actions: [{ type: 'account' } | { type: 'notifications', icon, badge, dropdown }
-              | { label, href, icon, class, dropdown }]
+              | { label, href, icon, class, size, dropdown }]
+
+    action.size is 'sm' | 'lg' (Bootstrap's button sizes) — anything else
+    renders no size class. NEVER test it for truthiness: Liquid answers `.size`
+    on a hash with its KEY COUNT, so every action would "have" a size (#43).
 
   Breadcrumbs come from the page's resolved.theme.header.breadcrumbs.items
   (the same frontmatter API as ever — they render here now instead of the
@@ -22,7 +26,7 @@
 
     <!-- Rail collapse toggle (desktop) -->
     <button class="btn-icon d-none d-xl-inline-flex" type="button" data-shell-toggle="collapse" aria-expanded="true" aria-controls="app-sidebar" aria-label="Toggle sidebar">
-      {% uj_icon "sidebar", "fa-sm" %}
+      {% uj_icon "table-columns", "fa-sm" %}
     </button>
 
     <!-- Breadcrumb trail -->
@@ -151,7 +155,9 @@
         {% include global/sections/account.html size="sm" attributes=action.attributes %}
       {% elsif action.dropdown %}
         <!-- Generic Dropdown -->
-        {% capture action_class %}btn {% if action.size %}btn-{{ action.size }}{% endif %} {% if action.class %}{{ action.class }}{% else %}btn-outline-adaptive btn-sm{% endif %}{% endcapture %}
+        {% comment %}Liquid's `.size` on a hash is its KEY COUNT — test the value, never truthiness (#43). The btn-sm default only applies when the author set no size.{% endcomment %}
+        {% assign action_size = '' %}{% if action.size == 'sm' or action.size == 'lg' %}{% assign action_size = action.size %}{% endif %}
+        {% capture action_class %}btn {% if action_size != '' %}btn-{{ action_size }}{% endif %} {% if action.class %}{{ action.class }}{% else %}btn-outline-adaptive{% if action_size == '' %} btn-sm{% endif %}{% endif %}{% endcapture %}
         {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
         <div class="dropdown">
           <button class="{{ action_class }} dropdown-toggle" type="button" data-bs-toggle="dropdown" {{ action_attributes }}>
@@ -193,7 +199,9 @@
         </div>
       {% else %}
         <!-- Regular Button -->
-        {% capture action_class %}btn {% if action.size %}btn-{{ action.size }}{% endif %} {% if action.class %}{{ action.class }}{% else %}btn-outline-adaptive btn-sm{% endif %}{% endcapture %}
+        {% comment %}Liquid's `.size` on a hash is its KEY COUNT — test the value, never truthiness (#43). The btn-sm default only applies when the author set no size.{% endcomment %}
+        {% assign action_size = '' %}{% if action.size == 'sm' or action.size == 'lg' %}{% assign action_size = action.size %}{% endif %}
+        {% capture action_class %}btn {% if action_size != '' %}btn-{{ action_size }}{% endif %} {% if action.class %}{{ action.class }}{% else %}btn-outline-adaptive{% if action_size == '' %} btn-sm{% endif %}{% endif %}{% endcapture %}
         {% capture action_attributes %}{% if action.attributes %}{% for attr in action.attributes %} {{ attr[0] }}="{{ attr[1] }}"{% endfor %}{% endif %}{% endcapture %}
         {% capture action_content %}
           {% if action.icon %}

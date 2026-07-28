@@ -21,24 +21,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { findBrandRoot } = require('./load.js');
-
-// A brand's pointer at its company root — stamped idempotently by company
-// manage runs, read here for the company layer of the chain.
-const COMPANY_MARKER = path.join('.omega', 'company.json');
-
-/**
- * The company root a brand points at via its .omega/company.json marker.
- * @param {string} brandRoot
- * @returns {string|null} Absolute company root, or null when unstamped/unreadable.
- */
-function readCompanyRoot(brandRoot) {
-  try {
-    const marker = JSON.parse(fs.readFileSync(path.join(brandRoot, COMPANY_MARKER), 'utf8'));
-    return typeof marker.root === 'string' && marker.root ? marker.root : null;
-  } catch {
-    return null;
-  }
-}
+const { readCompanyRoot } = require('./company.js');
 
 /**
  * Resolve the .env chain for a project dir, strongest file first.
@@ -112,4 +95,4 @@ function loadEnv(startDir) {
   return { chain, loaded };
 }
 
-module.exports = { loadEnv, resolveEnvChain, loadEnvChain, readCompanyRoot, COMPANY_MARKER };
+module.exports = { loadEnv, resolveEnvChain, loadEnvChain };

@@ -19,6 +19,8 @@
  *   __main_assets__/js/...  → the core layer (framework runtime modules)
  *   __main_assets__/themes/…→ the packaged themes dir (e.g. bootstrap js)
  *   __theme__/...           → active theme root, classy fallback
+ *   <framework dependency>  → resolved from @omega.js/web's own installation,
+ *                             so consumer code imports chart.js & friends bare
  *
  * Every js entry is wrapped in a boot stub around the runtime handshake
  * (runtime/boot.js): the main bundle calls bootMain(mod) — @omega.js/client
@@ -49,6 +51,60 @@ function isPageEntry(rel) {
   if (base.startsWith('_')) return false;
   if (base === 'index.js' || base === 'index.scss') return true;
   return rel.split('/').length <= 3; // 'pages' + up to 2 segments
+}
+
+// The framework's own installation root (src/ in the monorepo, dist/ in a
+// published install — both sit one level under the package root).
+const FRAMEWORK_ROOT = path.resolve(__dirname, '..');
+
+/**
+ * The set of libraries a consumer may import by BARE specifier (#2): every
+ * package `@omega.js/web` declares as a dependency — no hand-curated list, the
+ * declared set IS the list. `@omega.js/*` deps are excluded: the client is
+ * wired explicitly (the caller-supplied clientEntry alias) and the private
+ * packages are vendored, so neither resolves through node_modules here.
+ * @returns {string[]} dependency names
+ */
+function frameworkDependencyNames() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(FRAMEWORK_ROOT, 'package.json'), 'utf8'));
+  return Object.keys(pkg.dependencies || {}).filter((name) => !name.startsWith('@omega.js/'));
+}
+
+/**
+ * esbuild plugin resolving framework-provided libraries from the FRAMEWORK's
+ * installation, whoever imports them. A consumer page module lives outside
+ * `@omega.js/web`, so `import 'chart.js'` would otherwise resolve from the
+ * consumer's own dir and fail (or, if the consumer declared its own copy, ship
+ * the library TWICE — the framework's admin bundle and the consumer's page each
+ * carrying one). Resolving from the package root makes the framework's copy win
+ * always: one copy, one shared chunk. Anything the framework does not declare
+ * is untouched and resolves normally from the consumer. Build-time-only
+ * dependencies (esbuild, sass, sharp) need no exclusion — resolution happens on
+ * demand, so nothing enters a bundle unless browser code imports it by name.
+ * @returns {object|null} the plugin, or null when the package declares no deps
+ */
+function frameworkDepsPlugin() {
+  const names = frameworkDependencyNames();
+  if (!names.length) return null;
+  // A filter built from the declared names (bare specifier + subpaths) keeps
+  // the hook off every other import esbuild resolves.
+  const escaped = names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const filter = new RegExp(`^(${escaped.join('|')})(/|$)`);
+
+  return {
+    name: 'omega-framework-deps',
+    setup(build) {
+      build.onResolve({ filter }, (args) => {
+        // build.resolve re-runs every onResolve hook — the marker stops the loop.
+        if (args.pluginData && args.pluginData.frameworkDep) return null;
+        return build.resolve(args.path, {
+          kind: args.kind,
+          resolveDir: FRAMEWORK_ROOT,
+          pluginData: { frameworkDep: true },
+        });
+      });
+    },
+  };
 }
 
 function pageKey(rel) {
@@ -138,7 +194,8 @@ async function buildAssets(options) {
       keyBySpecifier.set(mainJs, ['main']);
     }
 
-    const bootRuntime = path.resolve(__dirname, '..', 'runtime', 'boot.js');
+    const bootRuntime = path.resolve(FRAMEWORK_ROOT, 'runtime', 'boot.js');
+    const depsPlugin = frameworkDepsPlugin();
 
     const bootPlugin = {
       name: 'omega-boot',
@@ -206,7 +263,7 @@ async function buildAssets(options) {
       metafile: true,
       // Directory alias so SUBPATH imports work too (@omega.js/client/modules/dom.js)
       alias: { '@omega.js/client': path.dirname(options.clientEntry) },
-      plugins: options.dev ? [bootPlugin] : [bootPlugin, stripDevBlocksPlugin],
+      plugins: [bootPlugin, depsPlugin, options.dev ? null : stripDevBlocksPlugin].filter(Boolean),
       logLevel: 'silent',
       define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
     });
@@ -239,7 +296,7 @@ async function buildAssets(options) {
         format: 'iife',
         outdir: path.join(options.outDir, 'assets', 'js'),
         entryNames: '[dir]/[name]',
-        plugins: options.dev ? [] : [stripDevBlocksPlugin],
+        plugins: [depsPlugin, options.dev ? null : stripDevBlocksPlugin].filter(Boolean),
         logLevel: 'silent',
         define: { 'process.env.NODE_ENV': options.dev ? '"development"' : '"production"' },
       });
