@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- [#61](https://github.com/Omega-JS-Stack/omega/issues/61) — The plugin staleness gate: scripts/skill-claims.test.js extracts every claim a skill makes (repo paths, consumer node_modules paths, omega: skill references, @omega.js package names, CLI verbs) and fails the battery when the repo no longer has it.
 - [#59](https://github.com/Omega-JS-Stack/omega/issues/59) — The Claude plugin ships from the monorepo: agent-plugins/claude carries seven ported skills plus the inject hook that loads the matching framework skill per project, the repo-root marketplace manifest lists it, and committed project settings auto-install it after one trust prompt. Structure and hook behavior pinned by scripts/agent-plugins.test.js.
 
 ### Changed
