@@ -342,6 +342,106 @@ test('retire rule: a marker file with real consumer notes is kept, with a warnin
   assert.ok(warnings.some((m) => m.includes('consumer content')));
 });
 
+// A prior generation's generated CLAUDE.md: the framework's own marker grammar,
+// content that no current template renders, and a Custom section carrying the
+// old template's boilerplate plus lines the merge migrated out of Default.
+const LEGACY_GENERATED_DOC = [
+  DEFAULT_MARKER,
+  '# OMEGA Backend (@omega.js/backend) — consumer project',
+  '',
+  '## Framework',
+  '',
+  'This project consumes **OMEGA Backend** (@omega.js/backend).',
+  '',
+  CUSTOM_MARKER,
+  '- **`node_modules/backend-manager/CLAUDE.md`** — full framework reference',
+  '',
+  '## Project-specific notes',
+  '',
+  'Add anything specific to THIS project here. Edits below this line are preserved across `npx omega setup` runs.',
+  '',
+].join('\n');
+
+test('retire rule: a PRIOR-GENERATION marker file is swept even when the current template dropped the markers', () => {
+  // #101: CLAUDE.md became the one-line `@AGENTS.md` pointer, so the rendered
+  // template carries no markers — the legacy generated file must still be
+  // recognized as the framework's own and retired, not kept as consumer content.
+  const { defaultsDir, outputDir } = stage({
+    'CLAUDE.md': '@AGENTS.md\n',
+  }, {
+    'CLAUDE.md': LEGACY_GENERATED_DOC,
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'CLAUDE.md': { retire: true } },
+    logger: quiet,
+  });
+
+  assert.deepEqual(result.removed, ['CLAUDE.md']);
+  assert.equal(jetpack.exists(path.join(outputDir, 'CLAUDE.md')), false);
+});
+
+test('retire rule: a consumer-authored file with NO framework markers is kept against a marker-less template', () => {
+  const warnings = [];
+  const { defaultsDir, outputDir } = stage({
+    'CLAUDE.md': '@AGENTS.md\n',
+  }, {
+    'CLAUDE.md': '# Notes\n\nOur deploy needs the VPN up.\n',
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { 'CLAUDE.md': { retire: true } },
+    logger: { ...quiet, warn: (m) => warnings.push(m) },
+  });
+
+  assert.deepEqual(result.removed, []);
+  assert.match(jetpack.read(path.join(outputDir, 'CLAUDE.md')), /VPN/);
+  assert.ok(warnings.some((m) => m.includes('consumer content')));
+});
+
+test('overwrite:false heals a PRIOR-GENERATION marker file to the marker-less template', () => {
+  // #101 twin gap: on the standalone upgrade path the retire rule never runs —
+  // the legacy content-bearing CLAUDE.md sat under `overwrite: false` and
+  // survived beside the new AGENTS.md. The framework owns it: heal it.
+  const { defaultsDir, outputDir } = stage({
+    'CLAUDE.md': '@AGENTS.md\n',
+  }, {
+    'CLAUDE.md': LEGACY_GENERATED_DOC,
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { '**/*': { overwrite: false } },
+    logger: quiet,
+  });
+
+  assert.deepEqual(result.written, ['CLAUDE.md']);
+  assert.equal(jetpack.read(path.join(outputDir, 'CLAUDE.md')).trim(), '@AGENTS.md');
+});
+
+test('overwrite:false still preserves a consumer file with no framework markers', () => {
+  const { defaultsDir, outputDir } = stage({
+    'CLAUDE.md': '@AGENTS.md\n',
+  }, {
+    'CLAUDE.md': '# Notes\n\nOur deploy needs the VPN up.\n',
+  });
+
+  const result = applyDefaults({
+    defaultsDir,
+    outputDir,
+    fileMap: { '**/*': { overwrite: false } },
+    logger: quiet,
+  });
+
+  assert.deepEqual(result.skipped, ['CLAUDE.md']);
+  assert.match(jetpack.read(path.join(outputDir, 'CLAUDE.md')), /VPN/);
+});
+
 test('retire rule: compares through the global transform (an untouched transformed copy is framework-owned)', () => {
   const { defaultsDir, outputDir } = stage({
     'docs/README.md': 'Docs for [site.name]',

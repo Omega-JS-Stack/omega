@@ -15,7 +15,7 @@ window.bootstrap = bootstrap;
 
 // Theme behaviors
 import setupNavbarScroll from './js/navbar-scroll.js';
-import initializeTooltips from './js/initialize-tooltips.js';
+import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 
 // Initialize when DOM is ready
 domReady().then(() => {

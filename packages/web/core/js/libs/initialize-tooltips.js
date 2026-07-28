@@ -1,6 +1,13 @@
 /**
  * Initialize Bootstrap Tooltips
  * Finds all elements with data-bs-toggle="tooltip" and initializes them
+ *
+ * The ONE home ([#99](https://github.com/Omega-JS-Stack/omega/issues/99)):
+ * every theme shipped a byte-identical copy under its own `js/`, so a fix
+ * had to be made three times. Themes import it off the core layer
+ * (`__main_assets__/js/libs/initialize-tooltips.js`) — same lane as the
+ * chart helper beside it — and `window.bootstrap` is already global by the
+ * time a theme's DOM-ready handler calls this.
  */
 export default function initializeTooltips() {
   const $tooltipTriggers = document.querySelectorAll('[data-bs-toggle="tooltip"]');

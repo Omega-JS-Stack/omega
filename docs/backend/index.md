@@ -20,8 +20,8 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 ### For Consuming Projects
 
 1. `npm install @omega.js/backend` (at the app root — it's a runtime dependency; the staged `dist/package.json` derives from the app manifest)
-2. `npx omega setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `src/index.js`, `engines.node`, plus the defaults tree via the shared devkit engine: CLAUDE.md, CHANGELOG.md, docs/, test/, `.gitignore`, `.env` — the last three live-sync their `Default Values` section on every setup), validates config, stages `dist/`, provisions Firestore indexes
-3. `npx omega emulator` — start Firebase emulators (auth/firestore/functions/database/storage)
+2. `npx omega setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `src/index.js`, `engines.node`, plus the defaults tree via the shared devkit engine: AGENTS.md + its one-line `@AGENTS.md` CLAUDE.md pointer, CHANGELOG.md, docs/, test/, `.gitignore`, `.env` — AGENTS.md, `.gitignore`, and `.env` live-sync their `Default Values` section on every setup), validates config, stages `dist/`, provisions Firestore indexes
+3. `npx omega emulator` — start Firebase emulators (auth/firestore/functions/database/storage). This is also a **prerequisite of the brand's frontend apps**: `omega dev` in the website app auto-connects Auth/Firestore to these emulators with no live-Firebase opt-out, so start them here first ([docs/web/index.md](../web/index.md))
 4. `npx omega serve` — local serve with Stripe webhook forwarding (if `STRIPE_SECRET_KEY` is set)
 5. `npx omega test` — runs framework + project test suites against an emulator. Positional target(s) select which test FILES run, by source + path (multiple space-separated targets compose):
    - `npx omega test` — everything (framework + project suites)
@@ -136,7 +136,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`; web's lives at `scaffold/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 

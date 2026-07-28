@@ -15,7 +15,7 @@ window.bootstrap = bootstrap;
 
 // Theme behaviors (masthead scroll state rides the shared motion engine's
 // data-omega-scroll-watch — no theme JS)
-import initializeTooltips from './js/initialize-tooltips.js';
+import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 
 // Initialize when DOM is ready
 domReady().then(() => {

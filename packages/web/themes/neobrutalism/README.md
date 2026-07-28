@@ -93,6 +93,5 @@ neobrutalism/
 │       ├── _cards.scss
 │       └── _forms.scss
 └── js/
-    ├── navbar-scroll.js
-    └── initialize-tooltips.js
+    └── navbar-scroll.js
 ```

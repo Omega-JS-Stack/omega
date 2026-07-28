@@ -2,7 +2,7 @@
  * `omega setup` — prepare/refresh a consumer project:
  *   1. Node version check (warn on mismatch with the framework standard)
  *   2. Scaffold framework defaults (devkit engine + the web FILE_MAP —
- *      marker merges for .gitignore/.env/CLAUDE.md, omega.json5 seed,
+ *      marker merges for .gitignore/.env/AGENTS.md, omega.json5 seed,
  *      Ruby-free CI workflow). No page copying: default pages are virtual.
  *   3. Sync package.json scripts to the omega commands
  *

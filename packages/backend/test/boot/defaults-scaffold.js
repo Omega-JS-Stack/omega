@@ -41,6 +41,7 @@ module.exports = {
         const expected = [
           '.env',
           '.gitignore',
+          'AGENTS.md',
           'CHANGELOG.md',
           'CLAUDE.md',
           'docs/README.md',
@@ -52,6 +53,11 @@ module.exports = {
         for (const file of expected) {
           assert.equal(jetpack.exists(path.join(tmp, file)), 'file', `${file} should exist`);
         }
+
+        // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is
+        // the one-line `@AGENTS.md` pointer.
+        assert.ok(jetpack.read(path.join(tmp, 'AGENTS.md')).includes('node_modules/@omega.js/AGENTS.md'), 'AGENTS.md points at the OMEGA map');
+        assert.equal(jetpack.read(path.join(tmp, 'CLAUDE.md')).trim(), '@AGENTS.md');
 
         // Marker files ship with the protocol sections intact.
         const env = jetpack.read(path.join(tmp, '.env'));
@@ -110,7 +116,7 @@ module.exports = {
       name: 'brand-context-skips-per-app-docs',
       async run({ assert }) {
         // Brand doc unification: inside a brand monorepo the brand root is the
-        // one doc home — CLAUDE.md/CHANGELOG.md/docs/ never scaffold.
+        // one doc home — AGENTS.md/CLAUDE.md/CHANGELOG.md/docs/ never scaffold.
         const tmp = makeTmp();
         jetpack.write(path.join(tmp, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
         const appDir = path.join(tmp, 'apps', 'backend');
@@ -118,7 +124,7 @@ module.exports = {
 
         const result = scaffoldDefaults({ outputDir: appDir, logger: quiet });
 
-        for (const file of ['CLAUDE.md', 'CHANGELOG.md', 'docs/README.md']) {
+        for (const file of ['AGENTS.md', 'CLAUDE.md', 'CHANGELOG.md', 'docs/README.md']) {
           assert.equal(jetpack.exists(path.join(appDir, file)), false, `${file} must not scaffold in brand context`);
         }
         // The non-doc defaults still land.
@@ -133,7 +139,7 @@ module.exports = {
       async run({ assert }) {
         // Seed a standalone scaffold, then wrap it in a brand monorepo — the
         // next setup sweeps the framework-owned per-app docs (one-time heal)
-        // but never destroys a CLAUDE.md carrying consumer notes.
+        // but never destroys an AGENTS.md carrying consumer notes.
         const tmp = makeTmp();
         const appDir = path.join(tmp, 'apps', 'backend');
         jetpack.dir(appDir);
@@ -142,19 +148,65 @@ module.exports = {
 
         const swept = scaffoldDefaults({ outputDir: appDir, logger: quiet });
 
-        assert.deepEqual(swept.removed.slice().sort(), ['CHANGELOG.md', 'CLAUDE.md', 'docs/README.md']);
+        assert.deepEqual(swept.removed.slice().sort(), ['AGENTS.md', 'CHANGELOG.md', 'CLAUDE.md', 'docs/README.md']);
         assert.equal(jetpack.exists(path.join(appDir, 'docs')), false, 'emptied docs/ dir is pruned');
 
-        // Consumer content is never destroyed: a CLAUDE.md with real notes
+        // Consumer content is never destroyed: an AGENTS.md with real notes
         // below the Custom marker stays, with a warning.
         const warnings = [];
-        jetpack.write(path.join(appDir, 'CLAUDE.md'),
+        jetpack.write(path.join(appDir, 'AGENTS.md'),
           `${DEFAULT_MARKER}\nframework guidance\n\n${CUSTOM_MARKER}\nOur deploy needs the VPN up.\n`);
         const kept = scaffoldDefaults({ outputDir: appDir, logger: { log() {}, warn: (m) => warnings.push(m), error: console.error } });
 
         assert.equal(kept.removed.length, 0);
-        assert.ok(jetpack.read(path.join(appDir, 'CLAUDE.md')).includes('VPN'), 'consumer CLAUDE.md content survives');
+        assert.ok(jetpack.read(path.join(appDir, 'AGENTS.md')).includes('VPN'), 'consumer AGENTS.md content survives');
         assert.ok(warnings.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints');
+      },
+    },
+    {
+      name: 'legacy-generated-claude-md-heals-on-both-paths',
+      async run({ assert }) {
+        // #101: a CLAUDE.md written by the PRE-agent-docs generation carries the
+        // framework's own markers and content no current template renders, so it
+        // matches neither the rendered `@AGENTS.md` pointer nor its (empty)
+        // Custom section. It is still the framework's file: the brand path
+        // sweeps it, the standalone path heals it to the pointer.
+        const legacy = [
+          DEFAULT_MARKER,
+          '# OMEGA Backend (@omega.js/backend) — consumer project',
+          '',
+          '## Framework',
+          '',
+          'This project consumes **OMEGA Backend** (@omega.js/backend).',
+          '',
+          CUSTOM_MARKER,
+          '- **`node_modules/backend-manager/CLAUDE.md`** — full framework reference',
+          '',
+          '## Project-specific notes',
+          '',
+          'Add anything specific to THIS project here. Edits below this line are preserved across `npx omega setup` runs.',
+          '',
+        ].join('\n');
+
+        // Brand path: swept.
+        const brand = makeTmp();
+        jetpack.write(path.join(brand, 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme' } }\n");
+        const appDir = path.join(brand, 'apps', 'backend');
+        jetpack.write(path.join(appDir, 'CLAUDE.md'), legacy);
+
+        const swept = scaffoldDefaults({ outputDir: appDir, logger: quiet });
+
+        assert.ok(swept.removed.includes('CLAUDE.md'), 'the legacy per-app CLAUDE.md is retired, not kept');
+        assert.equal(jetpack.exists(path.join(appDir, 'CLAUDE.md')), false);
+
+        // Standalone path: healed to the one-line pointer, AGENTS.md lands.
+        const standalone = makeTmp();
+        jetpack.write(path.join(standalone, 'CLAUDE.md'), legacy);
+
+        scaffoldDefaults({ outputDir: standalone, logger: quiet });
+
+        assert.equal(jetpack.read(path.join(standalone, 'CLAUDE.md')).trim(), '@AGENTS.md', 'the stale CLAUDE.md is healed to the pointer');
+        assert.ok(jetpack.read(path.join(standalone, 'AGENTS.md')).includes('node_modules/@omega.js/AGENTS.md'), 'AGENTS.md carries the content');
       },
     },
     {

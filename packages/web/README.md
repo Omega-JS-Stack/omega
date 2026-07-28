@@ -267,8 +267,9 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   boot, then `mod({ manager, options })` — the UJM page-module contract,
   with `manager` the frontend Manager wrapper carrying mode helpers).
 - **Scaffolding (`omega setup`)** — devkit's defaults engine over
-  `scaffold/`: marker-section merges live-sync .gitignore/.env/CLAUDE.md
-  (Custom sections preserved verbatim), config/omega.json5 seeds then
+  `scaffold/`: marker-section merges live-sync .gitignore/.env/AGENTS.md
+  (Custom sections preserved verbatim; CLAUDE.md is the one-line `@AGENTS.md`
+  pointer, copied when missing), config/omega.json5 seeds then
   JSON5-defaults-merges (consumer values win), the Ruby-free CI workflow +
   .nvmrc re-template every run, `src/**` is consumer-owned after seeding.
   NO pages are copied — the default set stays virtual. package.json scripts

@@ -8,7 +8,7 @@
  *   - NO page copying — default pages are virtual templates served from the
  *     package (the whole ~60-page default set works with zero files in src/)
  *   - NO Gemfile / _config.yml / Ruby anywhere
- *   - marker-section merges keep .gitignore/.env/CLAUDE.md live-synced while
+ *   - marker-section merges keep .gitignore/.env/AGENTS.md live-synced while
  *     the consumer's Custom section survives verbatim
  */
 const path = require('node:path');
@@ -25,7 +25,10 @@ const NODE_VERSION = '24';
 // and `_.env`, not their outputs.
 const FILE_MAP = {
   '**/*': { overwrite: false },
-  'CLAUDE.md': { mergeLines: true },
+  // The agent-docs chain (#63): AGENTS.md carries the content (marker-merged
+  // like .env), CLAUDE.md is the one-line `@AGENTS.md` pointer — copied when
+  // missing by the `**/*` rule above, never clobbered.
+  'AGENTS.md': { mergeLines: true },
   '_.gitignore': { mergeLines: true },
   '_.env': { mergeLines: true },
   // JSON5 defaults-merge: consumer values win, new framework keys are added
@@ -52,16 +55,24 @@ function scaffoldDefaults(options) {
   // re-adding template keys under it. Standalone consumers keep the full
   // template + JSON5 merge.
   const fileMap = { ...FILE_MAP };
+  const logger = options.logger || console;
   if (!resolveSeedMode(options.outputDir).standalone) {
+    // Say which mode applied ([#95](https://github.com/Omega-JS-Stack/omega/issues/95)):
+    // the branch below rewrites what setup scaffolds, and a silent branch made
+    // a missing config template and a missing AGENTS.md read as a bug.
+    logger.log('[setup] brand monorepo detected — targets-only config seed; the agent docs live at the brand root');
     if (!resolveConfigPath(options.outputDir)) {
       jetpack.write(path.join(options.outputDir, 'config', 'omega.json5'), renderBrandAppSeed('web'));
     }
     fileMap['config/omega.json5'] = { overwrite: false };
     // Brand doc unification (Ian 2026-07-20): inside a brand monorepo the
-    // BRAND ROOT is the one doc home — the per-app CLAUDE.md never scaffolds,
-    // and an existing framework-owned-only copy is swept (retire rule;
-    // consumer content is never destroyed). Standalone apps keep it.
+    // BRAND ROOT is the one doc home — the per-app AGENTS.md/CLAUDE.md never
+    // scaffold, and existing framework-owned-only copies are swept (retire
+    // rules; consumer content is never destroyed). Standalone apps keep them.
+    fileMap['AGENTS.md'] = { retire: true };
     fileMap['CLAUDE.md'] = { retire: true };
+  } else {
+    logger.log('[setup] standalone app — full config template scaffolded; the per-app agent docs land here');
   }
 
   return applyDefaults({

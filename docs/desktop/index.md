@@ -214,7 +214,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/AGENTS.md`; web's lives at `scaffold/AGENTS.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 

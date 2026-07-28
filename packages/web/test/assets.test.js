@@ -183,6 +183,28 @@ test('main bundle graph: real UJM runtime + theme via __theme__ + the boot runti
   assert.ok(graph.includes('Global module error:'), 'boot runtime (bootMain) in the graph');
 });
 
+test('tooltips: one shared initializer on the core layer, wired by every theme (#99)', async () => {
+  // The initializer had a byte-identical copy under every theme's js/ — a fix
+  // had to be made three times. One home on the core layer, imported through
+  // __main_assets__ like the chart helper beside it.
+  const SHARED = path.join(PKG, 'core', 'js', 'libs', 'initialize-tooltips.js');
+  assert.ok(fs.existsSync(SHARED), 'the shared initializer lives on the core layer');
+
+  for (const theme of fs.readdirSync(path.join(PKG, 'themes'))) {
+    const copy = path.join(PKG, 'themes', theme, 'js', 'initialize-tooltips.js');
+    assert.ok(!fs.existsSync(copy), `${theme} carries no private copy`);
+  }
+
+  // Every theme that wires tooltips still gets them into its bundle graph
+  // (real chain: a sibling theme always sits over the classy base).
+  for (const theme of ['classy', 'newsflash', 'neobrutalism']) {
+    const manifest = await build(theme === 'classy' ? ['classy'] : [theme, 'classy']);
+    const graph = readGraph(manifest.js.main);
+    assert.ok(graph.includes('data-bs-toggle="tooltip"'), `${theme}: the shared initializer rides the bundle`);
+    assert.ok(graph.includes('tooltips'), `${theme}: the initializer body (not just the selector) bundled`);
+  }
+});
+
 test('ESM splitting: @omega.js/client singleton lives in exactly ONE shared chunk', async () => {
   const manifest = await build(['classy']);
 

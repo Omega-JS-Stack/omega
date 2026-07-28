@@ -48,15 +48,21 @@ test('scaffold: files land with rename rules applied, no pages, no Ruby', () => 
   const result = scaffoldDefaults({ outputDir: root, logger: quiet });
 
   // `_.` renames + templating
-  for (const file of ['.gitignore', '.env', 'CLAUDE.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
+  for (const file of ['.gitignore', '.env', 'AGENTS.md', 'CLAUDE.md', '.nvmrc', '.github/workflows/build.yml', 'config/omega.json5']) {
     assert.ok(fs.existsSync(path.join(root, file)), `${file} scaffolded`);
   }
+
+  // The agent-docs chain (#63): AGENTS.md carries the content, CLAUDE.md is the
+  // one-line `@AGENTS.md` pointer.
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /node_modules\/@omega\.js\/AGENTS\.md/, 'AGENTS.md points at the OMEGA map');
+  assert.strictEqual(fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8').trim(), '@AGENTS.md');
   assert.strictEqual(fs.readFileSync(path.join(root, '.nvmrc'), 'utf8').trim(), `v${NODE_VERSION}`, '.nvmrc templated');
 
   // src/ seed dirs exist (via .gitkeep), but NO default pages are copied —
-  // the ~60-page default set is virtual, served from the package
+  // the ~60-page default set is virtual, served from the package. The one
+  // file there is the example walkthrough (#97), inert by its .txt suffix.
   assert.ok(fs.existsSync(path.join(root, 'src', 'pages')), 'src/pages seeded');
-  assert.strictEqual(fs.readdirSync(path.join(root, 'src', 'pages')).length, 0, 'zero pages copied');
+  assert.deepStrictEqual(fs.readdirSync(path.join(root, 'src', 'pages')), ['example.md.txt'], 'zero pages copied — only the example walkthrough');
 
   // Ruby is gone
   assert.ok(!fs.existsSync(path.join(root, 'Gemfile')), 'no Gemfile');
@@ -142,33 +148,64 @@ test('scaffold: inside a brand monorepo the seed is targets-only and the templat
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('scaffold: inside a brand monorepo the per-app CLAUDE.md never scaffolds and framework-owned copies sweep (brand doc unification)', () => {
+test('scaffold: setup names the seed mode it detected (#95)', () => {
+  const root = tmpConsumer();
+
+  // Standalone: the full template lane
+  const standaloneLines = [];
+  scaffoldDefaults({ outputDir: root, logger: { ...quiet, log: (m) => standaloneLines.push(m) } });
+  const standaloneMode = standaloneLines.filter((m) => m.startsWith('[setup]'));
+  assert.strictEqual(standaloneMode.length, 1, 'exactly one mode line');
+  assert.match(standaloneMode[0], /standalone app/, 'names the mode');
+  assert.match(standaloneMode[0], /full config template/, 'names the consequence');
+
+  // Brand monorepo: the targets-only lane
+  const appDir = path.join(root, 'brand', 'apps', 'website');
+  fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
+  fs.mkdirSync(appDir, { recursive: true });
+
+  const brandLines = [];
+  scaffoldDefaults({ outputDir: appDir, logger: { ...quiet, log: (m) => brandLines.push(m) } });
+  const brandMode = brandLines.filter((m) => m.startsWith('[setup]'));
+  assert.strictEqual(brandMode.length, 1, 'exactly one mode line');
+  assert.match(brandMode[0], /brand monorepo detected/, 'names the mode');
+  assert.match(brandMode[0], /targets-only config seed/, 'names the consequence');
+  assert.match(brandMode[0], /brand root/, 'says where the docs went');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('scaffold: inside a brand monorepo the per-app agent docs never scaffold and framework-owned copies sweep (brand doc unification)', () => {
   const root = tmpConsumer();
   const appDir = path.join(root, 'brand', 'apps', 'website');
   fs.mkdirSync(appDir, { recursive: true });
 
-  // Standalone scaffold first (no brand config yet) — the per-app CLAUDE.md lands.
+  // Standalone scaffold first (no brand config yet) — the per-app agent docs land.
   scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.ok(fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'standalone apps keep the per-app CLAUDE.md');
+  assert.ok(fs.existsSync(path.join(appDir, 'AGENTS.md')), 'standalone apps keep the per-app AGENTS.md');
+  assert.ok(fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'standalone apps keep the per-app CLAUDE.md pointer');
 
   // Wrap it in a brand monorepo: the next setup sweeps the untouched copy.
   fs.mkdirSync(path.join(root, 'brand', 'config'), { recursive: true });
   fs.writeFileSync(path.join(root, 'brand', 'config', 'omega.json5'), "{ brand: { id: 'acme', name: 'Acme', url: 'https://acme.test' }, targets: { web: {} } }\n");
   const swept = scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.deepStrictEqual(swept.removed, ['CLAUDE.md'], 'framework-owned per-app CLAUDE.md is swept');
+  assert.deepStrictEqual(swept.removed.slice().sort(), ['AGENTS.md', 'CLAUDE.md'], 'framework-owned per-app agent docs are swept');
+  assert.ok(!fs.existsSync(path.join(appDir, 'AGENTS.md')), 'the brand root is the doc home');
   assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'the brand root is the doc home');
 
-  // Rerun never resurrects it.
+  // Rerun never resurrects them.
   scaffoldDefaults({ outputDir: appDir, logger: quiet });
-  assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'reruns do not resurrect the per-app doc');
+  assert.ok(!fs.existsSync(path.join(appDir, 'AGENTS.md')), 'reruns do not resurrect the per-app doc');
+  assert.ok(!fs.existsSync(path.join(appDir, 'CLAUDE.md')), 'reruns do not resurrect the per-app pointer');
 
   // Consumer content is never destroyed: real notes below the Custom marker keep the file.
   const warnings = [];
-  fs.writeFileSync(path.join(appDir, 'CLAUDE.md'),
+  fs.writeFileSync(path.join(appDir, 'AGENTS.md'),
     '# ========== Default Values ==========\nframework guidance\n\n# ========== Custom Values ==========\nOur deploy needs the VPN up.\n');
   const kept = scaffoldDefaults({ outputDir: appDir, logger: { ...quiet, warn: (m) => warnings.push(m) } });
   assert.deepStrictEqual(kept.removed, []);
-  assert.match(fs.readFileSync(path.join(appDir, 'CLAUDE.md'), 'utf8'), /VPN/, 'consumer content survives');
+  assert.match(fs.readFileSync(path.join(appDir, 'AGENTS.md'), 'utf8'), /VPN/, 'consumer content survives');
   assert.ok(warnings.some((m) => m.includes('consumer content')), 'a move-it-to-the-brand-root warning prints');
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#97](../../issues/97) — A fresh web scaffold ships a starter walkthrough at `src/pages/example.md.txt`: the meta-only frontmatter allow-list, every `{% section %}` call form, slots, and `omega customize <url>` for starting from a stock page. The `.txt` suffix keeps it out of the build.
+
+### Changed
+- [#91](../../issues/91) — The backend and web consumer scaffolds become AGENTS.md plus a one-line CLAUDE.md pointer, matching desktop and extension: AGENTS.md is marker-merged every setup, required reading points at the live agent-docs chain, and the brand-monorepo retire sweep covers both names.
+- [#95](../../issues/95) — `omega setup` on a web app now says which seed mode it detected — standalone app or brand monorepo — and what follows from it, so a targets-only config and absent per-app agent docs read as the design instead of a bug.
+- [#96](../../issues/96) — The web and backend guides state that the backend app's emulators are a prerequisite of `omega dev`, and name what quietly misbehaves without them: the site renders perfectly while sign-in, every Firestore read, and every API call fail.
+- [#99](../../issues/99) — The Bootstrap tooltip initializer had a byte-identical copy in all three themes; it moves to one home on the core layer that every theme imports, the same lane as the chart helper.
+
+### Fixed
+- [#101](../../issues/101) — A CLAUDE.md an earlier scaffold generation wrote counts as framework-owned again: the brand sweep retires it instead of keeping it behind a false "carries consumer content" warning, and the standalone upgrade heals it to the one-line pointer instead of leaving it stale beside the new AGENTS.md.
+- [#92](../../issues/92) — The terms blueprint no longer ships a commented-out draft clause: HTML comments are still bytes in dist, so the draft reached every built legal page. The contract suite now fails on any HTML comment carrying draft markdown.
+
 ## [0.2.0] (2026-07-28)
 
 ### Added

@@ -16,8 +16,8 @@ window.bootstrap = bootstrap;
 // Nav glassiness, marquees, reveals, count-ups, and rotators all ride the
 // shared motion engine (core/js/core/motion.js) — no theme JS needed.
 
-// Import tooltip initialization
-import initializeTooltips from './js/initialize-tooltips.js';
+// Import tooltip initialization (the shared core-layer helper — #99)
+import initializeTooltips from '__main_assets__/js/libs/initialize-tooltips.js';
 // Import hero demo form initialization
 import initHeroDemoForm from './js/hero-demo-form.js';
 

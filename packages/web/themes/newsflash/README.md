@@ -60,7 +60,8 @@ two-property override.
 - **Page assets** (`css/pages/`, `js/pages/`): homepage rails/big-read band,
   blog index splash, blog post reading-progress + drop cap, pricing/about/404
   accents.
-- **Behaviors** (`js/`): Bootstrap tooltips. The ticker rides the shared
+- **Behaviors**: none of its own. Bootstrap tooltips come from the shared
+  core-layer initializer every theme imports; the ticker rides the shared
   motion engine's marquee; masthead scroll state is engine-stamped — no
   bespoke theme JS.
 

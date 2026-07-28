@@ -31,6 +31,9 @@
 //   - `.DS_Store` never copies
 //   - text writes are skipped when the destination is byte-identical (idempotent
 //     re-runs report zero writes)
+//   - a destination carrying the OMEGA section markers when the current template
+//     no longer does is a PRIOR-GENERATION generated file: framework-owned, so
+//     `retire` sweeps it and `overwrite: false` still heals it
 //   - binary files (by extension) copy verbatim — never templated/merged/transformed
 
 const path = require('path');
@@ -222,8 +225,11 @@ function applyDefaults(config) {
       }
     }
 
-    // Preserve the consumer's file unless a rule says otherwise.
-    if (exists && !options.overwrite && !didMerge) {
+    // Preserve the consumer's file unless a rule says otherwise — except a
+    // prior-generation marker artifact, which the framework owns and heals to
+    // the current template even under `overwrite: false` (the standalone twin
+    // of the retire sweep below).
+    if (exists && !options.overwrite && !didMerge && !isLegacyMarkerArtifact(jetpack.read(destination), contents)) {
       result.skipped.push(finalRelative);
       continue;
     }
@@ -252,10 +258,21 @@ function applyDefaults(config) {
 // untouched. Marker-less files must match the rendered template outright.
 function isFrameworkOwned(existing, rendered) {
   if (hasSectionMarkers(existing)) {
+    if (isLegacyMarkerArtifact(existing, rendered)) return true;
     const existingCustom = getCustomSection(existing).trim();
     return existingCustom === '' || existingCustom === getCustomSection(rendered).trim();
   }
   return existing.trim() === rendered.trim();
+}
+
+// A generation change: the destination carries the OMEGA marker grammar — which
+// only this framework's own scaffold writes — while the current template has
+// dropped it. That file is a PRIOR GENERATION's generated copy (e.g. the
+// content-bearing CLAUDE.md written before it became the one-line `@AGENTS.md`
+// pointer), so comparing it against the current render can never match and the
+// framework, not the consumer, owns it.
+function isLegacyMarkerArtifact(existing, rendered) {
+  return hasSectionMarkers(existing) && !hasSectionMarkers(rendered);
 }
 
 // Remove now-empty ancestor dirs of a retired file, stopping at (and never

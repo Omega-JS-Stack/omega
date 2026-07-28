@@ -165,7 +165,7 @@ class SetupCommand extends BaseCommand {
   // Copy default files (src/defaults/**) into the consumer project root via the
   // shared devkit defaults engine (same engine as EM/BXM). The file map lives in
   // src/utils/scaffold-defaults.js: copy-if-missing for everything, marker-section
-  // merge (Default = framework-owned, Custom = consumer-owned) for CLAUDE.md,
+  // merge (Default = framework-owned, Custom = consumer-owned) for AGENTS.md,
   // .gitignore, and functions/.env on every setup.
   copyDefaults() {
     const self = this.main;
@@ -264,7 +264,7 @@ class SetupCommand extends BaseCommand {
     const firebasercPath = `${self.firebaseProjectPath}/.firebaserc`;
     if (!hasContent(self.firebaseRC)) {
       const projectId = this.resolveProjectId();
-      jetpack.write(firebasercPath, JSON.stringify({ projects: { default: projectId } }, null, 2) + '\n');
+      jetpack.write(firebasercPath, `${JSON.stringify({ projects: { default: projectId } }, null, 2)}\n`);
       ui.status('add', `Created ${chalk.cyan('.firebaserc')} (project: ${chalk.bold(projectId)})`, { level: 2 });
       touched++;
     }
@@ -291,7 +291,7 @@ class SetupCommand extends BaseCommand {
         fbDirty = true;
       }
       if (fbDirty) {
-        jetpack.write(firebaseJsonPath, JSON.stringify(fbJson, null, 2) + '\n');
+        jetpack.write(firebaseJsonPath, `${JSON.stringify(fbJson, null, 2)}\n`);
         ui.status('change', `Migrated ${chalk.cyan('firebase.json')} → functions source + hosting public → dist/`, { level: 2 });
         touched++;
       }
