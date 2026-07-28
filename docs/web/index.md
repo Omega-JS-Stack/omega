@@ -13,7 +13,7 @@ OMEGA Web (`@omega.js/web`) is the framework for building a brand's marketing si
 ## Recommended skills
 
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
-- There is no `@omega.js/web` router skill yet. The `omega:ujm` skill in the in-repo Claude plugin still points at the LEGACY ultimate-jekyll-manager repo — do not follow it for work here (the plugin rewrite is issue #60).
+- **`omega:web`** — the router skill from the omega Claude plugin. The inject hook loads it automatically in any project with `@omega.js/web` (and inside `packages/web` here); it points back to this guide + `docs/` (the SSOT).
 
 ## 🚨 READ @omega.js/client TOO
 

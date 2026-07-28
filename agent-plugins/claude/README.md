@@ -40,23 +40,20 @@ The plugin carries the mechanism that loads its own skills. `hooks/inject/run.sh
 
 | package | skill |
 |---|---|
-| `ultimate-jekyll-manager` | `omega:ujm` |
-| `backend-manager` | `omega:bem` |
-| `browser-extension-manager` | `omega:bxm` |
-| `electron-manager` | `omega:em` |
-| `mobile-app-manager` | `omega:mam` |
-| `web-manager` | `omega:wm` — the project's own `name` only |
+| `@omega.js/web` | `omega:web` |
+| `@omega.js/backend` | `omega:backend` |
+| `@omega.js/desktop` | `omega:desktop` |
+| `@omega.js/extension` | `omega:extension` |
+| `@omega.js/manager` | `omega:manager` |
+| `@omega.js/client` | `omega:client` — the project's own `name` only |
+| `omega` (the monorepo root) | `omega:main` — the project's own `name` only |
 
-`web-manager` is the exception: the library is embedded by UJM, BXM, and EM, so a dependency on it says nothing about what the session is working on. Only being the library asks for its skill.
+Every row also matches the manifest's own `name`, which is what covers working inside a `packages/<pkg>` directory in this monorepo. `@omega.js/client` is the exception the other way: the runtime is embedded by web, desktop, and extension, so a dependency on it says nothing about what the session is working on — only being the package asks for its skill.
 
 Each skill is asked for once per session (a marker file under `TMPDIR`, keyed on the session id). The hook fails open — no `package.json`, unparseable JSON, no `jq`, and it exits silently without touching the prompt. Behavior is covered by the inject cases in `scripts/agent-plugins.test.js`, which run the script directly against fixture projects.
 
 ## What is here, and what is not built yet
 
-Seven skills — `main` (the hub: framework roster, documentation topology, mirror spec, brand-to-repo resolution, global operations) plus one router per framework: `ujm`, `bem`, `bxm`, `em`, `mam`, `wm`. They were ported mechanically from a personal harness, and the injection hook came with them, so the plugin now carries both the knowledge and the mechanism that loads it. Two things are still open.
-
-**The rewrite for the package world.** Every ported skill describes the pre-monorepo world — `ultimate-jekyll-manager`, `backend-manager`, `browser-extension-manager`, `electron-manager`, `mobile-app-manager`, `web-manager` as separate repos and separate npm packages, at absolute local paths. That world is gone: the frameworks are now `packages/*` in this repo, published under `@omega.js/*`. The rewrite decides whether the roster follows the packages one-for-one or groups differently — answer it from the package list, not from the old skill names.
+Seven skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives) plus one router per package a session works in: `web`, `backend`, `desktop`, `extension`, `client`, `manager`. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
 
 **The staleness mechanism.** This is the point of the move, not a bonus. Whatever ships needs something that fails when a skill names an export, a path, a config key, or a CLI command the code no longer has. A test in this repo is the strongest form; a generated section is next; a review trigger tied to a release is the floor. A plugin that goes stale quietly has only relocated the problem.
-
-**The local paths.** The hub skill resolves brand and project names to directories under `ITW-Creative-Works`, which is where this team keeps them. Those absolute paths are part of what the package-world rewrite has to answer for.

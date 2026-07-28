@@ -27,8 +27,8 @@ while [ -n "$dir" ] && [ "$dir" != "/" ]; do
 done
 [ -n "$manifest" ] || exit 0
 
-# BEM consumers keep backend-manager in functions/package.json with a plain
-# site manifest at the root, so the functions manifest joins the dep pool.
+# Backend apps keep @omega.js/backend in functions/package.json with a plain
+# app manifest at the root, so the functions manifest joins the dep pool.
 fn_manifest="$(dirname "$manifest")/functions/package.json"
 
 own_name=$(jq -r '.name // empty' "$manifest" 2>/dev/null || true)
@@ -38,9 +38,11 @@ if [ -f "$fn_manifest" ]; then
   deps=$(printf '%s\n%s' "$deps" "$fn_deps")
 fi
 
-# package → skill. web-manager is the exception: it matches on the project's own
-# name only, because half the frameworks depend on the library without the
-# session working IN it.
+# package → skill. Every row also matches the manifest's OWN name, which is what
+# covers working inside `packages/<pkg>` in the monorepo. @omega.js/client and
+# the monorepo root are name-only: web, desktop, and extension all depend on the
+# client runtime, so a dependency on it says nothing about what the session
+# works on.
 matched=()
 while read -r pkg skill signal; do
   [ -n "$pkg" ] || continue
@@ -50,12 +52,13 @@ while read -r pkg skill signal; do
     matched+=("$skill")
   fi
 done <<'MAP'
-ultimate-jekyll-manager omega:ujm any
-backend-manager omega:bem any
-browser-extension-manager omega:bxm any
-electron-manager omega:em any
-mobile-app-manager omega:mam any
-web-manager omega:wm name
+@omega.js/web omega:web any
+@omega.js/backend omega:backend any
+@omega.js/desktop omega:desktop any
+@omega.js/extension omega:extension any
+@omega.js/manager omega:manager any
+@omega.js/client omega:client name
+omega omega:main name
 MAP
 
 [ "${#matched[@]}" -gt 0 ] || exit 0

@@ -1,6 +1,6 @@
 # Audit Workflow
 
-Full-project audit for @omega.js/desktop — runs against a CONSUMER app or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:em` skill (`/omega:em audit`) or any "audit this app/project" request.
+Full-project audit for @omega.js/desktop — runs against a CONSUMER app or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:desktop` skill (`/omega:desktop audit`) or any "audit this app/project" request.
 
 Every check has a stable ID, a severity, and a scope. Findings are reported as `ID @ file:line`, fixed one at a time, then re-verified. The tables below do NOT restate the rules — each check links to the doc that owns the rule and the fix.
 

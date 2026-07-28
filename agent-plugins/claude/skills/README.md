@@ -1,6 +1,8 @@
 # Skills — the authoring contract
 
-One directory per skill, holding a `SKILL.md`. The directory name and the frontmatter `name` must match exactly, and both are BARE — no namespace. The plugin supplies the namespace, so `skills/ujm` surfaces in a session as `omega:ujm`.
+One directory per skill, holding a `SKILL.md`. The directory name and the frontmatter `name` must match exactly, and both are BARE — no namespace. The plugin supplies the namespace, so `skills/web` surfaces in a session as `omega:web`.
+
+The roster follows the packages a session works in: `main` (the hub) plus `web`, `backend`, `desktop`, `extension`, `client`, and `manager`.
 
 ```
 skills/
@@ -22,7 +24,7 @@ The `description` is the whole loading decision — it is the only part Claude r
 
 ## The body points; the repo docs are the source
 
-A skill is a router. It names where the truth lives — `packages/<name>/docs/<topic>.md`, the package's own `AGENTS.md` — and carries only what a session needs before it knows which document to open: the hard rules, the shape of the thing, and the paths.
+A skill is a router. It names where the truth lives for BOTH worlds — `docs/<framework>/index.md` plus `docs/shared/` when the session is in this monorepo, `node_modules/@omega.js/<pkg>/AGENTS.md` and its pointer when the session is in a consumer project — and carries only what a session needs before it knows which document to open: the hard rules, the shape of the thing, and the paths.
 
 Content copied out of the docs into a skill is a second home for the same fact, and the copy is what goes stale. Point instead.
 

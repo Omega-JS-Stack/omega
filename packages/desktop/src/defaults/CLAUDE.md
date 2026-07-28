@@ -1,7 +1,7 @@
 # ========== Default Values ==========
 # OMEGA Desktop (@omega.js/desktop) — consumer project
 
-<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates — same sections, same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit all five together. Canonical skeleton: omega:main skill → resources/mirror-spec.md -->
+<!-- MAINTAINERS (framework repo): this consumer template is MIRRORED across all OMEGA framework consumer templates — same sections, same order (framework-specific extras may be inserted; canonical sections are never reordered/renamed). Edit every framework consumer template together. The mirroring rule lives in each framework guide's Doc-update parity section (docs/<framework>/index.md) -->
 
 ## Framework
 

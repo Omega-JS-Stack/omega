@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - [#59](https://github.com/Omega-JS-Stack/omega/issues/59) — The Claude plugin ships from the monorepo: agent-plugins/claude carries seven ported skills plus the inject hook that loads the matching framework skill per project, the repo-root marketplace manifest lists it, and committed project settings auto-install it after one trust prompt. Structure and hook behavior pinned by scripts/agent-plugins.test.js.
 
 ### Changed
+- [#60](https://github.com/Omega-JS-Stack/omega/issues/60) — The Claude plugin's skills rewritten for the package world: the legacy roster (bem, ujm, em, bxm, wm, mam) is deleted, replaced by web, backend, desktop, extension, client, manager and a rebuilt main hub; the inject hook now maps the `@omega.js/*` packages; the framework guides repointed.
 - [#45](https://github.com/Omega-JS-Stack/omega/issues/45) — Docs architecture rebuilt: knowledge moved to docs/shared/ + docs/&lt;framework&gt;/ (each framework's guide is index.md, including the new web guide), package AGENTS.md files reduced to thin pointers, root AGENTS.md rewritten as the map with the plugin story and the deterministic-loading doctrine, stale WEB-MANAGER headings fixed, 52 files repointed.
 
 ### Fixed

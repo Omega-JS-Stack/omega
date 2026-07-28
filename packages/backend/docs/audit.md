@@ -1,6 +1,6 @@
 # Audit Workflow
 
-Full-project audit for @omega.js/backend — runs against a CONSUMER backend or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:bem` skill (`/omega:bem audit`) or any "audit this backend/project" request.
+Full-project audit for @omega.js/backend — runs against a CONSUMER backend or the FRAMEWORK repo itself (scope auto-detected). Invoked via the `omega:backend` skill (`/omega:backend audit`) or any "audit this backend/project" request.
 
 Every check has a stable ID, a severity, and a scope. Findings are reported as `ID @ file:line`, fixed one at a time, then re-verified. The tables below do NOT restate the rules — each check links to the doc that owns the rule and the fix.
 

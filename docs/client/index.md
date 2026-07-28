@@ -17,6 +17,7 @@ OMEGA Client is the runtime singleton powering **@omega.js/web**, **@omega.js/ex
 
 ## Recommended skills
 
+- **`omega:client`** — the router skill from the omega Claude plugin. The inject hook loads it automatically when the session works inside `packages/client` (own-name match only — a dependency on the runtime says nothing about the session); it points back to this guide + `docs/` (the SSOT).
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 
 ## Quick Start
@@ -69,7 +70,7 @@ Whenever you make a behavioral change (new module, new method, new pattern, remo
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** @omega.js/client follows the library subset of the canonical OMEGA AGENTS.md skeleton (the scaffolding frameworks `@omega.js/web` / `@omega.js/backend` / `@omega.js/extension` / `@omega.js/desktop` — the legacy UJM/BEM/BXM/EM lineage — carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sibling packages and the canonical skeletons + omission rules in the `omega:main` skill's `mirror-spec.md` resource.
+**The four framework guides are structurally MIRRORED** — this guide follows the library subset of that skeleton (the scaffolding frameworks [web](../web/index.md), [backend](../backend/index.md), [desktop](../desktop/index.md), and [extension](../extension/index.md) carry the full skeleton + a consumer template). Never add, rename, or reorder a section here without checking the sibling guides.
 
 ## Documentation
 

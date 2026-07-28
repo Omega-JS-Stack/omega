@@ -100,11 +100,11 @@ const inject = (dir, session) => execFileSync(INJECT_HOOK, {
 
 test('inject: every framework dependency asks for its skill', () => {
   const table = {
-    'ultimate-jekyll-manager': 'omega:ujm',
-    'backend-manager': 'omega:bem',
-    'browser-extension-manager': 'omega:bxm',
-    'electron-manager': 'omega:em',
-    'mobile-app-manager': 'omega:mam',
+    '@omega.js/web': 'omega:web',
+    '@omega.js/backend': 'omega:backend',
+    '@omega.js/desktop': 'omega:desktop',
+    '@omega.js/extension': 'omega:extension',
+    '@omega.js/manager': 'omega:manager',
   };
 
   for (const [pkg, skill] of Object.entries(table)) {
@@ -117,43 +117,55 @@ test('inject: every framework dependency asks for its skill', () => {
 });
 
 test('inject: a devDependency counts too', () => {
-  const dir = project({ name: 'a-brand', devDependencies: { 'backend-manager': '^1.0.0' } });
-  assert.match(inject(dir), /omega:bem/);
+  const dir = project({ name: 'a-brand', devDependencies: { '@omega.js/backend': '^1.0.0' } });
+  assert.match(inject(dir), /omega:backend/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('inject: depending on web-manager is silent — the library is embedded everywhere', () => {
-  const dir = project({ name: 'a-brand', dependencies: { 'web-manager': '^1.0.0' } });
+test('inject: depending on @omega.js/client is silent — the runtime is embedded everywhere', () => {
+  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/client': '^1.0.0' } });
   assert.equal(inject(dir), '');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('inject: being web-manager asks for omega:wm', () => {
-  const dir = project({ name: 'web-manager', version: '1.0.0' });
-  assert.match(inject(dir), /omega:wm/);
+test('inject: being @omega.js/client asks for omega:client', () => {
+  const dir = project({ name: '@omega.js/client', version: '1.0.0' });
+  assert.match(inject(dir), /omega:client/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('inject: a BEM consumer with backend-manager only in functions/ still matches', () => {
+test('inject: being a framework package asks for its own skill', () => {
+  const dir = project({ name: '@omega.js/web', version: '1.0.0' });
+  assert.match(inject(dir), /omega:web/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('inject: the monorepo root asks for omega:main', () => {
+  const dir = project({ name: 'omega', version: '1.0.0' });
+  assert.match(inject(dir), /omega:main/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('inject: a backend app with @omega.js/backend only in functions/ still matches', () => {
   const dir = project({ name: 'a-brand', version: '1.0.0' });
   fs.mkdirSync(path.join(dir, 'functions'));
   fs.writeFileSync(
     path.join(dir, 'functions', 'package.json'),
-    JSON.stringify({ name: 'a-brand-functions', dependencies: { 'backend-manager': '^1.0.0' } }),
+    JSON.stringify({ name: 'a-brand-functions', dependencies: { '@omega.js/backend': '^1.0.0' } }),
   );
-  assert.match(inject(dir), /omega:bem/);
+  assert.match(inject(dir), /omega:backend/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('inject: two frameworks ask for both skills in one message', () => {
   const dir = project({
     name: 'a-brand',
-    dependencies: { 'ultimate-jekyll-manager': '^1.0.0', 'electron-manager': '^1.0.0' },
+    dependencies: { '@omega.js/web': '^1.0.0', '@omega.js/desktop': '^1.0.0' },
   });
   const out = inject(dir);
   const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
   assert.match(ctx, /invoke these skills/);
-  assert.match(ctx, /omega:em, omega:ujm/);
+  assert.match(ctx, /omega:desktop, omega:web/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -170,9 +182,9 @@ test('inject: malformed package.json is silent', () => {
 });
 
 test('inject: the same session is asked once', () => {
-  const dir = project({ name: 'a-brand', dependencies: { 'electron-manager': '^1.0.0' } });
+  const dir = project({ name: 'a-brand', dependencies: { '@omega.js/desktop': '^1.0.0' } });
   const session = `repeat-${Date.now()}-${Math.random()}`;
-  assert.match(inject(dir, session), /omega:em/);
+  assert.match(inject(dir, session), /omega:desktop/);
   assert.equal(inject(dir, session), '');
   fs.rmSync(dir, { recursive: true, force: true });
 });

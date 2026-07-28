@@ -10,7 +10,7 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 
 ## Recommended skills
 
-- **`omega:bxm`** — router skill. Auto-loads on extension-specific keywords (`manifest.json`, `extension popup`, `extension background`, `offscreen document`, `chrome extension`, etc.) and points back to this guide + `docs/` (the SSOT), carrying only Claude-workflow hard rules and process checklists.
+- **`omega:extension`** — the router skill from the omega Claude plugin. The inject hook loads it automatically in any project with `@omega.js/extension` (and inside `packages/extension` here); it points back to this guide + `docs/` (the SSOT).
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 
 ## 🚨 READ @omega.js/client TOO
@@ -236,7 +236,7 @@ Whenever you make a behavioral change (new command, new flag, new pattern, remov
 
 Don't ship behavioral changes with stale docs. Validate first, then document — write docs that describe shipped reality, not intentions.
 
-**The OMEGA docs are structurally MIRRORED.** This file's section skeleton, the consumer template (`src/defaults/CLAUDE.md`), shared-concept `docs/*.md` filenames, and the `omega:*` skills are identical in structure and order across the sister frameworks (UJM / @omega.js/backend / @omega.js/extension / @omega.js/desktop / MAM — @omega.js/client mirrors the library subset). Never add, rename, or reorder a section here without making the SAME change in every sister repo in the same pass. The canonical skeletons + omission rules live in the `omega:main` skill's `mirror-spec.md` resource.
+**The four framework guides are structurally MIRRORED.** [docs/web/index.md](../web/index.md), [docs/backend/index.md](../backend/index.md), [docs/desktop/index.md](../desktop/index.md), and [docs/extension/index.md](../extension/index.md) keep the same section skeleton in the same order, and each consumer template (`src/defaults/CLAUDE.md`) mirrors its guide. Never add, rename, or reorder a section in one without making the SAME change in the others in the same pass.
 
 ## Documentation
 
