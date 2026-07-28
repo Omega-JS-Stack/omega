@@ -6,23 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.0] (2026-07-28)
+
 ### Added
-- [#2](../../issues/2) — Consumer code imports any dependency the web framework declares by bare specifier (`import 'chart.js'` just works): an esbuild resolve hook serves the framework's own copy, one shared chunk, no curated list. Cross-framework lanes tracked in [#87](../../issues/87).
-- [#54](../../issues/54) — The company config merge layer is implemented in @omega.js/config itself, so direct framework builds see it — previously only `mgr` runs did. Deploy uploads carry it too.
+- [#2](../../issues/2) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — Consumer code imports any dependency the web framework declares by bare specifier (`import 'chart.js'` just works): an esbuild resolve hook serves the framework's own copy, one shared chunk, no curated list. Cross-framework lanes tracked in [#87](../../issues/87).
+- [#54](../../issues/54) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — The company config merge layer is implemented in @omega.js/config itself, so direct framework builds see it — previously only `mgr` runs did. Deploy uploads carry it too.
 
 ### Changed
-- [#68](../../issues/68) — The disposable-email-domains dataset splits into a committed seed and a gitignored refresh cache: refreshes write only the cache, lookups read cache-else-seed, and a deliberate promote script advances the baseline. Suite runs no longer dirty the tree.
-- [#20](../../issues/20) — The backend CLI's help listing is generated from the same command table that drives dispatch, so a command can no longer exist without appearing in help.
-- [#14](../../issues/14) — Download page reworked: bigger platform marks, side-by-side Linux buttons, one mobile email form, token-painted modals, tighter intro copy. Auto-population from config targets split to [#85](../../issues/85).
-- [#11](../../issues/11) — Affirmation checks unify on one design-system token (`--omega-check`, accent-driven) with a shared utility class; per-page check colors removed.
+- [#68](../../issues/68) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — The disposable-email-domains dataset splits into a committed seed and a gitignored refresh cache: refreshes write only the cache, lookups read cache-else-seed, and a deliberate promote script advances the baseline. Suite runs no longer dirty the tree.
+- [#20](../../issues/20) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — The backend CLI's help listing is generated from the same command table that drives dispatch, so a command can no longer exist without appearing in help.
+- [#14](../../issues/14) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — Download page reworked: bigger platform marks, side-by-side Linux buttons, one mobile email form, token-painted modals, tighter intro copy. Auto-population from config targets split to [#85](../../issues/85).
+- [#11](../../issues/11) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — Affirmation checks unify on one design-system token (`--omega-check`, accent-driven) with a shared utility class; per-page check colors removed.
 
 ### Fixed
-- [#73](../../issues/73) — The brand-root discovery walks in config and devkit stop at the nearest `.git` instead of climbing to the filesystem root.
-- [#43](../../issues/43) — Topbar and page-header actions no longer render a bogus `btn-<N>` class from Liquid's `.size` key count; only `sm`/`lg` produce a size class, and `lg` is no longer overridden by the default.
-- [#3](../../issues/3) — The topbar rail control uses `table-columns`, an icon the free chain resolves; six more Pro-only icon names in shipped themes swapped to free equivalents. Guard test tracked in [#86](../../issues/86).
-- [#10](../../issues/10) — Pricing feature checks align with their text on the first line, including wrapped features.
-- [#21](../../issues/21) — `remoteScripts` is declared in the desktop target schema, matching what the desktop framework reads.
-- [#67](../../issues/67) — The three in-repo brand roots declare `@omega.js/manager`, so a session at those roots gets the manager skill injected like the real brand.
+- [#73](../../issues/73) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — The brand-root discovery walks in config and devkit stop at the nearest `.git` instead of climbing to the filesystem root.
+- [#43](../../issues/43) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — Topbar and page-header actions no longer render a bogus `btn-<N>` class from Liquid's `.size` key count; only `sm`/`lg` produce a size class, and `lg` is no longer overridden by the default.
+- [#3](../../issues/3) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — The topbar rail control uses `table-columns`, an icon the free chain resolves; six more Pro-only icon names in shipped themes swapped to free equivalents. Guard test tracked in [#86](../../issues/86).
+- [#10](../../issues/10) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — Pricing feature checks align with their text on the first line, including wrapped features.
+- [#21](../../issues/21) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — `remoteScripts` is declared in the desktop target schema, matching what the desktop framework reads.
+- [#67](../../issues/67) [`fbcbdea2`](../../commit/fbcbdea2) Thanks [@ianwieds]! — The three in-repo brand roots declare `@omega.js/manager`, so a session at those roots gets the manager skill injected like the real brand.
 
 ## [0.0.2] (2026-07-27)
 
