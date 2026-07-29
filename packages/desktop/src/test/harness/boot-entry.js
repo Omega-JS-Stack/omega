@@ -46,6 +46,17 @@ async function run(manager) {
   const projectRoot = spec.projectRoot;
   const tests       = spec.tests || [];
 
+  // Everything a test needs to reach the build under test: `appRoot` is the staged app
+  // root Electron booted (its dist/ IS the isolated boot-test output — #110),
+  // `frameworkDistRoot` locates framework test utilities, `distSnapshotBefore` is the
+  // fingerprint of the project's real dist/ taken before the test build.
+  const args = {
+    projectRoot,
+    appRoot:            spec.appRoot,
+    frameworkDistRoot:  spec.frameworkDistRoot,
+    distSnapshotBefore: spec.distSnapshotBefore,
+  };
+
   // Reconstitute each `inspect` from its serialized body string. We expose Node's
   // `require` + `process` + `Buffer` to the inspect body so tests can require('fs'),
   // require('electron'), etc. — `new Function(...)` creates a no-closure function so
@@ -55,20 +66,21 @@ async function run(manager) {
     description:  t.description,
     timeout:      t.timeout || 15000,
     inspect:      new Function('args', 'require', 'process', 'Buffer',
-      `return (async function ({ manager, expect, projectRoot }) {\n${t.inspectSource}\n})(args)`,
+      `return (async function ({ manager, expect, projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore }) {\n${t.inspectSource}\n})(args)`,
     ),
   }));
 
   // Bring in @omega.js/desktop's expect (assert.js) — same path conventions as main-entry.js uses.
   const expect = require(path.join(spec.frameworkDistRoot, 'test', 'assert.js'));
 
-  let passed = 0, failed = 0, skipped = 0;
+  let passed = 0, failed = 0;
+  const skipped = 0;   // boot inspects have no skip mechanism — reported for protocol parity
 
   for (const t of inspectors) {
     const start = Date.now();
     try {
       await Promise.race([
-        t.inspect({ manager, expect, projectRoot }, require, process, Buffer),
+        t.inspect(Object.assign({ manager, expect }, args), require, process, Buffer),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Boot test timeout')), t.timeout)),
       ]);
       const duration = Date.now() - start;

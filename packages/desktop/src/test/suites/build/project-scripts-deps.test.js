@@ -2,8 +2,13 @@
 // be a DECLARED peer dependency — an outside-the-monorepo consumer has no
 // hoisted root to fall back on (cp194 wizard-rehearsal catch: `npx cross-env`
 // in build/package/publish with cross-env undeclared → exit 127).
+//
+// Since #117 the build-mode env flags are set in-process by the CLI verbs, so
+// the scripts invoke nothing but `npx omega` — cross-env is gone from the
+// scaffold, from desktop's own deps, and from the setup dependency map.
 
 const path = require('path');
+const fs = require('fs');
 
 module.exports = {
   type: 'suite',
@@ -26,10 +31,51 @@ module.exports = {
           }
         }
 
-        ctx.expect(tools.has('cross-env')).toBe(true); // the script set genuinely uses it
         for (const tool of tools) {
           ctx.expect(Boolean(peers[tool])).toBe(true);
         }
+      },
+    },
+    {
+      name: 'the build-mode env flags live in the CLI verbs, not in the scaffolded scripts',
+      run: (ctx) => {
+        const pkg = require(path.join(__dirname, '..', '..', '..', '..', 'package.json'));
+        const scripts = pkg.projectScripts || {};
+
+        for (const script of Object.values(scripts)) {
+          ctx.expect(String(script).includes('cross-env')).toBe(false);
+          ctx.expect(/OMEGA_BUILD_MODE|OMEGA_IS_PUBLISH/.test(String(script))).toBe(false);
+        }
+
+        ctx.expect(scripts.build).toBe('npx omega build');
+        ctx.expect(scripts.package).toBe('npx omega package');
+        ctx.expect(scripts['package:quick']).toBe('npx omega package --quick');
+        ctx.expect(scripts.publish).toBe('npx omega publish');
+        ctx.expect(scripts['release:local']).toBe('npx omega publish --local');
+      },
+    },
+    {
+      name: 'cross-env is not declared anywhere in @omega.js/desktop',
+      run: (ctx) => {
+        const pkg = require(path.join(__dirname, '..', '..', '..', '..', 'package.json'));
+
+        ctx.expect(Boolean((pkg.dependencies || {})['cross-env'])).toBe(false);
+        ctx.expect(Boolean((pkg.devDependencies || {})['cross-env'])).toBe(false);
+        ctx.expect(Boolean((pkg.peerDependencies || {})['cross-env'])).toBe(false);
+      },
+    },
+    {
+      name: 'setup no longer scaffolds cross-env into the consumer',
+      run: (ctx) => {
+        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'setup.js'), 'utf8');
+        ctx.expect(source.includes('cross-env')).toBe(false);
+      },
+    },
+    {
+      name: 'setup syncs projectScripts unconditionally — consumers heal on the next run',
+      run: (ctx) => {
+        const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'commands', 'setup.js'), 'utf8');
+        ctx.expect(/project\.scripts\[key\] = package\.projectScripts\[key\]/.test(source)).toBe(true);
       },
     },
   ],

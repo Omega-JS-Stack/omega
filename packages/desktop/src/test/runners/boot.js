@@ -3,8 +3,12 @@
 //
 // Differences from runners/electron.js:
 //   - electron.js spawns electron with `harness/main-entry.js` and tests @omega.js/desktop lib code in isolation.
-//   - boot.js spawns electron with the consumer's `dist/main.bundle.js` (the real production
+//   - boot.js spawns electron with the consumer's built `main.bundle.js` (the real production
 //     boot path), then injects `harness/boot-entry.js` via --require to drive inspection.
+//
+// The build + boot happen in a STAGED app root (`<project>/.omega/test-app`), never the
+// project's own dist/ (#110) — a concurrent `npm start` watcher writes dist/, and two
+// writers on one tree means either side can load a half-written bundle. See stageTestApp().
 //
 // Why both? `main` layer tests cover individual lib behavior fast. `boot` layer covers
 // integration — does the consumer's actual main.js boot end-to-end with their config + scaffolds?
@@ -16,6 +20,7 @@ const fs = require('fs');
 const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 const chalk = require('chalk').default;
+const distSnapshot = require('../utils/dist-snapshot.js');
 
 async function runBootTests({ tests, projectRoot, frameworkDistRoot }) {
   if (tests.length === 0) {
@@ -62,23 +67,34 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
     return { passed: 0, failed: 0, skipped: tests.length };
   }
 
+  // Stage the boot-test app root and record the project's real dist/ before anything
+  // builds — the boot layer asserts that fingerprint is unchanged afterwards (#110).
+  const testApp = stageTestApp(effectiveRoot);
+  const distSnapshotBefore = distSnapshot(path.join(effectiveRoot, 'dist'));
+
   // Always rebuild before boot tests. Boot tests run against the consumer's actual
-  // production main bundle (`dist/main.bundle.js`); if it's stale, tests pass against
-  // outdated code. Always-build is ~10s slower than a staleness check, but a staleness
-  // heuristic (mtime comparison) can be defeated by editor backdating, git restores, or
+  // production main bundle; if it's stale, tests pass against outdated code.
+  // Always-build is ~10s slower than a staleness check, but a staleness heuristic
+  // (mtime comparison) can be defeated by editor backdating, git restores, or
   // file copies — and a silently-stale test is worse than a slow one.
   // Set OMEGA_TEST_SKIP_BUILD=1 to opt out (CI scenarios where build ran in a separate step).
-  const bundlePath = path.join(effectiveRoot, 'dist', 'main.bundle.js');
   if (process.env.OMEGA_TEST_SKIP_BUILD !== '1') {
     console.log(chalk.gray(`      Building bundle for boot tests...`));
-    const buildResult = runGulpBuild(effectiveRoot);
+    // A fresh build gets a fresh output: leftovers from a prior run (a deleted
+    // view, a renamed bundle) would otherwise survive and keep existence-style
+    // assertions green. SKIP_BUILD keeps the staged output — that is its point.
+    fs.rmSync(testApp.distRoot, { recursive: true, force: true });
+    const buildResult = runGulpBuild(effectiveRoot, testApp.distRoot);
     if (buildResult !== 0) {
       console.log(chalk.red(`    ✗ Boot tests aborted — gulp build failed (exit ${buildResult}).`));
       return { passed: 0, failed: tests.length, skipped: 0 };
     }
-  } else if (!fs.existsSync(bundlePath)) {
-    console.log(chalk.yellow(`    ○ boot tests skipped (no bundle at ${bundlePath}, OMEGA_TEST_SKIP_BUILD=1 set)`));
-    return { passed: 0, failed: 0, skipped: tests.length };
+  } else if (!fs.existsSync(testApp.bundlePath)) {
+    // Loud, not skipped: the test output is private to the boot runner, so an absent
+    // bundle means the build step the operator promised never ran. Booting anything
+    // else (the project's dist/, a stale tree) would silently test the wrong bundle.
+    console.log(chalk.red(`    ✗ Boot tests aborted — OMEGA_TEST_SKIP_BUILD=1 but no test build at ${testApp.bundlePath}. Run the boot tests once without it (or build with OMEGA_BUILD_OUTPUT=${testApp.distRoot}).`));
+    return { passed: 0, failed: tests.length, skipped: 0 };
   }
 
   // Write the spec file. Each test's `inspect` function body is extracted as a string
@@ -86,7 +102,9 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
   // uses for renderer suites.
   const spec = {
     projectRoot: effectiveRoot,
+    appRoot:     testApp.appRoot,
     frameworkDistRoot,
+    distSnapshotBefore,
     tests: tests.map((t) => ({
       description:    t.description,
       timeout:        t.timeout,
@@ -121,11 +139,14 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
   delete childEnv.ELECTRON_RUN_AS_NODE;
 
   // Args passed to electron:
-  //   effectiveRoot — load the consumer project (package.json#main = dist/main.bundle.js).
+  //   testApp.appRoot — the staged app root (package.json#main = dist/main.bundle.js,
+  //   its dist/ being the isolated test build). Electron loads it exactly the way it
+  //   loads a real project dir, so packaged-app semantics — app name/version from
+  //   package.json, appRoot-relative view/preload/icon lookups — are unchanged.
   //
   // We don't use `--require <bootEntry>` because Electron rejects unknown CLI flags. Instead,
   // @omega.js/desktop's main.js detects OMEGA_TEST_BOOT and `require()`s the boot harness itself after init.
-  const args = [effectiveRoot];
+  const args = [testApp.appRoot];
 
   return new Promise((resolve) => {
     const child = spawn(electronBin, args, {
@@ -135,7 +156,7 @@ async function bootProject({ tests, effectiveRoot, frameworkDistRoot }) {
     });
 
     let buffer = '';
-    let counts = { passed: 0, failed: 0, skipped: 0 };
+    const counts = { passed: 0, failed: 0, skipped: 0 };
 
     child.stdout.on('data', (chunk) => {
       buffer += chunk.toString();
@@ -211,16 +232,69 @@ function extractFnBody(fn) {
 }
 
 // Shell out to the same gulp pipeline `npm run build` uses. This produces a fresh
-// dist/main.bundle.js (+ preload + renderer bundles) using the consumer's current source.
-// Output is streamed inline so the user sees progress for the ~10s build cost.
-function runGulpBuild(projectRoot) {
+// main.bundle.js (+ preload + renderer bundles) using the consumer's current source.
+// OMEGA_BUILD_OUTPUT redirects every output path (utils/dist-root.js — the one seam) into
+// the staged test app, so the project's dist/ is never written. Output is streamed inline
+// so the user sees progress for the ~10s build cost.
+function runGulpBuild(projectRoot, outputRoot) {
   const gulpfile = path.join(projectRoot, 'node_modules', '@omega.js/desktop', 'dist', 'gulp', 'main.js');
   const result = spawnSync('npx', ['gulp', '--cwd', projectRoot, '--gulpfile', gulpfile, 'build'], {
     cwd:   projectRoot,
-    env:   Object.assign({}, process.env, { OMEGA_BUILD_MODE: 'true' }),
+    env:   Object.assign({}, process.env, { OMEGA_BUILD_MODE: 'true', OMEGA_BUILD_OUTPUT: outputRoot }),
     stdio: 'inherit',
   });
   return result.status == null ? 1 : result.status;
+}
+
+// Stage the app root the boot tests build into and boot from: `<project>/.omega/test-app`
+// (gitignored). It is a real Electron app dir, not a bare output folder:
+//   - package.json — the project's own, verbatim except `main`, which is pinned at the
+//     test build's bundle. Electron derives the app name, version and therefore the
+//     userData path from it, so booting the staged root resolves exactly what booting
+//     the project does.
+//   - src / config — symlinks back to the project's. Runtime lookups resolved against
+//     `app.getAppPath()` (src/integrations/*, the unbundled config fallback) keep finding
+//     the consumer's real files even though the app dir moved.
+//   - dist/ — the isolated build output (OMEGA_BUILD_OUTPUT), so `<appRoot>/dist/views`,
+//     `<appRoot>/dist/preload.bundle.js` and the tray's icon lookup need no runtime change.
+// package.json and the symlinks are rewritten on every run; dist/ is cleared by the
+// runner before each build (and deliberately kept under OMEGA_TEST_SKIP_BUILD).
+function stageTestApp(projectRoot) {
+  const appRoot  = path.join(projectRoot, '.omega', 'test-app');
+  const distRoot = path.join(appRoot, 'dist');
+
+  fs.mkdirSync(appRoot, { recursive: true });
+
+  let pkg = {};
+  try {
+    pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+  } catch (e) {
+    // A project without a readable package.json can't be built either — the gulp build
+    // below surfaces a far clearer error than anything we'd throw here.
+  }
+  pkg.main = 'dist/main.bundle.js';
+  fs.writeFileSync(path.join(appRoot, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+  for (const name of ['src', 'config']) {
+    const target   = path.join(projectRoot, name);
+    const linkPath = path.join(appRoot, name);
+
+    try { fs.unlinkSync(linkPath); } catch (e) { /* absent, or a Windows junction (rmdir below) */ }
+    try { fs.rmdirSync(linkPath); } catch (e) { /* already gone */ }
+
+    if (!fs.existsSync(target)) continue;
+
+    try {
+      fs.symlinkSync(target, linkPath, linkType);
+    } catch (e) {
+      if (process.env.OMEGA_TEST_DEBUG) {
+        console.log(chalk.gray(`      [boot] could not link ${name}: ${e.message}`));
+      }
+    }
+  }
+
+  return { appRoot, distRoot, bundlePath: path.join(distRoot, 'main.bundle.js') };
 }
 
 // Symlink the deps the bundled fixture's build + boot path resolves by EXPLICIT path

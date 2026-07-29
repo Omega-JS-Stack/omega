@@ -21,7 +21,7 @@ const logger = Manager.logger('package-quick');
 
 module.exports = function packageQuick(done) {
   const projectRoot = process.cwd();
-  const configPath  = path.join(projectRoot, 'dist', 'electron-builder.yml');
+  const configPath  = path.join(require('../../utils/dist-root.js')(projectRoot), 'electron-builder.yml');
 
   if (!jetpack.exists(configPath)) {
     return done(new Error(`Missing ${configPath}. Run gulp/build-config first.`));

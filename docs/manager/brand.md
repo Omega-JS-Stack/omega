@@ -41,7 +41,7 @@ npx omega setup      # validate config + scaffold/heal framework-owned files
 npx omega dev        # this app's dev server/build watch
 npx omega test       # the app's test suites
 npx omega deploy     # DELIBERATE publish for this target (commits never auto-deploy)
-npx omega i local    # link the local framework monorepo (framework development)
+npx omega i local    # link the local framework monorepo (ONE-TIME — the link is durable; rerun only to heal, never per change)
 npx omega i live     # restore published registry versions
 ```
 

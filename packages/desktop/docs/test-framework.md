@@ -97,6 +97,7 @@ A bare prefix (`mgr:` / `desktop:` / `project:` with no path) runs every test in
 - **build** — runs in plain Node. Fast.
 - **main**  — spawns Electron and runs inside the main process. Required for anything touching `app`/`ipcMain`/`BrowserWindow`.
 - **renderer** — runs inside a hidden `BrowserWindow` spawned by the main harness. Test functions are serialized + reconstructed via `new Function('ctx', body)`, so they only have access to `ctx` and the page's globals (`window`, `document`, `window.desktop.*`). No closures over module scope.
+- **boot** — rebuilds the project and spawns Electron against the real bundle. The build goes to a staged app root of its own (`<project>/.omega/test-app/`, via `OMEGA_BUILD_OUTPUT`), never the project's `dist/` — so a boot-test run and a live `npm start` watcher never write the same tree. See [test-boot-layer.md](test-boot-layer.md).
 - **all** (default) — build, then main, then renderer in a single Electron boot.
 
 ### Extended vs normal mode

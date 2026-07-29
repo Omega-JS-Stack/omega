@@ -114,11 +114,12 @@ The full per-target reference (every config knob, default value, and what it pro
 
 ## Build modes
 
-Environment variables (set by `npm run build` / `npm run release`):
+Environment variables (set in-process by the `omega build` / `omega package` / `omega publish` verbs — the consumer's npm scripts are thin `npx omega` aliases):
 
 | Var | Effect |
 |---|---|
 | `OMEGA_BUILD_MODE=true` | Production webpack (minified, name-mangled, no sourcemaps) |
+| `OMEGA_BUILD_OUTPUT=<path>` | The boot-test seam: redirect the gulp BUILD output away from `<project>/dist` (absolute, or relative to the project root). Resolved by [src/utils/dist-root.js](../src/utils/dist-root.js), which every build task's output path goes through — but `omega clean` and the generated `electron-builder.yml` stay project-relative, so this is NOT a general relocation switch; packaging under it is unsupported. Used by the boot-test runner so a test build never collides with the `npm start` watcher's `dist/` ([test-boot-layer.md](test-boot-layer.md#isolated-build-output)) |
 | `OMEGA_IS_PUBLISH=true` | electron-builder runs with `--publish always` |
 | `OMEGA_IS_SERVER=true` | Running in CI |
 

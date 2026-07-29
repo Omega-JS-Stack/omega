@@ -1,6 +1,9 @@
 # Runtime-only artifacts. The boot runner symlinks node_modules (@omega.js/desktop +
-# electron) and webpack-builds dist/ on each self-test run — none of it is committed.
+# electron) and builds into .omega/test-app/ on each self-test run — none of it is
+# committed. dist/ stays listed: it is the project's own build output, which a boot run
+# must never write (#110).
 node_modules/
+.omega/
 dist/
 logs/
 release/

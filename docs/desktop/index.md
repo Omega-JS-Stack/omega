@@ -29,7 +29,7 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 2. `npx omega setup` — scaffolds the project (writes `config/omega.json5`, `src/main.js`, `src/preload.js`, per-window renderer entries, and integrations skeletons in `src/integrations/{tray,menu,context-menu}/index.js`).
 3. `npm start` — dev (gulp → webpack → electron .)
 4. `npm run build` — local production build (compiles bundles only, no installer)
-5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally.
+5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally. Quick mode runs end-to-end (#117): clean keeps an existing `dist/` and `release/` (the gulp build still rebuilds every bundle fresh) and setup takes its quick path — run a full `npm run package` to clear old `release/` artifacts.
 6. `npm run package` — full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux). ~3min on mac.
 7. `npm run release` — signed + published release (requires certs)
 8. `npx omega test` — runs the project's test suites (bare consumer runs never include the framework corpus)
@@ -159,8 +159,9 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 | `deploy` | delegate to the release flow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo) |
 | `logs` | read the app's log files (alias `log`) |
 | `help` | command listing (router built-in; also `-h`/`--help`) |
-| `build` | shells `gulp build` with `OMEGA_BUILD_MODE=true` |
-| `publish` | full sign + notarize + GH release upload (`OMEGA_IS_PUBLISH=true`) |
+| `build` | clean + setup + `gulp build`, with `OMEGA_BUILD_MODE=true` set in-process |
+| `package` | clean + setup + the electron-builder package (`--quick` for host platform/arch only) |
+| `publish` | full sign + notarize + GH release upload (`OMEGA_IS_PUBLISH=true`); `--local` cleans + re-scaffolds first |
 | `validate-certs` | check cert files, env vars, profile expiration, Keychain identity. Auto-runs at end of `setup` |
 | `push-secrets` | encrypt `.env` Default section via libsodium → GH Actions secrets. Auto-runs at end of `setup` when `GH_TOKEN` is set |
 | `sign-windows` | strategy-aware EV/cloud/local signer; emits JSONL events for `runner monitor` |
@@ -174,7 +175,7 @@ See [docs/releasing.md](../../packages/desktop/docs/releasing.md) for the end-to
 ## Dependency Resolution
 
 - **Consumer code can `require()` any @omega.js/desktop dependency** — webpack's `resolve.modules` includes the framework's own `node_modules/`. Consumer projects do NOT need to `npm install firebase`, `fs-jetpack`, `@omega.js/client`, or any other @omega.js/desktop transitive dep. If a dep doesn't resolve, the fix is in @omega.js/desktop's webpack config — not the consumer's `package.json`.
-- **The framework's copy does NOT always win here (open: [#87](https://github.com/Omega-JS-Stack/omega/issues/87)).** `resolve.modules` lists the CONSUMER's `node_modules` first, so a consumer that declares its own copy of a framework dependency gets two copies in the build — the guarantee @omega.js/web's esbuild hook provides has no webpack equivalent yet. Two shapes were tried and reverted: re-anchoring the request at the framework root does not outrank `resolve.modules`' absolute roots, and rewriting the request to an absolute path does outrank them but bypasses packages' `exports` maps and left the built app crashing at boot (`TypeError: Cannot read properties of undefined (reading 'setName')`). Same open gap in @omega.js/extension.
+- **The framework's copy wins ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)).** `resolve.modules` lists the FRAMEWORK's `node_modules` first, so a consumer that declares its own version of a framework dependency still bundles ONE copy — the framework's — matching the guarantee @omega.js/web's esbuild hook gives web consumers. npm nests a framework-private copy only when the consumer's declaration conflicts, so this order picks the nested copy on a conflict and the shared hoisted copy otherwise. Accepted trade: the framework's copy also wins for the TRANSITIVE packages it carries, not only the ones it declares — there is no per-dependency override today, so a consumer that genuinely needs its OWN copy of a framework-carried package should raise it upstream ([#87](https://github.com/Omega-JS-Stack/omega/issues/87)) rather than pin and silently lose. Same shape in @omega.js/extension; pinned by `src/test/suites/build/framework-deps.test.js` in both.
 - **@omega.js/client owns Firebase.** Consumer code NEVER imports Firebase directly (`require('firebase')` / `import('firebase/app')`). Use `require('@omega.js/client')` → `omega.auth()`, `omega.firestore()` in renderers. In main process, use `manager.omega` (the @omega.js/desktop bridge). Same rule in BXM and UJM.
 - **`Manager.require(name)`** resolves from @omega.js/desktop's module context at runtime (static + prototype). Use in gulp tasks or unbundled code (e.g. test fixtures). Webpack `resolve.modules` handles the bundled case.
 

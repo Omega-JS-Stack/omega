@@ -6,11 +6,11 @@
 // uses it), and anything the framework does not declare is untouched and fails with
 // the bundler's normal resolution error.
 //
-// Each framework wires its own BUNDLER hook around this reader; only @omega.js/web's
-// esbuild half exists today (packages/web/src/assets.js). The webpack half for
-// desktop/extension is NOT implemented — see docs/devkit/index.md and #87: the
-// obvious shapes either fail to outrank `resolve.modules` or break module semantics
-// at runtime.
+// @omega.js/web wires its esbuild resolve hook around this reader
+// (packages/web/src/assets.js). Desktop and extension deliver the same contract
+// without it: their webpack configs list the FRAMEWORK's node_modules before the
+// consumer's, so the framework's copy wins for every name it declares (and, the
+// accepted trade, for the transitives it carries) — see docs/devkit/index.md and #87.
 
 const fs = require('fs');
 const path = require('path');

@@ -17,6 +17,7 @@ const sass = require('sass');
 
 const projectRoot = Manager.getRootPath('project');
 const packageRoot = Manager.getRootPath('main');
+const outputRoot  = require('../../utils/dist-root.js')(projectRoot);
 
 module.exports = function sassTask(done) {
   const isProd = Manager.getMode().environment === 'production';
@@ -43,7 +44,7 @@ module.exports = function sassTask(done) {
 
   // Compile main.scss → main.bundle.css
   const mainEntry = path.join(projectRoot, 'src', 'assets', 'scss', 'main.scss');
-  const mainOut = path.join(projectRoot, 'dist', 'assets', 'css', 'main.bundle.css');
+  const mainOut = path.join(outputRoot, 'assets', 'css', 'main.bundle.css');
 
   try {
     if (jetpack.exists(mainEntry)) {
@@ -64,7 +65,7 @@ module.exports = function sassTask(done) {
       for (const src of pageFiles) {
         const rel = path.relative(pagesDir, src);
         const name = rel.replace(/\.scss$/, '').replace(/\\/g, '/');
-        const out = path.join(projectRoot, 'dist', 'assets', 'css', 'components', `${name}.bundle.css`);
+        const out = path.join(outputRoot, 'assets', 'css', 'components', `${name}.bundle.css`);
         const result = sass.compile(src, compileOpts);
         jetpack.write(out, result.css);
         if (result.sourceMap) jetpack.write(`${out}.map`, JSON.stringify(result.sourceMap));

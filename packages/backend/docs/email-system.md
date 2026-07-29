@@ -109,7 +109,7 @@ All marketing contact operations (`add`, `sync`) pass through `validate()` befor
 - The `dns` check is opt-in (not in DEFAULT_CHECKS) because it's async/slower — include it for bulk validation
 - The `typo` check uses prefix matching (`"gamil."` catches `gamil.com`, `gamil.con`, `gamil.co`) — see `data/typo-domains.js`
 - Custom disposable domains go in `data/custom-disposable-domains.json` (not the vendor list)
-- Run `node src/manager/libraries/email/validation.test.js` to verify all checks
+- Run `npx omega test framework:email/validation-cases` to verify all checks against the address corpus
 
 ### The disposable-domain dataset: seed + refresh cache
 
@@ -341,16 +341,15 @@ All email tests live under `test/email/`, mirroring the source at `src/manager/l
 | `newsletter-generate.js` | Full AI newsletter generation pipeline (5min timeout) | Yes |
 | `marketing-lifecycle.js` | Contact lifecycle (add/sync/remove) | Yes |
 | `consent-lifecycle.js` | Consent webhook round-trip | Yes |
+| `render-content.js` | The [content-trust](#content-trust) render lanes (15 tests) | No |
+| `identity.js` | Config-driven identity + the loud failures (16 tests) | No |
+| `validation-cases.js` | Address corpus for the free checks + NeverBounce parsing (69 tests) | No |
+| `sanitize-images.js` | Brand-image absolutization (5 tests) | No |
+| `marketing/consent-gate.js` | The marketing consent gate (21 tests) | No |
 
 Extended tests (`TEST_EXTENDED_MODE`) send real emails to `_test-*@{domain}` addresses. See [test-framework.md](test-framework.md) for the full test framework reference.
 
-Some email tests are plain-node scripts colocated with the source instead — no emulator, no network. Run them directly:
-
-- `node src/manager/libraries/email/render-content.test.js` — the [content-trust](#content-trust) render lanes (15 cases)
-- `node src/manager/libraries/email/identity.test.js` — config-driven identity + the loud failures (16 cases)
-- `node src/manager/libraries/email/validation.test.js` — all free validation checks (69 cases)
-- `node src/manager/libraries/email/sanitize-images.test.js` — brand-image absolutization
-- `node src/manager/libraries/email/marketing/consent-gate.test.js` — the marketing consent gate (28 cases)
+The last five are pure plain-node units — no emulator, no providers, no network — but they run in the discovered suite like everything else (`npx omega test framework:email`).
 
 ### Test recipient convention
 
@@ -378,8 +377,8 @@ All extended email tests send to `_test-<purpose>@{domain}` addresses (e.g. `_te
 | Disposable-domain seed/cache contract | `src/manager/libraries/email/disposable-domains.js` |
 | NeverBounce provider | `src/manager/libraries/email/validation-provider-neverbounce.js` |
 | ZeroBounce provider | `src/manager/libraries/email/validation-provider-zerobounce.js` |
-| Validation test | `src/manager/libraries/email/validation.test.js` |
-| Content-trust test (render lanes + escaping) | `src/manager/libraries/email/render-content.test.js` |
-| Identity test (config-driven + loud failures) | `src/manager/libraries/email/identity.test.js` |
+| Validation tests | `test/email/validation.test.js`, `test/email/validation-cases.test.js` |
+| Content-trust test (render lanes + escaping) | `test/email/render-content.test.js` |
+| Identity test (config-driven + loud failures) | `test/email/identity.test.js` |
 | Seed campaigns | `src/cli/commands/setup-tests/helpers/seed-campaigns.js` |
 | Transition email dispatcher | `src/manager/events/firestore/payments-webhooks/transitions/send-email.js` |

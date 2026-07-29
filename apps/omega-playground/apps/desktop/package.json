@@ -14,12 +14,12 @@
   "scripts": {
     "start": "npx omega clean && npx omega setup && npm run gulp --",
     "gulp": "gulp",
-    "build": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- build",
-    "package": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- packageBuild",
-    "package:quick": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true npm run gulp -- packageQuick",
-    "publish": "npx cross-env OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true npm run gulp -- publish",
+    "build": "npx omega build",
+    "package": "npx omega package",
+    "package:quick": "npx omega package --quick",
+    "publish": "npx omega publish",
     "release": "npx omega release",
-    "release:local": "npx omega clean && npx omega setup && npx cross-env OMEGA_BUILD_MODE=true OMEGA_IS_PUBLISH=true npm run gulp -- publish",
+    "release:local": "npx omega publish --local",
     "postinstall": "node -e \"try { require('@omega.js/desktop/scripts/sync-nvmrc') } catch (e) {}\"",
     "test": "npx omega test",
     "electron": "electron ."

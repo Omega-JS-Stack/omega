@@ -16,7 +16,7 @@ const logger = Manager.logger('package');
 
 module.exports = function packageApp(done) {
   const projectRoot = process.cwd();
-  const config = path.join(projectRoot, 'dist', 'electron-builder.yml');
+  const config = path.join(require('../../utils/dist-root.js')(projectRoot), 'electron-builder.yml');
 
   if (!jetpack.exists(config)) {
     return done(new Error(`Missing ${config}. Run gulp/build-config first (it generates this file from omega.json5).`));

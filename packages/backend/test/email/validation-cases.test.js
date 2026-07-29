@@ -1,11 +1,13 @@
 /**
- * Email validation test — verifies all free checks (format, disposable, corporate, localPart, typo, dns)
- * plus NeverBounce result parsing (no API calls).
+ * Email validation case corpus — verifies all free checks (format, disposable,
+ * corporate, localPart, typo, dns) plus NeverBounce result parsing (no API calls).
  *
- * Run:   node src/manager/libraries/email/validation.test.js
+ * The behavior-by-behavior suite lives next door in validation.test.js; this file is
+ * the broad address corpus — one test per address, one per parse code.
  */
-const { validate } = require('./validation.js');
-const { parseResult } = require('./validation-provider-neverbounce.js');
+const { validate } = require('../../src/manager/libraries/email/validation.js');
+const { parseResult } = require('../../src/manager/libraries/email/validation-provider-neverbounce.js');
+const assert = require('node:assert');
 
 const FREE_CHECKS = ['format', 'disposable', 'corporate', 'localPart', 'typo', 'dns'];
 
@@ -104,52 +106,40 @@ const NB_PARSE_CASES = [
   { result: 4, expectValid: true, expectStatus: 'unknown' },
 ];
 
-async function run() {
-  let passed = 0;
-  let failed = 0;
+module.exports = {
+  description: 'Email validation case corpus (free checks + NeverBounce parsing)',
+  type: 'group',
+  tests: [
+    ...NB_PARSE_CASES.map(({ result, expectValid, expectStatus }) => ({
+      name: `parseResult(${JSON.stringify(result)})`,
 
-  for (const { result, expectValid, expectStatus } of NB_PARSE_CASES) {
-    const parsed = parseResult(result);
-    if (parsed.valid === expectValid && parsed.status === expectStatus) {
-      passed++;
-    } else {
-      failed++;
-      console.log(`  ✗ parseResult(${JSON.stringify(result)})`);
-      console.log(`    Expected: valid=${expectValid} status=${expectStatus}, Got: valid=${parsed.valid} status=${parsed.status}`);
-    }
-  }
+      run() {
+        const parsed = parseResult(result);
 
-  for (const { email, expect: expected, check: expectedCheck } of CASES) {
-    const result = await validate(email, { checks: FREE_CHECKS });
-    const actualPass = result.valid;
-    const ok = (expected === 'pass' && actualPass) || (expected === 'fail' && !actualPass);
+        assert.strictEqual(parsed.valid, expectValid, `Expected valid=${expectValid}, got ${parsed.valid}`);
+        assert.strictEqual(parsed.status, expectStatus, `Expected status=${expectStatus}, got ${parsed.status}`);
+      },
+    })),
 
-    if (ok && expectedCheck && !actualPass) {
-      const failedCheck = Object.entries(result.checks).find(([, v]) => v && !v.valid);
-      if (failedCheck && failedCheck[0] !== expectedCheck) {
-        console.log(`  ✗ ${email}`);
-        console.log(`    Expected to fail on: ${expectedCheck}, actually failed on: ${failedCheck[0]}`);
-        failed++;
-        continue;
-      }
-    }
+    ...CASES.map(({ email, expect: expected, check: expectedCheck }) => ({
+      name: `${expected}: ${email || '(empty)'}`,
+      timeout: 10000,
 
-    if (ok) {
-      passed++;
-    } else {
-      failed++;
-      const failedCheck = Object.entries(result.checks).find(([, v]) => v && !v.valid);
-      console.log(`  ✗ ${email}`);
-      console.log(`    Expected: ${expected}, Got: ${actualPass ? 'pass' : 'fail'}${failedCheck ? ` (${failedCheck[0]})` : ''}`);
-    }
-  }
+      async run() {
+        const result = await validate(email, { checks: FREE_CHECKS });
+        const failedCheck = Object.entries(result.checks).find(([, v]) => v && !v.valid);
 
-  console.log('');
-  console.log(`${passed} passed, ${failed} failed out of ${CASES.length + NB_PARSE_CASES.length} cases`);
+        assert.equal(
+          result.valid,
+          expected === 'pass',
+          `Expected: ${expected}, Got: ${result.valid ? 'pass' : 'fail'}${failedCheck ? ` (${failedCheck[0]})` : ''}`,
+        );
 
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-run();
+        // A failing case must fail on the check it was written for.
+        if (expectedCheck && !result.valid && failedCheck) {
+          assert.strictEqual(failedCheck[0], expectedCheck, `Expected to fail on: ${expectedCheck}, actually failed on: ${failedCheck[0]}`);
+        }
+      },
+    })),
+  ],
+};

@@ -68,7 +68,7 @@ Caveats:
 
 ### relaunch / quit — the iterate loop
 
-@omega.js/desktop dev has **no watch** (`npm start` builds once, then runs) — every `src/` edit needs quit → rebuild → boot. `relaunch` is that loop in one command: it quits the app (real quit — `before-quit` handlers run), waits for the **full process tree to drain** (port-down alone is NOT that signal — the npm-start chain takes a few more seconds, and a test run started inside that window gets contaminated with flaky boot suites), spawns a detached `npm start` with `OMEGA_CDP_PORT`, and waits for the boot signal. `quit` is the first half alone — safe to run `npx omega test` the moment it returns. **Never run tests while the app is up or going down** (both rebuild `dist/`).
+@omega.js/desktop dev has **no watch** (`npm start` builds once, then runs) — every `src/` edit needs quit → rebuild → boot. `relaunch` is that loop in one command: it quits the app (real quit — `before-quit` handlers run), waits for the **full process tree to drain** (port-down alone is NOT that signal — the npm-start chain takes a few more seconds, and a test run started inside that window gets contaminated with flaky boot suites), spawns a detached `npm start` with `OMEGA_CDP_PORT`, and waits for the boot signal. `quit` is the first half alone — safe to run `npx omega test` the moment it returns. **Never run tests while the app is going down** (a test run started before the process tree drains gets contaminated) — boot tests build into their own `.omega/test-app/` output since #110, so `dist/` itself no longer collides.
 
 The boot signal defaults to the main window's document target. Apps whose boot completes later than first paint override it in `config/omega.json5`:
 

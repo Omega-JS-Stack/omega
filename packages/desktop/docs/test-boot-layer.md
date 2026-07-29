@@ -1,6 +1,8 @@
 # Test Framework — Boot Layer
 
-The `boot` test layer runs against the **consumer's actual built `dist/main.bundle.js`** — the real production main entry, exactly as `electron .` would load it. Replaces shell-level `npm start && sleep 12 && kill` smoke tests with deterministic, signal-driven pass/fail.
+The `boot` test layer runs against the consumer's **actual built `main.bundle.js`** — the real production main entry, loaded exactly as `electron .` loads one. Replaces shell-level `npm start && sleep 12 && kill` smoke tests with deterministic, signal-driven pass/fail.
+
+The build and the boot happen in a **staged app root of their own**, `<project>/.omega/test-app/` (gitignored) — never the project's `dist/`, which belongs to the `npm start` watcher. See [Isolated build output](#isolated-build-output).
 
 ## When to use it
 
@@ -51,13 +53,16 @@ The `inspect` function receives:
 |---|---|
 | `manager` | The fully-initialized live Manager instance — same one your consumer code uses. |
 | `expect` | @omega.js/desktop's [Jest-compatible assertion library](../src/test/assert.js). |
-| `projectRoot` | Absolute path to the consumer project root. |
+| `projectRoot` | Absolute path to the consumer project root (its `src/`, `config/` — and the `dist/` a boot run must never write). |
+| `appRoot` | Absolute path to the staged app root Electron booted — `<projectRoot>/.omega/test-app`. Assert on built artifacts here (`<appRoot>/dist/main.bundle.js`), not under `projectRoot`. |
+| `frameworkDistRoot` | Absolute path to `<@omega.js/desktop>/dist` — where framework test utilities live. |
+| `distSnapshotBefore` | Fingerprint of `<projectRoot>/dist` taken before the test build, for the isolation assertion below. |
 
 ## How it works
 
 1. Test runner discovers `test/**/*.js` files with `layer: 'boot'`.
-2. Aggregates each test's `inspect` source body into a JSON spec file.
-3. Spawns a real Electron process: `electron <projectRoot>` — same as `npm start` does.
+2. Stages `<projectRoot>/.omega/test-app`, builds into its `dist/`, and aggregates each test's `inspect` source body into a JSON spec file.
+3. Spawns a real Electron process: `electron <projectRoot>/.omega/test-app` — an app dir with a `package.json` whose `main` is the built bundle, same shape as `npm start`'s `electron .`.
 4. Sets three env vars before spawn:
    - `OMEGA_TEST_BOOT=1` — gate
    - `OMEGA_TEST_BOOT_HARNESS=<absolute path to dist/test/harness/boot-entry.js>`
@@ -78,9 +83,27 @@ npx omega test --layer boot
 OMEGA_TEST_DEBUG=1 npx omega test --layer boot
 ```
 
+## Isolated build output
+
+`npm start`'s watcher owns `<project>/dist/`. When the boot runner built there too, a dev app and a boot-test run interleaved writes on one tree and either side could load a half-written bundle — a race that presents as a code bug. So the boot build gets its own output (#110).
+
+**The seam** is [src/utils/dist-root.js](../src/utils/dist-root.js): every gulp task resolves its output through it instead of joining `dist/` by hand, and `OMEGA_BUILD_OUTPUT` (absolute, or relative to the project root) redirects the whole build. Nothing else in the build config is duplicated.
+
+**The staged app root** is `<project>/.omega/test-app/`, built by `stageTestApp()` in [src/test/runners/boot.js](../src/test/runners/boot.js):
+
+| Entry | What it is |
+|---|---|
+| `package.json` | The project's own, verbatim except `main`, pinned at the test build's bundle — so Electron derives the same app name, version and userData path a real boot does. |
+| `dist/` | The isolated build output. `<appRoot>/dist/views/*`, `<appRoot>/dist/preload.bundle.js` and the tray icon lookup resolve against it with **no runtime change** — the app root moved, the layout under it did not. |
+| `src`, `config` | Symlinks back to the project's. Runtime lookups against `app.getAppPath()` — `src/integrations/{tray,menu,context-menu}/index.js`, the unbundled config fallback — still find the consumer's real files. |
+
+`package.json` and the symlinks are restaged on every run, and the runner clears the staged `dist/` before each build (kept only under `OMEGA_TEST_SKIP_BUILD`). `node_modules` resolution still walks up into the project's. The isolation promise is about `dist/`: a boot run still appends to the project's gitignored `logs/` (the gulp build log and the booted app's runtime log), same as any run.
+
+The regression is covered end-to-end in the real run: the runner fingerprints `<project>/dist` before the build, and [src/test/suites/boot/build-isolation.test.js](../src/test/suites/boot/build-isolation.test.js) re-fingerprints it from inside the booted app and asserts nothing was touched.
+
 ## Prerequisites
 
-Boot tests run against `dist/main.bundle.js`. **The runner always rebuilds it first** (via the same gulp pipeline `npm run build` uses) so tests never see stale code. Adds ~10s to the boot-test run; correctness over speed.
+**The runner always rebuilds the bundle first** (via the same gulp pipeline `npm run build` uses) so tests never see stale code. Adds ~10s to the boot-test run; correctness over speed.
 
 Opt out for CI scenarios where build already ran in a separate step:
 
@@ -88,11 +111,11 @@ Opt out for CI scenarios where build already ran in a separate step:
 OMEGA_TEST_SKIP_BUILD=1 npx omega test --layer boot
 ```
 
-When `OMEGA_TEST_SKIP_BUILD=1` is set and the bundle is missing, boot tests are skipped with a warning instead of running against nothing.
+Boot then runs against whatever is already in `<project>/.omega/test-app/dist/`. If there is no bundle there, the run **fails loudly** rather than skipping or falling back to the project's `dist/` — an absent test build means the build step that was promised never ran, and booting some other bundle would silently test the wrong code.
 
 ## Self-test from the framework repo (the bundled fixture)
 
-Everything above describes a **consumer** running boot tests against their own `dist/main.bundle.js`. @omega.js/desktop also boot-tests *itself* — the same way BXM verifies "does the extension load?" and UJM verifies "does the site boot?".
+Everything above describes a **consumer** running boot tests against their own built bundle. @omega.js/desktop also boot-tests *itself* — the same way BXM verifies "does the extension load?" and UJM verifies "does the site boot?".
 
 When `npx omega test` runs from the @omega.js/desktop repo (the cwd's `package.json` name is `@omega.js/desktop`), two complementary mechanisms engage:
 
@@ -111,7 +134,7 @@ The gate decides *whether* the framework boot suite runs; the env var decides *w
 
 **Runtime-only, gitignored** (never committed): before the boot build, the runner symlinks `@omega.js/desktop` (→ the @omega.js/desktop repo root) and `electron` (→ @omega.js/desktop's own copy) into the fixture's `node_modules` — the only two deps resolved by *explicit path* (the gulpfile location, webpack's `require('@omega.js/desktop/main')`, and the runner's electron-binary lookup). Everything else (gulp, webpack, …) resolves via the upward `node_modules` walk because the fixture lives inside the @omega.js/desktop repo. The links are **removed again when the run finishes** — the `@omega.js/desktop` link points back at the repo root, which *contains* the fixture, so a leftover link forms an infinite directory cycle inside `dist/` that crashes the next prepare-package tree walk (`npm run prepare` / `npm publish` → `ENAMETOOLONG`). The fixture `.gitignore` is belt-and-suspenders for crashed runs. See `ensureFixtureDeps()` / `removeFixtureDeps()` in [src/test/runners/boot.js](../src/test/runners/boot.js).
 
-The fixture is then **webpack-built into a real `dist/main.bundle.js`** and booted — the same production path a consumer's boot test exercises (bundled, not the unbundled lib code the `main` layer covers). The boot smoke lives at [src/test/suites/boot/consumer-app-boots.test.js](../src/test/suites/boot/consumer-app-boots.test.js).
+The fixture is then **webpack-built into a real `main.bundle.js`** (under its own `.omega/test-app/dist/`, like any other boot run) and booted — the same production path a consumer's boot test exercises (bundled, not the unbundled lib code the `main` layer covers). The boot smoke lives at [src/test/suites/boot/consumer-app-boots.test.js](../src/test/suites/boot/consumer-app-boots.test.js).
 
 ### `OMEGA_TEST_BOOT_PROJECT`
 

@@ -4,7 +4,8 @@ const jetpack = require('fs-jetpack');
 const fs = require('fs');
 const JSON5 = require('json5');
 const argv = require('yargs')(process.argv.slice(2)).parseSync();
-const { force, execute } = require('node-powertools');
+const { spawn } = require('child_process');
+const { force } = require('node-powertools');
 
 // Class
 function Manager() {
@@ -53,6 +54,19 @@ Manager.getArguments = function () {
 };
 Manager.prototype.getArguments = Manager.getArguments;
 
+// The notifly argv for a build error. Build messages routinely carry apostrophes
+// and parentheses, so the message is a spawn ARG — never interpolated into a shell
+// string, which mangled it and killed the notification (#104).
+Manager.getBuildErrorNotificationArgs = function (plugin, message) {
+  return [
+    '--title', `Build Error: ${plugin}`,
+    '--message', message,
+    '--appIcon', '/Users/ian/claude-ai-icon.png',
+    '--timeout', '3',
+    '--sound', 'Sosumi',
+  ];
+};
+
 // Report build errors with notification
 Manager.reportBuildError = function (error, callback) {
   const logger = new (require('./lib/logger'))('build-error');
@@ -61,8 +75,8 @@ Manager.reportBuildError = function (error, callback) {
   const errorMessage = error.message || error.toString() || 'Unknown error';
   const errorPlugin = error.plugin || 'Build';
 
-  execute(`notifly --title 'Build Error: ${errorPlugin}' --message '${errorMessage.replace(/'/g, "\\'")}' --appIcon '/Users/ian/claude-ai-icon.png' --timeout 3 --sound 'Sosumi'`)
-    .catch((e) => {
+  spawn('notifly', Manager.getBuildErrorNotificationArgs(errorPlugin, errorMessage), { shell: false, stdio: 'ignore' })
+    .on('error', (e) => {
       logger.error('Failed to send notification', e);
     });
 

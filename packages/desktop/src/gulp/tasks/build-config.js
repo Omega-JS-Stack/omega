@@ -25,7 +25,7 @@ const logger = Manager.logger('build-config');
 module.exports = function buildConfig(done) {
   Promise.resolve().then(async () => {
     const projectRoot = process.cwd();
-    const distRoot    = path.join(projectRoot, 'dist');
+    const distRoot    = require('../../utils/dist-root.js')(projectRoot);
     const distPath    = path.join(distRoot, 'electron-builder.yml');
 
     const config      = Manager.getConfig();

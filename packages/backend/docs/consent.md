@@ -215,7 +215,7 @@ The parent @omega.js/backend has its own brand (e.g. `itw-creative-works`) with 
 
 The signup route ADDITIONALLY gates at its call site (`userRecord.consent.marketing.status === 'granted'` before calling `mailer.sync(uid)`) — that check runs before the route's paid NeverBounce/ZeroBounce mailbox validation, so declined users never trigger a paid check. The library gate is the safety net for everyone else.
 
-The gate logic is unit-tested without Firestore in [src/manager/libraries/email/marketing/consent-gate.test.js](../src/manager/libraries/email/marketing/consent-gate.test.js) — run with `node src/manager/libraries/email/marketing/consent-gate.test.js`.
+The gate logic is unit-tested without Firestore in [test/email/marketing/consent-gate.test.js](../test/email/marketing/consent-gate.test.js) — run with `npx omega test framework:email/marketing/consent-gate` (the test needs no emulator, but the runner boots its standard harness around it).
 
 ## Configuration
 
@@ -328,7 +328,7 @@ After the migration: optionally run a re-opt-in drip campaign to legally recover
 - [test/routes/marketing/webhook.test.js](../test/routes/marketing/webhook.test.js) — 15+ tests covering SendGrid + Beehiiv processors against the emulator
 - [test/routes/marketing/webhook-forward.test.js](../test/routes/marketing/webhook-forward.test.js) — verifies the forwarder route returns 404 on non-parent BEMs
 - [test/helpers/webhook-forward.test.js](../test/helpers/webhook-forward.test.js) — 12 unit-style tests with mocked admin + fetch, covering fan-out, URL derivation, failure isolation, self-inclusion, edge cases
-- [src/manager/libraries/email/marketing/consent-gate.test.js](../src/manager/libraries/email/marketing/consent-gate.test.js) — 28 plain-node cases for the library consent gate (revoked-only skip semantics, `{ blocked: 'consent' }` returns from `sync()`/`add()`, by-email lookup query + normalization, fail-open on lookup errors); runs directly with `node`, no emulator
+- [test/email/marketing/consent-gate.test.js](../test/email/marketing/consent-gate.test.js) — 21 plain-node tests for the library consent gate (revoked-only skip semantics, `{ blocked: 'consent' }` returns from `sync()`/`add()`, by-email lookup query + normalization, fail-open on lookup errors); the tests themselves touch no emulator and no network (the runner still boots its standard harness)
 
 **Total: 75+ tests across the consent system.**
 

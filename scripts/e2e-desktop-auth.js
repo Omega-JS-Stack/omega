@@ -250,7 +250,7 @@ const bootTests = [
   {
     description: 'a REAL second instance delivers the deep link; main signs in as the emulator user',
     timeout: 150000,
-    inspect: async ({ manager, expect }) => {
+    inspect: async ({ manager, expect, appRoot }) => {
       const { spawn } = require('child_process');
 
       const url = `${process.env.OMEGA_E2E_SCHEME}://auth/token?authToken=${process.env.OMEGA_E2E_TOKEN}`;
@@ -278,8 +278,10 @@ const bootTests = [
       // lock, wins one of its own, and no argv is ever forwarded.
       env.OMEGA_TEST_KEEP_USERDATA = '1';
       const log = require('fs').openSync(process.env.OMEGA_E2E_SECOND_INSTANCE_LOG, 'w');
-      const child = spawn(process.env.OMEGA_E2E_ELECTRON_BIN, [process.env.OMEGA_TEST_BOOT_PROJECT, url], {
-        cwd: process.env.OMEGA_TEST_BOOT_PROJECT,
+      // The duplicate must boot the SAME app the primary booted: the staged
+      // test root (#110), not the project root — whose dist/ no longer exists.
+      const child = spawn(process.env.OMEGA_E2E_ELECTRON_BIN, [appRoot, url], {
+        cwd: appRoot,
         env,
         stdio: ['ignore', log, log],
       });

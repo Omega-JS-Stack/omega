@@ -1,6 +1,6 @@
 // Boot-layer self-test — @omega.js/desktop's analog of "does the extension load?" (BXM) / "does the
 // site boot?" (UJM). The boot runner webpack-builds the bundled fixture consumer
-// (src/test/fixtures/consumer-app) into a real dist/main.bundle.js, spawns Electron with
+// (src/test/fixtures/consumer-app) into a real main.bundle.js, spawns Electron with
 // it (the actual production boot path — bundled, not the unbundled lib code that the
 // `main` layer exercises), then runs these inspects against the live manager.
 //
@@ -12,7 +12,8 @@
 //
 // NOTE: inspect bodies are serialized to the spawned Electron process — no closures over
 // module scope. `require`, `process`, and `Buffer` are injected; { manager, expect,
-// projectRoot } is the inspect argument (projectRoot = the fixture root).
+// projectRoot, appRoot, frameworkDistRoot, distSnapshotBefore } is the inspect argument
+// (projectRoot = the fixture root; appRoot = the staged app root holding the build).
 
 module.exports = {
   type: 'group',
@@ -69,11 +70,11 @@ module.exports = {
 
     {
       description: 'webpack produced the real production bundle + view on disk',
-      inspect: async ({ expect, projectRoot }) => {
+      inspect: async ({ expect, appRoot }) => {
         const fs = require('fs');
         const path = require('path');
-        expect(fs.existsSync(path.join(projectRoot, 'dist', 'main.bundle.js'))).toBe(true);
-        expect(fs.existsSync(path.join(projectRoot, 'dist', 'views', 'main', 'index.html'))).toBe(true);
+        expect(fs.existsSync(path.join(appRoot, 'dist', 'main.bundle.js'))).toBe(true);
+        expect(fs.existsSync(path.join(appRoot, 'dist', 'views', 'main', 'index.html'))).toBe(true);
       },
     },
 
@@ -83,10 +84,10 @@ module.exports = {
       // showing up in the built bundle proves the whole chain: webpack alias →
       // @omega.js/desktop's vendored dist asset → its @omega.js/client import.
       description: 'renderer bundle carries the vendored app-shell module via __main_assets__',
-      inspect: async ({ expect, projectRoot }) => {
+      inspect: async ({ expect, appRoot }) => {
         const fs = require('fs');
         const path = require('path');
-        const bundle = fs.readFileSync(path.join(projectRoot, 'dist', 'assets', 'js', 'components', 'main.bundle.js'), 'utf8');
+        const bundle = fs.readFileSync(path.join(appRoot, 'dist', 'assets', 'js', 'components', 'main.bundle.js'), 'utf8');
 
         expect(bundle.includes('data-shell-toggle')).toBe(true);
         expect(bundle.includes('data-shell-dismiss')).toBe(true);

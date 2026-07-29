@@ -10,18 +10,28 @@ const jetpack = require('fs-jetpack');
 
 const projectRoot   = Manager.getRootPath('project');
 const frameworkRoot = Manager.getRootPath();
+const outputRoot    = require('../../utils/dist-root.js')(projectRoot);
 
 // Shared resolve config — lets consumer code `require()` any of @omega.js/desktop's bundled
 // dependencies (fs-jetpack, @omega.js/client, etc.) without installing them directly.
-// Webpack checks the consumer's node_modules first (default), then falls back to
-// the framework's node_modules. Mirrors how UJM/BXM resolve @omega.js/client deps.
-const sharedResolve = {
-  modules: [
-    path.join(projectRoot, 'node_modules'),
-    path.join(frameworkRoot, 'node_modules'),
-    'node_modules',
-  ],
-};
+// The FRAMEWORK's node_modules comes first (#87): the framework's copy wins, so a
+// consumer that declares its own version of a framework dependency still bundles ONE
+// copy — the framework's — exactly like @omega.js/web's esbuild half. npm nests a
+// private copy under the framework only when the consumer's declaration conflicts, so
+// this order finds the nested copy when there is a conflict and the shared hoisted copy
+// when there is not. Accepted trade: the framework's copy also wins for TRANSITIVE
+// packages it happens to carry, not just the ones it declares.
+function makeSharedResolve(project, framework) {
+  return {
+    modules: [
+      path.join(framework, 'node_modules'),
+      path.join(project, 'node_modules'),
+      'node_modules',
+    ],
+  };
+}
+
+const sharedResolve = makeSharedResolve(projectRoot, frameworkRoot);
 
 module.exports = function webpackTask(done) {
   const mode = Manager.getMode();
@@ -125,7 +135,7 @@ function makeMainConfig(buildJson, isProd) {
     devtool: isProd ? false : 'source-map',
     entry,
     output: {
-      path:     path.join(projectRoot, 'dist'),
+      path:     outputRoot,
       filename: 'main.bundle.js',
       libraryTarget: 'commonjs2',
       module:   false,
@@ -161,7 +171,7 @@ function makePreloadConfig(buildJson, isProd) {
     devtool: isProd ? false : 'source-map',
     entry,
     output: {
-      path:     path.join(projectRoot, 'dist'),
+      path:     outputRoot,
       filename: 'preload.bundle.js',
       libraryTarget: 'commonjs2',
       module:   false,
@@ -209,7 +219,7 @@ function makeRendererConfig(buildJson, isProd) {
     devtool: isProd ? false : 'source-map',
     entry,
     output: {
-      path:         path.join(projectRoot, 'dist', 'assets', 'js', 'components'),
+      path:         path.join(outputRoot, 'assets', 'js', 'components'),
       filename:     '[name].bundle.js',
       module:       false,
       globalObject: 'globalThis',
@@ -304,3 +314,5 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}kB`;
   return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
 }
+
+module.exports.makeSharedResolve = makeSharedResolve;

@@ -22,6 +22,7 @@ const jetpack = require('fs-jetpack');
 
 const projectRoot = Manager.getRootPath('project');
 const packageRoot = Manager.getRootPath('main');
+const outputRoot  = require('../../utils/dist-root.js')(projectRoot);
 
 // We require the templating lib directly (rather than going through a Manager singleton)
 // because gulp tasks run pre-Electron, with only the build-time Manager available.
@@ -50,7 +51,7 @@ module.exports = function htmlTask(done) {
     logger.warn(`No @omega.js/desktop page template at ${templatePath}. Falling back to raw view copy.`);
     files.forEach((src) => {
       const rel = path.relative(viewsDir, src);
-      const dest = path.join(projectRoot, 'dist', 'views', rel);
+      const dest = path.join(outputRoot, 'views', rel);
       jetpack.copy(src, dest, { overwrite: true });
       logger.log(`emitted dist/views/${rel} (raw)`);
     });
@@ -85,7 +86,7 @@ module.exports = function htmlTask(done) {
     const outerVars = templating.buildPageVars(pageName, { cacheBust, content: renderedBody }, Manager);
     const final = templating.render(pageTemplateContent, outerVars);
 
-    const dest = path.join(projectRoot, 'dist', 'views', rel);
+    const dest = path.join(outputRoot, 'views', rel);
     jetpack.write(dest, final);
     logger.log(`emitted dist/views/${rel} (page=${pageName})`);
   });

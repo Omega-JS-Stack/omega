@@ -82,6 +82,29 @@ function shouldHaveStableName(name) {
   return bundleNaming.stable.some(pattern => pattern.test(name));
 }
 
+// Module resolution paths — the FRAMEWORK's node_modules comes before the project's
+// (#87): consumer code may `require()` anything @omega.js/extension declares by bare
+// specifier, and the framework's copy wins, so a consumer that declares its own version
+// of a framework dependency still bundles ONE copy — the framework's — exactly like
+// @omega.js/web's esbuild half. npm nests a private copy under the framework only when
+// the consumer's declaration conflicts, so this order finds the nested copy when there
+// is a conflict and the shared hoisted copy when there is not. Accepted trade: the
+// framework's copy also wins for TRANSITIVE packages it happens to carry, not just the
+// ones it declares.
+function makeResolveModules(projectRoot, frameworkRoot) {
+  return [
+    // Local @omega.js/client's node_modules (for when we're using "@omega.js/client": "file:../@omega.js/client")
+    path.resolve(frameworkRoot, '../client/node_modules'),
+
+    // Package's node_modules
+    path.resolve(frameworkRoot, 'node_modules'),
+
+    // Project's node_modules
+    path.resolve(projectRoot, 'node_modules'),
+    'node_modules' // Default fallback
+  ];
+}
+
 // Helper function to get webpack settings (called at runtime)
 function getSettings() {
   return {
@@ -105,17 +128,7 @@ function getSettings() {
         '__theme__': path.resolve(rootPathPackage, 'dist/assets/themes', config.theme?.id || 'classy'),
       },
       // Add module resolution paths
-      modules: [
-        // Local @omega.js/client's node_modules (for when we're using "@omega.js/client": "file:../@omega.js/client")
-        path.resolve(rootPathPackage, '../client/node_modules'),
-
-        // Package's node_modules
-        path.resolve(rootPathPackage, 'node_modules'),
-
-        // Project's node_modules
-        path.resolve(process.cwd(), 'node_modules'),
-        'node_modules' // Default fallback
-      ],
+      modules: makeResolveModules(process.cwd(), rootPathPackage),
       // Fallbacks for Node.js modules that don't work in the browser
       fallback: {
         fs: false,
@@ -507,3 +520,5 @@ function getTemplateReplaceOptions() {
 
 // Default Task
 module.exports = series(webpack, webpackWatcher);
+
+module.exports.makeResolveModules = makeResolveModules;

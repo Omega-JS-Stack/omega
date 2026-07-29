@@ -19,10 +19,10 @@ module.exports = {
   tests: [
     {
       description: 'no live import("electron-store") remains in the bundle; module source is inlined',
-      inspect: async ({ expect, projectRoot }) => {
+      inspect: async ({ expect, appRoot }) => {
         const fs = require('fs');
         const path = require('path');
-        const bundle = fs.readFileSync(path.join(projectRoot, 'dist', 'main.bundle.js'), 'utf8');
+        const bundle = fs.readFileSync(path.join(appRoot, 'dist', 'main.bundle.js'), 'utf8');
 
         // A surviving dynamic import (with or without magic comments) means webpack
         // was told to ignore it → packaged consumers would hit the no-op fallback.

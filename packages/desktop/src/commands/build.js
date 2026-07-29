@@ -1,13 +1,25 @@
 // Libraries
 const Manager = new (require('../build.js'));
 const logger = Manager.logger('build');
-const { execute } = require('node-powertools');
+const { runPipeline } = require('../utils/build-pipeline.js');
+
+// The consumer's `build` script is `npx omega build` — this verb owns the
+// pipeline and the build-mode flag; it must never shell back to that script.
+function plan() {
+  return {
+    env: { OMEGA_BUILD_MODE: 'true' },
+    steps: [
+      { type: 'clean' },
+      { type: 'setup' },
+      { type: 'gulp', task: 'build' },
+    ],
+  };
+}
 
 module.exports = async function (options) {
   logger.log('Running production build...');
 
-  process.env.OMEGA_BUILD_MODE = 'true';
-
-  // Delegate to gulp build via the consumer's projectScripts
-  await execute('npm run build', { log: true });
+  await runPipeline(plan(options), options);
 };
+
+module.exports.plan = plan;

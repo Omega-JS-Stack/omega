@@ -50,6 +50,8 @@ Then the standard `omega dev` loop runs. Result: edit any framework's `src/` and
 
 ## Per-app linking: `mgr i local`
 
+**Linking is one-time and durable (Ian 2026-07-28) — never re-run it per change or per session.** The `file:` specs resolve to real symlinks into the monorepo, so once a brand is linked, every framework edit is live the moment its `dist/` rebuilds (the monorepo watch or any prepare); a running dev process only needs its normal restart to load the fresh code. Re-running `i local` is a HEAL for a link something overwrote (a registry install, a fresh clone) — reruns all-skip and cost nothing, but they are never part of the edit loop.
+
 Unchanged contract for consumers, now monorepo-backed: `mgr i local` (web, desktop, extension — web gained its install command in cp194) and `mgr i local` / `mgr install --local` (backend) call the same `linkLocalPackages()`. Backend links its app-root manifest like every other target (`functions/` is staged output; the CLI normalizes a `functions/` cwd up to the app root). `mgr i live/prod` still installs from the registry and is untouched.
 
 **Linking is brand-tree-wide by construction (cp194):** npm resolves the WHOLE workspace tree on any install anchored in a brand monorepo, so linking one app while a sibling still carries an unpublished registry spec (`@omega.js/backend: *`) 404s before anything links — only reachable in a brand OUTSIDE the omega monorepo, the real consumer topology. `linkLocalPackages()` therefore flips every app's `@omega.js/*` specs to `file:` first (dev/prod placement preserved; specs computed from REAL paths so symlinked/aliased dirs can't dangle), then runs ONE `npm install` for the tree. One call from any app links the whole brand; reruns all-skip.
