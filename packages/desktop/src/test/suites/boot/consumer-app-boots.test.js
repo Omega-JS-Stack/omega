@@ -76,5 +76,21 @@ module.exports = {
         expect(fs.existsSync(path.join(projectRoot, 'dist', 'views', 'main', 'index.html'))).toBe(true);
       },
     },
+
+    {
+      // #111 — the fixture's renderer entry imports the vendored app-shell
+      // module through the `__main_assets__` alias. Its declarative contract
+      // showing up in the built bundle proves the whole chain: webpack alias →
+      // @omega.js/desktop's vendored dist asset → its @omega.js/client import.
+      description: 'renderer bundle carries the vendored app-shell module via __main_assets__',
+      inspect: async ({ expect, projectRoot }) => {
+        const fs = require('fs');
+        const path = require('path');
+        const bundle = fs.readFileSync(path.join(projectRoot, 'dist', 'assets', 'js', 'components', 'main.bundle.js'), 'utf8');
+
+        expect(bundle.includes('data-shell-toggle')).toBe(true);
+        expect(bundle.includes('data-shell-dismiss')).toBe(true);
+      },
+    },
   ],
 };

@@ -23,7 +23,7 @@ All commands run from the **app root** (this directory). `dist/` is staged build
 npx omega setup             # validate config + scaffold defaults + stage dist/ + run checks
 npx omega build             # stage src/ → dist/ (the tree firebase.json points at)
 npx omega emulator          # start Firebase emulators (auth/firestore/functions/database/storage)
-npx omega test              # run framework + project test suites (project: → your tests only, mgr:/backend: → framework only)
+npx omega test              # run YOUR project's test suites (bare runs are project-only; mgr:/backend: → framework, full: → both)
 npx omega test --extended   # opt into REAL external APIs (shorthand for the shared TEST_EXTENDED_MODE; default: skipped)
 npx omega watch             # auto-reload functions on file change
 npx omega deploy            # deploy to Firebase

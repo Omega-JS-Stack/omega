@@ -159,6 +159,7 @@ Validate first, then document — write docs that describe shipped reality, not 
 - [docs/web/sections.md](sections.md) — the section/component contract · [docs/web/omega-sections-spec.md](omega-sections-spec.md) — the ratified architecture spec
 - [docs/shared/theming.md](../shared/theming.md) — the `--omega-*` design-system contract · [docs/web/classy-v2/DIRECTION.md](classy-v2/DIRECTION.md) — the visual spec
 - [docs/shared/config.md](../shared/config.md) — omega.json5 shape, merge chain, and the legacy mapping tables `omega migrate` implements
+- [docs/test-framework.md](../../packages/web/docs/test-framework.md) — the consumer test guide: the layered doctrine, what `omega test` builds and smoke-checks, the scope grammar, authoring `node --test` suites
 - [docs/shared/testing.md](../shared/testing.md) — the verification tiers and which lane gates what
 - [docs/shared/deploys.md](../shared/deploys.md) · [docs/shared/updates.md](../shared/updates.md) · [docs/shared/translation.md](../shared/translation.md) · [docs/shared/icons.md](../shared/icons.md) · [docs/web/ads-system.md](ads-system.md)
 - [docs/shared/local-dev.md](../shared/local-dev.md) — linking this monorepo into a brand · [docs/shared/brands.md](../shared/brands.md) — which brand is which

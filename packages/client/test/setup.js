@@ -5,6 +5,7 @@ global.window = {
     href: 'http://localhost:3000/test',
     search: '',
     origin: 'http://localhost:3000',
+    protocol: 'http:',
   },
   screen: {
     width: 1920,

@@ -62,6 +62,42 @@ The HTML pipeline auto-injects `<link rel="stylesheet" href="../assets/css/compo
 
 Theme SCSS is vendored from @omega.js/web's `themes/` tree into `dist/assets/themes/<theme-id>/` at prepare (C4 cp109 — one theme tree for web/desktop/extension). The load path resolves `@use 'theme'` to the active theme — flip `config.theme.id` to switch themes without code changes. See [themes.md](themes.md).
 
+## App shell
+
+Dashboard-style views (options, side panel, extension pages) use the `.omega-shell` layout — a sidebar + topbar + main grid with a collapsible desktop rail and a mobile drawer. Two layers ship, both vendored from @omega.js/web at prepare: the MECHANICS (`dist/assets/css/shell/_index.scss` — the grid, region geometry, states, and the `--omega-shell-*` tokens, loaded by the `omega-extension` entry before the theme) and the theme's SKIN (`dist/assets/themes/<theme-id>/css/layout/_shell.scss`, layered over it). Nothing to import — `@use 'omega-extension'` gets both.
+
+Emit this markup in the view's HTML:
+
+```html
+<div class="omega-shell" data-omega-shell>
+  <aside class="omega-shell__sidebar" id="app-sidebar">
+    <!-- nav; text that should hide in the collapsed rail wears .omega-shell__label -->
+  </aside>
+
+  <header class="omega-shell__topbar">
+    <div class="omega-shell__topbar-start">
+      <button data-shell-toggle="drawer" aria-expanded="false" aria-controls="app-sidebar">☰</button>
+      <button data-shell-toggle="collapse" aria-expanded="true" aria-controls="app-sidebar">⇤</button>
+    </div>
+    <div class="omega-shell__topbar-end"><!-- account menu, actions --></div>
+  </header>
+
+  <main class="omega-shell__main"><!-- page content --></main>
+
+  <div class="omega-shell__scrim" data-shell-dismiss></div>
+</div>
+```
+
+Wire the behavior from the view's script (`src/assets/js/components/<component>/index.js`) — `__main_assets__` is the build alias for @omega.js/extension's vendored core assets:
+
+```js
+import appShell from '__main_assets__/js/core/app-shell.js';
+
+appShell();
+```
+
+The module is delegated and declarative: `[data-shell-toggle="collapse"]` toggles the rail, `[data-shell-toggle="drawer"]` toggles the mobile drawer, `[data-shell-dismiss]` (and Escape) closes it. It stamps the state on the container — `data-shell-collapsed="true"` (persisted under the `shell.collapsed` storage key) and `data-shell-open="true"` — which is what the CSS keys off; the API is also registered at `omega._ujLibrary.appShell`. Add `.omega-shell--locked` when `main` should never scroll (the view manages its own interior scroll).
+
 ## Adding a utility class
 
 [src/assets/css/core/_utilities.scss](../src/assets/css/core/_utilities.scss):

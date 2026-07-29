@@ -5,7 +5,7 @@ Built-in test framework for both @omega.js/extension itself and consumer project
 ## Running tests
 
 ```bash
-npx omega test                          # runs framework + project suites
+npx omega test                          # consumer: runs YOUR project suites (bare runs never include the framework corpus)
 npx omega test --layer build            # only build-layer suites (plain Node, fast)
 npx omega test --layer background       # only background-layer suites (real MV3 SW)
 npx omega test --layer view             # only view-layer suites (popup/options/sidepanel)
@@ -31,7 +31,7 @@ All test output is also teed (ANSI-stripped) to `<projectRoot>/logs/test.log`, t
 #### Positional target — select files by source + path
 
 ```bash
-# Everything — framework + project suites
+# Project suites only (the consumer default — the framework corpus needs an explicit prefix)
 npx omega test
 
 # ONLY project tests (all of them)
@@ -51,21 +51,26 @@ npx omega test framework:
 npx omega test mgr:build/config
 npx omega test extension:build/config
 
-# Bare path (no prefix) — BOTH sources, matched by path
+# Bare path (no prefix) — PROJECT tests matched by path
 npx omega test build/config
+
+# Both sources — always an explicit choice
+npx omega test full:
+npx omega test full:build/config
 ```
 
 The source prefix is standardized across all four OMEGA frameworks:
 
 | Target | Selects |
 |---|---|
-| *(none)* | Everything — framework + project suites |
+| *(none)* | Project suites only (framework self-test context flips this to the framework suite) |
 | `project:` | ONLY project tests (all of them) |
 | `project:<path>` | Only project tests matching `<path>` |
 | `mgr:` | ONLY framework tests (`mgr:` is the universal alias for "the manager's own tests") |
 | `extension:` / `framework:` | ONLY framework tests (extension-specific aliases, equivalent to `mgr:`) |
 | `mgr:<path>` / `extension:<path>` | Framework tests matching `<path>` |
-| `<path>` (bare) | BOTH sources, matched by `<path>` |
+| `<path>` (bare) | PROJECT tests matched by `<path>` |
+| `full:` / `full:<path>` | BOTH sources — the only way a consumer run includes the framework suite |
 
 A source-prefixed target excludes the other source entirely; the path part (if any) matches by relative path prefix (relative to each source's `test/` root).
 

@@ -74,10 +74,18 @@ module.exports = async function (options) {
   // ---- Consumer test suite
   const testDir = path.join(paths.root, 'test');
   if (fs.existsSync(testDir)) {
-    const projectTests = scope.filters.project.length
-      ? scope.filters.project.map((f) => `test/${f.replace(/\.js$/, '')}*`).join(' ')
-      : 'test/';
+    const projectTests = projectTestArgs(scope.filters.project);
     logger.log(`Running consumer tests (node --test ${projectTests})`);
     execSync(`node --test ${projectTests}`, { stdio: 'inherit' });
   }
 };
+
+// The default is a QUOTED glob node expands itself: a bare `test/` positional
+// is treated as a module on Node >= 22 (our engines floor), and macOS /bin/sh
+// would half-expand `**` if the shell saw it (#114).
+function projectTestArgs(filters) {
+  return filters.length
+    ? filters.map((f) => `test/${f.replace(/\.js$/, '')}*`).join(' ')
+    : `'test/**/*.test.js'`;
+}
+module.exports.projectTestArgs = projectTestArgs;

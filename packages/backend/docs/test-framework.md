@@ -72,7 +72,7 @@ npx omega test project:routes/custom
 npx omega test --extended routes/marketing/push-send
 ```
 
-The filter matches against the test file path. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, both are searched.
+The filter matches against the test file path. `backend:` and `project:` prefixes scope the filter to framework-only or project-only tests respectively. Without a prefix, only the project's tests are searched; `full:` searches both.
 
 ## Project mismatch detection
 
@@ -222,7 +222,8 @@ Test runs tee output to `functions/test.log` (own-emulator runs go to `functions
 ## Filtering Tests
 
 ```bash
-npx omega test rules/             # Run rules tests (both @omega.js/backend and project)
+npx omega test rules/             # Run the project's rules tests (bare paths are project-only)
+npx omega test full:rules/        # Run rules tests from both sources
 npx omega test backend:rules/         # Only @omega.js/backend's rules tests
 npx omega test project:rules/     # Only project's rules tests
 npx omega test user/ admin/       # Multiple paths

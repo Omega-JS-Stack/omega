@@ -47,6 +47,8 @@ npx omega i live     # restore published registry versions
 
 `omega`, `omg`, and `mgr` are the same context-aware dispatcher — the nearest app names the framework that runs.
 
+Tests follow the layered doctrine in each framework's own `docs/test-framework.md` (unit for functions, integration for in-package systems, e2e only across framework boundaries; never mock what you can test real). Bare `npx omega test` runs are PROJECT-only — the framework corpus needs an explicit `framework:` or `full:` target.
+
 ## Working locally against the framework (upstream-first)
 
 When this brand runs `omega i local` / `omega dev --local`, every `@omega.js/*` dep is linked LIVE from the local framework monorepo — a framework change reflects here instantly. That linkage exists for a reason: real applications expose framework holes. **When you hit a defect or gap that EVERY consumer would face — a broken core style, a missing option, a wrong default — it belongs in the FRAMEWORK (the linked monorepo), not in this brand.** The test: would the next consumer project need the same patch? Then it belongs upstream. **But ask first, always: SURFACE the proposed framework change (what is broken, what you would change, why every consumer needs it) and WAIT for Ian's go before editing the monorepo — or file it as an upstream issue.** Never edit the framework silently as a side effect of brand work. Within reason: brand-specific looks, content, and one-off behavior stay in the brand; framework edits follow the framework's own rules (its docs, its tests). When the link is NOT active (published versions installed), file the gap upstream instead of patching around it locally.

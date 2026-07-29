@@ -32,6 +32,8 @@ The bridge handles all three.
 
 ### Auth flow: deep-link → all processes signed in
 
+**Consumers never collect credentials.** There is no login form to build — call `manager.openAuthFlow()` (documented in `lib/auth-flow.js`), which opens the brand website's sign-in page in the user's browser and receives the result through the deep link below.
+
 1. User signs in on the website. Web-manager generates a custom token. Website opens `myapp://auth/token?token=XYZ` (deep link).
 2. @omega.js/desktop's deep-link `auth/token` built-in fires `manager.omega.handleAuthToken(token)`.
 3. Main calls `signInWithCustomToken(auth, token)` against its own Firebase Auth → main is now signed in.

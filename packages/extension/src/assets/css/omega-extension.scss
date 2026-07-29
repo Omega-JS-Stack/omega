@@ -5,6 +5,13 @@
 // Import this in your extension components using:
 // @use 'omega-extension' as * with ($primary: #2563EB);
 
+// App shell mechanics (#111) — the .omega-shell grid, region geometry and the
+// collapse/drawer states, vendored from @omega.js/web alongside the theme's
+// shell SKIN. Loaded BEFORE the theme (Sass emits a module's CSS at its first
+// load, @forward included) so the skin layers OVER the mechanics, exactly as
+// web's core/css/main.scss orders them.
+@use 'shell/index' as omega-shell;
+
 // Forward the theme (allows consuming project to configure it)
 @forward 'theme';
 

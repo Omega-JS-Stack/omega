@@ -216,6 +216,12 @@ function makeRendererConfig(buildJson, isProd) {
     },
     resolve: {
       ...sharedResolve,
+      alias: {
+        // Vendored core assets (#111) — mirrors the alias BXM/UJM use, so
+        // renderer code imports shared core modules by a stable name:
+        //   import appShell from '__main_assets__/js/core/app-shell.js';
+        '__main_assets__': path.join(frameworkRoot, 'dist', 'assets'),
+      },
       // For 'web' target: provide empty fallbacks for Node built-ins that libraries
       // import but don't actually use in the browser. Firebase/@omega.js/client's browser
       // builds don't need these — the imports are dead code paths for Node-only features.

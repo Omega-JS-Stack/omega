@@ -29,8 +29,8 @@ This project consumes **OMEGA Extension** (`@omega.js/extension`) — a comprehe
 npm start                   # dev with live reload (gulp → webpack → serve)
 npm run build               # production build → dist/ + packaged/<browser>/raw/ + .zip per browser
 OMEGA_IS_PUBLISH=true npm run build   # build + auto-upload to Chrome / Firefox / Edge stores
-npx omega test                # run framework + project test suites
-npx omega test build/config         # bare path: run tests matching a path in BOTH sources
+npx omega test                # run YOUR project's test suites (bare runs never include the framework corpus)
+npx omega test build/config         # bare path: run project tests matching a path (full:<path> for both sources)
 npx omega test project:             # run ONLY your project tests (project:<path> to narrow)
 npx omega test mgr:                 # run ONLY framework tests (extension: / framework: are equivalent aliases)
 npx omega test extension:build/config     # run only framework tests matching a path

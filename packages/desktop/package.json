@@ -66,6 +66,16 @@
       },
       {
         "package": "@omega.js/web",
+        "from": "core/css/shell",
+        "to": "assets/css/shell"
+      },
+      {
+        "package": "@omega.js/web",
+        "from": "core/js/core/app-shell.js",
+        "to": "assets/js/core/app-shell.js"
+      },
+      {
+        "package": "@omega.js/web",
         "from": "themes",
         "to": "assets/themes"
       }

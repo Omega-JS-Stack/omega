@@ -39,7 +39,7 @@ A feature is not done when it works — it's done when every surface it exposes 
 ## Running tests
 
 ```bash
-npx omega test                          # consumer: runs framework + project suites
+npx omega test                          # consumer: runs YOUR project suites (bare runs never include the framework corpus)
 npx omega test --layer=main             # only main-process suites (also: build, renderer, all)
 npx omega test --filter="storage"       # only suites/tests whose name contains "storage"
 npx omega test --extended               # opt into extended mode — real external APIs (also: TEST_EXTENDED_MODE=true)
@@ -47,15 +47,19 @@ npx omega test --reporter=json          # pretty output + machine-readable {"eve
 OMEGA_TEST_DEBUG=1 npx omega test          # see Electron stderr (otherwise drained silently)
 ```
 
-In @omega.js/desktop itself, `npm test` does the same.
+In @omega.js/desktop itself, `npm test` runs the framework's own suite — the self-test context flips the no-target default.
 
 ### Filtering tests
 
 Pass a path (relative to `test/`) as a positional **target** to select which test FILES run:
 
 ```bash
-# Run a single test file (matches both framework + project)
+# Run project test files under a path (a bare path binds to the PROJECT source)
 npx omega test build/config
+
+# Run BOTH sources — reaching the framework suite is always an explicit choice
+npx omega test full:
+npx omega test full:build/config
 
 # Run ONLY consumer project tests (no framework suites at all)
 npx omega test project:
@@ -67,7 +71,7 @@ npx omega test project:main/tab-manager
 npx omega test mgr:
 
 # Run ONLY @omega.js/desktop framework tests (desktop-specific aliases, equivalent to mgr:)
-npx omega test em:
+npx omega test desktop:
 npx omega test framework:
 
 # Run framework tests matching a path
@@ -84,7 +88,7 @@ The target matches against the test file path. The source prefix scopes selectio
 - `desktop:` / `framework:` — desktop-specific aliases for framework-only tests, equivalent to `mgr:`.
 - `project:` — consumer project tests only.
 
-A bare prefix (`mgr:` / `desktop:` / `project:` with no path) runs every test in that source. A bare path (no prefix) searches both sources by path.
+A bare prefix (`mgr:` / `desktop:` / `project:` with no path) runs every test in that source. A bare path (no prefix) binds to the PROJECT source; `full:<path>` searches both sources by path.
 
 > **Target vs `--filter`.** The positional target selects test FILES (by path + source). The `--filter=<substring>` flag is orthogonal: it matches test NAMES/descriptions within the selected files. Use them together, e.g. `npx omega test project: --filter="reorder"`.
 
@@ -309,4 +313,4 @@ module.exports = {
 };
 ```
 
-`npx omega test` runs framework defaults + your project suites.
+`npx omega test` runs your project suites; scope `framework:` or `full:` to reach the framework's own.

@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#109](../../issues/109) — The desktop docs cover three consumer traps surfaced on a real brand: shared code that touches `process` throws in isolated renderers, `target="_blank"` does nothing over `file://`, and the client-bridge guide now says sign-in is `manager.openAuthFlow()` — consumers never build a login form.
+
+- [#112](../../issues/112) — Web gains the consumer test guide its siblings already ship (`packages/web/docs/test-framework.md`): the layered doctrine, the production-build + smoke step a project run performs, the scope grammar, and how to author `node --test` suites — every claim checked against the command's code.
+
+- [#113](../../issues/113) — The omega Claude plugin gains a shape hook: writes of `__tests__/` directories, `*.spec.*` filenames, or `test/tests/` nesting bounce at write time in any project depending on `@omega.js/*` — the layered mantra's mechanical remainder, enforced in consumer sessions too.
+
+### Fixed
+- [#114](../../issues/114) — `npx omega test` in a web app no longer errors when the app has a `test/` directory: the consumer-suite step hands node a `test/**/*.test.js` glob instead of a bare directory positional, which Node 22+ treats as a module to load.
+
+- [#106](../../issues/106) — `omega dev` on a desktop app resolves electron through Node resolution instead of a hardcoded `<app>/node_modules/electron` path, so a brand monorepo that hoists electron to its root launches instead of failing every time.
+
+- [#107](../../issues/107) — Fourteen doc lines across the framework guides claimed a bare `npx omega test` runs framework + project suites; every one now states the parser's truth — bare consumer runs are project-only, `framework:` or `full:` reaches the framework corpus. The brand guide gained a layered-doctrine pointer.
+
+- [#111](../../issues/111) — Desktop and extension consumers get a working app shell, not just its paint: the core `.omega-shell` grid sheet and the `app-shell.js` toggle module are now vendored alongside the theme skin, and both CSS guides carry a copy-paste markup reference.
+
+- [#108](../../issues/108) — The client no longer tries to register a service worker on origins that cannot host one: the boot branch is gated on http(s), so desktop (`file://`) and extension pages skip registration — and the disabled-branch sweep — instead of logging a failure on every window.
+
 ## [0.3.0] (2026-07-28)
 
 ### Added

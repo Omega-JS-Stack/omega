@@ -31,11 +31,11 @@ npm run build       # local production build (compiles bundles only, no installe
 npm run package     # full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux)
 npm run package:quick   # fast packaged build for the host platform/arch only (~20-30s)
 npm run release     # signed + published release (requires certs)
-npx omega test        # run framework + project test suites
-npx omega test build/config         # run a specific test by path (relative to test/)
+npx omega test        # run YOUR project's test suites (bare runs never include the framework corpus)
+npx omega test build/config         # run project tests by path (relative to test/; full:<path> for both sources)
 npx omega test project:             # run ONLY your project tests (all of them)
 npx omega test project:custom-test  # run only consumer project tests matching a path
-npx omega test mgr:                 # run ONLY framework tests (universal alias; em:/framework: are equivalent)
+npx omega test mgr:                 # run ONLY framework tests (universal alias; desktop:/framework: are equivalent)
 npx omega test desktop:build/config      # run only framework tests matching a path
 npx omega test --extended           # also run tests that hit REAL external services (off by default; TEST_EXTENDED_MODE=true is the env equivalent — shared name across @omega.js/backend, @omega.js/extension, UJM, and @omega.js/desktop)
 # (output is teed to logs/ — dev.log on `npm start`, build.log on `npm run build`, test.log on `npx omega test`; cat instead of scrolling scrollback)

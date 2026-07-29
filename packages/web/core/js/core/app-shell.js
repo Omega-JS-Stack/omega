@@ -70,7 +70,10 @@ export default () => {
     },
   };
 
-  // Register on UJ library
+  // Register on UJ library — web's bundle entry creates the container before
+  // this runs; vendored surfaces (desktop/extension renderers) call this
+  // module directly with no such entry, so create it if absent (#111)
+  omega._ujLibrary = omega._ujLibrary || {};
   omega._ujLibrary.appShell = shellAPI;
 
   // No shell on this page — the API stays registered but inert

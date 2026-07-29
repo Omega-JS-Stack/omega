@@ -6,6 +6,13 @@
 // gulp/sass adds <omega-package-root>/dist/assets/css and <omega-package-root>/dist/assets/themes/<theme>
 // to the sass loadPaths so the bare 'omega-desktop' import resolves to this file.
 
+// App shell mechanics (#111) — the .omega-shell grid, region geometry and the
+// collapse/drawer states, vendored from @omega.js/web alongside the theme's
+// shell SKIN. Loaded BEFORE the theme (Sass emits a module's CSS at its first
+// load, @forward included) so the skin layers OVER the mechanics, exactly as
+// web's core/css/main.scss orders them.
+@use 'shell/index' as omega-shell;
+
 // Forward the active theme so consumers can override theme variables via @use ... with ()
 @forward 'theme';
 

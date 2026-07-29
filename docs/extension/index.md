@@ -30,9 +30,9 @@ OMEGA Extension (@omega.js/extension) is a comprehensive framework for building 
 3. `npm start` — dev (gulp → webpack → serve with live reload)
 4. `npm run build` — production build (compiles `dist/`, packages per-browser into `packaged/<browser>/raw/` + `.zip`)
 5. `OMEGA_IS_PUBLISH=true npm run build` — also uploads to Chrome / Firefox / Edge stores (see [docs/shared/publishing.md](../../packages/extension/docs/publishing.md))
-6. `npx omega test` — runs framework + project test suites
-   - `npx omega test build/config` — bare path: run tests matching a path in BOTH sources
-   - `npx omega test project:` — run ONLY consumer project tests (`project:<path>` to narrow)
+6. `npx omega test` — runs the project's test suites (bare consumer runs never include the framework corpus)
+   - `npx omega test build/config` — bare path: run project tests matching a path
+   - `npx omega test framework:` / `npx omega test full:` — reach the framework suite (alone, or both sources)
    - `npx omega test mgr:` — run ONLY framework tests (`mgr:` is the universal cross-framework alias; `extension:` / `framework:` are equivalent)
    - `npx omega test extension:build/config` — run only framework tests matching a path
    - The positional target selects which test FILES run (by source + path); `--filter=<substring>` is orthogonal — it matches test NAMES within them
@@ -190,7 +190,7 @@ Every feature ships with tests at EVERY layer it has a surface in — logic (`bu
 | `deploy` | dispatch the CI publish workflow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo) |
 | `version` | print versions |
 | `help` | command listing (router built-in; also `-h`/`--help`) |
-| `test` | run framework + project test suites |
+| `test` | run the project's test suites (`framework:` / `full:` reach the framework suite) |
 | `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/shared/updates.md in the Omega repo |
 
 See [docs/cli.md](../../packages/extension/docs/cli.md).

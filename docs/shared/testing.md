@@ -18,6 +18,8 @@ Every package's suite wears the same clothes:
 - **`*.test.js` filenames** — the suffix IS the discovery signal, everywhere. Backend's suite now matches (its runner discovers `.test.js` only — no bare-`.js` fallback); `_`-prefixed files and directories stay excluded at any depth for shared helpers and fixtures.
 - **`node --test`** is the default runner (`node --test test/*.test.js` in the npm script), unless the package's own runner is the motivated path: backend, desktop, and extension self-test through `omega test` because their suites need a booted emulator/app and the C5 scope grammar, and devkit wraps the same runner in `scripts/run-tests.js` for its documented flake-isolation re-run of the e2e-harness suite.
 
+The always-wrong shapes — a `__tests__/` directory, a `*.spec.*` filename, `test/tests/` nesting — are bounced at write time by the omega plugin's shape hook (`agent-plugins/claude/hooks/shape/`), in this repo and in every consumer session the plugin loads in. The layer CHOICE stays judgment; the hook guards only the mechanical shape.
+
 Layer names inside a suite are platform-native on purpose: desktop's `main`/`renderer` and extension's `background`/`view` name the runtimes those platforms actually have. That is vocabulary, not drift — the mirroring rule is about layout, naming, and runner semantics, not about pretending every platform has the same layers.
 
 ## The three verification tiers (what runs when)

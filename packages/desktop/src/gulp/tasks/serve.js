@@ -6,7 +6,6 @@
 
 const Manager = new (require('../../build.js'));
 const logger = Manager.logger('serve');
-const path = require('path');
 const { spawn } = require('child_process');
 
 const projectRoot = Manager.getRootPath('project');
@@ -47,17 +46,24 @@ async function resolveServePorts() {
   return ports;
 }
 
+// Resolve the electron package from the consumer project — it exports the path to
+// the platform binary. Node resolution walks UP from projectRoot, so an npm-workspaces
+// brand that hoists electron to the monorepo root resolves just as well as an app
+// carrying its own copy.
+function resolveElectron(projectRoot) {
+  return require(require.resolve('electron', { paths: [projectRoot] }));
+}
+
 function start(ports, done) {
   const port = ports.livereload;
   logger.log(`serve — livereload port=${port}`);
 
-  // Resolve the electron binary relative to the consumer project's node_modules.
-  // require.resolve gives us the package, then we read `bin.electron` relative to that.
+  // Resolve the electron binary from the consumer project (see resolveElectron).
   let electronBin;
   try {
-    electronBin = require(path.join(projectRoot, 'node_modules', 'electron'));
+    electronBin = resolveElectron(projectRoot);
   } catch (e) {
-    logger.error('Could not find electron in consumer node_modules. Run `npm i electron`.');
+    logger.error(`Could not resolve electron from ${projectRoot} — no copy in the app or any parent node_modules.`);
     return done(e);
   }
 
@@ -134,3 +140,5 @@ function start(ports, done) {
     done(err);
   });
 };
+
+module.exports.resolveElectron = resolveElectron;

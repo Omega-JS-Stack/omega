@@ -32,9 +32,9 @@ OMEGA Desktop (@omega.js/desktop) is a comprehensive framework for building mode
 5. `npm run package:quick` — fast packaged build for the host platform/arch only (~20-30s, skips DMG/zip/universal/notarize). Smoke-test packaged-mode behavior locally.
 6. `npm run package` — full local production package (DMG/zip/universal-mac, NSIS-win, deb+AppImage-linux). ~3min on mac.
 7. `npm run release` — signed + published release (requires certs)
-8. `npx omega test` — runs framework + project test suites
-   - `npx omega test build/config` — run a specific test by path (relative to `test/`, matches both sources)
-   - `npx omega test project:` — run ONLY consumer project tests (no framework suites)
+8. `npx omega test` — runs the project's test suites (bare consumer runs never include the framework corpus)
+   - `npx omega test build/config` — run project tests by path (relative to `test/`)
+   - `npx omega test framework:` / `npx omega test full:` — reach the framework suite (alone, or both sources)
    - `npx omega test project:custom-test` — run only that project test file
    - `npx omega test mgr:` — run ONLY framework tests (universal cross-framework alias for "the manager's own tests")
    - `npx omega test desktop:build/config` — run only framework tests matching a path (`desktop:` is equivalent to `mgr:`)
@@ -154,7 +154,7 @@ Every gulp invocation tees stdout+stderr to `<projectRoot>/logs/dev.log` on `npm
 | `clean` | remove `dist/`, `release/`, `.cache/` |
 | `install` | install peer deps |
 | `version` | print versions |
-| `test` | run framework + project test suites |
+| `test` | run the project's test suites (`framework:` / `full:` reach the framework suite) |
 | `update` | dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/shared/updates.md in the Omega repo |
 | `deploy` | delegate to the release flow (the deliberate-deploy verb; see docs/shared/deploys.md in the Omega repo) |
 | `logs` | read the app's log files (alias `log`) |

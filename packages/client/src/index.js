@@ -167,12 +167,19 @@ class Manager {
       // port), and the worker itself evicts foreign caches on boot. When a
       // project explicitly disables the SW, sweep the origin clean instead so
       // a previous project's worker can't keep serving its stale caches.
-      if (this.config.serviceWorker?.enabled) {
-        this._serviceWorker.register({
-          path: this.config.serviceWorker?.config?.path
-        });
-      } else {
-        this._serviceWorker.unregisterAll();
+      // Only http(s) origins are eligible: file:// (desktop) and
+      // chrome-extension:// (extension) pages ship the API but cannot host a
+      // page-scope worker, so they skip the branch entirely — no register, no sweep.
+      const originProtocol = window.location?.protocol;
+
+      if (originProtocol === 'http:' || originProtocol === 'https:') {
+        if (this.config.serviceWorker?.enabled) {
+          this._serviceWorker.register({
+            path: this.config.serviceWorker?.config?.path
+          });
+        } else {
+          this._serviceWorker.unregisterAll();
+        }
       }
 
       // Start version checking if enabled

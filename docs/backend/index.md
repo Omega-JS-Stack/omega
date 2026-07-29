@@ -23,9 +23,10 @@ OMEGA Backend (@omega.js/backend) is a comprehensive framework for building mode
 2. `npx omega setup` — bootstraps a new project (scaffolds `.firebaserc`, `firebase.json`, `src/index.js`, `engines.node`, plus the defaults tree via the shared devkit engine: AGENTS.md + its one-line `@AGENTS.md` CLAUDE.md pointer, CHANGELOG.md, docs/, test/, `.gitignore`, `.env` — AGENTS.md, `.gitignore`, and `.env` live-sync their `Default Values` section on every setup), validates config, stages `dist/`, provisions Firestore indexes
 3. `npx omega emulator` — start Firebase emulators (auth/firestore/functions/database/storage). This is also a **prerequisite of the brand's frontend apps**: `omega dev` in the website app auto-connects Auth/Firestore to these emulators with no live-Firebase opt-out, so start them here first ([docs/web/index.md](../web/index.md))
 4. `npx omega serve` — local serve with Stripe webhook forwarding (if `STRIPE_SECRET_KEY` is set)
-5. `npx omega test` — runs framework + project test suites against an emulator. Positional target(s) select which test FILES run, by source + path (multiple space-separated targets compose):
-   - `npx omega test` — everything (framework + project suites)
-   - `npx omega test email/transactional` — bare path (no prefix): both sources, matched by path (relative to `test/`)
+5. `npx omega test` — runs the project's test suites against an emulator (bare consumer runs never include the framework corpus; the framework self-test context flips the default). Positional target(s) select which test FILES run, by source + path (multiple space-separated targets compose):
+   - `npx omega test` — the project's suites
+   - `npx omega test email/transactional` — bare path (no prefix): project tests matched by path (relative to `test/`)
+   - `npx omega test full:` / `npx omega test full:email` — BOTH sources, the explicit way to include the framework suite
    - `npx omega test mgr:` / `npx omega test backend:` — ONLY framework tests (`mgr:` is the universal cross-framework alias for the manager's own tests; `backend:` is the equivalent @omega.js/backend-specific alias)
    - `npx omega test mgr:email/templates` / `npx omega test backend:email/templates` — only framework tests matching a path
    - `npx omega test project:` — ONLY project tests (all of them)
@@ -57,7 +58,7 @@ For the directory layout of both the @omega.js/backend library and consumer proj
 
 ### Test framework
 
-`npx omega test` runs framework + project suites against a **real Firebase emulator** (real Firestore/Auth — never mocked). Suites are organized by concern (`test/routes/`, `test/events/`, `test/rules/`, …) rather than runtime layers. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md).
+`npx omega test` runs the project's suites (scope `framework:` or `full:` to include the framework's own) against a **real Firebase emulator** (real Firestore/Auth — never mocked). Suites are organized by concern (`test/routes/`, `test/events/`, `test/rules/`, …) rather than runtime layers. See [docs/test-framework.md](../../packages/backend/docs/test-framework.md).
 
 ### Test coverage
 
@@ -74,7 +75,7 @@ Every feature ships with tests at EVERY surface it exposes — logic (`test/rout
 | `serve` | Local Firebase serve (with auto Stripe webhook forwarding if keys set) |
 | `watch` | Auto-reload functions on file change |
 | `deploy` | Deploy Cloud Functions to Firebase |
-| `test` | Run framework + project test suites against an emulator |
+| `test` | Run the project's test suites against an emulator (`framework:` / `full:` reach the framework suite) |
 | `update` | Dependency freshness report (installed/wanted/latest + patch/minor/major, < 7-day releases QUARANTINED); `--apply` installs the safe set via npu, `--major` explicit. Aliases: `outdated`, `out`. See docs/shared/updates.md in the Omega repo |
 | `mcp` | Start the stdio MCP server (for Claude Code / Claude Desktop). Supports `--token <key>` for user-level connections |
 | `firestore:get/set/query/delete` | Direct Firestore reads/writes from the terminal |
