@@ -6,22 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] (2026-07-29)
+
 ### Changed
-- [#116](../../issues/116) — The local-dev docs now state that linking is one-time and durable: a linked brand picks up every framework change with its normal `npm start` restart, and `omega i local` reruns exist only to heal an overwritten link — never as part of the edit loop.
+- [#116](../../issues/116) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — The local-dev docs now state that linking is one-time and durable: a linked brand picks up every framework change with its normal `npm start` restart, and `omega i local` reruns exist only to heal an overwritten link — never as part of the edit loop.
 
-- [#117](../../issues/117) — The desktop `build`/`package`/`publish` verbs now run the pipeline and set the build-mode env flags themselves, the synced npm scripts are thin `npx omega` aliases, and cross-env is gone from every desktop consumer.
+- [#117](../../issues/117) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — The desktop `build`/`package`/`publish` verbs now run the pipeline and set the build-mode env flags themselves, the synced npm scripts are thin `npx omega` aliases, and cross-env is gone from every desktop consumer.
 
-- [#87](../../issues/87) — Desktop bundles now resolve the framework's `node_modules` before the consumer's, so a bare import of a framework-declared dependency always gets the framework's copy — the guarantee web already had, and extension always delivered; a per-lane test now pins all three.
+- [#87](../../issues/87) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — Desktop bundles now resolve the framework's `node_modules` before the consumer's, so a bare import of a framework-declared dependency always gets the framework's copy — the guarantee web already had, and extension always delivered; a per-lane test now pins all three.
 
-- [#110](../../issues/110) — Desktop boot tests build and boot in their own staged app root (`.omega/test-app/`) instead of the project's `dist/`, so a boot-test run and a live `npm start` watcher can no longer interleave writes and load each other's half-written bundles.
+- [#110](../../issues/110) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — Desktop boot tests build and boot in their own staged app root (`.omega/test-app/`) instead of the project's `dist/`, so a boot-test run and a live `npm start` watcher can no longer interleave writes and load each other's half-written bundles.
 
-- [#105](../../issues/105) — The five backend email tests that ran by hand from `src/manager/libraries/email/` now live in their mirrored spots under `test/email/`, so the runner discovers them — 126 tests the suite never used to run.
+- [#105](../../issues/105) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — The five backend email tests that ran by hand from `src/manager/libraries/email/` now live in their mirrored spots under `test/email/`, so the runner discovers them — 126 tests the suite never used to run.
 
 ### Removed
-- [#100](../../issues/100) — Four checked-in per-app `CLAUDE.md` files predating the agent-docs chain are removed (three brand backend apps and the manager package's extension fixture), and the sandbox backend's `docs/README.md` is re-synced to the current scaffold wording.
+- [#100](../../issues/100) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — Four checked-in per-app `CLAUDE.md` files predating the agent-docs chain are removed (three brand backend apps and the manager package's extension fixture), and the sandbox backend's `docs/README.md` is re-synced to the current scaffold wording.
 
 ### Fixed
-- [#104](../../issues/104) — An extension build error whose message contains an apostrophe now reaches its desktop notification: the reporter spawns notifly with an argv array instead of interpolating the message into a shell string the shell then failed to parse.
+- [#104](../../issues/104) [`3221397b`](../../commit/3221397b) Thanks [@ianwieds]! — An extension build error whose message contains an apostrophe now reaches its desktop notification: the reporter spawns notifly with an argv array instead of interpolating the message into a shell string the shell then failed to parse.
 
 ## [0.4.0] (2026-07-28)
 
