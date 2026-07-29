@@ -6,24 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-- [#46](../../issues/46) — A new root lane, `npm run test:e2e-extension`, proves the extension ↔ backend auth boundary in a real headless Chrome running the real built extension: the background worker signs in from the brand-site auth tab, then `omega:syncAuth` round-trips a fresh custom token from the backend emulator. Offline; skips without puppeteer's Chrome.
+## [0.3.0] (2026-07-28)
 
-- [#46](../../issues/46) — A new root lane, `npm run test:e2e-desktop`, proves the desktop ↔ backend auth boundary in a real Electron app: a second instance delivers `<brand.id>://auth/token` the way the OS does, and both main and the renderer land on the emulator user. Offline; skips without an electron binary.
+### Added
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — A new root lane, `npm run test:e2e-extension`, proves the extension ↔ backend auth boundary in a real headless Chrome running the real built extension: the background worker signs in from the brand-site auth tab, then `omega:syncAuth` round-trips a fresh custom token from the backend emulator. Offline; skips without puppeteer's Chrome.
+
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — A new root lane, `npm run test:e2e-desktop`, proves the desktop ↔ backend auth boundary in a real Electron app: a second instance delivers `<brand.id>://auth/token` the way the OS does, and both main and the renderer land on the emulator user. Offline; skips without an electron binary.
 
 ### Changed
-- [#46](../../issues/46) — Every package's suite wears the same shape under the layered mantra ratified in the testing guide: backend's 128 test files gain the `.test.js` suffix, the client suite runs on `node --test` instead of mocha, config's catch-all file splits by module, and ~250 new unit tests close the gaps.
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — Every package's suite wears the same shape under the layered mantra ratified in the testing guide: backend's 128 test files gain the `.test.js` suffix, the client suite runs on `node --test` instead of mocha, config's catch-all file splits by module, and ~250 new unit tests close the gaps.
 
 ### Fixed
-- [#46](../../issues/46) — An extension build no longer produces an extension Chrome refuses to load: the manifest declares only minted icons, a missing app `version` or any packaging-step error fails the build, the worker's Firebase config arrives under `cloud.config`, and shared theme imports ship. Testing builds point auth at the emulator.
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — An extension build no longer produces an extension Chrome refuses to load: the manifest declares only minted icons, a missing app `version` or any packaging-step error fails the build, the worker's Firebase config arrives under `cloud.config`, and shared theme imports ship. Testing builds point auth at the emulator.
 
-- [#46](../../issues/46) — The backend router strips the `omega_api` URL prefix correctly: first-match alternation made `/omega_api/user/sign-up` resolve to `_api/user/sign-up`, and any first segment merely starting with a prefix word was truncated.
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — The backend router strips the `omega_api` URL prefix correctly: first-match alternation made `/omega_api/user/sign-up` resolve to `_api/user/sign-up`, and any first segment merely starting with a prefix word was truncated.
 
-- [#46](../../issues/46) — A schema file with a broken inner require now fails loudly: the settings loader's missing-module guard decides from the error's require stack instead of a message substring, so the silent `index.js` fallback no longer masks real defects.
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — A schema file with a broken inner require now fails loudly: the settings loader's missing-module guard decides from the error's require stack instead of a message substring, so the silent `index.js` fallback no longer masks real defects.
 
-- [#46](../../issues/46) — The client no longer floats an unhandled unsupported-browser rejection in browsers with a service worker but no push support: messaging initializes only when `PushManager` exists, and `notifications.isSupported()` reports false when messaging is disabled. Repeat `initialize()` calls no longer stack version-check intervals.
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — The client no longer floats an unhandled unsupported-browser rejection in browsers with a service worker but no push support: messaging initializes only when `PushManager` exists, and `notifications.isSupported()` reports false when messaging is disabled. Repeat `initialize()` calls no longer stack version-check intervals.
 
-- [#46](../../issues/46) — The backend's `isUserOverStat` helper now means what its name says: it returns true when the user is over quota (the comparison was inverted) and fails closed on a malformed limit.
+- [#46](../../issues/46) [`80e3a3b5`](../../commit/80e3a3b5) Thanks [@ianwieds]! — The backend's `isUserOverStat` helper now means what its name says: it returns true when the user is over quota (the comparison was inverted) and fails closed on a malformed limit.
 
 ## [0.2.1] (2026-07-28)
 
