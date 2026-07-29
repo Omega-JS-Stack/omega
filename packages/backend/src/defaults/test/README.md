@@ -4,7 +4,7 @@ Drop your project test suites here. The framework auto-runs them alongside its o
 
 ## Layout
 
-Match the framework's layout — OMEGA Backend's test runner discovers files by the directory they sit in. Mirror the same per-area split as the framework's own `test/` (see `node_modules/@omega.js/backend/test/`):
+Name every test file `<concern>.test.js` — the suffix is how the runner finds it, and a plain `.js` file under `test/` is support code that never runs. Match the framework's layout — OMEGA Backend's test runner discovers files by the directory they sit in. Mirror the same per-area split as the framework's own `test/` (see `node_modules/@omega.js/backend/test/`):
 
 | Directory | Use for |
 |---|---|

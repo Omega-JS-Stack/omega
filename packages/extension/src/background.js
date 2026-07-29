@@ -7,7 +7,7 @@ import { createRequest } from '@omega.js/client/modules/request.js';
 
 // Firebase (static imports - dynamic import() doesn't work in service workers with webpack chunking)
 import { initializeApp, getApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithCustomToken, onAuthStateChanged, connectAuthEmulator } from 'firebase/auth';
 
 // Variables
 const serviceWorker = self;
@@ -18,6 +18,11 @@ const serviceWorker = self;
 // The machinery stays wired (updateCache + the message command) so this
 // single flag re-enables it if an offline lane ever lands.
 const CACHE_WARMING_ENABLED = false;
+
+// Auth emulator port for TESTING builds. An extension context has no
+// `process.env`, so a bumped port can't reach here — the auth-emulator lane
+// pins the classic default (mirrors url-helpers' classic-5002 hosting note).
+const AUTH_EMULATOR_PORT = 9099;
 
 // Import build config at the top level (synchronous)
 importScripts('/build.js');
@@ -421,6 +426,15 @@ class Manager {
 
     // Get auth and set up state listener (only once)
     this.libraries.firebaseAuth = getAuth(this.libraries.firebase);
+
+    // A TESTING build talks to the LOCAL stack, never real auth — the same
+    // call getApiUrl() makes when it maps testing to localhost, and the same
+    // move @omega.js/client makes for emulator runs. Only a build baked with
+    // OMEGA_TEST_MODE=true reaches here; dev and production are untouched.
+    if (this.isTesting()) {
+      this.logger.log(`[AUTH] Testing build — connecting auth to the emulator on :${AUTH_EMULATOR_PORT}`);
+      connectAuthEmulator(this.libraries.firebaseAuth, `http://localhost:${AUTH_EMULATOR_PORT}`, { disableWarnings: true });
+    }
 
     // Set up auth state change listener (background is source of truth)
     onAuthStateChanged(this.libraries.firebaseAuth, (user) => {

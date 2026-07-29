@@ -1,4 +1,5 @@
-const { getManager, TEST_CONFIG, assert } = require('../helpers.js');
+const { describe, it } = require('node:test');
+const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Configuration & Initialization', () => {
 

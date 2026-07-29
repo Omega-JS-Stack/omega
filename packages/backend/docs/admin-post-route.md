@@ -17,7 +17,7 @@ The `POST /admin/post` route creates blog posts via GitHub's API. It handles ima
 7. **Rewrites the body** to replace external URLs with `@post/{filename}` format
 8. The `@post/` prefix is resolved at Jekyll build time by `jekyll-uj-powertools` to the full path
 
-**Download failures:** the header image is fatal (the whole request 400s); body images are skipped with a warning (the body keeps the original external URL — the post still publishes). Failure reasons go through `formatImageDownloadError` — `Could not download image (<url>): <reason>` with HTML stripped from the reason (CDN 404 pages return raw HTML bodies) and long reasons truncated, so callers (e.g. sponsorship failure emails) surface something readable. Unsupported formats (anything that isn't jpg/png/webp) are rejected, naming the offending URL. Tests: `test/routes/admin/post-download-error.js` + `test/routes/admin/post-convert-image.js`.
+**Download failures:** the header image is fatal (the whole request 400s); body images are skipped with a warning (the body keeps the original external URL — the post still publishes). Failure reasons go through `formatImageDownloadError` — `Could not download image (<url>): <reason>` with HTML stripped from the reason (CDN 404 pages return raw HTML bodies) and long reasons truncated, so callers (e.g. sponsorship failure emails) surface something readable. Unsupported formats (anything that isn't jpg/png/webp) are rejected, naming the offending URL. Tests: `test/routes/admin/post-download-error.test.js` + `test/routes/admin/post-convert-image.test.js`.
 
 ## Image resize
 

@@ -53,18 +53,25 @@ Settings.prototype.resolve = function (ctx, schema, settings, options) {
     const indexSchemaPath = path.resolve(options.dir, `${schemaFile}/index.js`);
 
     // Helper: only fall back when THIS specific file is missing.
-    // If the file exists but throws (syntax error, runtime error, etc.) we re-throw
-    // so the real problem surfaces instead of being masked by a misleading fallback.
-    const isMissingModule = (err, expectedPath) => err
+    // If the file exists but throws (syntax error, runtime error, a broken
+    // require of its own) we re-throw so the real problem surfaces instead of
+    // being masked by a misleading fallback.
+    // The decision is STRUCTURAL, not textual: err.requireStack[0] is the
+    // module that ISSUED the failing require. THIS file issues it only when
+    // the schema file itself cannot be resolved; once the schema file loads,
+    // any resolution failure inside it is issued by the schema file (or one
+    // of its own dependencies) and must surface. A message match cannot tell
+    // these apart — Node's "Require stack:" names the schema file in both.
+    const isMissingModule = (err) => err
       && err.code === 'MODULE_NOT_FOUND'
-      && typeof err.message === 'string'
-      && err.message.includes(expectedPath);
+      && Array.isArray(err.requireStack)
+      && err.requireStack[0] === __filename;
 
     try {
       schema = loadSchema(ctx, methodSchemaPath);
       ctx.log(`Settings.resolve(): Loaded method-specific schema: ${schemaFile}/${methodFile}`);
     } catch (methodErr) {
-      if (!isMissingModule(methodErr, methodSchemaPath)) {
+      if (!isMissingModule(methodErr)) {
         throw methodErr;
       }
 
@@ -72,7 +79,7 @@ Settings.prototype.resolve = function (ctx, schema, settings, options) {
         schema = loadSchema(ctx, indexSchemaPath);
         ctx.log(`Settings.resolve(): Method-specific schema not found, using main schema fallback`);
       } catch (indexErr) {
-        if (!isMissingModule(indexErr, indexSchemaPath)) {
+        if (!isMissingModule(indexErr)) {
           throw indexErr;
         }
         throw ctx.report(

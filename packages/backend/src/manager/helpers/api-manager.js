@@ -2,7 +2,7 @@ const moment = require('moment');
 const uuidv5 = require('uuid').v5;
 const { get, set, merge } = require('lodash');
 
-let sampleUser = {
+const sampleUser = {
   api: {},
   auth: {},
   subscription: {
@@ -85,7 +85,7 @@ ApiManager.prototype._createNewUser = function (authenticatedUser, planId, persi
   persistentData = persistentData || {};
   persistentData._APIManager = persistentData._APIManager || merge({}, _APIManager_default);
 
-  let newUser = {
+  const newUser = {
     api: authenticatedUser?.api || {},
     auth: authenticatedUser?.auth || {},
     subscription: {
@@ -139,7 +139,7 @@ ApiManager.prototype.getUser = async function (ctx) {
   const self = this;
 
   let newUser;
-  let apiKey = ctx.request.data.apiKey;
+  const apiKey = ctx.request.data.apiKey;
   let authenticatedUser;
   let persistentData = {set: false};
   // console.log('---getuser for', apiKey);
@@ -169,7 +169,7 @@ ApiManager.prototype.getUser = async function (ctx) {
     authenticatedUser = await ctx.authenticate({apiKey: apiKey});
     // console.log('---authenticatedUser', authenticatedUser);
     const planId = authenticatedUser?.subscription?.product?.id || 'basic';
-    let workingUID = !authenticatedUser.authenticated
+    const workingUID = !authenticatedUser.authenticated
       ? uuidv5(ctx.request.geolocation.ip || 'unknown', '1b671a64-40d5-491e-99b0-da01ff1f3341')
       : authenticatedUser.auth.uid
     authenticatedUser.ip = ctx.request.geolocation.ip;
@@ -231,12 +231,11 @@ ApiManager.prototype.isUserOverStat = function (user, stat, def, frame) {
     if (frame === 'daily') {
       limit = Math.floor(result.limit / 31);
     }
-    // console.log('----limit', limit);
-    // console.log('-----result.current < limit', result.current < limit);
-    return limit >= result.current;
+    return result.current > limit;
   }
 
-  return false;
+  // A limit that is not a number cannot be reasoned about — fail closed (over).
+  return true;
 }
 
 ApiManager.prototype.getUserStat = function (user, stat, def, ) {

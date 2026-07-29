@@ -1,4 +1,5 @@
-const { assert } = require('../helpers.js');
+const { describe, it, before } = require('node:test');
+const { assert } = require('./helpers.js');
 
 // live-page is transport-free: the loading line and swap are pure, and the
 // poller's only seam is the fetcher it is HANDED — so every test here drives
@@ -33,7 +34,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 describe('live-page', () => {
 
   before(async () => {
-    const mod = await import('../../src/modules/live-page.js');
+    const mod = await import('../src/modules/live-page.js');
     loading = mod.loading;
     swap = mod.swap;
     createFeedPoller = mod.createFeedPoller;

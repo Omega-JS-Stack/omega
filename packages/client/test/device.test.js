@@ -1,4 +1,5 @@
-const { getManager, TEST_CONFIG, assert } = require('../helpers.js');
+const { describe, it, before, beforeEach, afterEach } = require('node:test');
+const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Device Module', () => {
 
@@ -86,7 +87,7 @@ describe('Device Module — malformed stored data (wave-4 F6)', () => {
       lastActive: 1,
     }));
 
-    const DeviceModule = (await import('../../src/modules/device.js')).default;
+    const DeviceModule = (await import('../src/modules/device.js')).default;
     const device = new DeviceModule(getManager());
     const data = await device.initialize();
 
@@ -124,7 +125,7 @@ describe('Device Module — primitive stored data (wave-4 B3)', () => {
   it('should treat a stored primitive as first-time data, not break boot', async () => {
     global.localStorage.setItem('omega_device', JSON.stringify(5));
 
-    const DeviceModule = (await import('../../src/modules/device.js')).default;
+    const DeviceModule = (await import('../src/modules/device.js')).default;
     const device = new DeviceModule(getManager());
     const data = await device.initialize();
 

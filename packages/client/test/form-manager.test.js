@@ -6,13 +6,14 @@
  * `@omega.js/client/modules/form-manager.js` now. Real import under the
  * test DOM shim plus source-shape pins that keep the move honest.
  */
+const { describe, it, before } = require('node:test');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { assert } = require('../helpers.js');
+const { assert } = require('./helpers.js');
 
-const SRC_PATH = path.join(__dirname, '..', '..', 'src', 'modules', 'form-manager.js');
-const DIST_PATH = path.join(__dirname, '..', '..', 'dist', 'modules', 'form-manager.js');
+const SRC_PATH = path.join(__dirname, '..', 'src', 'modules', 'form-manager.js');
+const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'form-manager.js');
 const SOURCE = fs.readFileSync(SRC_PATH, 'utf8');
 
 describe('FormManager Module', () => {

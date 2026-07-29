@@ -16,10 +16,17 @@
  *      token at POST /omega/user/token.
  *   3. That custom token actually signs in a second app instance and lands
  *      on the SAME uid (the round trip, end to end).
- *   4. The wire contract both callers now speak is pinned raw: `{ token }`
- *      at the TOP level (the legacy `response` envelope is asserted gone).
- *   5. The retired legacy command lane no longer answers: POST /omega with a
- *      `command` body must NOT mint a token.
+ *
+ * That is ALL this lane proves — the cross-boundary round trip (desktop ↔
+ * backend). The route's own HTTP wire contract (`{ token }` at the top level,
+ * no legacy `response` envelope, the retired `command` lane refusing to mint)
+ * is a single-package assertion and lives in @omega.js/backend's route suite:
+ * packages/backend/test/routes/user/token.test.js (#46 push-down).
+ *
+ * This is the fast WIRE lane — library code called from node. The REAL-SURFACE
+ * proofs of the same chain are its siblings: scripts/e2e-extension-auth.js (the
+ * background SW inside actual Chrome) and scripts/e2e-desktop-auth.js (the app
+ * inside actual Electron, signed in by an OS-delivered deep link).
  *
  * Knobs: OMEGA_SKIP_E2E=1 skips (matches the sibling e2e lanes).
  */
@@ -151,7 +158,6 @@ async function main() {
       return `hosting :${ports.hosting}, auth :${ports.auth}`;
     });
 
-    const base = `http://127.0.0.1:${ports.hosting}`;
     const firebaserc = JSON.parse(fs.readFileSync(path.join(PLAYGROUND_BACKEND, '.firebaserc'), 'utf8'));
     const projectId = firebaserc.projects.default;
 
@@ -189,6 +195,9 @@ async function main() {
       // via the resolved-port env channel (N7).
       process.env.OMEGA_TEST_MODE = 'true';
       process.env.OMEGA_HOSTING_PORT = String(ports.hosting);
+      // A testing bridge points its own Firebase Auth at the auth emulator on
+      // this same channel (it never reaches real auth from here).
+      process.env.OMEGA_AUTH_PORT = String(ports.auth);
       delete process.env.OMEGA_HTTPS_PORT;
 
       const desktopRequire = createRequire(path.join(ROOT, 'packages', 'desktop', 'package.json'));
@@ -216,37 +225,6 @@ async function main() {
       assert.equal(credential.user.uid, user.uid, 'round-tripped uid should match the original user');
     });
 
-    await step('wire contract: { token } at the top level, no legacy response envelope', async () => {
-      // The exact request the extension background and desktop bridge now send
-      const idToken = await user.getIdToken(true);
-      const response = await fetch(`${base}/omega/user/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({}),
-      });
-
-      assert.equal(response.status, 200, `POST /omega/user/token should 200 (got ${response.status})`);
-      const data = await response.json();
-      assert.equal(typeof data.token, 'string', 'token should be at the TOP level of the body');
-      assert.equal(data.response, undefined, 'the legacy response envelope must not exist');
-    });
-
-    await step('the retired legacy command lane no longer mints tokens', async () => {
-      const idToken = await user.getIdToken(true);
-      const response = await fetch(`${base}/omega`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ command: 'user:create-custom-token', payload: {} }),
-      });
-
-      assert.notEqual(response.status, 200, `legacy command dispatch must not succeed (got ${response.status})`);
-    });
   } finally {
     if (emulator) {
       await stopEmulator(emulator.child);

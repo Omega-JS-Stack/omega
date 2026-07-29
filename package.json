@@ -12,10 +12,12 @@
   },
   "scripts": {
     "start": "node scripts/watch-all.js",
-    "test": "npm run test:packages && npm run test:corpus && npm run test:e2e && npm run test:verts && npm run test:auth && node scripts/e2e-journey.js",
+    "test": "npm run test:packages && npm run test:corpus && npm run test:e2e && npm run test:e2e-extension && npm run test:e2e-desktop && npm run test:verts && npm run test:auth && node scripts/e2e-journey.js",
     "test:packages": "node --test scripts/*.test.js && node scripts/test-workspaces.js",
     "test:corpus": "node scripts/corpus-shapes.js && npm run test:backend -w sandbox-brand",
     "test:e2e": "npm run test -w sandbox-brand",
+    "test:e2e-extension": "node scripts/e2e-extension-auth.js",
+    "test:e2e-desktop": "node scripts/e2e-desktop-auth.js",
     "test:verts": "node scripts/e2e-verts-company.js",
     "test:auth": "node scripts/e2e-auth-token.js",
     "test:journey": "node scripts/e2e-journey.js",

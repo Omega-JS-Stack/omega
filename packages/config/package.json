@@ -15,7 +15,7 @@
     "./site-global": "./src/site-global.js"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

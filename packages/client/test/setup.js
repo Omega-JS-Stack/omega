@@ -36,19 +36,34 @@ global.window = {
 global.localStorage = global.window.localStorage;
 global.sessionStorage = global.window.sessionStorage;
 
-global.navigator = {
-  userAgent: 'Mozilla/5.0 (Testing) Node.js',
-  language: 'en-US',
-  platform: 'Node.js',
-  vendor: 'Test',
-  clipboard: {
-    writeText: async (text) => text
+// Node ships `navigator` as a getter-only global, so a plain assignment
+// silently loses (and `'serviceWorker' in navigator` would stay false).
+Object.defineProperty(globalThis, 'navigator', {
+  value: {
+    userAgent: 'Mozilla/5.0 (Testing) Node.js',
+    language: 'en-US',
+    platform: 'Node.js',
+    vendor: 'Test',
+    clipboard: {
+      writeText: async (text) => text
+    },
+    userAgentData: {
+      mobile: false
+    },
+    // Declared (so `'serviceWorker' in navigator` support gates read true) and
+    // inert: the container APIs the modules touch, doing nothing.
+    serviceWorker: {
+      register: async (path, options) => ({ scope: options?.scope || '/', active: null, unregister: async () => true }),
+      getRegistrations: async () => [],
+      ready: Promise.resolve({ scope: '/', active: null }),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      controller: null,
+    }
   },
-  userAgentData: {
-    mobile: false
-  },
-  serviceWorker: undefined
-};
+  configurable: true,
+  writable: true,
+});
 
 global.document = {
   readyState: 'complete',

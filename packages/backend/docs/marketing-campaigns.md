@@ -215,15 +215,15 @@ module.exports = {
 **Adding a new template:**
 1. Create `lib/templates/<name>.js` with `build`, `meta`, `schema`, and `normalize`. Add `buildPrompt` if the content shape requires a custom AI brief.
 2. Register it in `lib/templates/index.js`.
-3. **Add a matching fixture** at `test/marketing/fixtures/<name>.json` with the same content shape. This is REQUIRED — the iteration test loads it by default when the active brand's template is your new one. Without it, the default test run fails with "fixture not found".
-4. Add the template name to the `TEMPLATES` array in `test/marketing/newsletter-templates.js` so the fixture suite renders it. Add per-template assertions if the new template renders unique identity markers (e.g. field-report's `LEAD DISPATCH` kicker).
+3. **Add a matching fixture** at `test/email/fixtures/<name>.json` with the same content shape. This is REQUIRED — the iteration test loads it by default when the active brand's template is your new one. Without it, the default test run fails with "fixture not found".
+4. Add the template name to the `TEMPLATES` array in `test/email/newsletter-templates.test.js` so the fixture suite renders it. Add per-template assertions if the new template renders unique identity markers (e.g. field-report's `LEAD DISPATCH` kicker).
 5. Audit graceful omission — every template's `build()` must handle missing optional fields (return `''` for omitted blocks rather than throwing). Existing templates (clean, editorial, field-report) all do this.
 
 Existing classic-shape templates (`clean`, `editorial`) share their schema via `lib/templates/classic-schema.js`. New templates with the same `{intro, sections: [{title, body, cta, image_prompt}]}` shape should reuse `CLASSIC_SCHEMA` + `normalizeClassic` rather than duplicating.
 
 ## Iteration test default behavior
 
-`test/marketing/newsletter-generate.js` runs in **fixture mode by default** — it loads `test/marketing/fixtures/<active-template>.json` and renders straight through MJML. ~25-50ms, no AI, $0. This is what runs in CI and what you use for layout iteration.
+`test/email/newsletter-generate.test.js` runs in **fixture mode by default** — it loads `test/email/fixtures/<active-template>.json` and renders straight through MJML. ~25-50ms, no AI, $0. This is what runs in CI and what you use for layout iteration.
 
 Set `TEST_EXTENDED_MODE=1` to switch to the full AI pipeline against real sources from the parent server. That mode requires `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OMEGA_ADMIN_KEY`, and a parent URL.
 
@@ -330,7 +330,7 @@ Requires `GH_TOKEN` env var (org-scoped, write access to `newsletter-assets`). W
 | `lib/templates/editorial/helpers.js` | Editorial-only helpers (pullquote, issue number, eyebrow) |
 | `lib/templates/field-report/helpers.js` | Field-report-only helpers (kicker, dispatch dateline, terminal block, terminator) |
 | `newsletter.js` | Orchestrator — resolves sources via the unified source-resolver, calls lib modules, tracks usage locally |
-| `test/marketing/fixtures/{name}.json` | Hand-crafted structure per template (loaded by iteration test in fixture mode) |
+| `test/email/fixtures/{name}.json` | Hand-crafted structure per template (loaded by iteration test in fixture mode) |
 
 ## Seed Campaigns
 

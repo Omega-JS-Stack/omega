@@ -1,4 +1,5 @@
-const { assert } = require('../helpers.js');
+const { describe, it, before, afterEach } = require('node:test');
+const { assert } = require('./helpers.js');
 
 // createRequest is pure wiring (deps-injected) — testable without the singleton.
 // The real-wire proof (live emulator, real backend, real omega-properties) is
@@ -31,7 +32,7 @@ function fetchStub(queue) {
 describe('Request Module', () => {
 
   before(async () => {
-    const mod = await import('../../src/modules/request.js');
+    const mod = await import('../src/modules/request.js');
     createRequest = mod.createRequest;
     mergeUsageIntoBindings = mod.mergeUsageIntoBindings;
   });

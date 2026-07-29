@@ -69,5 +69,41 @@ module.exports = {
         assert.isError(response, 401, 'Create custom token should fail without authentication');
       },
     },
+
+    // Test 5: The wire shape both token callers speak — `{ token }` at the TOP
+    // level, no legacy `response` envelope. Pinned here (single-package HTTP
+    // contract) since #46; the auth-token e2e lane keeps only the cross-boundary
+    // round trip. A broken read of this shape (`data.response.token`) is exactly
+    // what shipped unnoticed before the desktop/extension flow had coverage.
+    {
+      name: 'wire-shape-is-token-at-top-level',
+      auth: 'basic',
+      timeout: 15000,
+
+      async run({ http, assert }) {
+        const response = await http.post('backend-manager/user/token', {});
+
+        assert.isSuccess(response, 'Create custom token should succeed');
+        assert.equal(typeof response.data.token, 'string', 'Token should be at the TOP level of the body');
+        assert.equal(response.data.response, undefined, 'The legacy response envelope must not exist');
+      },
+    },
+
+    // Test 6: The retired legacy command lane must not mint tokens — a POST to
+    // the API root with a `command` body is no longer dispatched.
+    {
+      name: 'legacy-command-lane-does-not-mint',
+      auth: 'basic',
+      timeout: 15000,
+
+      async run({ http, assert }) {
+        const response = await http.post('backend-manager', {
+          command: 'user:create-custom-token',
+          payload: {},
+        });
+
+        assert.isError(response, null, 'Legacy command dispatch must not succeed');
+      },
+    },
   ],
 };

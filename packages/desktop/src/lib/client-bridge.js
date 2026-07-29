@@ -113,6 +113,19 @@ const bridge = {
     } else {
       bridge._firebaseAuth = getAuth(app);
     }
+
+    // A TESTING run talks to the LOCAL stack, never real auth — the same move
+    // getApiUrl() makes when it maps testing to localhost, and the same one
+    // @omega.js/extension's background SW makes for its emulator runs. Only
+    // OMEGA_TEST_MODE=true reaches here; dev and production are untouched. The
+    // port arrives on the resolved-port env channel (N7), classic 9099 when unset.
+    if (bridge._manager.isTesting()) {
+      const { connectAuthEmulator } = bridge._firebaseModule;
+      const port = process.env.OMEGA_AUTH_PORT || 9099;
+      logger.log(`testing run — connecting auth to the emulator on :${port}`);
+      connectAuthEmulator(bridge._firebaseAuth, `http://localhost:${port}`, { disableWarnings: true });
+    }
+
     return bridge._firebaseAuth;
   },
 

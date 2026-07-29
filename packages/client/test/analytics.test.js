@@ -1,10 +1,11 @@
+const { describe, it } = require('node:test');
 const fs = require('fs');
 const path = require('path');
-const { assert } = require('../helpers.js');
+const { assert } = require('./helpers.js');
 
-const SOURCE_PATH = path.join(__dirname, '..', '..', 'src', 'modules', 'analytics.js');
+const SOURCE_PATH = path.join(__dirname, '..', 'src', 'modules', 'analytics.js');
 const SOURCE = fs.readFileSync(SOURCE_PATH, 'utf8');
-const INDEX_SOURCE = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'index.js'), 'utf8');
+const INDEX_SOURCE = fs.readFileSync(path.join(__dirname, '..', 'src', 'index.js'), 'utf8');
 
 describe('Analytics Module (C4 cp106a — de-ITW)', () => {
 

@@ -1,4 +1,5 @@
-const { getManager, TEST_CONFIG, assert } = require('../helpers.js');
+const { describe, it, before } = require('node:test');
+const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
 // Config with an in-house source + company layer for source resolution
 const ADS_CONFIG = {
@@ -34,7 +35,7 @@ let vertsModule;
 describe('Verts Module', () => {
 
   before(async () => {
-    vertsModule = await import('../../src/modules/verts.js');
+    vertsModule = await import('../src/modules/verts.js');
     await getManager().initialize(ADS_CONFIG);
   });
 

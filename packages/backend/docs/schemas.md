@@ -56,7 +56,7 @@ Context fields: `ctx`, `user` (resolved user), `data` (raw request data), `metho
 
 ## Zod schemas
 
-A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the declarative walk. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects — both engines run the SAME field pipeline (`src/manager/helpers/schema-engine.js`), so wire shapes are identical either way (proven by `test/helpers/schema-zod.js`). Build with the `fields` helpers for the shared semantics (coerce-never-reject, min/max clamp/truncate, `required` fires on `undefined`/`''`, unknown keys stripped):
+A schema module may return a **zod schema** instead of a declarative node object — `Settings.resolve()` detects it and parses with zod in place of the declarative walk. **All framework route schemas use this form** (except the deliberately-empty provider webhook schemas); the declarative form above remains fully supported for consumer projects — both engines run the SAME field pipeline (`src/manager/helpers/schema-engine.js`), so wire shapes are identical either way (proven by `test/helpers/schema-zod.test.js`). Build with the `fields` helpers for the shared semantics (coerce-never-reject, min/max clamp/truncate, `required` fires on `undefined`/`''`, unknown keys stripped):
 
 ```javascript
 const { fields: f } = require('@omega.js/backend/dist/manager/helpers/schema-zod.js'); // framework schemas use a relative path
@@ -75,7 +75,7 @@ Every builder takes the exact declarative node options (`types` via the builder 
 
 Exporting **raw zod** (no builders) opts into zod-native semantics instead: invalid input **rejects with 400** rather than coercing. Use deliberately — it's a behavior change from the declarative contract.
 
-Both engines carry two deliberate fixes over the old powertools resolver (documented + asserted in `test/helpers/schema-zod.js`): non-empty object/array defaults are returned **clean** (powertools injected `types`/`min`/`max` keys into them) and **cloned per request** (powertools returned the schema's default object by reference). `powertools.defaults()` is no longer used for settings resolution anywhere — node-powertools remains a dependency for its other utilities.
+Both engines carry two deliberate fixes over the old powertools resolver (documented + asserted in `test/helpers/schema-zod.test.js`): non-empty object/array defaults are returned **clean** (powertools injected `types`/`min`/`max` keys into them) and **cloned per request** (powertools returned the schema's default object by reference). `powertools.defaults()` is no longer used for settings resolution anywhere — node-powertools remains a dependency for its other utilities.
 
 Webhook routes (`payments/webhook`, `marketing/webhook`, …) keep their **empty schemas** by design — the body is the raw provider payload; don't wrap them in zod.
 
@@ -148,7 +148,7 @@ module.exports = ({ ctx, data }) => {
 
 ## Reference Implementation
 
-The comprehensive test schema exercising every field option (types, function defaults, forced `value`, conditional `required`, min/max clamping, `clean` regex + function, nested objects, plan-based fields): [`src/manager/schemas/test/schema/post.js`](../src/manager/schemas/test/schema/post.js) — in zod `fields` form; its frozen declarative twin (the powertools reference it must keep matching) lives in [`test/helpers/schema-zod.js`](../test/helpers/schema-zod.js).
+The comprehensive test schema exercising every field option (types, function defaults, forced `value`, conditional `required`, min/max clamping, `clean` regex + function, nested objects, plan-based fields): [`src/manager/schemas/test/schema/post.js`](../src/manager/schemas/test/schema/post.js) — in zod `fields` form; its frozen declarative twin (the powertools reference it must keep matching) lives in [`test/helpers/schema-zod.test.js`](../test/helpers/schema-zod.test.js).
 
 ## Field Sanitization
 
@@ -158,4 +158,4 @@ Middleware always trims whitespace on string fields. HTML sanitization is **opt-
 
 - [routes.md](routes.md) — the routes consuming `settings`
 - [sanitization.md](sanitization.md) — trim vs HTML-strip behavior
-- [test-framework.md](test-framework.md) — schema tests (`test/routes/test/schema.js`)
+- [test-framework.md](test-framework.md) — schema tests (`test/routes/test/schema.test.js`)

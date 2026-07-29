@@ -322,12 +322,12 @@ After the migration: optionally run a re-opt-in drip campaign to legally recover
 
 **@omega.js/backend tests:**
 
-- [test/helpers/user.js](../test/helpers/user.js) — 31 tests covering the canonical schema, defaults, granted/revoked states, round-tripping
-- [test/routes/user/signup.js](../test/routes/user/signup.js) — 3 tests for signup-time consent capture (granted both, marketing declined, missing payload)
-- [test/routes/marketing/email-preferences.js](../test/routes/marketing/email-preferences.js) — 14 tests for the email-preferences route (anonymous HMAC + authenticated)
-- [test/routes/marketing/webhook.js](../test/routes/marketing/webhook.js) — 15+ tests covering SendGrid + Beehiiv processors against the emulator
-- [test/routes/marketing/webhook-forward.js](../test/routes/marketing/webhook-forward.js) — verifies the forwarder route returns 404 on non-parent BEMs
-- [test/helpers/webhook-forward.js](../test/helpers/webhook-forward.js) — 12 unit-style tests with mocked admin + fetch, covering fan-out, URL derivation, failure isolation, self-inclusion, edge cases
+- [test/helpers/user.test.js](../test/helpers/user.test.js) — 31 tests covering the canonical schema, defaults, granted/revoked states, round-tripping
+- [test/routes/user/signup.test.js](../test/routes/user/signup.test.js) — 3 tests for signup-time consent capture (granted both, marketing declined, missing payload)
+- [test/routes/marketing/email-preferences.test.js](../test/routes/marketing/email-preferences.test.js) — 14 tests for the email-preferences route (anonymous HMAC + authenticated)
+- [test/routes/marketing/webhook.test.js](../test/routes/marketing/webhook.test.js) — 15+ tests covering SendGrid + Beehiiv processors against the emulator
+- [test/routes/marketing/webhook-forward.test.js](../test/routes/marketing/webhook-forward.test.js) — verifies the forwarder route returns 404 on non-parent BEMs
+- [test/helpers/webhook-forward.test.js](../test/helpers/webhook-forward.test.js) — 12 unit-style tests with mocked admin + fetch, covering fan-out, URL derivation, failure isolation, self-inclusion, edge cases
 - [src/manager/libraries/email/marketing/consent-gate.test.js](../src/manager/libraries/email/marketing/consent-gate.test.js) — 28 plain-node cases for the library consent gate (revoked-only skip semantics, `{ blocked: 'consent' }` returns from `sync()`/`add()`, by-email lookup query + normalization, fail-open on lookup errors); runs directly with `node`, no emulator
 
 **Total: 75+ tests across the consent system.**
@@ -336,7 +336,7 @@ Run with `npx omega test` (full suite) or `npx omega test routes/marketing/webho
 
 ### Live-provider tests (extended mode only)
 
-Most @omega.js/backend tests are self-contained against the local emulator. The marketing-consent system has one test that's an exception — [test/marketing/consent-lifecycle.js](../test/marketing/consent-lifecycle.js) — which makes real API calls to SendGrid + Beehiiv to verify the full round-trip works end-to-end.
+Most @omega.js/backend tests are self-contained against the local emulator. The marketing-consent system has one test that's an exception — [test/email/consent-lifecycle.test.js](../test/email/consent-lifecycle.test.js) — which makes real API calls to SendGrid + Beehiiv to verify the full round-trip works end-to-end.
 
 The validation pipeline (`src/manager/libraries/email/validation.js`) blocks all `_test.*` emails from reaching providers via the `/^_test\.(?!allow_)/` pattern in `blocked-local-patterns.js`. The two `_test.allow_*` sentinels (`_test.allow_consent-granted` and `_test.allow_consent-declined`) used by the lifecycle test bypass that gate intentionally, and the test cleans up after itself (phase-3 removes the granted contact via `Manager.Email().remove()`).
 

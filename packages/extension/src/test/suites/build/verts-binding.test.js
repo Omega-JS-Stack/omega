@@ -7,7 +7,7 @@
 // modules (window/chrome at module scope), so this pins the SOURCE text
 // rather than importing them — same model as cache-warming.test.js. The
 // binder's runtime behavior (lazy mount, ladder, no-fill) is pinned in
-// @omega.js/client's own suite (client test/tests/verts.test.js).
+// @omega.js/client's own suite (client test/verts.test.js).
 
 const fs = require('fs');
 const path = require('path');

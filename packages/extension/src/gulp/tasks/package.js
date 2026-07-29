@@ -71,6 +71,11 @@ async function generateBuildJs(outputDir) {
         // Brand configuration (from config/omega.json5 or manifest)
         brand: config.brand || {},
 
+        // Cloud (firebase) config in the CANONICAL `cloud.config` shape —
+        // what @omega.js/client prefers and the only shape background.js
+        // reads. Without it the SW's Firebase auth never initializes (#46).
+        cloud: config.cloud || {},
+
         // OMEGA build metadata
         omega: {
           environment: Manager.getEnvironment(),
@@ -142,7 +147,10 @@ async function generateBuildJs(outputDir) {
 
     logger.log(`Generated build.js and build.json`);
   } catch (e) {
+    // Report, then re-throw — a package with no build.js has no service-worker
+    // config, and its own catch would eat the error before packageRaw's (#46).
     logger.error(`Error generating build.js`, e);
+    throw e;
   }
 }
 
@@ -302,7 +310,12 @@ async function compileManifest(outputDir, target) {
       }
     });
 
-    // Add package version to manifest
+    // Add package version to manifest. Chrome REFUSES a manifest with no
+    // version — an app whose package.json has none used to build a perfectly
+    // normal-looking extension that no browser would load (#46). Fail here.
+    if (!project.version) {
+      throw new Error('Cannot build the manifest: the extension app\'s package.json has no "version" (Chrome refuses to load a manifest without one)');
+    }
     manifest.version = project.version;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -316,6 +329,47 @@ async function compileManifest(outputDir, target) {
     // ═══════════════════════════════════════════════════════════════════════════
     // STEP 3: Clean up (shared across all targets)
     // ═══════════════════════════════════════════════════════════════════════════
+    // Declare only icons the build actually produced. The defaults name the
+    // full size ladder, but the icons task mints nothing without a
+    // `config/icon.{png,svg}` — and Chrome REFUSES to load an extension whose
+    // manifest points at an icon that isn't there, silently (#46).
+    const iconMissing = (relative) => !jetpack.exists(path.join('dist', relative));
+    const prunedIcons = [];
+
+    for (const [size, file] of Object.entries(manifest.icons || {})) {
+      if (iconMissing(file)) {
+        delete manifest.icons[size];
+        prunedIcons.push(file);
+      }
+    }
+
+    // `action.default_icon` is legally EITHER a path string or a size→path map
+    // (both shapes ship in dist/config/manifest.json) — prune the map per entry
+    // and drop the key only when nothing survives.
+    const defaultIcon = manifest.action?.default_icon;
+
+    if (typeof defaultIcon === 'string') {
+      if (iconMissing(defaultIcon)) {
+        prunedIcons.push(defaultIcon);
+        delete manifest.action.default_icon;
+      }
+    } else if (defaultIcon && typeof defaultIcon === 'object') {
+      for (const [size, file] of Object.entries(defaultIcon)) {
+        if (iconMissing(file)) {
+          delete defaultIcon[size];
+          prunedIcons.push(file);
+        }
+      }
+
+      if (Object.keys(defaultIcon).length === 0) {
+        delete manifest.action.default_icon;
+      }
+    }
+
+    if (prunedIcons.length > 0) {
+      logger.warn(`[${target}] Dropped ${prunedIcons.length} missing icon reference(s) from the manifest — add config/icon.png to ship icons`);
+    }
+
     // Remove empty arrays and objects from manifest
     const cleanedManifest = removeEmptyValues(manifest);
 
@@ -324,7 +378,11 @@ async function compileManifest(outputDir, target) {
 
     logger.log(`[${target}] Manifest compiled with defaults`);
   } catch (e) {
+    // Report, then FAIL the build. A swallowed error here shipped the raw JSON5
+    // source manifest as `manifest.json` and finished green — including the
+    // versionless case the guard above exists to catch (#46).
     logger.error(`Error compiling manifest`, e);
+    throw e;
   }
 }
 
@@ -351,7 +409,10 @@ async function compileLocales(outputDir) {
       logger.log(`Locale compiled and saved: ${outputPath}`);
     });
   } catch (e) {
+    // Report, then re-throw — a broken locale finishing green loads as a
+    // Chrome refusal when default_locale is declared (#46).
     logger.error(`Error compiling locales`, e);
+    throw e;
   }
 }
 
@@ -369,7 +430,10 @@ async function packageRaw() {
     // Log completion
     logger.log(`Finished raw packaging for all targets`);
   } catch (e) {
+    // Report, then re-throw so packageFn's handler fails the gulp task — a
+    // half-packaged target is never a green build (#46).
     logger.error(`Error during raw packaging`, e);
+    throw e;
   }
 }
 
@@ -458,7 +522,10 @@ async function packageZip() {
       logger.log(`[${target}] Zipped package created at ${zipPath}`);
     }
   } catch (e) {
+    // Report, then re-throw — a build-mode run without its zip artifact is
+    // never a green build (#46).
     logger.error(`Error zipping package`, e);
+    throw e;
   }
 }
 
@@ -517,7 +584,10 @@ async function packageSource() {
 
     logger.log(`Source code zip created at ${sourceZipPath}`);
   } catch (e) {
+    // Report, then re-throw — a build-mode run without its source zip is
+    // never a green build (#46).
     logger.error(`Error zipping source code`, e);
+    throw e;
   }
 }
 
@@ -661,6 +731,10 @@ function packageFnWatcher(complete) {
 
 // Export tasks
 module.exports = series(packageFn, packageFnWatcher);
+module.exports.packageFn = packageFn;
+module.exports.compileManifest = compileManifest;
+module.exports.generateBuildJs = generateBuildJs;
+module.exports.compileLocales = compileLocales;
 
 // Run hooks
 async function hook(file, index) {

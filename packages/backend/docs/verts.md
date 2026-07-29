@@ -6,7 +6,7 @@ The backend half of the OMEGA ads system (spec: monorepo `docs/web/ads-system.md
 
 `{ enabled, title, description, button, link, image, footer, weight (default 1), targeting: { sites: [], categories: [], keywords: [] }, whitelist: [], blacklist: [], metadata }`
 
-Client-inaccessible by rules (the framework's default admin-only lock — proven by `test/rules/verts.js`); ALL access rides the routes.
+Client-inaccessible by rules (the framework's default admin-only lock — proven by `test/rules/verts.test.js`); ALL access rides the routes.
 
 ## Routes
 
@@ -26,4 +26,4 @@ Module-level, shared by serve + redirect: ~5 min TTL in production (one Firestor
 
 ## Tests
 
-`test/routes/verts/{selection,cache,serve,redirect,crud}.js` + `test/rules/verts.js` — 54 tests: scoring/eligibility, cache TTL, serve round-trip (200 HTML / 204 no-fill / XSS escaping / port-preserving target origin), redirect fail-closed + UTM, CRUD auth gates, rules lock. The cross-brand company-mode e2e (monorepo `scripts/e2e-verts-company.js`, root `npm run test:verts`) exercises the same routes through a real consumer resolution. Serve/redirect round-trips use raw `fetch` (HTML/302 can't ride the JSON `http` client — mcp-test precedent).
+`test/routes/verts/{selection,cache,serve,redirect,crud}.test.js` + `test/rules/verts.test.js` — 54 tests: scoring/eligibility, cache TTL, serve round-trip (200 HTML / 204 no-fill / XSS escaping / port-preserving target origin), redirect fail-closed + UTM, CRUD auth gates, rules lock. The cross-brand company-mode e2e (monorepo `scripts/e2e-verts-company.js`, root `npm run test:verts`) exercises the same routes through a real consumer resolution. Serve/redirect round-trips use raw `fetch` (HTML/302 can't ride the JSON `http` client — mcp-test precedent).

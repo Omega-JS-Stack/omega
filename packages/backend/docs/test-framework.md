@@ -16,7 +16,7 @@ If you're writing `const mockX = {...}` to satisfy a function under test, STOP a
 Mock **nothing** by default. There are exactly two narrow cases where the real dependency genuinely cannot run in the test environment — and even then, stub the *smallest possible seam*, never a whole `Manager`/`ctx`:
 
 1. **A side effect that would destroy the test run itself.** If invoking the real method would kill or corrupt the harness — e.g. a process-exit, an `app.quit()`, a destructive filesystem wipe, a recursive re-invocation of the test/build command — you may stub *that one call* to a no-op, assert the surrounding logic, then restore it. You are not faking behavior; you are preventing the harness from terminating mid-assertion.
-2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omega.js/backend backends (parent → child brand servers). Only **one** @omega.js/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.js`.)
+2. **Cross-project fan-out that needs infrastructure you can't run locally.** Some routes fan out to *other* @omega.js/backend backends (parent → child brand servers). Only **one** @omega.js/backend emulator runs locally, so the real cross-project call has no second backend to hit. A unit test may hand-roll the minimal inputs (`makeManager`/`makeAdminMock`/mocked `wonderful-fetch`) to exercise the *fan-out logic* in isolation — but a companion integration test MUST still verify the real route's gate/wiring against the emulator. (Example: `test/helpers/webhook-forward.test.js`.)
 
 **Rules for both exceptions:** stub the narrowest seam (one method / one module), restore it immediately, and add a comment stating *why the real thing can't run here*. If you can run it for real, you must.
 
@@ -233,7 +233,9 @@ npx omega test user/ admin/       # Multiple paths
 - **@omega.js/backend core tests:** `test/` (in the framework repo)
 - **Project tests:** the consumer project's repo-root `test/` directory (NOT inside `functions/`)
 
-Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.js`, `.../manual-validation.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx omega test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
+Use `backend:` or `project:` prefix to filter by source. **Mirror the source path so a test reads like what it tests.** Route tests live under `test/routes/<route-path>/<concern>.test.js`, mirroring `functions/routes/<route-path>/` — e.g. `functions/routes/write/article/` → `test/routes/write/article/generate.test.js`, `functions/routes/sponsorship/post.js` → `test/routes/sponsorship/post.test.js`. Split each route into **one file per concern** under its mirrored dir (`test/routes/sponsorship/post.test.js`, `.../manual-validation.test.js`), never one giant `test/test.js`. The runner discovers files by directory, so the split also drives the `project:<path>` filter: `npx omega test project:routes/write` runs a whole route's tests, `project:routes/write/markdown` runs one concern.
+
+**The `.test.js` suffix IS discovery:** the runner only picks up files ending in `.test.js` (the mirrored suite shape shared by every OMEGA package — monorepo `docs/shared/testing.md`). A `.js` file under `test/` without the suffix is support code, never a test, and never runs.
 
 **The underscore convention:** `_`-prefixed files and directories at any depth under `test/` are excluded from suite discovery. Put shared helpers, fixture data, and non-test support files in `_`-prefixed paths — e.g. `test/_fixtures/`, `test/_helpers/`, `test/routes/_shared-utils.js`. The runner still specifically loads `test/_init.js` as the lifecycle hook. Matches the same convention in EM/BXM/UJM.
 
@@ -477,6 +479,6 @@ const response = await http.as('journey-payments-intent-discount').post('payment
 | `src/test/utils/http-client.js` | HTTP client |
 | `src/test/utils/firestore-rules-client.js` | Rules testing client (`asAccount` / `expectSuccess` / `expectFailure`) |
 | `src/test/test-accounts.js` | Test account definitions |
-| `test/routes/test/schema.js` | Schema-validation reference test |
-| `test/routes/user/signup.js` | Full-lifecycle route suite reference |
-| `test/rules/user.js` | Rules-test reference |
+| `test/routes/test/schema.test.js` | Schema-validation reference test |
+| `test/routes/user/signup.test.js` | Full-lifecycle route suite reference |
+| `test/rules/user.test.js` | Rules-test reference |

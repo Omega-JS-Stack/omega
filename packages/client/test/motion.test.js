@@ -5,10 +5,12 @@
  * rotators, marquees) are exercised end-to-end by @omega.js/web's build
  * and the browser proof. Pure CJS — required straight from dist.
  */
+const { describe, it, before } = require('node:test');
 const assert = require('assert');
 const path = require('path');
+require('./helpers.js');
 
-const DIST_PATH = path.join(__dirname, '..', '..', 'dist', 'modules', 'motion.js');
+const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'motion.js');
 
 describe('motion', () => {
   let motion;

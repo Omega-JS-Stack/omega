@@ -4,11 +4,12 @@
  * so the defects cannot silently revert; the behavioral coverage lives in
  * the cross-stack e2e once those SDK paths run for real.
  */
+const { describe, it } = require('node:test');
 const fs = require('fs');
 const path = require('path');
-const { assert } = require('../helpers.js');
+const { assert } = require('./helpers.js');
 
-const MODULES = path.join(__dirname, '..', '..', 'src', 'modules');
+const MODULES = path.join(__dirname, '..', 'src', 'modules');
 const read = (name) => fs.readFileSync(path.join(MODULES, name), 'utf8');
 
 describe('Wave-4 source pins', () => {

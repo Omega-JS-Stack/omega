@@ -1,4 +1,5 @@
-const { getManager, TEST_CONFIG, assert } = require('../helpers.js');
+const { describe, it, before } = require('node:test');
+const { getManager, TEST_CONFIG, assert } = require('./helpers.js');
 
 describe('Auth Module', () => {
 
@@ -21,14 +22,18 @@ describe('Auth Module', () => {
     assert.strictEqual(getManager().auth().getUser(), null);
   });
 
-  it('should call listener with null user when Firebase disabled', (done) => {
+  it('should call listener with null user when Firebase disabled', () => new Promise((resolve, reject) => {
     getManager().auth().listen((state) => {
-      assert.strictEqual(state.user, null);
-      assert(state.account);
-      assert.strictEqual(state.account.subscription.product.id, 'basic');
-      done();
+      try {
+        assert.strictEqual(state.user, null);
+        assert(state.account);
+        assert.strictEqual(state.account.subscription.product.id, 'basic');
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
     });
-  });
+  }));
 
   describe('resolveSubscription', () => {
 

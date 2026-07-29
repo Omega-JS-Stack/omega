@@ -66,7 +66,7 @@ class Notifications {
   isSupported() {
     return 'Notification' in window &&
            'serviceWorker' in navigator &&
-           this.manager.firebaseMessaging !== undefined;
+           !!this.manager.firebaseMessaging;
   }
 
   // Check if user is subscribed to notifications

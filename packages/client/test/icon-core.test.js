@@ -3,10 +3,12 @@
  * validation, candidate lookup order, root-attribute injection, and alias
  * mapping. Pure CJS — required straight from dist like desktop main does.
  */
+const { describe, it, before } = require('node:test');
 const assert = require('assert');
 const path = require('path');
+require('./helpers.js');
 
-const DIST_PATH = path.join(__dirname, '..', '..', 'dist', 'modules', 'icon-core.js');
+const DIST_PATH = path.join(__dirname, '..', 'dist', 'modules', 'icon-core.js');
 
 describe('icon-core', () => {
   let core;

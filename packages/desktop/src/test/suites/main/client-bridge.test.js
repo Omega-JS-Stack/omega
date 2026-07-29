@@ -157,6 +157,72 @@ module.exports = {
       },
     },
     {
+      // The emulator gate (#46). _getFirebaseAuth resolves firebase through the
+      // bridge's OWN seams (_firebase / _firebaseModule, filled by
+      // _tryLoadFirebase) — swapping those recording namespaces in drives the real
+      // method, no stubbing of the module under test. The manager is an input too:
+      // isTesting() is the whole gate.
+      name: 'auth emulator: a testing run connects, dev/production never do',
+      run: (ctx) => {
+        const bridge = ctx.manager.omega;
+        const saved = {
+          firebase:  bridge._firebase,
+          module:    bridge._firebaseModule,
+          auth:      bridge._firebaseAuth,
+          manager:   bridge._manager,
+          port:      process.env.OMEGA_AUTH_PORT,
+        };
+
+        // One recording firebase namespace pair, reused per run
+        const connects = [];
+        const authInstance = { __auth: true };
+        bridge._firebase = {
+          getApp:        () => { throw new Error('no app'); },
+          initializeApp: () => ({ __app: true }),
+        };
+        bridge._firebaseModule = {
+          getAuth: () => authInstance,
+          connectAuthEmulator: (auth, url, opts) => connects.push({ auth, url, opts }),
+        };
+
+        const run = (isTesting) => {
+          bridge._firebaseAuth = null;
+          bridge._manager = {
+            config: { cloud: { config: { apiKey: 'AIza-test', projectId: 'demo-desktop' } } },
+            isTesting: () => isTesting,
+          };
+          return bridge._getFirebaseAuth(null);
+        };
+
+        try {
+          delete process.env.OMEGA_AUTH_PORT;
+
+          // production / dev shape — no emulator, ever
+          ctx.expect(run(false)).toBe(authInstance);
+          ctx.expect(connects.length).toBe(0);
+
+          // testing shape — classic 9099 when no resolved port is on the env channel
+          ctx.expect(run(true)).toBe(authInstance);
+          ctx.expect(connects.length).toBe(1);
+          ctx.expect(connects[0].auth).toBe(authInstance);
+          ctx.expect(connects[0].url).toBe('http://localhost:9099');
+
+          // a bumped port arrives on OMEGA_AUTH_PORT (N7)
+          process.env.OMEGA_AUTH_PORT = '9199';
+          run(true);
+          ctx.expect(connects.length).toBe(2);
+          ctx.expect(connects[1].url).toBe('http://localhost:9199');
+        } finally {
+          bridge._firebase       = saved.firebase;
+          bridge._firebaseModule = saved.module;
+          bridge._firebaseAuth   = saved.auth;
+          bridge._manager        = saved.manager;
+          if (saved.port === undefined) delete process.env.OMEGA_AUTH_PORT;
+          else                          process.env.OMEGA_AUTH_PORT = saved.port;
+        }
+      },
+    },
+    {
       name: 'deep-link auth/token route is wired to handleAuthToken',
       run: async (ctx) => {
         // We've already tested the deep-link side in deep-link.test.js. Here we verify

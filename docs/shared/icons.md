@@ -93,7 +93,7 @@ future FA families work with zero framework changes.
 
 ## Testing
 
-- `packages/client/test/tests/icon-core.test.js` — parsing/validation.
+- `packages/client/test/icon-core.test.js` — parsing/validation.
 - `packages/desktop/src/test/suites/{main,renderer}/fontawesome.test.js` —
   the real-DOM proof of the SHARED renderer (insert, re-class, clear,
   Pro-adaptive assertions) + main's root chain and IPC sanitization.

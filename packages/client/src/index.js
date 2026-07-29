@@ -514,11 +514,12 @@ class Manager {
       console.log('[Firebase] Emulators connected');
     }
 
-    // Only initialize messaging if service workers are supported
-    if ('serviceWorker' in navigator) {
+    // Only initialize messaging if service workers AND push are supported —
+    // getMessaging() floats an unhandled unsupported-browser rejection otherwise
+    if ('serviceWorker' in navigator && typeof window !== 'undefined' && 'PushManager' in window) {
       this._firebaseMessaging = getMessaging(app);
     } else {
-      console.warn('Service workers not available - Firebase Messaging disabled');
+      console.warn('Service workers or push not available - Firebase Messaging disabled');
       this._firebaseMessaging = null;
     }
 
@@ -687,7 +688,9 @@ class Manager {
       });
     }
 
-    // Set up interval
+    // Set up interval — re-initializing replaces the timer, never stacks a
+    // second one on top of the first
+    clearInterval(this._versionCheckInterval);
     this._versionCheckInterval = setInterval(() => {
       this._checkVersion();
     }, this.config.refreshNewVersion.config.interval);

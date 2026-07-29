@@ -340,7 +340,7 @@ class TestRunner {
 
       if (stat.type === 'dir') {
         tests.push(...this.discoverTests(fullPath));
-      } else if (stat.type === 'file' && item.endsWith('.js')) {
+      } else if (stat.type === 'file' && item.endsWith('.test.js')) {
         tests.push(fullPath);
       }
     }
@@ -362,7 +362,7 @@ class TestRunner {
     return testFiles.filter((testFile) => {
       const relativePath = this.getRelativeTestPath(testFile, source);
       return filters.some((filterPath) => relativePath.startsWith(filterPath)
-        || relativePath === `${filterPath.replace('.js', '')}.js`);
+        || relativePath === `${filterPath.replace(/(\.test)?\.js$/, '')}.test.js`);
     });
   }
 
@@ -430,7 +430,7 @@ class TestRunner {
     if (testModule.skip) {
       const skipReason = typeof testModule.skip === 'string' ? testModule.skip : '';
       const description = testModule.description || relativePath;
-      console.log(chalk.yellow(`    ○ ${description}`) + chalk.gray(` (skipped${skipReason ? ': ' + skipReason : ''})`));
+      console.log(chalk.yellow(`    ○ ${description}`) + chalk.gray(` (skipped${skipReason ? `: ${skipReason}` : ''})`));
 
       this.results.skipped++;
       this.results.tests.push({
@@ -475,7 +475,7 @@ class TestRunner {
       // Check if test should be skipped
       if (test.skip) {
         const skipReason = typeof test.skip === 'string' ? test.skip : '';
-        console.log(chalk.yellow(`      ○ ${testName}`) + chalk.gray(` (skipped${skipReason ? ': ' + skipReason : ''})`));
+        console.log(chalk.yellow(`      ○ ${testName}`) + chalk.gray(` (skipped${skipReason ? `: ${skipReason}` : ''})`));
 
         this.results.skipped++;
         this.results.tests.push({
@@ -892,7 +892,7 @@ class TestRunner {
     const total = this.results.passed + this.results.failed + this.results.skipped;
     const duration = Date.now() - this.results.startTime;
 
-    console.log('\n  ' + chalk.bold('Results'));
+    console.log(`\n  ${chalk.bold('Results')}`);
     console.log(`    ${chalk.green(`${this.results.passed} passing`)}`);
 
     if (this.results.failed > 0) {

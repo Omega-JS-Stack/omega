@@ -167,6 +167,8 @@ Firebase is **bundled by webpack from @omega.js/desktop's module context** (@ome
 
 If you're building a no-auth Electron app, just leave `cloud.config` empty — the bridge is a clean no-op.
 
+In a TESTING run (`OMEGA_TEST_MODE=true`) the bridge connects its auth instance to the local auth emulator — `OMEGA_AUTH_PORT` when the CLI that booted the stack published one, classic `9099` otherwise. Same move `getApiUrl()` makes when it maps testing to localhost, and the same one @omega.js/extension's background worker makes for its emulator runs; development and production are untouched.
+
 ## Common patterns
 
 ### Refresh tray when auth state changes
@@ -236,6 +238,10 @@ manager.deepLink.on('user/profile/:id', (ctx) => {
 ### Unit tests (always run)
 
 `client-bridge.test.js` covers the dispatch logic, IPC handler shape, sync-request comparison, and the `auth/token` deep-link integration — all without hitting Firebase.
+
+### The real-surface e2e lane (monorepo root)
+
+`npm run test:e2e-desktop` ([scripts/e2e-desktop-auth.js](../../../scripts/e2e-desktop-auth.js)) boots a real Electron app against the backend emulator and delivers `<brand.id>://auth/token` from a SECOND instance — the OS-forwarded argv path — then asserts main AND the renderer both land on the emulator user. Offline; it is the lane that proves this whole chain end to end.
 
 ### Extended tests (skip without opt-in + creds)
 

@@ -21,9 +21,12 @@ BackendRouter.prototype.resolve = function () {
 
   // Strip prefix: /omega/, /omega_api/ (direct function URL), the legacy
   // /backend-manager/ alias (kept so migrating brands' in-the-wild clients
-  // keep working), or leading slash
+  // keep working), or leading slash.
+  // The prefix must be a WHOLE first segment — longest alternative first, and
+  // a boundary (slash or end of path) after it — so /omega_api/… is never
+  // eaten by `omega` and /omegatron/… is not a prefixed path at all.
   const routePath = urlPath
-    .replace(/^\/(omega|omega_api|backend-manager)\/?/, '')
+    .replace(/^\/(omega_api|backend-manager|omega)(\/|$)/, '')
     .replace(/^\//, '');
 
   return {
