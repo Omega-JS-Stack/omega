@@ -50,7 +50,7 @@ module.exports = async function (options) {
   }
 
   if (stats.failures.length) {
-    logger.error(`${stats.failures.length} page translation(s) failed (source text kept):`);
+    logger.error(`${stats.failures.length} page-language pair(s) failed (skipped whole — no copy shipped):`);
     stats.failures.forEach((failure) => logger.error(`  ${failure}`));
     process.exitCode = 1;
   }

@@ -295,7 +295,7 @@ async function getInventory(Manager, options) {
     // A transient Firestore error must not 500 the public serve route — fall back
     // to the last-good inventory (stale beats down), or [] (→ 204 no-fill). Leave
     // cache.fetched alone so the next impression retries instead of re-caching failure.
-    console.error(`[verts] getInventory failed (${e.message}) — serving ${cache.verts ? 'last-good cache' : 'no-fill'}`);
+    console.error(`[@omega.js/backend:verts:utils] getInventory failed (${e.message}) — serving ${cache.verts ? 'last-good cache' : 'no-fill'}`);
     return cache.verts || [];
   }
 

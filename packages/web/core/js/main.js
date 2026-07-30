@@ -7,6 +7,7 @@ import serviceWorkerModule from '__main_assets__/js/core/service-worker.js';
 import appearanceModule from '__main_assets__/js/core/appearance.js';
 import appShellModule from '__main_assets__/js/core/app-shell.js';
 import motionModule from '__main_assets__/js/core/motion.js';
+import languageSwitcherModule from '__main_assets__/js/core/language-switcher.js';
 import completeModule from '__main_assets__/js/core/complete.js';
 import { setupPasswordToggle } from '__main_assets__/js/libs/auth/password-toggle.js';
 
@@ -39,6 +40,7 @@ export default async function ({ manager, options } = {}) {
   appearanceModule({ manager, options });
   appShellModule({ manager, options });
   motionModule({ manager, options });
+  languageSwitcherModule({ manager, options });
 
   // Web's own click triggers on the shared registry (#16) — registered here so
   // every page has them (the auth pages and the styleguide both carry the eye)

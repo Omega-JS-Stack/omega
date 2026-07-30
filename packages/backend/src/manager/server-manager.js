@@ -53,11 +53,11 @@ ServerManager.prototype.monitor = function (command, options) {
 };
 
 function log() {
-  console.log(chalk.blue('[ServerManager]:'), ...arguments);
+  console.log(chalk.blue('[@omega.js/backend:server-manager]'), ...arguments);
 }
 
 function error() {
-  console.error(chalk.red('[ServerManager]:'), ...arguments);
+  console.error(chalk.red('[@omega.js/backend:server-manager]'), ...arguments);
 }
 
 // Check if the script is run directly from the command line

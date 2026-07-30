@@ -5,6 +5,11 @@ One config file, identical shape, for every OMEGA project type. Owned by `@omega
 there is no dual-read of legacy files. Legacy brands migrate by converting their old config
 once (mapping tables below) and deleting the old file.
 
+Consistency between this file and what pages actually say — brand facts read from config instead of typed,
+one brand hex, the merge chain, secrets out of config — is the plugin's `omega:brandcheck` skill,
+[agent-plugins/claude/skills/brandcheck/SKILL.md](../../agent-plugins/claude/skills/brandcheck/SKILL.md);
+its quality hook fires on every `omega.json5` edit.
+
 ## Location
 
 | Project | File |
@@ -280,8 +285,17 @@ null auto-derives the authorizing user's email instead of asking.
 `toSiteGlobal()` (the web build's `site.*`) strips the raw `targets` machinery and
 replaces it with a CURATED `site.targets` — an allow-list of display-safe facts per
 declared target, never a spread of the raw config: every entry carries `enabled: true`,
-desktop adds a derived `releasesUrl`, extension adds its store `listings`.
+desktop adds a derived `releasesUrl` once releases are opted in, extension adds its
+store `listings`.
 
+- **The desktop derivation is OPT-IN (#124)**: `releasesUrl` and the derived
+  `site.download` appear only when `targets.desktop.releases` is present (its
+  `enabled` defaults true when the block exists); `releases.enabled: false` always
+  suppresses, and a bare desktop target with no `releases` block derives nothing —
+  declaring the target does not mean a release exists yet. `releases.enabled` is ONE
+  switch for the whole release surface: the desktop build also reads it
+  (electron-builder publish config), so `false` turns off desktop publishing too — and
+  there it defaults true even with no `releases` block.
 - **Desktop releases URL**: `https://github.com/<github.org>/<repo>/releases/latest`,
   where repo is `targets.desktop.releases.repo` (where built artifacts live) →
   `github.repo` → `brand.id`. No `github.org` → no URL.
@@ -296,9 +310,9 @@ desktop adds a derived `releasesUrl`, extension adds its store `listings`.
 
 The download and extension pages populate from these with no hand-supplied links:
 when the config has no explicit `download`/`extension` page map, `site.download`
-derives from the desktop target (every desktop platform → the releases URL, the exact
-shape brands used to hand-write) and `site.extension[browser]` derives from the
-listings' urls. An explicit map in config always wins over the derivation.
+derives from an opted-in desktop target (every desktop platform → the releases URL,
+the exact shape brands used to hand-write) and `site.extension[browser]` derives from
+the listings' urls. An explicit map in config always wins over the derivation.
 
 ## Consumer access
 

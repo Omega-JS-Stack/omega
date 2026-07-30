@@ -102,7 +102,7 @@ module.exports = async function (options) {
 
   if (!translation.skipped) {
     logger.log(`Translated ${translation.pages} pages → ${translation.languages.join(', ')} (${translation.newStrings} new, ${translation.cachedStrings} cached strings)`);
-    translation.failures.forEach((failure) => logger.warn(`translation: ${failure}`));
+    translation.failures.forEach((failure) => logger.warn(`translation: ${failure} — page skipped whole, no copy shipped`));
 
     if (translation.skippedCold.length) {
       const preview = translation.skippedCold.slice(0, 10).join(', ');

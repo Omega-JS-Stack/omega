@@ -189,14 +189,15 @@ export function openAuthPage(context, options = {}) {
 
 /**
  * Register the extension's own auth triggers on the shared click-trigger
- * registry (#16). `omega-signin` is surface-specific — only an extension opens
- * the website's /token page in a new tab — so the extension owns it here;
- * `omega-signout` comes from @omega.js/client (setupSignOutListener detects the
- * sign-out and notifies background).
+ * registry (#16). `omega-signin` and `omega-account` are surface-specific — only
+ * an extension opens a brand page in a new tab — so the extension owns them
+ * here; `omega-signout` comes from @omega.js/client (setupSignOutListener
+ * detects the sign-out and notifies background).
  * @param {Object} context - The manager instance (must have extension, omega, logger)
  */
 export function setupAuthEventListeners(context) {
   registerTrigger('signin', () => openAuthPage(context));
+  registerTrigger('account', () => openAuthPage(context, { path: '/account' }));
 
   // Log
   context.logger.log('Auth event listeners set up');

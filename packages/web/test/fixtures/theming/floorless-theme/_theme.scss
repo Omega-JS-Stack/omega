@@ -1,0 +1,11 @@
+// A FULL SIBLING theme that skips the vocabulary floor (#98): it configures
+// and emits its OWN Bootstrap (the newsflash shape), so the whole-chain hatch
+// is wrong for it (two Bootstraps) — but it imports none of classy's
+// token-pure floor partials either, so fall-through auth/account/footer
+// surfaces render unstyled. The fall-through guard's red fixture for the
+// FLOOR lane.
+@forward '../../../../themes/bootstrap/scss/bootstrap.scss';
+
+:root {
+  --floorless-marker: 1;
+}

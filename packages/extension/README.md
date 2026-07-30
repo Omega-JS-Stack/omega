@@ -160,6 +160,7 @@ Add these CSS classes to HTML elements for declarative auth UI:
 |---|---|
 | `.omega-signin` | Opens `/token` page on your website |
 | `.omega-signout` | Signs out via Web Manager (broadcasts to all contexts) |
+| `.omega-account` | Opens `/account` page on your website |
 
 ```html
 <button class="btn omega-signin" data-omega-bind="@show !auth.user">Sign In</button>
@@ -167,6 +168,7 @@ Add these CSS classes to HTML elements for declarative auth UI:
 <div data-omega-bind="@show auth.user" hidden>
   <img data-omega-bind="@attr src auth.user.photoURL">
   <span data-omega-bind="@text auth.user.displayName">User</span>
+  <button class="omega-account">Account</button>
   <button class="omega-signout">Sign Out</button>
 </div>
 ```

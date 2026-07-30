@@ -274,6 +274,47 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+// The only URL schemes allowed to reach an email href. Everything outside this list
+// (javascript:, data:, vbscript:, file:) is a script vector in whichever client
+// doesn't happen to block it.
+const ALLOWED_URL_SCHEMES = ['http:', 'https:', 'mailto:'];
+
+/**
+ * Escape a URL for safe interpolation into an email href.
+ *
+ * escapeHtml() alone cannot make an href safe — `javascript:alert(1)` survives
+ * escaping intact — and a third-party or AI-authored URL (a dispute alert's
+ * stripeUrl, a newsletter source's url, an AI-written CTA) is exactly where one
+ * arrives. A scheme outside the allowlist is DROPPED: the link goes dead and the
+ * drop is logged, rather than throwing, because one bad URL inside a webhook or AI
+ * payload must not take down the whole alert email.
+ *
+ * A relative value (no scheme at all) passes through — it cannot carry script.
+ */
+function safeUrl(value) {
+  const raw = String(value ?? '').trim();
+
+  if (!raw) {
+    return '';
+  }
+
+  // Clients ignore whitespace, control characters AND zero-width/format characters
+  // inside the scheme, so a tab or a zero-width space inside `java...script:` still
+  // leaves a live javascript: URL — strip all three classes before matching. \p{Cf}
+  // is the class covering the invisible ones (ZWSP/ZWNJ/ZWJ, word joiner, bidi
+  // marks, soft hyphen, BOM).
+  const match = raw.replace(/[\s\p{Cc}\p{Cf}]/gu, '').match(/^[a-z][a-z0-9+.-]*:/i);
+  const scheme = match ? match[0].toLowerCase() : '';
+
+  if (scheme && !ALLOWED_URL_SCHEMES.includes(scheme)) {
+    console.error(`[@omega.js/backend:email:constants] safeUrl dropped href with disallowed scheme "${scheme}"`);
+
+    return '';
+  }
+
+  return escapeHtml(raw);
+}
+
 /**
  * Create an Error with a code property for distinguishing build (400) vs send (500) failures.
  */
@@ -453,6 +494,7 @@ module.exports = {
   sanitizeImagesForEmail,
   encode,
   escapeHtml,
+  safeUrl,
   errorWithCode,
   resolveFieldValues,
   nextWeekday,

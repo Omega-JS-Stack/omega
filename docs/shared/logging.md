@@ -16,6 +16,13 @@ join with `:`). Ratified 2026-07-29 ([#12](https://github.com/Omega-JS-Stack/ome
   segment: client `createLogger()` (`packages/client/src/modules/logger.js`), web
   core/js `createLogger()` (`packages/web/core/js/libs/logger.js`), and the
   desktop/extension `logger-lite` lineage.
+- **Backend** (Cloud Functions) is server-side runtime: the platform stamps every
+  entry, so `ctx.log`/`ctx.error`/every level emits the tag ALONE —
+  `[@omega.js/backend:<module>] <invocation-id>[ <logPrefix>]: message`. The module
+  segment is the invocation's function name, which the context already knows
+  (`options.functionName || FUNCTION_TARGET`). Home:
+  `packages/backend/src/manager/helpers/context/logging.js`. A shared backend module
+  that logs outside a ctx carries its own file identity.
 
 ## Markers and exemptions
 
@@ -25,9 +32,10 @@ join with `:`). Ratified 2026-07-29 ([#12](https://github.com/Omega-JS-Stack/ome
   untagged by design (ruling 2026-07-29). That covers ALL its rows: the indented
   `✓ / ~ / +` lines AND the `[DRY RUN]` rows printed through the same report
   (there the marker may open the line, since the report carries no tags at all).
-- `packages/backend`'s `ctx.log` lineage has no tag yet —
-  [#121](https://github.com/Omega-JS-Stack/omega/issues/121) tracks it; the guard
-  test exempts the package with the reason stated.
+- Backend's record classifiers (`skip`, `expire`, `authenticated`, `test-mode`, …)
+  classify one function's records, not modules. They survive as leading WORDS, never
+  brackets (`ctx.log('local: Clearing...')`) — a bracket there would read as a second
+  identity tag ([#121](https://github.com/Omega-JS-Stack/omega/issues/121)).
 - Test harnesses and fixtures are exempt; web's `core/js/pages/test/` demo pages are
   NOT (they ship).
 

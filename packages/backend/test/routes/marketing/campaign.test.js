@@ -98,6 +98,56 @@ module.exports = {
     },
 
     {
+      name: 'campaign-rejects-raw-content-html',
+      auth: 'admin',
+      timeout: 15000,
+
+      async run({ http, assert }) {
+        // The raw-HTML passthrough is internal-caller only — an admin (or the MCP
+        // create_campaign tool it fronts) must not bypass the escaped lane (#90).
+        const response = await http.post('backend-manager/marketing/campaign', {
+          name: 'Raw HTML Campaign',
+          subject: 'Should fail',
+          test: true,
+          data: { content: { html: '<img src=x onerror="alert(1)">' } },
+        });
+
+        assert.isError(response, 400, 'data.content.html should be rejected with a 400');
+      },
+    },
+
+    {
+      name: 'campaign-doc-cannot-carry-caller-content-html',
+      auth: 'admin',
+      timeout: 30000,
+
+      async run({ http, assert, firestore }) {
+        // The stored doc is what the cron sender reads later, and the marketing library
+        // reads contentHtml / data.content.html AHEAD of the escaped renderer — so
+        // neither may ever land in it from a caller. Two layers stop this: the schema
+        // strips the undeclared top-level contentHtml, and the handler's
+        // internalOnlyFieldFault() rejects data.content.html outright.
+        const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const response = await http.post('backend-manager/marketing/campaign', {
+          name: 'Raw HTML Persistence Probe',
+          subject: 'Probe',
+          contentHtml: '<img src=x onerror=alert(1)>',
+          test: true,
+          sendAt: futureDate,
+        });
+
+        assert.isSuccess(response, 'A campaign carrying only the stripped field should still create');
+
+        const doc = await firestore.get(`marketing-campaigns/${response.data.id}`);
+
+        assert.ok(doc, 'Campaign doc should exist in Firestore');
+        assert.equal(doc.settings.contentHtml, undefined, 'Caller-supplied contentHtml persisted into the stored campaign doc');
+        assert.ok(!JSON.stringify(doc).includes('onerror'), 'Raw HTML payload persisted into the stored campaign doc');
+      },
+    },
+
+    {
       name: 'campaign-requires-admin',
       auth: 'user',
       timeout: 15000,

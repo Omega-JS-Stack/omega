@@ -9,6 +9,17 @@
 // CSS custom properties (light/dark bridge)
 @import 'css/base/root';
 
+// The classy app/auth FLOOR: fall-through surfaces (auth, dashboard/account,
+// admin) render classy layouts whose vocabulary is token-pure — these partials
+// paint through YOUR token values. Keep them EARLY so your rules win collisions.
+// Removing them leaves those pages unstyled (the build warns — #98).
+@import '../classy/css/layout/shell';
+@import '../classy/css/layout/footer';
+@import '../classy/css/app/panels';
+@import '../classy/css/pages/auth';
+@import '../classy/css/components/receipt';
+@import '../classy/css/components/badges';
+
 // Your theme's styles (add base/layout/component partials as you grow)
 @import 'css/components/components';
 

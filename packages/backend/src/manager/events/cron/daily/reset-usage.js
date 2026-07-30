@@ -23,19 +23,19 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
 };
 
 function clearLocal(ctx, storage) {
-  ctx.log('[local]: Clearing...');
+  ctx.log('local: Clearing...');
   storage.setState({}).write();
-  ctx.log('[local]: Completed!');
+  ctx.log('local: Completed!');
 }
 
 async function clearUnauthenticatedUsage(ctx, libraries) {
   const { admin } = libraries;
 
-  ctx.log('[unauthenticated]: Deleting usage collection...');
+  ctx.log('unauthenticated: Deleting usage collection...');
 
   await admin.firestore().recursiveDelete(admin.firestore().collection('usage'))
   .then(() => {
-    ctx.log('[unauthenticated]: Completed!');
+    ctx.log('unauthenticated: Completed!');
   })
   .catch((e) => {
     ctx.report(`Error deleting usage collection: ${e}`, { code: 500 });
@@ -55,7 +55,7 @@ async function resetAuthenticated(Manager, ctx) {
   }
   const metricNames = Object.keys(metricSet);
 
-  ctx.log(`[authenticated]: Resetting ${isFirstOfMonth ? 'daily + monthly' : 'daily'} for metrics`, metricNames);
+  ctx.log(`authenticated: Resetting ${isFirstOfMonth ? 'daily + monthly' : 'daily'} for metrics`, metricNames);
 
   // Collect all user IDs that need resetting (deduplicated across metrics)
   // Each entry maps uid -> { ref, usage } so we only write once per user
@@ -110,7 +110,7 @@ async function resetAuthenticated(Manager, ctx) {
   }
 
   const userIds = Object.keys(usersToReset);
-  ctx.log(`[authenticated]: Found ${userIds.length} users to reset`);
+  ctx.log(`authenticated: Found ${userIds.length} users to reset`);
 
   // Single write per user: reset daily (always) + monthly (on 1st) for all metrics
   for (const uid of userIds) {
@@ -130,12 +130,12 @@ async function resetAuthenticated(Manager, ctx) {
 
     await ref.update({ usage })
     .then(() => {
-      ctx.log(`[authenticated]: Reset ${uid}`);
+      ctx.log(`authenticated: Reset ${uid}`);
     })
     .catch(e => {
       ctx.report(`Error resetting ${uid}: ${e}`, { code: 500 });
     });
   }
 
-  ctx.log(`[authenticated]: Completed!`);
+  ctx.log(`authenticated: Completed!`);
 }

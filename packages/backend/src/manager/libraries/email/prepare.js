@@ -115,6 +115,43 @@ function renderContent({ content, html, trusted }, utmOptions) {
   return rendered;
 }
 
+// The send/campaign fields that hand the renderer raw HTML, or the trust to render
+// it. Each one is a real first-party lane AND a complete bypass of the escaped lane,
+// so no caller arriving over the API may set any of them.
+const INTERNAL_ONLY_SEND_FIELDS = [
+  { path: 'data.content.html', what: 'the raw-HTML body passthrough' },
+  { path: 'contentHtml', what: 'the pre-rendered campaign HTML the newsletter generator hands over' },
+  { path: 'trustedContent', what: 'the flag that renders raw HTML inside the body' },
+];
+
+/**
+ * The internal-only-field fault for a caller-facing lane, or null when clean.
+ *
+ * Each field in INTERNAL_ONLY_SEND_FIELDS skips or disarms the escaped renderer:
+ * whatever it carries lands in the inbox as live markup. That is by declaration for
+ * INTERNAL callers (the newsletter generator hands over pre-rendered HTML; the
+ * dispute alert hand-builds its own markup), but a caller arriving over the API —
+ * including an admin-authenticated AI on the MCP `send_email` / `create_campaign`
+ * tools — must never reach any of them, or the escaped lane is one field away from
+ * being bypassed. Every external email lane checks its raw settings through here
+ * BEFORE handing them to the library; internal callers don't call it and are unchanged.
+ *
+ * @param {object} [settings] - Caller-supplied send/campaign settings
+ * @returns {?Error} A coded-400 permanent fault, or null when every field is absent
+ */
+function internalOnlyFieldFault(settings) {
+  const found = INTERNAL_ONLY_SEND_FIELDS.find((field) => _.has(settings, field.path));
+
+  if (!found) {
+    return null;
+  }
+
+  return errorWithCode(
+    `Parameter ${found.path} is internal-caller only — ${found.what} is not accepted over the API. Send markdown in data.content.message instead.`,
+    400,
+  );
+}
+
 /**
  * Resolve the human who fronts "personal" emails, from `brand.contact.person`.
  *
@@ -284,6 +321,7 @@ module.exports = {
   resolveBrand,
   resolveSender,
   renderContent,
+  internalOnlyFieldFault,
   resolvePerson,
   resolveSignoff,
   buildCategories,

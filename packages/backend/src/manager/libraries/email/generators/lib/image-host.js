@@ -97,7 +97,7 @@ async function uploadAssets({ images, html, markdown, summary, brandId, campaign
     throw new Error('image-host: GH_TOKEN env var (or token arg) is required');
   }
 
-  const log = (msg) => ctx?.log ? ctx.log(`[image-host] ${msg}`) : null;
+  const log = (msg) => ctx?.log ? ctx.log(`image-host: ${msg}`) : null;
 
   // Brand branch — each brand gets its own branch, zero cross-brand contention
   const branch = brandId;

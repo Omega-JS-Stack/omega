@@ -79,7 +79,7 @@ async function writeArticle({ brand, description, links, sourceContent, override
   });
 
   const duration = Date.now() - start;
-  console.log(`[ghostii] writeArticle() completed in ${duration}ms (${(duration / 1000).toFixed(1)}s)`);
+  console.log(`[@omega.js/backend:ghostii] writeArticle() completed in ${duration}ms (${(duration / 1000).toFixed(1)}s)`);
 
   return result;
 }
@@ -160,7 +160,7 @@ async function publishArticle(ctx, { brand, article, id, author, postPath, sourc
     source: source || null,
   };
 
-  console.log(`[ghostii] publishArticle() source=${postBody.source}`);
+  console.log(`[@omega.js/backend:ghostii] publishArticle() source=${postBody.source}`);
 
   const result = await fetch(`${apiUrl}/omega/admin/post`, {
     method: 'POST',

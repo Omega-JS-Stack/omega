@@ -98,39 +98,17 @@
           </nav>
         {% endif %}
 
-        <!-- Language (dropup) -->
-        <div class="dropup uj-language-dropdown">
+        <!-- Language (dropup) — the rows render CLIENT-SIDE from the page's own
+             hreflang alternates (core/js/core/language-switcher.js). Those tags
+             are stitched post-translation and name only the languages actually
+             PRODUCED for this page, so the menu can never offer a copy that was
+             never written. Fewer than two languages → this block stays hidden. -->
+        <div class="dropup uj-language-dropdown" data-omega-language-switcher hidden>
           <button class="classy-footer__pill dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
             {% uj_icon "language", "fa-sm" %}
             <span>Language</span>
           </button>
-          <ul class="dropdown-menu">
-            {% assign default_language = site.translation.default | default: "en" %}
-            {% assign page_excluded_from_translation = false %}
-            {% for exclude in site.translation.exclude %}
-              {% assign exclude_folder = "/" | append: exclude | append: "/" %}
-              {% assign exclude_page = "/" | append: exclude %}
-              {% if page.url == exclude_page or page.url contains exclude_folder %}
-                {% assign page_excluded_from_translation = true %}
-              {% endif %}
-            {% endfor %}
-            {% if site.translation.enabled and site.translation.languages.size > 0 and page_excluded_from_translation != true %}
-              {% assign all_languages = site.translation.languages | push: default_language %}
-            {% else %}
-              {% assign all_languages = "" | split: "" | push: default_language %}
-            {% endif %}
-            {% for language in all_languages %}
-              <li>
-                {% capture lang_name %}{% uj_language language, "native" %}{% endcapture %}
-                {% comment %} Language flags resolve via the core flag set +
-                the language→country map (en → us.svg) {% endcomment %}
-                <a class="dropdown-item d-flex align-items-center uj-language-dropdown-item" href="{% uj_translation_url language, page.url %}" data-lang="{{ language }}">
-                  <span class="classy-flag me-2">{% uj_icon language %}</span>
-                  {{ lang_name | capitalize }}
-                </a>
-              </li>
-            {% endfor %}
-          </ul>
+          <ul class="dropdown-menu" data-omega-language-list></ul>
         </div>
 
         <!-- Appearance (segmented; core appearance.js stamps .active/aria-pressed on data-appearance-set) -->

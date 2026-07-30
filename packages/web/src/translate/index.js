@@ -4,13 +4,14 @@
  * cache in <consumer>/translations/, provider from config), and writes
  * /{lang}/... copies with localized <html lang|dir>, canonical/og tags,
  * rewritten internal links, and hreflang alternates stitched into both the
- * copies and the originals (only for pages actually translated — hreflang
- * never lies). No GitHub-branch cache, no separate credentials: the cache is
- * part of the repo, and the default claude provider rides the local Claude
- * Code install.
+ * copies and the originals (only the languages actually produced — hreflang
+ * never lies; a provider failure skips its page-language pair whole rather
+ * than shipping a mixed-language copy). No GitHub-branch cache, no separate
+ * credentials: the cache is part of the repo, and the default claude provider
+ * rides the local Claude Code install.
  *
- * Sitemap alternates ride whenever @omega.js/web grows a sitemap generator —
- * dist/ carries none today.
+ * dist/sitemap.xml is rewritten afterwards (./sitemap.js) so the produced
+ * copies are listed with the same hreflang story the pages carry.
  */
 const path = require('node:path');
 const jetpack = require('fs-jetpack');
@@ -20,6 +21,7 @@ const {
   resolveTranslationSettings,
   translateStrings,
   languageName,
+  ogLocale,
   isRTL,
   hashKey,
   loadCache,
@@ -27,6 +29,7 @@ const {
   LANGUAGE_NAMES,
 } = require('@omega.js/devkit/translate');
 const { collectTextNodes } = require('./collect-text-nodes.js');
+const { updateSitemap } = require('./sitemap.js');
 
 // System routes never translated (auth flows, transactional + legal pages)
 const SYSTEM_EXCLUDED_ROUTES = [
@@ -152,15 +155,16 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
     changed = true;
   }
 
-  const ogLocale = $('head meta[property="og:locale"]');
-  if (ogLocale.length) {
-    const currentLang = ogLocale.attr('content');
+  const ogLocaleTag = $('head meta[property="og:locale"]');
+  if (ogLocaleTag.length) {
+    const currentLocale = ogLocaleTag.attr('content');
     for (const lang of [defaultLang, ...languages]) {
-      if (lang === currentLang || $(`head meta[property="og:locale:alternate"][content="${lang}"]`).length) {
+      const locale = ogLocale(lang);
+      if (locale === currentLocale || $(`head meta[property="og:locale:alternate"][content="${locale}"]`).length) {
         continue;
       }
 
-      ogLocale.after(`\n<meta property="og:locale:alternate" content="${lang}"/>`);
+      ogLocaleTag.after(`\n<meta property="og:locale:alternate" content="${locale}"/>`);
       changed = true;
     }
   }
@@ -181,7 +185,8 @@ function insertAlternates($, languages, defaultLang, route, baseUrl) {
  *   any cold (uncached) string are skipped whole (listed in stats.skippedCold)
  *   instead of shipping mixed-language copies — `omega build` runs this way;
  *   explicit `omega translate` owns live-LLM translation (friction #24)
- * @returns {Promise<object>} stats: { skipped?, pages, languages, newStrings, cachedStrings, failures, usage, skippedCold }
+ * @returns {Promise<object>} stats: { skipped?, pages, languages, newStrings,
+ *   cachedStrings, failures (page-language pairs skipped whole), usage, skippedCold }
  */
 async function translateSite(options) {
   const { root, outDir, config } = options;
@@ -225,6 +230,7 @@ async function translateSite(options) {
     // Source strings (collected once per page from a throwaway DOM)
     const strings = collectTextNodes(cheerio.load(sourceHtml)).map((n) => n.text);
     const producedLangs = [];
+    const copies = [];
 
     for (const lang of settings.languages) {
       done++;
@@ -275,10 +281,12 @@ async function translateSite(options) {
           stats.usage.output += usage.output;
           logger.log(`✓ ${logTag} — ${missIndices.length} new + ${strings.length - missIndices.length} cached`);
         } catch (e) {
-          // Fall back to source strings for the misses; the page still ships
-          missIndices.forEach((i) => { translated[i] = strings[i]; });
+          // Skip the whole page-language pair, exactly like a cold cache
+          // under cachedOnly: a half-translated copy is worse than none, and
+          // it would ship silently behind full language chrome
           stats.failures.push(`${lang} /${route}: ${e.message}`);
-          logger.warn(`✗ ${logTag} — ${e.message}`);
+          logger.warn(`✗ ${logTag} — ${e.message} — page skipped (no ${lang} copy)`);
+          continue;
         }
       } else {
         logger.log(`✓ ${logTag} — all ${strings.length} strings cached`);
@@ -309,10 +317,9 @@ async function translateSite(options) {
       $('html').attr('dir', isRTL(lang) ? 'rtl' : 'ltr');
       $('link[rel="canonical"]').attr('href', pageUrl);
       $('meta[property="og:url"]').attr('content', pageUrl);
-      $('meta[property="og:locale"]').attr('content', lang);
+      $('meta[property="og:locale"]').attr('content', ogLocale(lang));
 
       rewriteLinks($, lang, baseUrl, isExcluded);
-      insertAlternates($, settings.languages, settings.default, route, baseUrl);
 
       // Canonical URLs are extensionless (about.html ↔ /about), so the
       // language HOME must land as <lang>.html for /es to resolve as a FILE.
@@ -320,8 +327,16 @@ async function translateSite(options) {
       // /es/), which fights the zone's strip-trailing-slash rule into a
       // 301 loop (live find, launch night 2026-07-19).
       const targetRel = relPath === 'index.html' ? `${lang}.html` : path.join(lang, relPath);
-      jetpack.write(path.join(outDir, targetRel), $.html());
+      copies.push({ targetRel, $ });
       producedLangs.push(lang);
+    }
+
+    // Copies land after the page's whole language pass so their alternates
+    // name only the languages actually produced — a skipped pair (cold cache
+    // or provider failure) is never advertised (hreflang never lies)
+    for (const { targetRel, $ } of copies) {
+      insertAlternates($, producedLangs, settings.default, route, baseUrl);
+      jetpack.write(path.join(outDir, targetRel), $.html());
     }
 
     if (producedLangs.length) {
@@ -338,6 +353,21 @@ async function translateSite(options) {
     if (insertAlternates($, langs, settings.default, routeOf(relPath), baseUrl)) {
       jetpack.write(file, $.html());
     }
+  }
+
+  // The sitemap tells the same story: the produced copies join it with their
+  // hreflang alternates, and a skipped pair is listed nowhere
+  const sitemapUrls = updateSitemap({
+    outDir,
+    baseUrl,
+    defaultLang: settings.default,
+    produced: new Map([...translatedRoutes].map(([relPath, langs]) => [routeOf(relPath), langs])),
+    logger,
+  });
+
+  if (sitemapUrls !== null) {
+    stats.sitemapUrls = sitemapUrls;
+    logger.log(`Sitemap: ${sitemapUrls} translated URL(s) with hreflang alternates`);
   }
 
   return stats;

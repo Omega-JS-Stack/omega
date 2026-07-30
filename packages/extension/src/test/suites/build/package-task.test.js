@@ -135,7 +135,7 @@ module.exports = {
         try {
           await inProject(tmp, async (task) => {
             // Drive the real gulp task: it must hand its `complete` callback an error.
-            // (The build-error reporter fires for real here — its notifly stderr in
+            // (The build-error reporter fires for real here — its notifly note in
             // the log is the failure being reported, not a test problem.)
             const failure = await new Promise((resolve) => task.packageFn(resolve));
             ctx.expect(failure).toBeInstanceOf(Error);

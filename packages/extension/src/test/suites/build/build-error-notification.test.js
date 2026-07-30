@@ -64,5 +64,57 @@ module.exports = {
         ctx.expect(JSON.parse(result.stdout)).toEqual(args);
       },
     },
+    {
+      // notifly is an optional local nicety: on a machine without it the spawn
+      // used to dump a raw `spawn notifly ENOENT` error after the suite (#123).
+      // The ENOENT here comes from a REAL spawn of a binary that cannot exist.
+      name: 'a real missing-binary ENOENT prints ONE friendly note, no error dump',
+      run: (ctx) => {
+        const result = spawnSync('omega-notifly-does-not-exist-xyz', ['--title', 'x'], { shell: false });
+        ctx.expect(result.error.code).toBe('ENOENT');
+
+        const warns = [];
+        const errors = [];
+        const origWarn = console.warn;
+        const origError = console.error;
+        console.warn = (...args) => warns.push(args.join(' '));
+        console.error = (...args) => errors.push(args.join(' '));
+        try {
+          Manager.reportNotificationFailure(result.error);
+        } finally {
+          console.warn = origWarn;
+          console.error = origError;
+        }
+
+        ctx.expect(warns.length).toBe(1);
+        ctx.expect(warns[0]).toContain('notifly not installed — skipping desktop notification');
+        ctx.expect(warns[0].includes('ENOENT')).toBe(false);
+        ctx.expect(warns[0].includes('spawnSync')).toBe(false);
+        ctx.expect(errors.length).toBe(0);
+      },
+    },
+    {
+      name: 'every other spawn failure keeps the logged-not-thrown error',
+      run: (ctx) => {
+        const failure = Object.assign(new Error('permission denied'), { code: 'EACCES' });
+
+        const warns = [];
+        const errors = [];
+        const origWarn = console.warn;
+        const origError = console.error;
+        console.warn = (...args) => warns.push(args.join(' '));
+        console.error = (...args) => errors.push(args.join(' '));
+        try {
+          Manager.reportNotificationFailure(failure);
+        } finally {
+          console.warn = origWarn;
+          console.error = origError;
+        }
+
+        ctx.expect(errors.length).toBe(1);
+        ctx.expect(errors[0]).toContain('Failed to send notification');
+        ctx.expect(warns.length).toBe(0);
+      },
+    },
   ],
 };

@@ -24,6 +24,8 @@ Shared section (typically brand-level; `SHARED_SECTIONS` includes it, so
 disperse copies it and every app inherits through the cascade). Language codes
 validate against the SSOT in `@omega.js/devkit/translate` (`LANGUAGE_NAMES`,
 ~32 codes) — an unknown code is a hard config error naming the supported set.
+The same SSOT carries `LANGUAGE_LOCALES` + `ogLocale(code)`, the one code →
+Open Graph `language_TERRITORY` map (`es` → `es_ES`).
 
 ## Providers
 
@@ -71,10 +73,14 @@ string. Committed to git — that's the whole point:
 
 `omega build` translates everything by default (Ian's #24 final call): warm
 strings come from the committed cache instantly, cold strings translate live
-through the provider — a build always ships the COMPLETE translated site,
-and a warm cache means zero provider calls. `omega build --cached-only`
-skips cold page-language pairs WHOLE instead (no mixed-language copies,
-hreflang stays honest; the warning lists them) for provider-free builds.
+through the provider — a build ships the COMPLETE translated site whenever
+the provider delivers, and a warm cache means zero provider calls. A provider
+FAILURE skips that page-language pair whole, warning loudly with the page and
+the language (the build still exits 0): no half-translated copy ever ships
+behind full language chrome.
+`omega build --cached-only` skips cold page-language pairs WHOLE instead (no
+mixed-language copies, hreflang stays honest; the warning lists them) for
+provider-free builds.
 `omega translate` still runs the live pass standalone against an existing
 dist/ and exits 1 on failures. `OMEGA_TRANSLATE_ONLY=<route>` limits any of
 these to one page (canary/debug).
@@ -83,9 +89,13 @@ Per page × language: text nodes/`<title>`/meta/attribute copy translate
 (cache-first), then the copy lands at `dist/{lang}/...` with `<html lang dir>`
 (RTL-aware), canonical + `og:url` + `og:locale` localized, internal links
 rewritten to `/{lang}/...`, and hreflang + `og:locale:alternate` tags
-stitched into BOTH the copy and the original — only for pages actually
-translated, so hreflang never lies. Cache namespace: `pages/{route}`
-(`pages/home` for `/`).
+stitched into BOTH the copy and the original — naming only the languages
+actually PRODUCED for that page (a pair skipped cold or failed is never
+advertised, on the copies as on the originals), so hreflang never lies.
+`og:locale` carries Open Graph's `language_TERRITORY` form (`en_US`,
+`es_ES`) from the devkit language SSOT's locale map — on translated copies
+and on the source pages the head include renders. Cache namespace:
+`pages/{route}` (`pages/home` for `/`).
 
 Never translated: auth flows (`oauth2`, `authentication-*`), `checkout*`,
 `submission/confirmation`, legal (`terms`/`privacy`/`cookies`), `404`,
@@ -95,9 +105,28 @@ Element opt-out: `data-omega-no-translate`. Collector fixes vs UJM:
 `aria-describedby`/`aria-labelledby` are NOT collected (ID refs), `value`
 only on button-type inputs (hidden-input tokens stay intact).
 
-Not here yet: sitemap alternates ride whenever @omega.js/web grows a sitemap
-generator (dist/ carries none today); no default homepage exists in the D8
-set, so brand sites translate their own `index` when they add one.
+`dist/sitemap.xml` (emitted by the build in the source language only) is
+rewritten afterwards so it tells the same story: every PRODUCED copy joins it
+as its own `<url>`, and each entry of a translated set — source and copies
+alike — carries the full `xhtml:link rel="alternate"` list (`x-default` at the
+source language) plus the source entry's `lastmod`/`changefreq`/`priority`.
+Entries stay in loc byte order. The language-prefixed entries are owned by that
+pass: each run drops them all and re-emits only what it produced, so a skipped
+or failed pair is listed nowhere.
+
+The visitor-facing **language switcher** is the footer dropup in the shared
+classy footer include (`_includes/frontend/sections/footer.html`, the base layer
+every theme inherits). It renders CLIENT-SIDE from the page's own
+`link[rel="alternate"][hreflang]` tags — the produced-only SSOT above — so the
+menu can never offer a copy that was not written: `core/js/core/language-switcher.js`
+drops `x-default`, labels each row with its native name (`Intl.DisplayNames` in
+that language's own locale, upper-cased code as the fallback), marks
+`documentElement.lang` as current, and leaves the mount empty and hidden when
+fewer than two languages exist. Selecting a language is a plain link to that
+alternate's href — never a redirect or a negotiation.
+
+Not here yet: no default homepage exists in the D8 set, so brand sites
+translate their own `index` when they add one.
 
 ## Extension (`@omega.js/extension`)
 
@@ -122,8 +151,11 @@ list in `gulp/config/locales.js` is gone (only the CWS `limits` remain there).
 - devkit `test/translate.test.js` — engine protocol, providers, cache,
   language SSOT, settings reader (fake `send`).
 - web `test/translate.test.js` — handcrafted dist through the real pipeline:
-  copies/chrome/links/exclusions/alternates/cache/override/only-filter/failure
-  fallback.
+  copies/chrome/links/exclusions/alternates/cache/override/only-filter, the
+  produced-languages-only alternates, and the loud failure skip.
+- web `test/language-switcher.test.js` — the switcher's DOM read (x-default
+  dropped, duplicates collapsed, current marked, escaping) and the built footer
+  mount in classy and newsflash.
 - extension `build/translate.test.js` — compose + description marker glue.
 - Live canary (cp96, local Claude): omega-brand `/about` → es (102 strings,
   rerun 0 calls) and the extension's 4 messages (2 unique) + 2,703-char

@@ -2,7 +2,7 @@
  * Plain template — looks like a regular email from a person.
  * No logo, no card, no branding. Full-width MJML body so it doesn't center in a narrow column.
  */
-const { escape } = require('./shared-campaign.js');
+const { escape, safeUrl } = require('./shared-campaign.js');
 
 function build({ data }) {
   const brand = data?.brand || {};
@@ -27,7 +27,7 @@ function build({ data }) {
 
   // Optional link
   const link = content.link?.url
-    ? `<p><a href="${content.link.url}" style="color: #1a73e8;">${escape(content.link.text || content.link.url)}</a></p>`
+    ? `<p><a href="${safeUrl(content.link.url)}" style="color: #1a73e8;">${escape(content.link.text || content.link.url)}</a></p>`
     : '';
 
   // Signoff

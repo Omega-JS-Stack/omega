@@ -11,6 +11,7 @@
  */
 const pushid = require('pushid');
 const { buildCampaignDoc } = require('./utils');
+const prepare = require('../../../libraries/email/prepare.js');
 
 module.exports = async ({ ctx, user, Manager, settings, analytics }) => {
 
@@ -19,6 +20,19 @@ module.exports = async ({ ctx, user, Manager, settings, analytics }) => {
   }
   if (!user.roles.admin) {
     return ctx.respond('Admin access required', { code: 403 });
+  }
+
+  // The raw-HTML fields are internal-caller only — a campaign authored over this
+  // route (or the MCP create_campaign tool) sends markdown through the escaped lane.
+  // Rejecting BEFORE buildCampaignDoc() is what keeps the field out of the stored
+  // doc, which the cron sender reads later.
+  const internalOnlyFault = prepare.internalOnlyFieldFault(settings);
+
+  if (internalOnlyFault) {
+    // The field name only, never the payload it tried to smuggle.
+    ctx.log(`Rejected: ${internalOnlyFault.message}`);
+
+    return ctx.respond(internalOnlyFault.message, { code: internalOnlyFault.code });
   }
 
   const { admin } = Manager.libraries;

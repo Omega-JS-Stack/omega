@@ -163,6 +163,17 @@ test('desktop remoteScripts is a declared key: the opt-in shape passes, wrong ty
   assert.ok(errors.some((e) => e.includes('config.remoteScripts.url') && e.includes('does not match')));
 });
 
+test('desktop releases.enabled is a declared key: booleans pass, a string bounces (#124)', () => {
+  const gated = { ...VALID, releases: { enabled: false, repo: 'acme-site' } };
+  assert.deepStrictEqual(validateConfig(gated, { target: 'desktop' }).errors, []);
+
+  const { errors } = validateConfig(
+    { ...VALID, releases: { enabled: 'nope' } },
+    { target: 'desktop' },
+  );
+  assert.ok(errors.some((e) => e.includes('config.releases.enabled has wrong type')));
+});
+
 test('extension listings are declared keys: valid urls pass, a non-url bounces (#85)', () => {
   const listed = {
     ...VALID,

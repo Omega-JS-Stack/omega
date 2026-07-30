@@ -27,24 +27,12 @@ case "$file_path" in
     ;;
 esac
 
-# Scope guard: walk up from the file to the nearest package.json (stopping at
-# the git root); only police projects that depend on (or are) @omega.js/*.
-dir=$(dirname "$file_path")
-manifest=""
-while [ -n "$dir" ] && [ "$dir" != "/" ]; do
-  if [ -f "$dir/package.json" ]; then
-    manifest="$dir/package.json"
-    break
-  fi
-  [ -e "$dir/.git" ] && break
-  dir=$(dirname "$dir")
-done
-[ -n "$manifest" ] || exit 0
-omega_linked=$(jq -r '
-  [.name // ""] + ((.dependencies // {}) | keys) + ((.devDependencies // {}) | keys)
-  | map(select(startswith("@omega.js/"))) | length
-' "$manifest" 2>/dev/null || echo 0)
-[ "$omega_linked" -gt 0 ] 2>/dev/null || exit 0
+# Scope guard: only police projects that depend on (or are) @omega.js/*.
+scope_lib="$(dirname "${BASH_SOURCE[0]}")/../lib/omega-scope.sh"
+[ -r "$scope_lib" ] || exit 0
+# shellcheck source-path=SCRIPTDIR source=../lib/omega-scope.sh
+. "$scope_lib"
+omega_scope "$file_path" || exit 0
 
 cat >&2 <<EOF
 omega:shape — test suite shape violation: $file_path

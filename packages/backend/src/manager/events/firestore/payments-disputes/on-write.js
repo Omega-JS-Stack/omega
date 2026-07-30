@@ -1,7 +1,7 @@
 const path = require('path');
 const loadProcessor = require('../../../libraries/load-processor.js');
 const powertools = require('node-powertools');
-const { escapeHtml } = require('../../../libraries/email/constants.js');
+const { escapeHtml, safeUrl } = require('../../../libraries/email/constants.js');
 
 /**
  * Firestore trigger: payments-disputes/{alertId} onWrite
@@ -211,7 +211,7 @@ function sendDisputeEmail({ alert, match, result, alertId, ctx }) {
 
   // Stripe link
   if (alert.stripeUrl) {
-    messageLines.push(`<br><a href="${escapeHtml(alert.stripeUrl)}">View in Stripe Dashboard</a>`);
+    messageLines.push(`<br><a href="${safeUrl(alert.stripeUrl)}">View in Stripe Dashboard</a>`);
   }
 
   // Errors

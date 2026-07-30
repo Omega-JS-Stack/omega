@@ -14,6 +14,8 @@ OMEGA Web (`@omega.js/web`) is the framework for building a brand's marketing si
 
 - **`js:patterns`** — JavaScript/Node.js conventions: file structure, JSDoc, defensive coding (`?.` usage), template literals, `package.json` conventions. Auto-loads when creating new `.js` files or touching JS module structure.
 - **`omega:web`** — the router skill from the omega Claude plugin. The inject hook loads it automatically in any project with `@omega.js/web` (and inside `packages/web` here); it points back to this guide + `docs/` (the SSOT).
+- **`omega:seo`** — the search-surface checklist for a page (meta values, the per-type structured-data gates in foot.html, one h1, sitemap/robots, link shape): [agent-plugins/claude/skills/seo/SKILL.md](../../agent-plugins/claude/skills/seo/SKILL.md). The plugin's quality hook fires it on any page, layout, or head/foot-chrome edit.
+- **`omega:accessibility`** — the front-end checklist (landmarks and heading order, alt text, control names, token color, focus visibility, reduced motion): [agent-plugins/claude/skills/accessibility/SKILL.md](../../agent-plugins/claude/skills/accessibility/SKILL.md). Same hook fires it on markup, section, and stylesheet edits.
 
 ## 🚨 READ @omega.js/client TOO
 

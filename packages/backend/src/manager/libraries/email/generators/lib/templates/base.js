@@ -8,7 +8,7 @@
  * Everything else is an opt-in block — a function that returns an MJML string.
  * Templates import what they need and ignore the rest.
  */
-const { escape } = require('./shared-campaign.js');
+const { escape, safeUrl } = require('./shared-campaign.js');
 
 const DEFAULT_STYLES = `
   body { background-color: #F7FAFC; }
@@ -116,7 +116,7 @@ function signoff(data, theme) {
       ? `<img src="${escape(s.image)}" alt="${escape(s.name)}" width="60" style="width: 60px; height: 60px; border-radius: 50%; display: block;" />`
       : '';
     const link = s.url
-      ? `<br/><a href="${s.url}" style="color: ${primaryColor}; font-size: 14px; text-decoration: none;">${escape(s.urlText || s.url)}</a>`
+      ? `<br/><a href="${safeUrl(s.url)}" style="color: ${primaryColor}; font-size: 14px; text-decoration: none;">${escape(s.urlText || s.url)}</a>`
       : '';
 
     const inner = img
@@ -144,7 +144,7 @@ function button(btn) {
     return '';
   }
 
-  return `<mj-button href="${btn.url}" background-color="#1A202C" color="#ffffff" border-radius="4px" font-size="16px" font-weight="normal" inner-padding="10px 20px" padding="24px 0 0 0">${escape(btn.text)}</mj-button>`;
+  return `<mj-button href="${safeUrl(btn.url)}" background-color="#1A202C" color="#ffffff" border-radius="4px" font-size="16px" font-weight="normal" inner-padding="10px 20px" padding="24px 0 0 0">${escape(btn.text)}</mj-button>`;
 }
 
 /**

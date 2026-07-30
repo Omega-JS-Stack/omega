@@ -22,10 +22,33 @@
  * carries no explicit `download`/`extension` page map, site.download and
  * site.extension derive from the targets so those pages populate with no
  * hand-supplied links. An explicit map always wins.
+ *
+ * The desktop derivation is OPT-IN (#124): only a brand that carries a
+ * `targets.desktop.releases` block gets releases/latest links — merely
+ * declaring a desktop target derives nothing, since the release may not
+ * exist yet.
  */
 
 // Keys that are resolution machinery, not site content
 const MACHINERY_KEYS = ['targets', 'enabled'];
+
+/**
+ * Whether the brand OPTED IN to derived desktop download links (#124):
+ * declaring a desktop target is not enough — a `targets.desktop.releases`
+ * block must be present (`enabled` defaults true when it is), and
+ * `releases.enabled: false` always suppresses. On the pipeline's second
+ * toSiteGlobal pass the raw block is gone, so a curated `releasesUrl` is
+ * itself the opt-in (idempotence).
+ * @param {object} config - resolved config object
+ * @returns {boolean}
+ */
+function desktopReleasesEnabled(config) {
+  const desktop = targetEntry(config, 'desktop');
+  if (!desktop) return false;
+  if (desktop.releases) return desktop.releases.enabled !== false;
+
+  return Boolean(desktop.releasesUrl);
+}
 
 /**
  * The GitHub releases URL a desktop target's downloads point at.
@@ -80,7 +103,7 @@ function targetEntry(config, name) {
 function curateTarget(name, config) {
   const view = { enabled: true };
 
-  if (name === 'desktop' && targetEntry(config, 'desktop')) {
+  if (name === 'desktop' && desktopReleasesEnabled(config)) {
     const releasesUrl = desktopReleasesUrl(config);
     if (releasesUrl) view.releasesUrl = releasesUrl;
   }
@@ -104,14 +127,15 @@ function curateTarget(name, config) {
 }
 
 /**
- * The download-page map derived from the desktop target: every desktop
- * platform points at the releases hub (the exact shape brands hand-wrote
- * before #85). Mobile platforms stay absent — MAM is parked.
+ * The download-page map derived from the desktop target once releases are
+ * opted in: every desktop platform points at the releases hub (the exact
+ * shape brands hand-wrote before #85). Mobile platforms stay absent — MAM
+ * is parked.
  * @param {object} config - resolved config object
  * @returns {object|undefined}
  */
 function deriveDownload(config) {
-  if (!targetEntry(config, 'desktop')) return undefined;
+  if (!desktopReleasesEnabled(config)) return undefined;
 
   const url = desktopReleasesUrl(config);
   if (!url) return undefined;

@@ -11,12 +11,14 @@
  * farm, and pages it doesn't cover fall through to the classy base.
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 const sass = require('sass');
 
 const { resolveThemeLayers } = require('../src/layers.js');
-const { layeredFileImporter, sectionsImporter } = require('../src/assets.js');
+const { buildAssets, layeredFileImporter, sectionsImporter } = require('../src/assets.js');
+const { checkThemeVocabulary } = require('../src/theme-vocabulary.js');
 const { buildWith: sharedBuildWith, miniData, MINI, PKG } = require('./lib/build.js');
 
 // Namespace this file's Eleventy output dirs (test files run concurrently)
@@ -99,6 +101,101 @@ test('inheritance hatch: a partial theme @forwards omega:theme and inherits the 
     css.indexOf('--partial-marker') > css.lastIndexOf('.classy-statgrid'),
     'partial rules land after the inherited chain',
   );
+});
+
+// ─── The fall-through guard (#98): a theme that reached NEITHER lane warns ───
+
+// The compiled main bundle for a theme root of any provenance (fixture dirs
+// included — the shipped chain always sits under it).
+function compileMain(themeRoot) {
+  const layers = [themeRoot, path.join(PKG, 'themes', 'classy'), path.join(PKG, 'core')];
+  return sass.compile(path.join(PKG, 'core', 'css', 'main.scss'), {
+    importers: [layeredFileImporter(layers), sectionsImporter([])],
+    loadPaths: layers,
+    quietDeps: true,
+    silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'legacy-js-api'],
+    logger: { warn: () => {}, debug: () => {} },
+  }).css;
+}
+
+test('fall-through guard: a hatchless partial theme warns and names the inheritance hatch (#98)', () => {
+  const themeRoot = path.join(THEMING, 'hatchless-theme');
+  const warnings = [];
+  const result = checkThemeVocabulary({
+    css: compileMain(themeRoot),
+    themeRoots: [themeRoot, path.join(PKG, 'themes', 'classy')],
+    warn: (message) => warnings.push(message),
+  });
+
+  assert.equal(warnings.length, 1, 'exactly one warning block per build');
+  assert.deepEqual(result, {
+    theme: 'hatchless-theme',
+    lane: 'hatch',
+    missing: ['.classy-auth', '.classy-statgrid', '.classy-footer'],
+  });
+
+  const block = warnings[0];
+  assert.ok(block.includes('theme "hatchless-theme"'), 'names the theme');
+  assert.ok(block.includes('.classy-auth (pages/auth'), 'names the missing sentinel and its partial');
+  assert.ok(block.includes('inheritance hatch'), 'names the missing piece');
+  assert.ok(block.includes("@forward 'omega:theme';"), 'carries the exact fix line');
+  assert.ok(block.includes('themes/hatchless-theme/_theme.scss'), 'names the file to edit');
+  assert.ok(block.includes('docs/shared/theming.md'), 'points at the contract');
+});
+
+test('fall-through guard: a sibling theme with its own Bootstrap is sent to the floor imports (#98)', () => {
+  const themeRoot = path.join(THEMING, 'floorless-theme');
+  const warnings = [];
+  const result = checkThemeVocabulary({
+    css: compileMain(themeRoot),
+    themeRoots: [themeRoot, path.join(PKG, 'themes', 'classy')],
+    warn: (message) => warnings.push(message),
+  });
+
+  assert.equal(warnings.length, 1, 'exactly one warning block per build');
+  assert.equal(result.lane, 'floor', 'its own Bootstrap rules the hatch out');
+  assert.ok(warnings[0].includes('vocabulary floor'), 'names the missing piece');
+  assert.ok(
+    warnings[0].includes("@import '../classy/css/pages/auth';")
+    && warnings[0].includes("@import '../classy/css/app/panels';")
+    && warnings[0].includes("@import '../classy/css/layout/footer';"),
+    'carries the exact floor import lines',
+  );
+  assert.ok(!warnings[0].includes("@forward 'omega:theme'"), 'never suggests two Bootstraps');
+});
+
+test('fall-through guard: every bundled theme is silent (#98)', () => {
+  const themesDir = path.join(PKG, 'themes');
+  for (const id of fs.readdirSync(themesDir).filter((name) => !name.startsWith('_') && name !== 'bootstrap')) {
+    const themeRoots = resolveThemeLayers({ activeTheme: id, themesDir });
+    const warnings = [];
+    const result = checkThemeVocabulary({
+      css: compileMain(path.join(themesDir, id)),
+      themeRoots,
+      warn: (message) => warnings.push(message),
+    });
+    assert.equal(result, null, `${id} reaches the fall-through vocabulary`);
+    assert.deepEqual(warnings, [], `${id} builds silent`);
+  }
+});
+
+test('fall-through guard: the asset lane fires it on the real css build (#98)', async () => {
+  const themeRoot = path.join(THEMING, 'hatchless-theme');
+  const themeRoots = [themeRoot, path.join(PKG, 'themes', 'classy')];
+  const warnings = [];
+  await buildAssets({
+    layers: [...themeRoots, path.join(PKG, 'core')],
+    themeRoots,
+    sectionRoots: themeRoots,
+    themesDir: path.join(PKG, 'themes'),
+    coreDir: path.join(PKG, 'core'),
+    outDir: path.join(PKG, '.omega', 'themes-test-guard-out'),
+    only: 'css',
+    warn: (message) => warnings.push(message),
+  });
+
+  assert.equal(warnings.length, 1, 'the css lane emitted the guard block once');
+  assert.ok(warnings[0].includes('theme "hatchless-theme"'), 'the wired warning names the theme');
 });
 
 // ─── Tier 2: consumer-local full theme through the engine ────────────────────

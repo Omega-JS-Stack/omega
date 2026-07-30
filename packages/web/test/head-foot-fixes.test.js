@@ -23,7 +23,7 @@ test('W8 + W11: og:locale/hreflang carry the default language; quoted brand stri
   });
   const html = pages.get('/blog');
 
-  assert.ok(html.includes('property="og:locale" content="en"'), 'og:locale defaults to en');
+  assert.ok(html.includes('property="og:locale" content="en_US"'), 'og:locale carries the Open Graph language_TERRITORY form of the default language');
   assert.ok(!html.includes('property="og:locale" content=""'), 'og:locale never empty');
   assert.ok(!html.includes('hreflang=""'), 'no invalid empty hreflang annotation');
 

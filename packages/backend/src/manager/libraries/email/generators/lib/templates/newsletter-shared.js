@@ -31,7 +31,7 @@
  */
 const MarkdownIt = require('markdown-it');
 
-const { escapeHtml } = require('../../../constants.js');
+const { escapeHtml, safeUrl } = require('../../../constants.js');
 
 // Newsletter bodies are AI-authored — raw HTML stays disabled here.
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true });
@@ -269,7 +269,7 @@ function ctaBlock({ cta, padding, background, align }) {
   return singleColumnSection({
     background,
     padding: padding || '16px 32px 0 32px',
-    content: `<mj-button href="${cta.url}"${align ? ` align="${align}"` : ''}>${escape(cta.label)}</mj-button>`,
+    content: `<mj-button href="${safeUrl(cta.url)}"${align ? ` align="${align}"` : ''}>${escape(cta.label)}</mj-button>`,
   });
 }
 
@@ -435,7 +435,7 @@ function sponsorshipBlock({ sponsorship, theme, padding, background, label, with
           ${headline}
           ${body}
         </mj-text>
-        <mj-button href="${sponsorship.url}" align="left" padding="14px 0 0 0">${escape(cta)}</mj-button>`,
+        <mj-button href="${safeUrl(sponsorship.url)}" align="left" padding="14px 0 0 0">${escape(cta)}</mj-button>`,
   });
 
   if (withRules === false) {
@@ -487,7 +487,7 @@ function sectionCard({ section, imagePath, theme, padding, background, imageBord
   const imageMjml = imagePath ? `
         <mj-image src="${escape(imagePath)}" alt="${escape(section.title)}" padding="0" border-radius="${imageBorderRadius || '8px 8px 0 0'}" />` : '';
   const ctaMjml = section.cta?.label && section.cta?.url ? `
-        <mj-button href="${section.cta.url}" padding="16px 0 0 0">${escape(section.cta.label)}</mj-button>` : '';
+        <mj-button href="${safeUrl(section.cta.url)}" padding="16px 0 0 0">${escape(section.cta.label)}</mj-button>` : '';
 
   return `
     <mj-section background-color="${background || '#ffffff'}" padding="${padding || `24px ${gutter} 8px ${gutter}`}">
@@ -517,7 +517,7 @@ function transactionalSignoffBlock({ data, theme }) {
       ? `<mj-image src="${escape(signoff.image)}" alt="${escape(signoff.name)}" width="60px" border-radius="50%" padding="0 0 12px 0" />`
       : '';
     const linkMjml = signoff.url
-      ? `<br/><a href="${signoff.url}" style="color: ${theme.primaryColor}; font-size: 14px;">${escape(signoff.urlText || signoff.url)}</a>`
+      ? `<br/><a href="${safeUrl(signoff.url)}" style="color: ${theme.primaryColor}; font-size: 14px;">${escape(signoff.urlText || signoff.url)}</a>`
       : '';
 
     return singleColumnSection({
@@ -581,6 +581,7 @@ module.exports = {
   // helpers
   markdownToHtml,
   escape,
+  safeUrl,
   inlineMarkdown,
   formatAddress,
   resolveTheme,

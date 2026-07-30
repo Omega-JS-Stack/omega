@@ -40,6 +40,7 @@ const { frameworkDependencyNames, frameworkDepsPattern } = require('@omega.js/de
 const { collectLayered } = require('./layers.js');
 const { collectSectionAssets } = require('./sections.js');
 const { stripDevBlocksPlugin } = require('./strip-dev-blocks.js');
+const { checkThemeVocabulary } = require('./theme-vocabulary.js');
 
 // A page file is an ENTRY when it's a per-page index.js/index.scss, or a flat
 // file at most two segments below pages/ (pages/index.js, pages/blog/[slug].js).
@@ -150,6 +151,8 @@ function resolvePageAsset(map, base) {
  *   (data-omega-section/-component attributes, boot.js bootSections)
  * @param {boolean} [options.dev] - dev mode: stable (un-hashed) names, no minify —
  *   asset rebuilds keep their URLs so rendered HTML stays valid without a re-render
+ * @param {function} [options.warn] - warning sink for the theme fall-through
+ *   guard (default the devkit logger)
  * @param {'css'|'js'} [options.only] - rebuild just one half (dev watcher
  *   narrowing: a css-only rebuild writes no js files, so the dev server
  *   hot-swaps stylesheets instead of full-reloading; dev's stable names make
@@ -322,7 +325,11 @@ async function buildAssets(options) {
   const mainScss = collectLayered(cssDirs, /^main\.scss$/).get('main.scss');
   if (mainScss) {
     const ownerRoot = path.dirname(path.dirname(mainScss));
-    manifest.css.main = emitCss(compileScss(mainScss, ownerRoot), 'main');
+    const mainCss = compileScss(mainScss, ownerRoot);
+    manifest.css.main = emitCss(mainCss, 'main');
+    // #98: the compiled bundle is the only honest place to ask whether the
+    // active theme reached the classy fall-through vocabulary at all.
+    checkThemeVocabulary({ css: mainCss, themeRoots, warn: options.warn });
   }
 
   // Page css: base entries come from NON-theme layers (site, core); the theme

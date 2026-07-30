@@ -469,6 +469,12 @@ const TARGET_SCHEMAS = {
       description: 'Boot-complete signal for `mgr cdp relaunch` — a URL substring matched against CDP page targets.',
     },
     {
+      path:        'releases.enabled',
+      type:        'boolean',
+      required:    false,
+      description: 'One switch for the release surface: false suppresses the site\'s derived download links AND desktop publishing (electron-builder publish). Site derivation defaults true only when the releases block exists; desktop publishing defaults true regardless.',
+    },
+    {
       path:        'releases.repo',
       type:        'string',
       required:    false,

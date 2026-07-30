@@ -76,7 +76,8 @@ RouteContext.prototype.init = function (ref, options) {
   self.meta.startTime.timestamp = now.toISOString();
   self.meta.startTime.timestampUNIX = Math.round((now.getTime()) / 1000);
 
-  self.meta.name = options.functionName || process.env.FUNCTION_TARGET || 'unnamed';
+  // Outside a function invocation (CLI lane, internal helpers) the module is the manager core.
+  self.meta.name = options.functionName || process.env.FUNCTION_TARGET || 'manager';
   self.meta.environment = options.environment || self.getEnvironment();
   self.meta.type = options.functionType || process.env.FUNCTION_SIGNATURE_TYPE || 'unknown';
 

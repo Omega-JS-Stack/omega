@@ -27,6 +27,7 @@ const { SAMPLE_SETS, resolveAnchor, generateSampleSet, hasOwnContent } = require
 const { composePricing } = require('./pricing.js');
 const { composeBrandTokens } = require('./brand-tokens.js');
 const { resolveFontAwesomeRoots } = require('@omega.js/devkit/icons');
+const { ogLocale } = require('@omega.js/devkit/translate');
 const { PATHS } = require('./paths.js');
 
 const logger = new Logger('engine');
@@ -572,6 +573,10 @@ function configureOmega(eleventyConfig, options) {
     ...(site.uj || {}),
   };
   eleventyConfig.addGlobalData('site', site);
+  // og:locale wants Open Graph's language_TERRITORY form (en → en_US), and the
+  // code → locale map is the devkit language SSOT — the head include cannot
+  // derive it in Liquid, so it arrives as a computed global.
+  eleventyConfig.addGlobalData('ogLocale', ogLocale(site.translation?.default || 'en'));
   // `dev` rides the jekyll global into the Configuration chrome (N7): `omega
   // dev` passes { ports } with the resolved map; production builds pass
   // nothing → null, and @omega.js/client falls back to the classic ports.

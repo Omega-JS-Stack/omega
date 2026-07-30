@@ -4,6 +4,13 @@
  * Every level in LOG_LEVELS becomes a ctx method (ctx.log/warn/error/info/debug/
  * notice/critical/emergency). Console in any non-production environment; the
  * Firebase Cloud logger in production for levels console lacks.
+ *
+ * Every line opens with the ONE identity tag, `[@omega.js/backend:<module>]`
+ * ([#121](https://github.com/Omega-JS-Stack/omega/issues/121)) — the module
+ * segment is the invocation's function name, which the ctx already knows.
+ * Backend is server-side: Cloud Logging (and the emulator) stamps every entry,
+ * so the tag stands alone with no timestamp bracket. The invocation id and any
+ * log prefix follow the tag.
  */
 
 const LOG_LEVELS = {
@@ -17,14 +24,20 @@ const LOG_LEVELS = {
   emergency: 'EMERGENCY',
 };
 
+// The ONE identity tag. The module segment is the function name the ctx resolved
+// at init (options.functionName || FUNCTION_TARGET || 'manager').
+function identityTag(ctx) {
+  return `[@omega.js/backend:${ctx.meta?.name || 'unnamed'}]`;
+}
+
 const methods = {
   _log() {
     const self = this;
     const logs = [...arguments];
     const prefix = self.logPrefix ? ` ${self.logPrefix}:` : ':';
 
-    // Prepend log prefix log string
-    logs.unshift(`[${new Date().toISOString()}] ${self.tag}${prefix}`);
+    // Prepend the identity tag, the invocation id, and the log prefix
+    logs.unshift(`${identityTag(self)} ${self.id}${prefix}`);
 
     // Get the log level
     const level = logs[1];

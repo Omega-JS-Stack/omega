@@ -47,14 +47,8 @@ const STATIC_TAG = /^[A-Za-z@][\w .:@/-]*$/;
 // Test harnesses and fixtures are stand-ins for consumer code, not OMEGA output.
 const EXEMPT_PATH = /(^|\/)(test|tests|fixtures|harness)(\/|$)/;
 
-// @omega.js/backend is exempt, deliberately and temporarily: its Cloud Functions
-// lineage logs through the function context (`ctx.log`), which emits no identity
-// tag at all yet, and its remaining brackets ([skip], [expire], [authenticated],
-// [test-mode]) classify RECORDS inside one function rather than naming a module —
-// so they are not the hand-written module tags this guard exists to stop. Giving
-// backend the tag is its own step (issue #121); until then this scan does
-// not pretend the package is clean.
-const EXEMPT_PACKAGES = new Set(['backend']);
+// No package is exempt (backend joined the contract in issue #121).
+const EXEMPT_PACKAGES = new Set();
 
 // Scan one source string; returns [{ tag, method }] for every hand-written tag.
 function findHandWrittenTags(source) {

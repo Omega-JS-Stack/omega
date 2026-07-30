@@ -67,11 +67,45 @@ Email bodies arrive from two very different places, so `renderContent()` has two
 
 Rules for the trusted lane:
 
-- A caller may set `trustedContent: true` ONLY for markup it authored itself.
+- A caller may set `trustedContent: true` ONLY for markup it authored itself — and only an INTERNAL caller may set it at all, see [Internal-only send fields](#internal-only-send-fields).
 - Every third-party or AI-authored value interpolated into that markup must go through `escapeHtml()` (`constants.js`) first — otherwise the trusted lane becomes an injection lane. Both current trusted callers do this for their webhook/AI values.
-- `data.content.html` is a raw-HTML passthrough by declaration; never point it at untrusted input.
+- Every URL interpolated into an `href` must go through `safeUrl()` (`constants.js`), not `escapeHtml()` — see [Link schemes](#link-schemes).
+- `data.content.html` is a raw-HTML passthrough by declaration — INTERNAL callers only, see [Internal-only send fields](#internal-only-send-fields).
 
 Newsletter template rendering (`generators/lib/templates/newsletter-shared.js`) is independently `html: false` — those bodies are always AI-authored — and escapes every AI field it interpolates via the shared `escapeHtml()`.
+
+### Internal-only send fields
+
+Three send/campaign fields hand the renderer raw HTML, or the trust to render it. Each is a real first-party lane AND a complete bypass of the escaped one, so first-party callers keep all three and **no caller arriving over the API may set any of them**. Ian's call on [#90](https://github.com/Omega-JS-Stack/omega/issues/90).
+
+| Field | What it does | Its internal user |
+|---|---|---|
+| `data.content.html` | Skips markdown — the body lands in the inbox as live markup | Pre-rendered first-party bodies |
+| `contentHtml` (top level) | Same, on the campaign lane — read AHEAD of the escaped renderer (`marketing/index.js`), and it persists into the stored campaign doc that cron sends later | `generators/newsletter.js` |
+| `trustedContent` | Flips the body renderer to `html: true` (raw HTML *and* `javascript:` hrefs survive) | The dispute alert + the newsletter report email |
+
+| Lane | All three fields |
+|---|---|
+| Internal callers (generators, transition handlers, cron, auth hooks) | Accepted — unchanged |
+| `POST /admin/email` (the surface behind the MCP `send_email` tool) | **Rejected**, coded 400 |
+| `POST` / `PUT /marketing/campaign` (the MCP `create_campaign` / `update_campaign` tools) | **Rejected**, coded 400 |
+
+The check is one shared helper over one field table: `prepare.internalOnlyFieldFault(settings)` returns a coded-400 permanent fault (naming the offending field and the rule) when the caller's raw settings carry any of them, else null. Every caller-facing email lane runs its raw settings through it BEFORE handing them to the library — and, on the campaign routes, before `buildCampaignDoc()`, which blacklists doc-level fields rather than allowlisting and would otherwise persist whatever the caller sent. An external lane added later must do the same. Rejection is on the FIELD's presence, not its contents: an external caller has no legitimate reason to send any of these keys at all, and the rejection is logged by field name (never the payload).
+
+Two of the three (`contentHtml`, `trustedContent`) are also undeclared on the route schemas, and a zod object strips unknown keys — that strip is the belt, this guard the braces, and it is the guard that holds the moment a schema gains the field or a consumer route forwards raw settings. `data.content.html` has no belt: `data` is a schema passthrough, so the guard is its only stop.
+
+`settings.html` — the documented top-level raw-HTML override on `POST /admin/email` — is deliberately NOT in this table; it is a declared capability of the route and the MCP tool, tracked separately in [#125](https://github.com/Omega-JS-Stack/omega/issues/125).
+
+Markdown in `data.content.message` is the external caller's lane, and it renders through the untrusted (escaped) renderer.
+
+### Link schemes
+
+An `href` is not made safe by `escapeHtml()` — `javascript:alert(1)` survives escaping intact, and third-party or AI-authored URLs (a dispute alert's `stripeUrl`, a newsletter source's `url`, an AI-written CTA) land in exactly that position. Every URL interpolated into an href goes through `safeUrl()` (`constants.js`) instead:
+
+- **Allowed**: `http:`, `https:`, `mailto:`, and relative/anchor values (no scheme — they cannot carry script). The kept value is still `escapeHtml()`d, which also closes attribute-breakout via a quote in the URL.
+- **Dropped**: everything else (`javascript:`, `data:`, `vbscript:`, `file:`), including the obfuscated forms clients still execute — whitespace, control characters, and zero-width/format characters inside the scheme (`java<TAB>script:`, `java<ZWSP>script:`) are all stripped before the scheme is matched. The href comes back empty — the link goes dead — and the drop is logged. It does not throw: one bad URL inside a webhook or AI payload must not take down the whole alert email.
+
+Markdown LINKS need no extra guard — markdown-it's own `validateLink` blocks these schemes in `[text](url)` syntax on both lanes. It is not a guard on the trusted lane's raw HTML: an `<a href="javascript:...">` written directly into a `trustedContent` body is markup, not markdown link syntax, so `validateLink` never sees it. That anchor is the caller's responsibility — hence the `safeUrl()` rule above, and hence `trustedContent` being internal-only.
 
 ### Transactional Pipeline (`transactional/index.js`)
 

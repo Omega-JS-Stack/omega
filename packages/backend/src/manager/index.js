@@ -412,7 +412,7 @@ Manager.prototype.init = function (exporter, options) {
         // explicitly opted in. Intentional positive check — we never want test-run errors
         // polluting production Sentry.
         if (!self.isProduction() && !self.options.reportErrorsInDev) {
-          self.ctx.error(new Error('[Sentry] Skipping Sentry because we\'re not in production'), hint)
+          self.ctx.error(new Error('Skipping Sentry because we\'re not in production'), hint)
           return null;
         }
         event.tags = event.tags || {};
@@ -1323,9 +1323,9 @@ function setupTestModeWatcher(manager) {
   const initial = readTestMode(projectDir);
   const changed = applyEnvFromFile(initial);
   for (const c of changed) {
-    manager.ctx.log(`[test-mode] sync ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
+    manager.ctx.log(`test-mode sync ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
   }
-  manager.ctx.log(`[test-mode] resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
+  manager.ctx.log(`test-mode resolved TEST_EXTENDED_MODE=${!!process.env.TEST_EXTENDED_MODE} (file ${initial ? 'present' : 'absent'})`);
 
   // Ensure .temp/ exists so we can watch the directory (fs.watch on a missing
   // path throws synchronously). Watching the directory rather than the file
@@ -1342,11 +1342,11 @@ function setupTestModeWatcher(manager) {
       const next = readTestMode(projectDir);
       const flipped = applyEnvFromFile(next);
       for (const c of flipped) {
-        manager.ctx.log(`[test-mode] flip ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
+        manager.ctx.log(`test-mode flip ${c.key}: ${c.was || '(unset)'} → ${c.now || '(unset)'}`);
       }
     });
   } catch (e) {
-    manager.ctx.log(`[test-mode] watcher failed to install (${e.message}), live sync disabled`);
+    manager.ctx.log(`test-mode watcher failed to install (${e.message}), live sync disabled`);
   }
 }
 

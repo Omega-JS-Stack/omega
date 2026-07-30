@@ -14,6 +14,18 @@
 // CSS custom properties (light/dark bridge)
 @import 'css/base/root';
 
+// ── The classy app/auth FLOOR (cp190, #98) ──────────────────────────────────
+// A full sibling theme (own Bootstrap) reaches the shared fall-through
+// vocabulary by importing classy's token-pure partials directly — they paint
+// through THIS theme's token re-values. EARLY on purpose: the floor sits under
+// the theme's own voice. Contract: docs/shared/theming.md § "CSS fall-through".
+@import '../classy/css/layout/shell';
+@import '../classy/css/layout/footer';
+@import '../classy/css/app/panels';
+@import '../classy/css/pages/auth';
+@import '../classy/css/components/receipt';
+@import '../classy/css/components/badges';
+
 // Base styles
 @import 'css/base/typography';
 @import 'css/base/utilities';

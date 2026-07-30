@@ -1,0 +1,9 @@
+// A PARTIAL theme that skips the inheritance hatch (#98): no
+// `@forward 'omega:theme'`, no floor imports, no Bootstrap of its own — it
+// re-values tokens and stops. It builds fine, and every framework page it
+// does not cover (auth, account, legal) renders classy-* markup UNSTYLED.
+// The fall-through guard's red fixture for the HATCH lane.
+:root {
+  --hatchless-marker: 1;
+  --omega-accent: #b30000;
+}

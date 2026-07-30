@@ -5,7 +5,7 @@
  * Config contract (shared `translation` section of omega.json5):
  *   { enabled, default, languages, provider, model, exclude }
  */
-const { LANGUAGE_NAMES, RTL_LANGUAGES, isRTL, languageName, assertKnownLanguages } = require('./languages.js');
+const { LANGUAGE_NAMES, LANGUAGE_LOCALES, RTL_LANGUAGES, isRTL, languageName, ogLocale, assertKnownLanguages } = require('./languages.js');
 const { PROVIDERS, DEFAULT_MODELS, resolveProvider } = require('./providers.js');
 const { translateStrings, preserveWhitespace, CONTROL, BATCH_SIZE } = require('./engine.js');
 const { hashKey, cachePath, loadCache, saveCache } = require('./cache.js');
@@ -34,7 +34,7 @@ function resolveTranslationSettings(config) {
 
 module.exports = {
   // languages
-  LANGUAGE_NAMES, RTL_LANGUAGES, isRTL, languageName, assertKnownLanguages,
+  LANGUAGE_NAMES, LANGUAGE_LOCALES, RTL_LANGUAGES, isRTL, languageName, ogLocale, assertKnownLanguages,
   // providers
   PROVIDERS, DEFAULT_MODELS, resolveProvider,
   // engine

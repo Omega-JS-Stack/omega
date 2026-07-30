@@ -70,7 +70,7 @@ test('derives the desktop releases URL: playground parity (org + brand.id)', () 
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
     github: { org: 'Omega-JS-Stack' },
-    targets: { desktop: {} },
+    targets: { desktop: { releases: {} } },
   });
 
   // The literal value the playground used to hand-write.
@@ -89,15 +89,75 @@ test('desktop releases URL: releases.repo wins over github.repo wins over brand.
     'https://github.com/Acme-Org/update-server/releases/latest',
   );
   assert.strictEqual(
-    toSiteGlobal({ ...base, targets: { desktop: {} } }).targets.desktop.releasesUrl,
+    toSiteGlobal({ ...base, targets: { desktop: { releases: {} } } }).targets.desktop.releasesUrl,
     'https://github.com/Acme-Org/acme-site/releases/latest',
   );
 });
 
 test('desktop releases URL omitted without a github org', () => {
-  const site = toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: {} } });
+  const site = toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: { releases: {} } } });
   assert.strictEqual(site.targets.desktop.enabled, true);
   assert.strictEqual(site.targets.desktop.releasesUrl, undefined);
+});
+
+// ── the releases opt-in gate (#124) ───────────────────────────────────────
+
+test('a bare desktop target derives nothing — no releases config, no links', () => {
+  const site = toSiteGlobal({
+    brand: { id: 'acme' },
+    github: { org: 'Acme-Org', repo: 'acme-site' },
+    targets: { desktop: { app: { category: 'utilities' } } },
+  });
+
+  assert.deepStrictEqual(site.targets.desktop, { enabled: true });
+  assert.strictEqual(site.download, undefined);
+});
+
+test('a present releases block opts in (enabled defaults true)', () => {
+  const url = 'https://github.com/Acme-Org/acme-site/releases/latest';
+  const base = { brand: { id: 'acme' }, github: { org: 'Acme-Org', repo: 'acme-site' } };
+
+  for (const releases of [{}, { enabled: true }, { repo: 'acme-site' }]) {
+    const site = toSiteGlobal({ ...base, targets: { desktop: { releases } } });
+    assert.strictEqual(site.targets.desktop.releasesUrl, url);
+    assert.strictEqual(site.download.mac.universal, url);
+  }
+});
+
+test('releases.enabled false always suppresses the derivation', () => {
+  const site = toSiteGlobal({
+    brand: { id: 'acme' },
+    github: { org: 'Acme-Org', repo: 'acme-site' },
+    targets: { desktop: { releases: { enabled: false, repo: 'update-server' } } },
+  });
+
+  assert.deepStrictEqual(site.targets.desktop, { enabled: true });
+  assert.strictEqual(site.download, undefined);
+});
+
+test('an explicit download map still wins on a suppressed (or bare) desktop target', () => {
+  const explicit = { mac: { universal: 'https://acme.com/dl/mac' } };
+  const base = { brand: { id: 'acme' }, github: { org: 'Acme-Org' }, download: explicit };
+
+  assert.deepStrictEqual(toSiteGlobal({ ...base, targets: { desktop: {} } }).download, explicit);
+  assert.deepStrictEqual(
+    toSiteGlobal({ ...base, targets: { desktop: { releases: { enabled: false } } } }).download,
+    explicit,
+  );
+});
+
+test('double application is idempotent for a bare and a suppressed desktop target', () => {
+  for (const desktop of [{}, { releases: { enabled: false, repo: 'update-server' } }]) {
+    const once = toSiteGlobal({
+      brand: { id: 'acme' },
+      github: { org: 'Acme-Org', repo: 'acme-site' },
+      targets: { desktop },
+    });
+    const twice = toSiteGlobal(once);
+
+    assert.strictEqual(once.download, undefined);
+    assert.deepStrictEqual(twice, once);
+  }
 });
 
 test('exposes extension listings on site.targets.extension', () => {
@@ -124,7 +184,7 @@ test('derives site.download from the desktop target when no explicit map exists'
   const site = toSiteGlobal({
     brand: { id: 'omega-playground' },
     github: { org: 'Omega-JS-Stack' },
-    targets: { desktop: {} },
+    targets: { desktop: { releases: {} } },
   });
 
   const url = 'https://github.com/Omega-JS-Stack/omega-playground/releases/latest';
@@ -142,7 +202,7 @@ test('explicit download map wins over the derivation', () => {
     brand: { id: 'acme' },
     github: { org: 'Acme-Org' },
     download: explicit,
-    targets: { desktop: {} },
+    targets: { desktop: { releases: {} } },
   });
 
   assert.deepStrictEqual(site.download, explicit);
@@ -150,7 +210,10 @@ test('explicit download map wins over the derivation', () => {
 
 test('no desktop target (or no derivable URL) leaves site.download absent', () => {
   assert.strictEqual(toSiteGlobal({ brand: { id: 'acme' }, github: { org: 'X' } }).download, undefined);
-  assert.strictEqual(toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: {} } }).download, undefined);
+  assert.strictEqual(
+    toSiteGlobal({ brand: { id: 'acme' }, targets: { desktop: { releases: {} } } }).download,
+    undefined,
+  );
 });
 
 test('derives site.extension store URLs from listings when no explicit map exists', () => {

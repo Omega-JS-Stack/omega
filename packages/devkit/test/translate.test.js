@@ -21,8 +21,10 @@ const {
   loadCache,
   saveCache,
   LANGUAGE_NAMES,
+  LANGUAGE_LOCALES,
   isRTL,
   languageName,
+  ogLocale,
   assertKnownLanguages,
   resolveTranslationSettings,
 } = require('../src/translate/index.js');
@@ -209,6 +211,22 @@ test('language SSOT: names, RTL, unknown-code rejection', () => {
   assert.ok(isRTL('ar') && !isRTL('es'));
   assert.ok(Object.keys(LANGUAGE_NAMES).length >= 30);
   assert.throws(() => assertKnownLanguages(['es', 'klingon']), /klingon/);
+});
+
+test('ogLocale: Open Graph language_TERRITORY form for every supported code', () => {
+  assert.strictEqual(ogLocale('en'), 'en_US');
+  assert.strictEqual(ogLocale('es'), 'es_ES');
+  assert.strictEqual(ogLocale('ar'), 'ar_AR');
+  assert.strictEqual(ogLocale('no'), 'nb_NO', 'Norwegian carries the bokmal territory');
+
+  // Every target language is mapped, and every locale is language_TERRITORY
+  for (const code of Object.keys(LANGUAGE_NAMES)) {
+    assert.match(ogLocale(code), /^[a-z]{2}_[A-Z]{2}$/, `${code} has a locale`);
+  }
+  assert.strictEqual(Object.keys(LANGUAGE_LOCALES).length, Object.keys(LANGUAGE_NAMES).length + 1, 'the map is the language set plus en');
+
+  // Unmapped source language falls back to the bare code
+  assert.strictEqual(ogLocale('xx'), 'xx');
 });
 
 test('resolveTranslationSettings: defaults + gating', () => {

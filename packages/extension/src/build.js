@@ -67,6 +67,20 @@ Manager.getBuildErrorNotificationArgs = function (plugin, message) {
   ];
 };
 
+// notifly is an optional local nicety, so a MISSING BINARY is one friendly note —
+// never the raw `spawn notifly ENOENT` dump that used to land after a suite (#123).
+// Every other spawn failure keeps the logged-not-thrown error path from #104.
+Manager.reportNotificationFailure = function (error) {
+  const logger = new (require('./lib/logger'))('build-error');
+
+  if (error && error.code === 'ENOENT') {
+    return logger.warn('notifly not installed — skipping desktop notification');
+  }
+
+  return logger.error('Failed to send notification', error);
+};
+Manager.prototype.reportNotificationFailure = Manager.reportNotificationFailure;
+
 // Report build errors with notification
 Manager.reportBuildError = function (error, callback) {
   const logger = new (require('./lib/logger'))('build-error');
@@ -76,9 +90,7 @@ Manager.reportBuildError = function (error, callback) {
   const errorPlugin = error.plugin || 'Build';
 
   spawn('notifly', Manager.getBuildErrorNotificationArgs(errorPlugin, errorMessage), { shell: false, stdio: 'ignore' })
-    .on('error', (e) => {
-      logger.error('Failed to send notification', e);
-    });
+    .on('error', (e) => Manager.reportNotificationFailure(e));
 
   // Log the error
   logger.error(`[${errorPlugin}] ${errorMessage}`);

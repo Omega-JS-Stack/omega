@@ -18,6 +18,7 @@ const {
   shell,
   resolveTheme,
   escape,
+  safeUrl,
   markdownToHtml,
   inlineMarkdown,
   singleColumnSection,
@@ -278,7 +279,7 @@ function editorialSection({ section, imagePath, theme, index, total }) {
     ? singleColumnSection({
       background: WHITE,
       padding: `8px ${gutter} 0 ${gutter}`,
-      content: `<mj-button href="${safeSection.cta.url}" align="left">${escape(safeSection.cta.label)} &nbsp;→</mj-button>`,
+      content: `<mj-button href="${safeUrl(safeSection.cta.url)}" align="left">${escape(safeSection.cta.label)} &nbsp;→</mj-button>`,
     })
     : '';
 

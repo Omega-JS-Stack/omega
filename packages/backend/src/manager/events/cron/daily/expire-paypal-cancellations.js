@@ -35,12 +35,12 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
 
       // Double-check: skip if expires is in the future
       if (!sub?.expires?.timestampUNIX || sub.expires.timestampUNIX > nowUNIX) {
-        ctx.log(`[skip] ${uid}: expires=${sub?.expires?.timestamp || 'null'} is still in the future (now=${nowStr})`);
+        ctx.log(`skip ${uid}: expires=${sub?.expires?.timestamp || 'null'} is still in the future (now=${nowStr})`);
         skipped++;
         continue;
       }
 
-      ctx.log(`[expire] ${uid}: expires=${sub.expires.timestamp}, product=${sub.product?.id}, processor=${sub.payment?.processor}, orderId=${sub.payment?.orderId || 'null'}`);
+      ctx.log(`expire ${uid}: expires=${sub.expires.timestamp}, product=${sub.product?.id}, processor=${sub.payment?.processor}, orderId=${sub.payment?.orderId || 'null'}`);
 
       // Snapshot the before state for transition detection
       const before = { ...sub };
@@ -58,13 +58,13 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
       // Write to Firestore
       await doc.ref.set({ subscription: after }, { merge: true });
 
-      ctx.log(`[expire] ${uid}: Updated status=cancelled, cancellation.pending=false`);
+      ctx.log(`expire ${uid}: Updated status=cancelled, cancellation.pending=false`);
 
       // Detect and dispatch transition (should fire 'subscription-cancelled')
       const transitionName = transitions.detectTransition('subscription', before, after, null);
 
       if (transitionName) {
-        ctx.log(`[expire] ${uid}: Transition detected: subscription/${transitionName}`);
+        ctx.log(`expire ${uid}: Transition detected: subscription/${transitionName}`);
 
         // Build minimal order context for the handler
         const order = {
@@ -85,7 +85,7 @@ module.exports = async ({ Manager, ctx, context, libraries }) => {
           ctx,
         });
       } else {
-        ctx.log(`[expire] ${uid}: No transition detected (before.status=${before.status}, after.status=${after.status})`);
+        ctx.log(`expire ${uid}: No transition detected (before.status=${before.status}, after.status=${after.status})`);
       }
 
       processed++;

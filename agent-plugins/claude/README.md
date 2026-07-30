@@ -27,7 +27,7 @@ agent-plugins/
     ├── .claude-plugin/plugin.json   the manifest
     ├── .mcp.json                    the one MCP declaration — the @omega.js/mcp-router endpoint
     ├── README.md                    this file
-    ├── hooks/                       hooks.json + the inject hook that loads a skill
+    ├── hooks/                       hooks.json, the inject/shape/quality hooks, and lib/ (the shared scope guard)
     └── skills/                      the skills, one directory each (see skills/README.md)
 ```
 
@@ -53,8 +53,22 @@ Every row also matches the manifest's own `name`, which is what covers working i
 
 Each skill is asked for once per session (a marker file under `TMPDIR`, keyed on the session id). The hook fails open — no `package.json`, unparseable JSON, no `jq`, and it exits silently without touching the prompt. Behavior is covered by the inject cases in `scripts/agent-plugins.test.js`, which run the script directly against fixture projects.
 
+## The quality hook
+
+The three quality skills do not wait to be remembered. `hooks/quality/run.sh` serves two events from one script — so the surface table has one home — and fires them off the files a session actually edits:
+
+| Surface written or edited | Skills asked for |
+|---|---|
+| a page (`*/pages/*.html`, `*/pages/*.md`), a layout, a `.liquid` template | `omega:seo`, `omega:accessibility` |
+| the core head/foot chrome | `omega:seo`, `omega:accessibility` |
+| an include, section, or component partial; page/core JS | `omega:accessibility` |
+| `.scss` / `.css` | `omega:accessibility`, `omega:brandcheck` |
+| `omega.json5`, section data JSON, a section schema | `omega:brandcheck` |
+
+On `PostToolUse` (Write|Edit) a match names its skills once per session per skill and records the file. On `Stop` the recorded list comes back as a block: the surfaces edited this session, the checklists they owe, and a refusal to sign off on an unreviewed pass. The block runs once per batch of edits (the list clears, so a later edit re-arms it) and never inside its own turn (`stop_hook_active`). Same scope guard as the shape hook, literally: both source `hooks/lib/omega-scope.sh`, which walks up from the edited file to the nearest `package.json` (stopping at the git root) and answers whether that project is or depends on `@omega.js/*`. The inject hook asks a different question — a project from a cwd, with its `functions/` manifest joined in — and keeps its own walk. Fail-open throughout. Covered by the quality cases in `scripts/agent-plugins.test.js`.
+
 ## What is here, and what is not built yet
 
-Eight skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), and `browser` (driving the MCP router's Chrome upstreams). Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
+Eleven skills — `main` (the hub: the package roster, the docs topology, the brand map, where project state lives), one router per package a session works in (`web`, `backend`, `desktop`, `extension`, `client`, `manager`), `browser` (driving the MCP router's Chrome upstreams), and the three quality checklists (`seo`, `accessibility`, `brandcheck`) the quality hook fires on web-surface edits. Each one names where the knowledge lives, in the monorepo and in a consumer project, and carries only the handful of rules a session needs before it knows which document to open. One thing is still open.
 
 **The staleness mechanism.** This is the point of the move, not a bonus. Whatever ships needs something that fails when a skill names an export, a path, a config key, or a CLI command the code no longer has. A test in this repo is the strongest form; a generated section is next; a review trigger tied to a release is the floor. A plugin that goes stale quietly has only relocated the problem.

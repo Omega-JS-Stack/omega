@@ -3,6 +3,10 @@
 > classy v2 (the flagship skin) + the shared machinery every theme and, at C4,
 > every target rides. Visual spec: [docs/web/classy-v2/DIRECTION.md](../web/classy-v2/DIRECTION.md).
 
+The one-hex/one-token half of this contract is checkable per edit: the plugin's `omega:brandcheck` skill,
+[agent-plugins/claude/skills/brandcheck/SKILL.md](../../agent-plugins/claude/skills/brandcheck/SKILL.md), and
+its quality hook fires on every stylesheet edit (contrast, focus, and reduced-motion checks ride `omega:accessibility`).
+
 ## The three layers
 
 1. **Tokens** — `packages/web/core/css/tokens/_index.scss` emits the
@@ -96,8 +100,18 @@ proven:
   re-inks it), `app/panels` (table/statgrid/iconbtn/count), `pages/auth`,
   `components/receipt`, `components/badges` (chips/dot-status). Import
   EARLY (the floor sits UNDER the theme's voice, so later theme rules win
-  collisions like classy's `.badge` base). Live model:
-  `themes/newsflash/_theme.scss`.
+  collisions like classy's `.badge` base). Live models:
+  `themes/newsflash/_theme.scss`, `themes/neobrutalism/_theme.scss`.
+
+**The guard ([#98](https://github.com/Omega-JS-Stack/omega/issues/98))**: the web
+asset lane reads the COMPILED main bundle for three sentinels the two lanes both
+guarantee — `.classy-auth`, `.classy-statgrid`, `.classy-footer`, one per
+fall-through surface (the other floor partials ride along unsentineled) — and a
+non-classy theme missing ANY of them gets one loud build WARNING (never a failure)
+naming the theme, the missing piece (hatch vs floor — decided by whether the
+bundle defines `--bs-body-bg`, i.e. whether the theme ships its own Bootstrap),
+and the exact line to add. `packages/web/src/theme-vocabulary.js`; every bundled
+theme is silent, pinned in `test/themes.test.js` ("fall-through guard").
 
 Rule for classy authors: app/auth vocabulary partials MUST stay token-pure
 — a Sass config dependency there breaks every sibling theme's floor.

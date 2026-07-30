@@ -25,6 +25,28 @@ const PAGE = (title, body) => `<!doctype html><html lang="en" dir="ltr"><head>
 <link rel="alternate" href="https://mini.co/" hreflang="en"/>
 </head><body>${body}</body></html>`;
 
+// The built sitemap as defaults/pages/sitemap.html emits it (source language
+// only, entries in loc byte order, the home loc bare)
+const SITEMAP_ENTRY = (loc, priority) => `  <url>
+    <loc>${loc}</loc>
+    <lastmod>2026-07-29T00:00:00.000Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>${priority}</priority>
+  </url>`;
+
+const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml"
+  >
+${[
+    SITEMAP_ENTRY('https://mini.co', '1.0'),
+    SITEMAP_ENTRY('https://mini.co/about', '0.5'),
+    SITEMAP_ENTRY('https://mini.co/checkout', '0.5'),
+  ].join('\n')}
+</urlset>
+`;
+
 /** Stage a consumer root with a built dist. */
 function stage() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-wtr-'));
@@ -49,6 +71,7 @@ function stage() {
   write('admin/panel/index.html', PAGE('Admin', '<p>Secret admin copy</p>'));
   write('skipme/index.html', PAGE('Skipped', '<p>User-excluded page</p>'));
   write('twitter.html', PAGE('Social redirect', '<p>Social</p>'));
+  write('sitemap.xml', SITEMAP);
 
   return { root, dist };
 }
@@ -106,9 +129,10 @@ test('translateSite: copies, chrome, links, exclusions, alternates, cache', asyn
   assert.ok(es.includes('dir="ltr"'));
   assert.ok(es.includes('<link rel="canonical" href="https://mini.co/es"'));
   assert.ok(es.includes('content="https://mini.co/es"'), 'og:url localized');
-  assert.ok(es.includes('property="og:locale" content="es"'));
-  assert.ok(es.includes('og:locale:alternate" content="en"'));
-  assert.ok(es.includes('og:locale:alternate" content="ar"'));
+  assert.ok(es.includes('property="og:locale" content="es_ES"'), 'og:locale in Open Graph language_TERRITORY form');
+  assert.ok(es.includes('og:locale:alternate" content="en_US"'));
+  assert.ok(es.includes('og:locale:alternate" content="ar_AR"'));
+  assert.ok(!es.includes('og:locale:alternate" content="es"'), 'no bare-code locale alternates');
 
   // Links: internal rewritten, excluded + external untouched
   assert.ok(es.includes('href="/es/about"'));
@@ -163,11 +187,13 @@ test('translateSite: only-filter limits the run to one page', async () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('translateSite: provider failure falls back to source text and reports', async () => {
+test('translateSite: provider failure skips the page-language pair whole and warns loudly', async () => {
   const { root, dist } = stage();
+  const warnings = [];
 
   const stats = await translateSite({
-    root, outDir: dist, config: { ...CONFIG, translation: { languages: ['es', 'ar'] } },
+    root, outDir: dist, config: CONFIG,
+    logger: { log: () => {}, warn: (m) => warnings.push(m), error: () => {} },
     send: async ({ user }) => {
       const lang = user.match(/^Target language: (\S+)/)[1];
       if (lang === 'ar') {
@@ -181,10 +207,42 @@ test('translateSite: provider failure falls back to source text and reports', as
   assert.ok(stats.failures.length >= 1);
   assert.ok(stats.failures.every((f) => f.startsWith('ar ')), 'only ar failed');
 
-  // The ar page still ships, carrying the source text
-  const ar = fs.readFileSync(path.join(dist, 'ar.html'), 'utf8');
-  assert.ok(ar.includes('Grow faster with MiniCo'), 'source text kept on failure');
-  assert.ok(ar.includes('lang="ar"'), 'chrome still localized');
+  // No mixed-language copy: the ar pair is skipped whole, like a cold cache
+  assert.ok(!fs.existsSync(path.join(dist, 'ar.html')), 'no half-translated language home');
+  assert.ok(!fs.existsSync(path.join(dist, 'ar')), 'no half-translated ar copies at all');
+
+  // The failure is loud, naming the page and the language
+  const loud = warnings.filter((m) => m.includes('[ar]') && m.includes('boom') && /skipped/i.test(m));
+  assert.strictEqual(loud.length, 2, 'both translatable pages warn by page + language');
+  assert.strictEqual(stats.failures.length, 2);
+
+  // es still ships, and it never advertises the language that failed
+  const es = fs.readFileSync(path.join(dist, 'es.html'), 'utf8');
+  assert.ok(es.includes('Grow faster with MiniCo·es'));
+  assert.ok(es.includes('hreflang="es"'));
+  assert.ok(!es.includes('hreflang="ar"'), 'a failed language is never advertised');
+
+  const original = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+  assert.ok(!original.includes('hreflang="ar"'), 'the original stays honest too');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('translateSite: a copy advertises only the languages actually produced', async () => {
+  const { root, dist } = stage();
+  const refuse = async () => { throw new Error('cachedOnly must never call the provider'); };
+
+  // Warm es for /about only, then run cachedOnly with ar configured but cold
+  await translateSite({ root, outDir: dist, config: { ...CONFIG, translation: { languages: ['es'] } }, send: fakeSend([]), only: 'about' });
+  const stats = await translateSite({ root, outDir: dist, config: CONFIG, cachedOnly: true, send: refuse });
+
+  assert.strictEqual(stats.pages, 1);
+  assert.ok(stats.skippedCold.includes('ar /about'), 'ar is cold for about');
+
+  const copy = fs.readFileSync(path.join(dist, 'es', 'about', 'index.html'), 'utf8');
+  assert.ok(copy.includes('hreflang="es"'), 'the copy advertises itself');
+  assert.ok(!copy.includes('hreflang="ar"'), 'the copy never advertises a language that was not produced');
+  assert.ok(!copy.includes('og:locale:alternate" content="ar_AR"'), 'no og:locale alternate for a skipped language');
 
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -223,6 +281,117 @@ test('translateSite: cachedOnly never calls the provider and skips cold pages wh
   assert.ok(fs.existsSync(path.join(dist, 'es', 'about', 'index.html')));
   assert.ok(!fs.existsSync(path.join(dist, 'es', 'index.html')), 'cold home has no copy');
   assert.ok(warm.skippedCold.includes('es /'), 'cold home still reported');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('translateSite: the sitemap gains every produced language URL with xhtml:link alternates', async () => {
+  const { root, dist } = stage();
+  const sitemapFile = path.join(dist, 'sitemap.xml');
+
+  await translateSite({ root, outDir: dist, config: CONFIG, send: fakeSend([]) });
+
+  const xml = fs.readFileSync(sitemapFile, 'utf8');
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+
+  // Every produced copy is listed, and only produced ones
+  assert.ok(locs.includes('https://mini.co/es'), 'es language home listed');
+  assert.ok(locs.includes('https://mini.co/ar'), 'ar language home listed');
+  assert.ok(locs.includes('https://mini.co/es/about'), 'es about listed');
+  assert.ok(locs.includes('https://mini.co/ar/about'), 'ar about listed');
+  assert.ok(!locs.some((loc) => loc.includes('/checkout') && loc.includes('/es/')), 'excluded route gets no copy entry');
+  assert.deepStrictEqual(locs, [...locs].sort(), 'entries stay in loc byte order (cp227)');
+
+  // Every entry of a translated set carries the full alternate set, x-default
+  // at the source language — sitemap and page-level hreflang tell one story
+  const entry = (loc) => xml.match(new RegExp(`<url>\\s*<loc>${loc.replace(/\//g, '\\/')}</loc>[\\s\\S]*?</url>`))[0];
+  for (const loc of ['https://mini.co', 'https://mini.co/es', 'https://mini.co/ar']) {
+    const block = entry(loc);
+    assert.match(block, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/mini\.co"\/>/, `${loc}: x-default`);
+    assert.match(block, /<xhtml:link rel="alternate" hreflang="en" href="https:\/\/mini\.co"\/>/, `${loc}: en`);
+    assert.match(block, /<xhtml:link rel="alternate" hreflang="es" href="https:\/\/mini\.co\/es"\/>/, `${loc}: es`);
+    assert.match(block, /<xhtml:link rel="alternate" hreflang="ar" href="https:\/\/mini\.co\/ar"\/>/, `${loc}: ar`);
+  }
+  assert.match(entry('https://mini.co/es/about'), /hreflang="ar" href="https:\/\/mini\.co\/ar\/about"\/>/, 'about copy names its sibling');
+
+  // An untranslated page keeps a plain entry
+  assert.ok(!entry('https://mini.co/checkout').includes('xhtml:link'), 'untranslated page gets no alternates');
+
+  // Copies inherit the source entry's metadata
+  assert.match(entry('https://mini.co/es'), /<priority>1\.0<\/priority>/, 'language home inherits the home priority');
+
+  // Idempotent: a second pass neither duplicates entries nor alternates
+  await translateSite({ root, outDir: dist, config: CONFIG, send: async () => { throw new Error('warm cache'); } });
+  const second = fs.readFileSync(sitemapFile, 'utf8');
+  assert.strictEqual([...second.matchAll(/<loc>https:\/\/mini\.co\/es<\/loc>/g)].length, 1, 'no duplicate copy entry');
+  assert.strictEqual([...second.matchAll(/hreflang="es" href="https:\/\/mini\.co\/es"/g)].length, 3, 'no duplicate alternates');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('translateSite: an unproduced language appears nowhere in the sitemap', async () => {
+  const { root, dist } = stage();
+  const sitemapFile = path.join(dist, 'sitemap.xml');
+
+  // ar fails at the provider; es ships
+  await translateSite({
+    root, outDir: dist, config: CONFIG,
+    send: async ({ user }) => {
+      const lang = user.match(/^Target language: (\S+)/)[1];
+      if (lang === 'ar') {
+        throw new Error('boom');
+      }
+      const payload = JSON.parse(user.slice(user.indexOf('\n\n') + 2));
+      return { text: JSON.stringify(payload.map((s) => (s === CONTROL ? s : `${s.trim()}·es`))), usage: {} };
+    },
+  });
+
+  const xml = fs.readFileSync(sitemapFile, 'utf8');
+  assert.ok(xml.includes('<loc>https://mini.co/es</loc>'), 'the produced language is listed');
+  assert.ok(!xml.includes('/ar'), 'a failed language is never listed or advertised');
+  assert.ok(!xml.includes('hreflang="ar"'), 'no alternate for a language that was never written');
+
+  // A stale copy entry from an earlier run is dropped when the language stops
+  // being produced (the sitemap owns no lie either)
+  await translateSite({
+    root, outDir: dist, config: { ...CONFIG, translation: { languages: ['ar'] } },
+    cachedOnly: true, send: async () => { throw new Error('no calls'); },
+  });
+  const after = fs.readFileSync(sitemapFile, 'utf8');
+  assert.ok(!after.includes('/es'), 'entries for a no-longer-produced language are removed');
+
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('updateSitemap: a loc with query-string ampersands stays valid XML, and an unproduced prefixed entry is dropped with a warning', () => {
+  const { updateSitemap } = require('../src/translate/sitemap.js');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-sitemap-'));
+  const sitemapFile = path.join(root, 'sitemap.xml');
+  fs.writeFileSync(sitemapFile, [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    SITEMAP_ENTRY('https://mini.co/search?a=1&amp;b=2', '0.5'),
+    SITEMAP_ENTRY('https://mini.co/it/legacy', '0.5'),
+    '</urlset>',
+    '',
+  ].join('\n'));
+
+  const warns = [];
+  const count = updateSitemap({
+    outDir: root,
+    baseUrl: 'https://mini.co',
+    defaultLang: 'en',
+    produced: new Map([['search?a=1&b=2', ['es']]]),
+    logger: { warn: (message) => warns.push(message) },
+  });
+
+  const xml = fs.readFileSync(sitemapFile, 'utf8');
+  assert.equal(count, 1);
+  assert.ok(xml.includes('<loc>https://mini.co/es/search?a=1&amp;b=2</loc>'), 'the cloned loc re-escapes the ampersand');
+  assert.ok(xml.includes('href="https://mini.co/es/search?a=1&amp;b=2"'), 'alternate hrefs re-escape too');
+  assert.ok(!/&(?!amp;|lt;|gt;|quot;|#)/.test(xml), 'no bare ampersand survives anywhere');
+  assert.equal(warns.length, 1, 'the dropped, never-re-emitted /it/legacy entry warns');
+  assert.ok(warns[0].includes('https://mini.co/it/legacy'), 'the warning names the lost loc');
 
   fs.rmSync(root, { recursive: true, force: true });
 });

@@ -285,6 +285,8 @@
       app: {
         category: "developer-tools",
       },
+      // #124: download links are opt-in now — the playground keeps them to exercise the derivation.
+      releases: {},
       monitoring: {
         dsn: "https://4633c36db8db53a298e05cea9cce611e@o192327.ingest.us.sentry.io/4511736953831424",
       },

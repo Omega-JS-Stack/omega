@@ -3,6 +3,8 @@
  * Minimal — just the utilities that card/plain/order/feedback need.
  */
 
+const { safeUrl } = require('../../../constants.js');
+
 const DEFAULT_SPACING = {
   gutter: '32px',
   sectionGap: '24px',
@@ -56,6 +58,7 @@ function formatAddress(address) {
 module.exports = {
   DEFAULT_SPACING,
   escape,
+  safeUrl,
   resolveTheme,
   formatAddress,
 };
