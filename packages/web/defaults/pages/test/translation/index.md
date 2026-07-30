@@ -10,7 +10,7 @@ meta:
   breadcrumb: "Test translation page"
   index: false
 
-web_manager:
+client:
   exitPopup:
     enabled: false
 ---

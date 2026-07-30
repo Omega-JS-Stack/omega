@@ -33,6 +33,25 @@ function makeSharedResolve(project, framework) {
 
 const sharedResolve = makeSharedResolve(projectRoot, frameworkRoot);
 
+// @dev-only strip (#18) — production bundles must not carry the dev-only blocks
+// their inputs hold: @omega.js/client's src and the vendored theme assets both
+// use the markers, and every one reaches a bundle here. The marker contract and
+// the cut live in @omega.js/devkit (one home); this returns the module rule for
+// a config, production only. No node_modules exclude — the markers arrive via
+// BUNDLED dependencies, and the loader short-circuits on files without the
+// start marker, so the sweep is a substring check per module.
+function makeStripModule(isProd) {
+  if (!isProd) return { rules: [] };
+  return {
+    rules: [
+      {
+        test: /\.js$/,
+        use: [require.resolve('@omega.js/devkit/strip-dev-blocks-loader')],
+      },
+    ],
+  };
+}
+
 module.exports = function webpackTask(done) {
   const mode = Manager.getMode();
   const isProd = mode.environment === 'production';
@@ -144,6 +163,7 @@ function makeMainConfig(buildJson, isProd) {
       __dirname:  false,
       __filename: false,
     },
+    module: makeStripModule(isProd),
     externals: {
       electron: 'commonjs2 electron',
       // Native modules — consumer can extend via config.em.webpack.externals
@@ -176,6 +196,7 @@ function makePreloadConfig(buildJson, isProd) {
       libraryTarget: 'commonjs2',
       module:   false,
     },
+    module: makeStripModule(isProd),
     externals: {
       electron: 'commonjs2 electron',
     },
@@ -218,6 +239,7 @@ function makeRendererConfig(buildJson, isProd) {
     mode:    isProd ? 'production' : 'development',
     devtool: isProd ? false : 'source-map',
     entry,
+    module: makeStripModule(isProd),
     output: {
       path:         path.join(outputRoot, 'assets', 'js', 'components'),
       filename:     '[name].bundle.js',
@@ -316,3 +338,4 @@ function formatBytes(bytes) {
 }
 
 module.exports.makeSharedResolve = makeSharedResolve;
+module.exports.makeStripModule = makeStripModule;

@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- [#4](../../issues/4) — Every web build now emits `llms.txt` ([llmstxt.org](https://llmstxt.org)): the brand heading, a summary, then the site's pages and posts as markdown links. It joins the machine files already shipped (robots, sitemap, feeds, ads, humans, opensearch, security), and a consumer file at `/llms.txt` replaces it.
+
+### Changed
+- [#1](../../issues/1) — The web config key `web_manager` is now `client`. No dual-read: rename it in `omega.json5` and layout frontmatter; `omega migrate` emits the new name. A page may also set `client` in its own frontmatter now, reaching `resolved.client` with the layout chain merged underneath.
+
+### Fixed
+- [#18](../../issues/18) — Production desktop bundles no longer ship `@dev-only` code: the webpack lane strips the marked blocks in production the way web and extension already did, and the marker contract now lives in one home (`@omega.js/devkit`) that all three frameworks strip through.
+
 ## [0.8.3] (2026-07-30)
 
 ### Fixed

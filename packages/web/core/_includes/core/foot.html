@@ -67,10 +67,10 @@
     // Canonical providers shape straight through (C4 cp106a — no flatten
     // bridge; secrets never ride: omega.json5 carries ids only)
     analytics: {{ resolved.analytics | jsonify }},
-    {% for item in resolved.web_manager %}
+    {% for item in resolved.client %}
       {{ item[0] | jsonify }}: {{ item[1] | jsonify }},
     {% endfor %}
-    env: {{ resolved.web_manager.env | jsonify }},
+    env: {{ resolved.client.env | jsonify }},
     recaptcha: {{ resolved.recaptcha | jsonify }},
     oauth2: {{ resolved.oauth2 | jsonify }},
   };

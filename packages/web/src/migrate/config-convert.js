@@ -14,13 +14,14 @@
  *   socials, download, extension, favicon, manifest, icons, recaptcha,
  *   cloudflare, translation), blog/engine config (permalink, pagination,
  *   collections, defaults, generators — codemod rule 8's home), the
- *   remaining `web_manager` client-settings blob, and the UJM-json build
+ *   remaining `web_manager` client-settings blob (renamed `client` on the way
+ *   out — #1: WebManager is not an OMEGA concept), and the UJM-json build
  *   settings (distribute, purgecss, imagemin, workflows).
  * - Dropped with notes: Jekyll machinery keys, `webpack` (esbuild now),
  *   `gems` (Ruby is gone), secret-shaped keys (they belong in .env).
  *
  * The engine composes the runtime shape back together (cloud.config →
- * web_manager.firebase.app.config, payment → web_manager.payment) in
+ * client.firebase.app.config, payment → client.payment) in
  * engine.js, so templates and the client keep their contract.
  */
 const fs = require('node:fs');
@@ -40,7 +41,7 @@ const DROPPED_JEKYLL_KEYS = [
 const WEB_SECTION_ORDER = [
   'meta', 'socials', 'download', 'extension', 'favicon', 'manifest', 'icons',
   'recaptcha', 'cloudflare', 'translation', 'permalink', 'pagination',
-  'collections', 'defaults', 'generators', 'web_manager',
+  'collections', 'defaults', 'generators', 'client',
 ];
 
 /**
@@ -137,8 +138,8 @@ function convertConfig({ jekyll, ujm }) {
 
   // ---- web-scoped sections from _config.yml
   for (const key of WEB_SECTION_ORDER) {
-    if (key === 'web_manager') {
-      if (!isEmpty(legacyWebManager)) web.web_manager = legacyWebManager;
+    if (key === 'client') {
+      if (!isEmpty(legacyWebManager)) web.client = legacyWebManager;
       continue;
     }
     const value = take(key);

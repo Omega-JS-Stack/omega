@@ -11,8 +11,11 @@
  * exclude each other (legacy pages.json listed robots.txt as a search hit).
  */
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { test, before } = require('node:test');
-const { buildWith, miniData } = require('./lib/build.js');
+const { buildSite, buildWith, miniData } = require('./lib/build.js');
 
 let pages;
 before(async () => {
@@ -109,6 +112,56 @@ test('humans.txt + opensearch.xml + security.txt: brand-derived, no empties', ()
   assert.ok(security.includes('Contact: https://mini.example.com/contact'));
   const expires = security.match(/Expires: (\d{4})-12-31/);
   assert.strictEqual(Number(expires[1]), new Date().getFullYear() + 1, 'expires one year out');
+});
+
+// #4 — llms.txt (llmstxt.org): the machine-readable site brief an LLM reads
+// instead of crawling. Same channel as every other meta file: a default page,
+// generated from site metadata, suppressed by a consumer file at the same URL.
+test('llms.txt: llmstxt.org shape — brand heading, summary, pages and posts as markdown links', () => {
+  const llms = pages.get('/llms.txt');
+  assert.ok(llms, 'llms.txt emitted');
+
+  assert.match(llms, /^# MiniCo$/m, 'H1 is the brand name');
+  assert.match(llms, /^> /m, 'blockquote summary from site meta');
+  assert.match(llms, /^## Pages$/m, 'pages section');
+  assert.match(llms, /^## Posts$/m, 'posts section (fixture site has a blog)');
+
+  // Real pages as absolute markdown links…
+  assert.match(llms, /^- \[.+\]\(https:\/\/mini\.example\.com\/about\)/m, 'consumer page listed');
+  assert.match(llms, /^- \[.+\]\(https:\/\/mini\.example\.com\/blog\//m, 'posts listed under Posts');
+
+  // …and the same exclusions every other meta file honors.
+  assert.ok(!llms.includes('/test/'), 'test pages excluded');
+  assert.ok(!llms.includes('/admin/'), 'admin pages excluded');
+  assert.ok(!llms.includes('robots.txt') && !llms.includes('sitemap.xml'), 'machine files excluded');
+  assert.ok(!llms.includes('llms.txt'), 'llms.txt does not list itself');
+});
+
+test('llms.txt: a consumer file at the same URL wins (default-page shadowing)', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-llms-'));
+  const consumerDir = path.join(tmp, 'src');
+  fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
+  fs.writeFileSync(path.join(consumerDir, 'pages', 'llms.md'), [
+    '---',
+    'permalink: /llms.txt',
+    'sitemap:',
+    '  include: false',
+    '---',
+    'CONSUMER LLMS BRIEF',
+    '',
+  ].join('\n'));
+
+  try {
+    const shadowed = await buildSite(consumerDir, miniData, {}, 'meta-files-llms-shadow');
+    const llms = shadowed.get('/llms.txt');
+    // The unshadowed build DOES carry the default's section — so the absence
+    // below proves suppression, not a missing default page.
+    assert.ok(pages.get('/llms.txt').includes('## Pages'), 'the default page exists unshadowed');
+    assert.ok(llms.includes('CONSUMER LLMS BRIEF'), 'the consumer file renders');
+    assert.ok(!llms.includes('## Pages'), 'the default page is suppressed, not merged');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('sitemap.xml + pages.json: entries in URL byte order (deterministic emission, cp227)', () => {

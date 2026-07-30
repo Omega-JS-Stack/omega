@@ -25,6 +25,8 @@
     "./deploy-record": "./src/deploy-record.js",
     "./clean-dirs": "./src/clean-dirs.js",
     "./parse-audit": "./src/parse-audit.js",
+    "./strip-dev-blocks": "./src/strip-dev-blocks.js",
+    "./strip-dev-blocks-loader": "./src/strip-dev-blocks-loader.js",
     "./test/runner-core": "./src/test/runner-core.js",
     "./test/scope": "./src/test/scope.js",
     "./test/assert": "./src/test/assert.js",

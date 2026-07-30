@@ -228,7 +228,7 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   `jekyllInclude: true` and `cache: true` (without the parsed-template cache,
   re-parsing the 885-line core chrome per render was the corpus bottleneck).
 - **`resolved`** — inject-properties.rb parity: `site config ← layout chain ←
-  page data` (the site seed carries brand/theme/analytics/web_manager/…;
+  page data` (the site seed carries brand/theme/analytics/client/…;
   site collections and bulk keys excluded). Frontmatter values that reference
   `page.*` / `resolved.*` render per page, copy-on-write (layout defaults
   template on merged data — classy alternative's hero does this).
@@ -287,7 +287,8 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
 - **Migration (`omega migrate`)** — one command converts a UJM consumer in
   place: legacy configs → validated omega.json5 (shared sections extracted
   with unified spellings — `analytics.providers.<p>.id`, `cloud.{provider,config}`,
-  `payment` at the top level; the `web_manager` client blob + presentation
+  `payment` at the top level; the legacy `web_manager` blob renamed to the
+  `client` client-settings key + presentation
   sections + build settings under `targets.web`), the codemod rule table over
   `src/**` templates, seed `main.js` removal (the core main + boot runtime
   replace it), the `@use 'omega:main' with (…)` rewrite for theme-variable
@@ -295,8 +296,8 @@ the SW (`serviceWorker.enabled: false`) gets the origin swept clean instead
   consumer main.scss configures the layers below it), page-css self-@use
   drops, liquid-lint, and legacy-file removal (Gemfile & co). `--check` runs
   everything in memory. The ENGINE composes the runtime shape back
-  (cloud.config → `web_manager.firebase.app.config`, payment →
-  `web_manager.payment`, providers → the client's flat analytics) so the
+  (cloud.config → `client.firebase.app.config`, payment →
+  `client.payment`, providers → the client's flat analytics) so the
   chrome/client contract is unchanged — one home per value in the config,
   same bridge pattern as the extension framework.
 

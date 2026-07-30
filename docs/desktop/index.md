@@ -114,6 +114,8 @@ Convention-only. Drop PNGs at `config/icons/<platform>/<slot>.png` (platform-spe
 
 prepare-package copies `src/` → `dist/`; gulp orchestrates webpack (3 targets, all bundled) + electron-builder. `gulp/build-config` generates `dist/electron-builder.yml` + `dist/config/entitlements.mac.plist` from @omega.js/desktop defaults + consumer config. Strategy-pluggable Windows signing (`platforms.win.signing.strategy`: `self-hosted` | `cloud` | `local`). See [docs/build-system.md](../../packages/desktop/docs/build-system.md), [docs/installer-options.md](../../packages/desktop/docs/installer-options.md), [docs/signing.md](../../packages/desktop/docs/signing.md).
 
+All three webpack targets strip `@dev-only` blocks in production builds — code between `/* @dev-only:start */` and `/* @dev-only:end */` is cut from the bundle, so dev warnings and simulation hooks (@omega.js/client's and the vendored themes' included) never ship. Dev builds keep them. The markers and the cut are one home, `@omega.js/devkit/strip-dev-blocks`, shared with @omega.js/web's esbuild plugin and @omega.js/extension's loader.
+
 ### Config flow
 
 `config/omega.json5` (JSON5, in consumer; shared sections top-level + desktop settings under `targets.desktop`) → `Manager.getConfig()` (resolves via `@omega.js/config` — `targets.desktop` overlays the top level, brand-monorepo walk-up included — then applies derived defaults: `app.appId` ← `com.itwcreativeworks.<brand.id>`, `app.productName` ← `brand.name`) → injected into ALL THREE bundles at build time via webpack DefinePlugin as `OMEGA_BUILD_JSON`. Runtime reads `OMEGA_BUILD_JSON.config` first (authoritative in packaged apps); dev falls back to resolving from disk.

@@ -4,23 +4,14 @@
  * Production builds only — dev builds keep the blocks so dev warnings and
  * simulation hooks run. Without this, dev-only code (e.g. the OAuth "may
  * fail in development" notification in core auth) ships to the live site.
+ *
+ * The markers and the cut itself live in ONE home (#18) — @omega.js/devkit —
+ * shared with @omega.js/extension's and @omega.js/desktop's webpack loaders.
+ * This file is web's esbuild binding to them.
  */
 const fs = require('node:fs');
 
-const START_MARKER = '/* @dev-only:start */';
-const END_MARKER = '/* @dev-only:end */';
-
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const BLOCK_PATTERN = new RegExp(`${escapeRegex(START_MARKER)}[\\s\\S]*?${escapeRegex(END_MARKER)}`, 'g');
-
-/**
- * Strip every dev-only block from a source string.
- * @param {string} source
- * @returns {string}
- */
-function stripDevBlocks(source) {
-  return source.replace(BLOCK_PATTERN, '');
-}
+const { stripDevBlocks, START_MARKER, END_MARKER } = require('@omega.js/devkit/strip-dev-blocks');
 
 /**
  * esbuild plugin: strip dev-only blocks from every .js file loaded in a

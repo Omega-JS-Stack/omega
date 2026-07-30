@@ -17,13 +17,13 @@ const { buildSite, BARE } = require('./lib/build.js');
 
 const bareData = JSON.parse(fs.readFileSync(path.join(BARE, 'site-data.json'), 'utf8'));
 
-function makeConsumer(pageFrontmatter) {
+function makeConsumer(pageFrontmatter, layout = 'blueprint/index') {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'omega-fmguard-'));
   const consumerDir = path.join(tmp, 'src');
   fs.mkdirSync(path.join(consumerDir, 'pages'), { recursive: true });
   fs.writeFileSync(path.join(consumerDir, 'pages', 'index.md'), [
     '---',
-    'layout: blueprint/index',
+    `layout: ${layout}`,
     'permalink: /',
     ...pageFrontmatter,
     '---',
@@ -52,6 +52,42 @@ test('content keys in page frontmatter are stripped (never rendered) and warned 
     assert.ok(warning, `build warns about the stripped keys: ${warnings.join(' | ')}`);
     assert.ok(/hero/.test(warning) && /mission/.test(warning), 'warning lists the offending keys');
     assert.ok(/section/.test(warning), 'warning points at section calls as the home');
+  } finally {
+    console.warn = originalWarn;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// #1 — `client` (the @omega.js/client settings blob, renamed from the legacy
+// `web_manager`) is client MACHINERY configuration, the same class as `theme`
+// and `schema`: a page may set it, and the value must survive to resolved.client
+// with the layout chain still merging underneath it.
+test('a page may set `client` in frontmatter — it reaches resolved.client, layout chain merged underneath', async () => {
+  const { tmp, consumerDir } = makeConsumer([
+    'client:',
+    '  auth:',
+    '    config:',
+    '      policy: "authenticated"',
+  ], 'blueprint/auth/signin');
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...parts) => warnings.push(parts.join(' '));
+  try {
+    const pages = await buildSite(consumerDir, bareData, { environment: 'development' }, 'fm-guard-client');
+    const html = pages.get('/');
+    assert.ok(html, 'page built');
+
+    // The Configuration blob in core/foot.html is the emitted view of resolved.client.
+    assert.ok(/"policy":\s*"authenticated"/.test(html), 'page frontmatter client.auth.config.policy wins');
+    assert.ok(!/"policy":\s*"unauthenticated"/.test(html), 'the layout value is overridden, not appended');
+
+    // …and the rest of the layout's client blob still merges underneath.
+    assert.ok(/"authenticated":\s*"\/"/.test(html), 'the signin layout\'s auth.config.redirects survives the page override');
+
+    assert.ok(
+      !warnings.some((line) => line.includes('ignoring frontmatter content keys') && line.includes('client')),
+      `client is not treated as smuggled content: ${warnings.join(' | ')}`,
+    );
   } finally {
     console.warn = originalWarn;
     fs.rmSync(tmp, { recursive: true, force: true });

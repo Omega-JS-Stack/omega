@@ -58,10 +58,11 @@ const RESOLVED_SITE_EXCLUDE = new Set(['data', 'uj', 'time', 'posts', 'team', 'u
 // collections (_posts/_team/…) are content ENTRIES whose frontmatter IS the
 // document, and layouts are theme voice that never renders standalone —
 // neither passes through the guard.
-// `theme` (shell chrome config, e.g. main class) and `schema` (JSON-LD SEO)
-// are page PRESENTATION/meta machinery, not band content — legal.
+// `theme` (shell chrome config, e.g. main class), `schema` (JSON-LD SEO) and
+// `client` (the @omega.js/client settings blob — auth policy, cookie consent,
+// chatsy…) are page PRESENTATION/machinery config, not band content — legal.
 const PAGE_FRONTMATTER_ALLOW = new Set([
-  'meta', 'schema', 'theme', 'append', 'sitemap', 'templateEngineOverride', 'eleventyExcludeFromCollections',
+  'meta', 'schema', 'theme', 'client', 'append', 'sitemap', 'templateEngineOverride', 'eleventyExcludeFromCollections',
 ]);
 
 // Deep merge shared with the section tag's defaults ← data ← args chain —
@@ -96,28 +97,29 @@ function configureOmega(eleventyConfig, options) {
   site.theme = { ...(site.theme || {}), id: activeTheme };
 
   // ---- Runtime composition: omega.json5 keeps ONE home per shared section
-  // (cloud, payment at the top level); the chrome + client contract
-  // reads them through site.web_manager (pricing loops over
-  // site.web_manager.payment.products, the Configuration spread feeds the
-  // client). Compose here — same bridge pattern as extension's package.js
+  // (cloud, payment at the top level); the chrome + @omega.js/client contract
+  // reads them through site.client — the client settings blob (#1: renamed
+  // from the legacy `web_manager`; WebManager is not an OMEGA concept). Pricing
+  // loops over site.client.payment.products and the Configuration spread feeds
+  // the client. Compose here — same bridge pattern as extension's package.js
   // mapping analytics.providers → the client's flat shape.
-  site.web_manager = site.web_manager || {};
+  site.client = site.client || {};
   if (site.cloud && site.cloud.config) {
-    site.web_manager.firebase = site.web_manager.firebase || {};
-    site.web_manager.firebase.app = site.web_manager.firebase.app || {};
-    site.web_manager.firebase.app.config = site.cloud.config;
+    site.client.firebase = site.client.firebase || {};
+    site.client.firebase.app = site.client.firebase.app || {};
+    site.client.firebase.app.config = site.cloud.config;
   }
   if (site.cloud && site.cloud.messaging && site.cloud.messaging.vapidKey) {
-    site.web_manager.firebase = site.web_manager.firebase || {};
-    site.web_manager.firebase.messaging = site.web_manager.firebase.messaging || {};
-    site.web_manager.firebase.messaging.config = site.web_manager.firebase.messaging.config || {};
-    site.web_manager.firebase.messaging.config.vapidKey = site.cloud.messaging.vapidKey;
+    site.client.firebase = site.client.firebase || {};
+    site.client.firebase.messaging = site.client.firebase.messaging || {};
+    site.client.firebase.messaging.config = site.client.firebase.messaging.config || {};
+    site.client.firebase.messaging.config.vapidKey = site.cloud.messaging.vapidKey;
   }
-  if (site.payment) site.web_manager.payment = site.payment;
+  if (site.payment) site.client.payment = site.payment;
 
   // Pricing view-model (C2): payment.products is the ONLY plan source — the
   // seed surfaces as resolved.pricing (cascade still lets consumer frontmatter
-  // override presentation). Lives OUTSIDE web_manager so the client
+  // override presentation). Lives OUTSIDE site.client so the client
   // Configuration payload stays the raw catalog. null = honest empty state.
   site.pricing = composePricing(site.payment);
 
@@ -366,7 +368,7 @@ function configureOmega(eleventyConfig, options) {
         for (const key of contentKeys) delete data[key];
         logger.warn(
           `${inputPath}: ignoring frontmatter content keys (${contentKeys.join(', ')}) — `
-          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, sitemap, append); `
+          + `consumer page frontmatter is meta-only (layout, permalink, meta, schema, theme, client, sitemap, append); `
           + `content lives in {% section %} calls in the page body (docs/web/sections.md).`,
         );
       }
@@ -457,7 +459,7 @@ function configureOmega(eleventyConfig, options) {
       // inject-properties.rb parity: resolved = site config ← layout chain ←
       // page data. The cascade already merged layouts under page frontmatter;
       // the site seed adds the site-level sections (brand, theme, analytics,
-      // web_manager…) every core include reads via resolved.*.
+      // client…) every core include reads via resolved.*.
       const out = {};
       for (const key of Object.keys(site)) {
         if (!RESOLVED_SITE_EXCLUDE.has(key)) out[key] = site[key];

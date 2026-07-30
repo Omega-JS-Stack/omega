@@ -418,9 +418,9 @@ before the report prints.
 | `url` | `brand.url` (site.url derives; empty `baseurl` dropped) |
 | `brand`, `theme`, `oauth2` | top level, verbatim |
 | `analytics.{google,meta,tiktok}` (flat scalars) | `analytics.providers.<p>.id` — the unified spelling; the web chrome emits the client's flat shape from it |
-| `web_manager.firebase.app.config` | **`cloud: { provider: 'firebase', config: {…} }`** (top level); the engine composes `cloud.config` back into `web_manager.firebase.app.config` at build |
-| `web_manager.payment` | **`payment`** (top level); composed back into `web_manager.payment` (pricing layouts + the client read it there); credential keys set to `false` (legacy "disabled") are dropped |
-| `web_manager` (rest: auth, chatsy, sentry, cookieConsent, exitPopup, …) | `targets.web.web_manager` — the client-runtime settings blob, whole |
+| `web_manager.firebase.app.config` | **`cloud: { provider: 'firebase', config: {…} }`** (top level); the engine composes `cloud.config` back into `client.firebase.app.config` at build |
+| `web_manager.payment` | **`payment`** (top level); composed back into `client.payment` (pricing layouts + the client read it there); credential keys set to `false` (legacy "disabled") are dropped |
+| `web_manager` (rest: auth, chatsy, sentry, cookieConsent, exitPopup, …) | **`targets.web.client`** — the client-runtime settings blob, whole, under its new name (#1: `web_manager` → `client`, since it configures `@omega.js/client`; WebManager is not an OMEGA concept). No dual-read: the old key name is not honored anywhere |
 | `meta`, `socials`, `download`, `extension`, `favicon`, `manifest`, `icons`, `recaptcha`, `cloudflare`, `translation` | `targets.web.<same key>` (target overlay puts them back at the top level for web loads) |
 | `permalink`, `pagination`, `collections`, `defaults`, `generators` | `targets.web.<same key>` (codemod rule 8's home — engine consumption of custom collections rides the consumer-theme waves) |
 | UJM-json `distribute`, `sass.purgecss`, `imagemin`, `github.workflows` | `targets.web.{distribute,purgecss,imagemin,workflows}` — `imagemin` is LIVE (schema-known; `enabled: false` ships images verbatim, otherwise the build-time 320/640/1024 + webp matrix runs) |

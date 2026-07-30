@@ -209,10 +209,11 @@ test('config: shared sections extracted with unified spellings', () => {
   assert.strictEqual(omega.oauth2.discord.enabled, true);
 
   const web = omega.targets.web;
-  assert.strictEqual(web.web_manager.payment, undefined, 'payment moved out of the client blob');
-  assert.strictEqual(web.web_manager.firebase.app.config, undefined, 'firebase config moved out');
-  assert.strictEqual(web.web_manager.firebase.app.enabled, true, 'client firebase toggles stay');
-  assert.strictEqual(web.web_manager.sentry.config.dsn, 'https://x@sentry.io/1', 'client sentry settings stay whole');
+  assert.strictEqual(web.web_manager, undefined, 'the legacy key name does not survive the conversion (#1)');
+  assert.strictEqual(web.client.payment, undefined, 'payment moved out of the client blob');
+  assert.strictEqual(web.client.firebase.app.config, undefined, 'firebase config moved out');
+  assert.strictEqual(web.client.firebase.app.enabled, true, 'client firebase toggles stay');
+  assert.strictEqual(web.client.sentry.config.dsn, 'https://x@sentry.io/1', 'client sentry settings stay whole');
   assert.strictEqual(web.collections.recipes.title, 'Recipes', 'custom collections carried (rule 8)');
   assert.strictEqual(web.permalink, '/blog/:title');
   assert.deepStrictEqual(web.purgecss.safelist.standard, ['keep-me'], 'UJM json build settings carried');
@@ -234,7 +235,7 @@ test('config: converted output passes the real loader for target web', () => {
     const { config, errors, enabled } = loadConfig(tmp, 'web');
     assert.deepStrictEqual(errors, [], 'no schema findings');
     assert.strictEqual(enabled, true, 'web target enabled by key presence');
-    assert.strictEqual(config.web_manager.auth.enabled, true, 'targets.web overlays the top level');
+    assert.strictEqual(config.client.auth.enabled, true, 'targets.web overlays the top level');
     assert.strictEqual(config.meta.title, 'Sample - {{ site.brand.name }}', 'Liquid-bearing values survive');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -386,6 +387,6 @@ test('composition: cloud/payment/analytics at their omega homes reach the chrome
 
   assert.ok(html.includes('googletagmanager.com/gtag/js?id=G-COMPOSE1'), 'gtag reads analytics.providers.google.id');
   assert.ok(html.includes('"google":{"id":"G-COMPOSE1"}'), 'Configuration.analytics carries the canonical providers shape (flat bridge dead — cp106a)');
-  assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config composed into web_manager.firebase.app.config');
-  assert.ok(html.includes('"site":"compose"'), 'payment composed into web_manager.payment');
+  assert.ok(html.includes('"apiKey":"AIza-COMPOSE"'), 'cloud.config composed into client.firebase.app.config');
+  assert.ok(html.includes('"site":"compose"'), 'payment composed into client.payment');
 });

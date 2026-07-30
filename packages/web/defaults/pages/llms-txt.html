@@ -1,0 +1,48 @@
+---
+permalink: /llms.txt
+sitemap:
+  include: false
+meta:
+  index: false
+---
+{%- comment -%}
+llms.txt (llmstxt.org) — the markdown brief an LLM reads instead of crawling
+the site. Generated from site metadata + the same URL-sorted page collection
+sitemap.xml and pages.json walk, with the same exclusions (test, admin,
+redirects, sitemap-excluded and draft pages, the machine files themselves).
+A consumer file at /llms.txt suppresses this one like any default page.
+{%- endcomment -%}
+# {{ site.brand.name }}
+
+> {{ site.meta.description | default: site.brand.description | default: site.brand.name }}
+
+{% if site.brand.description and site.meta.description -%}
+{{ site.brand.description }}
+
+{% endif -%}
+## Pages
+{% for item in collections.allByUrl -%}
+  {%- unless item.url -%}{%- continue -%}{%- endunless -%}
+  {%- assign prefix5 = item.url | slice: 0, 5 -%}
+  {%- if prefix5 == '/test' -%}{%- continue -%}{%- endif -%}
+  {%- assign prefix7 = item.url | slice: 0, 7 -%}
+  {%- if prefix7 == '/admin/' -%}{%- continue -%}{%- endif -%}
+  {%- if item.data.layout contains 'redirect' -%}{%- continue -%}{%- endif -%}
+  {%- if item.data.sitemap.include == false -%}{%- continue -%}{%- endif -%}
+  {%- if item.data.draft -%}{%- continue -%}{%- endif -%}
+  {%- if item.data.post.id -%}{%- continue -%}{%- endif -%}
+  {%- assign entry_title = item.data.meta.title | default: item.url -%}
+  {%- assign entry_desc = item.data.meta.description -%}
+- [{{ entry_title }}]({{ site.url }}{{ item.url }}){% if entry_desc %}: {{ entry_desc }}{% endif %}
+{% endfor -%}
+{%- assign posts = collections.posts | default: empty -%}
+{%- if posts.size > 0 %}
+## Posts
+{% for item in posts -%}
+  {%- unless item.url -%}{%- continue -%}{%- endunless -%}
+  {%- if item.data.draft -%}{%- continue -%}{%- endif -%}
+  {%- assign post_title = item.data.post.title | default: item.data.meta.title | default: item.url -%}
+  {%- assign post_desc = item.data.post.description | default: item.data.meta.description -%}
+- [{{ post_title }}]({{ site.url }}{{ item.url }}){% if post_desc %}: {{ post_desc }}{% endif %}
+{% endfor -%}
+{%- endif -%}

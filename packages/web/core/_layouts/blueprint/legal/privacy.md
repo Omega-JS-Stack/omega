@@ -6,7 +6,7 @@ meta:
   description: "This privacy policy has been compiled to better serve those who are concerned with how their personal information is being used online."
   breadcrumb: "Privacy Policy"
 
-web_manager:
+client:
   exitPopup:
     enabled: false
 ---

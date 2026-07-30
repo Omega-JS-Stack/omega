@@ -6,7 +6,7 @@
  * Scoped by the real-usage audit (2026-07-06) of UJM's theme/blueprints +
  * somiibo: config-owned keys referenced in templates are site.{brand, url,
  * theme, meta, socials, download, translation, extension, analytics,
- * web_manager, icons, currency, advertising, …} — which is the resolved
+ * client, icons, currency, advertising, …} — which is the resolved
  * config's own shape, so this is an identity mapping plus: machinery keys
  * stripped (`targets`, `enabled`), `url` derived (explicit url, else
  * brand.url), `baseurl` defaulted. ENGINE-owned keys (site.posts, site.pages,

@@ -21,6 +21,7 @@ Liquid form.
 #   meta                            title / description / image — the <head>
 #   schema                          structured data (JSON-LD) for this page
 #   theme                           per-page theme overrides (nav, footer…)
+#   client                          per-page @omega.js/client settings (auth…)
 #   sitemap                         false keeps the page out of sitemap.xml
 #   append                          extra markup appended for this page
 #   templateEngineOverride          the engine, when it isn't inferred

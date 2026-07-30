@@ -131,8 +131,15 @@ named arg keeps the default, so absence semantics survive.
 **Consumer page frontmatter is META-ONLY (Ian 2026-07-19: "not only no more
 frontmatter but NOTHING EVEN TRIES TO CONSUME frontmatter"; softened same
 day: no build-fail)**: a real file under `pages/` may carry only `layout`,
-`permalink`, `meta`, `schema`, `theme`, `sitemap`, `append` (+ engine
-plumbing). Any other key is content-in-frontmatter — a lane that doesn't
+`permalink`, `meta`, `schema`, `theme`, `client`, `sitemap`, `append` (+ engine
+plumbing). `client` (#1) is the `@omega.js/client` settings blob — auth policy,
+cookie consent, chatsy, exit popup — the key the core chrome reads into the
+Configuration payload via `resolved.client`; it is machinery configuration, the
+same class as `theme` and `schema`, so a page may set it and the layout chain
+still merges underneath. (It was `web_manager` through the UJM era; WebManager
+is not an OMEGA concept, and there is no dual-read — see the
+[config mapping tables](../shared/config.md).) Any other key is
+content-in-frontmatter — a lane that doesn't
 exist: the engine STRIPS it from the data cascade before resolution (and the
 collections parity-repair lane filters pages to the same allow set, so
 nothing stripped re-enters through `resolved`), then warns with a
